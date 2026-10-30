@@ -2,3 +2,10 @@
 /data/
 /build*/
 /.venv/
+/vendor/
+/research/downloads/
+/research/machine-probe/bin/
+/research/machine-probe/scratch/
+*.dSYM/
+*.sparseimage
+*.dmg
