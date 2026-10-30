@@ -1,0 +1,29 @@
+{
+  "reference_day": "12302019",
+  "days": {
+    "12302019": {
+      "name": "12302019.NASDAQ_ITCH50",
+      "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/12302019.NASDAQ_ITCH50.gz",
+      "gz_size": 3524013057,
+      "gz_sha256": "ef03df46a27e6bda4dead017f84c2e3979df7211f02c7868b51d53fceb99c689",
+      "decompressed_size": 8251407909,
+      "decompressed_sha256": "5d81c2e14a0f748b29c674b6a342796932702034b4dd341e39e9a9ec5bac610f",
+      "message_count": 268744780,
+      "http_head": {
+        "content_length": 3524013057,
+        "last_modified": "Tue, 31 Dec 2019 05:13:48 GMT",
+        "etag": "64b3281599bfd51:0",
+        "checked": "2026-10-30"
+      }
+    },
+    "10302019": {
+      "name": "10302019.NASDAQ_ITCH50",
+      "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/10302019.NASDAQ_ITCH50.gz",
+      "gz_size": 3872931242,
+      "gz_sha256": null,
+      "decompressed_size": 9035016843,
+      "decompressed_sha256": null,
+      "message_count": null
+    }
+  }
+}
