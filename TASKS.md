@@ -16,7 +16,7 @@ The plan through to the done criteria. Phases are gated: each ends with a phase 
 - [x] Machine probe finished: Q2b-e, measured Q3, Q4 (`machine-probe.md`)
 - [x] Project session opens the source of every number that became a target
 - [x] BENCHMARKS.md, TASKS.md and NOTES.md finished
-- [ ] Phase report
+- [x] Phase report
 
 ## Phase 2: Harness, before any implementation
 
