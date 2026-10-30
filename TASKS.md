@@ -23,6 +23,7 @@ The plan through to the done criteria. Phases are gated: each ends with a phase 
 Scaffold
 - [ ] CMake project, C++23, presets for dev, ASan+UBSan, TSan, fuzz and bench. The toolchain comes from the environment, never a hardcoded path
 - [ ] Dependencies through pinned FetchContent: Google Benchmark, HdrHistogram, GoogleTest. Nothing vendored in git
+- [ ] All scratch files stay inside the folders, including for subagents. A tool that needs a temp dir gets `TMPDIR` under the gitignored `build/`
 
 Data
 - [ ] Data script: same file and SHA-256 as itch-orderbook, read from that repo's script once it exists. Stands alone, and accepts a path to an existing copy, verified the same way
@@ -55,6 +56,7 @@ Benchmarks
 - [ ] Google Benchmark plus HdrHistogram, warm-up, seeded inputs, verify before measuring
 - [ ] Results header: host label, CPU model, kernel, compiler version, flags, ISA, commit, core, governor, frequency, turbo state, pinning status, load lines from `measure.sh`
 - [ ] macOS records "not pinned". The pinning and perf-counter code is built anyway
+- [ ] Mac results state plainly that they are unpinned and have no counters, and `proc_pid_rusage` is not used in their place. Neither is a blocker, because `debian` supplies both
 - [ ] Linux: `taskset -c 4`, `cpu5` idle, output written to a file on `debian`. TSC calibrated on every run. Boost ceiling is unknown, so record observed frequency, not an assumed one. Batch anything below about 100 ns; publish no single-shot percentile the timer cannot resolve
 - [ ] macOS: report no latency below a few ticks of the 42 ns timer
 - [ ] Linux counters through `perf stat` with `:u` events. Confirm what `cache-misses` counts on Zen 1 against AMD documentation before quoting it
@@ -68,9 +70,11 @@ Comparison harness
 - [ ] QuestDB: pre-created tables with `TIMESTAMP_NS`. Never rely on ILP auto-create, which silently lost nanoseconds. Clock stops at `wait_wal_table`
 - [ ] Each result records exact version and all settings
 - [ ] Durability classes A and B for every system, flush granularity stated. Verify that QuestDB `sync` really flushes, and validate the config value, because a typo silently gives `nosync`
+- [ ] Harness reads back the setting in force for every comparison system and fails if it differs from what was requested, because QuestDB silently accepts a bad `cairo.commit.mode`. A durability class is not proven until this passes
 - [ ] macOS cold-cache tool built on the probe's result: stop the server, `msync(MS_INVALIDATE)` on a fresh read-only mapping of every file, `mincore` must read 0 on every file with a retry otherwise, start, query, disk0 byte delta must reach the expected bytes. State that metadata stays warm
 - [ ] Linux cold-cache tool: stop the process, fsync, `posix_fadvise(POSIX_FADV_DONTNEED)`, prove with `fincore` or `mincore`. Show it on real QuestDB and ArcticDB data files, since only a fresh test file is proven so far
 - [ ] QuestDB on `debian`: choose and record the heap, since only `-Xmx1g` was tried. Record GraalVM and jemalloc in the results header. Read bind addresses with `ss`, not `SHOW PARAMETERS`
+- [ ] Check QuestDB's `debian` heap against the full day before relying on any `-Xmx1g` result
 - [ ] ArcticDB and pyarrow on `debian`: check for SIGILL at full size, since the wheels' zmm code is untraced and the CPU has no AVX-512
 - [ ] Name the sync primitive beside every macOS class B number: `fsync`, `F_BARRIERFSYNC` and `F_FULLFSYNC` differ by about 80x at p50
 - [ ] A warm result counts only if residency is proven before and after the run
@@ -115,7 +119,9 @@ SIMD on both architectures
 - [ ] AVX-512: not shipped, because neither host can run it, and an unexecuted kernel is untested code
 - [ ] An environment variable caps the kernel level. A test fails if the requested kernel did not run (S1, S6)
 - [ ] Width, offset and tail matrix and scalar-vs-kernel `memcmp` for every kernel, on both architectures (S3-S5)
-- [ ] x86-64 kernels cannot execute on the Mac: Rosetta is absent, and only compile checks are possible there. They must first run on `debian`, and their tests must pass there before any AVX2 number counts. See the open question in NOTES.md about sanitizers for these kernels
+- [ ] x86-64 kernels cannot execute on the Mac: Rosetta is absent, and only compile checks are possible there. They must first run on `debian`, and their tests must pass there before any AVX2 number counts
+- [ ] AVX2 kernels: short ASan and UBSan pass on `debian`, through `~/quant-projects/bin/heavy.sh`, avoiding `cpu4` and `cpu5`, never overlapping a measurement
+- [ ] AVX2 decoders: fuzz runs on `debian`, because the Mac cannot execute them, under the same three conditions
 - [ ] Compare 64-bit lanes with 32-bit lanes relative to a block base, since 64-bit lanes are the weakest case in every source
 - [ ] Fused unpack-plus-prefix kernel against two passes
 - [ ] 64-bit prefix sum: NEON against a scalar dependency tree, since Arm's engineers report scalar wins on Neoverse

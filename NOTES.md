@@ -131,15 +131,21 @@ What this means for a fair run:
 - `THREAD_AFFINITY_POLICY` is rejected, kr=46. QoS hints were accepted but moved nothing: BACKGROUND stayed on P cores, while
   `taskpolicy -b` did move threads to E cores. So nothing here pins, and thread QoS does not choose a cluster.
 - `kpc` is denied, EPERM. `proc_pid_rusage` returns process-wide instructions and cycles with no privilege, but no cache or branch
-  events. It is not used as a substitute for counters unless the user accepts it.
+  events. Decision: it is not used in place of counters. Mac results state plainly that they are unpinned and have no counters.
 - `debian`: TSC 1997.94 MHz, `cycles:u` and `instructions:u` work, and `perf` comes from `.toolchain`.
 - `debian` clock facts differ from the evidence: the governor floor is 1.6 GHz, one snapshot showed 2.79 GHz, and the boost ceiling is
   still unknown because `cpuinfo_cur_freq` is root-only.
 
-### Open question for the orchestrator
+### Decisions
 
-The brief keeps sanitizer runs and fuzzing on the Mac, but x86-64 kernels cannot execute there. Unless told otherwise, the plan runs
-the exact-size-buffer tests and a short ASan and UBSan pass of the AVX2 kernels on `debian`, treating them as Linux-only code.
+- AVX2 kernels get a short ASan and UBSan pass on `debian`. AVX2 decoders also get their fuzz runs on `debian`, because the Mac cannot
+  execute them. These run through `~/quant-projects/bin/heavy.sh`, avoid `cpu4` and `cpu5`, and must not overlap a measurement.
+- macOS counters and pinning are not blockers, because `debian` supplies both. Results from the Mac state plainly that they are
+  unpinned and have no counters. `proc_pid_rusage` is not used in their place.
+- QuestDB silently accepts a bad `cairo.commit.mode`, so the harness must read back the setting in force for every comparison system
+  and fail if it differs from what was requested. A durability class is not proven until that passes.
+- QuestDB's `debian` heap must be checked against the full day before any `-Xmx1g` result is relied on.
+- All scratch files stay inside the folders from now on, including for subagents.
 
 ## Process notes
 

@@ -1,5 +1,7 @@
 # Evidence: ITCH data and tick-storage prior art
 
+Note: the pinned day changed to `12302019`. Figures in this file labelled `10302019` are second-day figures.
+
 Status: complete for Phase 1. Sections 1 to 6, then Not found.
 Rule: every fact below was confirmed in a source opened in this task (cached copy under
 CACHE/downloads/ or a live fetch). CACHE is the research cache, kept outside this repo; `CACHE/...` paths are labels into it.
