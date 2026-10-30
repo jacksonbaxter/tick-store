@@ -2,6 +2,7 @@
 // told apart by reason, is counted, and encodes back exactly.
 
 #include "itch_fixtures.hpp"
+#include "test_bytes.hpp"
 #include "tick_store/itch/codec.hpp"
 #include "tick_store/itch/frame.hpp"
 #include "tick_store/itch/message.hpp"

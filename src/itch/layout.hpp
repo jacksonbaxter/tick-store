@@ -65,7 +65,7 @@ struct HeaderField<Member, Width> {
 
 template <auto Member>
 [[nodiscard]] consteval BodyField<Member> field(std::string_view name, std::size_t offset) {
-    return {name, offset};
+    return {.name = name, .offset = offset};
 }
 
 // The Message Type byte comes first in every message, and the dispatch in
@@ -74,9 +74,9 @@ inline constexpr std::size_t kTypeByteSize = 1;
 
 // Offset 11 is where the fields after the common header begin in all 23 types.
 inline constexpr auto kHeaderFields = std::tuple{
-    HeaderField<&MessageHeader::stock_locate, 2>{"stock_locate", 1},
-    HeaderField<&MessageHeader::tracking_number, 2>{"tracking_number", 3},
-    HeaderField<&MessageHeader::timestamp_ns, 6>{"timestamp_ns", 5},
+    HeaderField<&MessageHeader::stock_locate, 2>{.name = "stock_locate", .offset = 1},
+    HeaderField<&MessageHeader::tracking_number, 2>{.name = "tracking_number", .offset = 3},
+    HeaderField<&MessageHeader::timestamp_ns, 6>{.name = "timestamp_ns", .offset = 5},
 };
 
 // The fields after the header, in wire order. Specialised once per type.

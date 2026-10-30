@@ -3,6 +3,7 @@
 // field comes from the hand-written tables in the fixtures.
 
 #include "itch_fixtures.hpp"
+#include "test_bytes.hpp"
 #include "tick_store/itch/codec.hpp"
 #include "tick_store/itch/frame.hpp"
 #include "tick_store/itch/message.hpp"

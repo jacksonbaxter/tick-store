@@ -37,3 +37,7 @@ if(TICK_STORE_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests/unit)
 endif()
+
+if(TICK_STORE_BUILD_FUZZ)
+    add_subdirectory(fuzz)
+endif()

@@ -1,6 +1,7 @@
 # Chosen for byte-level decoder code. The disabled checks are style rules that
-# argue with fixed wire offsets and with short, conventional names; the rest of
-# each group stays on. Warnings are errors, and any NOLINT carries its reason.
+# argue with fixed wire offsets, short conventional names, hand-laid byte tables
+# or #pragma once, which every compiler we target supports. The rest of each
+# group stays on. Warnings are errors, and any NOLINT carries its reason.
 Checks: >
   -*,
   bugprone-*,
@@ -19,9 +20,11 @@ Checks: >
   -modernize-use-trailing-return-type,
   performance-*,
   portability-*,
+  -portability-avoid-pragma-once,
   readability-*,
   -readability-identifier-length,
   -readability-magic-numbers,
+  -readability-trailing-comma,
   -readability-function-cognitive-complexity
 WarningsAsErrors: '*'
 HeaderFilterRegex: '(include/tick_store|src|tests/unit|fuzz)/.*'

@@ -17,12 +17,13 @@ using test::Bytes;
 using test::exact_copy;
 using test::framed;
 
-const Bytes kShort = bytes({0xA1, 0xA2, 0xA3});
-const Bytes kLong = bytes({0xB1, 0xB2, 0xB3, 0xB4, 0xB5});
+Bytes short_payload() { return bytes({0xA1, 0xA2, 0xA3}); }
+
+Bytes long_payload() { return bytes({0xB1, 0xB2, 0xB3, 0xB4, 0xB5}); }
 
 Bytes two_frames() {
-    Bytes stream = framed(3, kShort);
-    const Bytes second = framed(5, kLong);
+    Bytes stream = framed(3, short_payload());
+    const Bytes second = framed(5, long_payload());
     stream.insert(stream.end(), second.begin(), second.end());
     return stream;
 }
@@ -44,13 +45,13 @@ TEST(FrameCursor, WalksFramesAndReportsEachOffset) {
     const auto first = cursor.next();
     ASSERT_TRUE(first.has_value());
     EXPECT_EQ(first->offset, 0U);
-    EXPECT_TRUE(same(first->payload, kShort));
+    EXPECT_TRUE(same(first->payload, short_payload()));
     EXPECT_EQ(cursor.offset(), 5U);
 
     const auto second = cursor.next();
     ASSERT_TRUE(second.has_value());
     EXPECT_EQ(second->offset, 5U);
-    EXPECT_TRUE(same(second->payload, kLong));
+    EXPECT_TRUE(same(second->payload, long_payload()));
     EXPECT_EQ(cursor.offset(), 12U);
 
     const auto stop = cursor.next();
@@ -104,7 +105,7 @@ TEST(FrameCursor, TruncationAtEveryByteLengthIsTypedAndLocated) {
 }
 
 TEST(FrameCursor, AZeroLengthFrameIsReportedNotSkipped) {
-    Bytes stream = framed(3, kShort);
+    Bytes stream = framed(3, short_payload());
     const Bytes marker = bytes({0x00, 0x00, 0xEE, 0xFF});
     stream.insert(stream.end(), marker.begin(), marker.end());
     const Bytes exact = exact_copy(stream);

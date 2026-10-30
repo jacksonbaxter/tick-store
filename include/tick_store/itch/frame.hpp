@@ -74,23 +74,22 @@ public:
     [[nodiscard]] constexpr std::expected<Frame, FrameStop> next() noexcept {
         const std::size_t left = bytes_.size() - offset_;
         if (left == 0) {
-            return std::unexpected(FrameStop{FrameStopKind::end, offset_, 0, 0});
+            return stop(FrameStopKind::end, 0, 0);
         }
         const auto length = BigEndianReader{bytes_}.read_uint<kFramePrefixSize>(offset_);
         if (!length.has_value()) {
-            return std::unexpected(
-                FrameStop{FrameStopKind::truncated_prefix, offset_, kFramePrefixSize, left});
+            return stop(FrameStopKind::truncated_prefix, kFramePrefixSize, left);
         }
         const std::size_t after_prefix = left - kFramePrefixSize;
         const auto payload_size = static_cast<std::size_t>(*length);
         if (payload_size == 0) {
-            return std::unexpected(FrameStop{FrameStopKind::zero_length, offset_, 0, after_prefix});
+            return stop(FrameStopKind::zero_length, 0, after_prefix);
         }
         if (payload_size > after_prefix) {
-            return std::unexpected(
-                FrameStop{FrameStopKind::truncated_body, offset_, payload_size, after_prefix});
+            return stop(FrameStopKind::truncated_body, payload_size, after_prefix);
         }
-        const Frame frame{bytes_.subspan(offset_ + kFramePrefixSize, payload_size), offset_};
+        const Frame frame{.payload = bytes_.subspan(offset_ + kFramePrefixSize, payload_size),
+                          .offset = offset_};
         offset_ += kFramePrefixSize + payload_size;
         return frame;
     }
@@ -104,6 +103,12 @@ public:
     }
 
 private:
+    [[nodiscard]] constexpr std::unexpected<FrameStop> stop(FrameStopKind kind, std::size_t expected,
+                                                            std::size_t actual) const noexcept {
+        return std::unexpected(
+            FrameStop{.kind = kind, .offset = offset_, .expected = expected, .actual = actual});
+    }
+
     std::span<const std::byte> bytes_;
     std::size_t offset_ = 0;
 };

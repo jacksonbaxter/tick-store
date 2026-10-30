@@ -2,6 +2,7 @@
 // values read off them by eye, and those values encode back to the same bytes.
 
 #include "itch_fixtures.hpp"
+#include "test_bytes.hpp"
 #include "tick_store/itch/codec.hpp"
 #include "tick_store/itch/message.hpp"
 
@@ -10,7 +11,6 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
-#include <cstdint>
 #include <set>
 #include <string_view>
 #include <utility>
@@ -24,14 +24,14 @@ using test::fixture;
 using test::fixtures;
 
 template <std::size_t N>
-Alpha<N> alpha(std::string_view text) {
+constexpr Alpha<N> alpha(std::string_view text) {
     Alpha<N> out{};
     std::ranges::transform(text.substr(0, N), out.begin(),
                            [](char c) { return static_cast<std::byte>(c); });
     return out;
 }
 
-const Stock kZvzzt = alpha<8>("ZVZZT   ");
+constexpr Stock kZvzzt = alpha<8>("ZVZZT   ");
 
 constexpr std::byte ch(char c) { return static_cast<std::byte>(c); }
 
@@ -286,7 +286,7 @@ TEST(ItchWireSize, IsPinnedForEveryByteValue) {
     for (unsigned value = 0; value < 256; ++value) {
         const auto type = static_cast<std::byte>(value);
         const auto size = wire_size_of(type);
-        const auto match = std::ranges::find_if(expected, [value](const auto& entry) {
+        const auto* const match = std::ranges::find_if(expected, [value](const auto& entry) {
             return static_cast<unsigned char>(entry.first) == value;
         });
         if (match == expected.end()) {

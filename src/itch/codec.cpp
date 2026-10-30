@@ -3,8 +3,8 @@
 #include "layout.hpp"
 #include "tick_store/itch/big_endian.hpp"
 #include "tick_store/itch/frame.hpp"
+#include "tick_store/itch/message.hpp"
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -15,7 +15,6 @@
 #include <string_view>
 #include <tuple>
 #include <type_traits>
-#include <utility>
 #include <variant>
 
 namespace tick_store::itch {
@@ -31,29 +30,45 @@ using detail::kAllFields;
     // A field past the end of the payload has nothing left at all, so the
     // subtraction only happens when it cannot wrap.
     const std::size_t left = offset < payload_size ? payload_size - offset : 0;
-    return {DecodeErrorKind::truncated, field, offset, width, left};
+    return {.kind = DecodeErrorKind::truncated,
+            .field = field,
+            .offset = offset,
+            .expected = width,
+            .actual = left};
 }
 
 [[gnu::cold, gnu::noinline]] DecodeError unknown_type(std::byte type) noexcept {
-    return {DecodeErrorKind::unknown_type, "message_type", 0, 0,
-            std::to_integer<std::size_t>(type)};
+    return {.kind = DecodeErrorKind::unknown_type,
+            .field = "message_type",
+            .offset = 0,
+            .expected = 0,
+            .actual = std::to_integer<std::size_t>(type)};
 }
 
 [[gnu::cold, gnu::noinline]] DecodeError trailing_bytes(std::size_t wire_size,
                                                         std::size_t payload_size) noexcept {
-    return {DecodeErrorKind::trailing_bytes, "end of message", wire_size, 0,
-            payload_size - wire_size};
+    return {.kind = DecodeErrorKind::trailing_bytes,
+            .field = "end of message",
+            .offset = wire_size,
+            .expected = 0,
+            .actual = payload_size - wire_size};
 }
 
 [[gnu::cold, gnu::noinline]] EncodeError buffer_too_small(std::size_t needed,
                                                           std::size_t available) noexcept {
-    return {EncodeErrorKind::buffer_too_small, "out", needed, available};
+    return {.kind = EncodeErrorKind::buffer_too_small,
+            .field = "out",
+            .expected = needed,
+            .actual = available};
 }
 
 [[gnu::cold, gnu::noinline]] EncodeError out_of_range(std::string_view field,
                                                       std::uint64_t largest,
                                                       std::uint64_t value) noexcept {
-    return {EncodeErrorKind::value_out_of_range, field, largest, value};
+    return {.kind = EncodeErrorKind::value_out_of_range,
+            .field = field,
+            .expected = largest,
+            .actual = value};
 }
 
 // Reads one field through the checked reader. The dispatch on value type lives
@@ -252,7 +267,7 @@ std::expected<Message, DecodeError> decode_strict(std::span<const std::byte> pay
     return with_message_type(
         *type,
         [&]<class T>(std::type_identity<T>) { return decode_as<T>(payload); },
-        [&]() -> std::expected<Message, DecodeError> {
+        [&] -> std::expected<Message, DecodeError> {
             return std::unexpected(unknown_type(*type));
         });
 }
@@ -268,9 +283,12 @@ std::expected<Message, DecodeError> decode(std::span<const std::byte> payload) n
     const RawReason reason = result.error().kind == DecodeErrorKind::unknown_type
                                  ? RawReason::unknown_type
                                  : RawReason::wrong_length;
-    return RawMessage{payload, reason};
+    return RawMessage{.bytes = payload, .reason = reason};
 }
 
+// std::visit only throws on a valueless variant. Message holds trivially copyable
+// alternatives, so it can never be valueless.
+// NOLINTNEXTLINE(bugprone-exception-escape): see the comment above.
 std::expected<std::size_t, EncodeError> encode(const Message& message,
                                                std::span<std::byte> out) noexcept {
     return std::visit([&](const auto& alternative) { return encode_as(alternative, out); },

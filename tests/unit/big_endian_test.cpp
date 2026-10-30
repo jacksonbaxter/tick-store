@@ -1,13 +1,13 @@
 #include "tick_store/itch/big_endian.hpp"
 
+#include "test_bytes.hpp"
+
 #include <gtest/gtest.h>
 
-#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
-#include <memory>
 #include <span>
 #include <type_traits>
 
@@ -74,9 +74,8 @@ TEST(BigEndianReader, AnOffsetNearSizeMaxCannotWrapPastTheCheck) {
 TEST(BigEndianReader, WorksOnUnalignedBytes) {
     // Every start offset of an exact heap block, so ASan and the UBSan alignment
     // check both see each one.
-    const auto block = std::make_unique<std::byte[]>(kSequence.size());
-    std::ranges::copy(kSequence, block.get());
-    const std::span<const std::byte> bytes{block.get(), kSequence.size()};
+    const test::Bytes block = test::exact_copy(kSequence);
+    const std::span<const std::byte> bytes{block};
     for (std::size_t start = 0; start + 2 <= bytes.size(); ++start) {
         const BigEndianReader reader{bytes.subspan(start)};
         const auto value = reader.read_uint<2>(0);

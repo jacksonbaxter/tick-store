@@ -2,6 +2,7 @@
 // on, that every byte of every type reaches a field and comes back unchanged.
 
 #include "itch_fixtures.hpp"
+#include "test_bytes.hpp"
 #include "tick_store/itch/codec.hpp"
 #include "tick_store/itch/message.hpp"
 
@@ -12,7 +13,6 @@
 #include <cstdint>
 #include <format>
 #include <limits>
-#include <variant>
 
 namespace tick_store::itch {
 namespace {
@@ -54,7 +54,7 @@ TEST(ItchBoundary, EveryFieldOfEveryTypeHoldsItsExtremes) {
             const std::uint64_t top = field.width >= 8
                                           ? std::numeric_limits<std::uint64_t>::max()
                                           : (std::uint64_t{1} << (8U * field.width)) - 1U;
-            const std::uint64_t high_bit = std::uint64_t{1} << (8U * field.width - 1U);
+            const std::uint64_t high_bit = std::uint64_t{1} << ((8U * field.width) - 1U);
             for (const std::uint64_t value :
                  {std::uint64_t{0}, std::uint64_t{1}, high_bit - 1U, high_bit, top - 1U, top}) {
                 Bytes bytes = f.bytes;

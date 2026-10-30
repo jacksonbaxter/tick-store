@@ -1,0 +1,3 @@
+# Test tables are positional values laid out to read against the specification.
+InheritParentConfig: true
+Checks: -modernize-use-designated-initializers

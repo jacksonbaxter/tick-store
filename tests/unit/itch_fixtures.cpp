@@ -1,5 +1,7 @@
 #include "itch_fixtures.hpp"
 
+#include "test_bytes.hpp"
+
 #include <algorithm>
 #include <cstddef>
 #include <initializer_list>
