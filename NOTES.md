@@ -30,8 +30,11 @@ context, and the census of the pinned file is the first real measurement this pr
 - The only same-data comparison across resolutions is TritanDB: delta-of-delta grows from 5.2 to 23.2 bits per timestamp going from
   milliseconds to nanoseconds, on regular data with jitter (derived).
 - On uneven data in the same paper, a delta scheme beat delta-of-delta. Delta-of-delta may lose to plain delta on ITCH.
+- The tightest real-data anchor is KX on NYSE TAQ: 31.3% of an 8-byte timespan at zstd 1, about 20.0 bits. Percentages cannot be
+  copied across columns: KX's `Sequence_Number` and `Offer_Size` are 4-byte `int` and `TradePrice` is a 4-byte `real`, so those targets
+  are stated in bits.
 - Mean gap is about 83 µs over market hours on 10302019, across the whole venue (derived). The busiest millisecond in the Nasdaq
-  report implies a gap near 393 ns. Several messages can share a nanosecond, and no text guarantees timestamps never go backwards,
+  report implies a gap near 366 ns, and that report describes an average day, with the open able to run higher. Several messages can share a nanosecond, and no text guarantees timestamps never go backwards,
   so signed deltas stay unless the census proves otherwise.
 - Gorilla's and Prometheus's bucket widths must not be reused for nanosecond data without measuring.
 
@@ -77,14 +80,24 @@ context, and the census of the pinned file is the first real measurement this pr
 
 ### Comparison systems
 
-All three run natively on the M4 Max from inside the repo: pyarrow 26.0.0, ArcticDB 6.28.2 on LMDB, QuestDB 10.1.0 on Temurin
-25.0.5, with CPython 3.13.18 because ArcticDB has no 3.15 wheel. Smoke tests only. What this means for a fair run:
+All three run natively on both hosts from inside the permitted folders, in smoke tests of 10,000 rows, so this says nothing about
+scale or speed. pyarrow 26.0.0, ArcticDB 6.28.2 on LMDB and QuestDB 10.1.0, with CPython 3.13.18 because ArcticDB has no 3.15 wheel.
+
+| System | macOS | `debian`, no Docker |
+|---|---|---|
+| pyarrow | Runs | Runs, 35 of 35 checks, runtime SIMD `avx2` |
+| ArcticDB | Runs | Runs, LMDB write and read exact. Wheel's zmm code untraced, and the CPU has no AVX-512, so a larger run must watch for SIGILL |
+| QuestDB | Runs on Temurin 25.0.5, scalar kernels | Runs on bundled GraalVM 25.0.2 with jemalloc preloaded, AVX2 tier, capped at `-Xmx1g`. Default heap untested |
+
+What this means for a fair run:
 
 - Defaults are not like for like. Parquet never fsyncs, default QuestDB is `nosync`, and default ArcticDB syncs every storage key.
 - `pyarrow` does not use the page index or Bloom filters on read, so row groups are the smallest pruning unit. Do not credit it with more.
 - ArcticDB `date_range` walks every index row under the default static schema. No public zstd option was found. LMDB is not its
   fastest backend, so results carry that label.
 - QuestDB's vector kernels run scalar on arm64, so a macOS result understates its x86 path. Linux is the fair comparison.
+- QuestDB's runtime differs by host, GraalVM and jemalloc on Linux against Temurin on macOS, which is one more reason never to compare
+  across hosts. On `debian`, `SHOW PARAMETERS` shows `http.min.bind.to = 0.0.0.0:9003` while the real listener is loopback: trust `ss`.
 - ILP auto-create silently truncated 10,000 timestamps to microseconds, so tables must be pre-created.
 - `cairo.commit.mode=not_a_mode` is accepted with no warning and silently becomes `nosync`, while `SHOW PARAMETERS` echoes the bad
   value. Whether `sync` really flushes is unverified. QuestDB's own docs conflict on what WAL commits guarantee.
@@ -95,9 +108,33 @@ All three run natively on the M4 Max from inside the repo: pyarrow 26.0.0, Arcti
 - macOS (Q2a, plain APFS, one 1 GiB file, under `measure.sh`): `msync(MS_INVALIDATE)` evicts, proven three ways: 0 of 65,536 pages
   by `mincore`, 1,024 MiB of device reads on the next pass, and timing, 39 ms warm against about 170 ms cold. It works while another
   process holds the file mapped, and lost no dirty data in the test. `F_NOCACHE` and every `madvise` variant tried do not evict.
+- A separate process with read access can evict a file another process holds open or mapped (3.5 ms and 17 to 20 ms for 1 GiB). The
+  holder then really re-reads from disk. Evicting another process's dirty, unsynced mapping lost nothing in 3 of 3 rounds.
+- A tree costs about 13 µs per file, and data goes cold but metadata stays warm, because the evictor must open every file.
+- A disk image takes metadata cold too, but cuts sequential reads 2.7x and raises `F_BARRIERFSYNC` p50 42x, so it must not be used to
+  compare systems.
+- Chosen macOS method: stop the server, `msync(MS_INVALIDATE)` across the tree, prove, start, query, then check the disk0 byte delta.
+  The proof is not optional: 1 eviction in 35 left 128 of 65,536 pages resident, cause unknown, so `mincore` must read 0 on every file,
+  with a retry otherwise.
 - A server's own user-space buffers cannot be evicted from outside, so servers restart between cold runs.
-- Linux: `posix_fadvise` always returns 0 and skips dirty, mapped and writeback pages, so eviction must be proven.
+- Linux: `posix_fadvise` always returns 0 and skips dirty, mapped and writeback pages, so eviction must be proven. On `debian` a 64 MiB
+  file on ext4 went from fully resident to 0 under `fincore`. That has not been shown on a comparison system's own files.
 - Linux `fsync` on ext4 corresponds to macOS `F_FULLFSYNC`, not macOS `fsync`.
+- macOS sync latency, 4 KiB append on plain APFS, 4,000 samples per mode: `fsync` p50 49 µs, p99 316 µs, 1 device op. `F_BARRIERFSYNC`
+  288 µs and 826 µs, 16 ops. `F_FULLFSYNC` 4.0 ms and 5.1 ms, 16 ops. So plain `fsync` is roughly 80x cheaper than the call that matches
+  Linux, and class B needs the primitive named beside every macOS number. Power-loss behaviour was not tested.
+
+### Timers and placement
+
+- macOS: `steady_clock` claims 1 ns but resolves one 41.667 ns tick, and costs about 12 ns a read against 4.0 ns for
+  `mach_absolute_time`.
+- `THREAD_AFFINITY_POLICY` is rejected, kr=46. QoS hints were accepted but moved nothing: BACKGROUND stayed on P cores, while
+  `taskpolicy -b` did move threads to E cores. So nothing here pins, and thread QoS does not choose a cluster.
+- `kpc` is denied, EPERM. `proc_pid_rusage` returns process-wide instructions and cycles with no privilege, but no cache or branch
+  events. It is not used as a substitute for counters unless the user accepts it.
+- `debian`: TSC 1997.94 MHz, `cycles:u` and `instructions:u` work, and `perf` comes from `.toolchain`.
+- `debian` clock facts differ from the evidence: the governor floor is 1.6 GHz, one snapshot showed 2.79 GHz, and the boost ceiling is
+  still unknown because `cpuinfo_cur_freq` is root-only.
 
 ### Open question for the orchestrator
 
@@ -111,5 +148,9 @@ the exact-size-buffer tests and a short ASan and UBSan pass of the AVX2 kernels 
 - One subagent ended its turn with a background job running, which killed the job partway through Q2b. A subagent's final message
   ends its background work.
 - A usage limit stopped the session at about 13:00, with nothing committed. Findings are now committed as they arrive.
+- Checking sources after the draft changed five targets. Two claims were wrong in a way only the opened source showed: `O-T`'s best on-disk
+  figure is TimescaleDB, not kdb+, and the feed-rate anchor was not the highest row in the workbook. `TradePrice` was also read as 8 bytes
+  in a draft reference line. The lesson is to read the whole table, not the cell the subagent quoted.
+- Audit outputs can name private files. Keep them out of the repo, or redact them, before committing.
 - A clone in the working tree exposed its own skills to this session. Nothing from it was invoked. Third-party files now stay in
   the research cache, and `output/docs-recheck/` was moved there before committing.

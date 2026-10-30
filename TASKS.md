@@ -12,10 +12,10 @@ The plan through to the done criteria. Phases are gated: each ends with a phase 
 - [x] Evidence: ITCH format, sample files, prior art (`itch-data.md`)
 - [x] Comparison systems tried on macOS (`system-feasibility.md`)
 - [x] Comparison systems assessed for `debian` from published packaging (`debian-host.md`)
-- [ ] Comparison systems actually run on `debian`
-- [ ] Machine probe finished: Q2b-e, measured Q3, Q4 (`machine-probe.md`, unfinished)
-- [ ] Project session opens the source of every number that became a target
-- [ ] BENCHMARKS.md, TASKS.md and NOTES.md finished
+- [x] Comparison systems actually run on `debian`, smoke only (`research/debian-check/`)
+- [x] Machine probe finished: Q2b-e, measured Q3, Q4 (`machine-probe.md`)
+- [x] Project session opens the source of every number that became a target
+- [x] BENCHMARKS.md, TASKS.md and NOTES.md finished
 - [ ] Phase report
 
 ## Phase 2: Harness, before any implementation
@@ -55,7 +55,7 @@ Benchmarks
 - [ ] Google Benchmark plus HdrHistogram, warm-up, seeded inputs, verify before measuring
 - [ ] Results header: host label, CPU model, kernel, compiler version, flags, ISA, commit, core, governor, frequency, turbo state, pinning status, load lines from `measure.sh`
 - [ ] macOS records "not pinned". The pinning and perf-counter code is built anyway
-- [ ] Linux: `taskset -c 4`, `cpu5` idle, output written to a file on `debian`. TSC calibrated on every run. Batch anything below about 100 ns; publish no single-shot percentile the timer cannot resolve
+- [ ] Linux: `taskset -c 4`, `cpu5` idle, output written to a file on `debian`. TSC calibrated on every run. Boost ceiling is unknown, so record observed frequency, not an assumed one. Batch anything below about 100 ns; publish no single-shot percentile the timer cannot resolve
 - [ ] macOS: report no latency below a few ticks of the 42 ns timer
 - [ ] Linux counters through `perf stat` with `:u` events. Confirm what `cache-misses` counts on Zen 1 against AMD documentation before quoting it
 - [ ] Results table in the README generated from results files, never typed
@@ -68,8 +68,11 @@ Comparison harness
 - [ ] QuestDB: pre-created tables with `TIMESTAMP_NS`. Never rely on ILP auto-create, which silently lost nanoseconds. Clock stops at `wait_wal_table`
 - [ ] Each result records exact version and all settings
 - [ ] Durability classes A and B for every system, flush granularity stated. Verify that QuestDB `sync` really flushes, and validate the config value, because a typo silently gives `nosync`
-- [ ] macOS cold-cache tool built on the probe's result, proving eviction per file
-- [ ] Linux cold-cache tool: stop the process, fsync, `posix_fadvise(POSIX_FADV_DONTNEED)`, prove with `fincore` or `mincore`
+- [ ] macOS cold-cache tool built on the probe's result: stop the server, `msync(MS_INVALIDATE)` on a fresh read-only mapping of every file, `mincore` must read 0 on every file with a retry otherwise, start, query, disk0 byte delta must reach the expected bytes. State that metadata stays warm
+- [ ] Linux cold-cache tool: stop the process, fsync, `posix_fadvise(POSIX_FADV_DONTNEED)`, prove with `fincore` or `mincore`. Show it on real QuestDB and ArcticDB data files, since only a fresh test file is proven so far
+- [ ] QuestDB on `debian`: choose and record the heap, since only `-Xmx1g` was tried. Record GraalVM and jemalloc in the results header. Read bind addresses with `ss`, not `SHOW PARAMETERS`
+- [ ] ArcticDB and pyarrow on `debian`: check for SIGILL at full size, since the wheels' zmm code is untraced and the CPU has no AVX-512
+- [ ] Name the sync primitive beside every macOS class B number: `fsync`, `F_BARRIERFSYNC` and `F_FULLFSYNC` differ by about 80x at p50
 - [ ] A warm result counts only if residency is proven before and after the run
 - [ ] One system runs at a time. Record peak RSS, heap settings, `MemAvailable` and stored bytes. Keep the Python overhead visible rather than hidden in engine time
 
