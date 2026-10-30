@@ -22,7 +22,7 @@ Results from the two hosts are kept apart and never mixed.
 
 | Label | Machine | Measurement limits |
 |---|---|---|
-| macOS | Apple M4 Max, 12 P and 4 E cores, 64 GiB, macOS 27.2, APFS on internal SSD | No pinning. 24 MHz timer, about 42 ns per tick. Hardware counters are denied, and `proc_pid_rusage` gives process-wide instructions and cycles only. NEON only: no SVE, no bit-deposit instructions. Run under `.orchestrator/measure.sh`. |
+| macOS | Apple M4 Max, 12 P and 4 E cores, 64 GiB, macOS 27.2, APFS on internal SSD | No pinning. 24 MHz timer, about 42 ns per tick. Hardware counters are denied, and `proc_pid_rusage` gives process-wide instructions and cycles only. NEON only: no SVE, no bit-deposit instructions. Run under the machine's measurement lock (`measure.sh`). |
 | Linux | `debian`: AMD Ryzen Embedded V1605B (Zen 1), 4 cores and 8 threads, 2.0 GHz base, 4 MB L3, 15 GB RAM, Debian 13, kernel 6.12 | Pin with `taskset -c 4`, `cpu5` idle. TSC resolution about 10 ns. `perf` `:u` events only. AVX2 runs as two 128-bit halves; PEXT and PDEP are microcoded. Run under `~/quant-projects/bin/measure.sh`. Headline pinned numbers come from here. |
 
 ## Definitions
@@ -46,7 +46,7 @@ These come from the project brief, so they need no published source. Each one mu
 |---|---|---|
 | G-1 | Every record of the full pinned day round-trips bit-exact | Re-serialise every record, compare bytes with the source across the whole day, and also compare the SHA-256 of the whole stream |
 | G-2 | The check catches corruption | An injected single-bit corruption is detected, with the location reported |
-| G-3 | Every parser and decoder is fuzzed | Each libFuzzer target runs clean for 30 minutes under `.orchestrator/heavy.sh` |
+| G-3 | Every parser and decoder is fuzzed | Each libFuzzer target runs clean for 30 minutes under the heavy-job lock (`heavy.sh`) |
 | G-4 | Gorilla is built and measured | Delta-of-delta timestamps and XOR floats exist and run on this data, whatever the result |
 
 ## Compression targets
