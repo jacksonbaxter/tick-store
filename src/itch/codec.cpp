@@ -138,8 +138,8 @@ inline constexpr std::type_identity<T> tag{};
 // type, and `unknown` for any other byte. Case labels are the structs' own type
 // codes, so two types sharing a code cannot compile.
 template <class Known, class Unknown>
-[[nodiscard]] constexpr auto with_message_type(std::byte type, Known&& known,
-                                               Unknown&& unknown) noexcept {
+[[nodiscard]] constexpr auto with_message_type(std::byte type, const Known& known,
+                                               const Unknown& unknown) noexcept {
     switch (type) {
         case SystemEvent::type_code:
             return known(tag<SystemEvent>);
@@ -286,9 +286,7 @@ std::expected<Message, DecodeError> decode(std::span<const std::byte> payload) n
     return RawMessage{.bytes = payload, .reason = reason};
 }
 
-// std::visit only throws on a valueless variant. Message holds trivially copyable
-// alternatives, so it can never be valueless.
-// NOLINTNEXTLINE(bugprone-exception-escape): see the comment above.
+// NOLINTNEXTLINE(bugprone-exception-escape): visit cannot throw; a Message is never valueless.
 std::expected<std::size_t, EncodeError> encode(const Message& message,
                                                std::span<std::byte> out) noexcept {
     return std::visit([&](const auto& alternative) { return encode_as(alternative, out); },

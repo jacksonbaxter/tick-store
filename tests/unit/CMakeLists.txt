@@ -21,4 +21,4 @@ set_source_files_properties(itch_real_day_test.cpp PROPERTIES
     COMPILE_DEFINITIONS "TICK_STORE_DATA_DIR=\"${TICK_STORE_DATA_DIR}\""
 )
 
-gtest_discover_tests(tick_store_unit_tests)
+gtest_discover_tests(tick_store_unit_tests DISCOVERY_TIMEOUT 60)

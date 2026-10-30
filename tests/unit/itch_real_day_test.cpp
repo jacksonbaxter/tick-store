@@ -30,11 +30,10 @@ constexpr std::size_t kMessages = 2'000'000;
 // least kMessages whole frames.
 constexpr std::size_t kBytesNeeded = kMessages * (50 + kFramePrefixSize);
 
-std::vector<std::byte> read_prefix(const std::filesystem::path& path, std::size_t size) {
-    std::vector<std::byte> bytes(size);
+std::vector<char> read_prefix(const std::filesystem::path& path, std::size_t size) {
+    std::vector<char> bytes(size);
     std::ifstream file{path, std::ios::binary};
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): istream reads into char*.
-    file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+    file.read(bytes.data(), static_cast<std::streamsize>(bytes.size()));
     bytes.resize(static_cast<std::size_t>(file.gcount()));
     return bytes;
 }
@@ -47,8 +46,9 @@ TEST(ItchRealDay, FirstTwoMillionMessagesRoundTripByteForByte) {
                         "Fetch it with scripts/fetch_data.py.";
     }
 
-    const std::vector<std::byte> stream = read_prefix(path, kBytesNeeded);
-    ASSERT_GE(stream.size(), kBytesNeeded);
+    const std::vector<char> file = read_prefix(path, kBytesNeeded);
+    ASSERT_GE(file.size(), kBytesNeeded);
+    const std::span<const std::byte> stream = std::as_bytes(std::span{file});
 
     FrameCursor cursor{stream};
     RawPathCounters raw;
@@ -66,7 +66,7 @@ TEST(ItchRealDay, FirstTwoMillionMessagesRoundTripByteForByte) {
 
         const auto written = encode_frame(*message, out);
         ASSERT_TRUE(written.has_value()) << "message " << index;
-        const auto source = std::span{stream}.subspan(frame->offset, *written);
+        const auto source = stream.subspan(frame->offset, *written);
         ASSERT_TRUE(std::ranges::equal(std::span{out}.first(*written), source))
             << "message " << index << " at byte " << frame->offset;
 

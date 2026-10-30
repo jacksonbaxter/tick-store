@@ -14,7 +14,6 @@
 //   Reserved, `P` Order Reference Number and Buy/Sell Indicator.
 
 #include <array>
-#include <compare>
 #include <cstddef>
 #include <cstdint>
 #include <span>

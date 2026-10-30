@@ -31,11 +31,6 @@ struct Fixture {
     std::vector<FieldSpec> fields;
 };
 
-// The header values every fixture carries.
-inline constexpr unsigned kFixtureLocate = 0x1112;
-inline constexpr unsigned kFixtureTracking = 0x2122;
-inline constexpr unsigned long long kFixtureTimestamp = 0x313233343536ULL;
-
 // All 23, in the order of the specification's tables.
 [[nodiscard]] const std::vector<Fixture>& fixtures();
 

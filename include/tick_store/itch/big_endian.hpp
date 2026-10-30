@@ -35,8 +35,6 @@ class BigEndianReader {
 public:
     constexpr explicit BigEndianReader(std::span<const std::byte> bytes) noexcept : bytes_(bytes) {}
 
-    [[nodiscard]] constexpr std::size_t size() const noexcept { return bytes_.size(); }
-
     // The Width-byte unsigned integer at `offset`, or nullopt if it does not fit.
     template <std::size_t Width>
         requires(Width >= 1 && Width <= 8)
@@ -82,8 +80,6 @@ private:
 class BigEndianWriter {
 public:
     constexpr explicit BigEndianWriter(std::span<std::byte> bytes) noexcept : bytes_(bytes) {}
-
-    [[nodiscard]] constexpr std::size_t size() const noexcept { return bytes_.size(); }
 
     // Writes the low Width bytes of `value`, most significant first. Any higher
     // bytes of `value` are dropped, so the caller proves the value fits first.

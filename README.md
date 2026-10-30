@@ -15,4 +15,4 @@ cmake --preset dev && cmake --build --preset dev && ctest --preset dev
 ```
 
 Presets, each building into `build/<preset>`: `dev`, `asan-ubsan`, `tsan`, `fuzz`,
-`bench`.
+`bench`. Fuzzing is described in `fuzz/README.md`.

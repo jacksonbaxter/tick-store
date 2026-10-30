@@ -209,9 +209,7 @@ void write_frame_seeds(SeedDir& seeds) {
 
 }  // namespace
 
-// Any failure throws out of main: this runs as a build step, so terminating with
-// the error's text and a non-zero status is the right way to stop the build.
-// NOLINTNEXTLINE(bugprone-exception-escape): see the comment above.
+// NOLINTNEXTLINE(bugprone-exception-escape): a failed build step should terminate and say why.
 int main(int argc, char** argv) {
     if (argc != 2) {
         std::println(stderr, "usage: generate_seeds <output directory>");

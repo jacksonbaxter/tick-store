@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <optional>
 #include <span>
 #include <variant>
 
@@ -132,6 +133,20 @@ TEST(ItchRawPath, EncodeFrameOfAnEmptyRawMessageNeedsTheWholePrefix) {
     Bytes out(2, std::byte{0x5A});
     ASSERT_EQ(encode_frame(raw, out).value_or(0), 2U);
     EXPECT_EQ(out, Bytes(2, std::byte{0x00}));
+}
+
+TEST(ItchLifetime, ATypedMessageAndAnErrorOutliveThePayload) {
+    // Only RawMessage borrows. ASan would report these if anything else did.
+    std::optional<Message> kept;
+    std::optional<DecodeError> error;
+    {
+        const Bytes payload = exact_copy(fixture('A').bytes);
+        kept = decode_strict(payload).value();
+        const Bytes cut = exact_copy(std::span{payload}.first(30));
+        error = decode_strict(cut).error();
+    }
+    EXPECT_EQ(std::get<AddOrder>(*kept).price, Price4{0x61626364U});
+    EXPECT_EQ(error->field, "stock");
 }
 
 TEST(RawMessage, ComparesContentAndReasonNotAddress) {

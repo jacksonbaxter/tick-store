@@ -12,7 +12,6 @@
 #include <print>
 #include <span>
 
-// NOLINTNEXTLINE(readability-identifier-naming): libFuzzer fixes this name.
 extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size) {
     // A 2-byte length prefix cannot declare more, so a longer input is not a
     // payload. -1 keeps it out of the corpus.

@@ -77,7 +77,8 @@ namespace tick_store::itch::oracle {
 // A byte stream through the cursor. Each frame must lie inside the input, directly
 // after the one before; re-encoding every frame and appending the tail the cursor
 // reports must rebuild the input exactly; and a cursor over any shorter prefix must
-// agree on every frame that fits and stop where the cut lands.
+// agree on every frame that fits and stop where the cut lands. A stop must also be
+// justified by the bytes: a whole frame must never be reported as truncated.
 [[nodiscard]] inline const char* check_stream(std::span<const std::byte> stream) {
     std::vector<std::byte> rebuilt(stream.size());
     std::size_t out = 0;
@@ -125,6 +126,12 @@ namespace tick_store::itch::oracle {
     }
     if (stop.kind != FrameStopKind::end && tail.empty()) {
         return "the cursor reported a fault with no bytes left";
+    }
+    if (stop.kind == FrameStopKind::truncated_prefix && tail.size() >= kFramePrefixSize) {
+        return "the cursor reported a truncated prefix with a whole prefix left";
+    }
+    if (stop.kind == FrameStopKind::truncated_body && stop.actual >= stop.expected) {
+        return "the cursor reported a truncated body with the whole body present";
     }
     std::ranges::copy(tail, std::span{rebuilt}.subspan(out).begin());
     if (!std::ranges::equal(rebuilt, stream)) {

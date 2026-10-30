@@ -27,7 +27,7 @@ static_assert(BigEndianReader{kSequence}.read_uint<8>(0) == 0x0123456789ABCDEFUL
 static_assert(!BigEndianReader{kSequence}.read_uint<8>(1).has_value());
 
 TEST(BigEndianReader, ReadsEveryWidthAtEveryOffsetAndRejectsTheRest) {
-    // Mirrors the loop body at run time, so all widths share one expectation.
+    // The expected value is rebuilt by hand, so every width shares one check.
     const auto check = []<std::size_t Width>(std::integral_constant<std::size_t, Width>) {
         const BigEndianReader reader{kSequence};
         for (std::size_t offset = 0; offset <= kSequence.size() + 1; ++offset) {
@@ -56,7 +56,6 @@ TEST(BigEndianReader, ReadsEveryWidthAtEveryOffsetAndRejectsTheRest) {
 
 TEST(BigEndianReader, AnEmptySpanFailsEveryRead) {
     const BigEndianReader reader{std::span<const std::byte>{}};
-    EXPECT_EQ(reader.size(), 0U);
     EXPECT_FALSE(reader.read_uint<1>(0).has_value());
     EXPECT_FALSE(reader.read_byte(0).has_value());
     EXPECT_FALSE((reader.read_bytes<1>(0).has_value()));
