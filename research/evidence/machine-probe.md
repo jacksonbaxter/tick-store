@@ -212,7 +212,7 @@ Image route, same process and same reads, both proven cold first (the image's nu
   raw/q2e-overhead.txt agrees, so the 4.92 load was not the cause. In the image, F_BARRIERFSYNC costs the same as F_FULLFSYNC, about
   55 device ops per sample against 16 on plain, so the image erases the difference Q3 measures. The 1000-sample run has one 270 ms outlier
   (max of F_BARRIERFSYNC). An earlier run of the same script, replaced because its script ended with a stray exit 1, also had one.
-- Partial eviction: 1 of 35 recorded msync passes left 128/65536 pages resident (q2e-overhead round 1 plain, right after a cold
+- Partial eviction: 1 of about 38 recorded eviction passes left 128/65536 pages resident (residency lines reading 0 or near it: q2a 6, q2b 14, q2c 6, q2e 12; q2e-overhead round 1 plain, right after a cold
   read). A targeted repeat of that sequence did not reproduce it, 0 of 60 cycles. The cause is not established. It is rare, it is real,
   and only the mincore check caught it, which is why the proof step below is not optional.
 

@@ -114,8 +114,8 @@ What this means for a fair run:
 - A disk image takes metadata cold too, but cuts sequential reads 2.7x and raises `F_BARRIERFSYNC` p50 42x, so it must not be used to
   compare systems.
 - Chosen macOS method: stop the server, `msync(MS_INVALIDATE)` across the tree, prove, start, query, then check the disk0 byte delta.
-  The proof is not optional: 1 eviction in 35 left 128 of 65,536 pages resident, cause unknown, so `mincore` must read 0 on every file,
-  with a retry otherwise.
+  The proof is not optional: 1 pass of about 38 left 128 of 65,536 pages resident, and 60 targeted repeats did not reproduce it, cause
+  unknown. So `mincore` must read 0 on every file, with a retry otherwise.
 - A server's own user-space buffers cannot be evicted from outside, so servers restart between cold runs.
 - Linux: `posix_fadvise` always returns 0 and skips dirty, mapped and writeback pages, so eviction must be proven. On `debian` a 64 MiB
   file on ext4 went from fully resident to 0 under `fincore`. That has not been shown on a comparison system's own files.
