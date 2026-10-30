@@ -22,7 +22,7 @@ Results from the two hosts are kept apart and never mixed.
 
 | Label | Machine | Measurement limits |
 |---|---|---|
-| macOS | Apple M4 Max, 12 P and 4 E cores, 64 GiB, macOS 27.2, APFS on internal SSD | No pinning. 24 MHz timer, about 42 ns per tick. No cycle counts. NEON only: no SVE, no bit-deposit instructions. Run under `.orchestrator/measure.sh`. |
+| macOS | Apple M4 Max, 12 P and 4 E cores, 64 GiB, macOS 27.2, APFS on internal SSD | No pinning. 24 MHz timer, about 42 ns per tick. Hardware counters are denied, and `proc_pid_rusage` gives process-wide instructions and cycles only. NEON only: no SVE, no bit-deposit instructions. Run under `.orchestrator/measure.sh`. |
 | Linux | `debian`: AMD Ryzen Embedded V1605B (Zen 1), 4 cores and 8 threads, 2.0 GHz base, 4 MB L3, 15 GB RAM, Debian 13, kernel 6.12 | Pin with `taskset -c 4`, `cpu5` idle. TSC resolution about 10 ns. `perf` `:u` events only. AVX2 runs as two 128-bit halves; PEXT and PDEP are microcoded. Run under `~/quant-projects/bin/measure.sh`. Headline pinned numbers come from here. |
 
 ## Definitions
@@ -87,7 +87,7 @@ Every write number states its durability class and flush granularity.
 | ID | Target | Host | Source value | Source | Measured on | Fit | Checked |
 |---|---|---|---|---|---|---|---|
 | WT-1 | Full-day ingest, class A, one thread, at least 8.59 M records/s | Both | QuestDB 8.59 M rows/s at 100,000 hosts | https://questdb.com/blog/clickhouse-vs-questdb-comparison/ ingestion table | Vendor. r8a.8xlarge, 32 vCPU, 32 workers, TSBS `cpu-only`, uncompressed hot tier, default `nosync` | Context. Theirs is 32 workers on a server with no compression. Ours is one thread with compression, so Linux may fall short | opened 2026-10-30 |
-| WT-2 | Sustained ingest above the Nasdaq peak feed rate, 2,547,190 messages/s | Both | `1ms_mps` 2,547,190, Nov 2024 | Nasdaq bandwidth report, https://web.archive.org/web/20250123185610/https://www.nasdaqtrader.com/content/technicalsupport/specifications/dataproducts/bandwidthreport.xls | Nasdaq TotalView live feed. Column meanings are not defined in the file | **Direct** for the domain | opened 2026-10-30 |
+| WT-2 | Sustained ingest above 2,732,762 messages/s, the highest TotalView rate published | Both | `1ms_mps` 2,732,762, Dec 2024, row `Nasdaq TotalView-ITCH (FPGA)`. The plain `Nasdaq TotalView` row is 2,547,190 for Nov and 2,439,000 for Dec | Nasdaq bandwidth report, sheet `BandwidthDec24`, https://web.archive.org/web/20250123185610/https://www.nasdaqtrader.com/content/technicalsupport/specifications/dataproducts/bandwidthreport.xls | Nasdaq live feed. The file calls these figures an average trading day in continuous trading, warns the open can run significantly higher, and does not define the columns | **Direct** for the domain. A floor, not a true peak | opened 2026-10-30 |
 | WT-3 | Class A ingest at least as fast as each comparison system | Both | None | Our harness | Rows visible to queries, not rows sent | **Relative** | n/a |
 | WT-4 | Class B ingest at least as fast as each comparison system, at stated flush granularity | Linux | None | **UNCONFIRMED** for any absolute figure | Looked at QuestDB docs and blogs: no throughput under `sync`. ArcticDB: no ingest figure. Arrow: no fsync in the writer | **Relative**. macOS class B is not like-for-like, because LMDB uses `F_FULLFSYNC` and QuestDB plain `fsync` | n/a |
 
@@ -99,17 +99,19 @@ Warm and cold are reported separately, with how cold was achieved and proven.
 |---|---|---|---|---|---|---|---|
 | QL-1 | Q2 warm median at most 16.9 ms | Both | 0.0169 s, hour slice, single ticker | tse_tick, Table 6, PDF p. 10, https://arxiv.org/abs/2608.23053 | DuckDB on Hive-partitioned Parquet, i5-14400F, 1.5 M-row store, 52 rows returned. Preprint | Context. Far smaller store | opened 2026-10-30 |
 | QL-2 | Q3 warm median at most 0.41 ms | Both | 0.41 ms, `single-groupby-1-1-1` | https://questdb.com/blog/clickhouse-vs-questdb-comparison/ query table | Vendor. r8a.8xlarge, TSBS, two days of 4,000 hosts, median of 3, warm, `--workers=1` | Context. The closest published shape to a filtered short-range aggregate | opened 2026-10-30 |
-| QL-3 | Q4 cold mean at most 11 ms | Both | 11 ms, kdb+ on-disk, `O-T`: top of the book at a random time | Barez et al., Table 6, PDF p. 23, https://arxiv.org/pdf/2301.12561 | i7-1065G7 laptop, 16 GB, SSD, 33 M order-book records, mean of 10, cache cleared before each execution. Versions not stated. Preprint | Context. The only published cold-cache point lookup on order-book data | opened 2026-10-30 |
+| QL-3 | Q4 cold mean at most 10 ms | Both | 10 ms, TimescaleDB, `O-T`: top of the book at a random time. kdb+ on-disk 11, InfluxDB 124, ClickHouse 706. kdb+ in-memory 5 is not a cold read | Barez et al., Table 6, PDF p. 23, https://arxiv.org/pdf/2301.12561 | i7-1065G7 PC, 16 GB, SSD, 33 M order-book records, mean of 10 executions, standby list cache cleared before each. Versions not stated. Preprint | Context. The only published cold-cache point lookup on order-book data | opened 2026-10-30 |
 | QL-4 | Lowest median and p99 of the four systems on every query, warm and cold | Both | None | Our harness | Same queries, same machine, same run conditions | **Relative** | n/a |
 
 ## Reference numbers
 
-These are context only. They are recorded so the write-up can cite them, and are not targets.
+These are context only. They are recorded so the write-up can cite them, and are not targets. A research subagent opened each
+source. The project session also opened the TritanDB, KX, ALP, VIREL and datafusion rows, but not Gorilla, Lemire, Stream VByte,
+Agner Fog or TSM-Bench, since no target rests on them.
 
 | Value | Counted | Source | Measured on |
 |---|---|---|---|
 | 23.2 bits per timestamp, derived from 35.9 MB over 12.4 M rows | Delta-of-delta at nanosecond resolution; 5.2 bits at milliseconds | TritanDB, Table 5, https://arxiv.org/pdf/1801.07947 | Shelburne data, regular with jitter. Preprint |
-| Bid price 3.6 to 4.9 bits/value, trade price 9.7 to 12.9, derived from 5.6 to 7.6% and 15.2 to 20.2% of 8 bytes | zstd 22 down to zstd 1, generic codec | KX, https://code.kx.com/q/kb/compression/fsicasestudy/ | NYSE TAQ, parted by symbol. Bid prices repeat heavily, unlike add orders, so these bracket CR-4 rather than replace it |
+| Bid price 3.6 to 4.9 bits/value, from 5.6 to 7.6% of an 8-byte `float`. Trade price 4.9 to 6.5, from 15.2 to 20.2% of a 4-byte `real`. Derived | zstd 22 down to zstd 1, generic codec | KX, https://code.kx.com/q/kb/compression/fsicasestudy/ | NYSE TAQ, parted by symbol. Bid prices repeat heavily, unlike add orders, so these bracket CR-4 rather than replace it |
 | 1.37 bytes per point, 12x | Timestamp plus value, against 16 raw bytes | Gorilla, Sec. 2.1, https://www.vldb.org/pvldb/vol8/p1816-teller.pdf | Facebook monitoring data, fixed intervals |
 | 96.39% of timestamps in 1 bit | Delta-of-delta zero case | Gorilla, Fig. 3 | 440,000 regular timestamps |
 | Gorilla 37.7, Chimp128 12.2, Elf 8.8, Zstd 7.8 bits/value | Stocks-USA, 64-bit baseline | ALP, Table 4 | INFORE stock doubles |
