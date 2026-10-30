@@ -1,8 +1,9 @@
 # tick-store benchmarks and targets
 
 Status: Phase 1. Nothing here has been measured on tick-store yet: there is no code. Every number below is a published figure, or
-arithmetic on one, used as a target or as context. A research subagent opened each source, and the `Checked` column records that
-the project session then opened it too and recomputed any derived figure from the raw values.
+arithmetic on one, used as a target or as context. The exceptions are the file facts in CR-1 and Data, which come from the downloaded
+files. A research subagent opened each source, and the `Checked` column records that the project session then opened it too and
+recomputed any derived figure from the raw values.
 
 Full evidence, with quotes and locations, is in `research/evidence/`.
 
@@ -29,6 +30,10 @@ Results from the two hosts are kept apart and never mixed.
 
 - **Record**: one ITCH message of the source file.
 - **Source bytes**: the decompressed ITCH stream, including the 2-byte length prefix on every message. The `.gz` is not the baseline.
+- **Data**: the reference day is `12302019.NASDAQ_ITCH50.gz`, 3,524,013,057 bytes compressed, 8,251,407,909 decompressed, 268,744,780
+  messages. The second day is `10302019.NASDAQ_ITCH50.gz`, 3,872,931,242 bytes compressed, 9,035,016,843 decompressed, 293,989,079
+  messages. The reference day's figures are measured from the file; the second day's are not yet, and only its compressed size is
+  confirmed, by HTTP HEAD. The SHA-256 pins are in `scripts/data_pins.json`.
 - **Ratio**: source bytes divided by stored bytes. Stored bytes include everything needed to re-serialise the source exactly:
   indexes, permutations, exceptions and metadata. Every system is measured against the same baseline.
 - **Durability class A**: returns once data is in the OS page cache. **Class B**: returns after a flush to the device.
@@ -55,7 +60,7 @@ Ratio does not depend on the host.
 
 | ID | Target | Source value | Source | Measured on | Fit | Checked |
 |---|---|---|---|---|---|---|
-| CR-1 | Whole store ratio beats the pinned file's own `.gz`: at least 2.333 on 10302019 | 2.333: 9,035,016,843 decompressed / 3,872,931,242 `.gz`. Derived | https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/ (`.gz` size); decompressed size matches the file's gzip trailer | That file. gzip level not stated. Sibling days: 2.314 to 2.341 | **Direct**. A floor, not an ambition. The only whole-file ratio published on ITCH | opened 2026-10-30 |
+| CR-1 | Whole store ratio beats the pinned file's own `.gz`: at least 2.3415 on 12302019 | 8,251,407,909 decompressed / 3,524,013,057 `.gz` = 2.34148, so 2.3415 is the floor rounded up to exceed it. Second day, 10302019: 2.333, from 9,035,016,843 / 3,872,931,242. Derived | Sizes measured from the downloaded file, whose gzip trailer agrees; https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/ | That file. gzip level not stated. Sibling days: 2.314 to 2.341 | **Direct**. A floor, not an ambition. The only whole-file ratio published on ITCH | 12302019 downloaded and measured 2026-10-30. 10302019: `.gz` size confirmed by HEAD, file not yet measured |
 | CR-2 | Whole store is smaller than Parquet, ArcticDB and QuestDB, each tuned per its docs | None | Our harness | Same records, same machine | **Relative**. No published ratio exists on ITCH for any of them | n/a |
 | CR-3 | Timestamp column at most 20.0 bits per value | `Time` 31.3% of an 8-byte timespan at zstd 1. 20.0 bits is derived | KX, https://code.kx.com/q/kb/compression/fsicasestudy/ | NYSE TAQ `quote` table, one day in 2022, 1.78 B rows, parted by symbol, 128 KB blocks. Vendor | Context. Real US equity timestamps under a generic codec, so a dedicated codec should beat it. ITCH file order differs from per-symbol order | opened 2026-10-30 |
 | CR-4 | Add-order price column at most 7.9 bits per value | ALP 7.9 bits/value on Stocks-USA, against a 64-bit baseline | ALP, Table 4, PDF p. 9, https://ir.cwi.nl/pub/33334/33334.pdf | INFORE stock prices as doubles, 282 M values, 2 decimal places. Ratios are independent of hardware | Context. Closest published data to tick prices, but not ITCH and not integers | opened 2026-10-30 |

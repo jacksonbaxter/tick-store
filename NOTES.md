@@ -11,6 +11,18 @@ Nobody has published columnar storage of ITCH. No source compares Parquet, Arcti
 whole-file ratio on ITCH is the gzip ratio implied by Nasdaq's own files, 2.31 to 2.34. So almost every target in BENCHMARKS.md is
 context, and the census of the pinned file is the first real measurement this project makes.
 
+### Pinned data
+
+- The reference day is `12302019`, because it is the same data as itch-orderbook, so the comparison between the two projects holds.
+  It is 8.25 GB decompressed, which fits `debian`'s 15 GB RAM. `10302019` is the second day, and figures labelled with it are
+  second-day figures.
+- `12302019` was downloaded and measured here: 3,524,013,057 bytes compressed, 8,251,407,909 decompressed, 268,744,780 messages, all
+  as stated beforehand. The gz ratio is 8,251,407,909 / 3,524,013,057 = 2.34148, not the 2.3414 or 2.34146 quoted earlier.
+- Nasdaq publishes no usable checksum, so `scripts/data_pins.json` proves a copy matches our download, not what Nasdaq first wrote.
+  Both `12302019` hashes do match the third-party values in `research/evidence/itch-data.md` L5.
+- Walking the length prefixes of `12302019` ends exactly at end of file, with no frame off its spec length, no zero-length message,
+  and a last message of `S` code `C`. That confirms directly, for this day, what the byte accounting below could only infer.
+
 ### Prices: XOR looks like a poor fit, but not on data like ours
 
 - Every source that compares them finds XOR on doubles does badly on decimal-origin values. On Stocks-USA, Gorilla takes 37.7
@@ -33,7 +45,7 @@ context, and the census of the pinned file is the first real measurement this pr
 - The tightest real-data anchor is KX on NYSE TAQ: 31.3% of an 8-byte timespan at zstd 1, about 20.0 bits. Percentages cannot be
   copied across columns: KX's `Sequence_Number` and `Offer_Size` are 4-byte `int` and `TradePrice` is a 4-byte `real`, so those targets
   are stated in bits.
-- Mean gap is about 83 µs over market hours on 10302019, across the whole venue (derived). The busiest millisecond in the Nasdaq
+- Second-day figure: mean gap is about 83 µs over market hours on 10302019, across the whole venue (derived). The busiest millisecond in the Nasdaq
   report implies a gap near 366 ns, and that report describes an average day, with the open able to run higher. Several messages can share a nanosecond, and no text guarantees timestamps never go backwards,
   so signed deltas stay unless the census proves otherwise.
 - Gorilla's and Prometheus's bucket widths must not be reused for nanosecond data without measuring.
@@ -157,6 +169,8 @@ What this means for a fair run:
 - Checking sources after the draft changed five targets. Two claims were wrong in a way only the opened source showed: `O-T`'s best on-disk
   figure is TimescaleDB, not kdb+, and the feed-rate anchor was not the highest row in the workbook. `TradePrice` was also read as 8 bytes
   in a draft reference line. The lesson is to read the whole table, not the cell the subagent quoted.
+- `12302019` downloaded at about 50 MB/s, on one connection. Then, with itch-orderbook fetching over four connections, every
+  connection to the same host fell to about 85 KB/s. Cause not proven. A slow day needs planning for, not more connections.
 - Audit outputs can name private files. Keep them out of the repo, or redact them, before committing.
 - A clone in the working tree exposed its own skills to this session. Nothing from it was invoked. Third-party files now stay in
   the research cache, and `docs-recheck/` was moved there before committing.

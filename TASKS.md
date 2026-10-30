@@ -26,10 +26,12 @@ Scaffold
 - [ ] All scratch files stay inside the folders, including for subagents. A tool that needs a temp dir gets `TMPDIR` under the gitignored `build/`
 
 Data
-- [ ] Data script: same file and SHA-256 as itch-orderbook, read from that repo's script once it exists. Stands alone, and accepts a path to an existing copy, verified the same way
-- [ ] Verify the `.gz` SHA-256, the gzip CRC32 and ISIZE, and the decompressed SHA-256. Nasdaq publishes no usable checksum: every `.md5sum` returned 404
+- [x] Data script: `scripts/fetch_data.py`, same files as itch-orderbook. Stands alone, and accepts a path to an existing copy, verified the same way. Each check is shown failing on an injected fault in `tests/scripts/test_fetch_data.py`
+- [x] SHA-256 pin computed here (`scripts/data_pins.json`), for cross-checking against itch-orderbook once its script has computed its own
+- [x] Verify the `.gz` SHA-256, the gzip CRC32 and ISIZE, and the decompressed SHA-256, on `12302019`. Nasdaq publishes no usable checksum: every `.md5sum` returned 404
+- [ ] Download, pin and verify the second day, `10302019`
 - [ ] Same data on `debian` under `~/quant-projects/tick-store/data`, through the repo's own script
-- [ ] Choose the benchmark day only after checking stored size against `debian`'s 15 GB RAM. A 41.7 GB day cannot be fully warm there
+- [x] Benchmark day decided: `12302019`, 8.25 GB decompressed, which fits `debian`'s 15 GB RAM
 
 Census of the pinned file, because no source publishes these
 - [ ] Message count and bytes per type, reconciled against the gzip ISIZE
