@@ -20,10 +20,10 @@
       "name": "10302019.NASDAQ_ITCH50",
       "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/10302019.NASDAQ_ITCH50.gz",
       "gz_size": 3872931242,
-      "gz_sha256": null,
+      "gz_sha256": "0ad86b61a0eb7f1bce2cffca0e08c8658026451c68657ea6b06f61ff3710b999",
       "decompressed_size": 9035016843,
-      "decompressed_sha256": null,
-      "message_count": null
+      "decompressed_sha256": "55d4620a0cbb1926dbba97ff560a0979cd879dbe9087fcb8a62ebbf993578ab4",
+      "message_count": 293989079
     }
   }
 }
