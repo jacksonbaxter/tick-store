@@ -1,7 +1,7 @@
 # Evidence: debian host feasibility (Phase 1)
 
 Status: desk research written before the host was contacted, then checked on the host. Results, and every place the host contradicted
-this file, are in `research/debian-check/README.md`, which takes precedence. Everything below comes from published sources or cached
+this file, are in the host-check report, which is kept outside this repo (`debian-check/README.md`, see `research/README.md`) and takes precedence. Everything below comes from published sources or cached
 copies, confirmed in primary text.
 
 CACHE is the research cache, kept outside this repo; `CACHE/...` paths are labels into it.
@@ -74,7 +74,7 @@ The host's actual patch level is not known from here. See "To verify on the host
   libresolv.so.2, librt.so.1, libstdc++.so.6. No libcurl or libssl NEEDED. Bundled in `arcticdb.libs/`:
   libsasl2, libkrb5, libgssapi_krb5, libk5crypto, libkrb5support, libcom_err, libcrypt, libkeyutils, libpcre, libselinux.
 - Python deps from wheel METADATA lines 18-25: `pandas<3`, numpy, attrs, `protobuf<7,>=3.15.0`, `msgpack>=0.5.0`, pyyaml, packaging, pytz.
-  Repo lock (research/feasibility-scripts/requirements.lock) pins numpy 2.5.4, pandas 2.3.3, protobuf 6.33.6; all have
+  Repo lock (`requirements.lock`, kept outside this repo) pins numpy 2.5.4, pandas 2.3.3, protobuf 6.33.6; all have
   cp313 glibc x86-64 wheels: `numpy-2.5.4-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl`,
   `pandas-2.3.3-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl`,
   `protobuf-6.33.6-cp39-abi3-manylinux2014_x86_64.whl` (dh2-pkg/pypi-*.json, https://pypi.org/pypi/numpy/2.5.4/json etc).
@@ -166,10 +166,10 @@ field; both linux-relevant files recomputed here and match. The release body has
 
 | System | Verdict | Blocking risk |
 |---|---|---|
-| pyarrow 26.0.0 | runs natively, smoke only (`research/debian-check/`) | none known |
-| arcticdb 6.28.2 | runs natively, smoke only (`research/debian-check/`) | origin of zmm code still untraced; no SIGILL on the paths the smoke ran |
-| QuestDB 10.1.0 | runs natively, smoke only, `-Xmx1g` (`research/debian-check/`) | default heap untested |
-| uv + CPython 3.13 | installed from pinned checksums (`research/debian-check/`) | none known |
+| pyarrow 26.0.0 | runs natively, smoke only (host check, kept outside this repo) | none known |
+| arcticdb 6.28.2 | runs natively, smoke only (host check, kept outside this repo) | origin of zmm code still untraced; no SIGILL on the paths the smoke ran |
+| QuestDB 10.1.0 | runs natively, smoke only, `-Xmx1g` (host check, kept outside this repo) | default heap untested |
+| uv + CPython 3.13 | installed from pinned checksums (host check, kept outside this repo) | none known |
 
 Install commands to run later (not run):
 
@@ -199,7 +199,7 @@ mkdir -p "$QP/questdb" && tar -xzf "$QP/dl/qdb.tgz" -C "$QP/questdb"
 "$QP/questdb/questdb-10.1.0-rt-linux-x86-64/bin/questdb.sh" start -d "$QP/questdb-data"
 ```
 
-`requirements.lock` (research/feasibility-scripts) contains the Linux cp313 hashes for pyarrow (line 268) and arcticdb (line 13), so `--require-hashes` should pass for those two. The Linux hashes for numpy 2.5.4, pandas 2.3.3, protobuf 6.33.6 and the questdb 6.0.1 client (cp313 manylinux x86-64 wheels) also appear in the lock: each sha256 from CACHE/downloads/dh2-pkg/pypi-*.json was searched for in the file and found.
+`requirements.lock` (kept outside this repo) contains the Linux cp313 hashes for pyarrow (line 268) and arcticdb (line 13), so `--require-hashes` should pass for those two. The Linux hashes for numpy 2.5.4, pandas 2.3.3, protobuf 6.33.6 and the questdb 6.0.1 client (cp313 manylinux x86-64 wheels) also appear in the lock: each sha256 from CACHE/downloads/dh2-pkg/pypi-*.json was searched for in the file and found.
 
 ## Q2. Zen 1 and V1605B facts affecting SIMD design
 

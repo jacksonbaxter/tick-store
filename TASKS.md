@@ -12,7 +12,7 @@ The plan through to the done criteria. Phases are gated: each ends with a phase 
 - [x] Evidence: ITCH format, sample files, prior art (`itch-data.md`)
 - [x] Comparison systems tried on macOS (`system-feasibility.md`)
 - [x] Comparison systems assessed for `debian` from published packaging (`debian-host.md`)
-- [x] Comparison systems actually run on `debian`, smoke only (`research/debian-check/`)
+- [x] Comparison systems actually run on `debian`, smoke only (`debian-host.md`; raw outputs kept outside this repo)
 - [x] Machine probe finished: Q2b-e, measured Q3, Q4 (`machine-probe.md`)
 - [x] Project session opens the source of every number that became a target
 - [x] BENCHMARKS.md, TASKS.md and NOTES.md finished

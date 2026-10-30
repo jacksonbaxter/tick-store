@@ -153,4 +153,4 @@ the exact-size-buffer tests and a short ASan and UBSan pass of the AVX2 kernels 
   in a draft reference line. The lesson is to read the whole table, not the cell the subagent quoted.
 - Audit outputs can name private files. Keep them out of the repo, or redact them, before committing.
 - A clone in the working tree exposed its own skills to this session. Nothing from it was invoked. Third-party files now stay in
-  the research cache, and `output/docs-recheck/` was moved there before committing.
+  the research cache, and `docs-recheck/` was moved there before committing.

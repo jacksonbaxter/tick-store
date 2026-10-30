@@ -2,7 +2,7 @@
 
 Status: complete, smoke tests only, no benchmarks.
 Host: Apple M4 Max, macOS 27.2, arm64. All paths are relative to the repo root unless absolute.
-`output/` means `research/feasibility-scripts/output/`. Files named `*-recheck*` or `*-current*`, in `output/` were produced by this agent; all others are raw records from the previous agent's run (12:15-12:26 local, 2026-10-30).
+`output/...` and `scripts/...` are labels for the raw outputs and the setup and smoke scripts, which are kept outside this repo (see `research/README.md`). Files named `*-recheck*` or `*-current*`, in `output/` were produced by this agent; all others are raw records from the previous agent's run (12:15-12:26 local, 2026-10-30).
 CACHE means the research cache, kept outside this repo; `CACHE/...` paths are labels into it. The digest there is used only where marked, for events that no raw output records.
 
 ## Summary
@@ -25,7 +25,7 @@ Result: RUNS. `pyarrow 26.0.0`, native arm64 wheel, `FAILS: 0` in `output/smoke-
 - Build: AppleClang 21.0.0, `-march=armv8-a`, release, git `446167169a0dc547e00e1bc29f417a40c0ca267a`, `git_description='apache-arrow-26.0.0-rc0'`, `package_kind='python-wheel-macos'` (`output/smoke-pyarrow.txt`).
 - Allocator: mimalloc. `cpu_count` 16, `io_thread_count` 8.
 - Python 3.13.18, numpy 2.5.4, pandas 2.3.3 (`output/uv-venv.txt`, `output/venv-freeze.txt`).
-- Command: `.venv/bin/python -I research/feasibility-scripts/smoke_pyarrow.py vendor/tmp/pyarrow-smoke`.
+- Command: `.venv/bin/python -I scripts/smoke_pyarrow.py vendor/tmp/pyarrow-smoke`.
 
 Codec and feature matrix, all from `output/smoke-pyarrow.txt`:
 
@@ -44,7 +44,7 @@ Codec and feature matrix, all from `output/smoke-pyarrow.txt`:
 | Bloom filter, write | Works for symbol and ts, absent on price as a negative control | Footer offsets and lengths |
 | Bloom filter, read use | NOT CHECKED, no read API found | `ParquetFile` has no bloom attribute; `ParquetFragmentScanOptions` shows only `page_checksum_verification` |
 
-Smoke coverage (`research/feasibility-scripts/smoke_pyarrow.py`, `smoke_common.py`):
+Smoke coverage (`scripts/smoke_pyarrow.py`, `smoke_common.py`):
 
 - Nanosecond timestamp column: checked. Type asserted as `timestamp[ns, tz=UTC]`, and the data has non-zero sub-microsecond digits.
 - Symbol column: checked, as a plain string column (dictionary encoded by default on write).
@@ -61,7 +61,7 @@ Result: RUNS. `arcticdb 6.28.2`, LMDB backend, native arm64 wheel, `FAILS: 0` in
 - URL: https://files.pythonhosted.org/packages/0c/c6/3dcc5c5bc6a30e8eb922bbb3e877da53924679a5b9c22e53e2c3bae7902a/arcticdb-6.28.2-cp313-cp313-macosx_15_0_arm64.whl
 - sha256: `1d717af923c38eb9ac254f10d9cb00c024426a8218b6d57a03881da5931e6843` (`output/wheel-urls.txt`, `output/archive-sha256.txt`).
 - Python 3.13.18, numpy 2.5.4, pandas 2.3.3. pandas stays below 3 because the wheel declares `Requires-Dist: pandas<3` (`.venv/lib/python3.13/site-packages/arcticdb-6.28.2.dist-info/METADATA`).
-- Command: `.venv/bin/python -I research/feasibility-scripts/smoke_arcticdb.py vendor/arcticdb-data/smoke`.
+- Command: `.venv/bin/python -I scripts/smoke_arcticdb.py vendor/arcticdb-data/smoke`.
 - Library options: all defaults, `rows_per_segment=100000`, `columns_per_segment=127`, `encoding_version=0`, `dedup=False` (`output/smoke-arcticdb.txt`).
 
 Support status on macOS:
@@ -77,7 +77,7 @@ Support status on macOS:
 - Runtime: the smoke output shows no macOS warning or error. The platform scan (`output/arcticdb-platform-scan.txt`) found no macOS branch outside test fixtures, only `platform.system() != "Linux"` CA-certificate checks in the S3, Azure and GCP adapters, which are irrelevant to LMDB.
 - Licence: Business Source License 1.1. Production use needs a paid licence (wheel METADATA). This is a publication and licensing point, not a technical limit.
 
-Smoke coverage (`research/feasibility-scripts/smoke_arcticdb.py`):
+Smoke coverage (`scripts/smoke_arcticdb.py`):
 
 - Nanosecond timestamp: checked, but stored as the DataFrame index and not as an ordinary column. Read-back index is `datetime64[ns]` with exact int64 equality.
 - Symbol column: checked, as an object string column stored as `UTF_DYNAMIC64`. This is ArcticDB's string column, not a dictionary or categorical type.
@@ -103,8 +103,8 @@ Result: RUNS, natively on darwin-aarch64 from `vendor/`, with its root in `vendo
 - JDK: Temurin 25.0.5+8 LTS, 64-Bit Server VM, `mixed mode, sharing` (`output/java-version.txt`). The QuestDB pom sets `javac.target` to 25 (CACHE/vendor-meta/questdb-pom-10.1.0.xml).
 - JDK URL: https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.5%2B8/OpenJDK25U-jdk_aarch64_mac_hotspot_25.0.5_8.tar.gz
 - JDK sha256: `36dc14d797aaff6d89aab302cd053fdba6207dfdcf772052fa7b023a94b0e857`, which matches Temurin's published `.sha256.txt` (`output/archive-sha256-recheck.txt`).
-- Client: Python `questdb 6.0.1`, wheel `questdb-6.0.1-cp313-cp313-macosx_11_0_arm64.whl`, 9079906 bytes, sha256 `7b495f6a11de4b44afe2fe3aa4bb48e84873a96e373b54bbb77d39023ea9d234`, uploaded 2026-10-29 (`output/pypi-tags.txt`). The hash is pinned in `research/feasibility-scripts/requirements.lock`. The exact file URL is not recorded in any output.
-- Commands: `research/feasibility-scripts/qdb.sh start`, then `.venv/bin/python -I research/feasibility-scripts/smoke_questdb.py vendor/questdb-data/import`, then `qdb.sh stop`.
+- Client: Python `questdb 6.0.1`, wheel `questdb-6.0.1-cp313-cp313-macosx_11_0_arm64.whl`, 9079906 bytes, sha256 `7b495f6a11de4b44afe2fe3aa4bb48e84873a96e373b54bbb77d39023ea9d234`, uploaded 2026-10-29 (`output/pypi-tags.txt`). The hash is pinned in `scripts/requirements.lock`. The exact file URL is not recorded in any output.
+- Commands: `scripts/qdb.sh start`, then `.venv/bin/python -I scripts/smoke_questdb.py vendor/questdb-data/import`, then `qdb.sh stop`.
 
 Native libraries and fallbacks:
 
@@ -160,7 +160,7 @@ Commit modes (`output/questdb-config-matrix.txt`):
 - NOT CHECKED: whether `sync` actually flushes more than `nosync`. The smoke proves only that the key parses and rows round-trip. No syscall or latency evidence exists, and system-call tracing would need sudo, which is not allowed here.
 - Data survived a clean restart in every run: `restart persistence: s_ilp_http_client exact`. A crash was not tested.
 
-Smoke coverage (`research/feasibility-scripts/smoke_questdb.py`):
+Smoke coverage (`scripts/smoke_questdb.py`):
 
 - Nanosecond timestamp column: checked. `SHOW COLUMNS` type plus exact `cast(ts AS LONG)` equality.
 - Symbol column: checked, as the `SYMBOL` type.
@@ -177,10 +177,10 @@ Smoke coverage (`research/feasibility-scripts/smoke_questdb.py`):
 | Python 3.13.18 from python-build-standalone, not the host Python 3.15 | `arcticdb==6.28.2` has no `cp315` wheel; full error below | `output/uv-compile-315-vs-314.txt` | All Python clients share 3.13. 3.14 also resolved, so 3.13 is a choice, not a hard limit |
 | pandas 2.3.3 | `arcticdb` requires `pandas<3` | wheel METADATA, `output/uv-install.txt` | Shared by all Python paths |
 | No Homebrew QuestDB; `no-jre` tarball plus a repo-local Temurin JDK | Brew is forbidden here, and the release has no macOS runtime bundle: its `rt` assets are linux-x86-64 and windows-x86-64 only | `output/questdb-release.txt` | Runtime JDK is 25.0.5, while QuestDB was built with 25.0.2 |
-| `qdb.sh` runs `java` directly and never calls `questdb.sh` | `questdb.sh` defaults its root to `$HOME/.questdb` or `/usr/local/var/questdb` | `research/feasibility-scripts/qdb.sh`, `vendor/questdb/questdb-10.1.0-no-jre-bin/questdb.sh` | JVM flags differ from upstream; see below |
+| `qdb.sh` runs `java` directly and never calls `questdb.sh` | `questdb.sh` defaults its root to `$HOME/.questdb` or `/usr/local/var/questdb` | `scripts/qdb.sh`, `vendor/questdb/questdb-10.1.0-no-jre-bin/questdb.sh` | JVM flags differ from upstream; see below |
 | Added `-XX:-UsePerfData` | Stops the JVM creating `hsperfdata_*` in the user temp dir | `qdb.sh`; digest | Not in upstream flags; expected to be small but not measured |
 | Added `-Djava.io.tmpdir=vendor/questdb-data/tmp` | Keeps extracted native libraries inside the repo | `qdb.sh`, `output/questdb-loaded-natives.txt` | None expected |
-| `server.conf` template: loopback binds, telemetry off, UDP off, `cairo.commit.mode=nosync` | Hard constraints. `nosync` equals the unset default | `research/feasibility-scripts/questdb-server.conf` | See fairness |
+| `server.conf` template: loopback binds, telemetry off, UDP off, `cairo.commit.mode=nosync` | Hard constraints. `nosync` equals the unset default | `scripts/questdb-server.conf` | See fairness |
 | `http.min.bind.to` replaced by `http.min.net.bind.to` in the template | Startup deprecation notice | `output/questdb-first-start.log` | None |
 | Dropped `uv pip compile --python-platform` | It targeted macOS 13 and `arcticdb` needs macOS 15 tags | digest only | None; final lock resolved for the real interpreter |
 
@@ -231,7 +231,7 @@ Current figures are from `output/disk-use-recheck.txt`, after this agent removed
 | `vendor/arcticdb-data` | 424K |
 | `vendor/uv-python` | 69M |
 | `vendor/cache` (uv cache, shared) | 333M |
-| `research/feasibility-scripts` | 820K, of which `output/` 708K |
+| `scripts/` (kept outside this repo) | 820K, of which `output/` 708K |
 | Outside repo: CACHE/vendor-dl | 238M |
 | Outside repo: CACHE/vendor-meta | 3.8M |
 
@@ -241,11 +241,11 @@ Nothing is left running: after the last stop, `pgrep -x java` found nothing, and
 
 ## Repeatable setup
 
-`research/feasibility-scripts/reproduce.zsh` is the setup. It uses `research/feasibility-scripts/env.sh`, and it needs `/opt/homebrew/bin/uv` (0.13.6 was used). In order, it does the following:
+`scripts/reproduce.zsh`, kept outside this repo, is the setup. It uses `scripts/env.sh`, and it needs `/opt/homebrew/bin/uv` (0.13.6 was used). In order, it does the following:
 
 ```zsh
 export REPO=$PWD
-F=$REPO/research/feasibility-scripts; V=$REPO/vendor
+F=<archived scripts>; V=$REPO/vendor
 . $F/env.sh        # all uv, pip and temp paths under vendor/; CACHE defaults to the research cache outside this repo
 DL=$CACHE/vendor-dl
 /opt/homebrew/bin/uv python install 3.13.18

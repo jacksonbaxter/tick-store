@@ -2,7 +2,7 @@
 
 Status: finished. Q1-Q6 all answered; two requested measurements cannot be produced on this host (see Gaps at the end).
 Host: Apple M4 Max, macOS, arm64, shared.
-Raw outputs: research/machine-probe/raw/. Probe sources: research/machine-probe/src/.
+Raw outputs and probe sources are kept outside this repo. `raw/...`, `src/...` and `bin/...` below are labels into that archive (see `research/README.md`).
 Numbers are quoted only if taken under .orchestrator/measure.sh.
 
 ## Q1. Machine facts
@@ -39,7 +39,7 @@ exists on this CPU. There is no PDEP/PEXT equivalent; it has to be done with tab
 
 ## Q5. x86-64 coverage from this Mac
 
-Command: `bash research/machine-probe/src/q5_x86.sh`. Raw: raw/q5-x86.txt. Not a timing, so not under measure.sh.
+Command: `bash src/q5_x86.sh`. Raw: raw/q5-x86.txt. Not a timing, so not under measure.sh.
 
 - Compile `--target=x86_64-apple-darwin -mavx2 -mbmi2` and `-mavx512f -mavx512vbmi2`: both exit 0. Disassembly confirms real
   ymm instructions (vpshufb, vpmovmskb), pdepq, and vpcompressb/vpexpandb on zmm. The first AVX2 probe compiled but had been
@@ -63,7 +63,7 @@ be established on the Linux host.
 
 ## Q6. Toolchain
 
-Command: `bash research/machine-probe/src/q6_toolchain.sh`. Raw: raw/q6-toolchain.txt. Sources: src/cxx23probe.cpp, src/fuzz_target.cc.
+Command: `bash src/q6_toolchain.sh`. Raw: raw/q6-toolchain.txt. Sources: src/cxx23probe.cpp, src/fuzz_target.cc.
 clang 23.1.4, `-std=c++23`, _LIBCPP_VERSION 230104, process loads /usr/lib/libc++.1.dylib (dyld trace in the raw file).
 
 All nine are defined, and each feature was also used, linked against the system libc++, and run, because a header macro does not
