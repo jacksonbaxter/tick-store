@@ -47,10 +47,25 @@ build/fuzz/fuzz/fuzz_itch_frame -max_total_time=60 -max_len=70000 \
 
 ## Reach
 
-Replay the corpus with `-runs=0 -print_coverage=1` and read `COVERED_FUNC` and
-`UNCOVERED_FUNC` for `src/itch/` and `include/tick_store/itch/`. Every message
-type's `decode_as` and `encode_as`, and each `FrameCursor` stop, should be covered.
-The remaining uncovered lines are listed below, so a new one stands out.
+`-runs=0 -print_coverage=1` lists `COVERED_FUNC` and `UNCOVERED_FUNC`, but at this
+optimisation level the per-type templates are inlined into one dispatch function,
+so it cannot show that each type was reached. For that, compile `src/itch/` and the
+target at `-O0` with `-fprofile-instr-generate -fcoverage-mapping`, replay with
+`-runs=0`, and read the instantiations with `llvm-cov show --show-instantiations`.
+
+Measured on the 60-second corpora, with both targets merged:
+
+- `decode_as` is entered for all 23 types, and no line in any of them has a zero
+  count, so every field's truncation check and the trailing-bytes check are reached.
+- `encode_as` is entered for all 23 types. Its one uncovered branch is the timestamp
+  range check, which a value decoded from 6 bytes cannot trip.
+- `FrameCursor`, `BigEndianReader`, `BigEndianWriter` and the layout checks are at
+  100% of functions, with every `FrameCursor` stop reached.
+
+The fuzzers do not reach the following, all of which the unit tests cover: the
+`to_string` formatters and `wire_size_of`, which the oracles do not call, and the
+`encode_frame` branches for a short buffer, an oversized raw message or an
+out-of-range timestamp, which need a hand-built message or a deliberately small buffer.
 
 ## Crashers
 
