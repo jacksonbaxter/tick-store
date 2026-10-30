@@ -1,7 +1,8 @@
 # Evidence: debian host feasibility (Phase 1)
 
-Status: complete for Phase 1 desk research. Nothing is verified on the host: see "To verify on the host". Target host was NOT contacted. Everything here comes from
-published sources or cached copies, confirmed in primary text.
+Status: desk research written before the host was contacted, then checked on the host. Results, and every place the host contradicted
+this file, are in `research/debian-check/README.md`, which takes precedence. Everything below comes from published sources or cached
+copies, confirmed in primary text.
 
 CACHE is the research cache, kept outside this repo; `CACHE/...` paths are labels into it.
 
@@ -165,10 +166,10 @@ field; both linux-relevant files recomputed here and match. The release body has
 
 | System | Verdict | Blocking risk |
 |---|---|---|
-| pyarrow 26.0.0 | expected to run, not yet verified | none known |
-| arcticdb 6.28.2 | expected to run, not yet verified | origin of zmm code untraced; SIGILL test needed |
-| QuestDB 10.1.0 | expected to run, not yet verified | needs host libz, libstdc++, libgcc_s; OS limits advisory only |
-| uv + CPython 3.13 | expected to run, not yet verified | none known |
+| pyarrow 26.0.0 | runs natively, smoke only (`research/debian-check/`) | none known |
+| arcticdb 6.28.2 | runs natively, smoke only (`research/debian-check/`) | origin of zmm code still untraced; no SIGILL on the paths the smoke ran |
+| QuestDB 10.1.0 | runs natively, smoke only, `-Xmx1g` (`research/debian-check/`) | default heap untested |
+| uv + CPython 3.13 | installed from pinned checksums (`research/debian-check/`) | none known |
 
 Install commands to run later (not run):
 
@@ -553,7 +554,7 @@ cat /proc/self/cgroup; systemctl --user is-system-running
 Behaviour checks, in the venv and install tree under ~/quant-projects:
 
 - SIGILL smoke test: `python -c "import pyarrow, pyarrow.parquet, arcticdb; print(pyarrow.__version__, arcticdb.__version__)"`, then run one LMDB write/read.
-- QuestDB start: `grep -iE 'instruction set|file limit|max_map|map count' <log>`, confirm which SIMD tier it chose and whether limit warnings appear.
+- QuestDB start: grep the rolling log for `linux-x86-64 \[`, `fs.file-max checked` and `vm.max_map_count checked` to confirm which SIMD tier it chose and whether limit warnings appear. (Corrected on the host: the original pattern matched only `max_map`.)
 - Cold cache proof: on a small test file, run fsync, `posix_fadvise(fd,0,0,POSIX_FADV_DONTNEED)`, then `fincore <file>` from the owning user, with every process using it stopped. If `fincore` is missing, use a `mincore` helper.
 - TSC: calibrate `rdtscp` against `CLOCK_MONOTONIC_RAW` under both boost states observed.
 - perf: `perf stat -e cycles:u,instructions:u -- true`, confirm counters are supported, not just permitted.
