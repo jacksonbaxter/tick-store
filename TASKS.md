@@ -80,22 +80,30 @@ Benchmarks
 - [ ] Nothing uses `cpu6` yet. The first two-thread benchmark must pin its second thread there, past the `taskset -c 4` it inherits
 
 Comparison harness
-- [ ] One schema covering the same records for all systems, so the ratio baseline is identical. Decide how the 23 message types map to columns and how unused fields are stored
-- [ ] Read-back check for each comparison system against the source records
-- [ ] Parquet: streaming `ParquetWriter`, settings from `column-systems.md` section 7, row-group sweep
-- [ ] ArcticDB on LMDB: settings from section 7, including rows-per-segment and columns-per-segment sweeps
-- [ ] QuestDB: pre-created tables with `TIMESTAMP_NS`. Never rely on ILP auto-create, which silently lost nanoseconds. Clock stops at `wait_wal_table`
-- [ ] Each result records exact version and all settings
-- [ ] Durability classes A and B for every system, flush granularity stated. Verify that QuestDB `sync` really flushes, and validate the config value, because a typo silently gives `nosync`
-- [ ] Harness reads back the setting in force for every comparison system and fails if it differs from what was requested, because QuestDB silently accepts a bad `cairo.commit.mode`. A durability class is not proven until this passes
-- [ ] macOS cold-cache tool built on the probe's result: stop the server, `msync(MS_INVALIDATE)` on a fresh read-only mapping of every file, `mincore` must read 0 on every file with a retry otherwise, start, query, disk0 byte delta must reach the expected bytes. State that metadata stays warm
-- [ ] Linux cold-cache tool: stop the process, fsync, `posix_fadvise(POSIX_FADV_DONTNEED)`, prove with `fincore` or `mincore`. Show it on real QuestDB and ArcticDB data files, since only a fresh test file is proven so far
-- [ ] QuestDB on `debian`: choose and record the heap, since only `-Xmx1g` was tried. Record GraalVM and jemalloc in the results header. Read bind addresses with `ss`, not `SHOW PARAMETERS`
+- [x] One schema covering the same records for all systems, so the ratio baseline is identical. Decide how the 23 message types map to columns and how unused fields are stored
+- [x] Read-back check for each comparison system against the source records
+- [x] Parquet: streaming `ParquetWriter`, settings from `column-systems.md` section 7, row-group sweep
+- [x] ArcticDB on LMDB: settings from section 7, including rows-per-segment and columns-per-segment sweeps
+- [x] QuestDB: pre-created tables with `TIMESTAMP_NS`. Never rely on ILP auto-create, which silently lost nanoseconds. Clock stops at `wait_wal_table`
+- [x] Each result records exact version and all settings
+- [x] Durability classes A and B for every system, flush granularity stated. Verify that QuestDB `sync` really flushes, and validate the config value, because a typo silently gives `nosync`
+- [x] Harness reads back the setting in force for every comparison system and fails if it differs from what was requested, because QuestDB silently accepts a bad `cairo.commit.mode`. A durability class is not proven until this passes
+- [x] macOS cold-cache tool built on the probe's result: stop the server, `msync(MS_INVALIDATE)` on a fresh read-only mapping of every file, `mincore` must read 0 on every file with a retry otherwise, start, query, disk0 byte delta must reach the expected bytes. State that metadata stays warm
+- [x] Linux cold-cache tool: stop the process, fsync, `posix_fadvise(POSIX_FADV_DONTNEED)`, prove with `fincore` or `mincore`. Show it on real QuestDB and ArcticDB data files, since only a fresh test file is proven so far
+- [x] QuestDB on `debian`: record the heap, `-Xmx1g` for the slice, and read bind addresses with `ss`, not `SHOW PARAMETERS`
+- [ ] Record GraalVM and jemalloc in the results header. Each file has them only under a class's `facts`
 - [ ] Check QuestDB's `debian` heap against the full day before relying on any `-Xmx1g` result
 - [ ] ArcticDB and pyarrow on `debian`: check for SIGILL at full size, since the wheels' zmm code is untraced and the CPU has no AVX-512
-- [ ] Name the sync primitive beside every macOS class B number: `fsync`, `F_BARRIERFSYNC` and `F_FULLFSYNC` differ by about 80x at p50
-- [ ] A warm result counts only if residency is proven before and after the run
-- [ ] One system runs at a time. Record peak RSS, heap settings, `MemAvailable` and stored bytes. Keep the Python overhead visible rather than hidden in engine time
+- [x] Name the sync primitive beside every macOS class B number: `fsync`, `F_BARRIERFSYNC` and `F_FULLFSYNC` differ by about 80x at p50
+- [x] A warm result counts only if residency is proven before and after the run
+- [x] One system runs at a time. Record peak RSS, heap settings, `MemAvailable` and stored bytes. Keep the Python overhead visible rather than hidden in engine time
+- [x] The real-system failures in `tests/compare/test_real_systems.py` ran on both hosts: 4 tests pass with no skip, and `not_a_mode` raises `SettingsMismatch`
+- [x] `fuzz_columns` covers the column directory and manifest parsers: clean for 60 s, 2,318,532 runs. The 30 minutes stay under the G-3 task below
+- [ ] Parquet sweep gaps against section 7: no `none` codec variant, and no run of `ts` on its default encoding against `DELTA_BINARY_PACKED`
+- [ ] ArcticDB sweep gap against section 7: only one symbol for the whole table ran, not one symbol per security
+- [ ] `pq.read_table` imports `pyarrow.dataset` inside the timed call, so `cold_includes` is wrong for Parquet. Import it before the clock, find the rest of Parquet's cold floor, then re-run
+- [ ] macOS `st_blocks` reads 17% to 24% above the apparent size on five of six Parquet variants, and on ArcticDB `rows100k-cols1` in class B. Find why before quoting a macOS stored ratio for them
+- [ ] Repeat the read-back on QuestDB's converted Parquet partition before quoting its size as proven
 
 Checks
 - [x] ASan and UBSan with no recover, TSan on concurrent code
