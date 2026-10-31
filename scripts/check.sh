@@ -360,7 +360,9 @@ step_py_compare() {
     fi
     run_unittests "$1" .venv/bin/python tests/compare/test_coldcache.py \
         tests/compare/test_schema.py tests/compare/test_settings.py
+    local code=$?
     NOTE="$NOTE, fast set; test_real_systems.py not run here"
+    return "$code"
 }
 
 # Each validator refuses an empty list only if it is handed one, so an empty folder fails
