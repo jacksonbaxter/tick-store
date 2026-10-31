@@ -161,6 +161,48 @@ class RuntimeReading(unittest.TestCase):
             compare_run.questdb_runtime(systems({"a": 1}, {"a": 2}))
 
 
+class Statements(unittest.TestCase):
+    """Every sentence compare/run.py writes must be safe to publish."""
+
+    def test_no_statement_trips_the_leak_check(self):
+        for text in (compare_run.COLD_INCLUDES, compare_run.LINUX_HEAP, compare_run.MACOS_HEAP,
+                     runtime_reading(jvm_properties(RuntimeReading.LOG), {"libjvm.so"})):
+            self.assertEqual(check_compare.check_results.check_leaks({"text": text}), [])
+
+
+class SiblingCommand(unittest.TestCase):
+    """The reading goes inside the pin, so the wrapper still sees `taskset -c 4` first."""
+
+    class Meter:
+        @staticmethod
+        def snapshot_command(snapshot):
+            return ["sh", snapshot]
+
+    def test_linux_under_the_wrapper(self):
+        self.assertEqual(compare_run.wrapped_command("wrapper", self.Meter, "stat", ["python"]),
+                         ["wrapper", "taskset", "-c", "4", "sh", "stat", "python"])
+
+    def test_linux_with_no_wrapper_is_unpinned_as_before_and_still_read(self):
+        self.assertEqual(compare_run.wrapped_command(None, self.Meter, "stat", ["python"]),
+                         ["sh", "stat", "python"])
+
+    def test_macos_has_neither(self):
+        self.assertEqual(compare_run.wrapped_command("wrapper", None, "stat", ["python"]),
+                         ["wrapper", "python"])
+        self.assertEqual(compare_run.sibling_block(None, None, ["parquet"]), "not-available")
+
+    def test_each_system_is_a_case(self):
+        class Meter:
+            @staticmethod
+            def block(cases):
+                return cases
+
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "build") as scratch:
+            (Path(scratch) / "parquet.sibling").write_text("0.5", encoding="utf-8")
+            self.assertEqual(compare_run.sibling_block(Meter, Path(scratch), ["parquet"]),
+                             {"parquet": 0.5})
+
+
 class HeapStatements(unittest.TestCase):
     """What compare/run.py writes, against the validator and the real capacity file."""
 

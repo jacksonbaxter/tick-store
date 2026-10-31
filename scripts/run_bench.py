@@ -12,10 +12,13 @@ iteration-only, goes under build/, and check_results.py will refuse it.
 
 On Linux the case runs as
 
-    <wrapper> taskset -c 4 perf stat -x, -e cycles:u,instructions:u,branch-misses:u ...
+    <wrapper> taskset -c 4 sh -c <copy /proc/stat, then exec> \\
+        perf stat -x, -e cycles:u,instructions:u,branch-misses:u ...
 
 with events held off by perf's control FIFOs until the binary opens them around the
-timed passes. stdout and stderr go to files on the host, so nothing depends on a
+timed passes. The copy of /proc/stat is taken once the wrapper has the lock, and read
+against /proc/stat when it exits, to record how busy the core's SMT sibling was: nothing
+keeps it idle. stdout and stderr go to files on the host, so nothing depends on a
 terminal or an SSH connection staying up. The results file appears only when the whole
 run has finished and check_results.py has passed it, so a file that exists is complete.
 
@@ -46,7 +49,6 @@ EXIT_RETRY_LATER = 75
 EXIT_USAGE = 2
 
 LINUX_CORE = 4
-LINUX_SIBLING = "cpu5 idle as stated, not enforced"
 LINUX_SECOND_THREAD = "cpu6 reserved, unused: every case is single-threaded"
 PERF_EVENTS = {
     "cycles:u": "cycles",
@@ -69,6 +71,18 @@ MACOS_STATEMENT = ("Unpinned. No hardware counters. macOS has no thread pinning,
 LINUX_STATEMENT = (f"Pinned with taskset -c {LINUX_CORE} and verified by sched_getcpu. Counters "
                    "come from perf stat user-mode events. perf cycles and timer ticks are "
                    "different units.")
+
+CPU_SYSFS = Path("/sys/devices/system/cpu")
+PROC_STAT = Path("/proc/stat")
+SIBLING_FILES = ("thread_siblings_list", "core_cpus_list")
+# user nice system idle iowait irq softirq steal. Guest time is already inside user and nice.
+JIFFY_FIELDS = 8
+IDLE_FIELDS = (3, 4)
+# The copy runs in the command's place and execs it, so the wrapper's child is the same process.
+SNAPSHOT_SCRIPT = 'cat "$0" > "$1" && shift && exec "$@"'
+SIBLING_METHOD = ("Busy jiffies over total jiffies from the kernel's proc stat file, read once "
+                  "the measurement lock is held and again when the wrapper exits. Busy is "
+                  "everything but idle and iowait, and a wait for the lock is not in the window.")
 
 LOAD_LINE = re.compile(r"^measure\.sh: (?:start|end) load1=")
 HOST_TOKEN = re.compile(r" host=\S+")
@@ -123,6 +137,73 @@ def linux_turbo():
             continue
         return {"1": "enabled", "0": "disabled"}.get(state, "unavailable")
     return "unavailable"
+
+
+def parse_cpu_list(text):
+    """A kernel CPU list, such as 4-5 or 4,5."""
+    cpus = []
+    for part in text.strip().split(","):
+        low, _, high = part.partition("-")
+        cpus += range(int(low), int(high or low) + 1)
+    return cpus
+
+
+def linux_sibling(core, sysfs):
+    """The core's one other hardware thread, and the topology file that named it."""
+    for name in SIBLING_FILES:
+        try:
+            text = (sysfs / f"cpu{core}" / "topology" / name).read_text(encoding="ascii")
+        except OSError:
+            continue
+        if not text.strip():
+            continue
+        others = [cpu for cpu in parse_cpu_list(text) if cpu != core]
+        if len(others) != 1:
+            raise Failure(EXIT_USAGE, f"cpu{core} has {len(others)} siblings in {name}, not 1")
+        return others[0], name
+    raise Failure(EXIT_USAGE, f"no topology file names cpu{core}'s sibling")
+
+
+def cpu_jiffies(stat_text, cpu):
+    """(busy, total) jiffies of one CPU, from the text of /proc/stat."""
+    for line in stat_text.splitlines():
+        fields = line.split()
+        if fields and fields[0] == f"cpu{cpu}":
+            values = [int(value) for value in fields[1:JIFFY_FIELDS + 1]]
+            idle = sum(values[index] for index in IDLE_FIELDS)
+            return sum(values) - idle, sum(values)
+    raise Failure(1, f"/proc/stat has no cpu{cpu}")
+
+
+class SiblingMeter:
+    """How busy the pinned core's SMT sibling was across a case. Nothing keeps it idle."""
+
+    def __init__(self, sysfs=CPU_SYSFS, stat=PROC_STAT):
+        self.sibling, self.topology = linux_sibling(LINUX_CORE, sysfs)
+        self.stat = stat
+
+    def snapshot_command(self, snapshot):
+        """A prefix for a command, so that the first reading falls inside the lock."""
+        return ["sh", "-c", SNAPSHOT_SCRIPT, str(self.stat), str(snapshot)]
+
+    def busy_percent(self, snapshot):
+        """Since the snapshot, up to now."""
+        try:
+            first = snapshot.read_text(encoding="ascii")
+        except OSError as error:
+            raise Failure(1, f"no reading of cpu{self.sibling} before the case: {error}") from None
+        busy_before, total_before = cpu_jiffies(first, self.sibling)
+        busy, total = cpu_jiffies(self.stat.read_text(encoding="ascii"), self.sibling)
+        if total <= total_before:
+            raise Failure(1, f"no jiffies passed on cpu{self.sibling} across the case")
+        return 100.0 * (busy - busy_before) / (total - total_before)
+
+    def statement(self):
+        return f"cpu{self.sibling} idle as stated, not enforced: see sibling_busy_percent"
+
+    def block(self, cases):
+        return {"core": LINUX_CORE, "sibling": self.sibling, "topology": self.topology,
+                "method": SIBLING_METHOD, "cases": cases}
 
 
 def clean_load_lines(stderr_text):
@@ -220,21 +301,22 @@ def ratio_of(case, report):
     return {"status": "not-applicable", "reason": "decode only, so nothing is stored"}
 
 
-def wrapped_command(host, measure, case_files, binary_args):
+def wrapped_command(host, measure, case_files, binary_args, meter=None):
     command = []
     if measure:
         command.append(measure)
     if host == "Linux":
-        command += ["taskset", "-c", str(LINUX_CORE), "perf", "stat", "-x,",
+        command += ["taskset", "-c", str(LINUX_CORE),
+                    *meter.snapshot_command(case_files["stat"]), "perf", "stat", "-x,",
                     "-e", ",".join(PERF_EVENTS), "--delay=-1",
                     f"--control=fifo:{case_files['control']},{case_files['ack']}",
                     "-o", str(case_files["perf"]), "--"]
     return command + binary_args
 
 
-def run_case(host, measure, binary, case, slice_path, pin, work_dir):
+def run_case(host, measure, binary, case, slice_path, pin, work_dir, meter=None):
     files = {name: work_dir / f"{case}.{name}" for name in
-             ("stdout", "stderr", "report", "gbench", "perf", "control", "ack")}
+             ("stdout", "stderr", "report", "gbench", "perf", "control", "ack", "stat")}
     for path in files.values():
         path.unlink(missing_ok=True)
 
@@ -248,7 +330,7 @@ def run_case(host, measure, binary, case, slice_path, pin, work_dir):
         arguments += [f"--core={LINUX_CORE}", f"--perf-control={files['control']}",
                       f"--perf-ack={files['ack']}"]
 
-    command = wrapped_command(host, measure, files, arguments)
+    command = wrapped_command(host, measure, files, arguments, meter)
     with open(files["stdout"], "wb") as stdout, open(files["stderr"], "wb") as stderr:
         code = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=stdout,
                               stderr=stderr, check=False).returncode
@@ -260,10 +342,12 @@ def run_case(host, measure, binary, case, slice_path, pin, work_dir):
     if code != 0:
         raise Failure(code, f"{case}: exited {code}, see {files['stderr']}")
 
+    sibling_busy = meter.busy_percent(files["stat"]) if meter else None
     report = json.loads(files["report"].read_text(encoding="utf-8"))
     google_benchmark = json.loads(files["gbench"].read_text(encoding="utf-8"))
     return {
         "case": case,
+        "sibling_busy_percent": sibling_busy,
         "report": report,
         "throughput": throughput_of(google_benchmark, case),
         "counters": counters_of(host, files, report),
@@ -319,7 +403,7 @@ def result_row(host, run):
     }
 
 
-def build_document(host, benchmark, slice_name, pin, commit, measure, runs):
+def build_document(host, benchmark, slice_name, pin, commit, measure, runs, meter=None):
     first = runs[0]["report"]
     build = first["build"]
     linux = host == "Linux"
@@ -337,7 +421,9 @@ def build_document(host, benchmark, slice_name, pin, commit, measure, runs):
         "isa": build["isa"],
         "commit": commit,
         "core": LINUX_CORE if linux else "not-available",
-        "sibling": LINUX_SIBLING if linux else "not-available",
+        "sibling": meter.statement() if linux else "not-available",
+        "sibling_busy_percent": (meter.block({run["case"]: run["sibling_busy_percent"]
+                                              for run in runs}) if linux else "not-available"),
         "second_thread": LINUX_SECOND_THREAD if linux else "not-available",
         "governor": governor_of(host, runs),
         "frequency": frequency_block(host, runs),
@@ -402,6 +488,10 @@ def parse_arguments(argv):
     parser.add_argument("--iteration-dir", type=Path, default=DEFAULT_ITERATION_DIR)
     parser.add_argument("--work-dir", type=Path, default=DEFAULT_WORK_DIR,
                         help="where raw outputs go, under the build tree")
+    parser.add_argument("--sysfs-cpu", type=Path, default=CPU_SYSFS,
+                        help="where the kernel's CPU topology is")
+    parser.add_argument("--proc-stat", type=Path, default=PROC_STAT,
+                        help="where the kernel's CPU times are")
     return parser.parse_args(argv)
 
 
@@ -417,13 +507,14 @@ def run(args):
     benchmark = binary.name.removesuffix("_bench")
     commit = current_commit()
     args.work_dir.mkdir(parents=True, exist_ok=True)
+    meter = SiblingMeter(args.sysfs_cpu, args.proc_stat) if host == "Linux" else None
 
     cases = run_text([str(binary), "--list-cases"]).split()
-    runs = [run_case(host, measure, binary, case, slice_path, pin, args.work_dir)
+    runs = [run_case(host, measure, binary, case, slice_path, pin, args.work_dir, meter)
             for case in cases]
     check_builds_match(runs, commit, measure)
 
-    document = build_document(host, benchmark, args.slice, pin, commit, measure, runs)
+    document = build_document(host, benchmark, args.slice, pin, commit, measure, runs, meter)
     directory = args.results_dir if measure else args.iteration_dir
     output = directory / f"{host}-{benchmark}-{commit[:12]}.json"
     publish(document, output, args.pins, measure)

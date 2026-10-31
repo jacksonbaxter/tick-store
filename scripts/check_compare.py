@@ -39,8 +39,8 @@ COMMIT_MODE_SOURCES = ("cairo.commit.mode (conf file)", "cairo.commit.mode (echo
                        "cairo.commit.mode (parsed)")
 COMMIT_MODE = {"A": "nosync", "B": "sync"}
 HEADER_FIELDS = ("schema", "host", "measurement", "statement", "cpu_model", "kernel", "compiler",
-                 "compile_flags", "build_type", "commit", "core", "second_thread", "governor",
-                 "turbo", "pinning", "questdb_runtime", "load_lines")
+                 "compile_flags", "build_type", "commit", "core", "sibling_busy_percent",
+                 "second_thread", "governor", "turbo", "pinning", "questdb_runtime", "load_lines")
 RUNTIME_FIELDS = ("jvm_vendor", "jvm_version", "jvm_read_from", "jemalloc_read_from")
 ORACLE_FIELDS = ("verdict", "exit_code", "records", "mismatched_records", "hashes_match",
                  "source_sha256", "stored_sha256")
@@ -316,7 +316,7 @@ def check_document(document, top_keys, path, pins, capacity):
         problems += check_heap(document, "macOS", capacity)
     elif header.get("host") == "Linux":
         problems += check_results.check_linux({key: value for key, value in header.items()
-                                               if key != "frequency"})
+                                               if key != "frequency"}, list(systems))
         problems += check_heap(document, "Linux", capacity)
     label = str(document.get("label", ""))
     if "not claims about a full day" not in label:

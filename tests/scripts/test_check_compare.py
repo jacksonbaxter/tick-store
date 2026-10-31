@@ -137,6 +137,11 @@ def runtime_block(host):
             "jemalloc_read_from": "the libraries mapped into the running server"}
 
 
+def sibling_block():
+    return {"core": 4, "sibling": 5, "topology": "thread_siblings_list", "method": "jiffies",
+            "cases": {"parquet": 0.5, "arcticdb": 0.1, "questdb": 1.0}}
+
+
 def valid_document(host):
     linux = host == "Linux"
     return {
@@ -148,6 +153,7 @@ def valid_document(host):
             "commit": COMMIT, "core": 4 if linux else "not-available",
             "second_thread": "cpu6" if linux else "not-available",
             "sibling": "cpu5 idle as stated, not enforced" if linux else "not-available",
+            "sibling_busy_percent": sibling_block() if linux else "not-available",
             "governor": "performance" if linux else "not-available",
             "turbo": "enabled" if linux else "not-available",
             "pinning": "pinned" if linux else "not-supported",
@@ -452,6 +458,37 @@ class Faults(Harness):
         def fault(document):
             document["method"]["cold"] = ""
         self.assert_fault(fault, "how warm and cold")
+
+    # The core's SMT sibling.
+
+    def test_no_sibling_reading_on_linux(self):
+        def fault(document):
+            del document["header"]["sibling_busy_percent"]
+        self.assert_fault(fault, "missing field 'sibling_busy_percent'", "Linux")
+
+    def test_a_system_with_no_sibling_reading(self):
+        def fault(document):
+            del document["header"]["sibling_busy_percent"]["cases"]["questdb"]
+        self.assert_fault(fault, "no reading for questdb", "Linux")
+
+    def test_a_sibling_busy_for_6_percent_is_refused(self):
+        def fault(document):
+            document["header"]["sibling_busy_percent"]["cases"]["parquet"] = 6.0
+        self.assert_fault(fault, "parquet reads 6.0%, over the 5.0% limit", "Linux")
+
+    def test_a_sibling_busy_for_half_a_percent_is_accepted(self):
+        result = self.run_on(valid_document("Linux"), "Linux")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_macos_claiming_a_sibling_reading(self):
+        def fault(document):
+            document["header"]["sibling_busy_percent"] = sibling_block()
+        self.assert_fault(fault, "macOS has no pinned core")
+
+    def test_macos_with_no_sibling_field(self):
+        def fault(document):
+            del document["header"]["sibling_busy_percent"]
+        self.assert_fault(fault, "missing field 'sibling_busy_percent'")
 
     # QuestDB's runtime.
 

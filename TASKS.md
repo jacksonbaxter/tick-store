@@ -64,7 +64,7 @@ Tests and fuzzing
 
 Slice for the comparison harness
 - [x] `tools/tick_slice`: every `S` and `R` of `12302019` plus the window 09:29:30 to 09:34:30, 6,125,294 messages and 206,138,339 bytes, proved clean by the strict decoder and by a round trip, pinned under `slices` in `scripts/data_pins.json`
-- [ ] The comparison harness verifies the slice against its pin before loading it
+- [x] The comparison harness verifies the slice against its pin before loading it: `Runner.verify_slice` in `compare/run_system.py` hashes the slice against the pin and rebuilds the pin from the export through the oracle, first thing in `Runner.run`, and stops the run on a difference
 
 Benchmarks
 - [x] Google Benchmark plus HdrHistogram, warm-up, seeded inputs, verify before measuring (`bench/itch_codec_bench.cpp`)
@@ -76,7 +76,7 @@ Benchmarks
 - [x] Linux counters through `perf stat` with `:u` events, limited to the timed passes by perf's control FIFOs
 - [ ] Confirm what `cache-misses` counts on Zen 1 against AMD documentation before quoting it. Until then the results mark it unavailable
 - [x] Results table in the README generated from results files, never typed. `--check` fails on a hand edit
-- [ ] Record whether `cpu5` really stayed idle during a run, for example from its `/proc/stat` times, since nothing enforces it and the results only state it
+- [x] Record whether `cpu5` really stayed idle during a run: `sibling_busy_percent` per case in the bench and compare headers, from `/proc/stat` inside the lock, with the sibling read from the kernel's topology. The validators refuse over 5%, a limit of our choosing. Nothing enforces idleness, and no real Linux reading exists until the re-run
 - [ ] Boost cannot be turned off without root, so pinned numbers ran near 3.56 GHz with the clock free to move. Decide before Phase 3 whether to ask for a fixed-clock run, or to report cycles as the headline
 - [ ] Nothing uses `cpu6` yet. The first two-thread benchmark must pin its second thread there, past the `taskset -c 4` it inherits
 
@@ -102,7 +102,8 @@ Comparison harness
 - [x] `fuzz_columns` covers the column directory and manifest parsers: clean for 60 s, 2,318,532 runs. The 30 minutes stay under the G-3 task below
 - [ ] Parquet sweep gaps against section 7: no `none` codec variant, and no run of `ts` on its default encoding against `DELTA_BINARY_PACKED`
 - [ ] ArcticDB sweep gap against section 7: only one symbol for the whole table ran, not one symbol per security
-- [ ] `pq.read_table` imports `pyarrow.dataset` inside the timed call, so `cold_includes` is wrong for Parquet. Import it before the clock, find the rest of Parquet's cold floor, then re-run
+- [x] `pq.read_table` imported `pyarrow.dataset` inside the timed call, so `cold_includes` was wrong for Parquet. `ParquetSystem.open` now imports it first, and `pyarrow.acero` too, and `tests/compare/test_system_worker.py` fails if any module loads inside the clock. On macOS that import was the whole cold floor, 116 ms: see "A fault in the Parquet cold numbers" in `NOTES.md`
+- [ ] Re-run the comparison and the benchmarks on both hosts at the final code. The files in `results/` predate `questdb_runtime`, the heap check, `sibling_busy_percent` and the import fix, and the validators refuse them until then
 - [ ] macOS `st_blocks` reads 17% to 24% above the apparent size on five of six Parquet variants, and on ArcticDB `rows100k-cols1` in class B. Find why before quoting a macOS stored ratio for them
 - [ ] Repeat the read-back on QuestDB's converted Parquet partition before quoting its size as proven
 

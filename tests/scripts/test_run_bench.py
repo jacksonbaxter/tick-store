@@ -20,6 +20,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "run_bench.py"
@@ -116,6 +117,7 @@ exec "$@"
 
 PERF = """#!/bin/bash
 echo "perf $*" >> {record}
+cp {stat}.after {stat}
 while [ "$1" != "--" ]; do
   if [ "$1" = "-o" ]; then out=$2; fi
   shift
@@ -132,6 +134,44 @@ rc=$?
 }} > "$out"
 exit $rc
 """
+
+
+# cpu4 is the pinned core, whose counters must not be the ones read.
+STAT_BEFORE = ("cpu  9 9 9 9 9 9 9 9 0 0\ncpu4 9000 0 9000 0 0 0 0 0 0 0\n"
+               "cpu5 100 0 100 800 0 0 0 0 0 0\ncpu6 1 1 1 1 1 1 1 1 0 0\nintr 1\n")
+# Over 1000 jiffies: 2 user, 1 nice, 1 system, 1 irq, 985 idle, 10 iowait. So 0.5% busy.
+STAT_AFTER = ("cpu  9 9 9 9 9 9 9 9 0 0\ncpu4 9000 0 9000 1000 0 0 0 0 0 0\n"
+              "cpu5 102 1 101 1785 10 1 0 0 0 0\ncpu6 1 1 1 1 1 1 1 1 0 0\nintr 1\n")
+# 2000 busy jiffies on the sibling while another job held the lock, and then the same case.
+STAT_AFTER_A_WAIT = STAT_BEFORE.replace("cpu5 100 0 100", "cpu5 1100 0 1100")
+STAT_AFTER_THE_WAIT_AND_CASE = STAT_AFTER.replace("cpu5 102 1 101", "cpu5 1102 1 1101")
+WAITING_WRAPPER = """#!/bin/bash
+cp STAT.waited STAT
+"$@"
+"""
+
+
+def load_run_bench():
+    sys.dont_write_bytecode = True
+    spec = importlib.util.spec_from_file_location("run_bench_under_test", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+RUN_BENCH = load_run_bench()
+
+
+def load_check_results():
+    spec = importlib.util.spec_from_file_location("check_results_under_test", CHECK)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+CHECK_RESULTS = load_check_results()
 
 
 def write_script(path, text):
@@ -157,8 +197,18 @@ class RunBenchTest(unittest.TestCase):
             check=False).stdout.strip() or COMMIT
         self.bin = self.dir / "bin"
         self.bin.mkdir()
+        self.stat = self.dir / "stat"
+        self.stat.write_text(STAT_BEFORE, encoding="ascii")
+        (self.dir / "stat.after").write_text(STAT_AFTER, encoding="ascii")
+        self.sysfs = self.dir / "cpu"
+        self.write_topology("thread_siblings_list", "4-5")
         write_script(self.bin / "taskset", TASKSET.format(record=self.record))
-        write_script(self.bin / "perf", PERF.format(record=self.record))
+        write_script(self.bin / "perf", PERF.format(record=self.record, stat=self.stat))
+
+    def write_topology(self, name, text):
+        directory = self.sysfs / "cpu4" / "topology"
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / name).write_text(f"{text}\n", encoding="ascii")
 
     def make_binary(self, commit=None, dirty=False, exit_code=0):
         cases = ("itch_decode", "itch_decode_encode")
@@ -186,7 +236,8 @@ class RunBenchTest(unittest.TestCase):
             [sys.executable, "-I", str(SCRIPT), str(binary), "--slice", SLICE,
              "--slice-path", str(self.slice), "--pins", str(self.pins),
              "--results-dir", str(self.results), "--iteration-dir", str(self.iteration),
-             "--work-dir", str(self.work)],
+             "--work-dir", str(self.work), "--sysfs-cpu", str(self.sysfs),
+             "--proc-stat", str(self.stat)],
             capture_output=True, text=True, env=environment, check=False)
 
     def result_path(self):
@@ -271,8 +322,8 @@ class RunBenchTest(unittest.TestCase):
     def test_linux_pins_and_counts_as_the_brief_says(self):
         self.run_bench(self.make_binary(), self.make_wrapper())
         commands = self.record.read_text(encoding="utf-8")
-        self.assertIn("taskset -c 4 perf stat -x, -e cycles:u,instructions:u,branch-misses:u",
-                      commands)
+        self.assertIn("taskset -c 4 sh -c", commands)
+        self.assertIn("perf stat -x, -e cycles:u,instructions:u,branch-misses:u", commands)
         self.assertIn("--core=4", commands)
         document = json.loads(self.result_path().read_text(encoding="utf-8"))
         header = document["header"]
@@ -282,6 +333,7 @@ class RunBenchTest(unittest.TestCase):
         self.assertEqual(counters["cycles"]["value"], 4000)
         self.assertEqual(counters["cache_misses"]["status"], "unavailable")
         self.assertEqual(counters["per_message"]["cycles"], 0.4)
+        self.assertEqual(header["sibling_busy_percent"]["cases"]["itch_decode"], 0.5)
 
     @unittest.skipUnless(HOST == "macOS", "the unpinned path exists only on macOS")
     def test_macos_stays_unpinned_with_no_counters(self):
@@ -292,7 +344,95 @@ class RunBenchTest(unittest.TestCase):
         self.assertNotIn("--core", commands)
         document = json.loads(self.result_path().read_text(encoding="utf-8"))
         self.assertIn("Unpinned", document["header"]["statement"])
+        self.assertEqual(document["header"]["sibling_busy_percent"], "not-available")
         self.assertEqual(document["results"][0]["counters"]["cycles"]["status"], "unavailable")
+
+    # The Linux path of a case, on either host, with the fake taskset and perf above.
+
+    def linux_case(self, wrapper):
+        self.work.mkdir()
+        environment = {"PATH": f"{self.bin}{os.pathsep}{os.environ['PATH']}"}
+        meter = RUN_BENCH.SiblingMeter(self.sysfs, self.stat)
+        with mock.patch.dict(os.environ, environment):
+            return RUN_BENCH.run_case("Linux", str(wrapper), self.make_binary(), "itch_decode",
+                                      self.slice, PINS["slices"][SLICE], self.work, meter)
+
+    def test_a_linux_case_records_its_siblings_busy_share(self):
+        run = self.linux_case(self.make_wrapper())
+        self.assertEqual(run["sibling_busy_percent"], 0.5)
+        commands = self.record.read_text(encoding="utf-8")
+        self.assertIn("taskset -c 4 sh -c", commands)
+        self.assertIn("perf stat -x,", commands)
+
+    def test_a_linux_document_meets_the_validators_sibling_rule(self):
+        run = self.linux_case(self.make_wrapper())
+        meter = RUN_BENCH.SiblingMeter(self.sysfs, self.stat)
+        with (mock.patch.object(RUN_BENCH, "cpu_model", return_value="cpu"),
+              mock.patch.object(RUN_BENCH, "linux_turbo", return_value="enabled")):
+            document = RUN_BENCH.build_document("Linux", "itch_codec", SLICE, PINS["slices"][SLICE],
+                                                COMMIT, "wrapper", [run], meter)
+        header = document["header"]
+        self.assertEqual(header["sibling_busy_percent"]["cases"], {"itch_decode": 0.5})
+        self.assertEqual(CHECK_RESULTS.check_sibling(header, ["itch_decode"]), [])
+        self.assertEqual(CHECK_RESULTS.check_linux({"sibling": header["sibling"]}, []), [])
+        self.assertEqual(CHECK_RESULTS.check_leaks(document), [])
+
+    def test_a_wait_for_the_lock_is_outside_the_window(self):
+        self.stat.with_suffix(".waited").write_text(STAT_AFTER_A_WAIT, encoding="ascii")
+        self.stat.with_suffix(".after").write_text(STAT_AFTER_THE_WAIT_AND_CASE, encoding="ascii")
+        wrapper = self.make_wrapper(WAITING_WRAPPER.replace("STAT", str(self.stat)))
+        self.assertEqual(self.linux_case(wrapper)["sibling_busy_percent"], 0.5)
+
+    def test_the_document_carries_the_reading_for_each_case(self):
+        meter = RUN_BENCH.SiblingMeter(self.sysfs, self.stat)
+        block = meter.block({"itch_decode": 0.5})
+        self.assertEqual((block["core"], block["sibling"]), (4, 5))
+        self.assertEqual(block["topology"], "thread_siblings_list")
+        self.assertIn("not enforced", meter.statement())
+        self.assertIn("cpu5", meter.statement())
+        document = {"header": {"sibling": meter.statement(), "sibling_busy_percent": block}}
+        self.assertEqual(CHECK_RESULTS.check_leaks(document), [])
+        self.assertEqual(CHECK_RESULTS.check_sibling(document["header"], ["itch_decode"]), [])
+
+    def test_the_sibling_is_read_and_never_assumed(self):
+        self.write_topology("thread_siblings_list", "2,4")
+        self.assertEqual(RUN_BENCH.SiblingMeter(self.sysfs, self.stat).sibling, 2)
+
+    def test_core_cpus_list_is_the_fallback(self):
+        (self.sysfs / "cpu4" / "topology" / "thread_siblings_list").unlink()
+        self.write_topology("core_cpus_list", "4,7")
+        meter = RUN_BENCH.SiblingMeter(self.sysfs, self.stat)
+        self.assertEqual((meter.sibling, meter.topology), (7, "core_cpus_list"))
+
+    def test_no_topology_is_refused(self):
+        (self.sysfs / "cpu4" / "topology" / "thread_siblings_list").unlink()
+        with self.assertRaisesRegex(RUN_BENCH.Failure, "no topology file"):
+            RUN_BENCH.SiblingMeter(self.sysfs, self.stat)
+
+    def test_a_core_with_no_sibling_is_refused(self):
+        self.write_topology("thread_siblings_list", "4")
+        with self.assertRaisesRegex(RUN_BENCH.Failure, "0 siblings"):
+            RUN_BENCH.SiblingMeter(self.sysfs, self.stat)
+
+    def test_a_sibling_missing_from_proc_stat_is_refused(self):
+        self.write_topology("thread_siblings_list", "4,9")
+        meter = RUN_BENCH.SiblingMeter(self.sysfs, self.stat)
+        snapshot = self.dir / "snapshot"
+        snapshot.write_text(STAT_BEFORE, encoding="ascii")
+        with self.assertRaisesRegex(RUN_BENCH.Failure, "no cpu9"):
+            meter.busy_percent(snapshot)
+
+    def test_no_time_passing_is_not_an_idle_sibling(self):
+        meter = RUN_BENCH.SiblingMeter(self.sysfs, self.stat)
+        snapshot = self.dir / "snapshot"
+        snapshot.write_text(STAT_BEFORE, encoding="ascii")
+        with self.assertRaisesRegex(RUN_BENCH.Failure, "no jiffies passed"):
+            meter.busy_percent(snapshot)
+
+    def test_no_first_reading_is_refused(self):
+        meter = RUN_BENCH.SiblingMeter(self.sysfs, self.stat)
+        with self.assertRaisesRegex(RUN_BENCH.Failure, "no reading of cpu5"):
+            meter.busy_percent(self.dir / "absent")
 
 
 if __name__ == "__main__":

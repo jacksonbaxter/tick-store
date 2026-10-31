@@ -63,6 +63,11 @@ def counters(host):
             "per_message": {"cycles": 40.0, "instructions": 80.0, "branch_misses": 0.3}}
 
 
+def sibling_block():
+    return {"core": 4, "sibling": 5, "topology": "thread_siblings_list", "method": "jiffies",
+            "cases": {"itch_decode": 0.5}}
+
+
 def valid_document(host):
     linux = host == "Linux"
     header = {
@@ -80,6 +85,7 @@ def valid_document(host):
         "commit": COMMIT,
         "core": 4 if linux else "not-available",
         "sibling": "cpu5 idle as stated, not enforced" if linux else "not-available",
+        "sibling_busy_percent": sibling_block() if linux else "not-available",
         "second_thread": "cpu6 reserved, unused" if linux else "not-available",
         "governor": "performance" if linux else "not-available",
         "frequency": ({"snapshot_khz": [3200000, 3200000], "effective_mhz": {"itch_decode": 3390.0}}
@@ -181,8 +187,8 @@ class CheckResultsTest(unittest.TestCase):
     def test_every_header_field_is_required(self):
         fields = ("schema", "host", "measurement", "statement", "cpu_model", "kernel", "compiler",
                   "compile_flags", "build_type", "sanitizers", "isa", "commit", "core", "sibling",
-                  "second_thread", "governor", "frequency", "turbo", "pinning", "counters",
-                  "timer", "load_lines", "peak_rss_bytes")
+                  "sibling_busy_percent", "second_thread", "governor", "frequency", "turbo",
+                  "pinning", "counters", "timer", "load_lines", "peak_rss_bytes")
         for field in fields:
             with self.subTest(field=field):
                 self.assert_fails("Linux", lambda d, f=field: remove(d, "header", f),
@@ -257,6 +263,65 @@ class CheckResultsTest(unittest.TestCase):
     def test_linux_claiming_the_sibling_is_idle(self):
         self.assert_fails("Linux", lambda d: set_value(d, "cpu5 idle", "header", "sibling"),
                           "recorded as stated, not claimed")
+
+    # The core's SMT sibling, measured.
+
+    def test_a_sibling_at_half_a_percent_is_accepted(self):
+        self.assertEqual(self.check("Linux").returncode, 0)
+
+    def test_a_sibling_at_the_limit_is_accepted(self):
+        def at_limit(document):
+            set_value(document, 5.0, "header", "sibling_busy_percent", "cases", "itch_decode")
+        self.assertEqual(self.check("Linux", at_limit).returncode, 0)
+
+    def test_a_sibling_at_6_percent_is_refused(self):
+        self.assert_fails("Linux",
+                          lambda d: set_value(d, 6.0, "header", "sibling_busy_percent", "cases",
+                                              "itch_decode"),
+                          "itch_decode reads 6.0%, over the 5.0% limit")
+
+    def test_linux_with_no_sibling_reading(self):
+        self.assert_fails("Linux", lambda d: remove(d, "header", "sibling_busy_percent"),
+                          "missing field 'sibling_busy_percent'")
+
+    def test_linux_marking_the_sibling_not_available(self):
+        self.assert_fails("Linux",
+                          lambda d: set_value(d, "not-available", "header",
+                                              "sibling_busy_percent"),
+                          "Linux must measure it, case by case")
+
+    def test_a_case_with_no_sibling_reading(self):
+        self.assert_fails("Linux",
+                          lambda d: set_value(d, {"other": 0.5}, "header", "sibling_busy_percent",
+                                              "cases"),
+                          "no reading for itch_decode")
+
+    def test_a_sibling_reading_that_is_not_a_percentage(self):
+        self.assert_fails("Linux",
+                          lambda d: set_value(d, -1, "header", "sibling_busy_percent", "cases",
+                                              "itch_decode"),
+                          "which is not a percentage")
+
+    def test_a_sibling_reading_for_the_wrong_core(self):
+        self.assert_fails("Linux",
+                          lambda d: set_value(d, 2, "header", "sibling_busy_percent", "core"),
+                          "core 2 is not the pinned core 4")
+
+    def test_the_core_read_as_its_own_sibling(self):
+        self.assert_fails("Linux",
+                          lambda d: set_value(d, 4, "header", "sibling_busy_percent", "sibling"),
+                          "4 is not a sibling of the core")
+
+    def test_a_sibling_reading_with_no_method(self):
+        self.assert_fails("Linux",
+                          lambda d: remove(d, "header", "sibling_busy_percent", "method"),
+                          "no method")
+
+    def test_macos_claiming_a_sibling_reading(self):
+        self.assert_fails("macOS",
+                          lambda d: set_value(d, sibling_block(), "header",
+                                              "sibling_busy_percent"),
+                          "macOS has no pinned core")
 
     # No lock, no reported result.
 

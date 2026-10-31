@@ -6,8 +6,9 @@
 A results file is a claim that a number was measured under stated conditions. This
 checks that the file can back the claim: a header comes first and is complete, the
 host cannot be mistaken, a measurement lock really was held, the input was verified,
-and no latency sits below what the timer can resolve. It also checks that the file is
-safe to publish, with no path, username or hostname anywhere in it.
+no latency sits below what the timer can resolve, and on Linux the core's SMT sibling
+was measured and stayed under the limit. It also checks that the file is safe to
+publish, with no path, username or hostname anywhere in it.
 
 Standard library only. tests/scripts/test_check_results.py shows each rule failing on
 an injected fault.
@@ -49,6 +50,7 @@ HEADER_FIELDS = (
     "commit",
     "core",
     "sibling",
+    "sibling_busy_percent",
     "second_thread",
     "governor",
     "frequency",
@@ -69,6 +71,9 @@ HOSTS = {
     "Linux": {"timer": "rdtscp+lfence", "isa": "x86-64", "kernel": "Linux "},
 }
 LINUX_CORE = 4
+# Our choice, not a measured limit: a sibling busy for more than this share of a case is no
+# longer idle as a result states. Nothing keeps it idle, so a reported result has to show it.
+SIBLING_BUSY_LIMIT_PERCENT = 5.0
 
 LOAD_LINE = re.compile(
     r"^measure\.sh: (?P<kind>start|end) load1=(?P<load>[0-9.]+)(?: exit=(?P<exit>\d+))? "
@@ -246,6 +251,8 @@ def check_macos(document):
         problems.append(f"header.core: macOS claims core {header['core']}")
     if "counters" in header and header["counters"] != UNAVAILABLE:
         problems.append(f"header.counters: macOS claims {header['counters']}")
+    if header.get("sibling_busy_percent", NOT_AVAILABLE) != NOT_AVAILABLE:
+        problems.append("header.sibling_busy_percent: macOS has no pinned core to measure")
     for index, result in enumerate(document.get("results", [])):
         for field, value in result.get("counters", {}).items():
             if isinstance(value, dict) and is_number(value.get("value")):
@@ -257,8 +264,38 @@ def check_macos(document):
     return problems
 
 
-def check_linux(header):
+def check_sibling(header, cases):
+    """The SMT sibling, measured across every case and under the limit in each."""
+    if "sibling_busy_percent" not in header:
+        return []  # Named among the missing header fields.
+    block = header["sibling_busy_percent"]
+    if not isinstance(block, dict) or not isinstance(block.get("cases"), dict):
+        return ["header.sibling_busy_percent: Linux must measure it, case by case"]
     problems = []
+    sibling = block.get("sibling")
+    if block.get("core") != LINUX_CORE:
+        problems.append(f"header.sibling_busy_percent: core {block.get('core')} is not the "
+                        f"pinned core {LINUX_CORE}")
+    if not is_number(sibling) or sibling == LINUX_CORE:
+        problems.append(f"header.sibling_busy_percent: {sibling} is not a sibling of the core")
+    if not block.get("method") or not block.get("topology"):
+        problems.append("header.sibling_busy_percent: no method, or no topology file")
+    measured = block["cases"]
+    for case in cases:
+        if case not in measured:
+            problems.append(f"header.sibling_busy_percent: no reading for {case}")
+    for case, value in measured.items():
+        if not is_number(value) or not 0 <= value <= 100:
+            problems.append(f"header.sibling_busy_percent: {case} reads {value!r}, which is not "
+                            "a percentage")
+        elif value > SIBLING_BUSY_LIMIT_PERCENT:
+            problems.append(f"header.sibling_busy_percent: {case} reads {value}%, over the "
+                            f"{SIBLING_BUSY_LIMIT_PERCENT}% limit")
+    return problems
+
+
+def check_linux(header, cases):
+    problems = check_sibling(header, cases)
     if "core" in header and header["core"] != LINUX_CORE:
         problems.append(f"header.core: expected {LINUX_CORE}, got {header['core']}")
     if "pinning" in header and header["pinning"] != "pinned":
@@ -391,7 +428,8 @@ def check_document(document, top_keys, path, pins):
     if header.get("host") == "macOS":
         problems += check_macos(document)
     elif header.get("host") == "Linux":
-        problems += check_linux(header)
+        problems += check_linux(header, [result.get("case") for result in results]
+                                if isinstance(results, list) else [])
     if isinstance(header.get("timer"), dict):
         problems += check_timer("header.timer", header["timer"])
     problems += check_results_rows(document, pins)

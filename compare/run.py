@@ -8,9 +8,10 @@ wrapper is never named here: it comes from TICK_STORE_MEASURE. Without it there 
 the file is marked iteration-only, goes under build/, and scripts/check_compare.py refuses
 it. On Linux each system runs as
 
-    <wrapper> taskset -c 4 python3 -I compare/run_system.py ...
+    <wrapper> taskset -c 4 sh -c <copy /proc/stat, then exec> python3 -I compare/run_system.py ...
 
-and run_system.py adds cpu6 as the run's second CPU. Output goes to files, so nothing depends
+and run_system.py adds cpu6 as the run's second CPU. The copy is how busy the sibling of cpu4 was
+across the system's run, read against /proc/stat when the wrapper exits. Output goes to files, so nothing depends
 on a terminal or an SSH connection. The results file appears only when every system has
 finished and check_compare.py has passed it, so a file that exists is complete.
 
@@ -104,17 +105,27 @@ def require_clean_tree(measure):
         raise run_bench.Failure(run_bench.EXIT_USAGE, "the tree is dirty: commit first")
 
 
-def run_one(system, args, layout, measure, parts):
+def wrapped_command(measure, meter, snapshot, command):
+    """The wrapper, the pin and the first sibling reading around a system's command."""
+    prefix = [measure] if measure else []
+    if meter is not None and measure:
+        prefix += ["taskset", "-c", str(LINUX_CORE)]
+    if meter is not None:
+        prefix += meter.snapshot_command(snapshot)
+    return prefix + command
+
+
+def run_one(system, args, layout, measure, parts, meter):
     """Runs a system unless its part is already there. Returns its load lines."""
     part = parts / f"{system}.json"
     lines_path = parts / f"{system}.load"
-    if part.exists() and lines_path.exists():
+    sibling_path = parts / f"{system}.sibling"
+    if part.exists() and lines_path.exists() and (meter is None or sibling_path.exists()):
         return json.loads(lines_path.read_text(encoding="utf-8"))
-    command = [measure] if measure else []
-    if platform.system() == "Linux" and measure:
-        command += ["taskset", "-c", str(LINUX_CORE)]
-    command += [sys.executable, "-I", str(RUN_SYSTEM), "--system", system, "--part", str(part),
-                "--slice", args.slice, *layout.as_arguments()]
+    snapshot = parts / f"{system}.stat"
+    command = wrapped_command(measure, meter, snapshot, [
+        sys.executable, "-I", str(RUN_SYSTEM), "--system", system, "--part", str(part),
+        "--slice", args.slice, *layout.as_arguments()])
     for option in ("write_repetitions", "warm_repetitions", "cold_repetitions", "variants"):
         value = getattr(args, option)
         if value is not None:
@@ -132,6 +143,8 @@ def run_one(system, args, layout, measure, parts):
                                 "retry later: the measurement wrapper did not get the machine")
     if code != 0:
         raise run_bench.Failure(code, f"{system}: exited {code}, see {stderr_path.name}")
+    if meter is not None:
+        sibling_path.write_text(json.dumps(meter.busy_percent(snapshot)), encoding="utf-8")
     lines = run_bench.clean_load_lines(text) if measure else []
     lines_path.write_text(json.dumps(lines), encoding="utf-8")
     return lines
@@ -148,7 +161,15 @@ def questdb_runtime(systems):
     return readings[0]
 
 
-def build_document(host, args, layout, pin, commit, measure, parts, load_lines):
+def sibling_block(meter, parts, systems):
+    """Each system's run is one case. macOS has no pinned core to have a sibling."""
+    if meter is None:
+        return "not-available"
+    return meter.block({system: json.loads((parts / f"{system}.sibling").read_text(
+        encoding="utf-8")) for system in systems})
+
+
+def build_document(host, args, layout, pin, commit, measure, parts, load_lines, meter=None):
     linux = host == "Linux"
     systems = {system: json.loads((parts / f"{system}.json").read_text(encoding="utf-8"))
                for system in args.systems}
@@ -168,6 +189,7 @@ def build_document(host, args, layout, pin, commit, measure, parts, load_lines):
         **compiler_facts(layout),
         "commit": commit,
         "core": LINUX_CORE if linux else "not-available",
+        "sibling_busy_percent": sibling_block(meter, parts, args.systems),
         "second_thread": "cpu6, used by every system" if linux else "not-available",
         "governor": run_bench.governor_of(host, runs),
         "turbo": run_bench.linux_turbo() if linux else "not-available",
@@ -236,8 +258,9 @@ def run(args):
     layout = Layout.from_arguments(args)
     parts = layout.work / "parts" / commit[:12]
     parts.mkdir(parents=True, exist_ok=True)
-    load_lines = [run_one(system, args, layout, measure, parts) for system in args.systems]
-    document = build_document(host, args, layout, pin, commit, measure, parts, load_lines)
+    meter = run_bench.SiblingMeter() if host == "Linux" else None
+    load_lines = [run_one(system, args, layout, measure, parts, meter) for system in args.systems]
+    document = build_document(host, args, layout, pin, commit, measure, parts, load_lines, meter)
     directory = args.results_dir if measure else args.iteration_dir
     output = directory / f"{host}-{args.slice}-{commit[:12]}.json"
     publish(document, output, measure)

@@ -82,6 +82,13 @@ TICK_STORE_MEASURE=<wrapper> <venv>/bin/python -I compare/run.py \
 The Linux run adds `taskset -c 4` itself, and `compare/run_system.py` then widens the mask to cpu4
 and cpu6, so every thread of a system shares those two CPUs. macOS has no pinning.
 
+Nothing keeps cpu4's SMT sibling idle, so the header's `sibling_busy_percent` records how busy it
+was, per system: the sibling is read from `thread_siblings_list`, or `core_cpus_list` failing that,
+and its busy and total jiffies from `/proc/stat` once the lock is held and when the wrapper exits.
+`scripts/check_compare.py` refuses a reported result where any system exceeds 5%, a limit that is
+our choice and not a measured threshold, and macOS records `not-available`. cpu6's own sibling is
+not measured.
+
 Exit 75 means the wrapper did not get the machine: finished systems are kept, so run it again to
 go on. Exit 2 is usage or setup, and anything else is what failed. For iteration, `--systems`,
 `--variants` and `--write-repetitions`, `--warm-repetitions` and `--cold-repetitions` narrow a run.
