@@ -2,6 +2,7 @@ include(GoogleTest)
 
 add_executable(tick_store_unit_tests
     big_endian_test.cpp
+    census_test.cpp
     frame_cursor_test.cpp
     fuzz_regression_test.cpp
     hash_worker_test.cpp
@@ -16,6 +17,7 @@ add_executable(tick_store_unit_tests
     oracle_test.cpp
     roundtrip_cli_test.cpp
     sha256_test.cpp
+    slice_test.cpp
     stub_store_test.cpp
 )
 target_link_libraries(tick_store_unit_tests PRIVATE tick_store_harness GTest::gtest_main)

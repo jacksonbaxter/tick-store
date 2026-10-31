@@ -4,4 +4,6 @@ function(tick_store_add_tool name)
     tick_store_apply_warnings(${name})
 endfunction()
 
+tick_store_add_tool(tick_census)
 tick_store_add_tool(tick_roundtrip)
+tick_store_add_tool(tick_slice)
