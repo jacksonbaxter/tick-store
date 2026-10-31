@@ -29,6 +29,8 @@ add_library(tick_store_core STATIC)
 target_sources(tick_store_core PRIVATE
     src/itch/codec.cpp
     src/itch/frame.cpp
+    src/store/mapped_file.cpp
+    src/store/stub_store.cpp
 )
 target_include_directories(tick_store_core PUBLIC include)
 target_compile_features(tick_store_core PUBLIC cxx_std_23)

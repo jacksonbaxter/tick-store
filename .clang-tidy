@@ -2,6 +2,8 @@
 # argue with fixed wire offsets, short conventional names, hand-laid byte tables
 # or #pragma once, which every compiler we target supports. The rest of each
 # group stays on. Warnings are errors, and any NOLINT carries its reason.
+# IgnoreHeaders: macOS declares POSIX names in private headers. The portable
+# spellings, <fcntl.h> and <unistd.h>, are the ones to include.
 Checks: >
   -*,
   bugprone-*,
@@ -28,3 +30,5 @@ Checks: >
   -readability-function-cognitive-complexity
 WarningsAsErrors: '*'
 HeaderFilterRegex: '(include/tick_store|src|tests/unit|fuzz)/.*'
+CheckOptions:
+  misc-include-cleaner.IgnoreHeaders: 'sys/fcntl\.h;sys/_types/.*'
