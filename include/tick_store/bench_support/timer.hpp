@@ -22,23 +22,23 @@
 #include <string>
 #include <string_view>
 
-#if defined(__x86_64__)
+#ifdef __x86_64__
 #include <x86intrin.h>
 #elif defined(__APPLE__) && defined(__aarch64__)
 #include <mach/mach_time.h>
-#elif !defined(__aarch64__)
+#elifndef __aarch64__
 #error "tick-store benchmarks support x86-64 and arm64"
 #endif
 
 namespace tick_store::bench_support {
 
 [[nodiscard]] inline std::uint64_t read_ticks() noexcept {
-#if defined(__x86_64__)
+#ifdef __x86_64__
     unsigned int processor = 0;
     const std::uint64_t ticks = __rdtscp(&processor);
     _mm_lfence();
     return ticks;
-#elif defined(__APPLE__)
+#elifdef __APPLE__
     return mach_absolute_time();
 #else
     std::uint64_t ticks = 0;

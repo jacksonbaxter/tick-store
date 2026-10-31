@@ -10,7 +10,6 @@
 #include <expected>
 #include <format>
 #include <string>
-#include <utility>
 
 namespace tick_store::bench_support {
 

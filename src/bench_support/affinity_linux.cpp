@@ -3,9 +3,9 @@
 #include <pthread.h>
 #include <sched.h>
 
-#include <cstring>
 #include <format>
 #include <optional>
+#include <system_error>
 
 namespace tick_store::bench_support {
 
@@ -21,7 +21,7 @@ PinResult pin_current_thread(int cpu) {
     CPU_SET(static_cast<unsigned>(cpu), &wanted);
     if (const int error = ::pthread_setaffinity_np(::pthread_self(), sizeof(wanted), &wanted);
         error != 0) {
-        result.detail = std::format("pthread_setaffinity_np: {}", std::strerror(error));
+        result.detail = std::format("pthread_setaffinity_np: {}", std::generic_category().message(error));
         return result;
     }
     // The call moves the thread before it returns, so this reads the new CPU.

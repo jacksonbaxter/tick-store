@@ -31,4 +31,4 @@ Checks: >
 WarningsAsErrors: '*'
 HeaderFilterRegex: '(include/tick_store|src|tests/unit|fuzz|bench)/.*'
 CheckOptions:
-  misc-include-cleaner.IgnoreHeaders: 'sys/fcntl\.h;sys/_types/.*'
+  misc-include-cleaner.IgnoreHeaders: 'sys/fcntl\.h;sys/poll\.h;sys/_types/.*'

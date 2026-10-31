@@ -31,12 +31,13 @@
 #include "tick_store/itch/codec.hpp"
 #include "tick_store/itch/frame.hpp"
 #include "tick_store/store/mapped_file.hpp"
+#include "tick_store/store/store_error.hpp"
 
 #include <benchmark/benchmark.h>
 
 #include <algorithm>
-#include <chrono>
 #include <charconv>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -54,6 +55,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <vector>
 
 namespace {
@@ -84,8 +86,8 @@ struct DecodeOnly {
         benchmark::DoNotOptimize(message);
         return message.has_value();
     }
-    [[nodiscard]] std::expected<void, std::string> check_output(
-        std::span<const std::byte> /*source*/) const {
+    [[nodiscard]] static std::expected<void, std::string> check_output(
+        std::span<const std::byte> /*source*/) {
         return {};
     }
 };
@@ -207,7 +209,7 @@ void throughput(benchmark::State& state, Session& session, Step step) {
     }
     std::uint64_t succeeded = 0;
     const std::uint64_t start = bs::read_ticks();
-    for (auto _ : state) {
+    for (const auto _ : state) {
         step.begin_pass();
         succeeded = run_pass(session.source, step);
         benchmark::DoNotOptimize(succeeded);
@@ -240,7 +242,7 @@ template <class Step>
 void batch_latency(benchmark::State& state, Session& session, Step step, std::mt19937_64& phases) {
     warm_up(session, step);
     std::uint64_t succeeded = 0;
-    for (auto _ : state) {
+    for (const auto _ : state) {
         const std::uint64_t phase = phases() % kBatchMessages;
         step.begin_pass();
         succeeded = run_timed_pass(session.source, step, phase, session.recorder);
@@ -303,6 +305,7 @@ struct Options {
 template <class Number>
 [[nodiscard]] bool parse_number(std::string_view text, Number& number) noexcept {
     const auto* const end = text.data() + text.size();
+    // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage): from_chars takes the end too
     const auto [next, error] = std::from_chars(text.data(), end, number);
     return error == std::errc{} && next == end;
 }
@@ -487,6 +490,7 @@ int run_workload(const Options& options, Step step, std::span<const std::byte> s
                     .gated_messages = 0,
                     .gated_ticks = 0,
                     .warmup_pass_ticks = {}};
+    // NOLINTNEXTLINE(cert-msc32-c,cert-msc51-cpp,bugprone-random-generator-seed): fixed for B1
     std::mt19937_64 phases{Step::kBatchPhaseSeed};
     register_workload(session, step, phases);
 
@@ -580,6 +584,8 @@ int main(int argc, char** argv) {
     try {
         return run(argc, argv);
     } catch (const std::exception& error) {
-        return fail(error.what());
+        // Only a value that cannot throw is safe here, so a failed write goes unreported.
+        (void)std::fputs(error.what(), stderr);
+        return kExitFailed;
     }
 }

@@ -14,8 +14,8 @@
 
 #include <gtest/gtest.h>
 
-#include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <array>
@@ -27,6 +27,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <utility>
 #include <vector>
 
 namespace tick_store::bench_support {

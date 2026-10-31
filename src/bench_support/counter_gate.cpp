@@ -7,20 +7,21 @@
 
 #include <array>
 #include <chrono>
-#include <cstring>
+#include <cstddef>
 #include <expected>
 #include <filesystem>
 #include <format>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 
 namespace tick_store::bench_support {
 
 namespace {
 
-#if defined(__linux__)
+#ifdef __linux__
 constexpr CounterStatus kWithoutFifos = CounterStatus::not_requested;
 constexpr bool kPlatformHasPerf = true;
 #else
@@ -33,6 +34,10 @@ constexpr bool kPlatformHasPerf = false;
 [[nodiscard]] int open_fifo(const std::filesystem::path& path) noexcept {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg): open is variadic
     return ::open(path.c_str(), O_RDWR | O_NONBLOCK | O_CLOEXEC);
+}
+
+[[nodiscard]] std::string last_error() {
+    return std::generic_category().message(errno);
 }
 
 }  // namespace
@@ -66,8 +71,7 @@ std::expected<CounterGate, std::string> CounterGate::open(
     gate.control_fd_ = open_fifo(control);
     gate.acknowledge_fd_ = open_fifo(acknowledge);
     if (gate.control_fd_ < 0 || gate.acknowledge_fd_ < 0) {
-        return std::unexpected(std::format("cannot open the perf control FIFOs: {}",
-                                           std::strerror(errno)));
+        return std::unexpected(std::format("cannot open the perf control FIFOs: {}", last_error()));
     }
     return gate;
 }
@@ -112,7 +116,7 @@ std::expected<void, std::string> CounterGate::command(std::string_view text) {
     }
     if (::write(control_fd_, text.data(), text.size()) != static_cast<ssize_t>(text.size())) {
         return std::unexpected(
-            std::format("cannot write to the perf control FIFO: {}", std::strerror(errno)));
+            std::format("cannot write to the perf control FIFO: {}", last_error()));
     }
     pollfd waiting{.fd = acknowledge_fd_, .events = POLLIN, .revents = 0};
     const int ready = ::poll(&waiting, 1, static_cast<int>(ack_timeout_.count()));

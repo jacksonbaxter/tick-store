@@ -1,12 +1,10 @@
 #include "tick_store/bench_support/timer.hpp"
 
-#include <time.h>  // NOLINT(modernize-deprecated-headers): clock_gettime and its clock ids are POSIX
-
 #include <algorithm>
-#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <ctime>
 #include <expected>
 #include <limits>
 #include <numeric>
@@ -27,6 +25,7 @@ constexpr int kBracketTries = 16;
 
 [[nodiscard]] std::int64_t raw_clock_ns() noexcept {
     timespec now{};
+    // NOLINTNEXTLINE(misc-include-cleaner): <ctime> declares these on the platforms we build for
     ::clock_gettime(CLOCK_MONOTONIC_RAW, &now);
     return (static_cast<std::int64_t>(now.tv_sec) * 1'000'000'000) + now.tv_nsec;
 }
@@ -56,9 +55,9 @@ struct ClockPair {
 }  // namespace
 
 std::string_view timer_source() noexcept {
-#if defined(__x86_64__)
+#ifdef __x86_64__
     return "rdtscp+lfence";
-#elif defined(__APPLE__)
+#elifdef __APPLE__
     return "mach_absolute_time";
 #else
     return "cntvct_el0";
