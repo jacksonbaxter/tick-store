@@ -1,0 +1,13 @@
+diff --git a/include/tick_store/harness/bounded_queue.hpp b/include/tick_store/harness/bounded_queue.hpp
+--- a/include/tick_store/harness/bounded_queue.hpp
++++ b/include/tick_store/harness/bounded_queue.hpp
+@@ -32,8 +32,8 @@ public:
+         if (ended()) {
+             return false;
+         }
+-        items_.push_back(std::move(value));
+         lock.unlock();
++        items_.push_back(std::move(value));
+         not_empty_.notify_one();
+         return true;
+     }

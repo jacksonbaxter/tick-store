@@ -1,0 +1,14 @@
+diff --git a/src/itch/layout.hpp b/src/itch/layout.hpp
+--- a/src/itch/layout.hpp
++++ b/src/itch/layout.hpp
+@@ -214,8 +214,8 @@ inline constexpr auto kBodyFields<OrderDelete> = std::tuple{
+ 
+ template <>
+ inline constexpr auto kBodyFields<OrderReplace> = std::tuple{
+-    field<&OrderReplace::original_order_reference_number>("original_order_reference_number", 11),
+-    field<&OrderReplace::new_order_reference_number>("new_order_reference_number", 19),
++    field<&OrderReplace::new_order_reference_number>("original_order_reference_number", 11),
++    field<&OrderReplace::original_order_reference_number>("new_order_reference_number", 19),
+     field<&OrderReplace::shares>("shares", 27),
+     field<&OrderReplace::price>("price", 31),
+ };

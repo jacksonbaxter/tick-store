@@ -31,8 +31,9 @@ class CheckScript(unittest.TestCase):
         self.env = dict(os.environ, CXX=os.environ.get("CXX", "c++"))
 
     def run_script(self, *arguments, env=None):
-        return subprocess.run([str(SCRIPT), *arguments], capture_output=True, text=True,
-                              env=env or self.env)
+        """Always with this test's own log folder, so a test never touches a real run's logs."""
+        return subprocess.run([str(SCRIPT), "--log-dir", str(self.logs), *arguments],
+                              capture_output=True, text=True, env=env or self.env)
 
     def summary(self):
         lines = (self.logs / "summary.tsv").read_text().splitlines()
@@ -70,13 +71,12 @@ class CheckScript(unittest.TestCase):
         self.assertEqual(done.returncode, 2)
 
     def test_a_passing_step_exits_zero(self):
-        done = self.run_script("--log-dir", str(self.logs), "--only", "render-check")
+        done = self.run_script("--only", "render-check")
         self.assertEqual(done.returncode, 0, done.stdout)
         self.assertEqual(self.summary(), {"render-check": "PASS"})
 
     def test_quick_skips_visibly_and_says_so(self):
-        done = self.run_script("--quick", "--log-dir", str(self.logs),
-                               "--only", "asan-test,coverage,render-check")
+        done = self.run_script("--quick", "--only", "asan-test,coverage,render-check")
         self.assertEqual(done.returncode, 0, done.stdout)
         status = self.summary()
         self.assertEqual(status["asan-test"], "SKIP")
@@ -85,7 +85,8 @@ class CheckScript(unittest.TestCase):
         self.assertRegex(done.stdout, r"pass 1, fail 0, blocked 0, skipped 3 \(a skip is not a pass")
 
     def test_every_step_is_run_by_the_workflow(self):
-        steps = self.run_script("--list").stdout.split()
+        steps = subprocess.run([str(SCRIPT), "--list"], capture_output=True, text=True,
+                               env=self.env).stdout.split()
         named = set()
         for listed in re.findall(r'only: "([a-z0-9,-]+)"', WORKFLOW.read_text()):
             named.update(listed.split(","))

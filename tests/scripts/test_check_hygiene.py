@@ -19,6 +19,9 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CHECK = REPO_ROOT / "scripts" / "check_hygiene.py"
 SCRATCH_ROOT = REPO_ROOT / "build" / "test_check_hygiene"
+# Split, so this file does not trip the check it tests.
+MAC_HOME = b"/Us" b"ers/alice"
+LINUX_HOME = b"/ho" b"me/alice"
 
 
 class Hygiene(unittest.TestCase):
@@ -55,15 +58,15 @@ class Hygiene(unittest.TestCase):
         self.assert_refused("nothing was checked")
 
     def test_a_mac_home_path_is_refused_with_its_line(self):
-        self.track("notes.txt", b"first line\nsee /Users/alice/data\n")
+        self.track("notes.txt", b"first line\nsee " + MAC_HOME + b"/data\n")
         self.assert_refused("notes.txt:2: absolute home path")
 
     def test_a_linux_home_path_is_refused(self):
-        self.track("notes.txt", b"see /home/alice/data\n")
+        self.track("notes.txt", b"see " + LINUX_HOME + b"/data\n")
         self.assert_refused("notes.txt:1: absolute home path")
 
     def test_a_home_path_inside_a_binary_file_is_refused(self):
-        self.track("blob", b"\0\1\2/home/alice\0")
+        self.track("blob", b"\0\1\2" + LINUX_HOME + b"\0")
         self.assert_refused("blob:1: absolute home path")
 
     def test_the_fixture_placeholders_are_allowed(self):
@@ -95,7 +98,7 @@ class Hygiene(unittest.TestCase):
         self.assertEqual(self.run_check().returncode, 0)
 
     def test_every_problem_is_named(self):
-        self.track("a.txt", b"/Users/alice\n")
+        self.track("a.txt", MAC_HOME + b"\n")
         self.track("b.gz", b"x")
         done = self.run_check()
         self.assertIn("a.txt:1", done.stderr)

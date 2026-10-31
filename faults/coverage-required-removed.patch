@@ -1,0 +1,11 @@
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -1,7 +1,6 @@
+ include(GoogleTest)
+ 
+ add_executable(tick_store_unit_tests
+-    bench_support_test.cpp
+     big_endian_test.cpp
+     census_test.cpp
+     columns_cli_test.cpp

@@ -1,0 +1,14 @@
+diff --git a/src/store/columns.cpp b/src/store/columns.cpp
+--- a/src/store/columns.cpp
++++ b/src/store/columns.cpp
+@@ -307,10 +307,6 @@ template <ColumnFile File>
+         return std::unexpected(
+             bad(StoreErrorKind::bad_text_offsets, name_of(offsets), row, start, end));
+     }
+-    if (end > all.size()) {
+-        return std::unexpected(
+-            bad(StoreErrorKind::bad_text_offsets, name_of(offsets), row, all.size(), end));
+-    }
+     return all.subspan(static_cast<std::size_t>(start), static_cast<std::size_t>(end - start));
+ }
+ 

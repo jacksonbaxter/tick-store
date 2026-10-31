@@ -1,0 +1,13 @@
+diff --git a/src/itch/codec.cpp b/src/itch/codec.cpp
+--- a/src/itch/codec.cpp
++++ b/src/itch/codec.cpp
+@@ -124,9 +124,6 @@ template <class T>
+     if (!complete) [[unlikely]] {
+         return std::unexpected(error);
+     }
+-    if (payload.size() != T::wire_size) [[unlikely]] {
+-        return std::unexpected(trailing_bytes(T::wire_size, payload.size()));
+-    }
+     return message;
+ }
+ 

@@ -1,0 +1,12 @@
+diff --git a/src/bench_support/resolution_guard.cpp b/src/bench_support/resolution_guard.cpp
+--- a/src/bench_support/resolution_guard.cpp
++++ b/src/bench_support/resolution_guard.cpp
+@@ -12,7 +12,7 @@ ResolutionGuard::ResolutionGuard(double resolution_ns, double read_cost_ns) noex
+ 
+ std::expected<double, std::string> ResolutionGuard::publish(double value_ns,
+                                                             const std::string& what) const {
+-    if (value_ns < floor_ns_) {
++    if (value_ns < 0.0) {
+         return std::unexpected(
+             std::format("refusing to publish {}: {:.3f} ns is below the {:.3f} ns the timer can "
+                         "resolve; batch or average it",

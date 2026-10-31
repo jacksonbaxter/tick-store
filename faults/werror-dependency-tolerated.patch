@@ -1,0 +1,30 @@
+diff --git a/build/_deps/googletest-src/googletest/include/gtest/gtest.h b/build/_deps/googletest-src/googletest/include/gtest/gtest.h
+--- a/build/_deps/googletest-src/googletest/include/gtest/gtest.h
++++ b/build/_deps/googletest-src/googletest/include/gtest/gtest.h
+@@ -163,6 +163,11 @@ GTEST_DECLARE_string_(flagfile);
+ 
+ namespace testing {
+ 
++inline int dependency_warning_in_a_header() {
++  int never_used_in_header = 0;
++  return 1;
++}
++
+ // Silence C4100 (unreferenced formal parameter) and 4805
+ // unsafe mix of type 'const int' and type 'const bool'
+ GTEST_DISABLE_MSC_WARNINGS_PUSH_(4805 4100)
+diff --git a/build/_deps/googletest-src/googletest/src/gtest.cc b/build/_deps/googletest-src/googletest/src/gtest.cc
+--- a/build/_deps/googletest-src/googletest/src/gtest.cc
++++ b/build/_deps/googletest-src/googletest/src/gtest.cc
+@@ -168,6 +168,11 @@
+ 
+ namespace testing {
+ 
++int dependency_warning_in_a_source() {
++  int never_used_in_source = 0;
++  return 1;
++}
++
+ using internal::CountIf;
+ using internal::ForEach;
+ using internal::GetElementOr;

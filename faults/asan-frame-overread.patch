@@ -1,0 +1,15 @@
+diff --git a/include/tick_store/itch/frame.hpp b/include/tick_store/itch/frame.hpp
+--- a/include/tick_store/itch/frame.hpp
++++ b/include/tick_store/itch/frame.hpp
+@@ -76,8 +76,9 @@ public:
+         if (left == 0) {
+             return stop(FrameStopKind::end, 0, 0);
+         }
+-        const auto length = BigEndianReader{bytes_}.read_uint<kFramePrefixSize>(offset_);
+-        if (!length.has_value()) {
++        const std::optional<std::uint64_t> length{(std::to_integer<std::uint64_t>(bytes_.data()[offset_]) << 8U) |
++                                                  std::to_integer<std::uint64_t>(bytes_.data()[offset_ + 1])};
++        if (left < kFramePrefixSize) {
+             return stop(FrameStopKind::truncated_prefix, kFramePrefixSize, left);
+         }
+         const std::size_t after_prefix = left - kFramePrefixSize;

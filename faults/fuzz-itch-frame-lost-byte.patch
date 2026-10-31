@@ -1,0 +1,12 @@
+diff --git a/include/tick_store/itch/frame.hpp b/include/tick_store/itch/frame.hpp
+--- a/include/tick_store/itch/frame.hpp
++++ b/include/tick_store/itch/frame.hpp
+@@ -73,7 +73,7 @@ public:
+ 
+     [[nodiscard]] constexpr std::expected<Frame, FrameStop> next() noexcept {
+         const std::size_t left = bytes_.size() - offset_;
+-        if (left == 0) {
++        if (left <= 1) {
+             return stop(FrameStopKind::end, 0, 0);
+         }
+         const auto length = BigEndianReader{bytes_}.read_uint<kFramePrefixSize>(offset_);

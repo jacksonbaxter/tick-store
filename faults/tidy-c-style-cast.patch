@@ -1,0 +1,14 @@
+diff --git a/src/itch/frame.cpp b/src/itch/frame.cpp
+--- a/src/itch/frame.cpp
++++ b/src/itch/frame.cpp
+@@ -6,6 +6,10 @@
+ namespace tick_store::itch {
+ 
+ std::string to_string(FrameStopKind kind) {
++    const auto as_number = (int)kind;
++    if (as_number > 3) {
++        return "invalid frame stop";
++    }
+     switch (kind) {
+         case FrameStopKind::end:
+             return "end";

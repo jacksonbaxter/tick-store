@@ -1,0 +1,15 @@
+diff --git a/src/store/stub_store.cpp b/src/store/stub_store.cpp
+--- a/src/store/stub_store.cpp
++++ b/src/store/stub_store.cpp
+@@ -377,11 +377,6 @@ std::expected<std::optional<itch::Message>, StoreError> StoreParser::next() noex
+     const std::uint64_t offset = kStubHeaderSize + stop.offset;
+     switch (stop.kind) {
+         case itch::FrameStopKind::end:
+-            if (records_read_ != header_.record_count) {
+-                return std::unexpected(bad_field(StoreErrorKind::record_count_mismatch,
+-                                                 "record_count", kRecordCountOffset,
+-                                                 header_.record_count, records_read_));
+-            }
+             return std::nullopt;
+         case itch::FrameStopKind::truncated_prefix:
+             return std::unexpected(bad_field(StoreErrorKind::truncated_record, "frame prefix",

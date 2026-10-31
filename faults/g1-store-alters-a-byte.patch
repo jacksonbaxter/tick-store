@@ -1,0 +1,13 @@
+diff --git a/src/store/stub_store.cpp b/src/store/stub_store.cpp
+--- a/src/store/stub_store.cpp
++++ b/src/store/stub_store.cpp
+@@ -256,6 +256,9 @@ std::expected<void, StoreError> StubWriter::append(const itch::Message& message)
+         return fail(bad_field(StoreErrorKind::unencodable_record, "empty record",
+                               header_.record_count, 1, 0));
+     }
++    if (header_.record_count == 2) {
++        buffer_[buffered_ + 5] ^= std::byte{0x01};
++    }
+     buffered_ += *written;
+     ++header_.record_count;
+     header_.records_bytes += *written;

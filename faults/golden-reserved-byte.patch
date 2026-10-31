@@ -1,0 +1,13 @@
+diff --git a/src/itch/codec.cpp b/src/itch/codec.cpp
+--- a/src/itch/codec.cpp
++++ b/src/itch/codec.cpp
+@@ -204,6 +204,9 @@ template <class T>
+ 
+     BigEndianWriter writer{out};
+     const auto store = [&]<class F>(const F& field) noexcept {
++        if (field.name == "reserved") {
++            return true;
++        }
+         return write_value<typename F::Value, F::width>(writer, field.offset, F::of(message));
+     };
+     const bool written =

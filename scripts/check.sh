@@ -107,17 +107,6 @@ require_tools() {
 }
 require_tools
 
-mkdir -p "$LOG_DIR" "$ROOT/build/tmp" || exit 2
-LOG_DIR=$(cd "$LOG_DIR" && pwd -P) || exit 2
-rm -f "$LOG_DIR"/*.log "$LOG_DIR/summary.tsv"
-# Every tool that wants a scratch file gets it inside the gitignored build folder.
-export TMPDIR=$ROOT/build/tmp
-export TSAN_OPTIONS=${TSAN_OPTIONS:-halt_on_error=1}
-export UBSAN_OPTIONS=${UBSAN_OPTIONS:-print_stacktrace=1}
-
-SUMMARY=$LOG_DIR/summary.tsv
-: >"$SUMMARY"
-
 # Steps a step cannot run without. A step blocked this way is a failure, not a skip.
 needs() {
     case $1 in
@@ -159,6 +148,19 @@ selected_steps() {
         fi
     done
 }
+
+STEPS=$(selected_steps) || exit 2
+
+mkdir -p "$LOG_DIR" "$ROOT/build/tmp" || exit 2
+LOG_DIR=$(cd "$LOG_DIR" && pwd -P) || exit 2
+rm -f "$LOG_DIR"/*.log "$LOG_DIR/summary.tsv"
+# Every tool that wants a scratch file gets it inside the gitignored build folder.
+export TMPDIR=$ROOT/build/tmp
+export TSAN_OPTIONS=${TSAN_OPTIONS:-halt_on_error=1}
+export UBSAN_OPTIONS=${UBSAN_OPTIONS:-print_stacktrace=1}
+
+SUMMARY=$LOG_DIR/summary.tsv
+: >"$SUMMARY"
 
 # The status a step ended with, or nothing if it has not run.
 status_of() {
@@ -401,7 +403,6 @@ step_actionlint() {
 
 step_hygiene() { python3 -I scripts/check_hygiene.py; }
 
-STEPS=$(selected_steps) || exit 2
 BEGIN=$SECONDS
 TOTAL=$(printf '%s\n' "$STEPS" | wc -l | tr -d ' ')
 INDEX=0
