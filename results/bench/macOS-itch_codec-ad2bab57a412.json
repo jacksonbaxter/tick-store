@@ -1,0 +1,242 @@
+{
+  "header": {
+    "schema": 1,
+    "host": "macOS",
+    "measurement": "reported",
+    "statement": "Unpinned. No hardware counters. macOS has no thread pinning, and no unprivileged hardware counters.",
+    "cpu_model": "Apple M4 Max",
+    "kernel": "Darwin 27.2.0",
+    "compiler": "Clang 23.1.4",
+    "compile_flags": "-O3 -DNDEBUG -std=c++23",
+    "build_type": "Release",
+    "sanitizers": "none",
+    "isa": "arm64 baseline, scalar kernels",
+    "commit": "ad2bab57a412fe3ef082665f8fb0b343272943c9",
+    "core": "not-available",
+    "sibling": "not-available",
+    "sibling_busy_percent": "not-available",
+    "second_thread": "not-available",
+    "governor": "not-available",
+    "frequency": "not-available",
+    "turbo": "not-available",
+    "pinning": "not-supported",
+    "counters": "unavailable",
+    "timer": {
+      "source": "mach_absolute_time",
+      "calibrated_against": "CLOCK_MONOTONIC_RAW",
+      "ticks_per_second": 24000000.04,
+      "resolution_ticks": 1,
+      "resolution_ns": 41.666667,
+      "read_cost_ns": 4.447369,
+      "min_publishable_ns": 416.666666,
+      "calibration_window_ns": 200000083.0
+    },
+    "load_lines": [
+      "measure.sh: start load1=3.80 at=2026-10-31T12:06:58Z",
+      "measure.sh: end load1=3.65 exit=0 at=2026-10-31T12:07:04Z",
+      "measure.sh: start load1=3.65 at=2026-10-31T12:07:04Z",
+      "measure.sh: end load1=3.44 exit=0 at=2026-10-31T12:07:11Z"
+    ],
+    "peak_rss_bytes": 416546816
+  },
+  "benchmark": "itch_codec",
+  "input": {
+    "slice": "12302019-open",
+    "sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+    "messages": 6125294,
+    "bytes": 206138339,
+    "seed": "the input is a pinned file. Only batch boundaries are seeded, per case"
+  },
+  "results": [
+    {
+      "case": "itch_decode",
+      "host": "macOS",
+      "timer": {
+        "source": "mach_absolute_time",
+        "calibrated_against": "CLOCK_MONOTONIC_RAW",
+        "ticks_per_second": 24000000.04,
+        "resolution_ticks": 1,
+        "resolution_ns": 41.666667,
+        "read_cost_ns": 4.447369,
+        "min_publishable_ns": 416.666666,
+        "calibration_window_ns": 200000083.0
+      },
+      "timer_end_ticks_per_second": 23999999.96,
+      "warmup": {
+        "passes_per_repetition": 2,
+        "first_repetition_pass_ms": [
+          46.980625,
+          47.769125
+        ]
+      },
+      "verification": {
+        "messages": 6125294,
+        "bytes": 206138339,
+        "input_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "reencoded_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a"
+      },
+      "throughput": {
+        "repetitions": 10,
+        "pass_ms_median": 47.09531250409782,
+        "messages_per_second": {
+          "median": 130061660.29649623,
+          "mean": 129801442.88833287,
+          "stddev": 1043144.4340997719,
+          "cv": 0.008036462545313773
+        },
+        "bytes_per_second_median": 4377046166.453721
+      },
+      "counters": {
+        "cycles": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        },
+        "instructions": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        },
+        "branch_misses": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        },
+        "cache_misses": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        }
+      },
+      "ratio": {
+        "status": "not-applicable",
+        "reason": "decode only, so nothing is stored"
+      },
+      "latency": {
+        "unit": "ns per batch",
+        "batch_messages": 1024,
+        "batches": 59806,
+        "batch_phase_seed": 130816448909017089,
+        "timer_resolution_ns": 41.666667,
+        "min_publishable_ns": 416.666666,
+        "significant_figures": 3,
+        "min_ns": 5083.333325,
+        "max_ns": 29708.333284,
+        "percentiles": [
+          {
+            "percentile": 50.0,
+            "value_ns": 8208.33332
+          },
+          {
+            "percentile": 90.0,
+            "value_ns": 8666.666652
+          },
+          {
+            "percentile": 99.0,
+            "value_ns": 9458.333318
+          },
+          {
+            "percentile": 99.9,
+            "value_ns": 12791.666645
+          },
+          {
+            "percentile": 99.99,
+            "value_ns": 20624.999966
+          }
+        ]
+      }
+    },
+    {
+      "case": "itch_decode_encode",
+      "host": "macOS",
+      "timer": {
+        "source": "mach_absolute_time",
+        "calibrated_against": "CLOCK_MONOTONIC_RAW",
+        "ticks_per_second": 24000000.0,
+        "resolution_ticks": 1,
+        "resolution_ns": 41.666667,
+        "read_cost_ns": 4.43211,
+        "min_publishable_ns": 416.666667,
+        "calibration_window_ns": 200000125.0
+      },
+      "timer_end_ticks_per_second": 23999999.96,
+      "warmup": {
+        "passes_per_repetition": 2,
+        "first_repetition_pass_ms": [
+          85.932625,
+          85.463208
+        ]
+      },
+      "verification": {
+        "messages": 6125294,
+        "bytes": 206138339,
+        "input_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "reencoded_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a"
+      },
+      "throughput": {
+        "repetitions": 10,
+        "pass_ms_median": 87.67568750772625,
+        "messages_per_second": {
+          "median": 69863118.37230134,
+          "mean": 69759970.02005647,
+          "stddev": 470052.02613942407,
+          "cv": 0.0067381340044194524
+        },
+        "bytes_per_second_median": 2351147092.470432
+      },
+      "counters": {
+        "cycles": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        },
+        "instructions": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        },
+        "branch_misses": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        },
+        "cache_misses": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        }
+      },
+      "ratio": {
+        "value": 1.0,
+        "source_bytes": 206138339,
+        "output_bytes": 206138339,
+        "note": "the wire format re-encoded, with no compression yet"
+      },
+      "latency": {
+        "unit": "ns per batch",
+        "batch_messages": 1024,
+        "batches": 59808,
+        "batch_phase_seed": 130816448909017090,
+        "timer_resolution_ns": 41.666667,
+        "min_publishable_ns": 416.666667,
+        "significant_figures": 3,
+        "min_ns": 9791.666667,
+        "max_ns": 56958.333333,
+        "percentiles": [
+          {
+            "percentile": 50.0,
+            "value_ns": 14416.666667
+          },
+          {
+            "percentile": 90.0,
+            "value_ns": 15833.333333
+          },
+          {
+            "percentile": 99.0,
+            "value_ns": 17083.333333
+          },
+          {
+            "percentile": 99.9,
+            "value_ns": 21916.666667
+          },
+          {
+            "percentile": 99.99,
+            "value_ns": 36333.333333
+          }
+        ]
+      }
+    }
+  ]
+}
