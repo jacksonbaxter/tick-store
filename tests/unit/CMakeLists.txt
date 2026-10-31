@@ -14,6 +14,7 @@ add_executable(tick_store_unit_tests
     oracle_broken_store_test.cpp
     oracle_flip_test.cpp
     oracle_test.cpp
+    roundtrip_cli_test.cpp
     sha256_test.cpp
     stub_store_test.cpp
 )

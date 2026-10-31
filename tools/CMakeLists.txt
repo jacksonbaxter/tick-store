@@ -1,0 +1,7 @@
+function(tick_store_add_tool name)
+    add_executable(${name} ${name}.cpp)
+    target_link_libraries(${name} PRIVATE tick_store_harness)
+    tick_store_apply_warnings(${name})
+endfunction()
+
+tick_store_add_tool(tick_roundtrip)

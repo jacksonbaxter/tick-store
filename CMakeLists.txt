@@ -44,6 +44,7 @@ if(TICK_STORE_BUILD_TESTS OR TICK_STORE_BUILD_TOOLS)
         src/harness/flip_bit.cpp
         src/harness/hash_worker.cpp
         src/harness/roundtrip.cpp
+        src/harness/roundtrip_cli.cpp
         src/harness/sha256.cpp
         src/harness/stub_reader.cpp
     )
@@ -54,6 +55,10 @@ endif()
 if(TICK_STORE_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests/unit)
+endif()
+
+if(TICK_STORE_BUILD_TOOLS)
+    add_subdirectory(tools)
 endif()
 
 if(TICK_STORE_BUILD_FUZZ)
