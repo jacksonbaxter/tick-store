@@ -58,11 +58,11 @@
     }
   ],
   "buildPresets": [
-    { "name": "dev", "configurePreset": "dev" },
-    { "name": "asan-ubsan", "configurePreset": "asan-ubsan" },
-    { "name": "tsan", "configurePreset": "tsan" },
-    { "name": "fuzz", "configurePreset": "fuzz" },
-    { "name": "bench", "configurePreset": "bench" }
+    { "name": "dev", "configurePreset": "dev", "jobs": 6 },
+    { "name": "asan-ubsan", "configurePreset": "asan-ubsan", "jobs": 6 },
+    { "name": "tsan", "configurePreset": "tsan", "jobs": 6 },
+    { "name": "fuzz", "configurePreset": "fuzz", "jobs": 6 },
+    { "name": "bench", "configurePreset": "bench", "jobs": 6 }
   ],
   "testPresets": [
     {
