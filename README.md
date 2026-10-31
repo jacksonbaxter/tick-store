@@ -81,7 +81,7 @@ Each fault is a patch in `faults/` or a data mutation in the script. It runs in 
 clone under `build/fault-proofs/`, never the working tree, and no production code knows about
 it. The step must pass on the clean clone, then fail with the expected exit code and the
 expected string in its own log, so a build error cannot pass for a detection. The clone keeps
-one incremental build per preset, and proving everything from cold takes about an hour.
+one incremental build per preset, and proving every fault on those builds takes about 22 minutes.
 `results/check-proofs.json` records each fault, and an undetected one is a bug in the check.
 
 ## Continuous integration
@@ -92,8 +92,10 @@ step group, on a pinned LLVM. The steps are the same as a local run, and
 absent on CI, so `ItchRealDay` skips visibly, and with no `.venv`, `py-compare` shows as `SKIP`.
 
 **This workflow has never executed on GitHub: the repository has no remote.** It is validated
-by actionlint with shellcheck, and its commands have been run by hand on macOS arm64 only. The
-Linux jobs, `apt-get` and the GitHub actions themselves have never run.
+by actionlint with shellcheck. By hand on macOS arm64, a fresh clone ran `install_tools.sh`,
+the environment step and each job's `check.sh` line, with 240 s of fuzzing per target, on the
+pinned LLVM, and all passed. The Linux jobs, `apt-get` and the GitHub actions themselves have
+never run.
 
 ## Round-trip check
 
