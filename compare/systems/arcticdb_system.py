@@ -58,6 +58,21 @@ class ArcticDBSystem(System):
                 "ARCTICDB_VersionStore_NumCPUThreads_int": str(self.context.threads),
                 "ARCTICDB_VersionStore_NumIOThreads_int": str(self.context.threads)}
 
+    def requested(self):
+        return {"uri": f"lmdb, on a local disk, map_size={MAP_SIZE_TEXT}",
+                "symbol_layout": "one symbol for the whole table",
+                "write": "one lib.write of a pandas frame",
+                "rows_per_segment": self.tuning["rows_per_segment"],
+                "columns_per_segment": self.tuning["columns_per_segment"],
+                "dynamic_schema": False, "dedup": False, "encoding_version": "default, V1",
+                "column_stats": "off", "strings": "dynamic",
+                "reader": "lib.read with OutputFormat.PYARROW, so no pandas on the read path",
+                **self.worker_environment()}
+
+    def service_facts(self):
+        return {"context": "LMDB is not ArcticDB's highest-performance backend, by its own docs",
+                "class_a_flags": "marked in ArcticDB's docs as for throwaway data"}
+
     def open(self):
         import arcticdb
         from arcticdb.options import LibraryOptions

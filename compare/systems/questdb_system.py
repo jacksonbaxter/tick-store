@@ -10,6 +10,7 @@ import json
 import os
 import platform
 import re
+import resource
 import signal
 import socket
 import subprocess
@@ -67,6 +68,9 @@ BASE_CONF = {
     "qwp.udp.bind.to": f"{HOST}:9007",
     "qwp.udp.enabled": "false",
 }
+ECHOED_CONF_KEYS = ("telemetry.enabled", "line.udp.enabled", "http.net.bind.to",
+                    "pg.net.bind.to", "line.tcp.net.bind.to")
+OPEN_FILE_TARGET = 1048576  # QuestDB's capacity docs, which also ask this of vm.max_map_count.
 WORKER_SETTINGS = ("shared.network.worker.count", "shared.query.worker.count",
                    "shared.write.worker.count")
 
@@ -85,6 +89,34 @@ def linux_death_signal():
         ctypes.CDLL(None, use_errno=True).prctl(1, signal.SIGKILL)  # PR_SET_PDEATHSIG
 
     return request
+
+
+def named_loopback(value):
+    """No results file holds an address, even this one."""
+    return value.replace(HOST, "loopback") if isinstance(value, str) else value
+
+
+def raise_open_file_limit():
+    """The soft limit up to what QuestDB's docs ask, as far as the hard limit allows."""
+    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    wanted = OPEN_FILE_TARGET if hard == resource.RLIM_INFINITY else min(hard, OPEN_FILE_TARGET)
+    if soft == resource.RLIM_INFINITY or soft >= wanted:
+        return
+    try:
+        resource.setrlimit(resource.RLIMIT_NOFILE, (wanted, hard))
+    except (OSError, ValueError):
+        pass  # The value in force goes into the results either way.
+
+
+def host_limits():
+    """What the docs ask of the host, against what it has. Neither can change without root."""
+    limits = {"docs_ask_open_files": OPEN_FILE_TARGET,
+              "open_files_soft_limit": resource.getrlimit(resource.RLIMIT_NOFILE)[0]}
+    if platform.system() == "Linux":
+        limits["docs_ask_max_map_count"] = OPEN_FILE_TARGET
+        limits["vm_max_map_count"] = int(
+            Path("/proc/sys/vm/max_map_count").read_text(encoding="ascii"))
+    return limits
 
 
 def port_in_use(port):
@@ -177,6 +209,7 @@ class QuestDBServer:
 
     def start(self):
         require_ports_free()
+        raise_open_file_limit()
         with open(self.root / "log" / "stdout.txt", "ab") as log:
             self.process = subprocess.Popen(
                 self.command(), stdin=subprocess.DEVNULL, stdout=log, stderr=log,
@@ -294,6 +327,17 @@ class QuestDBSystem(System):
     def start_service(self):
         self.listening = self.server.start()
 
+    def requested(self):
+        return {"server_conf": {key: named_loopback(value)
+                                for key, value in self.server.conf.items()},
+                "java_options": [*JAVA_OPTIONS, f"-Xms{HEAP}", f"-Xmx{HEAP}",
+                                 f"-XX:ActiveProcessorCount={self.context.threads}",
+                                 "-XX:-UsePerfData"],
+                "table": self._column_definitions(TABLE),
+                "ingest": "QWP over WebSocket, Python client, in time order",
+                "symbol_capacity": "not set, as the docs conflict",
+                "o3_settings": "the defaults"}
+
     def stop_service(self):
         self.server.stop()
         return {"peak_rss_bytes": self.server.peak_rss_bytes, "heap": f"-Xms{HEAP} -Xmx{HEAP}"}
@@ -307,6 +351,11 @@ class QuestDBSystem(System):
         command = self._running_command()
         checks = [Setting(name, str(self.context.threads), counts.get(name), "SHOW PARAMETERS")
                   for name in WORKER_SETTINGS]
+        echoed = {row["property_path"]: row["value"]
+                  for row in sql("SELECT property_path, value FROM (SHOW PARAMETERS)")}
+        checks += [Setting(key, named_loopback(value), named_loopback(echoed.get(key)),
+                           "SHOW PARAMETERS")
+                   for key, value in self.server.conf.items() if key in ECHOED_CONF_KEYS]
         checks += [
             Setting("java heap", f"-Xmx{HEAP}", _flag(command, "-Xmx"), "the running command"),
             Setting("java processors", f"-XX:ActiveProcessorCount={self.context.threads}",
@@ -353,6 +402,7 @@ class QuestDBSystem(System):
                 "listening_ports": sorted(int(item.rsplit(":", 1)[1]) for item in self.listening),
                 "bind": "loopback only, read from the host's socket table",
                 "telemetry": "off",
+                "host_limits": host_limits(),
                 "commit_mode_conf": self.mode}
 
     # Worker side.

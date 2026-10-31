@@ -81,8 +81,12 @@ class System(ABC):
         return {}
 
     def service_facts(self):
-        """Facts about the service the results should state."""
+        """Facts about the system the results should state."""
         return {}
+
+    @abstractmethod
+    def requested(self):
+        """Every setting this run asks for, the defaults it relies on included."""
 
     # Worker side.
 

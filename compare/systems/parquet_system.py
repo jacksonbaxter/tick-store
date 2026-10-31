@@ -75,6 +75,20 @@ class ParquetSystem(System):
         super().__init__(context)
         self.harness_flushes = 0
 
+    def requested(self):
+        return {"writer": "streaming pq.ParquetWriter", "version": PARQUET_VERSION,
+                "data_page_version": DATA_PAGE_VERSION, "data_page_bytes": "1 MiB, the default",
+                "compression": self.tuning["compression"],
+                "compression_level": self.tuning["compression_level"],
+                "row_group_rows": self.tuning["row_group_rows"] or "the whole slice",
+                "dictionary": list(self._dictionary_columns()),
+                "delta_binary_packed": list(self._delta_columns()),
+                "plain_columns": ["rest"], "statistics": True, "page_index": False,
+                "bloom_filters": False, "sorting_columns": ["ts"],
+                "reader": {"call": "pq.read_table", "use_threads": True, "pre_buffer": True,
+                           "memory_map": False},
+                "threads": self.context.threads}
+
     def open(self):
         pa.set_cpu_count(self.context.threads)
         pa.set_io_thread_count(self.context.threads)
@@ -208,6 +222,10 @@ class ParquetSystem(System):
                     checks.append(Setting(f"group {group_index} {name} dictionary",
                                           name in self._dictionary_columns(),
                                           chunk.has_dictionary_page, "footer"))
+                    checks.append(Setting(f"group {group_index} {name} statistics", True,
+                                          chunk.is_stats_set, "footer"))
+                    checks.append(Setting(f"group {group_index} {name} page index", False,
+                                          chunk.has_column_index, "footer"))
                     if name in self._delta_columns():
                         checks.append(Setting(f"group {group_index} {name} delta encoded", True,
                                               "DELTA_BINARY_PACKED" in chunk.encodings, "footer"))
@@ -218,6 +236,9 @@ class ParquetSystem(System):
                                         "data_page_version": version,
                                         "compressed_bytes": chunk.total_compressed_size,
                                         "uncompressed_bytes": chunk.total_uncompressed_size})
+        sorting = metadata.row_group(0).sorting_columns
+        checks.append(Setting("sorted by ts", [TABLE_COLUMNS.index("ts")],
+                              [item.column_index for item in sorting], "footer"))
         checked = require_all_match(checks)
         return {"checks_passed": len(checked), "created_by": metadata.created_by,
                 "format_version": metadata.format_version, "row_groups": len(rows),

@@ -10,6 +10,7 @@ has finished.
 """
 
 import argparse
+import hashlib
 import json
 import os
 import platform
@@ -183,6 +184,7 @@ class Runner:
                                      flush_report=last)
                 settle = system.settle() if last else {}
                 facts = system.service_facts() if last else {}
+                facts["requested"] = system.requested()
             finally:
                 service = system.stop_service()
             repetitions.append({"timings": answer["timings"],
@@ -274,7 +276,21 @@ class Runner:
             system.data_paths())["allocated_bytes"]
         return answer
 
+    def verify_slice(self):
+        """Nothing is loaded from a slice or an export that is not the pinned one."""
+        digest = hashlib.sha256()
+        with open(self.source, "rb") as source:
+            while chunk := source.read(1 << 20):
+                digest.update(chunk)
+        if digest.hexdigest() != self.pin["sha256"]:
+            raise StepFailed(f"the slice's sha256 is {digest.hexdigest()}, not its pin")
+        report = self.verify(self.columns_dir)
+        if report["verdict"] != "pass" or report["exit_code"] != 0:
+            raise StepFailed(f"the export does not rebuild the pinned slice: {report}")
+
     def run(self):
+        self.verify_slice()
+        self.note("the slice and its export match the pin")
         columns = ColumnSet(self.columns_dir)
         if columns.manifest["tail_bytes"] != 0:
             raise StepFailed("the slice has a tail, and the table has nowhere to keep it")
