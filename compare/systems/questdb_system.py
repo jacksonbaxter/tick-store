@@ -364,7 +364,7 @@ class LaunchedServer(QuestDBServer):
         pid = self.java_pid
         self.java_pid = None
         if pid is not None and process_alive(pid):
-            self.peak_rss_bytes = max(self.peak_rss_bytes, vm_hwm_bytes(pid))
+            self.peak_rss_bytes = max(self.peak_rss_bytes, proc_status_bytes(pid, "VmHWM"))
             os.kill(pid, signal.SIGTERM)
             deadline = time.monotonic() + STOP_TIMEOUT_SECONDS
             forced = False
@@ -386,9 +386,9 @@ def process_alive(pid):
     return state != "Z"
 
 
-def vm_hwm_bytes(pid):
+def proc_status_bytes(pid, field):
     for line in Path(f"/proc/{pid}/status").read_text(encoding="ascii").splitlines():
-        if line.startswith("VmHWM:"):
+        if line.startswith(f"{field}:"):
             return int(line.split()[1]) * 1024
     return 0
 
@@ -607,8 +607,12 @@ class QuestDBSystem(System):
         return state
 
     def ingest_stream(self, chunks):
-        """Every dataframe call commits. The clock stops as in `ingest`, but a day's backlog
-        can outlast one call's query timeout, so the WAL is polled down before the last call."""
+        """Every dataframe call commits. Each state also records the client's own memory, since
+        the chunks are bounded and whatever it holds beyond them is its own. The clock stops as
+        in `ingest`, but a day's backlog can outlast one call's query timeout, so the WAL is
+        polled down before the last call."""
+        import pyarrow as pa
+
         sql(self._column_definitions(TABLE))
         started = time.perf_counter()
         rows = 0
@@ -618,6 +622,8 @@ class QuestDBSystem(System):
             self.client.dataframe(prepared, table_name=TABLE, symbols=symbols, at="ts")
             rows += table.num_rows
             wal_states.append({"rows_sent": rows, "seconds": time.perf_counter() - started,
+                               "arrow_allocated_bytes": pa.total_allocated_bytes(),
+                               "client_rss_anon_bytes": proc_status_bytes(os.getpid(), "RssAnon"),
                                **self._wal_state()})
             print(f"questdb: {wal_states[-1]}", flush=True)
         sent = time.perf_counter()

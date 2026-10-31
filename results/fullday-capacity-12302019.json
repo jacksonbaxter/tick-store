@@ -1,0 +1,273 @@
+{
+ "measurement": "capacity check, not a benchmark",
+ "label": "One full ITCH day per system, to learn whether it fits and survives. Each ran once, on a shared machine with other services, in class B unless stated. No number here is a reported result, and no time here is a rate to quote.",
+ "day": "12302019",
+ "messages": 268744780,
+ "source_bytes": 8251407909,
+ "host": {
+  "os": "Linux",
+  "kernel": "6.12",
+  "cpu": "AMD Ryzen Embedded V1605B, 4 cores, 8 threads",
+  "mem_total_bytes": 16463536128,
+  "avx2": true,
+  "avx512f": false,
+  "swap_note": "swap was already full before the first run, and stayed so"
+ },
+ "method": {
+  "ingest": "bounded chunks read from the export: 4 Mi rows for Parquet and QuestDB, 4 M rows for ArcticDB, whose first chunk is a write and the rest appends",
+  "queries": "one full-column scan, the count and sum of shares, and one window, the first second of the open, each against a numpy ground truth from the export",
+  "stored_settings": "each system's existing stored-form checks passed at full size",
+  "not_done": "no whole-store read-back through the G-1 oracle, which needs a day on the heap, and no warm or cold proof. Durability was not proven at full size",
+  "guard": {
+   "sample_seconds": 2,
+   "stop_under_mem_available_bytes": 3221225472,
+   "stop_under_free_disk_bytes": 53687091200,
+   "stop_over_swap_bytes_per_second": 10485760
+  },
+  "sigill_scope": "only the paths run here: streamed write, one column read, one window read, stored-settings reads. It says nothing of the wheels' other kernels",
+  "peak_memory": "VmHWM. A worker's figure comes from wait4 where it exceeds the runner's VmHWM, since ru_maxrss cannot read below that, and otherwise from /proc samples every 2 s"
+ },
+ "export": {
+  "verdict": "pass",
+  "records": 268744780,
+  "raw_rows": 0,
+  "tail_bytes": 0,
+  "exit": {
+   "code": 0,
+   "signal": null
+  },
+  "wall_seconds": 318.8,
+  "stored_bytes": 23861605383,
+  "peak_memory_bytes": {
+   "VmHWM": 12329242624,
+   "RssAnon": 15044608,
+   "RssFile": 12308434944
+  },
+  "mem_available_lowest_bytes": 13532024832
+ },
+ "systems": {
+  "parquet": {
+   "variant": "zstd1-rg1Mi",
+   "durability_class": "B",
+   "commit": "9c8b09f91e8a44e99a2448932fa1b8e1b7087e1a",
+   "cpu_mask": [
+    2,
+    6,
+    7
+   ],
+   "threads": 2,
+   "exit": {
+    "code": 0,
+    "signal": null
+   },
+   "every_step_exit_zero": true,
+   "signals_seen": [],
+   "sigill": false,
+   "outcome": "finished",
+   "guard_fired": false,
+   "rows": {
+    "expected": 268744780,
+    "full_scan": 268744780,
+    "window_first_second_of_open": 527644,
+    "answers_match_ground_truth": true
+   },
+   "hs_err_files": 0,
+   "mem_available_start_bytes": 13585420288,
+   "mem_available_lowest_bytes": 11445825536,
+   "swapped_pages_during_run": 0,
+   "stored_bytes": 3191406592,
+   "stored_over_source": 0.387,
+   "disk_used_at_peak_bytes": 3120988160,
+   "wall_seconds": {
+    "whole_run": 196.7,
+    "ingest": 187.5,
+    "full_scan": 3.4,
+    "window": 1.0
+   },
+   "peak_memory_bytes": {
+    "ingest_worker_VmHWM": 1529008128,
+    "full_scan_worker_VmHWM": 1521938432,
+    "driver_VmHWM": 1193680896
+   }
+  },
+  "arcticdb": {
+   "variant": "rows100k-cols127",
+   "durability_class": "B",
+   "commit": "9c8b09f91e8a44e99a2448932fa1b8e1b7087e1a",
+   "cpu_mask": [
+    2,
+    6,
+    7
+   ],
+   "threads": 2,
+   "exit": {
+    "code": 0,
+    "signal": null
+   },
+   "every_step_exit_zero": true,
+   "signals_seen": [],
+   "sigill": false,
+   "outcome": "finished",
+   "guard_fired": false,
+   "rows": {
+    "expected": 268744780,
+    "full_scan": 268744780,
+    "window_first_second_of_open": 527644,
+    "answers_match_ground_truth": true
+   },
+   "hs_err_files": 0,
+   "mem_available_start_bytes": 12840230912,
+   "mem_available_lowest_bytes": 9326624768,
+   "swapped_pages_during_run": 1,
+   "stored_bytes": 6352666624,
+   "stored_over_source": 0.77,
+   "disk_used_at_peak_bytes": 6211543040,
+   "wall_seconds": {
+    "whole_run": 184.4,
+    "ingest": 164.1,
+    "full_scan": 12.3,
+    "window": 1.7
+   },
+   "peak_memory_bytes": {
+    "ingest_worker_VmHWM": 1317203968,
+    "full_scan_worker_VmHWM": 5838458880,
+    "driver_VmHWM": 1224720384
+   }
+  },
+  "questdb": {
+   "variant": "plain",
+   "durability_class": "B",
+   "commit": "9c8b09f91e8a44e99a2448932fa1b8e1b7087e1a",
+   "cpu_mask": [
+    2,
+    6,
+    7
+   ],
+   "threads": 2,
+   "exit": {
+    "code": 0,
+    "signal": null
+   },
+   "every_step_exit_zero": true,
+   "signals_seen": [],
+   "sigill": false,
+   "outcome": "finished",
+   "guard_fired": false,
+   "rows": {
+    "expected": 268744780,
+    "full_scan": 268744780,
+    "window_first_second_of_open": 527644,
+    "answers_match_ground_truth": true
+   },
+   "hs_err_files": 0,
+   "mem_available_start_bytes": 12833505280,
+   "mem_available_lowest_bytes": 6520430592,
+   "swapped_pages_during_run": 3,
+   "stored_bytes": 22897786880,
+   "stored_over_source": 2.775,
+   "disk_used_at_peak_bytes": 23957028864,
+   "wall_seconds": {
+    "whole_run": 998.9,
+    "ingest": 959.0,
+    "full_scan": 3.7,
+    "window": 1.4
+   },
+   "peak_memory_bytes": {
+    "server_ingest": {
+     "VmHWM": 1539555328,
+     "RssAnon": 1349836800,
+     "RssFile": 181026816
+    },
+    "server_queries": {
+     "VmHWM": 2584330240,
+     "RssAnon": 1351315456,
+     "RssFile": 1222656000
+    },
+    "ingest_client": {
+     "VmHWM": 5889290240,
+     "RssAnon": 5760458752,
+     "RssFile": 67887104
+    }
+   },
+   "heap": {
+    "requested": "-Xms1g -Xmx1g",
+    "through": "bin/questdb.sh, JVM_PREPEND",
+    "in_force_read_from": "the running command",
+    "gc_log_per_server_start": [
+     {
+      "pauses": 3,
+      "young_pauses": 0,
+      "full_pauses": 3,
+      "causes": [
+       "Metadata GC Threshold",
+       "System.gc()"
+      ],
+      "pause_total_ms": 180.0,
+      "pause_longest_ms": 107.83,
+      "last_pause_uptime_seconds": 4.389,
+      "server_uptime_seconds": 965.673,
+      "peak_heap_after_gc_mib": 115,
+      "heap_used_at_exit_mib": 300,
+      "heap_capacity_mib": 982,
+      "out_of_memory_error": false
+     },
+     {
+      "pauses": 3,
+      "young_pauses": 0,
+      "full_pauses": 3,
+      "causes": [
+       "Metadata GC Threshold",
+       "System.gc()"
+      ],
+      "pause_total_ms": 192.5,
+      "pause_longest_ms": 134.931,
+      "last_pause_uptime_seconds": 3.094,
+      "server_uptime_seconds": 18.712,
+      "peak_heap_after_gc_mib": 116,
+      "heap_used_at_exit_mib": 155,
+      "heap_capacity_mib": 982,
+      "out_of_memory_error": false
+     },
+     {
+      "pauses": 3,
+      "young_pauses": 0,
+      "full_pauses": 3,
+      "causes": [
+       "Metadata GC Threshold",
+       "System.gc()"
+      ],
+      "pause_total_ms": 191.2,
+      "pause_longest_ms": 111.906,
+      "last_pause_uptime_seconds": 3.234,
+      "server_uptime_seconds": 9.134,
+      "peak_heap_after_gc_mib": 115,
+      "heap_used_at_exit_mib": 158,
+      "heap_capacity_mib": 982,
+      "out_of_memory_error": false
+     }
+    ],
+    "wal": {
+     "polls": 66,
+     "largest_sequencer_minus_writer_txn": 1,
+     "largest_memory_pressure": 0,
+     "largest_buffered_txn_size": 0,
+     "suspended": false,
+     "apply_wait_seconds_after_last_send": 2.0,
+     "writer_txn_equals_sequencer_txn": true,
+     "clock_stops": "after wait_wal_table, with writerTxn = sequencerTxn checked"
+    },
+    "server_log": {
+     "lines_error_or_critical": 0,
+     "lines_naming_oom_backpressure_or_suspension": 0
+    }
+   }
+  }
+ },
+ "questdb_heap_verdict": {
+  "verdict": "adequate",
+  "chosen_heap": "-Xms1g -Xmx1g",
+  "tested_at_that_value": true,
+  "why": "A full day in class B ran to WAL fully applied with no collection at all after start-up: the only pauses are the three full collections every server start makes, the heap after them was about 116 MiB, and at the end of ingest under a third of 981 MiB was in use, with eden never filled. No OutOfMemoryError, no memory pressure, no suspension, and no error line.",
+  "risk": "Not the heap and not mapped pages. The server's mapped column files stayed under 200 MiB resident during ingest and 1.1 GiB during queries. The largest process is the Python ingest client, whose anonymous memory reached 5.4 GiB."
+ }
+}
