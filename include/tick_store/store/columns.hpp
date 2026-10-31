@@ -119,7 +119,7 @@ struct ColumnsManifest {
 
 // Parses a manifest, refusing anything but the exact form above.
 [[nodiscard]] std::expected<ColumnsManifest, StoreError> parse_columns_manifest(
-    std::span<const std::byte> text);
+    std::span<const std::byte> bytes);
 
 [[nodiscard]] std::string format_columns_manifest(const ColumnsManifest& manifest);
 

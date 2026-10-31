@@ -17,6 +17,7 @@
 
 #include <cstddef>
 #include <filesystem>
+#include <format>
 #include <initializer_list>
 #include <string>
 #include <string_view>

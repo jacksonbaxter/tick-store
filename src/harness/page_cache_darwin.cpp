@@ -8,19 +8,19 @@
 #include <cerrno>
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <expected>
 #include <filesystem>
 #include <format>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <vector>
 
 namespace tick_store::harness {
 namespace {
 
 [[nodiscard]] std::string failure(std::string_view call, const std::filesystem::path& path) {
-    return std::format("{} failed on {}: {}", call, path.string(), std::strerror(errno));
+    return std::format("{} failed on {}: {}", call, path.string(), std::generic_category().message(errno));
 }
 
 // A read-only MAP_SHARED mapping that lasts one scope and is never touched.
@@ -102,10 +102,13 @@ std::expected<FileResidency, std::string> file_residency(const std::filesystem::
     if (::mincore(mapping->base(), length, vector.data()) != 0) {
         return std::unexpected(failure("mincore", path));
     }
+    constexpr unsigned kResident = MINCORE_INCORE;
+    constexpr unsigned kDirty = MINCORE_MODIFIED;
     std::uint64_t dirty = 0;
     for (const char flags : vector) {
-        result.resident_pages += (flags & MINCORE_INCORE) != 0 ? 1U : 0U;
-        dirty += (flags & MINCORE_MODIFIED) != 0 ? 1U : 0U;
+        const auto bits = static_cast<unsigned>(static_cast<unsigned char>(flags));
+        result.resident_pages += (bits & kResident) != 0U ? 1U : 0U;
+        dirty += (bits & kDirty) != 0U ? 1U : 0U;
     }
     result.dirty_pages = dirty;
     return result;

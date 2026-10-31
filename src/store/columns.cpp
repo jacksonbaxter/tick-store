@@ -79,17 +79,15 @@ constexpr std::string_view name_of(ColumnFile file) noexcept {
 }
 
 // Which typed columns a hot row uses. Everything else must be 0 or empty.
-enum UsedColumn : std::uint16_t {
-    kUsesOrderRef = 1U << 0U,
-    kUsesNewRef = 1U << 1U,
-    kUsesSide = 1U << 2U,
-    kUsesShares = 1U << 3U,
-    kUsesPrice = 1U << 4U,
-    kUsesMatch = 1U << 5U,
-    kUsesPrintable = 1U << 6U,
-    kUsesStock = 1U << 7U,
-    kUsesMpid = 1U << 8U,
-};
+constexpr unsigned kUsesOrderRef = 1U << 0U;
+constexpr unsigned kUsesNewRef = 1U << 1U;
+constexpr unsigned kUsesSide = 1U << 2U;
+constexpr unsigned kUsesShares = 1U << 3U;
+constexpr unsigned kUsesPrice = 1U << 4U;
+constexpr unsigned kUsesMatch = 1U << 5U;
+constexpr unsigned kUsesPrintable = 1U << 6U;
+constexpr unsigned kUsesStock = 1U << 7U;
+constexpr unsigned kUsesMpid = 1U << 8U;
 
 constexpr std::uint16_t kAddColumns =
     kUsesOrderRef | kUsesSide | kUsesShares | kUsesStock | kUsesPrice;
@@ -272,7 +270,7 @@ void append_hex(std::string& out, std::span<const std::byte> bytes) {
         if (!low.has_value()) {
             return i + 1;
         }
-        out.push_back(static_cast<std::byte>((*high << 4U) | *low));
+        out.push_back(static_cast<std::byte>((static_cast<unsigned>(*high) << 4U) | *low));
     }
     return std::nullopt;
 }
@@ -518,8 +516,9 @@ void write_frame_prefix(std::vector<std::byte>& frame, std::size_t payload_size)
         return std::nullopt;
     }
     std::uint64_t value = 0;
-    const char* const end = digits.data() + digits.size();
-    const auto [stopped, status] = std::from_chars(digits.data(), end, value);
+    const char* const start = digits.data();
+    const char* const end = start + digits.size();
+    const auto [stopped, status] = std::from_chars(start, end, value);
     if (status != std::errc{} || stopped != end) {
         return std::nullopt;
     }

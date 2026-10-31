@@ -7,7 +7,6 @@
 #include "columns_fixture.hpp"
 #include "stub_fixture.hpp"
 #include "test_bytes.hpp"
-#include "tick_store/harness/columns_reader.hpp"
 #include "tick_store/harness/roundtrip.hpp"
 #include "tick_store/store/columns.hpp"
 

@@ -3,19 +3,18 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <sys/syscall.h>
 #include <unistd.h>
 
 #include <cerrno>
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <expected>
 #include <filesystem>
 #include <format>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <vector>
 
 namespace tick_store::harness {
@@ -39,7 +38,7 @@ struct Cachestat {
 };
 
 [[nodiscard]] std::string failure(std::string_view call, const std::filesystem::path& path) {
-    return std::format("{} failed on {}: {}", call, path.string(), std::strerror(errno));
+    return std::format("{} failed on {}: {}", call, path.string(), std::generic_category().message(errno));
 }
 
 class Descriptor {

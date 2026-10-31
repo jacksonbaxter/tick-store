@@ -5,7 +5,6 @@
 #include "itch_fixtures.hpp"
 #include "stub_fixture.hpp"
 #include "test_bytes.hpp"
-#include "tick_store/itch/big_endian.hpp"
 #include "tick_store/itch/codec.hpp"
 #include "tick_store/itch/frame.hpp"
 #include "tick_store/itch/message.hpp"
@@ -19,13 +18,13 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <format>
-#include <functional>
+#include <expected>
 #include <limits>
 #include <optional>
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace tick_store::store {

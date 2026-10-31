@@ -37,7 +37,7 @@ private:
         store::ColumnBytes bytes{};
     };
 
-    ColumnsReader(Files files, const store::ColumnsParser& parser) noexcept;
+    ColumnsReader(Files files, store::ColumnsParser parser) noexcept;
 
     Files files_;
     store::ColumnsParser parser_;

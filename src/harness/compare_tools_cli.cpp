@@ -14,12 +14,10 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#include <array>
 #include <cerrno>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <expected>
 #include <filesystem>
 #include <format>
@@ -29,6 +27,7 @@
 #include <string_view>
 #include <system_error>
 #include <thread>
+#include <utility>
 #include <vector>
 
 namespace tick_store::harness {
@@ -103,7 +102,7 @@ std::expected<std::vector<std::filesystem::path>, std::string> regular_files(
         if (!std::filesystem::is_directory(status)) {
             return std::unexpected(std::format("not a file or directory: {}", text));
         }
-        auto walker = std::filesystem::recursive_directory_iterator{path, error};
+        const auto walker = std::filesystem::recursive_directory_iterator{path, error};
         if (error) {
             return std::unexpected(std::format("cannot walk {}: {}", text, error.message()));
         }
@@ -172,7 +171,8 @@ std::expected<void, std::string> read_through(const std::filesystem::path& path)
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg): the POSIX interface is variadic.
     const int fd = ::open(path.c_str(), O_RDONLY | O_CLOEXEC);
     if (fd < 0) {
-        return std::unexpected(std::format("cannot read {}: {}", path.string(), std::strerror(errno)));
+        return std::unexpected(std::format("cannot read {}: {}", path.string(),
+                                           std::generic_category().message(errno)));
     }
     std::vector<char> buffer(kReadChunk);
     while (true) {
@@ -185,7 +185,7 @@ std::expected<void, std::string> read_through(const std::filesystem::path& path)
             const int saved = errno;
             ::close(fd);
             return std::unexpected(std::format("cannot read {}: {}", path.string(),
-                                               std::strerror(saved)));
+                                               std::generic_category().message(saved)));
         }
     }
 }

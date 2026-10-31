@@ -10,15 +10,14 @@
 #include <expected>
 #include <filesystem>
 #include <memory>
-#include <optional>
 #include <span>
 #include <utility>
 #include <vector>
 
 namespace tick_store::harness {
 
-ColumnsReader::ColumnsReader(Files files, const store::ColumnsParser& parser) noexcept
-    : files_(std::move(files)), parser_(parser) {}
+ColumnsReader::ColumnsReader(Files files, store::ColumnsParser parser) noexcept
+    : files_(std::move(files)), parser_(std::move(parser)) {}
 
 std::expected<std::unique_ptr<ColumnsReader>, store::StoreError> ColumnsReader::open(
     const std::filesystem::path& directory) {
@@ -43,11 +42,11 @@ std::expected<std::unique_ptr<ColumnsReader>, store::StoreError> ColumnsReader::
     }
 
     // Spans stay valid across the move of the MappedFiles, as mapped_file.hpp promises.
-    const auto parser = store::ColumnsParser::open(*manifest, files.bytes);
+    auto parser = store::ColumnsParser::open(*manifest, files.bytes);
     if (!parser.has_value()) {
         return std::unexpected(parser.error());
     }
-    return std::unique_ptr<ColumnsReader>{new ColumnsReader{std::move(files), *parser}};
+    return std::unique_ptr<ColumnsReader>{new ColumnsReader{std::move(files), std::move(*parser)}};
 }
 
 std::expected<RecordReader::Record, RecordReadError> ColumnsReader::next() {

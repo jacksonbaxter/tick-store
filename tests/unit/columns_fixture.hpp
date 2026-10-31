@@ -83,7 +83,7 @@ inline ColumnDirectory export_payload(std::span<const std::byte> payload) {
 // The directory's records for the oracle, in memory.
 class BufferReader final : public harness::RecordReader {
 public:
-    explicit BufferReader(const store::ColumnsParser& parser) : parser_(parser) {}
+    explicit BufferReader(store::ColumnsParser parser) : parser_(std::move(parser)) {}
 
     [[nodiscard]] std::expected<Record, harness::RecordReadError> next() override {
         const auto frame = parser_.next();

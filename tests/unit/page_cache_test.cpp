@@ -4,6 +4,7 @@
 
 #include "scratch_dir.hpp"
 #include "stub_fixture.hpp"
+#include "test_bytes.hpp"
 #include "tick_store/harness/compare_tools_cli.hpp"
 #include "tick_store/harness/page_cache.hpp"
 #include "tick_store/harness/roundtrip_cli.hpp"
@@ -17,6 +18,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <format>
 #include <initializer_list>
 #include <string>
 #include <string_view>
