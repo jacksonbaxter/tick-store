@@ -32,8 +32,7 @@ Results from the two hosts are kept apart and never mixed.
 - **Source bytes**: the decompressed ITCH stream, including the 2-byte length prefix on every message. The `.gz` is not the baseline.
 - **Data**: the reference day is `12302019.NASDAQ_ITCH50.gz`, 3,524,013,057 bytes compressed, 8,251,407,909 decompressed, 268,744,780
   messages. The second day is `10302019.NASDAQ_ITCH50.gz`, 3,872,931,242 bytes compressed, 9,035,016,843 decompressed, 293,989,079
-  messages. The reference day's figures are measured from the file; the second day's are not yet, and only its compressed size is
-  confirmed, by HTTP HEAD. The SHA-256 pins are in `scripts/data_pins.json`.
+  messages. Both days' figures are measured from the files. The SHA-256 pins are in `scripts/data_pins.json`.
 - **Ratio**: source bytes divided by stored bytes. Stored bytes include everything needed to re-serialise the source exactly:
   indexes, permutations, exceptions and metadata. Every system is measured against the same baseline.
 - **Durability class A**: returns once data is in the OS page cache. **Class B**: returns after a flush to the device.
