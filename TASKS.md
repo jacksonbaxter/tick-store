@@ -109,8 +109,10 @@ Comparison harness
 Checks
 - [x] ASan and UBSan with no recover, TSan on concurrent code
 - [x] clang-tidy, and `-Wall -Wextra -Werror`
-- [ ] GitHub Actions config, validated locally with actionlint, and recorded as never executed on GitHub
-- [ ] One local script that runs every check
+- [x] GitHub Actions config, validated locally with actionlint, and recorded as never executed on GitHub. There is no remote yet, so no job has ever run there, and the Linux jobs have run nowhere
+- [ ] First real run of `.github/workflows/ci.yml` on GitHub, once a remote exists, and any Linux-only failure it finds
+- [x] One local script that runs every check (`scripts/check.sh`), in sequence, with a summary table
+- [x] Every check shown failing on an injected fault: `scripts/prove_checks.py`, `faults/`, `results/check-proofs.json`. Each fault must pass its baseline, then fail with the expected exit code and string
 
 ## Phase 3: Implementation
 
