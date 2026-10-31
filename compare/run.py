@@ -37,6 +37,7 @@ from compare.layout import PINS_PATH, SLICE_NAME, Layout  # noqa: E402
 from compare.queries import CLIPPING_STATEMENT  # noqa: E402
 from compare.schema import read_manifest  # noqa: E402
 from compare.systems import SYSTEM_NAMES  # noqa: E402
+from compare.systems.questdb_system import heap_flags  # noqa: E402
 
 CHECK_COMPARE = REPO_ROOT / "scripts" / "check_compare.py"
 RUN_SYSTEM = REPO_ROOT / "compare" / "run_system.py"
@@ -50,9 +51,14 @@ MACOS_STATEMENT = ("Unpinned. No hardware counters. macOS has no thread pinning,
 LINUX_STATEMENT = (f"Each system ran under taskset -c {LINUX_CORE}, and the run then widened its "
                    "own mask to cpu4 and cpu6. Every thread of every system shares those two "
                    "CPUs, client and server alike. QuestDB's JVM has more threads than CPUs.")
-LINUX_HEAP = ("QuestDB ran with -Xmx1g for this slice. The heap needed for a full day is "
-              "unchecked.")
-MACOS_HEAP = "QuestDB ran with -Xmx1g, as on Linux, so that the two runs match."
+QUESTDB_HEAP = " ".join(heap_flags())
+CAPACITY_CHECK = "results/fullday-capacity-12302019.json"
+LINUX_HEAP = {"setting": QUESTDB_HEAP, "full_day_check": CAPACITY_CHECK,
+              "statement": f"QuestDB ran with {QUESTDB_HEAP}, the setting {CAPACITY_CHECK} records "
+                           "as checked and adequate for a full day on Linux."}
+MACOS_HEAP = {"setting": QUESTDB_HEAP, "full_day_check": "Linux only",
+              "statement": f"QuestDB ran with {QUESTDB_HEAP}, as on Linux, so that the two runs "
+                           "match. The full-day capacity check is Linux only."}
 WARM_METHOD = ("Every store file read through tick_coldcache warm, then residency read at 100% "
                "of pages by mincore before and after all repetitions, with the server running.")
 COLD_METHOD = {

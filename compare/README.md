@@ -314,7 +314,10 @@ benchmark. `compare/fullday.py` needs the day's export at `<data>/export/<day>-f
 **QuestDB's heap on Linux is `-Xms1g -Xmx1g`, the Phase 3 setting.** It held for a full day in class
 A and in class B, with no collection after start-up and at most 300 MiB of 982 MiB in use when ingest
 ended. QuestDB's default heap was not tested, because nothing pointed to it. The evidence is in
-`results/fullday-capacity-12302019.json`.
+`results/fullday-capacity-12302019.json`. Each Linux results file states its heap and cites that
+file, and `scripts/check_compare.py` refuses a heap other than the one the file records as checked,
+or one the running command did not hold. A macOS file states its own heap, and that this check is
+Linux only.
 
 ## What the numbers are
 

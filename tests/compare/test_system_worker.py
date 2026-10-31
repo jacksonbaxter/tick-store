@@ -19,6 +19,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 try:
@@ -28,13 +29,16 @@ except ImportError:
 
 from test_schema import DAY, write_fixture  # noqa: E402
 
+import check_compare  # noqa: E402
+
+from compare import run as compare_run  # noqa: E402
 from compare.durability import CLASS_B  # noqa: E402
 from compare.layout import Layout  # noqa: E402
-from compare.queries import ground_truth, query_to_json  # noqa: E402
-from compare.queries import OPEN_NS, Query  # noqa: E402
+from compare.queries import OPEN_NS, Query, ground_truth, query_to_json  # noqa: E402
 from compare.schema import NANOS_PER_SECOND, ColumnSet  # noqa: E402
-from compare.systems.parquet_system import ParquetSystem  # noqa: E402
 from compare.systems.base import RunContext  # noqa: E402
+from compare.systems.parquet_system import ParquetSystem  # noqa: E402
+from compare.systems.questdb_system import QuestDBServer  # noqa: E402
 
 WATCHED_WORKER = """
 import json, sys
@@ -107,6 +111,23 @@ class ColdWorker(unittest.TestCase):
         for query in QUERIES:
             with self.subTest(query=query.kind):
                 self.assertEqual(self.cold(query)["imported_inside_the_clock"], [])
+
+
+class HeapStatements(unittest.TestCase):
+    """What compare/run.py writes, against the validator and the real capacity file."""
+
+    @staticmethod
+    def problems(document, host):
+        capacity = json.loads(check_compare.DEFAULT_CAPACITY.read_text(encoding="utf-8"))
+        return check_compare.check_heap(document, host, capacity)
+
+    def test_each_host_passes(self):
+        self.assertEqual(self.problems({"heap": compare_run.LINUX_HEAP}, "Linux"), [])
+        self.assertEqual(self.problems({"heap": compare_run.MACOS_HEAP}, "macOS"), [])
+
+    def test_the_server_is_started_with_the_heap_stated(self):
+        self.assertEqual(" ".join(QuestDBServer(None, "root", 2, {}).heap_options),
+                         compare_run.QUESTDB_HEAP)
 
 
 if __name__ == "__main__":

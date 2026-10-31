@@ -30,6 +30,10 @@ SLICE = "test-slice"
 QUERY_NAMES = ("Q1", "Q2", "Q3", "Q4", "Q5")
 PROVEN = "proven"
 PINS = {"slices": {SLICE: {"sha256": SHA, "message_count": MESSAGES, "size": BYTES}}}
+HEAP = "-Xms1g -Xmx1g"
+CAPACITY_FILE = "results/fullday-capacity-12302019.json"
+CAPACITY = {"questdb_heap_verdict": {"verdict": "adequate", "chosen_heap": HEAP,
+                                     "tested_at_that_value": True}}
 LOAD_MAC = ["measure.sh: start load1=1.00 at=2026-10-30T00:00:00Z",
             "measure.sh: end load1=1.00 exit=0 at=2026-10-30T00:00:01Z"]
 LOAD_LINUX = [
@@ -53,7 +57,8 @@ def settings_of(system, durability):
         return [setting("threads", 2)]
     mode = {"A": "nosync", "B": "sync"}[durability]
     return [setting(f"cairo.commit.mode ({source})", mode)
-            for source in ("conf file", "echo", "parsed")]
+            for source in ("conf file", "echo", "parsed")] + [
+        setting("java initial heap", "-Xms1g"), setting("java heap", "-Xmx1g")]
 
 
 def flush(dirty, parquet_calls=None):
@@ -114,6 +119,14 @@ def system_block(system, host):
     }
 
 
+def heap_block(host):
+    if host == "Linux":
+        return {"setting": HEAP, "full_day_check": CAPACITY_FILE,
+                "statement": f"Ran with {HEAP}, as {CAPACITY_FILE} checked."}
+    return {"setting": HEAP, "full_day_check": "Linux only",
+            "statement": f"Ran with {HEAP}. The full-day capacity check is Linux only."}
+
+
 def valid_document(host):
     linux = host == "Linux"
     return {
@@ -132,7 +145,7 @@ def valid_document(host):
             "load_lines": (LOAD_LINUX if linux else LOAD_MAC) * 3,
         },
         "label": "Slice numbers. They are not claims about a full day, and no target changes.",
-        "heap": "The heap for a full day is unchecked." if linux else "-Xmx1g",
+        "heap": heap_block(host),
         "input": {"slice": SLICE, "sha256": SHA, "messages": MESSAGES, "bytes": BYTES,
                   "ratio_baseline": "source bytes", "clipping": "Q2 is clipped to the slice"},
         "method": {"warm": "how", "cold": "how"},
@@ -149,17 +162,20 @@ class Harness(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.directory, ignore_errors=True)
         self.pins = self.directory / "pins.json"
         self.pins.write_text(json.dumps(PINS), encoding="utf-8")
+        self.capacity = self.directory / "capacity.json"
+        self.capacity.write_text(json.dumps(CAPACITY), encoding="utf-8")
 
-    def run_on(self, document, host="macOS"):
+    def run_on(self, document, host="macOS", capacity=None):
         path = self.directory / f"{host}-{SLICE}-{COMMIT[:12]}.json"
         path.write_text(json.dumps(document), encoding="utf-8")
         return subprocess.run([sys.executable, "-I", str(SCRIPT), "--pins", str(self.pins),
-                               str(path)], check=False, capture_output=True, text=True)
+                               "--capacity", str(capacity or self.capacity), str(path)],
+                              check=False, capture_output=True, text=True)
 
-    def assert_fault(self, mutate, expected, host="macOS"):
+    def assert_fault(self, mutate, expected, host="macOS", capacity=None):
         document = copy.deepcopy(valid_document(host))
         mutate(document)
-        result = self.run_on(document, host)
+        result = self.run_on(document, host, capacity)
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn(expected, result.stderr)
 
@@ -178,6 +194,10 @@ class Valid(Harness):
             result = self.run_on(valid_document(host), host)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn(": ok", result.stdout)
+
+    def test_the_repos_own_capacity_file_records_the_heap_a_linux_file_states(self):
+        result = self.run_on(valid_document("Linux"), "Linux", REPO_ROOT / CAPACITY_FILE)
+        self.assertEqual(result.returncode, 0, result.stderr)
 
 
 class Faults(Harness):
@@ -422,10 +442,85 @@ class Faults(Harness):
             document["method"]["cold"] = ""
         self.assert_fault(fault, "how warm and cold")
 
-    def test_linux_with_no_heap_statement(self):
+    # The heap.
+
+    def test_linux_with_no_heap(self):
         def fault(document):
-            document["heap"] = "-Xmx1g"
-        self.assert_fault(fault, "full-day heap is unchecked", "Linux")
+            del document["heap"]
+        self.assert_fault(fault, "heap: Linux must state QuestDB's heap", "Linux")
+
+    def test_linux_with_the_old_sentence_and_no_setting(self):
+        def fault(document):
+            document["heap"] = "The heap needed for a full day is unchecked."
+        self.assert_fault(fault, "heap: Linux must state QuestDB's heap", "Linux")
+
+    def test_linux_stating_a_heap_that_was_not_checked(self):
+        def fault(document):
+            for field in ("setting", "statement"):
+                document["heap"][field] = document["heap"][field].replace(HEAP,
+                                                                          "-Xms2g -Xmx2g")
+        self.assert_fault(fault, "is not '-Xms1g -Xmx1g', the heap", "Linux")
+
+    def test_linux_running_a_heap_other_than_it_states(self):
+        def fault(document):
+            for item in b_of(document)["settings"]:
+                if item["name"] == "java heap":
+                    item["requested"] = item["in_force"] = "-Xmx2g"
+        self.assert_fault(fault, "questdb.v.B ran with '-Xms1g -Xmx2g'", "Linux")
+
+    def test_linux_with_no_heap_read_from_the_running_command(self):
+        def fault(document):
+            settings = b_of(document)["settings"]
+            b_of(document)["settings"] = [item for item in settings
+                                          if item["name"] != "java initial heap"]
+        self.assert_fault(fault, "questdb.v.B ran with 'None -Xmx1g'", "Linux")
+
+    def test_linux_not_citing_the_capacity_check(self):
+        def fault(document):
+            del document["heap"]["full_day_check"]
+        self.assert_fault(fault, f"Linux must cite {CAPACITY_FILE}", "Linux")
+
+    def test_a_statement_that_does_not_say_the_setting(self):
+        def fault(document):
+            document["heap"]["statement"] = "It ran."
+        self.assert_fault(fault, "the statement does not say", "Linux")
+
+    def test_a_capacity_file_with_no_adequate_heap(self):
+        for change in ({"verdict": "inadequate"}, {"tested_at_that_value": False}):
+            with self.subTest(change=change):
+                verdict = {**CAPACITY["questdb_heap_verdict"], **change}
+                path = self.directory / "capacity-refused.json"
+                path.write_text(json.dumps({"questdb_heap_verdict": verdict}), encoding="utf-8")
+                self.assert_fault(lambda document: None, "records no heap as checked", "Linux",
+                                  path)
+
+    def test_a_capacity_file_that_cannot_be_read(self):
+        result = self.run_on(valid_document("Linux"), "Linux", self.directory / "none.json")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("capacity check", result.stderr)
+
+    def test_macos_with_no_heap(self):
+        def fault(document):
+            del document["heap"]
+        self.assert_fault(fault, "heap: macOS must state QuestDB's heap")
+
+    def test_macos_not_saying_the_capacity_check_is_linux_only(self):
+        def fault(document):
+            document["heap"]["statement"] = f"Ran with {HEAP}."
+        self.assert_fault(fault, "capacity check is Linux only")
+
+    def test_macos_keeps_its_own_heap(self):
+        document = valid_document("macOS")
+        document["heap"]["setting"] = "-Xms2g -Xmx2g"
+        document["heap"]["statement"] = ("Ran with -Xms2g -Xmx2g. The full-day capacity check is "
+                                         "Linux only.")
+        for system in ("A", "B"):
+            for item in document["systems"]["questdb"]["variants"]["v"]["classes"][system][
+                    "settings"]:
+                if "heap" in item["name"]:
+                    item["requested"] = item["in_force"] = item["in_force"].replace("1g", "2g")
+        result = self.run_on(document)
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_linux_not_pinned(self):
         def fault(document):

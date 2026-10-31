@@ -83,6 +83,11 @@ class ServerFailure(Exception):
     """The server would not start, stop, or stay on its loopback address."""
 
 
+def heap_flags(heap=HEAP):
+    """Both bounds, or none for the JVM's own default of a quarter of RAM."""
+    return [] if heap == DEFAULT_HEAP else [f"-Xms{heap}", f"-Xmx{heap}"]
+
+
 def linux_death_signal():
     """A child made with this dies with its parent, on Linux."""
     if platform.system() != "Linux":
@@ -188,12 +193,15 @@ class QuestDBServer:
 
     @property
     def heap_options(self):
-        """Both bounds, or none for the JVM's own default of a quarter of RAM."""
-        return [] if self.heap == DEFAULT_HEAP else [f"-Xms{self.heap}", f"-Xmx{self.heap}"]
+        return heap_flags(self.heap)
 
     @property
     def heap_flag(self):
         return None if self.heap == DEFAULT_HEAP else f"-Xmx{self.heap}"
+
+    @property
+    def initial_heap_flag(self):
+        return None if self.heap == DEFAULT_HEAP else f"-Xms{self.heap}"
 
     @property
     def conf_path(self):
@@ -477,6 +485,8 @@ class QuestDBSystem(System):
                    for key, value in self.server.conf.items() if key in ECHOED_CONF_KEYS]
         checks += [
             Setting("java heap", self.server.heap_flag, _flag(command, "-Xmx"),
+                    "the running command"),
+            Setting("java initial heap", self.server.initial_heap_flag, _flag(command, "-Xms"),
                     "the running command"),
             Setting("java processors", f"-XX:ActiveProcessorCount={self.context.threads}",
                     _flag(command, "-XX:ActiveProcessorCount="), "the running command"),

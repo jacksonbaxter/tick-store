@@ -7,8 +7,8 @@ A comparison result claims that three systems held the same records under stated
 and gave the same answers. This checks that the file can back each claim: a requested setting
 must equal the one in force, every store must have rebuilt the source through the oracle,
 every answer must equal the ground truth, every warm and cold number must carry its proof, a
-class B result its flush proof, and the run its measurement lock. It also checks that the file
-is safe to publish. A system that could not prove something says so in the file, and the
+class B result its flush proof, the run its measurement lock, and a Linux heap the setting that
+the full-day capacity check found adequate. It also checks that the file is safe to publish. A system that could not prove something says so in the file, and the
 file is valid, as long as it does not claim the proof.
 
 Standard library only. tests/scripts/test_check_compare.py shows each rule failing on an
@@ -26,6 +26,10 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 import check_results  # noqa: E402
 
 DEFAULT_PINS = REPO_ROOT / "scripts" / "data_pins.json"
+DEFAULT_CAPACITY = REPO_ROOT / "results" / "fullday-capacity-12302019.json"
+CAPACITY_CITATION = f"results/{DEFAULT_CAPACITY.name}"
+LINUX_ONLY = "Linux only"
+HEAP_SETTINGS = ("java initial heap", "java heap")
 SYSTEMS = ("parquet", "arcticdb", "questdb")
 CLASSES = ("A", "B")
 PROVEN = "proven"
@@ -232,7 +236,53 @@ def check_system(name, system, document, pin):
     return problems
 
 
-def check_document(document, top_keys, path, pins):
+def checked_heap(capacity):
+    """The heap the capacity file records as run at and adequate, or None if it records none."""
+    verdict = capacity.get("questdb_heap_verdict") or {}
+    if verdict.get("verdict") == "adequate" and verdict.get("tested_at_that_value") is True:
+        return verdict.get("chosen_heap")
+    return None
+
+
+def check_heap_in_force(setting, questdb):
+    """Every class's running command must hold the heap the file states."""
+    problems = []
+    for variant_name, variant in (questdb.get("variants") or {}).items():
+        for class_name, entry in (variant.get("classes") or {}).items():
+            found = {item.get("name"): item.get("in_force") for item in entry.get("settings") or []}
+            ran = " ".join(str(found.get(name)) for name in HEAP_SETTINGS)
+            if ran != setting:
+                problems.append(f"heap: states {setting!r}, and questdb.{variant_name}."
+                                f"{class_name} ran with {ran!r}")
+    return problems
+
+
+def check_heap(document, host, capacity):
+    """Each host states its heap. A Linux heap must also be the one checked for a full day."""
+    heap = document.get("heap")
+    if not isinstance(heap, dict) or not heap.get("setting") or not heap.get("statement"):
+        return [f"heap: {host} must state QuestDB's heap"]
+    setting = heap["setting"]
+    problems = check_heap_in_force(setting, (document.get("systems") or {}).get("questdb") or {})
+    if setting not in str(heap["statement"]):
+        problems.append(f"heap: the statement does not say {setting!r}")
+    if host == "macOS":
+        if heap.get("full_day_check") != LINUX_ONLY or LINUX_ONLY not in str(heap["statement"]):
+            problems.append("heap: macOS must state that the full-day capacity check is "
+                            f"{LINUX_ONLY}")
+        return problems
+    checked = checked_heap(capacity)
+    if checked is None:
+        problems.append(f"heap: {DEFAULT_CAPACITY.name} records no heap as checked and adequate")
+    elif setting != checked:
+        problems.append(f"heap: {setting!r} is not {checked!r}, the heap "
+                        f"{DEFAULT_CAPACITY.name} records as checked")
+    if heap.get("full_day_check") != CAPACITY_CITATION:
+        problems.append(f"heap: Linux must cite {CAPACITY_CITATION}")
+    return problems
+
+
+def check_document(document, top_keys, path, pins, capacity):
     header = document.get("header")
     if not isinstance(header, dict):
         return ["the file does not start with its header"]
@@ -247,11 +297,11 @@ def check_document(document, top_keys, path, pins):
     problems += check_results.check_host({"header": header}, path)
     if header.get("host") == "macOS":
         problems += check_results.check_macos({"header": header})
+        problems += check_heap(document, "macOS", capacity)
     elif header.get("host") == "Linux":
         problems += check_results.check_linux({key: value for key, value in header.items()
                                                if key != "frequency"})
-        if "unchecked" not in str(document.get("heap", "")):
-            problems.append("heap: Linux must state that the full-day heap is unchecked")
+        problems += check_heap(document, "Linux", capacity)
     label = str(document.get("label", ""))
     if "not claims about a full day" not in label:
         problems.append("label: the file must say it makes no claim about a full day")
@@ -276,7 +326,7 @@ def check_document(document, top_keys, path, pins):
     return problems
 
 
-def check_file(path, pins, name_as=None):
+def check_file(path, pins, capacity, name_as=None):
     try:
         top_keys = []
 
@@ -289,23 +339,27 @@ def check_file(path, pins, name_as=None):
         return [f"cannot read it: {error}"]
     if not isinstance(document, dict):
         return ["the file is not a JSON object"]
-    return check_document(document, top_keys, Path(name_as) if name_as else path, pins)
+    return check_document(document, top_keys, Path(name_as) if name_as else path, pins, capacity)
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Validate comparison results files.")
     parser.add_argument("files", nargs="+", type=Path)
     parser.add_argument("--pins", type=Path, default=DEFAULT_PINS)
+    parser.add_argument("--capacity", type=Path, default=DEFAULT_CAPACITY,
+                        help="the full-day capacity check a Linux heap must match")
     parser.add_argument("--pending-as", help="the file's name once published")
     args = parser.parse_args(argv)
     try:
         pins = json.loads(args.pins.read_text(encoding="utf-8"))
+        capacity = json.loads(args.capacity.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
-        print(f"check_compare: cannot read the pins: {error}", file=sys.stderr)
+        print(f"check_compare: cannot read the pins or the capacity check: {error}",
+              file=sys.stderr)
         return check_results.EXIT_USAGE
     failed = False
     for path in args.files:
-        problems = check_file(path, pins, args.pending_as)
+        problems = check_file(path, pins, capacity, args.pending_as)
         for problem in problems:
             print(f"{path.name}: {problem}", file=sys.stderr)
         if problems:
