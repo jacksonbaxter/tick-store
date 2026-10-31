@@ -28,6 +28,7 @@ README = f"# Title\n\nBefore.\n\n{BEGIN}\n{END}\n\nAfter.\n"
 
 def load_fixtures():
     """The validated documents from the validator's own tests, so both stay in step."""
+    sys.dont_write_bytecode = True
     path = REPO_ROOT / "tests" / "scripts" / "test_check_results.py"
     spec = importlib.util.spec_from_file_location("check_results_fixtures", path)
     module = importlib.util.module_from_spec(spec)

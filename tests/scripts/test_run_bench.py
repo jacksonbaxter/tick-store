@@ -37,6 +37,7 @@ PINS = {"slices": {SLICE: {"sha256": SHA, "message_count": MESSAGES, "size": 500
 
 
 def load_fixtures():
+    sys.dont_write_bytecode = True
     path = REPO_ROOT / "tests" / "scripts" / "test_check_results.py"
     spec = importlib.util.spec_from_file_location("check_results_fixtures", path)
     module = importlib.util.module_from_spec(spec)
