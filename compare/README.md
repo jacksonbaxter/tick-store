@@ -278,10 +278,12 @@ The Linux counter is the block device's sectors read. The macOS counter is `iost
 it can only ever show a shortfall. An excess proves nothing on either host. File system metadata
 stays warm, because neither method reaches it.
 
-Each cold number is the query alone. The server's start and the worker's imports fall before the
-clock, and pages they touched count as resident and as device reads. There is one known exception
-in the results so far: `pq.read_table` imports `pyarrow.dataset` itself, inside the timed call, so
-that import is in Parquet's cold numbers and its first warm repetition.
+Each cold number is the query alone, in a fresh process. The server's start and the worker's
+imports fall before the clock, and pages they touched count as resident and as device reads.
+`pq.read_table` and `Table.group_by` import `pyarrow.dataset` and `pyarrow.acero` on their first
+call, so `ParquetSystem.open` imports both first, and `tests/compare/test_system_worker.py` fails
+if any module loads inside the timed call. The clock does hold what an engine sets up on its first
+call in a process: for Parquet on macOS, about 1 ms over a second call on warm pages.
 
 ## Full-day capacity
 

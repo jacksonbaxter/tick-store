@@ -74,9 +74,11 @@ COLD_METHOD = {
               "system metadata stays warm. The block device's sectors read must reach the bytes "
               "that became resident: a shortfall is conclusive, and an excess is not."),
 }
-COLD_INCLUDES = ("Each cold number is the query alone. The server's start and the worker's "
-                 "imports fall before the clock, and pages they touched count as resident and "
-                 "as device reads.")
+COLD_INCLUDES = ("Each cold number is the query alone, in a fresh process. The server's start "
+                 "and the worker's imports fall before the clock, pyarrow.dataset and "
+                 "pyarrow.acero among them, and pages they touched count as resident and as "
+                 "device reads. The clock does hold what an engine sets up on its first call in "
+                 "a process: for Parquet on macOS, about 1 ms over a second call on warm pages.")
 BASELINE = ("The slice's source bytes: every ITCH frame with its two-byte length prefix, which "
             "is what BENCHMARKS.md's stored bytes must be able to rebuild.")
 

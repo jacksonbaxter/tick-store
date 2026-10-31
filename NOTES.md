@@ -361,8 +361,13 @@ with a median of 148,133 µs against 7,800 µs warm, and 4,182,016 bytes on Linu
 and 21,307 µs cold. Parquet's warm Q1, the first query a worker runs, has a maximum of 156,078 µs and 281,651 µs against medians of 18,086
 µs and 55,365 µs. Part of this is the harness: `pq.read_table` imports `pyarrow.dataset` itself, inside the timed call, so the files'
 `cold_includes` line, that imports fall before the clock, is wrong for Parquet. A spot check on macOS, outside any run, put that first read
-at 16 to 22 ms with warm caches, against under 1 ms for the second. That does not account for the whole floor, and the rest is not
-established. Read Parquet's cold medians and Q1 tail as an upper bound. The runs were not repeated.
+at 16 to 22 ms with warm caches, against under 1 ms for the second. That spot check undercounted, and the import is the whole floor. On
+macOS, in a fresh process, Q5 took 126 ms cold and 125 ms warm with the import left to `pq.read_table`, 10.3 ms and 9.1 ms with it before
+the clock, and 7.8 ms on a second call, while the import timed alone took 116 ms, cold or warm, 6 repetitions each. Page residency does
+not move it, which is why warm Q1's first repetition showed it too. An iteration run of `zstd1-rg1Mi` with the import before the clock
+had a warm Q1 maximum of 25 ms against a median of 18 ms. What is left is about 1 ms of first-call start-up and the cold bytes, and the
+cause was not traced further. `Table.group_by` likewise imported `pyarrow.acero` inside Q3's clock. Linux's floor was not measured apart.
+The numbers quoted above, and every Parquet cold median and Q1 tail in the files at `53a3317`, hold the import.
 
 ## Process notes
 
