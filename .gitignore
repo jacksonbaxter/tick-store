@@ -7,3 +7,4 @@
 *.sparseimage
 *.dmg
 __pycache__/
+/.tools/

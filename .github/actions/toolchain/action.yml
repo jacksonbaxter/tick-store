@@ -1,0 +1,39 @@
+name: Toolchain
+description: >
+  The pinned LLVM and Ninja from scripts/install_tools.sh, and the environment scripts/check.sh
+  reads. The Linux runner also needs libstdc++ 14, because the code uses std::print.
+
+runs:
+  using: composite
+  steps:
+    - name: Restore pinned tools
+      id: tools
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: .tools
+        key: tools-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/install_tools.sh') }}
+
+    - name: Install pinned tools
+      if: steps.tools.outputs.cache-hit != 'true'
+      shell: bash
+      run: scripts/install_tools.sh llvm ninja actionlint shellcheck
+
+    - name: Install libstdc++ 14
+      if: runner.os == 'Linux'
+      shell: bash
+      run: sudo apt-get update && sudo apt-get install --yes libstdc++-14-dev
+
+    - name: Export the toolchain
+      shell: bash
+      run: |
+        {
+          echo "$PWD/.tools"
+          echo "$PWD/.tools/llvm/bin"
+        } >>"$GITHUB_PATH"
+        {
+          echo "CC=$PWD/.tools/llvm/bin/clang"
+          echo "CXX=$PWD/.tools/llvm/bin/clang++"
+          if [[ $RUNNER_OS == macOS ]]; then
+            echo "SDKROOT=$(xcrun --show-sdk-path)"
+          fi
+        } >>"$GITHUB_ENV"

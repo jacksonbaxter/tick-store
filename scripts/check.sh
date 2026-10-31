@@ -26,6 +26,9 @@
 # CHECK_CMAKE_ARGS holds extra arguments for each configure, and ACTIONLINT a path to the
 # actionlint binary if it is neither in .tools/ nor on PATH.
 
+# Step lists split on purpose. A step reads its own log only after writing it.
+# shellcheck disable=SC2086,SC2094
+
 set -u
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
@@ -195,7 +198,6 @@ run_step() {
 }
 
 build_preset() {
-    # shellcheck disable=SC2086  # CHECK_CMAKE_ARGS is a list of arguments.
     cmake --preset "$1" ${CHECK_CMAKE_ARGS:-} && cmake --build --preset "$1"
 }
 
@@ -245,7 +247,6 @@ step_clang_tidy() {
     local file preset code=0 other analysed=0 missing=0 selected
     local presets="dev fuzz bench"
     for preset in $presets; do
-        # shellcheck disable=SC2086
         cmake --preset "$preset" ${CHECK_CMAKE_ARGS:-} || return 1
         : >"$LOG_DIR/.tidy-$preset"
     done
@@ -394,7 +395,8 @@ step_actionlint() {
         echo ".github/workflows/ci.yml is missing"
         return 1
     fi
-    "$tool" -no-color .github/workflows/ci.yml
+    # Finds shellcheck on PATH, and checks the workflow's shell with it.
+    PATH=$ROOT/.tools:$PATH "$tool" -no-color .github/workflows/ci.yml
 }
 
 step_hygiene() { python3 -I scripts/check_hygiene.py; }

@@ -1,0 +1,83 @@
+# Every job calls scripts/check.sh, so CI runs the same steps as a local run and the two
+# cannot drift. tests/scripts/test_check_sh.py fails if a step of check.sh is missing here.
+#
+# Both matrix axes change the build (C2). `host` changes the target: its instruction set, its
+# C library, its standard library and the platform source files CMake picks. `check` selects
+# a preset, and so its compile flags, or a different tool.
+#
+# The market data is not available here, so tests that need it skip visibly: ItchRealDay shows
+# as skipped in the summary table, and is not a pass. There is no .venv either, so py-compare
+# shows as SKIP. No job uses a secret.
+#
+# This workflow has never executed on GitHub, because the repository has no remote yet. It is
+# validated by actionlint, and its commands have been run by hand on macOS arm64 only.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # The longer fuzz run (Z7). Tuesday, 04:17 UTC.
+    - cron: "17 4 * * 2"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # A pull request fuzzes each target for 4 minutes, and the schedule for 30.
+  FUZZ_SECONDS: ${{ github.event_name == 'schedule' && '1800' || '240' }}
+
+jobs:
+  check:
+    name: ${{ matrix.check.name }} on ${{ matrix.host.name }}
+    runs-on: ${{ matrix.host.runner }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        host:
+          - { name: linux-x86-64, runner: ubuntu-24.04, machine: x86_64 }
+          - { name: macos-arm64, runner: macos-15, machine: arm64 }
+        check:
+          - { name: unit, only: "dev-test,oracle" }
+          - { name: asan-ubsan, only: "asan-test" }
+          - { name: tsan, only: "tsan-test" }
+          - { name: clang-tidy, only: "clang-tidy" }
+          - { name: fuzz, only: "fuzz-columns,fuzz-itch-frame,fuzz-itch-message,fuzz-stub-store" }
+          - { name: coverage, only: "coverage" }
+          - { name: repo, only: "py-scripts,py-compare,check-results,check-compare,render-check,actionlint,hygiene" }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+
+      - uses: ./.github/actions/toolchain
+
+      - name: Confirm the runner is the host this job names
+        run: test "$(uname -m)" = "${{ matrix.host.machine }}"
+
+      - name: Run the checks
+        env:
+          ONLY: ${{ matrix.check.only }}
+        run: scripts/check.sh --fuzz-seconds "$FUZZ_SECONDS" --only "$ONLY"
+
+      - name: Keep logs and crashers
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: check-${{ matrix.check.name }}-${{ matrix.host.name }}
+          path: |
+            build/check/
+            build/fuzz/artifacts/
+          if-no-files-found: ignore
+          retention-days: 14
