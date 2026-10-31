@@ -17,6 +17,7 @@
 #include "tick_store/store/store_error.hpp"
 #include "tick_store/store/stub_store.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
