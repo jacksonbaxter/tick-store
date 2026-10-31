@@ -1,11 +1,11 @@
 // The slice tool on a stream small enough to read: which records go in, in what order,
 // and that the check at the end refuses what is not a clean stream.
 
-#include "itch_fixtures.hpp"
 #include "scratch_dir.hpp"
 #include "stub_fixture.hpp"
 #include "test_bytes.hpp"
 #include "tick_store/harness/data_tools_cli.hpp"
+#include "tick_store/harness/roundtrip_cli.hpp"
 #include "tick_store/harness/sha256.hpp"
 #include "tick_store/harness/slice.hpp"
 #include "tick_store/itch/codec.hpp"

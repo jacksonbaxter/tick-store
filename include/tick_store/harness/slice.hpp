@@ -30,7 +30,7 @@ struct SliceWindow {
 };
 
 // "HH:MM:SS", or nullopt.
-[[nodiscard]] std::optional<std::uint64_t> parse_time_of_day(std::string_view text) noexcept;
+[[nodiscard]] std::optional<std::uint64_t> parse_time_of_day(std::string_view text);
 
 struct SliceReport {
     std::uint64_t messages = 0;

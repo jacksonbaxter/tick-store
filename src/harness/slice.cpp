@@ -27,7 +27,7 @@ namespace {
 constexpr std::uint64_t kNanosecondsPerSecond = 1'000'000'000;
 
 // The timestamp of a typed message. A raw-path record has none.
-[[nodiscard]] std::optional<std::uint64_t> timestamp_of(const itch::Message& message) noexcept {
+[[nodiscard]] std::optional<std::uint64_t> timestamp_of(const itch::Message& message) {
     return std::visit(
         []<class M>(const M& typed) -> std::optional<std::uint64_t> {
             if constexpr (std::same_as<M, itch::RawMessage>) {
@@ -41,8 +41,9 @@ constexpr std::uint64_t kNanosecondsPerSecond = 1'000'000'000;
 
 [[nodiscard]] std::optional<unsigned> two_digits(std::string_view text) noexcept {
     unsigned value = 0;
-    const char* const end = text.data() + text.size();
-    const auto [stopped, status] = std::from_chars(text.data(), end, value);
+    const char* const start = text.data();
+    const char* const end = start + text.size();
+    const auto [stopped, status] = std::from_chars(start, end, value);
     if (text.size() != 2 || status != std::errc{} || stopped != end) {
         return std::nullopt;
     }
@@ -57,7 +58,7 @@ public:
     explicit Selector(SliceWindow window) noexcept : window_(window) {}
 
     // True if the record at `frame` belongs in the slice.
-    [[nodiscard]] bool take(const itch::Frame& frame, const itch::Message& message) noexcept {
+    [[nodiscard]] bool take(const itch::Frame& frame, const itch::Message& message) {
         const std::optional<std::uint64_t> timestamp = timestamp_of(message);
         if (timestamp.has_value()) {
             advance(*timestamp, frame.offset);
@@ -120,7 +121,7 @@ private:
 
 }  // namespace
 
-std::optional<std::uint64_t> parse_time_of_day(std::string_view text) noexcept {
+std::optional<std::uint64_t> parse_time_of_day(std::string_view text) {
     constexpr std::size_t kLength = 8;  // "HH:MM:SS"
     if (text.size() != kLength || text[2] != ':' || text[5] != ':') {
         return std::nullopt;
@@ -132,7 +133,7 @@ std::optional<std::uint64_t> parse_time_of_day(std::string_view text) noexcept {
         return std::nullopt;
     }
     const std::uint64_t whole =
-        std::uint64_t{*hours} * 3600U + std::uint64_t{*minutes} * 60U + *seconds;
+        (std::uint64_t{*hours} * 3600U) + (std::uint64_t{*minutes} * 60U) + *seconds;
     return whole * kNanosecondsPerSecond;
 }
 

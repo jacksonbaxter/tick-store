@@ -7,6 +7,7 @@
 #include "test_bytes.hpp"
 #include "tick_store/harness/census.hpp"
 #include "tick_store/harness/data_tools_cli.hpp"
+#include "tick_store/harness/roundtrip_cli.hpp"
 #include "tick_store/itch/codec.hpp"
 #include "tick_store/itch/frame.hpp"
 #include "tick_store/itch/message.hpp"
