@@ -43,6 +43,7 @@
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "TICK_STORE_SANITIZE": "fuzz",
         "TICK_STORE_BUILD_TESTS": "OFF",
+        "TICK_STORE_BUILD_TOOLS": "OFF",
         "TICK_STORE_BUILD_FUZZ": "ON"
       }
     },

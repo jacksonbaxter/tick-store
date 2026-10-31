@@ -4,14 +4,16 @@ add_executable(tick_store_unit_tests
     big_endian_test.cpp
     frame_cursor_test.cpp
     fuzz_regression_test.cpp
+    hash_worker_test.cpp
     itch_boundary_test.cpp
     itch_fixtures.cpp
     itch_golden_test.cpp
     itch_raw_path_test.cpp
     itch_real_day_test.cpp
     itch_truncation_test.cpp
+    sha256_test.cpp
 )
-target_link_libraries(tick_store_unit_tests PRIVATE tick_store_core GTest::gtest_main)
+target_link_libraries(tick_store_unit_tests PRIVATE tick_store_harness GTest::gtest_main)
 tick_store_apply_warnings(tick_store_unit_tests)
 target_include_directories(tick_store_unit_tests PRIVATE ${PROJECT_SOURCE_DIR}/fuzz)
 set_source_files_properties(fuzz_regression_test.cpp PROPERTIES
