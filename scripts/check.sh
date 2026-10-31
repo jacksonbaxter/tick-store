@@ -359,7 +359,8 @@ step_py_compare() {
         return 0
     fi
     run_unittests "$1" .venv/bin/python tests/compare/test_coldcache.py \
-        tests/compare/test_schema.py tests/compare/test_settings.py
+        tests/compare/test_schema.py tests/compare/test_settings.py \
+        tests/compare/test_system_worker.py
     local code=$?
     NOTE="$NOTE, fast set; test_real_systems.py not run here"
     return "$code"

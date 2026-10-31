@@ -92,6 +92,11 @@ class ParquetSystem(System):
                 "threads": self.context.threads}
 
     def open(self):
+        # pq.read_table and Table.group_by import these on their first call, which would put the
+        # imports on the clock.
+        import pyarrow.acero  # noqa: F401
+        import pyarrow.dataset  # noqa: F401
+
         pa.set_cpu_count(self.context.threads)
         pa.set_io_thread_count(self.context.threads)
 
