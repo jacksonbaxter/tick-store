@@ -8,6 +8,8 @@
 //   tick_roundtrip verify <source> <store> [--expect-sha256 HEX]
 //       Runs the oracle. Prints a JSON summary. On a failure, also describes the first
 //       difference on stderr.
+//   tick_roundtrip verify-columns <source> <columns-dir> [--expect-sha256 HEX]
+//       The same oracle, over a column directory (store/columns.hpp) in place of a store.
 //   tick_roundtrip flip-bit <file> <byte_offset> <bit>
 //       Flips one bit of a file in place. Bit 0 is the least significant bit.
 //

@@ -31,6 +31,7 @@ add_library(tick_store_core STATIC)
 target_sources(tick_store_core PRIVATE
     src/itch/codec.cpp
     src/itch/frame.cpp
+    src/store/columns.cpp
     src/store/mapped_file.cpp
     src/store/stub_store.cpp
 )
@@ -44,6 +45,8 @@ if(TICK_STORE_BUILD_TESTS OR TICK_STORE_BUILD_TOOLS OR TICK_STORE_BUILD_BENCH)
     add_library(tick_store_harness STATIC)
     target_sources(tick_store_harness PRIVATE
         src/harness/census.cpp
+        src/harness/columns_reader.cpp
+        src/harness/compare_tools_cli.cpp
         src/harness/data_tools_cli.cpp
         src/harness/flip_bit.cpp
         src/harness/hash_worker.cpp
@@ -53,6 +56,13 @@ if(TICK_STORE_BUILD_TESTS OR TICK_STORE_BUILD_TOOLS OR TICK_STORE_BUILD_BENCH)
         src/harness/slice.cpp
         src/harness/stub_reader.cpp
     )
+    # Page-cache control does not exist in one form everywhere, so the build picks the
+    # file and no caller needs an #ifdef.
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        target_sources(tick_store_harness PRIVATE src/harness/page_cache_linux.cpp)
+    else()
+        target_sources(tick_store_harness PRIVATE src/harness/page_cache_darwin.cpp)
+    endif()
     target_link_libraries(tick_store_harness PUBLIC tick_store_core Threads::Threads)
     tick_store_apply_warnings(tick_store_harness)
 endif()

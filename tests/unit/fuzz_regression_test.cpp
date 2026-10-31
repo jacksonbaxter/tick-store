@@ -2,6 +2,8 @@
 // the golden fixtures through them, so the oracles stay exercised on every build
 // even when the crasher directories hold nothing.
 
+#include "columns_fixture.hpp"
+#include "columns_oracles.hpp"
 #include "itch_fixtures.hpp"
 #include "itch_oracles.hpp"
 #include "scratch_dir.hpp"
@@ -73,6 +75,13 @@ TEST(FuzzRegression, StoreCrashersStayFixed) {
     }
 }
 
+TEST(FuzzRegression, ColumnsCrashersStayFixed) {
+    for (const auto& path : crashers("columns")) {
+        SCOPED_TRACE(path.filename().string());
+        EXPECT_EQ(text(store::oracle::check_columns(read_file(path))), "");
+    }
+}
+
 TEST(FuzzOracles, PassEveryFixtureWholeAndCutAtEveryLength) {
     for (const auto& f : fixtures()) {
         SCOPED_TRACE(f.label);
@@ -100,6 +109,26 @@ TEST(FuzzOracles, PassEveryWayAStreamCanEnd) {
     EXPECT_EQ(text(oracle::check_stream(exact_copy(ended))), "");
     ended.push_back(std::byte{0x41});
     EXPECT_EQ(text(oracle::check_stream(exact_copy(ended))), "");
+}
+
+// A real export, as fuzz_columns' sections, cut at every length of the whole input and
+// with every bit flipped in turn.
+TEST(FuzzOracles, PassEveryCutAndFlipOfAColumnDirectory) {
+    const Bytes source = tick_store::test::source_with_tail();
+    const auto directory = tick_store::test::export_columns(source);
+    const Bytes input = store::oracle::pack_columns(directory.manifest, directory.files);
+    EXPECT_EQ(text(store::oracle::check_columns(exact_copy(input))), "");
+    for (std::size_t length = 0; length < input.size(); length += 7) {
+        const Bytes cut = exact_copy(std::span{input}.first(length));
+        EXPECT_EQ(text(store::oracle::check_columns(cut)), "") << "length " << length;
+    }
+    Bytes flipped = input;
+    for (std::size_t byte = 0; byte < flipped.size(); byte += 3) {
+        const unsigned bit = byte % 8U;
+        flipped[byte] ^= static_cast<std::byte>(1U << bit);
+        EXPECT_EQ(text(store::oracle::check_columns(flipped)), "") << "byte " << byte;
+        flipped[byte] ^= static_cast<std::byte>(1U << bit);
+    }
 }
 
 // A real store, cut at every length and with every bit flipped in turn.

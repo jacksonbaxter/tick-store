@@ -1,9 +1,10 @@
 # Fuzzing
 
-Three libFuzzer targets take raw bytes directly, with nothing checking them first:
+Four libFuzzer targets take raw bytes directly, with nothing checking them first:
 
 | Target | Input | Oracle in `itch_oracles.hpp` |
 |---|---|---|
+| `fuzz_columns` | a whole column directory, as length-prefixed sections | `check_columns` in `columns_oracles.hpp`: errors repeat, every frame an accepted directory gives is one whole frame, re-exporting those frames rebuilds the same frames and tail, a cut of any file is refused, and a copy with one bit flipped is refused or gives frames that re-export cleanly |
 | `fuzz_itch_message` | one payload | `check_message`: both decoders agree, decode then encode gives back the exact input, decoding that gives the same message, and a short buffer fails cleanly |
 | `fuzz_itch_frame` | a byte stream | `check_stream`: frames are contiguous, every frame plus the reported tail rebuilds the input exactly, every stop is justified by the bytes, and a shorter input gives the same frames that fit |
 | `fuzz_stub_store` | a whole store file | `check_store` in `store_oracles.hpp`: errors repeat, an accepted file rebuilds the input exactly from its parsed values, a cut of it is refused, and a copy with one bit flipped is refused or rebuilds to the flipped bytes |
@@ -12,12 +13,12 @@ Three libFuzzer targets take raw bytes directly, with nothing checking them firs
 
 Needs upstream clang: Apple clang has no fuzzer runtime. The build regenerates the
 seeds from the real encoder and the real store writer into
-`build/fuzz/fuzz-seeds/{message,frame,store}`. They are never committed.
+`build/fuzz/fuzz-seeds/{message,frame,store,columns}`. They are never committed.
 
 ```sh
 cmake --preset fuzz && cmake --build --preset fuzz
 mkdir -p build/fuzz/corpus/itch_message build/fuzz/corpus/itch_frame \
-    build/fuzz/corpus/stub_store build/fuzz/artifacts
+    build/fuzz/corpus/stub_store build/fuzz/corpus/columns build/fuzz/artifacts
 ```
 
 ## Run
@@ -40,6 +41,11 @@ build/fuzz/fuzz/fuzz_stub_store -max_total_time=60 -max_len=70000 \
     -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 \
     -artifact_prefix=build/fuzz/artifacts/ \
     build/fuzz/corpus/stub_store build/fuzz/fuzz-seeds/store
+
+build/fuzz/fuzz/fuzz_columns -max_total_time=60 -max_len=70000 \
+    -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 \
+    -artifact_prefix=build/fuzz/artifacts/ \
+    build/fuzz/corpus/columns build/fuzz/fuzz-seeds/columns
 ```
 
 - `-max_len`: no message is longer than 50 bytes, so 256 leaves room for every
@@ -77,6 +83,6 @@ out-of-range timestamp, which need a hand-built message or a deliberately small 
 ## Crashers
 
 A crash writes to `build/fuzz/artifacts/`. Move the input to
-`tests/unit/crashers/itch_message/`, `itch_frame/` or `stub_store/` and fix the bug
+`tests/unit/crashers/itch_message/`, `itch_frame/`, `stub_store/` or `columns/` and fix the bug
 in the same commit. `fuzz_regression_test.cpp` replays those files through the same
 oracles in every test build.

@@ -1,5 +1,6 @@
 #include "tick_store/harness/roundtrip_cli.hpp"
 
+#include "tick_store/harness/columns_reader.hpp"
 #include "tick_store/harness/flip_bit.hpp"
 #include "tick_store/harness/json_writer.hpp"
 #include "tick_store/harness/roundtrip.hpp"
@@ -29,6 +30,7 @@ namespace {
 constexpr std::string_view kUsage =
     "usage: tick_roundtrip ingest <source> <store>\n"
     "       tick_roundtrip verify <source> <store> [--expect-sha256 HEX]\n"
+    "       tick_roundtrip verify-columns <source> <columns-dir> [--expect-sha256 HEX]\n"
     "       tick_roundtrip flip-bit <file> <byte_offset> <bit>\n";
 
 int usage(CliOutput& output) {
@@ -76,11 +78,11 @@ void write_difference(JsonWriter& json, const Difference& difference) {
     json.end_object();
 }
 
-std::string summary_json(const VerifyReport& report) {
+std::string summary_json(std::string_view command, const VerifyReport& report) {
     JsonWriter json;
     json.begin_object();
     json.field("tool", std::string_view{"tick_roundtrip"});
-    json.field("command", std::string_view{"verify"});
+    json.field("command", command);
     json.field("verdict", std::string_view{report.passed() ? "pass" : "mismatch"});
     json.field("records", report.source_records);
     json.field("stored_records", report.stored_records);
@@ -149,6 +151,15 @@ std::string describe_failure(const VerifyReport& report) {
     return text;
 }
 
+int report_verdict(std::string_view command, const VerifyReport& report, CliOutput& output) {
+    output.out += summary_json(command, report);
+    if (report.passed()) {
+        return kExitPass;
+    }
+    output.err += describe_failure(report);
+    return kExitMismatch;
+}
+
 int run_verify(std::string_view source_path, std::string_view store_path,
                const VerifyOptions& options, CliOutput& output) {
     const auto source = store::MappedFile::open(source_path);
@@ -159,14 +170,18 @@ int run_verify(std::string_view source_path, std::string_view store_path,
     if (!store_file.has_value()) {
         return io_failure(output, "cannot read the store", store_file.error());
     }
+    return report_verdict("verify", verify_stub_store(source->bytes(), store_file->bytes(), options),
+                          output);
+}
 
-    const VerifyReport report = verify_stub_store(source->bytes(), store_file->bytes(), options);
-    output.out += summary_json(report);
-    if (report.passed()) {
-        return kExitPass;
+int run_verify_columns(std::string_view source_path, std::string_view directory,
+                       const VerifyOptions& options, CliOutput& output) {
+    const auto source = store::MappedFile::open(source_path);
+    if (!source.has_value()) {
+        return io_failure(output, "cannot read the source", source.error());
     }
-    output.err += describe_failure(report);
-    return kExitMismatch;
+    return report_verdict("verify-columns", verify_columns(source->bytes(), directory, options),
+                          output);
 }
 
 int run_ingest(std::string_view source_path, std::string_view store_path, CliOutput& output) {
@@ -263,6 +278,16 @@ int run_roundtrip_cli(std::span<const std::string_view> arguments, CliOutput& ou
             return usage(output);
         }
         return run_verify(rest[0], rest[1], {.expected_sha256 = pin}, output);
+    }
+    if (command == "verify-columns" && rest.size() == 2) {
+        return run_verify_columns(rest[0], rest[1], {}, output);
+    }
+    if (command == "verify-columns" && rest.size() == 4 && rest[2] == "--expect-sha256") {
+        const auto pin = parse_sha256_hex(rest[3]);
+        if (!pin.has_value()) {
+            return usage(output);
+        }
+        return run_verify_columns(rest[0], rest[1], {.expected_sha256 = pin}, output);
     }
     if (command == "flip-bit" && rest.size() == 3) {
         return run_flip_bit(rest, output);

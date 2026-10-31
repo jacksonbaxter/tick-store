@@ -3,13 +3,16 @@
 //   <dir>/message/  payloads, for fuzz_itch_message
 //   <dir>/frame/    framed streams, for fuzz_itch_frame
 //   <dir>/store/    stub store files, for fuzz_stub_store
+//   <dir>/columns/  column directories as sections, for fuzz_columns
 //
 // Every valid seed comes from the real encoder or the real store writer, so the
 // seeds follow the code (Z4). Corrupt seeds are those same bytes cut, extended or
 // relabelled, one for each way the decoders and the parser can refuse an input.
 
+#include "columns_oracles.hpp"
 #include "tick_store/itch/codec.hpp"
 #include "tick_store/itch/message.hpp"
+#include "tick_store/store/columns.hpp"
 #include "tick_store/store/little_endian.hpp"
 #include "tick_store/store/store_error.hpp"
 #include "tick_store/store/stub_store.hpp"
@@ -297,6 +300,65 @@ void write_store_seeds(SeedDir& seeds, const std::filesystem::path& scratch) {
     }
 }
 
+// A directory from the real encoder holding `payloads`, as fuzz_columns' sections.
+Bytes columns_input(const std::vector<Bytes>& payloads, std::span<const std::byte> tail) {
+    tick_store::store::ColumnsEncoder encoder;
+    for (const Bytes& payload : payloads) {
+        if (const auto added = encoder.append(payload); !added.has_value()) {
+            throw std::runtime_error(to_string(added.error()));
+        }
+    }
+    auto buffers = std::move(encoder.buffers());
+    buffers[tick_store::store::kColumnFileCount - 1].assign(tail.begin(), tail.end());
+    return tick_store::store::oracle::pack_columns(
+        tick_store::store::format_columns_manifest(encoder.manifest(tail.size())), buffers);
+}
+
+// Valid directories, and one corrupt seed for each kind of check in the parser. The
+// hand-picked corruptions stand in for what mutation is slow to find: anything that has
+// to stay consistent across two sections.
+void write_columns_seeds(SeedDir& seeds) {
+    std::vector<Bytes> payloads;
+    for (const Message& message : ordinary_messages()) {
+        payloads.push_back(encoded(message));
+    }
+    payloads.push_back(filled(std::byte{'z'}, 9, std::byte{0xA5}));
+    payloads.push_back(filled(AddOrder::type_code, 20, std::byte{0}));
+    payloads.push_back(filled(AddOrder::type_code, AddOrder::wire_size, std::byte{0xFF}));
+
+    const std::array tail{std::byte{0x00}, std::byte{0x7F}, std::byte{0xAB}};
+    const Bytes whole = columns_input(payloads, tail);
+    seeds.add(whole);
+    seeds.add(columns_input(payloads, {}));
+    seeds.add(columns_input({}, {}));
+    seeds.add(columns_input({}, tail));
+    for (const Bytes& payload : payloads) {
+        seeds.add(columns_input({payload}, {}));
+    }
+
+    // Cuts through a section header, a manifest and a file, then nothing at all.
+    for (const std::size_t cut : {std::size_t{0}, std::size_t{3}, std::size_t{4}, std::size_t{40},
+                                  std::size_t{120}, whole.size() - 1}) {
+        seeds.add(std::span{whole}.first(cut));
+    }
+
+    // One byte flipped in each section, starting at its first byte.
+    auto sections = tick_store::store::oracle::split_columns(whole);
+    if (!sections.has_value()) {
+        throw std::runtime_error("a seed did not split");
+    }
+    std::size_t section_start = 0;
+    for (const std::span<const std::byte> section : *sections) {
+        section_start += 4;
+        if (!section.empty()) {
+            Bytes flipped = whole;
+            flipped[section_start] ^= std::byte{0x01};
+            seeds.add(flipped);
+        }
+        section_start += section.size();
+    }
+}
+
 }  // namespace
 
 // NOLINTNEXTLINE(bugprone-exception-escape): a failed build step should terminate and say why.
@@ -310,10 +372,12 @@ int main(int argc, char** argv) {
     SeedDir message{root / "message"};
     SeedDir stream{root / "frame"};
     SeedDir store{root / "store"};
+    SeedDir columns{root / "columns"};
     write_message_seeds(message);
     write_frame_seeds(stream);
     write_store_seeds(store, root / "store-scratch");
-    std::println("wrote {} message, {} frame and {} store seeds", message.count(), stream.count(),
-                 store.count());
+    write_columns_seeds(columns);
+    std::println("wrote {} message, {} frame, {} store and {} columns seeds", message.count(),
+                 stream.count(), store.count(), columns.count());
     return 0;
 }

@@ -153,6 +153,14 @@ std::string to_string(const StoreError& error) {
             return located("record count mismatch");
         case StoreErrorKind::unencodable_record:
             return located("unencodable record");
+        case StoreErrorKind::bad_manifest:
+            return located("bad manifest");
+        case StoreErrorKind::bad_column_size:
+            return located("bad column size");
+        case StoreErrorKind::bad_text_offsets:
+            return located("bad text offsets");
+        case StoreErrorKind::bad_row:
+            return located("bad row");
         case StoreErrorKind::io:
             return std::format("I/O error: {} failed with errno {}", error.field, error.actual);
     }

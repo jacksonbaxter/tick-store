@@ -4,6 +4,9 @@ add_executable(tick_store_unit_tests
     bench_support_test.cpp
     big_endian_test.cpp
     census_test.cpp
+    columns_cli_test.cpp
+    columns_flip_test.cpp
+    columns_test.cpp
     frame_cursor_test.cpp
     fuzz_regression_test.cpp
     hash_worker_test.cpp
@@ -16,6 +19,7 @@ add_executable(tick_store_unit_tests
     oracle_broken_store_test.cpp
     oracle_flip_test.cpp
     oracle_test.cpp
+    page_cache_test.cpp
     roundtrip_cli_test.cpp
     sha256_test.cpp
     slice_test.cpp

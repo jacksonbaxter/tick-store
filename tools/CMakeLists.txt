@@ -5,5 +5,7 @@ function(tick_store_add_tool name)
 endfunction()
 
 tick_store_add_tool(tick_census)
+tick_store_add_tool(tick_coldcache)
+tick_store_add_tool(tick_export)
 tick_store_add_tool(tick_roundtrip)
 tick_store_add_tool(tick_slice)
