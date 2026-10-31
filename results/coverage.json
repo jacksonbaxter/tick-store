@@ -1,6 +1,6 @@
 {
   "schema": "tick-store-coverage-1",
-  "commit": "7e865c80c203",
+  "commit": "4f9dcbd47984",
   "platform": "Darwin arm64",
   "run": "tests/unit, with ItchRealDay left out so the report needs no data file.",
   "simd_kernels": "No SIMD kernels exist yet, so none are reported and none are claimed.",
@@ -572,15 +572,15 @@
     },
     {
       "file": "src/harness/columns_reader.cpp",
-      "function": "harness::"
+      "function": "harness::RefusedColumns::tail"
     },
     {
       "file": "src/harness/roundtrip.cpp",
-      "function": "harness::"
+      "function": "harness::RefusedStore::tail"
     },
     {
       "file": "src/store/columns.cpp",
-      "function": "store::"
+      "function": "store::width_of"
     }
   ],
   "sources_not_built_on_this_platform": [
