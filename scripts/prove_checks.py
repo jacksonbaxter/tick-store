@@ -21,13 +21,15 @@ weakened to get a pass: the gap gets fixed, and the fault stays.
 
 Results go to results/check-proofs.json after every fault, so a stopped run resumes where it
 stopped. A fault already PROVEN for this code is skipped unless --force. The key is the last
-commit that changed anything but the prose and the summaries. Raw logs go to --raw-logs or
-CHECK_PROOF_LOGS, by default build/fault-proofs/logs. The toolchain comes from the environment.
+commit that changed code, not prose or the summaries, plus a fingerprint of the fault itself.
+Raw logs go to --raw-logs or CHECK_PROOF_LOGS, by default build/fault-proofs/logs. The
+toolchain comes from the environment.
 
 Standard library only.
 """
 
 import argparse
+import hashlib
 import json
 import os
 import platform
@@ -44,7 +46,7 @@ TREE = WORK / "tree"
 OUTPUT = REPO_ROOT / "results" / "check-proofs.json"
 SCHEMA = "tick-store-check-proofs-1"
 NOT_CODE = (":(exclude)results/check-proofs.json", ":(exclude)results/coverage.json",
-            ":(exclude)*.md")
+            ":(exclude)*.md", ":(exclude)faults", ":(exclude)scripts/prove_checks.py")
 CHECK_FAILED = 1
 FUZZ_ARGUMENTS = ("--fuzz-seconds", "45", "--fuzz-seed", "1", "--fresh-corpus")
 
@@ -55,6 +57,8 @@ MACOS_COMPARE = "results/compare/macOS-12302019-open-53a3317524f1.json"
 EXIT_CTEST = 8
 EXIT_BUILD = 1
 EXIT_LIBFUZZER = 77
+
+TIDY_ONE_FILE = ("--tidy-files", "src/itch/frame.cpp")
 
 
 def edit_json(path, change):
@@ -132,6 +136,15 @@ def inject_home_path():
     add_file("notes-injected.txt", b"see /" + b"Users/someuser/data\n")
 
 
+def inject_orphan_source():
+    add_file("src/orphan.cpp", b"int orphan() { return 1; }\n")
+
+
+def empty_the_results_folder():
+    for path in (TREE / "results" / "bench").glob("*.json"):
+        path.unlink()
+
+
 def inject_data_file():
     add_file("12302019.NASDAQ_ITCH50", b"\x00\x0cS")
 
@@ -169,8 +182,11 @@ FAULTS = (
     Fault("tsan-queue-race", "tsan-test", "the bounded queue pushes after releasing its lock",
           EXIT_CTEST, "ThreadSanitizer: data race"),
     Fault("tidy-c-style-cast", "clang-tidy", "a C-style cast in src/itch/frame.cpp", CHECK_FAILED,
-          "cppcoreguidelines-pro-type-cstyle-cast", arguments=("--tidy-files",
-                                                               "src/itch/frame.cpp")),
+          "[modernize-avoid-c-style-cast", arguments=TIDY_ONE_FILE),
+    Fault("tidy-file-in-no-build", "clang-tidy", "a tracked source no compile database holds, "
+          "which clang-tidy would otherwise never see", CHECK_FAILED,
+          "no compile database holds src/orphan.cpp", inject_orphan_source,
+          arguments=TIDY_ONE_FILE, fault_arguments=("--tidy-files", "src/orphan.cpp")),
     Fault("werror-unused-variable", "dev-build", "an unused variable in our code", EXIT_BUILD,
           "-Werror,-Wunused-variable"),
     Fault("werror-dependency-tolerated", "dev-build", "unused variables in GoogleTest, in a "
@@ -193,10 +209,14 @@ FAULTS = (
           arguments=("--test-regex", "OracleExhaustiveFlip")),
     Fault("data-sha256-removed", "py-scripts", "fetch_data.py stops comparing SHA-256 digests",
           CHECK_FAILED, "FAIL: test_one_flipped_byte (__main__.CompressedHash"),
+    Fault("compare-tests-settings", "py-compare", "the QuestDB commit mode check stops checking",
+          CHECK_FAILED, "FAIL: test_the_parser_outranks_a_matching_echo"),
     Fault("results-no-load-lines", "check-results", "a macOS results file with no load lines",
           CHECK_FAILED, "no load lines", drop_load_lines),
     Fault("results-macos-pinned", "check-results", "a macOS results file claiming pinned",
           CHECK_FAILED, "macOS cannot be pinned", claim_pinned_on_macos),
+    Fault("results-empty-folder", "check-results", "no results files at all, which must not "
+          "pass as nothing wrong", CHECK_FAILED, "no results files in", empty_the_results_folder),
     Fault("guard-sub-resolution-data", "check-results", "a percentile below the timer's floor "
           "in a results file", CHECK_FAILED, "the timer can resolve", sub_resolution_percentile),
     Fault("guard-cpp-removed", "dev-test", "ResolutionGuard stops refusing a value below its "
@@ -229,6 +249,16 @@ FAULTS = (
     Fault("control-comment-only", "render-check", "a comment, which no check should notice",
           0, "", control=True),
 )
+
+
+def fingerprint(fault):
+    """Changes when the fault does, so an edited fault cannot keep an old verdict."""
+    patch = patch_of(fault)
+    described = repr((fault.check, fault.arguments, fault.fault_arguments, fault.expected_exit,
+                      fault.expected_string, fault.later_step,
+                      getattr(fault.mutate, "__name__", None),
+                      patch.read_text() if patch else None))
+    return hashlib.sha256(described.encode()).hexdigest()[:12]
 
 
 def patch_of(fault):
@@ -274,6 +304,9 @@ def prepare_tree():
         git_in(REPO_ROOT, "clone", "--quiet", "--no-hardlinks", str(REPO_ROOT), str(TREE))
     git_in(TREE, "fetch", "--quiet", "origin", "HEAD")
     git_in(TREE, "reset", "--quiet", "--hard", "FETCH_HEAD")
+    venv = REPO_ROOT / ".venv"
+    if venv.exists() and not (TREE / ".venv").exists():
+        (TREE / ".venv").symlink_to(venv)
     for name in ("googletest", "hdrhistogram", "benchmark"):
         source = REPO_ROOT / "build" / "_deps" / f"{name}-src"
         target = TREE / "build" / "_deps" / f"{name}-src"
@@ -341,8 +374,8 @@ def apply_fault(fault):
             raise RuntimeError(f"{patch.name} does not apply: {done.stderr.strip()}")
     elif fault.mutate is not None:
         fault.mutate()
-    else:
-        raise RuntimeError(f"{fault.id} has neither a patch nor a mutation")
+    elif not fault.fault_arguments:
+        raise RuntimeError(f"{fault.id} changes nothing: no patch, mutation or arguments")
 
 
 def revert_fault(fault):
@@ -382,6 +415,7 @@ def prove(fault, raw_root):
         "check": fault.check,
         "what": fault.what,
         "kind": "patch" if patch_of(fault) else "mutation",
+        "fingerprint": fingerprint(fault),
         "expected_exit": fault.expected_exit,
         "expected_string": fault.expected_string,
         "actual_exit": None,
@@ -409,7 +443,7 @@ def prove(fault, raw_root):
 
 
 def is_proven(entry):
-    return entry.get("verdict") == "PROVEN" or (entry.get("control") and
+    return entry.get("verdict") == "PROVEN" or (entry.get("control") is True and
                                                 entry.get("verdict") == "UNDETECTED")
 
 
@@ -467,7 +501,8 @@ def main(argv=None):
     failed = 0
     for fault in chosen:
         known = entries.get(fault.id)
-        if known and is_proven(known) and not args.force:
+        current = known is not None and known.get("fingerprint") == fingerprint(fault)
+        if current and is_proven(known) and not args.force:
             print(f"{fault.id}: already {known['verdict']} at {commit}", flush=True)
             continue
         print(f"{fault.id}: {fault.check} ...", flush=True)

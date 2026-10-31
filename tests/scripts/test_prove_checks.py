@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+"""Tests for scripts/prove_checks.py. Run with:
+
+    python3 -I tests/scripts/test_prove_checks.py
+
+The verdict is what stands between a fault proof and a false claim, so these give it each way
+a detection can be wrong, a build error above all. The rest ties the fault list to the checks:
+every check has a fault, and every patch in faults/ is used.
+"""
+
+import importlib.util
+import subprocess
+import sys
+import unittest
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SPEC = importlib.util.spec_from_file_location("prove_checks",
+                                              REPO_ROOT / "scripts" / "prove_checks.py")
+prove = importlib.util.module_from_spec(SPEC)
+sys.modules["prove_checks"] = prove
+SPEC.loader.exec_module(prove)
+
+FAULT = prove.Fault("example", "dev-test", "an example", 8, "the expected string")
+
+
+def run_of(script_exit=1, status="FAIL", step_exit=8, log="... the expected string ...",
+           later_status=""):
+    return prove.StepRun(script_exit, status, step_exit, log, later_status)
+
+
+class Verdict(unittest.TestCase):
+    def test_the_expected_failure_is_proven(self):
+        self.assertEqual(prove.judge(FAULT, run_of()), "PROVEN")
+
+    def test_a_check_that_still_passes_is_undetected(self):
+        self.assertEqual(prove.judge(FAULT, run_of(0, "PASS", 0, "")), "UNDETECTED")
+
+    def test_a_build_error_is_not_a_detection(self):
+        verdict = prove.judge(FAULT, run_of(status="BLOCKED", step_exit=-1, log=""))
+        self.assertIn("WRONG REASON", verdict)
+
+    def test_the_wrong_exit_code_is_not_a_detection(self):
+        self.assertIn("WRONG REASON", prove.judge(FAULT, run_of(step_exit=1)))
+
+    def test_the_wrong_output_is_not_a_detection(self):
+        self.assertIn("WRONG REASON", prove.judge(FAULT, run_of(log="something else")))
+
+    def test_a_usage_error_from_the_script_is_not_a_detection(self):
+        self.assertIn("WRONG REASON", prove.judge(FAULT, run_of(script_exit=2)))
+
+    def test_a_later_step_that_did_not_run_is_not_proven(self):
+        fault = prove.Fault("example", "hygiene", "an example", 8, "the expected string",
+                            later_step="render-check")
+        self.assertIn("WRONG REASON", prove.judge(fault, run_of(later_status="")))
+        self.assertEqual(prove.judge(fault, run_of(later_status="PASS")), "PROVEN")
+
+    def test_a_tolerated_fault_must_pass_and_show_the_warning(self):
+        fault = prove.Fault("example", "dev-build", "an example", 0, "warning", tolerated=True)
+        self.assertEqual(prove.judge(fault, run_of(0, "PASS", 0, "warning")), "PROVEN")
+        self.assertEqual(prove.judge(fault, run_of(0, "PASS", 0, "")), "NOT TOLERATED")
+        self.assertEqual(prove.judge(fault, run_of(1, "FAIL", 1, "warning")), "NOT TOLERATED")
+
+    def test_the_control_must_go_unnoticed(self):
+        fault = prove.Fault("example", "render-check", "an example", 0, "", control=True)
+        self.assertEqual(prove.judge(fault, run_of(0, "PASS", 0, "")), "UNDETECTED")
+        self.assertEqual(prove.judge(fault, run_of()), "CONTROL FAILED")
+
+
+class FaultList(unittest.TestCase):
+    def test_every_check_has_a_fault(self):
+        steps = subprocess.run([str(REPO_ROOT / "scripts" / "check.sh"), "--list"],
+                               capture_output=True, text=True, check=True).stdout.split()
+        # A build's failure is the step that needs it, and the -Werror faults cover dev-build.
+        checks = {step for step in steps if not step.endswith("-build")}
+        proven = {fault.check for fault in prove.FAULTS if not fault.control}
+        self.assertEqual(sorted(checks - proven), [])
+
+    def test_every_fault_names_a_real_step(self):
+        steps = subprocess.run([str(REPO_ROOT / "scripts" / "check.sh"), "--list"],
+                               capture_output=True, text=True, check=True).stdout.split()
+        for fault in prove.FAULTS:
+            self.assertIn(fault.check, steps, fault.id)
+
+    def test_every_patch_is_used(self):
+        ids = {fault.id for fault in prove.FAULTS}
+        for patch in prove.FAULTS_DIR.glob("*.patch"):
+            self.assertIn(patch.stem, ids)
+
+    def test_fault_ids_are_unique(self):
+        ids = [fault.id for fault in prove.FAULTS]
+        self.assertEqual(len(ids), len(set(ids)))
+
+    def test_a_changed_fault_has_a_changed_fingerprint(self):
+        other = prove.Fault("example", "dev-test", "an example", 8, "another string")
+        self.assertNotEqual(prove.fingerprint(FAULT), prove.fingerprint(other))
+
+
+if __name__ == "__main__":
+    unittest.main()

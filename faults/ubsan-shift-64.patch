@@ -1,12 +1,12 @@
-diff --git a/include/tick_store/itch/big_endian.hpp b/include/tick_store/itch/big_endian.hpp
---- a/include/tick_store/itch/big_endian.hpp
-+++ b/include/tick_store/itch/big_endian.hpp
-@@ -46,6 +46,8 @@ public:
-         for (std::size_t i = 0; i < Width; ++i) {
-             value = (value << 8U) | std::to_integer<std::uint64_t>(bytes_[offset + i]);
-         }
-+        std::size_t bits_read = 8U * Width;
-+        value |= value >> bits_read;
-         return value;
+diff --git a/include/tick_store/store/little_endian.hpp b/include/tick_store/store/little_endian.hpp
+--- a/include/tick_store/store/little_endian.hpp
++++ b/include/tick_store/store/little_endian.hpp
+@@ -26,6 +26,8 @@ template <std::size_t Width>
+     for (std::size_t i = Width; i > 0; --i) {
+         value = (value << 8U) | std::to_integer<std::uint64_t>(bytes[offset + i - 1]);
      }
++    std::size_t bits_read = 8U * Width;
++    value |= value >> bits_read;
+     return value;
+ }
  

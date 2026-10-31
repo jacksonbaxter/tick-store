@@ -1,0 +1,12 @@
+diff --git a/compare/settings.py b/compare/settings.py
+--- a/compare/settings.py
++++ b/compare/settings.py
+@@ -91,7 +91,7 @@ def check_commit_mode(requested, conf_text, echo, parsed_mode):
+         Setting("cairo.commit.mode (parsed)", requested, parsed_mode,
+                 "QuestDB's own PropServerConfiguration, run on that conf from the same jar"),
+     ]
+-    return require_all_match(settings)
++    return settings
+ 
+ 
+ def split_dirty(files, exempt):
