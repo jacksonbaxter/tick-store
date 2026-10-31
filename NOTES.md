@@ -99,7 +99,7 @@ scale or speed. pyarrow 26.0.0, ArcticDB 6.28.2 on LMDB and QuestDB 10.1.0, with
 |---|---|---|
 | pyarrow | Runs | Runs, 35 of 35 checks, runtime SIMD `avx2` |
 | ArcticDB | Runs | Runs, LMDB write and read exact. Wheel's zmm code untraced, and the CPU has no AVX-512, so a larger run must watch for SIGILL |
-| QuestDB | Runs on Temurin 25.0.5, scalar kernels | Runs on bundled GraalVM 25.0.2 with jemalloc preloaded, AVX2 tier, capped at `-Xmx1g`. Default heap untested |
+| QuestDB | Runs on Temurin 25.0.5, scalar kernels | Runs on bundled GraalVM 25.0.2 with jemalloc preloaded, AVX2 tier, capped at `-Xmx1g`, which holds for a full day. Default heap untested |
 
 What this means for a fair run:
 
@@ -156,7 +156,8 @@ What this means for a fair run:
   unpinned and have no counters. `proc_pid_rusage` is not used in their place.
 - QuestDB silently accepts a bad `cairo.commit.mode`, so the harness must read back the setting in force for every comparison system
   and fail if it differs from what was requested. A durability class is not proven until that passes.
-- QuestDB's `debian` heap must be checked against the full day before any `-Xmx1g` result is relied on.
+- QuestDB's `debian` heap must be checked against the full day before any `-Xmx1g` result is relied on. Done: see "Full-day capacity on
+  `debian`" under Phase 2 findings. `-Xmx1g` is the Phase 3 setting.
 - All scratch files stay inside the folders from now on, including for subagents.
 
 ## Phase 2 findings
@@ -232,6 +233,32 @@ plus the low bits left over: a fair way to compare two transforms of one column,
 6,116,383 are the window, and 206,138,339 bytes. That is about 6 million, so the default was not narrowed. The strict decoder accepts every
 record, it round-trips through the oracle, and `shasum` agrees with our SHA-256. The window has no record out of its time range, as a
 non-decreasing file guarantees. Definition, sizes and hash are under `slices` in `scripts/data_pins.json`.
+
+### Full-day capacity on `debian`
+
+Each system took all 268,744,780 records of `12302019` once, through streamed ingest, on three CPUs and two engine threads, in class B
+unless stated, with a watchdog on the host. This is a capacity check, not a benchmark, and `results/fullday-capacity-12302019.json` holds
+it. All three survived: every step exited 0, no process saw SIGILL, no `hs_err` file appeared, the watchdog never fired and
+`MemAvailable` never fell under 6.0 GiB. A full-column scan counted every row on each, and it and a one-second window at the open matched
+the ground truth. Each system's stored-form checks passed. That SIGILL answer covers the paths run here and no others: streamed write,
+one column read, one window read.
+
+- **QuestDB's `-Xmx1g` is adequate, and is the Phase 3 setting.** In both class A and class B the server ran to WAL fully applied with no
+  collection after start-up. The only pauses are the three full collections of every server start, under 0.25 s in total. The most
+  used after a collection was 116 MiB, and at most 300 MiB of 982 MiB was in use when ingest ended. WAL lag stayed at 3 transactions or
+  fewer, memory pressure at 0, and the server log has no error line. The default heap was not tested, since nothing pointed to it.
+- **Neither the heap nor mapped pages is the risk.** The server's VmHWM was 1.4 GiB in ingest and 2.4 GiB in queries, of which at most
+  1.1 GiB was mapped. The largest process is the Python ingest client, at 5.5 GiB. Its anonymous memory climbs about 300 MiB a chunk to
+  about 5.4 GiB, falls and repeats, while Arrow's pool stays under 514 MiB, so the native client holds it. It is bounded rather than
+  day-sized, but it is the first thing to shrink if `debian` ever runs short.
+- **A day needs more than the slice's settings in one place.** ArcticDB's 2 GB LMDB map cannot hold a day, which stores 5.9 GiB, so the
+  full-day path maps 64 GB. ArcticDB's full-column scan is the largest read, at 5.4 GiB, against 1.4 GiB for Parquet's.
+- **Peak disk was small.** QuestDB used about 1 GiB more at peak than at rest, nothing like a second copy of the table, so applied WAL
+  segments must go during ingest. At rest it holds 2.78x the source, against 2.61x on the slice, and Parquet 0.39x and ArcticDB 0.77x.
+- Not covered: no whole-store read-back through G-1, which needs a day on the heap, no warm or cold proof, and no durability proof at
+  full size. The server ran through `bin/questdb.sh` and `JVM_PREPEND`, while reported runs start `java` directly with the same options.
+- `ru_maxrss` from `wait4` read no lower than the runner's own VmHWM here: a worker `/proc` put at 0.3 GiB reported 1.1 GiB. The figures
+  here use `/proc`, or `ru_maxrss` only where it exceeds the runner's peak. The reported slice runs read `ru_maxrss` the same way, and were not rechecked.
 
 ### What the data contradicted
 

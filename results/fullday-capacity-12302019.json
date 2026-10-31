@@ -1,6 +1,6 @@
 {
  "measurement": "capacity check, not a benchmark",
- "label": "One full ITCH day per system, to learn whether it fits and survives. Each ran once, on a shared machine with other services, in class B unless stated. No number here is a reported result, and no time here is a rate to quote.",
+ "label": "One full ITCH day per system, to learn whether it fits and survives. Each ran once, and QuestDB once more in class A, on a shared machine with other services, in class B unless stated. No number here is a reported result, and no time here is a rate to quote.",
  "day": "12302019",
  "messages": 268744780,
  "source_bytes": 8251407909,
@@ -261,13 +261,145 @@
      "lines_naming_oom_backpressure_or_suspension": 0
     }
    }
+  },
+  "questdb_class_a": {
+   "variant": "plain",
+   "durability_class": "A",
+   "commit": "87a5bb80c9cd915929c6c1219fb1c33362fb6c36",
+   "cpu_mask": [
+    2,
+    6,
+    7
+   ],
+   "threads": 2,
+   "exit": {
+    "code": 0,
+    "signal": null
+   },
+   "every_step_exit_zero": true,
+   "signals_seen": [],
+   "sigill": false,
+   "outcome": "finished",
+   "guard_fired": false,
+   "rows": {
+    "expected": 268744780,
+    "full_scan": 268744780,
+    "window_first_second_of_open": 527644,
+    "answers_match_ground_truth": true
+   },
+   "hs_err_files": 0,
+   "mem_available_start_bytes": 13566373888,
+   "mem_available_lowest_bytes": 6519263232,
+   "swapped_pages_during_run": 1,
+   "stored_bytes": 22897786880,
+   "stored_over_source": 2.775,
+   "disk_used_at_peak_bytes": null,
+   "wall_seconds": {
+    "whole_run": 689.9,
+    "ingest": 632.3,
+    "full_scan": 3.8,
+    "window": 1.4
+   },
+   "peak_memory_bytes": {
+    "server_ingest": {
+     "VmHWM": 1532809216,
+     "RssAnon": 1336344576,
+     "RssFile": 191369216
+    },
+    "server_queries": {
+     "VmHWM": 2570604544,
+     "RssAnon": 1340493824,
+     "RssFile": 1223569408
+    },
+    "ingest_client": {
+     "VmHWM": 5884186624,
+     "RssAnon": 5742665728,
+     "RssFile": 68268032
+    }
+   },
+   "heap": {
+    "requested": "-Xms1g -Xmx1g",
+    "through": "bin/questdb.sh, JVM_PREPEND",
+    "in_force_read_from": "the running command",
+    "gc_log_per_server_start": [
+     {
+      "pauses": 3,
+      "young_pauses": 0,
+      "full_pauses": 3,
+      "causes": [
+       "Metadata GC Threshold",
+       "System.gc()"
+      ],
+      "pause_total_ms": 164.0,
+      "pause_longest_ms": 104.558,
+      "last_pause_uptime_seconds": 3.452,
+      "server_uptime_seconds": 637.814,
+      "peak_heap_after_gc_mib": 114,
+      "heap_used_at_exit_mib": 261,
+      "heap_capacity_mib": 982,
+      "out_of_memory_error": false
+     },
+     {
+      "pauses": 3,
+      "young_pauses": 0,
+      "full_pauses": 3,
+      "causes": [
+       "Metadata GC Threshold",
+       "System.gc()"
+      ],
+      "pause_total_ms": 225.9,
+      "pause_longest_ms": 150.843,
+      "last_pause_uptime_seconds": 6.702,
+      "server_uptime_seconds": 25.888,
+      "peak_heap_after_gc_mib": 116,
+      "heap_used_at_exit_mib": 155,
+      "heap_capacity_mib": 982,
+      "out_of_memory_error": false
+     },
+     {
+      "pauses": 3,
+      "young_pauses": 0,
+      "full_pauses": 3,
+      "causes": [
+       "Metadata GC Threshold",
+       "System.gc()"
+      ],
+      "pause_total_ms": 177.8,
+      "pause_longest_ms": 108.956,
+      "last_pause_uptime_seconds": 3.249,
+      "server_uptime_seconds": 9.235,
+      "peak_heap_after_gc_mib": 116,
+      "heap_used_at_exit_mib": 158,
+      "heap_capacity_mib": 982,
+      "out_of_memory_error": false
+     }
+    ],
+    "wal": {
+     "polls": 66,
+     "largest_sequencer_minus_writer_txn": 3,
+     "largest_memory_pressure": 0,
+     "largest_buffered_txn_size": 0,
+     "suspended": false,
+     "apply_wait_seconds_after_last_send": 2.0,
+     "writer_txn_equals_sequencer_txn": true,
+     "clock_stops": "after wait_wal_table, with writerTxn = sequencerTxn checked"
+    },
+    "server_log": {
+     "lines_error_or_critical": 0,
+     "lines_naming_oom_backpressure_or_suspension": 0
+    }
+   },
+   "disk_note": "not measured: the run began by deleting the class B store, so free disk rose as it wrote"
   }
  },
  "questdb_heap_verdict": {
   "verdict": "adequate",
   "chosen_heap": "-Xms1g -Xmx1g",
   "tested_at_that_value": true,
-  "why": "A full day in class B ran to WAL fully applied with no collection at all after start-up: the only pauses are the three full collections every server start makes, the heap after them was about 116 MiB, and at the end of ingest under a third of 981 MiB was in use, with eden never filled. No OutOfMemoryError, no memory pressure, no suspension, and no error line.",
-  "risk": "Not the heap and not mapped pages. The server's mapped column files stayed under 200 MiB resident during ingest and 1.1 GiB during queries. The largest process is the Python ingest client, whose anonymous memory reached 5.4 GiB."
+  "default_heap_tested": false,
+  "why": "A full day ran to WAL fully applied in class B and again in class A, with no collection at all after start-up. The only pauses are the three full collections every server start makes, 2 for metadata and 1 System.gc(), under 0.25 s in total. The most used after any collection was 116 MiB, and at the end of ingest at most 300 MiB of 982 MiB was in use, with eden never filled. No OutOfMemoryError, no memory pressure, no suspension, no error line. The evidence gives no reason to test another heap.",
+  "phase_3_setting": "-Xms1g -Xmx1g for QuestDB on the Linux host, with the launcher's AlwaysPreTouch and ParallelGC",
+  "risk": "Neither the heap nor mapped pages. The server's resident mapped pages stayed under 200 MiB during ingest and near 1.1 GiB during queries, and its VmHWM peaked at 2.4 GiB. Most of the lowest MemAvailable comes from the Python ingest client, not the server",
+  "client": "The client's anonymous memory climbs about 300 MiB per 4 Mi-row chunk to a ceiling near 5.4 GiB, then falls, and repeats. Arrow's pool stayed under 514 MiB, so the rest is held outside Arrow, by the client's native side. It does not grow with the day: the first peak came at about a quarter of the rows, and later ones were no higher."
  }
 }

@@ -93,8 +93,8 @@ Comparison harness
 - [x] Linux cold-cache tool: stop the process, fsync, `posix_fadvise(POSIX_FADV_DONTNEED)`, prove with `fincore` or `mincore`. Show it on real QuestDB and ArcticDB data files, since only a fresh test file is proven so far
 - [x] QuestDB on `debian`: record the heap, `-Xmx1g` for the slice, and read bind addresses with `ss`, not `SHOW PARAMETERS`
 - [ ] Record GraalVM and jemalloc in the results header. Each file has them only under a class's `facts`
-- [ ] Check QuestDB's `debian` heap against the full day before relying on any `-Xmx1g` result
-- [ ] ArcticDB and pyarrow on `debian`: check for SIGILL at full size, since the wheels' zmm code is untraced and the CPU has no AVX-512
+- [x] Check QuestDB's `debian` heap against the full day before relying on any `-Xmx1g` result: adequate in classes A and B, and the Phase 3 setting. See `results/fullday-capacity-12302019.json`
+- [x] ArcticDB and pyarrow on `debian`: check for SIGILL at full size, since the wheels' zmm code is untraced and the CPU has no AVX-512. No SIGILL on streamed write, one column read and one window read, the paths that ran
 - [x] Name the sync primitive beside every macOS class B number: `fsync`, `F_BARRIERFSYNC` and `F_FULLFSYNC` differ by about 80x at p50
 - [x] A warm result counts only if residency is proven before and after the run
 - [x] One system runs at a time. Record peak RSS, heap settings, `MemAvailable` and stored bytes. Keep the Python overhead visible rather than hidden in engine time

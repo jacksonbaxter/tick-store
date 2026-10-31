@@ -31,6 +31,8 @@ One system runs at a time, each as one process. `compare/run.py` writes
 | `compare/durability.py` | The classes, and the host's strongest sync |
 | `compare/settings.py` | Requested against in force, and the verdict on a class |
 | `compare/coldcache.py` | Warm and cold proofs, and the size at rest |
+| `compare/fullday.py` | One system through a whole day, as an iteration-only capacity check |
+| `compare/guard.py` | Runs a command in its own session, and stops it before it can hurt the host |
 | `compare/systems/` | One file per system, behind `compare/systems/base.py` |
 | `compare/java/CommitModeProbe.java` | Runs QuestDB's own configuration parser on a conf |
 
@@ -280,6 +282,39 @@ Each cold number is the query alone. The server's start and the worker's imports
 clock, and pages they touched count as resident and as device reads. There is one known exception
 in the results so far: `pq.read_table` imports `pyarrow.dataset` itself, inside the timed call, so
 that import is in Parquet's cold numbers and its first warm repetition.
+
+## Full-day capacity
+
+A run on a whole day answers one question: does the system fit on the host and survive? It is not a
+benchmark. `compare/fullday.py` needs the day's export at `<data>/export/<day>-full`, and runs under
+`compare/guard.py`, Linux only:
+
+```sh
+<venv>/bin/python -I compare/guard.py --report <file> --samples <file> --watch <dir> -- \
+    <venv>/bin/python -I compare/fullday.py --system questdb [--heap 1g] [--durability B] \
+    --data <dir> --vendor <dir> --work <dir> --tools <dir>
+```
+
+- Ingest streams: `table_chunks` in `compare/schema.py` reads chunks of about 4 M rows into memory
+  of their own, and each system's `ingest_stream` holds one at a time. ArcticDB's first chunk is a
+  write and the rest are appends, and its LMDB map is 64 GB, because the slice's 2 GB cannot hold a
+  day. Every chunk is a whole number of row groups or segments, so `stored_settings` applies as is.
+- One full-column scan and one window run, each against the ground truth, then `stored_settings`.
+  There is no whole-store read-back, since that needs a day on the heap, and no warm or cold proof.
+- QuestDB starts through `bin/questdb.sh` with `JVM_PREPEND`, not from `java` directly, and writes a
+  GC log per server start. It is otherwise the same server: the prepended options are the ones
+  `QuestDBServer.command` passes.
+- The guard samples every 2 s. Under 3 GiB of `MemAvailable`, under 50 GiB of free disk, or over
+  10 MiB/s of swap traffic for three samples, it sends the session SIGTERM, then SIGKILL after 90 s
+  or under 2 GiB. It exits 70, and its report says why. Each exit status names its signal.
+- Output stays under `<work>/fullday/<tag>/`, marked `iteration-only`. `compare/fullday.py` refuses
+  a work folder under any `results` folder, and `scripts/check_compare.py` refuses the file.
+  `results/fullday-capacity-12302019.json` is the curated summary, and sits outside `results/compare/`.
+
+**QuestDB's heap on Linux is `-Xms1g -Xmx1g`, the Phase 3 setting.** It held for a full day in class
+A and in class B, with no collection after start-up and at most 300 MiB of 982 MiB in use when ingest
+ended. QuestDB's default heap was not tested, because nothing pointed to it. The evidence is in
+`results/fullday-capacity-12302019.json`.
 
 ## What the numbers are
 

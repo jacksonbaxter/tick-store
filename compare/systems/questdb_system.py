@@ -512,7 +512,8 @@ class QuestDBSystem(System):
                 if path.is_dir()]
 
     def service_facts(self):
-        version = subprocess.run([str(self.context.layout.java()), "-version"], check=True,
+        version = subprocess.run([str(self.context.layout.java()), "-XX:-UsePerfData", "-version"],
+                                 check=True,
                                  capture_output=True, text=True,
                                  env=child_environment(self.context.layout)).stderr
         return {"java": version.strip().splitlines(),
