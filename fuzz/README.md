@@ -1,21 +1,23 @@
 # Fuzzing
 
-Two libFuzzer targets take raw bytes directly, with nothing checking them first:
+Three libFuzzer targets take raw bytes directly, with nothing checking them first:
 
 | Target | Input | Oracle in `itch_oracles.hpp` |
 |---|---|---|
 | `fuzz_itch_message` | one payload | `check_message`: both decoders agree, decode then encode gives back the exact input, decoding that gives the same message, and a short buffer fails cleanly |
 | `fuzz_itch_frame` | a byte stream | `check_stream`: frames are contiguous, every frame plus the reported tail rebuilds the input exactly, every stop is justified by the bytes, and a shorter input gives the same frames that fit |
+| `fuzz_stub_store` | a whole store file | `check_store` in `store_oracles.hpp`: errors repeat, an accepted file rebuilds the input exactly from its parsed values, a cut of it is refused, and a copy with one bit flipped is refused or rebuilds to the flipped bytes |
 
 ## Build
 
 Needs upstream clang: Apple clang has no fuzzer runtime. The build regenerates the
-seeds from the real encoder into `build/fuzz/fuzz-seeds/{message,frame}`. They are
-never committed.
+seeds from the real encoder and the real store writer into
+`build/fuzz/fuzz-seeds/{message,frame,store}`. They are never committed.
 
 ```sh
 cmake --preset fuzz && cmake --build --preset fuzz
-mkdir -p build/fuzz/corpus/itch_message build/fuzz/corpus/itch_frame build/fuzz/artifacts
+mkdir -p build/fuzz/corpus/itch_message build/fuzz/corpus/itch_frame \
+    build/fuzz/corpus/stub_store build/fuzz/artifacts
 ```
 
 ## Run
@@ -33,11 +35,16 @@ build/fuzz/fuzz/fuzz_itch_frame -max_total_time=60 -max_len=70000 \
     -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 \
     -artifact_prefix=build/fuzz/artifacts/ \
     build/fuzz/corpus/itch_frame build/fuzz/fuzz-seeds/frame
+
+build/fuzz/fuzz/fuzz_stub_store -max_total_time=60 -max_len=70000 \
+    -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 \
+    -artifact_prefix=build/fuzz/artifacts/ \
+    build/fuzz/corpus/stub_store build/fuzz/fuzz-seeds/store
 ```
 
 - `-max_len`: no message is longer than 50 bytes, so 256 leaves room for every
   wrong-length case. A frame can hold 65,535 bytes, so 70,000 reaches the largest
-  one and the frames after it.
+  one and the frames after it, and in a store file the header too.
 - `-rss_limit_mb` and `-malloc_limit_mb`: the targets allocate at most a few times
   the input size, so hitting either is a defect. libFuzzer reports it as
   out-of-memory, distinct from a crash.
@@ -70,6 +77,6 @@ out-of-range timestamp, which need a hand-built message or a deliberately small 
 ## Crashers
 
 A crash writes to `build/fuzz/artifacts/`. Move the input to
-`tests/unit/crashers/itch_message/` or `itch_frame/` and fix the bug in the same
-commit. `fuzz_regression_test.cpp` replays those files through the same oracles
-in every test build.
+`tests/unit/crashers/itch_message/`, `itch_frame/` or `stub_store/` and fix the bug
+in the same commit. `fuzz_regression_test.cpp` replays those files through the same
+oracles in every test build.

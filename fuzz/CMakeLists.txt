@@ -9,6 +9,7 @@ endfunction()
 
 tick_store_add_fuzzer(fuzz_itch_frame)
 tick_store_add_fuzzer(fuzz_itch_message)
+tick_store_add_fuzzer(fuzz_stub_store)
 
 add_executable(generate_seeds generate_seeds.cpp)
 target_link_libraries(generate_seeds PRIVATE tick_store_core)

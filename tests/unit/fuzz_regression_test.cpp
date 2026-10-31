@@ -4,6 +4,9 @@
 
 #include "itch_fixtures.hpp"
 #include "itch_oracles.hpp"
+#include "scratch_dir.hpp"
+#include "store_oracles.hpp"
+#include "stub_fixture.hpp"
 #include "test_bytes.hpp"
 
 #include <gtest/gtest.h>
@@ -63,6 +66,13 @@ TEST(FuzzRegression, FrameCrashersStayFixed) {
     }
 }
 
+TEST(FuzzRegression, StoreCrashersStayFixed) {
+    for (const auto& path : crashers("stub_store")) {
+        SCOPED_TRACE(path.filename().string());
+        EXPECT_EQ(text(store::oracle::check_store(read_file(path))), "");
+    }
+}
+
 TEST(FuzzOracles, PassEveryFixtureWholeAndCutAtEveryLength) {
     for (const auto& f : fixtures()) {
         SCOPED_TRACE(f.label);
@@ -90,6 +100,25 @@ TEST(FuzzOracles, PassEveryWayAStreamCanEnd) {
     EXPECT_EQ(text(oracle::check_stream(exact_copy(ended))), "");
     ended.push_back(std::byte{0x41});
     EXPECT_EQ(text(oracle::check_stream(exact_copy(ended))), "");
+}
+
+// A real store, cut at every length and with every bit flipped in turn.
+TEST(FuzzOracles, PassEveryCutAndFlipOfAStore) {
+    const tick_store::test::ScratchDir dir;
+    const Bytes source = tick_store::test::source_with_tail();
+    const Bytes file =
+        tick_store::test::store_bytes(tick_store::test::messages_of(source),
+                                      tick_store::test::frames_of(source).tail, dir / "store");
+    EXPECT_EQ(text(store::oracle::check_store(exact_copy(file))), "");
+    for (std::size_t length = 0; length < file.size(); ++length) {
+        const Bytes cut = exact_copy(std::span{file}.first(length));
+        EXPECT_EQ(text(store::oracle::check_store(cut)), "") << "length " << length;
+    }
+    for (std::size_t bit = 0; bit < file.size() * 8; ++bit) {
+        Bytes flipped = exact_copy(file);
+        flipped[bit / 8] ^= static_cast<std::byte>(1U << (bit % 8));
+        EXPECT_EQ(text(store::oracle::check_store(flipped)), "") << "bit " << bit;
+    }
 }
 
 }  // namespace

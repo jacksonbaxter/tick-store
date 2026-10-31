@@ -2,14 +2,19 @@
 //
 //   <dir>/message/  payloads, for fuzz_itch_message
 //   <dir>/frame/    framed streams, for fuzz_itch_frame
+//   <dir>/store/    stub store files, for fuzz_stub_store
 //
-// Every valid seed comes from the real encoder, so the seeds follow the code (Z4).
-// Corrupt seeds are those same bytes cut, extended or relabelled, one for each
-// way the decoders can refuse an input.
+// Every valid seed comes from the real encoder or the real store writer, so the
+// seeds follow the code (Z4). Corrupt seeds are those same bytes cut, extended or
+// relabelled, one for each way the decoders and the parser can refuse an input.
 
 #include "tick_store/itch/codec.hpp"
 #include "tick_store/itch/message.hpp"
+#include "tick_store/store/little_endian.hpp"
+#include "tick_store/store/store_error.hpp"
+#include "tick_store/store/stub_store.hpp"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -17,6 +22,7 @@
 #include <format>
 #include <fstream>
 #include <ios>
+#include <iterator>
 #include <limits>
 #include <print>
 #include <span>
@@ -207,6 +213,90 @@ void write_frame_seeds(SeedDir& seeds) {
     seeds.add(Bytes{});
 }
 
+// A file from the real writer: the 23 types, two raw-path records and `tail`.
+Bytes written_store(const std::filesystem::path& scratch, const std::vector<Message>& messages,
+                    std::span<const std::byte> tail) {
+    auto writer = tick_store::store::StubWriter::create(scratch);
+    if (!writer.has_value()) {
+        throw std::runtime_error(to_string(writer.error()));
+    }
+    for (const Message& message : messages) {
+        if (const auto appended = writer->append(message); !appended.has_value()) {
+            throw std::runtime_error(to_string(appended.error()));
+        }
+    }
+    if (const auto finished = writer->finish(tail); !finished.has_value()) {
+        throw std::runtime_error(to_string(finished.error()));
+    }
+    std::ifstream file{scratch, std::ios::binary};
+    Bytes bytes;
+    for (auto it = std::istreambuf_iterator<char>{file}; it != std::istreambuf_iterator<char>{};
+         ++it) {
+        bytes.push_back(static_cast<std::byte>(*it));
+    }
+    std::filesystem::remove(scratch);
+    return bytes;
+}
+
+// `file` with one header field overwritten.
+template <std::size_t Width>
+Bytes with_field(Bytes file, std::size_t offset, std::uint64_t value) {
+    if (!tick_store::store::write_le<Width>(file, offset, value)) {
+        throw std::runtime_error("a header field is outside the file");
+    }
+    return file;
+}
+
+// Valid stores, and one corrupt seed for each check in the parser.
+void write_store_seeds(SeedDir& seeds, const std::filesystem::path& scratch) {
+    const Bytes unknown = filled(std::byte{'z'}, 9, std::byte{0xA5});
+    const Bytes short_add = filled(AddOrder::type_code, 20, std::byte{0});
+
+    std::vector<Message> messages = ordinary_messages();
+    messages.emplace_back(RawMessage{.bytes = unknown, .reason = RawReason::unknown_type});
+    messages.emplace_back(RawMessage{.bytes = short_add, .reason = RawReason::wrong_length});
+
+    const std::array tail{std::byte{0x00}, std::byte{0x7F}, std::byte{0xAB}};
+    const Bytes store = written_store(scratch, messages, tail);
+    seeds.add(store);
+    seeds.add(written_store(scratch, messages, {}));
+    seeds.add(written_store(scratch, {}, {}));
+    seeds.add(written_store(scratch, {}, tail));
+
+    // Each header check, in the order open() runs them. Offsets are in stub_store.hpp.
+    const std::uint64_t records_bytes =
+        store.size() - tick_store::store::kStubHeaderSize - tail.size();
+    seeds.add(with_field<1>(store, 0, 'X'));
+    seeds.add(with_field<4>(store, 8, 2));
+    seeds.add(with_field<4>(store, 12, 41));
+    seeds.add(with_field<8>(store, 16, messages.size() + 1));
+    seeds.add(with_field<8>(store, 16, 0));
+    seeds.add(with_field<8>(store, 24, records_bytes + tail.size() + 1));
+    seeds.add(with_field<8>(store, 24, records_bytes - 1));
+    seeds.add(with_field<8>(store, 32, tail.size() + 1));
+    seeds.add(with_field<8>(store, 16, std::numeric_limits<std::uint64_t>::max()));
+
+    // Sections that fill the file but hold a half prefix, a cut body, a zero length.
+    const std::array half_prefix{std::byte{0x00}};
+    const std::array cut_body{std::byte{0x00}, std::byte{0x05}, std::byte{'S'}};
+    const std::array zero_length{std::byte{0x00}, std::byte{0x00}};
+    for (const std::span<const std::byte> records :
+         {std::span<const std::byte>{half_prefix}, std::span<const std::byte>{cut_body},
+          std::span<const std::byte>{zero_length}}) {
+        const auto header = tick_store::store::encode_stub_header(
+            {.record_count = 1, .records_bytes = records.size(), .tail_bytes = 0});
+        Bytes bad(header.begin(), header.end());
+        bad.insert(bad.end(), records.begin(), records.end());
+        seeds.add(bad);
+    }
+
+    // Cut inside the header, at its end, in the records and in the tail.
+    for (const std::size_t cut : {std::size_t{0}, std::size_t{1}, std::size_t{39}, std::size_t{40},
+                                  std::size_t{41}, std::size_t{55}, store.size() - 1}) {
+        seeds.add(std::span{store}.first(cut));
+    }
+}
+
 }  // namespace
 
 // NOLINTNEXTLINE(bugprone-exception-escape): a failed build step should terminate and say why.
@@ -219,8 +309,11 @@ int main(int argc, char** argv) {
     const std::filesystem::path root{args[1]};
     SeedDir message{root / "message"};
     SeedDir stream{root / "frame"};
+    SeedDir store{root / "store"};
     write_message_seeds(message);
     write_frame_seeds(stream);
-    std::println("wrote {} message seeds and {} frame seeds", message.count(), stream.count());
+    write_store_seeds(store, root / "store-scratch");
+    std::println("wrote {} message, {} frame and {} store seeds", message.count(), stream.count(),
+                 store.count());
     return 0;
 }
