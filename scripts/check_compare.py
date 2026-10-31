@@ -8,8 +8,9 @@ and gave the same answers. This checks that the file can back each claim: a requ
 must equal the one in force, every store must have rebuilt the source through the oracle,
 every answer must equal the ground truth, every warm and cold number must carry its proof, a
 class B result its flush proof, the run its measurement lock, and a Linux heap the setting that
-the full-day capacity check found adequate. It also checks that the file is safe to publish. A system that could not prove something says so in the file, and the
-file is valid, as long as it does not claim the proof.
+the full-day capacity check found adequate. It also checks that the file is safe to publish. A
+system that could not prove something says so in the file, and the file is valid, as long as it
+does not claim the proof.
 
 Standard library only. tests/scripts/test_check_compare.py shows each rule failing on an
 injected fault.

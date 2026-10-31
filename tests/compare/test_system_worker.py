@@ -16,6 +16,8 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
@@ -201,6 +203,52 @@ class SiblingCommand(unittest.TestCase):
             (Path(scratch) / "parquet.sibling").write_text("0.5", encoding="utf-8")
             self.assertEqual(compare_run.sibling_block(Meter, Path(scratch), ["parquet"]),
                              {"parquet": 0.5})
+
+
+class Document(unittest.TestCase):
+    """compare/run.py's header and heap, built from parts as a real run leaves them."""
+
+    RUNTIME = {"jvm_vendor": "v", "jvm_version": "25", "jvm_read_from": "the JVM",
+               "jemalloc_preloaded": True, "jemalloc_read_from": "the process"}
+
+    def build(self, host, meter, parts):
+        systems = ("parquet", "questdb")
+        for name in systems:
+            classes = {"A": {"facts": {"runtime": self.RUNTIME}}} if name == "questdb" else {}
+            part = {"truth": {}, "queries": [], "variants": {"v": {"classes": classes}}}
+            (parts / f"{name}.json").write_text(json.dumps(part), encoding="utf-8")
+            (parts / f"{name}.sibling").write_text("0.5", encoding="utf-8")
+        args = SimpleNamespace(systems=systems, slice="s")
+        pin = {"sha256": "ab", "message_count": 1, "size": 1}
+        layout = SimpleNamespace(export_dir=lambda name: name)
+        run_bench = compare_run.run_bench
+        with (mock.patch.object(compare_run, "compiler_facts", return_value={}),
+              mock.patch.object(compare_run, "read_manifest", return_value={}),
+              mock.patch.object(run_bench, "cpu_model", return_value="cpu"),
+              mock.patch.object(run_bench, "linux_turbo", return_value="enabled")):
+            return compare_run.build_document(host, args, layout, pin, "c" * 40, "wrapper", parts,
+                                              [[], []], meter)
+
+    def test_each_host(self):
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "build") as scratch:
+            parts = Path(scratch)
+            topology = parts / "cpu" / "cpu4" / "topology"
+            topology.mkdir(parents=True)
+            (topology / "thread_siblings_list").write_text("4-5\n", encoding="ascii")
+            meter = compare_run.run_bench.SiblingMeter(parts / "cpu", parts / "stat")
+            linux = self.build("Linux", meter, parts)
+            macos = self.build("macOS", None, parts)
+        for document in (linux, macos):
+            self.assertEqual(document["header"]["questdb_runtime"], self.RUNTIME)
+            self.assertEqual(check_compare.check_runtime(document["header"]), [])
+            self.assertEqual(document["method"]["cold_includes"], compare_run.COLD_INCLUDES)
+        self.assertEqual(linux["heap"], compare_run.LINUX_HEAP)
+        self.assertEqual(macos["heap"], compare_run.MACOS_HEAP)
+        self.assertEqual(linux["header"]["sibling_busy_percent"]["cases"],
+                         {"parquet": 0.5, "questdb": 0.5})
+        self.assertEqual(check_compare.check_results.check_sibling(
+            linux["header"], ["parquet", "questdb"]), [])
+        self.assertEqual(macos["header"]["sibling_busy_percent"], "not-available")
 
 
 class HeapStatements(unittest.TestCase):

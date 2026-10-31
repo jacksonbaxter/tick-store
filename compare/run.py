@@ -11,9 +11,9 @@ it. On Linux each system runs as
     <wrapper> taskset -c 4 sh -c <copy /proc/stat, then exec> python3 -I compare/run_system.py ...
 
 and run_system.py adds cpu6 as the run's second CPU. The copy is how busy the sibling of cpu4 was
-across the system's run, read against /proc/stat when the wrapper exits. Output goes to files, so nothing depends
-on a terminal or an SSH connection. The results file appears only when every system has
-finished and check_compare.py has passed it, so a file that exists is complete.
+across the system's run, read against /proc/stat when the wrapper exits. Output goes to files, so
+nothing depends on a terminal or an SSH connection. The results file appears only when every
+system has finished and check_compare.py has passed it, so a file that exists is complete.
 
 Exit codes: 0 done, 75 the wrapper says retry later (finished systems are kept, and run it
 again to go on), 2 usage or setup, anything else what failed.
