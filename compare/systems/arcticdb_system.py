@@ -257,6 +257,9 @@ class ArcticDBSystem(System):
     def data_paths(self):
         return [self.root]
 
+    def read_paths(self):
+        return sorted(self.root.glob("*/data.mdb"))
+
     @staticmethod
     def versions():
         import arcticdb

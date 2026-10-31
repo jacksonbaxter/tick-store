@@ -24,9 +24,12 @@ class Layout:
 
     @classmethod
     def default(cls):
-        return cls(data=REPO_ROOT / "data", vendor=REPO_ROOT / "vendor",
-                   work=REPO_ROOT / "build" / "compare",
-                   tools=REPO_ROOT / "build" / "bench" / "tools")
+        """The checkout's own folders, unless TICK_STORE_COMPARE_<NAME> points elsewhere."""
+        defaults = {"data": REPO_ROOT / "data", "vendor": REPO_ROOT / "vendor",
+                    "work": REPO_ROOT / "build" / "compare",
+                    "tools": REPO_ROOT / "build" / "bench" / "tools"}
+        return cls(**{name: Path(os.environ.get(f"TICK_STORE_COMPARE_{name.upper()}", path))
+                      for name, path in defaults.items()})
 
     @classmethod
     def from_arguments(cls, args):

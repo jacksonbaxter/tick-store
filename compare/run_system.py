@@ -243,7 +243,7 @@ class Runner:
                     system.start_service()
                     answer = self.worker(system, "cold_query", query=query_to_json(query),
                                          truth=truth[query.name])
-                    after = coldcache.residency(self.layout, paths)
+                    after = coldcache.residency(self.layout, system.read_paths())
                 finally:
                     system.stop_service()
                 proofs[query.name].append(coldcache.proof_of_cold(evicted, after, device.delta()))

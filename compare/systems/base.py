@@ -159,6 +159,11 @@ class System(ABC):
     def data_paths(self):
         """Every file of the store."""
 
+    def read_paths(self):
+        """The files whose resident pages can only have come from the device. A file an engine
+        writes as it opens, such as LMDB's lock file, is resident with nothing read."""
+        return self.data_paths()
+
     @staticmethod
     @abstractmethod
     def versions():

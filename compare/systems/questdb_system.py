@@ -270,11 +270,12 @@ class QuestDBSystem(System):
     # What a commit under sync must flush: the WAL, the sequencer's log and _txn. Everything
     # else is outside that and is listed in each result. This is how the real server behaves:
     # under sync it leaves the table's symbol maps and each segment's _meta dirty on a commit,
-    # and after a large apply it leaves the partition's ts.d and rest.i dirty for several
-    # seconds as well. See "Comparison harness" in NOTES.md, and like_for_like below.
+    # keeps the schema files CREATE TABLE wrote dirty, and after a large apply leaves partition
+    # column files dirty for several seconds. See "Comparison harness" in NOTES.md, and
+    # like_for_like below.
     flush_exempt = (re.compile(r"^\d{4}-\d{2}-\d{2}"),
                     re.compile(r"^(?:stock|mpid|locate)\.[kovc](?:\.\d+)?$"),
-                    re.compile(r"^wal\d+/\d+/_meta$"))
+                    re.compile(r"^(?:wal\d+/\d+/|txn_seq/)?_meta$"))
 
     def __init__(self, context):
         super().__init__(context)
