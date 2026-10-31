@@ -137,6 +137,17 @@ def run_one(system, args, layout, measure, parts):
     return lines
 
 
+def questdb_runtime(systems):
+    """What every class read from its running server, which must be one reading."""
+    if "questdb" not in systems:
+        return "not-run"
+    readings = [entry["facts"]["runtime"] for variant in systems["questdb"]["variants"].values()
+                for entry in variant["classes"].values()]
+    if any(reading != readings[0] for reading in readings):
+        raise run_bench.Failure(1, "QuestDB's classes did not run on one runtime")
+    return readings[0]
+
+
 def build_document(host, args, layout, pin, commit, measure, parts, load_lines):
     linux = host == "Linux"
     systems = {system: json.loads((parts / f"{system}.json").read_text(encoding="utf-8"))
@@ -161,6 +172,7 @@ def build_document(host, args, layout, pin, commit, measure, parts, load_lines):
         "governor": run_bench.governor_of(host, runs),
         "turbo": run_bench.linux_turbo() if linux else "not-available",
         "pinning": "pinned" if linux else "not-supported",
+        "questdb_runtime": questdb_runtime(systems),
         "load_lines": [line for lines in load_lines for line in lines],
     }
     manifest = read_manifest(layout.export_dir(args.slice))

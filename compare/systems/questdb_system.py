@@ -41,6 +41,10 @@ PROBE_CLASS = "CommitModeProbe"
 LAUNCHER_TAG = "tick-store"
 WAL_POLL_SECONDS = 2
 LINUX_JEMALLOC = "libjemalloc.so"
+# Beyond bin/questdb.sh's options: the JVM prints its own properties to the log as it starts.
+SHOW_PROPERTIES = "-XshowSettings:properties"
+PROPERTY_BLOCK = "Property settings:"
+PROPERTY_LINE = re.compile(r"^\s+([\w.]+) = (.*)$")
 
 COLUMN_TYPES = {"seq": "LONG", "ts": "TIMESTAMP_NS", "msg_type": "SHORT", "locate": "INT",
                 "tracking": "INT", "order_ref": "LONG", "new_ref": "LONG", "side": "BYTE",
@@ -126,6 +130,47 @@ def host_limits():
         limits["vm_max_map_count"] = int(
             Path("/proc/sys/vm/max_map_count").read_text(encoding="ascii"))
     return limits
+
+
+def jvm_properties(log_text):
+    """The last set of properties a JVM printed in a log. A log holds one per server start."""
+    _, found, block = log_text.rpartition(PROPERTY_BLOCK)
+    if not found:
+        raise ServerFailure("the server's log has no properties from its JVM")
+    matches = (PROPERTY_LINE.match(line) for line in block.splitlines())
+    return dict(match.groups() for match in matches if match)
+
+
+def library_names(text, darwin):
+    """File names from `lsof -Fn` on macOS, or /proc's maps on Linux."""
+    if darwin:
+        paths = (line[1:] for line in text.splitlines() if line.startswith("n"))
+    else:
+        paths = (line.split()[-1] for line in text.splitlines() if "/" in line)
+    return {Path(path).name for path in paths}
+
+
+def loaded_libraries(pid):
+    """What is mapped into a running process, asked of the process and not of how it started."""
+    if platform.system() == "Darwin":
+        text = subprocess.run(["lsof", "-nP", "-p", str(pid), "-Fn"], check=False,
+                              capture_output=True, text=True).stdout
+        return library_names(text, darwin=True)
+    return library_names(Path(f"/proc/{pid}/maps").read_text(encoding="utf-8", errors="replace"),
+                         darwin=False)
+
+
+def runtime_reading(properties, libraries):
+    """QuestDB's runtime as read, for the results header. A process with no JVM mapped was not
+    really read, and that must not pass for "no jemalloc"."""
+    if not any(name.startswith("libjvm") for name in libraries):
+        raise ServerFailure("the server's libraries could not be read")
+    return {"jvm_vendor": properties["java.vendor"],
+            "jvm_vendor_version": properties.get("java.vendor.version", "not stated"),
+            "jvm_version": properties["java.runtime.version"],
+            "jvm_read_from": f"the running JVM's own properties, printed by {SHOW_PROPERTIES}",
+            "jemalloc_preloaded": any("jemalloc" in name for name in libraries),
+            "jemalloc_read_from": "the libraries mapped into the running server"}
 
 
 def port_in_use(port):
@@ -217,7 +262,7 @@ class QuestDBServer:
     def command(self):
         layout = self.layout
         common = [str(layout.java()), "-DQuestDB-Runtime-tick-store", *JAVA_OPTIONS,
-                  *self.heap_options, f"-XX:ActiveProcessorCount={self.threads}",
+                  SHOW_PROPERTIES, *self.heap_options, f"-XX:ActiveProcessorCount={self.threads}",
                   "-XX:-UsePerfData", f"-Djava.io.tmpdir={self.root / 'tmp'}",
                   f"-XX:ErrorFile={self.root / 'log'}/hs_err_pid%p.log"]
         if platform.system() == "Darwin":
@@ -288,6 +333,10 @@ class QuestDBServer:
                 raise ServerFailure("a port is still taken after the server stopped")
             time.sleep(0.05)
 
+    def runtime(self):
+        log = (self.root / "log" / "stdout.txt").read_text(encoding="utf-8", errors="replace")
+        return runtime_reading(jvm_properties(log), loaded_libraries(self.pid))
+
     def parsed_commit_mode(self):
         """What the same jar's own parser makes of the conf. Needs a started root."""
         layout = self.layout
@@ -330,6 +379,9 @@ class LaunchedServer(QuestDBServer):
         if self.gc_log is not None:
             options.append(f"-Xlog:gc*:file={self.gc_log}:time,uptime,level,tags:filesize=0")
         return options
+
+    def runtime(self):
+        return {"status": "not read", "reason": "the launcher keeps the JVM's start-up output"}
 
     def launcher_environment(self):
         return {**child_environment(self.layout), "JVM_PREPEND": " ".join(self.prepended())}
@@ -456,7 +508,7 @@ class QuestDBSystem(System):
     def requested(self):
         return {"server_conf": {key: named_loopback(value)
                                 for key, value in self.server.conf.items()},
-                "java_options": [*JAVA_OPTIONS, *self.server.heap_options,
+                "java_options": [*JAVA_OPTIONS, SHOW_PROPERTIES, *self.server.heap_options,
                                  f"-XX:ActiveProcessorCount={self.context.threads}",
                                  "-XX:-UsePerfData"],
                 "table": self._column_definitions(TABLE),
@@ -528,6 +580,7 @@ class QuestDBSystem(System):
                                  env=child_environment(self.context.layout)).stderr
         return {"java": version.strip().splitlines(),
                 "server_build": sql("SELECT build")[0]["build"],
+                "runtime": self.server.runtime(),
                 "allocator": (LINUX_JEMALLOC + " by LD_PRELOAD, as bin/questdb.sh does"
                               if platform.system() == "Linux" else "the system allocator"),
                 "heap": (" ".join(self.server.heap_options) or "the JVM's default") +

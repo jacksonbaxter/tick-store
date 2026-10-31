@@ -127,6 +127,16 @@ def heap_block(host):
             "statement": f"Ran with {HEAP}. The full-day capacity check is Linux only."}
 
 
+def runtime_block(host):
+    linux = host == "Linux"
+    return {"jvm_vendor": "GraalVM Community" if linux else "Eclipse Adoptium",
+            "jvm_vendor_version": "GraalVM CE 25.0.2" if linux else "Temurin-25.0.5+8",
+            "jvm_version": "25.0.2+10" if linux else "25.0.5+8-LTS",
+            "jvm_read_from": "the running JVM's own properties",
+            "jemalloc_preloaded": linux,
+            "jemalloc_read_from": "the libraries mapped into the running server"}
+
+
 def valid_document(host):
     linux = host == "Linux"
     return {
@@ -141,6 +151,7 @@ def valid_document(host):
             "governor": "performance" if linux else "not-available",
             "turbo": "enabled" if linux else "not-available",
             "pinning": "pinned" if linux else "not-supported",
+            "questdb_runtime": runtime_block(host),
             "counters": "unavailable",
             "load_lines": (LOAD_LINUX if linux else LOAD_MAC) * 3,
         },
@@ -441,6 +452,31 @@ class Faults(Harness):
         def fault(document):
             document["method"]["cold"] = ""
         self.assert_fault(fault, "how warm and cold")
+
+    # QuestDB's runtime.
+
+    def test_no_runtime_in_the_header(self):
+        def fault(document):
+            del document["header"]["questdb_runtime"]
+        for host in ("macOS", "Linux"):
+            with self.subTest(host=host):
+                self.assert_fault(fault, "missing field 'questdb_runtime'", host)
+
+    def test_each_runtime_field_is_required(self):
+        for field in ("jvm_vendor", "jvm_version", "jvm_read_from", "jemalloc_read_from"):
+            with self.subTest(field=field):
+                self.assert_fault(lambda d, f=field: d["header"]["questdb_runtime"].pop(f),
+                                  f"header.questdb_runtime: missing field '{field}'")
+
+    def test_jemalloc_not_read(self):
+        def fault(document):
+            del document["header"]["questdb_runtime"]["jemalloc_preloaded"]
+        self.assert_fault(fault, "jemalloc_preloaded must be true or false", "Linux")
+
+    def test_a_runtime_that_was_not_read(self):
+        def fault(document):
+            document["header"]["questdb_runtime"] = "not-run"
+        self.assert_fault(fault, "not a reading from the running server")
 
     # The heap.
 

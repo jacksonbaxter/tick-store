@@ -40,7 +40,8 @@ COMMIT_MODE_SOURCES = ("cairo.commit.mode (conf file)", "cairo.commit.mode (echo
 COMMIT_MODE = {"A": "nosync", "B": "sync"}
 HEADER_FIELDS = ("schema", "host", "measurement", "statement", "cpu_model", "kernel", "compiler",
                  "compile_flags", "build_type", "commit", "core", "second_thread", "governor",
-                 "turbo", "pinning", "load_lines")
+                 "turbo", "pinning", "questdb_runtime", "load_lines")
+RUNTIME_FIELDS = ("jvm_vendor", "jvm_version", "jvm_read_from", "jemalloc_read_from")
 ORACLE_FIELDS = ("verdict", "exit_code", "records", "mismatched_records", "hashes_match",
                  "source_sha256", "stored_sha256")
 LINUX_CPUS = [4, 6]
@@ -282,6 +283,20 @@ def check_heap(document, host, capacity):
     return problems
 
 
+def check_runtime(header):
+    """QuestDB's JVM and allocator, read from the process and never assumed."""
+    if "questdb_runtime" not in header:
+        return []  # Named among the missing header fields.
+    runtime = header["questdb_runtime"]
+    if not isinstance(runtime, dict):
+        return ["header.questdb_runtime: not a reading from the running server"]
+    problems = [f"header.questdb_runtime: missing field '{field}'" for field in RUNTIME_FIELDS
+                if not runtime.get(field)]
+    if not isinstance(runtime.get("jemalloc_preloaded"), bool):
+        problems.append("header.questdb_runtime: jemalloc_preloaded must be true or false")
+    return problems
+
+
 def check_document(document, top_keys, path, pins, capacity):
     header = document.get("header")
     if not isinstance(header, dict):
@@ -291,6 +306,7 @@ def check_document(document, top_keys, path, pins, capacity):
         problems.append("the file does not start with its header")
     problems += [f"header: missing field '{field}'" for field in HEADER_FIELDS
                  if field not in header]
+    problems += check_runtime(header)
     systems = document.get("systems") or {}
     problems += check_results.check_load_lines(header, len(systems))
     problems += check_results.check_build(header)

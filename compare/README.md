@@ -236,7 +236,9 @@ PARAMETERS` must say it came from the conf, its echoed value must match, and
 a bad value. The worker counts and echoed conf keys come from `SHOW
 PARAMETERS`, the heap and processor count from the running command, and the bind addresses from
 `ss` on Linux and `lsof` on macOS. After ingest, `SHOW COLUMNS`, `tables()` and `SHOW CREATE TABLE`
-give the stored form.
+give the stored form. The header's `questdb_runtime` is read the same way on both hosts: the JVM's
+vendor and version from the properties it prints to its log as it starts, and jemalloc from the
+libraries mapped into the running server, by `/proc` on Linux and `lsof` on macOS.
 
 **ArcticDB**'s settings come from the environment before it loads. The harness reads them back
 through `lib.options()`, the library config in storage, and the engine's own `get_config_int`. After

@@ -38,7 +38,8 @@ from compare.queries import OPEN_NS, Query, ground_truth, query_to_json  # noqa:
 from compare.schema import NANOS_PER_SECOND, ColumnSet  # noqa: E402
 from compare.systems.base import RunContext  # noqa: E402
 from compare.systems.parquet_system import ParquetSystem  # noqa: E402
-from compare.systems.questdb_system import QuestDBServer  # noqa: E402
+from compare.systems.questdb_system import (QuestDBServer, ServerFailure,  # noqa: E402
+                                             jvm_properties, library_names, runtime_reading)
 
 WATCHED_WORKER = """
 import json, sys
@@ -111,6 +112,53 @@ class ColdWorker(unittest.TestCase):
         for query in QUERIES:
             with self.subTest(query=query.kind):
                 self.assertEqual(self.cold(query)["imported_inside_the_clock"], [])
+
+
+class RuntimeReading(unittest.TestCase):
+    """The reading on both hosts' output, whichever host runs this."""
+
+    LOG = ("old line\nProperty settings:\n    java.vendor = Old\n\nserver lines\n"
+           "Property settings:\n    java.class.path = \n    java.library.path = /a\n        /b\n"
+           "    java.runtime.version = 25.0.5+8-LTS\n    java.vendor = Eclipse Adoptium\n"
+           "    java.vendor.version = Temurin-25.0.5+8\n\nserver lines\n")
+    MAPS = ("7f00-7f01 r-xp 00000000 08:01 12 /opt/q/bin/libjemalloc.so\n"
+            "7f02-7f03 r-xp 00000000 08:01 13 /opt/q/lib/server/libjvm.so\n"
+            "7f04-7f05 rw-p 00000000 00:00 0 \n7f06-7f07 rw-p 00000000 00:00 0 [heap]\n")
+    LSOF = "p123\nfcwd\nn/some/dir\nftxt\nn/jdk/lib/server/libjvm.dylib\nn/jdk/bin/java\n"
+
+    def test_the_last_start_is_the_one_read(self):
+        properties = jvm_properties(self.LOG)
+        self.assertEqual(properties["java.vendor"], "Eclipse Adoptium")
+        self.assertEqual(properties["java.runtime.version"], "25.0.5+8-LTS")
+
+    def test_a_log_with_no_properties_is_refused(self):
+        with self.assertRaisesRegex(ServerFailure, "no properties"):
+            jvm_properties("server lines\n")
+
+    def test_linux_maps_show_jemalloc(self):
+        reading = runtime_reading(jvm_properties(self.LOG),
+                                  library_names(self.MAPS, darwin=False))
+        self.assertIs(reading["jemalloc_preloaded"], True)
+
+    def test_macos_lsof_shows_none(self):
+        reading = runtime_reading(jvm_properties(self.LOG), library_names(self.LSOF, darwin=True))
+        self.assertIs(reading["jemalloc_preloaded"], False)
+        self.assertEqual(reading["jvm_vendor_version"], "Temurin-25.0.5+8")
+
+    def test_an_empty_reading_is_not_no_jemalloc(self):
+        with self.assertRaisesRegex(ServerFailure, "could not be read"):
+            runtime_reading(jvm_properties(self.LOG), set())
+
+    def test_the_header_takes_the_one_reading_of_every_class(self):
+        def systems(*readings):
+            classes = {str(index): {"facts": {"runtime": reading}}
+                       for index, reading in enumerate(readings)}
+            return {"questdb": {"variants": {"v": {"classes": classes}}}}
+
+        self.assertEqual(compare_run.questdb_runtime(systems({"a": 1}, {"a": 1})), {"a": 1})
+        self.assertEqual(compare_run.questdb_runtime({}), "not-run")
+        with self.assertRaisesRegex(compare_run.run_bench.Failure, "one runtime"):
+            compare_run.questdb_runtime(systems({"a": 1}, {"a": 2}))
 
 
 class HeapStatements(unittest.TestCase):

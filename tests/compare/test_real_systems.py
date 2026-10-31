@@ -9,6 +9,7 @@ The first test is the reason compare/settings.py exists: a QuestDB conf holding
 value and runs nosync. The harness must refuse it.
 """
 
+import platform
 import shutil
 import subprocess
 import sys
@@ -87,6 +88,17 @@ class BadCommitMode(unittest.TestCase):
         finally:
             self.system.stop_service()
         self.assertIn("cairo.commit.mode (parsed)", names)
+
+    def test_the_runtime_is_read_from_the_running_server(self):
+        try:
+            self.system.start_service()
+            runtime = self.system.server.runtime()
+        finally:
+            self.system.stop_service()
+        linux = platform.system() == "Linux"
+        self.assertEqual(runtime["jemalloc_preloaded"], linux)
+        self.assertIn("GraalVM" if linux else "Temurin", runtime["jvm_vendor_version"])
+        self.assertTrue(runtime["jvm_version"].startswith("25."), runtime)
 
 
 @unittest.skipUnless((LAYOUT.export_dir(SLICE_NAME) / "manifest.txt").exists() and
