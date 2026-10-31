@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <span>
 #include <variant>
@@ -39,6 +40,7 @@ namespace tick_store::store::oracle {
     const auto header = encode_stub_header(parser->header());
     std::ranges::copy(header, rebuilt.begin());
     std::size_t out = header.size();
+    std::uint64_t records = 0;
 
     while (true) {
         const auto record = parser->next();
@@ -56,11 +58,16 @@ namespace tick_store::store::oracle {
             return "encode_frame failed on a parsed record";
         }
         out += *written;
+        ++records;
     }
 
     const auto end = parser->next();
     if (!end.has_value() || end->has_value()) {
         return "the end of the records did not repeat";
+    }
+    // The rebuild takes the count from the header, so it could never disagree with itself.
+    if (records != parser->header().record_count) {
+        return "the record count differs from the records read";
     }
     if (out + parser->tail().size() != file.size()) {
         return "records and tail do not account for every byte";

@@ -66,15 +66,37 @@ using ColumnSections = std::array<std::span<const std::byte>, kSectionCount>;
     return files;
 }
 
+// Each file in a heap block of exactly its size, so that ASan sees a read past the end of a
+// file. Inside one input, that read lands in the next file and passes for valid bytes.
+class OwnedColumnFiles {
+public:
+    explicit OwnedColumnFiles(const ColumnSections& sections) {
+        for (std::size_t i = 0; i < kSectionCount; ++i) {
+            files_[i].assign(sections[i].begin(), sections[i].end());
+            sections_[i] = files_[i];
+        }
+    }
+    OwnedColumnFiles(const OwnedColumnFiles&) = delete;
+    OwnedColumnFiles& operator=(const OwnedColumnFiles&) = delete;
+
+    [[nodiscard]] const ColumnSections& sections() const noexcept { return sections_; }
+
+private:
+    std::array<std::vector<std::byte>, kSectionCount> files_;
+    ColumnSections sections_{};
+};
+
 struct Rebuilt {
     std::vector<std::vector<std::byte>> frames;
-    std::span<const std::byte> tail;
+    std::vector<std::byte> tail;
 };
 
 // Reads a directory to its end. nullopt means it was refused somewhere, with the refusal
 // proven repeatable. A broken property sets `failure`.
-[[nodiscard]] inline std::optional<Rebuilt> read_columns(const ColumnSections& sections,
+[[nodiscard]] inline std::optional<Rebuilt> read_columns(const ColumnSections& input_sections,
                                                          const char*& failure) {
+    const OwnedColumnFiles owned{input_sections};
+    const ColumnSections& sections = owned.sections();
     const auto manifest = parse_columns_manifest(sections[0]);
     if (!manifest.has_value()) {
         const auto again = parse_columns_manifest(sections[0]);
@@ -100,7 +122,8 @@ struct Rebuilt {
     }
 
     Rebuilt rebuilt;
-    rebuilt.tail = parser->tail();
+    const std::span<const std::byte> tail = parser->tail();
+    rebuilt.tail.assign(tail.begin(), tail.end());
     while (true) {
         const auto frame = parser->next();
         if (!frame.has_value()) {
