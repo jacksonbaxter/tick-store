@@ -23,7 +23,7 @@ The plan through to the done criteria. Phases are gated: each ends with a phase 
 Scaffold
 - [x] CMake project, C++23, presets for dev, ASan+UBSan, TSan, fuzz and bench. The toolchain comes from the environment, never a hardcoded path
 - [x] GoogleTest through pinned FetchContent. Nothing vendored in git
-- [ ] Google Benchmark and HdrHistogram the same way, when the benchmarks land
+- [x] Google Benchmark and HdrHistogram the same way, pinned to exact commits. HdrHistogram is its core-only build, with no zlib
 - [x] All scratch files stay inside the folders, including for subagents. A tool that needs a temp dir gets `TMPDIR` under the gitignored `build/`
 - [x] Every build preset capped at 6 parallel jobs, because full builds in several repos at once ran this shared Mac out of memory
 
@@ -32,7 +32,7 @@ Data
 - [x] SHA-256 pin computed here (`scripts/data_pins.json`), for cross-checking against itch-orderbook once its script has computed its own
 - [x] Verify the `.gz` SHA-256, the gzip CRC32 and ISIZE, and the decompressed SHA-256, on `12302019`. Nasdaq publishes no usable checksum: every `.md5sum` returned 404
 - [x] Download, pin and verify the second day, `10302019`
-- [ ] Same data on `debian` under `~/quant-projects/tick-store/data`, through the repo's own script
+- [x] Same data on `debian` under `~/quant-projects/tick-store/data`, through the repo's own script, by `--from` on an existing copy, with every pin checked
 - [x] Benchmark day decided: `12302019`, 8.25 GB decompressed, which fits `debian`'s 15 GB RAM
 
 Census of the pinned file, because no source publishes these
@@ -52,7 +52,7 @@ Correctness oracle
 - [x] Injected single-bit corruption test shows the check catches it and reports where
 - [x] Oracle fails correctly on a deliberately broken store, proving it is not vacuous
 - [x] G-1 and G-2 pass on the full `12302019` and `10302019` days on macOS (`results/roundtrip-*.json`), through the stub store
-- [ ] Repeat the full-day G-1 on `debian`
+- [x] Repeat the full-day G-1 on `debian` (`results/roundtrip-12302019-linux.json`)
 - [ ] Phase 3's store plugs into `RecordReader` with the oracle unchanged
 
 Tests and fuzzing
@@ -66,14 +66,18 @@ Slice for the comparison harness
 - [ ] The comparison harness verifies the slice against its pin before loading it
 
 Benchmarks
-- [ ] Google Benchmark plus HdrHistogram, warm-up, seeded inputs, verify before measuring
-- [ ] Results header: host label, CPU model, kernel, compiler version, flags, ISA, commit, core, governor, frequency, turbo state, pinning status, load lines from `measure.sh`
-- [ ] macOS records "not pinned". The pinning and perf-counter code is built anyway
-- [ ] Mac results state plainly that they are unpinned and have no counters, and `proc_pid_rusage` is not used in their place. Neither is a blocker, because `debian` supplies both
-- [ ] Linux: `taskset -c 4`, `cpu5` idle, output written to a file on `debian`. TSC calibrated on every run. Boost ceiling is unknown, so record observed frequency, not an assumed one. Batch anything below about 100 ns; publish no single-shot percentile the timer cannot resolve
-- [ ] macOS: report no latency below a few ticks of the 42 ns timer
-- [ ] Linux counters through `perf stat` with `:u` events. Confirm what `cache-misses` counts on Zen 1 against AMD documentation before quoting it
-- [ ] Results table in the README generated from results files, never typed
+- [x] Google Benchmark plus HdrHistogram, warm-up, seeded inputs, verify before measuring (`bench/itch_codec_bench.cpp`)
+- [x] Results header: host label, CPU model, kernel, compiler version, flags, ISA, commit, core, governor, frequency, turbo state, pinning status, timer, load lines from `measure.sh`. Flags are sanitised at build time, and `scripts/check_results.py` refuses a file that breaks any rule, each rule shown failing in `tests/scripts/test_check_results.py`
+- [x] macOS records "not pinned". The pinning and perf-counter code is built anyway, and reports not-supported
+- [x] Mac results state plainly that they are unpinned and have no counters, and `proc_pid_rusage` is not used in their place. Neither is a blocker, because `debian` supplies both
+- [x] Linux: `taskset -c 4`, `cpu5` idle as stated, output written to a file on `debian`. TSC calibrated on every run. Boost ceiling is unknown, so record observed frequency, not an assumed one. Batch anything below about 100 ns; publish no single-shot percentile the timer cannot resolve
+- [x] macOS: report no latency below a few ticks of the 42 ns timer. The floor is 10 ticks, and the guard refuses anything under it
+- [x] Linux counters through `perf stat` with `:u` events, limited to the timed passes by perf's control FIFOs
+- [ ] Confirm what `cache-misses` counts on Zen 1 against AMD documentation before quoting it. Until then the results mark it unavailable
+- [x] Results table in the README generated from results files, never typed. `--check` fails on a hand edit
+- [ ] Record whether `cpu5` really stayed idle during a run, for example from its `/proc/stat` times, since nothing enforces it and the results only state it
+- [ ] Boost cannot be turned off without root, so pinned numbers ran near 3.56 GHz with the clock free to move. Decide before Phase 3 whether to ask for a fixed-clock run, or to report cycles as the headline
+- [ ] Nothing uses `cpu6` yet. The first two-thread benchmark must pin its second thread there, past the `taskset -c 4` it inherits
 
 Comparison harness
 - [ ] One schema covering the same records for all systems, so the ratio baseline is identical. Decide how the 23 message types map to columns and how unused fields are stored

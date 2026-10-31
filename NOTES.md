@@ -245,6 +245,31 @@ non-decreasing file guarantees. Definition, sizes and hash are under `slices` in
 - **Signed timestamp deltas are not needed on these two days**, and Phase 1 kept them "unless the census proves otherwise". Two days prove
   nothing about the next one, and no text guarantees the order, so the format should keep a way to represent a step back.
 
+### Benchmark harness
+
+Numbers are in the README tables, and they are harness evidence, not targets. Seven things
+differed from what the plan assumed. The Mac's raw `cntvct_el0` counts 1 GHz units in steps of about
+42, so a greatest common divisor of its deltas would report a 1 ns timer: the harness reads
+`mach_absolute_time`, whose units are the real 24 MHz steps. On `debian`, `rdtscp` then `lfence`
+costs 25.2 ns, not the 19 ns of `rdtscp` alone, so the read cost and not the 10 ns step sets the
+floor, at 126 ns. A whole-process `perf stat` would have charged SHA-256 of 412 MB to the codec,
+so perf starts disabled and the binary opens it around the timed passes through perf's control
+FIFOs; that needs one process per workload, so each results file holds one lock per case, and
+four load lines. `measure.sh` sets the governor only once it has the lock, so sysfs read outside
+the run says `schedutil` while the run used `performance`; governor and frequency are taken from
+the load lines, which also print the hostname, and that token is stripped. Core clock is not what
+sysfs suggests: `scaling_max_freq` says 2.0 GHz, single reads at the load lines ranged from 2.0 to
+3.43 GHz, and cycles over wall time gave 3.56 GHz, so both are recorded and only the second is a
+measurement. The first process after the governor change ran its two warm-up passes in 134 ms
+against 102.5 ms for every timed pass. The cause is not established, but warm-up absorbed it and
+no timed pass shows it. Batch timers cost about 2.5% (105 against 102.5 ms a pass), which is why the distribution
+comes from separate passes and never touches the throughput figure or the counters. One result
+worth carrying forward: encoding adds 45 cycles and 136 instructions a message on Zen 1 but no
+branch misses at all (0.51 a message in both cases), so every miss is in the decode half. Why
+encode's own dispatch on type predicts so well is not established. Full-day G-1 on `debian` took
+63 s to ingest and 116 s to verify, 3.0x and 3.6x the Mac, at 9.0 GB peak RSS of clean mapped
+pages, with `MemAvailable` steady at 12.6 GB. The first Linux build needed no code change.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from

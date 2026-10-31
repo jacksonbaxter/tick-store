@@ -51,7 +51,8 @@ $tools/tick_roundtrip flip-bit build/12302019.stub 1390407067 1
 
 The store here is a stub with no checksum, on purpose, so the oracle is what catches
 the fault. Each step needs about 30 seconds and the store takes as much disk as the
-day. Results for both pinned days are in `results/`.
+day. Results for both pinned days are in `results/`, and for one day on Linux in
+`results/roundtrip-12302019-linux.json`.
 
 `tick_census <source> <output.json>` writes the aggregate statistics in `results/`.
 `tick_slice <source> <output> [--from HH:MM:SS] [--to HH:MM:SS]` writes a small valid
@@ -96,4 +97,13 @@ The tables below are generated from the results files by `scripts/render_results
 | `itch_decode_encode` | `40bc4b4ea765` | 10 | 33.98 M | 0.90% | 1024 msgs | 29.98 | 40.55 | 53.08 | 105.13 | 271.38 | 0.51 | 1.34 |
 
 Percentiles are the time for one whole batch, in microseconds, with the timer resolving 10.01 ns.
+
+**macOS.** Apple M4 Max, Clang 23.1.4, `-O3 -DNDEBUG -std=c++23`, arm64 baseline, scalar kernels. Unpinned. No hardware counters. macOS has no thread pinning, and no unprivileged hardware counters.
+
+| Case | Commit | Passes | Messages/s | Spread (CV) | Batch | p50 µs | p99 µs | p99.9 µs | Cycles/msg | Instr/msg | Branch misses/msg | Load at start |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `itch_decode` | `40bc4b4ea765` | 10 | 124.12 M | 0.67% | 1024 msgs | 8.38 | 10.92 | 13.88 | n/a | n/a | n/a | 3.90 |
+| `itch_decode_encode` | `40bc4b4ea765` | 10 | 69.02 M | 0.42% | 1024 msgs | 14.62 | 17.58 | 21.88 | n/a | n/a | n/a | 3.75 |
+
+Percentiles are the time for one whole batch, in microseconds, with the timer resolving 41.67 ns.
 <!-- results:end -->
