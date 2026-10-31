@@ -15,8 +15,85 @@ cmake --preset dev && cmake --build --preset dev && ctest --preset dev
 ```
 
 Presets, each building into `build/<preset>`: `dev`, `asan-ubsan`, `tsan`, `fuzz`,
-`bench`. Every build preset caps itself at 6 parallel jobs. Fuzzing is described in
+`coverage`, `bench`. Every build preset caps itself at 6 parallel jobs. Fuzzing is described in
 `fuzz/README.md`.
+
+## Checks
+
+`scripts/check.sh` runs every check, one step at a time, because a clang-tidy run and a
+sanitizer build at once have run this shared machine out of memory. Every step runs even after
+a failure. It then prints a summary table, and exits 1 if any step failed.
+
+```sh
+scripts/check.sh                          # everything, about 8 minutes on a warm build tree
+scripts/check.sh --quick                  # no sanitizers, fuzzing or coverage, and it says so
+scripts/check.sh --fuzz-seconds 60        # each fuzz target's budget, 20 s by default
+scripts/check.sh --only dev-test,hygiene  # chosen steps, plus the builds they need
+scripts/check.sh --list                   # the step names
+```
+
+`CC`, `CXX` and `clang-tidy` come from the environment, from the same upstream LLVM. A missing
+one is a clear error, and so is a missing `actionlint`, which `scripts/install_tools.sh
+actionlint shellcheck` installs into the gitignored `.tools/` after checking its SHA-256. Raw
+step logs go under `build/check/`, or `--log-dir` or `CHECK_LOG_DIR`.
+
+The steps: the `dev` build with `-Wall -Wextra -Werror` and its tests, G-1 and G-2 through
+`tick_roundtrip` on a small generated stream, the `asan-ubsan` and `tsan` builds and their
+tests, clang-tidy over all our C++, each libFuzzer target, coverage, the Python tests,
+`scripts/check_results.py`, `scripts/check_compare.py`, `scripts/render_results.py --check`,
+actionlint, and a check of what git tracks: no home path, no data file, nothing over 1 MB but
+the named results. No step loads a whole day. `ItchRealDay` reads the first 2 million messages.
+
+A skip is never a pass. A step that cannot run shows as `SKIP`, as `py-compare` does with no
+`.venv`, and a test skipped inside a passing step is named in that row. `ItchRealDay` skips
+this way where the data is absent. The two sources a host does not compile, such as
+`src/harness/page_cache_linux.cpp` on macOS, are named as not analysed by clang-tidy.
+
+A warning in a dependency cannot fail the build. `-Werror` is a `PRIVATE` option on our own
+targets (`cmake/Warnings.cmake`), so a dependency's sources never see it, and FetchContent's
+`SYSTEM` puts their headers on `-isystem`, which silences a warning from a header we include.
+The fault `werror-dependency-tolerated` shows both: unused variables added to a GoogleTest
+source and header print a warning and the build passes.
+
+## Coverage
+
+`scripts/coverage.sh` builds the `coverage` preset, runs the unit tests and reports line and
+function coverage per file for `src/` and `include/`, with llvm-cov. It fails if a function on
+the required list in `scripts/coverage_report.py` is missing or was never called: every
+`decode_as` and `encode_as` for the 23 types, every parser and validator entry point, the fuzz
+oracles and the oracle's compare path. `results/coverage.json` is the curated summary, written
+with `--output results/coverage.json`. No SIMD kernels exist yet, so none are reported. llvm-cov
+sees only the C++, so the Python validators are covered by their tests in `tests/scripts/`
+instead.
+
+## Proof that each check can fail
+
+A check that cannot fail proves nothing, so `scripts/prove_checks.py` shows each one failing on
+an injected fault.
+
+```sh
+python3 -I scripts/prove_checks.py            # resumes, skipping what is already proven
+python3 -I scripts/prove_checks.py --force    # redoes every fault
+python3 -I scripts/prove_checks.py --only ubsan-shift-64
+```
+
+Each fault is a patch in `faults/` or a data mutation in the script. It runs in a throwaway
+clone under `build/fault-proofs/`, never the working tree, and no production code knows about
+it. The step must pass on the clean clone, then fail with the expected exit code and the
+expected string in its own log, so a build error cannot pass for a detection. The clone keeps
+one incremental build per preset, and proving everything from cold takes about an hour.
+`results/check-proofs.json` records each fault, and an undetected one is a bug in the check.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs `scripts/check.sh` on Linux x86-64 and macOS arm64, one job per
+step group, on a pinned LLVM. The steps are the same as a local run, and
+`tests/scripts/test_check_sh.py` fails if one of them is missing from the workflow. The data is
+absent on CI, so `ItchRealDay` skips visibly, and with no `.venv`, `py-compare` shows as `SKIP`.
+
+**This workflow has never executed on GitHub: the repository has no remote.** It is validated
+by actionlint with shellcheck, and its commands have been run by hand on macOS arm64 only. The
+Linux jobs, `apt-get` and the GitHub actions themselves have never run.
 
 ## Round-trip check
 

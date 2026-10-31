@@ -43,7 +43,7 @@ Census of the pinned file, because no source publishes these
 - [x] Prices: share that are multiples of 100, per message type, and range
 - [x] Order references: delta histograms by message type
 - [x] Stock field against locate: any mismatch
-- [ ] `BENCHMARKS.md` still calls the file unmeasured in CR-1's `Checked` cell, and its status line says nothing has been measured. Both predate the census
+- [x] `BENCHMARKS.md` called the file unmeasured in CR-1's `Checked` cell, and its status line said nothing had been measured. Both predated the census, and both are corrected
 
 Correctness oracle
 - [x] Own small ITCH 5.0 decoder and re-serialiser, covering all 23 types, with a raw exception path for anything unknown
@@ -59,7 +59,8 @@ Tests and fuzzing
 - [x] Unit tests for everything built so far, including corrupt fixtures and boundary lists (T1, T3). T2 and T4 wait for the Phase 3 codecs
 - [x] One libFuzzer target per parser and decoder built so far: the ITCH message decoder, the frame cursor and the stub store, following Z1-Z7
 - [ ] Phase 3's parsers and decoders get theirs
-- [ ] Coverage report shows every kernel and validator is reached
+- [x] Coverage report shows every validator is reached (`scripts/coverage.sh`, `results/coverage.json`). It gates on 89 required functions: `decode_as` and `encode_as` for all 23 types, the parsers, the validators, the fuzz oracles and the oracle's compare path. No SIMD kernels exist yet, so none are claimed
+- [ ] Phase 3's kernels join the required list in `scripts/coverage_report.py`
 
 Slice for the comparison harness
 - [x] `tools/tick_slice`: every `S` and `R` of `12302019` plus the window 09:29:30 to 09:34:30, 6,125,294 messages and 206,138,339 bytes, proved clean by the strict decoder and by a round trip, pinned under `slices` in `scripts/data_pins.json`
