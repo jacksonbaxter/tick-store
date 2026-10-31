@@ -304,7 +304,9 @@ run_fuzzer() {
                 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1
                 -artifact_prefix=build/fuzz/artifacts/)
     [[ -z $FUZZ_SEED ]] || args+=("-seed=$FUZZ_SEED")
-    "build/fuzz/fuzz/$target" "${args[@]}" "$corpus_dir" "$seeds"
+    # ASan aborts on macOS and exits 1 on Linux. Pinned to libFuzzer's own code for a defect.
+    ASAN_OPTIONS=${ASAN_OPTIONS:-abort_on_error=0:exitcode=77} \
+        "build/fuzz/fuzz/$target" "${args[@]}" "$corpus_dir" "$seeds"
     code=$?
     runs=$(sed -n 's/^stat::number_of_executed_units: *//p' "$log")
     NOTE="${runs:-no} runs in ${FUZZ_SECONDS}s"

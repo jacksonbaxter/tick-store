@@ -200,7 +200,7 @@ FAULTS = (
           "record count with the records it read", EXIT_LIBFUZZER, "check_store:",
           arguments=FUZZ_ARGUMENTS),
     Fault("fuzz-columns-text-bound", "fuzz-columns", "the column reader stops checking a text "
-          "offset against its file", EXIT_LIBFUZZER, "ERROR: AddressSanitizer",
+          "offset against its file", EXIT_LIBFUZZER, "AddressSanitizer: heap-buffer-overflow",
           arguments=FUZZ_ARGUMENTS),
     Fault("g1-store-alters-a-byte", "oracle", "the stub store flips one bit of record 2 as it "
           "writes", CHECK_FAILED, "first difference: bytes at record 2, source byte"),
@@ -304,9 +304,12 @@ def prepare_tree():
         git_in(REPO_ROOT, "clone", "--quiet", "--no-hardlinks", str(REPO_ROOT), str(TREE))
     git_in(TREE, "fetch", "--quiet", "origin", "HEAD")
     git_in(TREE, "reset", "--quiet", "--hard", "FETCH_HEAD")
+    # A link, which the .gitignore rule for a folder misses, so a clean would remove it.
     venv = REPO_ROOT / ".venv"
     if venv.exists() and not (TREE / ".venv").exists():
         (TREE / ".venv").symlink_to(venv)
+    with (TREE / ".git" / "info" / "exclude").open("a") as exclude:
+        exclude.write("/.venv\n")
     for name in ("googletest", "hdrhistogram", "benchmark"):
         source = REPO_ROOT / "build" / "_deps" / f"{name}-src"
         target = TREE / "build" / "_deps" / f"{name}-src"

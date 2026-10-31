@@ -317,6 +317,37 @@ Bytes columns_input(const std::vector<Bytes>& payloads, std::span<const std::byt
 // Valid directories, and one corrupt seed for each kind of check in the parser. The
 // hand-picked corruptions stand in for what mutation is slow to find: anything that has
 // to stay consistent across two sections.
+// A rare row, then two hot rows, with the text offset between the hot rows moved past the end
+// of rest.dat. Hot rows hold no text, so the first of them starts exactly at the file's end, and
+// the parser's bound on the offset is all that stops it reading on. A mutation is unlikely to
+// find this, because every other seed with two rows ends in text.
+Bytes text_offset_past_its_file(const std::vector<Bytes>& payloads) {
+    const auto is_type = [](std::byte type) {
+        return [type](const Bytes& payload) { return payload.front() == type; };
+    };
+    const auto rare = std::ranges::find_if(payloads, is_type(SystemEvent::type_code));
+    const auto hot = std::ranges::find_if(payloads, is_type(AddOrder::type_code));
+    if (rare == payloads.end() || hot == payloads.end()) {
+        throw std::runtime_error("a seed payload is missing");
+    }
+    Bytes seed = columns_input({*rare, *hot, *hot}, {});
+    const auto sections = tick_store::store::oracle::split_columns(seed);
+    if (!sections.has_value()) {
+        throw std::runtime_error("a seed did not split");
+    }
+    constexpr std::size_t kRestOffsets =
+        1 + static_cast<std::size_t>(tick_store::store::ColumnFile::rest_off);
+    constexpr std::size_t kRestBytes =
+        1 + static_cast<std::size_t>(tick_store::store::ColumnFile::rest_dat);
+    constexpr std::size_t kSecondHotRow = 2;
+    const auto at = static_cast<std::size_t>((*sections)[kRestOffsets].data() - seed.data());
+    const std::uint64_t past_the_end = (*sections)[kRestBytes].size() + 8;
+    if (!tick_store::store::write_le<8>(seed, at + (kSecondHotRow * 8), past_the_end)) {
+        throw std::runtime_error("a seed was too short");
+    }
+    return seed;
+}
+
 void write_columns_seeds(SeedDir& seeds) {
     std::vector<Bytes> payloads;
     for (const Message& message : ordinary_messages()) {
@@ -341,6 +372,8 @@ void write_columns_seeds(SeedDir& seeds) {
                                   std::size_t{120}, whole.size() - 1}) {
         seeds.add(std::span{whole}.first(cut));
     }
+
+    seeds.add(text_offset_past_its_file(payloads));
 
     // One byte flipped in each section, starting at its first byte.
     auto sections = tick_store::store::oracle::split_columns(whole);
