@@ -11,6 +11,7 @@ set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 option(TICK_STORE_BUILD_TESTS "Build the GoogleTest unit tests" ON)
 option(TICK_STORE_BUILD_FUZZ "Build the libFuzzer targets (needs upstream clang)" OFF)
 option(TICK_STORE_BUILD_TOOLS "Build the correctness oracle and the data tools" ON)
+option(TICK_STORE_BUILD_BENCH "Build the benchmarks (pulls in Google Benchmark)" OFF)
 set(TICK_STORE_SANITIZE "none" CACHE STRING "Sanitizer set: none, asan-ubsan, tsan or fuzz")
 set_property(CACHE TICK_STORE_SANITIZE PROPERTY STRINGS none asan-ubsan tsan fuzz)
 set(TICK_STORE_DATA_DIR "${PROJECT_SOURCE_DIR}/data" CACHE PATH
@@ -24,6 +25,7 @@ tick_store_enable_sanitizers()
 
 include(cmake/Warnings.cmake)
 include(cmake/Dependencies.cmake)
+include(cmake/BuildInfo.cmake)
 
 add_library(tick_store_core STATIC)
 target_sources(tick_store_core PRIVATE
@@ -37,7 +39,7 @@ target_compile_features(tick_store_core PUBLIC cxx_std_23)
 tick_store_apply_warnings(tick_store_core)
 
 # The correctness harness. It is never linked into the store itself.
-if(TICK_STORE_BUILD_TESTS OR TICK_STORE_BUILD_TOOLS)
+if(TICK_STORE_BUILD_TESTS OR TICK_STORE_BUILD_TOOLS OR TICK_STORE_BUILD_BENCH)
     find_package(Threads REQUIRED)
     add_library(tick_store_harness STATIC)
     target_sources(tick_store_harness PRIVATE
@@ -55,13 +57,44 @@ if(TICK_STORE_BUILD_TESTS OR TICK_STORE_BUILD_TOOLS)
     tick_store_apply_warnings(tick_store_harness)
 endif()
 
+# What the benchmarks stand on: pinning, the timer, the resolution guard. Unit tested
+# in every test preset, so it stays free of Google Benchmark.
+if(TICK_STORE_BUILD_TESTS OR TICK_STORE_BUILD_BENCH)
+    add_library(tick_store_bench_support STATIC)
+    target_sources(tick_store_bench_support PRIVATE
+        src/bench_support/counter_gate.cpp
+        src/bench_support/latency_recorder.cpp
+        src/bench_support/resolution_guard.cpp
+        src/bench_support/stream_check.cpp
+        src/bench_support/timer.cpp
+    )
+    # Pinning does not exist on every platform, so the build picks the file and no
+    # caller needs an #ifdef.
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        target_sources(tick_store_bench_support PRIVATE src/bench_support/affinity_linux.cpp)
+    else()
+        target_sources(tick_store_bench_support PRIVATE src/bench_support/affinity_unsupported.cpp)
+    endif()
+    tick_store_generate_build_info(tick_store_bench_support)
+    target_link_libraries(tick_store_bench_support
+        PUBLIC tick_store_harness
+        PRIVATE hdr_histogram_core_static)
+    tick_store_apply_warnings(tick_store_bench_support)
+endif()
+
 if(TICK_STORE_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests/unit)
+    add_test(NAME sanitise_flags
+        COMMAND ${CMAKE_COMMAND} -P ${PROJECT_SOURCE_DIR}/tests/cmake/sanitise_flags_test.cmake)
 endif()
 
 if(TICK_STORE_BUILD_TOOLS)
     add_subdirectory(tools)
+endif()
+
+if(TICK_STORE_BUILD_BENCH)
+    add_subdirectory(bench)
 endif()
 
 if(TICK_STORE_BUILD_FUZZ)

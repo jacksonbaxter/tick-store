@@ -29,6 +29,6 @@ Checks: >
   -readability-trailing-comma,
   -readability-function-cognitive-complexity
 WarningsAsErrors: '*'
-HeaderFilterRegex: '(include/tick_store|src|tests/unit|fuzz)/.*'
+HeaderFilterRegex: '(include/tick_store|src|tests/unit|fuzz|bench)/.*'
 CheckOptions:
   misc-include-cleaner.IgnoreHeaders: 'sys/fcntl\.h;sys/_types/.*'

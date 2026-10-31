@@ -1,6 +1,7 @@
 include(GoogleTest)
 
 add_executable(tick_store_unit_tests
+    bench_support_test.cpp
     big_endian_test.cpp
     census_test.cpp
     frame_cursor_test.cpp
@@ -20,7 +21,8 @@ add_executable(tick_store_unit_tests
     slice_test.cpp
     stub_store_test.cpp
 )
-target_link_libraries(tick_store_unit_tests PRIVATE tick_store_harness GTest::gtest_main)
+target_link_libraries(tick_store_unit_tests PRIVATE
+    tick_store_bench_support tick_store_harness GTest::gtest_main)
 tick_store_apply_warnings(tick_store_unit_tests)
 target_include_directories(tick_store_unit_tests PRIVATE ${PROJECT_SOURCE_DIR}/fuzz)
 set_source_files_properties(fuzz_regression_test.cpp PROPERTIES

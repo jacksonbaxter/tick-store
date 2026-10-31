@@ -53,7 +53,8 @@
       "inherits": "base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_CXX_FLAGS_RELEASE": "-O3 -DNDEBUG"
+        "CMAKE_CXX_FLAGS_RELEASE": "-O3 -DNDEBUG",
+        "TICK_STORE_BUILD_BENCH": "ON"
       }
     }
   ],

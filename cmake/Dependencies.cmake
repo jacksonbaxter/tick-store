@@ -26,5 +26,31 @@ if(TICK_STORE_BUILD_TESTS)
     FetchContent_MakeAvailable(googletest)
 endif()
 
-# Google Benchmark and HdrHistogram_c go here, through tick_store_declare_dependency
-# with an exact URL and URL_HASH, behind their own option, when the benchmarks land.
+# The core-only build is the histogram engine alone: no zlib, no threads, no logging.
+# It backs tick_store_bench_support, so the tests need it as well as the benchmarks.
+if(TICK_STORE_BUILD_TESTS OR TICK_STORE_BUILD_BENCH)
+    tick_store_declare_dependency(hdrhistogram
+        # Tag 0.12.1.
+        URL https://github.com/HdrHistogram/HdrHistogram_c/archive/30e9ce6ef5dcdc60f9270e1ca03c0966eaaf71d0.tar.gz
+        URL_HASH SHA256=7f882d20defe473d3e42e8424805db6b37cbec1d044082f76ca1ab32726dbc8d
+    )
+    set(HDR_HISTOGRAM_CORE_ONLY ON CACHE BOOL "" FORCE)
+    set(HDR_LOG_REQUIRED OFF CACHE BOOL "" FORCE)
+    set(HDR_HISTOGRAM_DISABLE_AVX2 ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(hdrhistogram)
+endif()
+
+if(TICK_STORE_BUILD_BENCH)
+    tick_store_declare_dependency(benchmark
+        # Tag v1.9.5.
+        URL https://github.com/google/benchmark/archive/192ef10025eb2c4cdd392bc502f0c852196baa48.tar.gz
+        URL_HASH SHA256=f82705a2726d8f6cdcda274b841f6314dbfc6f731cdda06c946f310ec1cc3ad9
+    )
+    set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+    set(BENCHMARK_ENABLE_GTEST_TESTS OFF CACHE BOOL "" FORCE)
+    set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+    set(BENCHMARK_INSTALL_DOCS OFF CACHE BOOL "" FORCE)
+    set(BENCHMARK_INSTALL_TOOLS OFF CACHE BOOL "" FORCE)
+    set(BENCHMARK_ENABLE_WERROR OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(benchmark)
+endif()
