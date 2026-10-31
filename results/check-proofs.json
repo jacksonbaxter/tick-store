@@ -1,6 +1,6 @@
 {
   "schema": "tick-store-check-proofs-1",
-  "source_commit": "04675047a10e",
+  "source_commit": "66a9327e3d9b",
   "platform": "Darwin arm64",
   "compiler": "clang version 23.1.4",
   "statement": "Each fault ran in a throwaway clone. Baseline passed, the fault applied, the same step failed with this exit code and string, the fault reverted.",
@@ -166,13 +166,13 @@
       "check": "fuzz-columns",
       "what": "the column reader stops checking a text offset against its file",
       "kind": "patch",
-      "fingerprint": "8f205fc4b248",
+      "fingerprint": "9e72bfbf3de3",
       "expected_exit": 77,
-      "expected_string": "ERROR: AddressSanitizer",
-      "actual_exit": 0,
-      "matched_string": null,
+      "expected_string": "AddressSanitizer: heap-buffer-overflow",
+      "actual_exit": 77,
+      "matched_string": "AddressSanitizer: heap-buffer-overflow",
       "baseline_passed": true,
-      "verdict": "UNDETECTED"
+      "verdict": "PROVEN"
     },
     {
       "fault_id": "g1-store-alters-a-byte",
@@ -221,10 +221,10 @@
       "fingerprint": "aed2ea4113d2",
       "expected_exit": 1,
       "expected_string": "FAIL: test_the_parser_outranks_a_matching_echo",
-      "actual_exit": null,
-      "matched_string": null,
-      "baseline_passed": false,
-      "verdict": "BASELINE FAILED"
+      "actual_exit": 0,
+      "matched_string": "FAIL: test_the_parser_outranks_a_matching_echo",
+      "baseline_passed": true,
+      "verdict": "UNDETECTED"
     },
     {
       "fault_id": "results-no-load-lines",
