@@ -21,38 +21,49 @@ The plan through to the done criteria. Phases are gated: each ends with a phase 
 ## Phase 2: Harness, before any implementation
 
 Scaffold
-- [ ] CMake project, C++23, presets for dev, ASan+UBSan, TSan, fuzz and bench. The toolchain comes from the environment, never a hardcoded path
-- [ ] Dependencies through pinned FetchContent: Google Benchmark, HdrHistogram, GoogleTest. Nothing vendored in git
-- [ ] All scratch files stay inside the folders, including for subagents. A tool that needs a temp dir gets `TMPDIR` under the gitignored `build/`
+- [x] CMake project, C++23, presets for dev, ASan+UBSan, TSan, fuzz and bench. The toolchain comes from the environment, never a hardcoded path
+- [x] GoogleTest through pinned FetchContent. Nothing vendored in git
+- [ ] Google Benchmark and HdrHistogram the same way, when the benchmarks land
+- [x] All scratch files stay inside the folders, including for subagents. A tool that needs a temp dir gets `TMPDIR` under the gitignored `build/`
+- [x] Every build preset capped at 6 parallel jobs, because full builds in several repos at once ran this shared Mac out of memory
 
 Data
 - [x] Data script: `scripts/fetch_data.py`, same files as itch-orderbook. Stands alone, and accepts a path to an existing copy, verified the same way. Each check is shown failing on an injected fault in `tests/scripts/test_fetch_data.py`
 - [x] SHA-256 pin computed here (`scripts/data_pins.json`), for cross-checking against itch-orderbook once its script has computed its own
 - [x] Verify the `.gz` SHA-256, the gzip CRC32 and ISIZE, and the decompressed SHA-256, on `12302019`. Nasdaq publishes no usable checksum: every `.md5sum` returned 404
-- [ ] Download, pin and verify the second day, `10302019`
+- [x] Download, pin and verify the second day, `10302019`
 - [ ] Same data on `debian` under `~/quant-projects/tick-store/data`, through the repo's own script
 - [x] Benchmark day decided: `12302019`, 8.25 GB decompressed, which fits `debian`'s 15 GB RAM
 
 Census of the pinned file, because no source publishes these
-- [ ] Message count and bytes per type, reconciled against the gzip ISIZE
-- [ ] Unknown types, frame length against spec length, tail bytes, zero-length terminator
-- [ ] Tracking number: share non-zero
-- [ ] Timestamps: non-decreasing or not, share repeating the previous nanosecond, delta and delta-of-delta histograms, global and per locate
-- [ ] Prices: share that are multiples of 100, per message type, and range
-- [ ] Order references: delta histograms by message type
-- [ ] Stock field against locate: any mismatch
+- [x] Message count and bytes per type, reconciled against the gzip ISIZE (`results/census-*.json`, both days)
+- [x] Unknown types, frame length against spec length, tail bytes, zero-length terminator
+- [x] Tracking number: share non-zero
+- [x] Timestamps: non-decreasing or not, share repeating the previous nanosecond, delta and delta-of-delta histograms, global and per locate
+- [x] Prices: share that are multiples of 100, per message type, and range
+- [x] Order references: delta histograms by message type
+- [x] Stock field against locate: any mismatch
+- [ ] `BENCHMARKS.md` still calls the file unmeasured in CR-1's `Checked` cell, and its status line says nothing has been measured. Both predate the census
 
 Correctness oracle
-- [ ] Own small ITCH 5.0 decoder and re-serialiser, covering all 23 types, with a raw exception path for anything unknown
-- [ ] README defines "record" as one ITCH message of the source file
-- [ ] Oracle compares every re-serialised record with the source bytes and hashes the whole stream, so order, prefixes and tail are proven too
-- [ ] Injected single-bit corruption test shows the check catches it and reports where
-- [ ] Oracle fails correctly on a deliberately broken store, proving it is not vacuous
+- [x] Own small ITCH 5.0 decoder and re-serialiser, covering all 23 types, with a raw exception path for anything unknown
+- [x] README defines "record" as one ITCH message of the source file
+- [x] Oracle compares every re-serialised record with the source bytes and hashes the whole stream, so order, prefixes and tail are proven too
+- [x] Injected single-bit corruption test shows the check catches it and reports where
+- [x] Oracle fails correctly on a deliberately broken store, proving it is not vacuous
+- [x] G-1 and G-2 pass on the full `12302019` and `10302019` days on macOS (`results/roundtrip-*.json`), through the stub store
+- [ ] Repeat the full-day G-1 on `debian`
+- [ ] Phase 3's store plugs into `RecordReader` with the oracle unchanged
 
 Tests and fuzzing
-- [ ] Unit tests, including corrupt fixtures and boundary lists (T1-T4)
-- [ ] One libFuzzer target per parser and decoder, including the ITCH decoder, following Z1-Z7
+- [x] Unit tests for everything built so far, including corrupt fixtures and boundary lists (T1, T3). T2 and T4 wait for the Phase 3 codecs
+- [x] One libFuzzer target per parser and decoder built so far: the ITCH message decoder, the frame cursor and the stub store, following Z1-Z7
+- [ ] Phase 3's parsers and decoders get theirs
 - [ ] Coverage report shows every kernel and validator is reached
+
+Slice for the comparison harness
+- [x] `tools/tick_slice`: every `S` and `R` of `12302019` plus the window 09:29:30 to 09:34:30, 6,125,294 messages and 206,138,339 bytes, proved clean by the strict decoder and by a round trip, pinned under `slices` in `scripts/data_pins.json`
+- [ ] The comparison harness verifies the slice against its pin before loading it
 
 Benchmarks
 - [ ] Google Benchmark plus HdrHistogram, warm-up, seeded inputs, verify before measuring
@@ -83,8 +94,8 @@ Comparison harness
 - [ ] One system runs at a time. Record peak RSS, heap settings, `MemAvailable` and stored bytes. Keep the Python overhead visible rather than hidden in engine time
 
 Checks
-- [ ] ASan and UBSan with no recover, TSan on concurrent code
-- [ ] clang-tidy, and `-Wall -Wextra -Werror`
+- [x] ASan and UBSan with no recover, TSan on concurrent code
+- [x] clang-tidy, and `-Wall -Wextra -Werror`
 - [ ] GitHub Actions config, validated locally with actionlint, and recorded as never executed on GitHub
 - [ ] One local script that runs every check
 
@@ -100,6 +111,7 @@ Layout experiments, measured and recorded in NOTES.md whichever way they go
 - [ ] File-order blocks with per-type columns, against per-symbol columns plus a stored permutation
 - [ ] Block size sweep: ratio against range-query latency
 - [ ] Separate columns per message type against shared columns
+- [ ] Per-locate layouts cannot trust locate 0: `K` records carry it while naming real stocks, so a symbol filter has to read the stock field there
 
 Required codecs
 - [ ] Gorilla delta-of-delta timestamps. Prometheus widened Gorilla's buckets for milliseconds, so choose nanosecond buckets from the census
@@ -109,7 +121,7 @@ Required codecs
 Competing codecs
 - [ ] Timestamps: delta against delta-of-delta, frame of reference per block, Stream VByte
 - [ ] Prices: per-block frame of reference, delta, per-symbol delta, adaptive scale (never a hard-coded 100), patched outliers for stub quotes
-- [ ] Order references: delta against the running maximum, patched outliers, per-type streams
+- [ ] Order references: delta against the running maximum, patched outliers, per-type streams. The census favours the previous value in the same field over the running maximum on both days, so find what `A`'s two modes of delta follow before choosing
 - [ ] Shares, locate, type and flags: dictionary, run-length and bit-packing as the census suggests
 - [ ] Decide whether a general-purpose block codec on top pays for itself
 
