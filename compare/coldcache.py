@@ -130,7 +130,7 @@ class DeviceCounter:
 
     def delta(self):
         return {"bytes": self._read() - self.start,
-                "counter": (f"iostat -Id {IOSTAT_DEVICE}, MiB read and written, machine-wide"
+                "counter": (f"iostat's total for {IOSTAT_DEVICE}, MiB read and written, machine-wide"
                             if self.macos else "block device stat, sectors read, machine-wide"),
                 "slack": IOSTAT_SLACK_BYTES if self.macos else 0}
 

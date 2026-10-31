@@ -82,8 +82,9 @@ def query_from_json(item):
 
 CLIPPING_STATEMENT = (
     "The slice holds every S and R of 12302019 plus the five minutes [09:29:30, 09:34:30). Q2 "
-    "and Q3 are defined over one hour and run over [09:30:00, 09:34:30). Q5 is defined over a "
-    "full day and runs over the slice. No claim about a full-day query is made from this file.")
+    "and Q3 are defined over one hour and are clipped to [09:30:00, 09:34:30). Q5 is defined "
+    "over a full day and is clipped to the slice. No claim about a full-day query is made from "
+    "this file.")
 
 
 def _hash_rows(rows):

@@ -396,6 +396,7 @@ class QuestDBSystem(System):
                                  capture_output=True, text=True,
                                  env=child_environment(self.context.layout)).stderr
         return {"java": version.strip().splitlines(),
+                "server_build": sql("SELECT build")[0]["build"],
                 "allocator": (LINUX_JEMALLOC + " by LD_PRELOAD, as bin/questdb.sh does"
                               if platform.system() == "Linux" else "the system allocator"),
                 "heap": f"-Xms{HEAP} -Xmx{HEAP} with AlwaysPreTouch, so 1 GiB is resident always",
