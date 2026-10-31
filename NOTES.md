@@ -267,8 +267,8 @@ comes from separate passes and never touches the throughput figure or the counte
 worth carrying forward: encoding adds 45 cycles and 136 instructions a message on Zen 1 but no
 branch misses at all (0.51 a message in both cases), so every miss is in the decode half. Why
 encode's own dispatch on type predicts so well is not established. Full-day G-1 on `debian` took
-63 s to ingest and 116 s to verify, 3.0x and 3.6x the Mac, at 9.0 GB peak RSS of clean mapped
-pages, with `MemAvailable` steady at 12.6 GB. The first Linux build needed no code change.
+63 s to ingest and 116 s to verify, 3.0x and 3.6x the Mac, at 9.2 GB peak RSS of clean mapped
+pages, with `MemAvailable` steady at 12.9 GB. The first Linux build needed no code change.
 
 ## Process notes
 
