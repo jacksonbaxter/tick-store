@@ -129,7 +129,8 @@ def short_name(demangled):
     """A name without its signature, or None for a lambda, which has no name worth keeping."""
     if demangled.startswith("_Z") or "$_" in demangled:
         return None
-    return demangled.partition("(")[0].removeprefix("tick_store::")
+    plain = demangled.replace("(anonymous namespace)::", "")
+    return plain.partition("(")[0].removeprefix("tick_store::")
 
 
 def relative_to_repo(path, root):
