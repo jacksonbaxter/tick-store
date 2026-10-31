@@ -1,0 +1,3 @@
+pyarrow==26.0.0
+arcticdb==6.28.2
+questdb==6.0.1

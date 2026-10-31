@@ -6,3 +6,4 @@
 *.dSYM/
 *.sparseimage
 *.dmg
+__pycache__/
