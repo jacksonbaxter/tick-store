@@ -41,6 +41,7 @@ if(TICK_STORE_BUILD_TESTS OR TICK_STORE_BUILD_TOOLS)
     find_package(Threads REQUIRED)
     add_library(tick_store_harness STATIC)
     target_sources(tick_store_harness PRIVATE
+        src/harness/flip_bit.cpp
         src/harness/hash_worker.cpp
         src/harness/roundtrip.cpp
         src/harness/sha256.cpp
