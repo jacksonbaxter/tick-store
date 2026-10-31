@@ -99,6 +99,7 @@ struct LocateTables {
     std::array<TimestampStream, kLocateCount> timestamps{};
     std::array<itch::Stock, kLocateCount> stock{};
     std::bitset<kLocateCount> seen;
+    std::bitset<kLocateCount> named;
     std::bitset<kLocateCount> in_directory;
 };
 
@@ -178,9 +179,17 @@ private:
         }
     }
 
+    // The first stock named for a locate has nothing to be compared with, and every
+    // later one is held to it. That covers a record arriving before its locate's `R`,
+    // because the `R` is then the record that gets compared.
     void observe_stock(std::uint16_t locate, const itch::Stock& stock, TypeCensus& type) noexcept {
+        if (!tables_->named[locate]) {
+            tables_->named[locate] = true;
+            tables_->stock[locate] = stock;
+            return;
+        }
         ++type.stock_checked;
-        if (tables_->in_directory[locate] && tables_->stock[locate] != stock) {
+        if (tables_->stock[locate] != stock) {
             ++type.stock_mismatches;
         }
     }

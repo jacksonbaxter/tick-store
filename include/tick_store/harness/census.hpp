@@ -86,8 +86,9 @@ struct TypeCensus {
     // A known type at any length but the specification's.
     std::uint64_t off_spec_length = 0;
     std::uint64_t tracking_nonzero = 0;
-    // Records of this type that carry a stock field, and those that disagree with the
-    // directory's stock for their locate.
+    // Records whose stock field could be compared with the stock their locate already
+    // stood for, and those that disagreed. The first record to name a locate is not
+    // counted, as it has nothing to be compared with.
     std::uint64_t stock_checked = 0;
     std::uint64_t stock_mismatches = 0;
     // Records whose locate no `R` has named yet.

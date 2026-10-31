@@ -293,12 +293,29 @@ TEST(Census, ComparesTheStockFieldWithTheDirectory) {
     append(source, add(1, 4, 4, 100, "GOOG"));
 
     const Census census = take_census(source);
-    EXPECT_EQ(census.type('A').stock_checked, 4U);
+    EXPECT_EQ(census.type('A').stock_checked, 3U);  // locate 9 had nothing to compare with
     EXPECT_EQ(census.type('A').stock_mismatches, 1U);
     EXPECT_EQ(census.type('A').locate_not_in_directory, 1U);
+    EXPECT_EQ(census.type('R').stock_checked, 1U);
+    EXPECT_EQ(census.type('R').stock_mismatches, 1U);
     EXPECT_EQ(census.locates.in_directory, 3U);
     EXPECT_EQ(census.locates.directory_changes, 1U);
     EXPECT_EQ(census.locates.stocks_with_several_locates, 1U);
+}
+
+// A record can name a locate before its `R` does, and the `R` must still be held to it.
+TEST(Census, HoldsADirectoryEntryToTheStockAnEarlierRecordNamed) {
+    Bytes source;
+    append(source, add(1, 1, 1, 100, "AAPL"));
+    append(source, directory(1, "AAPL"));
+    append(source, add(2, 2, 2, 100, "MSFT"));
+    append(source, directory(2, "TSLA"));
+
+    const Census census = take_census(source);
+    EXPECT_EQ(census.type('A').locate_not_in_directory, 2U);
+    EXPECT_EQ(census.type('R').stock_checked, 2U);
+    EXPECT_EQ(census.type('R').stock_mismatches, 1U);
+    EXPECT_EQ(census.locates.directory_changes, 0U);
 }
 
 TEST(CensusCli, WritesJsonWithNoPathsAndExitsZero) {
