@@ -42,7 +42,9 @@ if(TICK_STORE_BUILD_TESTS OR TICK_STORE_BUILD_TOOLS)
     add_library(tick_store_harness STATIC)
     target_sources(tick_store_harness PRIVATE
         src/harness/hash_worker.cpp
+        src/harness/roundtrip.cpp
         src/harness/sha256.cpp
+        src/harness/stub_reader.cpp
     )
     target_link_libraries(tick_store_harness PUBLIC tick_store_core Threads::Threads)
     tick_store_apply_warnings(tick_store_harness)

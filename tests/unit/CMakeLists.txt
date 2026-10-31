@@ -11,6 +11,8 @@ add_executable(tick_store_unit_tests
     itch_raw_path_test.cpp
     itch_real_day_test.cpp
     itch_truncation_test.cpp
+    oracle_broken_store_test.cpp
+    oracle_test.cpp
     sha256_test.cpp
     stub_store_test.cpp
 )
