@@ -48,6 +48,15 @@
       }
     },
     {
+      "name": "coverage",
+      "displayName": "Debug build instrumented for llvm-cov",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "TICK_STORE_SANITIZE": "coverage"
+      }
+    },
+    {
       "name": "bench",
       "displayName": "Optimised with -O3, no sanitizers",
       "inherits": "base",
@@ -63,6 +72,7 @@
     { "name": "asan-ubsan", "configurePreset": "asan-ubsan", "jobs": 6 },
     { "name": "tsan", "configurePreset": "tsan", "jobs": 6 },
     { "name": "fuzz", "configurePreset": "fuzz", "jobs": 6 },
+    { "name": "coverage", "configurePreset": "coverage", "jobs": 6 },
     { "name": "bench", "configurePreset": "bench", "jobs": 6 }
   ],
   "testPresets": [

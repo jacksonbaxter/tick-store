@@ -4,6 +4,11 @@
 function(tick_store_enable_sanitizers)
     if(TICK_STORE_SANITIZE STREQUAL "none")
         return()
+    elseif(TICK_STORE_SANITIZE STREQUAL "coverage")
+        # Not a sanitizer, but it has the same shape: one flag set for the whole tree.
+        add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
+        add_link_options(-fprofile-instr-generate)
+        return()
     elseif(TICK_STORE_SANITIZE STREQUAL "asan-ubsan")
         set(compile_flags -fsanitize=address,undefined)
         set(link_flags -fsanitize=address,undefined)

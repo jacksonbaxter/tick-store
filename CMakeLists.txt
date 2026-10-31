@@ -12,8 +12,8 @@ option(TICK_STORE_BUILD_TESTS "Build the GoogleTest unit tests" ON)
 option(TICK_STORE_BUILD_FUZZ "Build the libFuzzer targets (needs upstream clang)" OFF)
 option(TICK_STORE_BUILD_TOOLS "Build the correctness oracle and the data tools" ON)
 option(TICK_STORE_BUILD_BENCH "Build the benchmarks (pulls in Google Benchmark)" OFF)
-set(TICK_STORE_SANITIZE "none" CACHE STRING "Sanitizer set: none, asan-ubsan, tsan or fuzz")
-set_property(CACHE TICK_STORE_SANITIZE PROPERTY STRINGS none asan-ubsan tsan fuzz)
+set(TICK_STORE_SANITIZE "none" CACHE STRING "Instrumentation: none, asan-ubsan, tsan, fuzz or coverage")
+set_property(CACHE TICK_STORE_SANITIZE PROPERTY STRINGS none asan-ubsan tsan fuzz coverage)
 set(TICK_STORE_DATA_DIR "${PROJECT_SOURCE_DIR}/data" CACHE PATH
     "Directory holding the decompressed ITCH days. Tests that need one skip visibly if it is absent")
 
