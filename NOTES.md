@@ -159,6 +159,92 @@ What this means for a fair run:
 - QuestDB's `debian` heap must be checked against the full day before any `-Xmx1g` result is relied on.
 - All scratch files stay inside the folders from now on, including for subagents.
 
+## Phase 2 findings
+
+First measurements on the two pinned days, `12302019` and `10302019`, in that order throughout. The figures are in
+`results/census-*.json` and `results/roundtrip-*.json`. "Ideal code" below is the entropy of a value's sign and power-of-two bucket
+plus the low bits left over: a fair way to compare two transforms of one column, not the size of a real codec.
+
+### The round trip holds
+
+- G-1 passes on both full days: 268,744,780 and 293,989,079 records, bit-exact, both stream hashes equal to the pin, about 33 s to
+  verify. G-2 passes on both: a seeded flip in the store was named at the exact record, source byte and bit, and the store passed again
+  once it was flipped back.
+- Peak RSS for a verify is 16.6 GB and 18.1 GB, which is both files fully mapped. Those are clean file-backed pages. The process's own
+  footprint peaks near 70 MB, so nothing holds a day on the heap. Read `peak_rss_bytes` with `peak_memory_footprint_bytes` beside it.
+
+### Prices: the tick premise holds for orders, and fails for trades
+
+- Of non-zero `A`, `F` and `U` prices, 99.53% and 99.61% are multiples of 100: `A` 99.53% and 99.60%, `F` 96.78% and 96.77%, `U` 99.74%
+  and 99.82%.
+- Every non-zero `A`, `F` or `U` price off a whole cent is below $1.00: all 656,931 and all 605,403. So sub-penny order prices are the
+  sub-dollar tick, and nothing else.
+- `P` is different: only 59.84% and 66.84% are whole cents, but 97.77% and 99.31% are multiples of 50. About a third of hidden trades
+  print on a half cent, which fits the midpoint executions Phase 1 expected. A price codec with one global scale of 100 would treat a
+  third of `P` as exceptions. `C` sits at 99.41% and 99.79%, `Q` at 96.49% and 96.38%.
+- The range is as wide as Phase 1 feared: 1 to 1,999,999,900 across `A`, `F` and `U` on both days. So the adaptive scale and patched
+  outliers stay in the plan. In `I`, 73.5% and 71.5% of far prices are zero, and in `Q`, 68.3% and 68.0% of cross prices are.
+
+### Timestamps: delta-of-delta looks worse than delta
+
+- Timestamps never step back on either day, in file order or within any locate: 0 decreases in 562,733,859 values.
+- 1.24% and 1.31% repeat the previous nanosecond. The gap between records is usually tens of microseconds: the median falls in
+  [16.4, 32.8) µs on both days. Non-zero gaps start in [64, 128) ns, with almost nothing there: 1 and 2 values, then millions from 128 ns.
+- Delta-of-delta looks worse than delta on every view:
+
+| View | Ideal code, delta | Ideal code, delta-of-delta | Mean bits, delta | Mean bits, delta-of-delta |
+|---|---|---|---|---|
+| File order | 17.15, 17.14 | 18.44, 18.42 | 14.53, 14.50 | 14.65, 14.65 |
+| Per locate | 23.37, 23.39 | 26.78, 26.79 | 19.81, 19.83 | 22.09, 22.10 |
+
+- Gorilla's one-bit case, a delta-of-delta of zero, covers 0.75% of values here, against its 96.39% on fixed-interval data. The Gorilla
+  codec is still required by G-4. Its buckets need choosing from these histograms, and a loss here would be a finding.
+- File order costs about 6 bits less per value than per-locate order, so a per-symbol layout pays for it on timestamps. On this rough
+  measure, file-order delta is under CR-3's 20.0 bits and per-locate delta is not.
+
+### Order references: the previous value beats the running maximum
+
+- `A` references do not simply count up. 73% of steps are positive, and the deltas have two modes. 43% of all steps are +1 to +15, most
+  of those +4 to +7. The rest are large jumps, up to about 2^25, nearly equal in number in each direction. That looks like several
+  sequences interleaved, with the stream hopping between them, but the cause is not proven.
+- Delta against the previous value in the same field beats delta against the running maximum in every field that carries references:
+  ideal code 16.8 against 20.6 bits for `A`, 23.2 against 24.1 for `D`, on `12302019`, and the same order on `10302019`. Phase 3 lists the
+  running maximum first, so it now has to earn its place.
+- `D` is the hardest column, at 23.2 and 22.3 bits. CR-6's 11.2 bits is well beyond a plain delta, so it depends on the layout.
+- `E` repeats the previous reference 12.8% and 15.0% of the time, as it would if one order fills in several parts. Every `P` reference
+  is zero.
+
+### Other census facts
+
+- The files are clean: no unknown type, no frame off its spec length, no tail, no zero-length terminator. Frames sum to the file size on
+  both days, and that size agrees with the gzip ISIZE.
+- 18 of the 23 types appear on each day. `N`, `O`, `W` and `h` appear on neither, `B` only on `10302019`, and `K` only on `12302019`. So real
+  days cannot exercise every decoder path, and the hand-built fixtures have to.
+- 2.73% and 3.15% of tracking numbers are non-zero, and they are concentrated: nearly all of `E`, `P`, `Q` and `C`, about 8% of `F`, and under
+  0.3% of anything else. A zero-or-not flag per type would cover most of this column.
+- Stock against locate: 124,125,385 and 134,154,625 comparisons, with 2 and 0 mismatches. Both mismatches are the `K` records below.
+  No locate changes its stock during a day, and no stock has two locates.
+- `10302019` has 8,887 `R` records for 8,886 locates: one locate is sent twice, with the same stock both times. `12302019` has one per locate.
+
+### The comparison slice
+
+`data/slices/12302019-open.itch` holds every `S` and `R` of `12302019` plus the window 09:29:30 to 09:34:30: 6,125,294 messages, of which
+6,116,383 are the window, and 206,138,339 bytes. That is about 6 million, so the default was not narrowed. The strict decoder accepts every
+record, it round-trips through the oracle, and `shasum` agrees with our SHA-256. The window has no record out of its time range, as a
+non-decreasing file guarantees. Definition, sizes and hash are under `slices` in `scripts/data_pins.json`.
+
+### What the data contradicted
+
+- **Locate 0 is not only for records with no stock.** `research/evidence/itch-data.md` D6 has locate 0 meaning "not stock dependent". All
+  3 `K` records of `12302019` carry locate 0, while naming `MKD`, `ZWZZT` and `ZJZZT`, each of which has a real locate in the directory
+  from about 03:09, hours earlier. The census check was first written too loosely and hid this, by skipping any record whose locate had
+  no `R`. It now holds each locate to the first stock named for it, and the 2 mismatches stand in the results. A per-symbol layout cannot
+  take a `K`'s symbol from its locate.
+- **Order references are 27.7% and 27.9% of the file**, just under Phase 1's 28 to 32%. Without the 2-byte prefixes they are 29.7% and 29.9%.
+  They are still the largest field class. Header plus prefix at 42.3% and the timestamp at 19.5% both land inside Phase 1's ranges.
+- **Signed timestamp deltas are not needed on these two days**, and Phase 1 kept them "unless the census proves otherwise". Two days prove
+  nothing about the next one, and no text guarantees the order, so the format should keep a way to represent a step back.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
