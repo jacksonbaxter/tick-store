@@ -5,6 +5,7 @@ fsyncs, so class B here is the harness flushing the closed file and its director
 is recorded in every result.
 """
 
+import itertools
 import time
 
 import pyarrow as pa
@@ -20,6 +21,7 @@ FILE_NAME = "table.parquet"
 FLUSHES_PER_FILE = 2  # The file, then its directory.
 ROW_GROUP_128K = 1 << 17
 ROW_GROUP_1MI = 1 << 20
+CHUNK_ROW_GROUPS = 4  # Row groups per chunk of a streamed day.
 WHOLE_SLICE = None  # One row group, near the 512 MB in the sweep at this slice's size.
 PARQUET_VERSION = "2.6"
 DATA_PAGE_VERSION = "1.0"
@@ -119,6 +121,22 @@ class ParquetSystem(System):
                 "flush_seconds": finished - written, "python_seconds": 0.0,
                 "python_note": "the Arrow table is a zero-copy view of the mapped columns, and "
                                "the engine call is the whole write"}
+
+    def stream_chunk_rows(self):
+        return self.tuning["row_group_rows"] * CHUNK_ROW_GROUPS
+
+    def ingest_stream(self, chunks):
+        chunks = iter(chunks)
+        first = next(chunks)
+        started = time.perf_counter()
+        with self._writer(self.path, first.schema) as writer:
+            for table in itertools.chain([first], chunks):
+                writer.write_table(table, row_group_size=self.tuning["row_group_rows"])
+        written = time.perf_counter()
+        self._flush(self.path)
+        finished = time.perf_counter()
+        return {"seconds": finished - started, "engine_seconds": written - started,
+                "flush_seconds": finished - written}
 
     def probe_flush(self, table):
         path = self.root / "probe.parquet"

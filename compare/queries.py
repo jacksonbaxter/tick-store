@@ -176,8 +176,9 @@ def ground_truth(columns, query, day):
     if query.kind == "minute_aggregate":
         return aggregate_digest(_truth_minutes(columns, query, day))
     if query.kind == "column_sum":
+        # Summed in place: a copy to int64 would be 2 GB on a full day.
         return aggregate_digest([[columns.records,
-                                  int(np.asarray(columns.fixed["shares"]).astype(np.int64).sum())]])
+                                  int(columns.fixed["shares"].sum(dtype=np.int64))]])
     raise ValueError(query.kind)
 
 

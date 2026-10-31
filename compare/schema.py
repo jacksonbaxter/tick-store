@@ -113,6 +113,11 @@ class ColumnSet:
     def timestamps_ns(self, day):
         return self.fixed["ts_ns"] + day.midnight_ns
 
+    def _read(self, file_name, numpy_type, first, count):
+        """`count` items from item `first`, read into memory of their own, not mapped."""
+        return np.fromfile(self.directory / file_name, dtype=numpy_type, count=count,
+                           offset=first * np.dtype(numpy_type).itemsize)
+
 
 def arrow_table(columns, day):
     """The whole table as Arrow, over the mapped files for everything but `ts`."""
@@ -130,6 +135,34 @@ def arrow_table(columns, day):
             pa.large_string(), columns.records,
             [None, pa.py_buffer(columns.offsets[name]), pa.py_buffer(columns.text_bytes[name])])
     return pa.table({name: arrays[name] for name in TABLE_COLUMNS})
+
+
+def table_chunks(columns, day, chunk_rows):
+    """The same table as `arrow_table`, in order, `chunk_rows` rows at a time.
+
+    Each chunk is read into memory of its own, so a chunk freed is gone and no mapping of a
+    day's files stays resident. This is the only way to load a whole day: `arrow_table` makes
+    a day-sized `ts`, and the systems' whole-table paths build more on top of it."""
+    import pyarrow as pa
+
+    for first in range(0, columns.records, chunk_rows):
+        count = min(chunk_rows, columns.records - first)
+        arrays = {}
+        for name, numpy_type, arrow_type in FIXED_COLUMNS:
+            values = columns._read(f"{name}.bin", numpy_type, first, count)
+            if name == "ts_ns":
+                arrays["ts"] = pa.array((values + day.midnight_ns).astype("datetime64[ns]"),
+                                        type=pa.timestamp("ns"))
+            else:
+                arrays[name] = pa.array(values, type=getattr(pa, arrow_type)())
+        for name in TEXT_COLUMNS:
+            offsets = columns._read(f"{name}.off", "<u8", first, count + 1)
+            start = int(offsets[0])
+            data = columns._read(f"{name}.dat", "u1", start, int(offsets[-1]) - start)
+            arrays[name] = pa.Array.from_buffers(
+                pa.large_string(), count,
+                [None, pa.py_buffer((offsets - start).astype("<i8")), pa.py_buffer(data)])
+        yield pa.table({name: arrays[name] for name in TABLE_COLUMNS})
 
 
 def plain_array(column, name):

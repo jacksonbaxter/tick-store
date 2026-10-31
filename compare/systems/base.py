@@ -14,6 +14,7 @@ memory is that step's alone.
     read_all()           the whole table as Arrow, ordered by seq
     query_*()            the three query shapes in compare/queries.py
     stored_settings()    settings read from the stored form
+    ingest_stream(chunks)  a whole day, chunk by chunk, for compare/fullday.py alone
     close()
     stop_service()       server down, port free, peak memory returned
     data_paths()         every file of the store, for size and residency
@@ -35,6 +36,10 @@ class RunContext:
     durability: str
     day: object
     threads: int = 2
+    # A whole day, for compare/fullday.py: an iteration run, never a results file.
+    full_day: bool = False
+    heap: str = "1g"
+    gc_log: Path | None = None
 
 
 class System(ABC):
@@ -108,6 +113,15 @@ class System(ABC):
     @abstractmethod
     def ingest(self, columns, table):
         """Stores every row, durably for the class, and returns when it is readable."""
+
+    def stream_chunk_rows(self):
+        """Rows per chunk for ingest_stream: a multiple of the stored unit, so a chunk's end
+        leaves no short row group or segment for the checks in stored_settings to refuse."""
+        raise NotImplementedError
+
+    def ingest_stream(self, chunks):
+        """As ingest, from an iterator of Arrow tables, holding one chunk at a time."""
+        raise NotImplementedError
 
     @abstractmethod
     def probe_flush(self, table):

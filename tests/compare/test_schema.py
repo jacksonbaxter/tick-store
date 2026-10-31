@@ -22,7 +22,8 @@ from compare.queries import (NANOS_PER_MINUTE, OPEN_NS, Query, QueryMismatch, ag
                              busiest_locate, build_queries, digest_result, ground_truth,
                              require_truth, rows_digest)
 from compare.schema import (FIXED_COLUMNS, TEXT_COLUMNS, ColumnsError, ColumnSet, TradingDay,
-                            arrow_table, format_manifest, read_manifest, write_columns)
+                            arrow_table, format_manifest, read_manifest, table_chunks,
+                            write_columns)
 
 DAY = TradingDay(2019, 12, 30)
 RECORDS = 6
@@ -71,6 +72,14 @@ class Columns(Fixture):
         write_columns(table, out, DAY)
         for path in sorted(self.directory.iterdir()):
             self.assertEqual(path.read_bytes(), (out / path.name).read_bytes(), path.name)
+
+    def test_table_chunks_are_the_same_table_in_order(self):
+        whole = arrow_table(self.columns, DAY)
+        for size in (1, 2, 4, RECORDS, RECORDS + 3):
+            chunks = list(table_chunks(self.columns, DAY, size))
+            self.assertEqual(len(chunks), -(-RECORDS // size))
+            self.assertLessEqual(max(chunk.num_rows for chunk in chunks), size)
+            self.assertTrue(pa.concat_tables(chunks).equals(whole), size)
 
     def test_chunks_and_dictionaries_change_nothing(self):
         table = arrow_table(self.columns, DAY)

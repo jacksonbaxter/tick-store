@@ -31,11 +31,15 @@ PORTS = (HTTP_PORT, 9003, 8812, 9009)
 TABLE = "ticks"
 PROBE_TABLE = "flush_probe"
 HEAP = "1g"
+DEFAULT_HEAP = "default"  # No -Xmx at all. Only a full-day run may ask for this.
 START_TIMEOUT_SECONDS = 60
+STREAM_CHUNK_ROWS = 1 << 22
 STOP_TIMEOUT_SECONDS = 60
 WAL_PURGE_TIMEOUT_SECONDS = 150
 EVIDENCE_PLAN = "Interval forward scan"
 PROBE_CLASS = "CommitModeProbe"
+LAUNCHER_TAG = "tick-store"
+WAL_POLL_SECONDS = 2
 LINUX_JEMALLOC = "libjemalloc.so"
 
 COLUMN_TYPES = {"seq": "LONG", "ts": "TIMESTAMP_NS", "msg_type": "SHORT", "locate": "INT",
@@ -168,13 +172,28 @@ def nanos_text(day, nanos):
 class QuestDBServer:
     """One server process. `stop` is safe to call at any time, and more than once."""
 
-    def __init__(self, layout, root, threads, extra_conf):
+    def __init__(self, layout, root, threads, extra_conf, heap=HEAP, gc_log=None):
         self.layout = layout
         self.root = Path(root)
         self.threads = threads
         self.conf = {**BASE_CONF, **extra_conf}
+        self.heap = heap
+        self.gc_log = gc_log
         self.process = None
         self.peak_rss_bytes = 0
+
+    @property
+    def pid(self):
+        return self.process.pid
+
+    @property
+    def heap_options(self):
+        """Both bounds, or none for the JVM's own default of a quarter of RAM."""
+        return [] if self.heap == DEFAULT_HEAP else [f"-Xms{self.heap}", f"-Xmx{self.heap}"]
+
+    @property
+    def heap_flag(self):
+        return None if self.heap == DEFAULT_HEAP else f"-Xmx{self.heap}"
 
     @property
     def conf_path(self):
@@ -190,7 +209,7 @@ class QuestDBServer:
     def command(self):
         layout = self.layout
         common = [str(layout.java()), "-DQuestDB-Runtime-tick-store", *JAVA_OPTIONS,
-                  f"-Xms{HEAP}", f"-Xmx{HEAP}", f"-XX:ActiveProcessorCount={self.threads}",
+                  *self.heap_options, f"-XX:ActiveProcessorCount={self.threads}",
                   "-XX:-UsePerfData", f"-Djava.io.tmpdir={self.root / 'tmp'}",
                   f"-XX:ErrorFile={self.root / 'log'}/hs_err_pid%p.log"]
         if platform.system() == "Darwin":
@@ -252,6 +271,9 @@ class QuestDBServer:
             self.peak_rss_bytes = max(self.peak_rss_bytes, usage.ru_maxrss * scale)
             if forced:
                 raise ServerFailure("the server ignored SIGTERM and was killed")
+        self.wait_for_ports()
+
+    def wait_for_ports(self):
         deadline = time.monotonic() + 10
         while any(port_in_use(port) for port in PORTS):
             if time.monotonic() > deadline:
@@ -275,6 +297,100 @@ class QuestDBServer:
         if match is None:
             raise SettingsMismatch(f"the parser probe gave no answer: exit {run.returncode}")
         return match.group(1)
+
+
+class LaunchedServer(QuestDBServer):
+    """The same server through bin/questdb.sh and its JVM_PREPEND hook, for a full-day run.
+
+    The hook carries what `command` passes and the launcher does not, and a GC log. The
+    launcher forks java and leaves, so this holds a pid, not a child: it reads the peak from
+    /proc before the stop, and compare/guard.py stops the java if this process dies first."""
+
+    def __init__(self, *arguments, **options):
+        super().__init__(*arguments, **options)
+        self.java_pid = None
+
+    @property
+    def pid(self):
+        return self.java_pid
+
+    def prepended(self):
+        log = self.root / "log"
+        options = [*self.heap_options, f"-XX:ActiveProcessorCount={self.threads}",
+                   "-XX:-UsePerfData", f"-Djava.io.tmpdir={self.root / 'tmp'}",
+                   f"-XX:ErrorFile={log}/hs_err_pid%p.log"]
+        if self.gc_log is not None:
+            options.append(f"-Xlog:gc*:file={self.gc_log}:time,uptime,level,tags:filesize=0")
+        return options
+
+    def launcher_environment(self):
+        return {**child_environment(self.layout), "JVM_PREPEND": " ".join(self.prepended())}
+
+    def find_java(self):
+        found = subprocess.run(["pgrep", "-f", "--", f"-DQuestDB-Runtime-{LAUNCHER_TAG}"],
+                               check=False, capture_output=True, text=True).stdout.split()
+        return int(found[0]) if len(found) == 1 else None
+
+    def start(self):
+        require_ports_free()
+        raise_open_file_limit()
+        launcher = self.layout.questdb_home() / "bin" / "questdb.sh"
+        with open(self.root / "log" / "launcher.txt", "ab") as log:
+            subprocess.run([str(launcher), "start", "-d", str(self.root), "-t", LAUNCHER_TAG],
+                           stdin=subprocess.DEVNULL, stdout=log, stderr=log, check=True,
+                           cwd=self.root / "tmp", env=self.launcher_environment())
+        deadline = time.monotonic() + START_TIMEOUT_SECONDS
+        while self.java_pid is None or not self.answers():
+            if self.java_pid is None:
+                self.java_pid = self.find_java()
+            if time.monotonic() > deadline:
+                raise ServerFailure("the server never answered")
+            time.sleep(0.05)
+        listening = listening_addresses(self.java_pid)
+        foreign = [address for address in listening if not address.startswith(f"{HOST}:")]
+        if foreign or not listening:
+            raise ServerFailure(f"not on loopback alone: {listening}")
+        return listening
+
+    @staticmethod
+    def answers():
+        try:
+            sql("SELECT 1", timeout=5)
+        except (OSError, ValueError, ServerFailure):
+            return False
+        return True
+
+    def stop(self):
+        pid = self.java_pid
+        self.java_pid = None
+        if pid is not None and process_alive(pid):
+            self.peak_rss_bytes = max(self.peak_rss_bytes, vm_hwm_bytes(pid))
+            os.kill(pid, signal.SIGTERM)
+            deadline = time.monotonic() + STOP_TIMEOUT_SECONDS
+            forced = False
+            while process_alive(pid):
+                if not forced and time.monotonic() > deadline:
+                    os.kill(pid, signal.SIGKILL)
+                    forced = True
+                time.sleep(0.02)
+            if forced:
+                raise ServerFailure("the server ignored SIGTERM and was killed")
+        self.wait_for_ports()
+
+
+def process_alive(pid):
+    try:
+        state = Path(f"/proc/{pid}/stat").read_text(encoding="ascii").rsplit(")", 1)[1].split()[0]
+    except FileNotFoundError:
+        return False
+    return state != "Z"
+
+
+def vm_hwm_bytes(pid):
+    for line in Path(f"/proc/{pid}/status").read_text(encoding="ascii").splitlines():
+        if line.startswith("VmHWM:"):
+            return int(line.split()[1]) * 1024
+    return 0
 
 
 def commit_mode_echo():
@@ -313,8 +429,10 @@ class QuestDBSystem(System):
     def __init__(self, context):
         super().__init__(context)
         self.mode = MODE_FOR_CLASS[context.durability]
-        self.server = QuestDBServer(context.layout, self.root, context.threads,
-                                    {"cairo.commit.mode": self.mode})
+        server_class = LaunchedServer if context.full_day else QuestDBServer
+        self.server = server_class(context.layout, self.root, context.threads,
+                                   {"cairo.commit.mode": self.mode}, heap=context.heap,
+                                   gc_log=context.gc_log)
         self.client = None
         self.listening = []
 
@@ -330,7 +448,7 @@ class QuestDBSystem(System):
     def requested(self):
         return {"server_conf": {key: named_loopback(value)
                                 for key, value in self.server.conf.items()},
-                "java_options": [*JAVA_OPTIONS, f"-Xms{HEAP}", f"-Xmx{HEAP}",
+                "java_options": [*JAVA_OPTIONS, *self.server.heap_options,
                                  f"-XX:ActiveProcessorCount={self.context.threads}",
                                  "-XX:-UsePerfData"],
                 "table": self._column_definitions(TABLE),
@@ -340,7 +458,8 @@ class QuestDBSystem(System):
 
     def stop_service(self):
         self.server.stop()
-        return {"peak_rss_bytes": self.server.peak_rss_bytes, "heap": f"-Xms{HEAP} -Xmx{HEAP}"}
+        return {"peak_rss_bytes": self.server.peak_rss_bytes,
+                "heap": " ".join(self.server.heap_options) or "the JVM's default"}
 
     def service_settings(self):
         """Run with the server up. This is what makes a class proven, or stops the run."""
@@ -357,7 +476,8 @@ class QuestDBSystem(System):
                            "SHOW PARAMETERS")
                    for key, value in self.server.conf.items() if key in ECHOED_CONF_KEYS]
         checks += [
-            Setting("java heap", f"-Xmx{HEAP}", _flag(command, "-Xmx"), "the running command"),
+            Setting("java heap", self.server.heap_flag, _flag(command, "-Xmx"),
+                    "the running command"),
             Setting("java processors", f"-XX:ActiveProcessorCount={self.context.threads}",
                     _flag(command, "-XX:ActiveProcessorCount="), "the running command"),
             Setting("listening on loopback only", True,
@@ -367,7 +487,7 @@ class QuestDBSystem(System):
         return settings + require_all_match(checks)
 
     def _running_command(self):
-        return subprocess.run(["ps", "-ww", "-o", "command=", "-p", str(self.server.process.pid)],
+        return subprocess.run(["ps", "-ww", "-o", "command=", "-p", str(self.server.pid)],
                               check=True, capture_output=True, text=True).stdout
 
     def settle(self):
@@ -399,7 +519,8 @@ class QuestDBSystem(System):
                 "server_build": sql("SELECT build")[0]["build"],
                 "allocator": (LINUX_JEMALLOC + " by LD_PRELOAD, as bin/questdb.sh does"
                               if platform.system() == "Linux" else "the system allocator"),
-                "heap": f"-Xms{HEAP} -Xmx{HEAP} with AlwaysPreTouch, so 1 GiB is resident always",
+                "heap": (" ".join(self.server.heap_options) or "the JVM's default") +
+                        " with AlwaysPreTouch, so that much is resident always",
                 "listening_ports": sorted(int(item.rsplit(":", 1)[1]) for item in self.listening),
                 "bind": "loopback only, read from the host's socket table",
                 "telemetry": "off",
@@ -434,10 +555,9 @@ class QuestDBSystem(System):
         return (f"CREATE TABLE {table} ({', '.join(parts)}) TIMESTAMP(ts) "
                 f"PARTITION BY {self.tuning['partition_by']} WAL")
 
-    def _send(self, name, table):
+    def _prepare(self, table):
         import pyarrow as pa
 
-        started = time.perf_counter()
         columns = {column: table.column(column) for column in table.column_names}
         symbols = ["stock", "mpid"]
         if self.tuning["locate_symbol_index"]:
@@ -445,7 +565,11 @@ class QuestDBSystem(System):
             symbols.append("locate")
         for symbol in symbols:
             columns[symbol] = columns[symbol].dictionary_encode()
-        prepared = pa.table(columns)
+        return pa.table(columns), symbols
+
+    def _send(self, name, table):
+        started = time.perf_counter()
+        prepared, symbols = self._prepare(table)
         ready = time.perf_counter()
         self.client.dataframe(prepared, table_name=name, symbols=symbols, at="ts")
         sent = time.perf_counter()
@@ -457,17 +581,56 @@ class QuestDBSystem(System):
                 "python_note": "python_seconds builds the dictionaries the client needs for "
                                "SYMBOL columns. engine_seconds covers the client and server"}
 
-    def ingest(self, columns, table):
-        sql(self._column_definitions(TABLE))
-        timings = self._send(TABLE, table)
+    def _require_applied(self, timings, rows):
         state = sql(f"SELECT writerTxn, sequencerTxn FROM wal_tables() WHERE name = '{TABLE}'")
         if len(state) != 1 or state[0]["writerTxn"] != state[0]["sequencerTxn"]:
             raise ServerFailure(f"the WAL is not fully applied: {state}")
         count = sql(f"SELECT count(*) AS n FROM {TABLE}")[0]["n"]
-        if count != table.num_rows:
-            raise ServerFailure(f"{count} rows visible, {table.num_rows} sent")
+        if count != rows:
+            raise ServerFailure(f"{count} rows visible, {rows} sent")
         timings["clock_stops"] = "after wait_wal_table, with writerTxn = sequencerTxn checked"
         return timings
+
+    def ingest(self, columns, table):
+        sql(self._column_definitions(TABLE))
+        timings = self._send(TABLE, table)
+        return self._require_applied(timings, table.num_rows)
+
+    def stream_chunk_rows(self):
+        return STREAM_CHUNK_ROWS
+
+    def _wal_state(self):
+        """The table's row in wal_tables(), which holds its lag and memory pressure."""
+        state = sql(f"SELECT * FROM wal_tables() WHERE name = '{TABLE}'")[0]
+        if state.get("suspended"):
+            raise ServerFailure(f"the table is suspended: {state}")
+        return state
+
+    def ingest_stream(self, chunks):
+        """Every dataframe call commits. The clock stops as in `ingest`, but a day's backlog
+        can outlast one call's query timeout, so the WAL is polled down before the last call."""
+        sql(self._column_definitions(TABLE))
+        started = time.perf_counter()
+        rows = 0
+        wal_states = []
+        for table in chunks:
+            prepared, symbols = self._prepare(table)
+            self.client.dataframe(prepared, table_name=TABLE, symbols=symbols, at="ts")
+            rows += table.num_rows
+            wal_states.append({"rows_sent": rows, "seconds": time.perf_counter() - started,
+                               **self._wal_state()})
+            print(f"questdb: {wal_states[-1]}", flush=True)
+        sent = time.perf_counter()
+        while (state := self._wal_state())["writerTxn"] != state["sequencerTxn"]:
+            wal_states.append({"rows_sent": rows, "seconds": time.perf_counter() - started,
+                               **state})
+            print(f"questdb: {wal_states[-1]}", flush=True)
+            time.sleep(WAL_POLL_SECONDS)
+        sql(f"SELECT wait_wal_table('{TABLE}')")
+        visible = time.perf_counter()
+        return self._require_applied(
+            {"seconds": visible - started, "sent_seconds": sent - started,
+             "apply_wait_seconds": visible - sent, "wal_states": wal_states}, rows)
 
     def probe_flush(self, table):
         sql(self._column_definitions(PROBE_TABLE))

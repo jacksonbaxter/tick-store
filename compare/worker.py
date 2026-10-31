@@ -19,7 +19,8 @@ from compare import coldcache  # noqa: E402
 from compare.layout import Layout  # noqa: E402
 from compare.queries import (QueryMismatch, digest_result, query_from_json,  # noqa: E402
                              require_truth, run_query)
-from compare.schema import ColumnSet, TradingDay, arrow_table, write_columns  # noqa: E402
+from compare.schema import (ColumnSet, TradingDay, arrow_table, table_chunks,  # noqa: E402
+                            write_columns)
 from compare.settings import split_dirty  # noqa: E402
 from compare.systems import system_class  # noqa: E402
 from compare.systems.base import RunContext  # noqa: E402
@@ -51,6 +52,28 @@ def step_ingest(system, request, layout):
         answer["flush"] = {**flush_report(system, layout), **system.flush_facts()}
         system.dirty_paths = saved
     return answer
+
+
+def step_ingest_stream(system, request, layout):
+    """A whole day, one chunk at a time. compare/fullday.py is the only caller."""
+    columns = ColumnSet(request["columns"])
+    settings = system.settings_in_force()
+    chunks = table_chunks(columns, system.context.day, system.stream_chunk_rows())
+    return {"timings": system.ingest_stream(chunks), "settings": settings}
+
+
+def step_capacity_query(system, request, layout):
+    """One query at full size, its answer against the truth. Its time is no measurement."""
+    query = query_from_json(request["query"])
+    elapsed, result = timed_query(system, query)
+    digest = digest_result(query, result)
+    require_truth(query, digest, request["truth"], system.name)
+    rows = result[0][0] if query.kind == "column_sum" else result.num_rows
+    return {"seconds": elapsed, "rows": rows, "digest": digest}
+
+
+def step_stored_settings(system, request, layout):
+    return {"stored_settings": system.stored_settings()}
 
 
 def step_flush_probe(system, request, layout):
@@ -124,14 +147,17 @@ def step_cold_query(system, request, layout):
 
 
 STEPS = {"ingest": step_ingest, "flush_probe": step_flush_probe, "read_back": step_read_back,
-         "warm_queries": step_warm_queries, "cold_query": step_cold_query}
+         "warm_queries": step_warm_queries, "cold_query": step_cold_query,
+         "ingest_stream": step_ingest_stream, "capacity_query": step_capacity_query,
+         "stored_settings": step_stored_settings}
 
 
 def main(argv):
     request = json.loads(Path(argv[0]).read_text(encoding="utf-8"))
     layout = Layout(**{key: Path(value) for key, value in request["layout"].items()})
     day = TradingDay.from_pin(request["day"])
-    context = RunContext(layout, Path(request["root"]), request["variant"], request["class"], day)
+    context = RunContext(layout, Path(request["root"]), request["variant"], request["class"], day,
+                         full_day=request.get("full_day", False))
     system = system_class(request["system"])(context)
     system.open()
     try:

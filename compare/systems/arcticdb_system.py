@@ -23,6 +23,9 @@ SYMBOL = "ticks"
 LIBRARY = "ticks"
 MAP_SIZE_BYTES = 2_000_000_000  # ArcticDB reads GB as 10^9. Read back from the meta page.
 MAP_SIZE_TEXT = "2GB"
+FULL_DAY_MAP_SIZE_BYTES = 64_000_000_000  # A slice's 2 GB cannot hold a day. Sparse until used.
+FULL_DAY_MAP_SIZE_TEXT = "64GB"
+CHUNK_SEGMENTS = 40  # Segments per chunk of a streamed day.
 LMDB_NO_SYNC_FLAGS = 0x10000 | 0x40000  # MDB_NOSYNC | MDB_NOMETASYNC
 LMDB_META_MAGIC = 0xBEEFC0DE
 LMDB_META_OFFSET = 16
@@ -51,6 +54,8 @@ class ArcticDBSystem(System):
     def __init__(self, context):
         super().__init__(context)
         self.library = None
+        self.map_size_bytes = FULL_DAY_MAP_SIZE_BYTES if context.full_day else MAP_SIZE_BYTES
+        self.map_size_text = FULL_DAY_MAP_SIZE_TEXT if context.full_day else MAP_SIZE_TEXT
 
     def worker_environment(self):
         flags = 0 if self.class_b else LMDB_NO_SYNC_FLAGS
@@ -59,7 +64,7 @@ class ArcticDBSystem(System):
                 "ARCTICDB_VersionStore_NumIOThreads_int": str(self.context.threads)}
 
     def requested(self):
-        return {"uri": f"lmdb, on a local disk, map_size={MAP_SIZE_TEXT}",
+        return {"uri": f"lmdb, on a local disk, map_size={self.map_size_text}",
                 "symbol_layout": "one symbol for the whole table",
                 "write": "one lib.write of a pandas frame",
                 "rows_per_segment": self.tuning["rows_per_segment"],
@@ -78,7 +83,7 @@ class ArcticDBSystem(System):
         from arcticdb.options import LibraryOptions
 
         pa.set_cpu_count(self.context.threads)
-        arctic = arcticdb.Arctic(f"lmdb://{self.root}?map_size={MAP_SIZE_TEXT}")
+        arctic = arcticdb.Arctic(f"lmdb://{self.root}?map_size={self.map_size_text}")
         if arctic.has_library(LIBRARY):
             self.library = arctic[LIBRARY]
         else:
@@ -132,6 +137,28 @@ class ArcticDBSystem(System):
                 "python_seconds": built - started,
                 "python_note": "lib.write takes pandas and not Arrow, so the frame is built "
                                "first, with a Python str per text value"}
+
+    def stream_chunk_rows(self):
+        return self.tuning["rows_per_segment"] * CHUNK_SEGMENTS
+
+    def ingest_stream(self, chunks):
+        """The first chunk is a write, and each one after it an append, so one frame at a time
+        exists. Each append makes a version, and none is pruned."""
+        started = time.perf_counter()
+        python_seconds = 0.0
+        appends = 0
+        for table in chunks:
+            before = time.perf_counter()
+            frame = _frame(table)
+            python_seconds += time.perf_counter() - before
+            if appends == 0 and not self.library.has_symbol(SYMBOL):
+                self.library.write(SYMBOL, frame)
+            else:
+                self.library.append(SYMBOL, frame)
+                appends += 1
+        finished = time.perf_counter()
+        return {"seconds": finished - started, "python_seconds": python_seconds,
+                "engine_seconds": finished - started - python_seconds, "appends": appends}
 
     def probe_flush(self, table):
         self.library.write("flush-probe", _frame(table))
@@ -246,7 +273,7 @@ class ArcticDBSystem(System):
                     bool(rows_per <= self.tuning["rows_per_segment"]), "stored index"),
             Setting("largest segment columns <= columns_per_segment", True,
                     bool(columns_per <= self.tuning["columns_per_segment"]), "stored index"),
-            Setting("LMDB map size", MAP_SIZE_BYTES, self._lmdb_map_size(),
+            Setting("LMDB map size", self.map_size_bytes, self._lmdb_map_size(),
                     "meta page of data.mdb"),
             Setting("rows in the description", int(description.row_count),
                     int(description.row_count), "lib.get_description"),
