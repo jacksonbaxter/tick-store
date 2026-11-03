@@ -3,6 +3,7 @@
 #include "tick_store/codec/bit_stream.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -11,7 +12,11 @@
 namespace tick_store::codec {
 
 // The loops over lanes are the ones a compiler vectorises: 16 independent words with
-// the same shift, and the shift and the straddle test hoisted out to the row.
+// the same shift, and the shift and the straddle test hoisted out to the row. Each row
+// goes through local arrays, loaded whole, computed, then stored whole: with the input
+// and output spans read and written directly, the compiler has to assume they overlap,
+// and clang kept every lane scalar.
+using Lanes = std::array<std::uint64_t, kLanes>;
 
 void pack_vector(std::span<const std::uint64_t, kVectorValues> values, unsigned width,
                  std::span<std::uint64_t> words) noexcept {
@@ -24,18 +29,24 @@ void pack_vector(std::span<const std::uint64_t, kVectorValues> values, unsigned 
         const std::size_t bit = row * width;
         const std::size_t word = bit / kWordBits;
         const auto shift = static_cast<unsigned>(bit % kWordBits);
-        const std::span<const std::uint64_t> in = values.subspan(row * kLanes, kLanes);
+        Lanes in{};
+        std::ranges::copy(values.subspan(row * kLanes, kLanes), in.begin());
         const std::span<std::uint64_t> low = words.subspan(word * kLanes, kLanes);
+        Lanes packed{};
+        std::ranges::copy(low, packed.begin());
         for (std::size_t lane = 0; lane < kLanes; ++lane) {
-            low[lane] |= (in[lane] & mask) << shift;
+            packed[lane] |= (in[lane] & mask) << shift;
         }
+        std::ranges::copy(packed, low.begin());
         // The value straddles into the next word. Then shift > 0, so 64 - shift < 64,
-        // and the next word exists: (word + 1) * 64 < bit + width <= 64 * width.
+        // and the next word exists: (word + 1) * 64 < bit + width <= 64 * width. The
+        // next word is still all zero, since rows fill words in order.
         if (shift + width > kWordBits) {
-            const std::span<std::uint64_t> high = words.subspan((word + 1) * kLanes, kLanes);
+            Lanes high{};
             for (std::size_t lane = 0; lane < kLanes; ++lane) {
-                high[lane] |= (in[lane] & mask) >> (kWordBits - shift);
+                high[lane] = (in[lane] & mask) >> (kWordBits - shift);
             }
+            std::ranges::copy(high, words.subspan((word + 1) * kLanes, kLanes).begin());
         }
     }
 }
@@ -51,11 +62,12 @@ void unpack_vector(std::span<const std::uint64_t> words, unsigned width,
         const std::size_t bit = row * width;
         const std::size_t word = bit / kWordBits;
         const auto shift = static_cast<unsigned>(bit % kWordBits);
-        const std::span<std::uint64_t> out = values.subspan(row * kLanes, kLanes);
-        const std::span<const std::uint64_t> low = words.subspan(word * kLanes, kLanes);
+        Lanes low{};
+        std::ranges::copy(words.subspan(word * kLanes, kLanes), low.begin());
+        Lanes out{};
         if (shift + width > kWordBits) {
-            const std::span<const std::uint64_t> high =
-                words.subspan((word + 1) * kLanes, kLanes);
+            Lanes high{};
+            std::ranges::copy(words.subspan((word + 1) * kLanes, kLanes), high.begin());
             for (std::size_t lane = 0; lane < kLanes; ++lane) {
                 out[lane] = ((low[lane] >> shift) | (high[lane] << (kWordBits - shift))) & mask;
             }
@@ -64,6 +76,7 @@ void unpack_vector(std::span<const std::uint64_t> words, unsigned width,
                 out[lane] = (low[lane] >> shift) & mask;
             }
         }
+        std::ranges::copy(out, values.subspan(row * kLanes, kLanes).begin());
     }
 }
 
