@@ -89,9 +89,13 @@ class Hygiene(unittest.TestCase):
         self.track("big.txt", b"x" * 1_000_001)
         self.assert_refused("big.txt: 1000001 bytes is over")
 
-    def test_a_named_result_may_be_large(self):
-        self.track("results/compare/macOS-12302019-open-53a3317524f1.json", b"x" * 1_000_001)
+    def test_a_named_kind_of_result_may_be_large_at_any_commit(self):
+        self.track("results/compare/macOS-12302019-open-0123456789ab.json", b"x" * 1_000_001)
         self.assertEqual(self.run_check().returncode, 0)
+
+    def test_another_kind_of_result_may_not_be_large(self):
+        self.track("results/bench/macOS-itch_codec-0123456789ab.json", b"x" * 1_000_001)
+        self.assert_refused("results/bench/macOS-itch_codec-0123456789ab.json: 1000001 bytes")
 
     def test_an_untracked_data_file_is_ignored(self):
         (self.root / "12302019.NASDAQ_ITCH50").write_bytes(b"x")

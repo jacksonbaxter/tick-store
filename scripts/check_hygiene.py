@@ -4,7 +4,7 @@
     python3 -I scripts/check_hygiene.py [--root DIR]
 
 This repository is public, so three rules hold for every tracked file: no absolute home
-path, no market data, and nothing over 1 MB except the results named below. Only tracked
+path, no market data, and nothing over 1 MB except the results matched below. Only tracked
 files count, since the data and the build tree stay on disk by design. The patterns are
 generic. They catch the shape of a leak, and name nobody.
 
@@ -13,6 +13,7 @@ injected fault.
 """
 
 import argparse
+import fnmatch
 import re
 import subprocess
 import sys
@@ -31,12 +32,9 @@ DATA_SUFFIXES = (".gz", ".zip", ".zst", ".tar", ".itch", ".bin", ".parquet", ".a
                  ".sparseimage", ".dmg")
 DATA_FOLDERS = ("data/",)
 
-# Tracked results that may pass the size limit. Each is named, so a new large file has to
-# be argued for here.
-LARGE_RESULTS = frozenset({
-    "results/compare/Linux-12302019-open-53a3317524f1.json",
-    "results/compare/macOS-12302019-open-53a3317524f1.json",
-})
+# Tracked results that may pass the size limit. Each kind is named by a pattern, so a
+# re-measure keeps its allowance and a new kind of large file has to be argued for here.
+LARGE_RESULTS = ("results/compare/*-12302019-open-*.json",)
 
 
 def tracked_files(root):
@@ -57,7 +55,8 @@ def problems_in(root, name):
             found.append(f"{name}:{line}: absolute home path")
     if name.startswith(DATA_FOLDERS) or name.endswith(DATA_SUFFIXES):
         found.append(f"{name}: data file is tracked")
-    if len(content) > MAX_BYTES and name not in LARGE_RESULTS:
+    if len(content) > MAX_BYTES and not any(fnmatch.fnmatchcase(name, pattern)
+                                            for pattern in LARGE_RESULTS):
         found.append(f"{name}: {len(content)} bytes is over the {MAX_BYTES} byte limit")
     return found
 
