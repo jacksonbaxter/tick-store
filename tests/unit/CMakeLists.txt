@@ -3,6 +3,7 @@ include(GoogleTest)
 add_executable(tick_store_unit_tests
     bench_support_test.cpp
     big_endian_test.cpp
+    bit_stream_test.cpp
     census_test.cpp
     columns_cli_test.cpp
     columns_flip_test.cpp

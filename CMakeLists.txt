@@ -29,6 +29,8 @@ include(cmake/BuildInfo.cmake)
 
 add_library(tick_store_core STATIC)
 target_sources(tick_store_core PRIVATE
+    src/codec/block.cpp
+    src/codec/codec_error.cpp
     src/itch/codec.cpp
     src/itch/frame.cpp
     src/store/columns.cpp
