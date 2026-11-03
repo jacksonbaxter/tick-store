@@ -50,6 +50,8 @@ enum class StreamOrder : std::uint8_t {
     file,
     // One stream per stock locate, each in file order.
     per_locate,
+    // One stream per stock locate and side, each in file order. Add orders only.
+    per_locate_side,
 };
 
 enum class Representation : std::uint8_t {
@@ -61,7 +63,7 @@ enum class Representation : std::uint8_t {
 };
 
 // Counters a codec fills as it encodes, named by its entry, for explaining a ratio.
-inline constexpr std::size_t kCodecCounters = 5;
+inline constexpr std::size_t kCodecCounters = 10;
 using CodecCounters = std::array<std::uint64_t, kCodecCounters>;
 
 using EncodeBlock = std::expected<void, codec::CodecError> (*)(std::span<const std::uint64_t>,
@@ -70,6 +72,9 @@ using EncodeBlock = std::expected<void, codec::CodecError> (*)(std::span<const s
 
 struct CodecEntry {
     std::string_view name;
+    // "gorilla" for Gorilla and its variants, otherwise the integer scheme's family. CR-5
+    // compares the best integer scheme with Gorilla on the same column.
+    std::string_view family;
     std::string_view what;
     EncodeBlock encode_block;
     codec::BlockDecoder decode_block;
@@ -91,6 +96,10 @@ struct ColumnSpec {
     StreamOrder order;
     // The target it is compared with, if any, by its BENCHMARKS.md id.
     std::string_view target;
+    // Whether to count every distinct delta, and for timestamps every delta-of-delta,
+    // for their exact order-0 entropy. Off where the distinct values would not fit in
+    // memory comfortably.
+    bool exact_entropy;
 };
 
 [[nodiscard]] std::span<const ColumnSpec> column_specs() noexcept;
@@ -146,7 +155,26 @@ struct ColumnResult {
     // streams, in bits per value: a yardstick for comparing transforms, not a codec.
     double ideal_delta_bits = 0;
     double ideal_delta_of_delta_bits = 0;
+    // The exact order-0 entropy of the deltas, and of the delta-of-deltas for timestamps,
+    // pooled over the column's streams, in bits per delta: the floor for any code that
+    // sees one delta at a time with no context beyond the stream order. Absent when the
+    // column does not count them. With how many distinct values each had.
+    std::optional<double> entropy_delta_bits;
+    std::optional<double> entropy_delta_of_delta_bits;
+    std::uint64_t distinct_deltas = 0;
+    std::uint64_t distinct_delta_of_deltas = 0;
     std::vector<CodecResult> codecs;
+};
+
+// What rebuilding file order from per-locate streams would cost if no locate column were
+// stored: the exact order-0 entropy of the locate sequence, in bits per message.
+struct PermutationEstimate {
+    std::uint64_t add_messages = 0;
+    double add_locate_entropy_bits = 0;
+    double add_locate_side_entropy_bits = 0;
+    std::uint64_t messages = 0;
+    double locate_entropy_bits = 0;
+    std::uint16_t largest_locate = 0;
 };
 
 struct EvalOptions {
@@ -161,6 +189,7 @@ struct EvalResult {
     // How the walk of the file ended, from the frame cursor.
     std::string stop;
     std::vector<ColumnResult> columns;
+    PermutationEstimate permutation;
 
     [[nodiscard]] bool exact() const noexcept;
 };

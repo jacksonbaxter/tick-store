@@ -4,7 +4,9 @@
 #include "tick_store/codec/codec_error.hpp"
 #include "tick_store/codec/gorilla_timestamps.hpp"
 #include "tick_store/codec/gorilla_xor.hpp"
+#include "tick_store/codec/pfor.hpp"
 #include "tick_store/codec/price_double.hpp"
+#include "tick_store/codec/stream_vbyte.hpp"
 #include "tick_store/harness/census.hpp"
 #include "tick_store/harness/json_writer.hpp"
 #include "tick_store/harness/roundtrip_cli.hpp"
@@ -21,6 +23,7 @@
 #include <bit>
 #include <charconv>
 #include <chrono>
+#include <cmath>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -43,12 +46,14 @@ namespace tick_store::harness {
 
 namespace {
 
-constexpr std::string_view kToolVersion = "1";
+constexpr std::string_view kToolVersion = "2";
 constexpr std::size_t kLocates = std::size_t{1} << 16U;
 // Bytes a reader needs per stream beyond its blocks: the value count, and for a
 // per-locate stream the locate it belongs to.
 constexpr std::uint64_t kStreamCountBytes = 8;
 constexpr std::uint64_t kStreamLocateBytes = 2;
+constexpr std::uint64_t kStreamSideBytes = 1;
+constexpr std::string_view kGorilla = "gorilla";
 
 void add_dod(CodecCounters& counters, const codec::DodStats& stats) {
     for (std::size_t i = 0; i < stats.buckets.size(); ++i) {
@@ -77,14 +82,59 @@ std::expected<void, codec::CodecError> gorilla_xor_block(std::span<const std::ui
     return done;
 }
 
+// One PFOR variant: its options fixed at compile time, so each is a plain function.
+template <codec::IntTransform Transform, bool Scale, bool Patch>
+std::expected<void, codec::CodecError> pfor_block(std::span<const std::uint64_t> values,
+                                                  std::vector<std::byte>& out,
+                                                  CodecCounters& counters) {
+    codec::PforStats stats;
+    auto done = codec::encode_pfor_block(
+        values, codec::PforOptions{.transform = Transform, .adaptive_scale = Scale, .patch = Patch},
+        out, &stats);
+    counters[0] += stats.scaled_blocks;
+    counters[1] += stats.remainders;
+    counters[2] += stats.full_vectors;
+    counters[3] += stats.tail_values;
+    counters[4] += stats.zigzag_vectors;
+    counters[5] += stats.exceptions;
+    counters[6] += stats.full_vector_bits;
+    counters[7] += stats.full_vector_bits_per_128;
+    counters[8] += stats.tail_padding_bits;
+    return done;
+}
+
+std::expected<void, codec::CodecError> svb_delta_block(std::span<const std::uint64_t> values,
+                                                       std::vector<std::byte>& out,
+                                                       CodecCounters& counters) {
+    codec::SvbStats stats;
+    auto done = codec::encode_svb_block(values, true, out, &stats);
+    counters[0] += stats.zigzag_blocks;
+    for (std::size_t i = 0; i < stats.lengths.size(); ++i) {
+        counters[1 + i] += stats.lengths[i];
+    }
+    counters[5] += stats.highs;
+    return done;
+}
+
 constexpr std::array<std::string_view, kCodecCounters> kDodCounters{
-    "zero", "bucket_16_bits", "bucket_19_bits", "bucket_23_bits", "escape_64_bits"};
-constexpr std::array<std::string_view, kCodecCounters> kXorCounters{"zero", "reuse",
-                                                                    "new_window", "data_bits", ""};
+    "zero", "bucket_16_bits", "bucket_19_bits", "bucket_23_bits", "escape_64_bits", "", "", "", "",
+    ""};
+constexpr std::array<std::string_view, kCodecCounters> kXorCounters{
+    "zero", "reuse", "new_window", "data_bits", "", "", "", "", "", ""};
+constexpr std::array<std::string_view, kCodecCounters> kPforCounters{
+    "scaled_blocks",    "remainders", "full_vectors",     "tail_values",
+    "zigzag_vectors",   "exceptions", "full_vector_bits", "full_vector_bits_if_width_per_128",
+    "tail_padding_bits_if_padded_to_1024", ""};
+constexpr std::array<std::string_view, kCodecCounters> kSvbCounters{
+    "zigzag_blocks", "low_1_byte", "low_2_bytes", "low_3_bytes", "low_4_bytes", "high_patches",
+    "", "", "", ""};
+
+using codec::IntTransform;
 
 // The codecs measured. A new codec is one more row here.
 constexpr std::array kRegistry{
     CodecEntry{.name = "gorilla-dod",
+               .family = kGorilla,
                .what = "Gorilla delta-of-delta, nanosecond buckets of 16, 19 and 23 bits",
                .encode_block = &gorilla_dod_block,
                .decode_block = &codec::decode_timestamp_block,
@@ -93,6 +143,7 @@ constexpr std::array kRegistry{
                .for_prices = false,
                .counter_names = kDodCounters},
     CodecEntry{.name = "gorilla-xor-f64-dollars",
+               .family = kGorilla,
                .what = "Gorilla XOR on the dollar value as a double, price / 10^4 or / 10^8",
                .encode_block = &gorilla_xor_block,
                .decode_block = &codec::decode_xor_block,
@@ -101,6 +152,7 @@ constexpr std::array kRegistry{
                .for_prices = true,
                .counter_names = kXorCounters},
     CodecEntry{.name = "gorilla-xor-f64-integer",
+               .family = kGorilla,
                .what = "Gorilla XOR on the integer price as a double",
                .encode_block = &gorilla_xor_block,
                .decode_block = &codec::decode_xor_block,
@@ -109,6 +161,7 @@ constexpr std::array kRegistry{
                .for_prices = true,
                .counter_names = kXorCounters},
     CodecEntry{.name = "gorilla-xor-u64-integer",
+               .family = kGorilla,
                .what = "Gorilla XOR on the raw integer price",
                .encode_block = &gorilla_xor_block,
                .decode_block = &codec::decode_xor_block,
@@ -116,6 +169,96 @@ constexpr std::array kRegistry{
                .for_timestamps = false,
                .for_prices = true,
                .counter_names = kXorCounters},
+    CodecEntry{.name = "pfor-delta",
+               .family = "pfor",
+               .what = "Delta, frame of reference per 1,024 values, interleaved bit-packing, "
+                       "patched exceptions",
+               .encode_block = &pfor_block<IntTransform::delta, false, true>,
+               .decode_block = &codec::decode_pfor_block,
+               .representation = Representation::identity,
+               .for_timestamps = true,
+               .for_prices = true,
+               .counter_names = kPforCounters},
+    CodecEntry{.name = "pfor-delta-unpatched",
+               .family = "pfor",
+               .what = "Delta, frame of reference per 1,024 values, interleaved bit-packing at "
+                       "the widest value's width",
+               .encode_block = &pfor_block<IntTransform::delta, false, false>,
+               .decode_block = &codec::decode_pfor_block,
+               .representation = Representation::identity,
+               .for_timestamps = true,
+               .for_prices = true,
+               .counter_names = kPforCounters},
+    CodecEntry{.name = "pfor-dod",
+               .family = "pfor",
+               .what = "Delta-of-delta, frame of reference per 1,024 values, interleaved "
+                       "bit-packing, patched exceptions",
+               .encode_block = &pfor_block<IntTransform::delta_of_delta, false, true>,
+               .decode_block = &codec::decode_pfor_block,
+               .representation = Representation::identity,
+               .for_timestamps = true,
+               .for_prices = false,
+               .counter_names = kPforCounters},
+    CodecEntry{.name = "pfor-dod-unpatched",
+               .family = "pfor",
+               .what = "Delta-of-delta, frame of reference per 1,024 values, interleaved "
+                       "bit-packing at the widest value's width",
+               .encode_block = &pfor_block<IntTransform::delta_of_delta, false, false>,
+               .decode_block = &codec::decode_pfor_block,
+               .representation = Representation::identity,
+               .for_timestamps = true,
+               .for_prices = false,
+               .counter_names = kPforCounters},
+    CodecEntry{.name = "svb-delta",
+               .family = "stream-vbyte",
+               .what = "Delta, Stream VByte on the low 32 bits, high halves patched, zigzag "
+                       "per block if smaller",
+               .encode_block = &svb_delta_block,
+               .decode_block = &codec::decode_svb_block,
+               .representation = Representation::identity,
+               .for_timestamps = true,
+               .for_prices = true,
+               .counter_names = kSvbCounters},
+    CodecEntry{.name = "pfor-for",
+               .family = "pfor",
+               .what = "Frame of reference per 1,024 values, no delta, interleaved bit-packing, "
+                       "patched exceptions",
+               .encode_block = &pfor_block<IntTransform::none, false, true>,
+               .decode_block = &codec::decode_pfor_block,
+               .representation = Representation::identity,
+               .for_timestamps = false,
+               .for_prices = true,
+               .counter_names = kPforCounters},
+    CodecEntry{.name = "pfor-for-scaled",
+               .family = "pfor",
+               .what = "Adaptive scale per block, then frame of reference per 1,024 values, "
+                       "interleaved bit-packing, patched exceptions",
+               .encode_block = &pfor_block<IntTransform::none, true, true>,
+               .decode_block = &codec::decode_pfor_block,
+               .representation = Representation::identity,
+               .for_timestamps = false,
+               .for_prices = true,
+               .counter_names = kPforCounters},
+    CodecEntry{.name = "pfor-delta-scaled",
+               .family = "pfor",
+               .what = "Adaptive scale per block, then delta, frame of reference per 1,024 "
+                       "values, interleaved bit-packing, patched exceptions",
+               .encode_block = &pfor_block<IntTransform::delta, true, true>,
+               .decode_block = &codec::decode_pfor_block,
+               .representation = Representation::identity,
+               .for_timestamps = false,
+               .for_prices = true,
+               .counter_names = kPforCounters},
+    CodecEntry{.name = "pfor-delta-scaled-unpatched",
+               .family = "pfor",
+               .what = "Adaptive scale per block, then delta, frame of reference per 1,024 "
+                       "values, interleaved bit-packing at the widest value's width",
+               .encode_block = &pfor_block<IntTransform::delta, true, false>,
+               .decode_block = &codec::decode_pfor_block,
+               .representation = Representation::identity,
+               .for_timestamps = false,
+               .for_prices = true,
+               .counter_names = kPforCounters},
 };
 
 // The columns, in report order. kColumn* below index this table.
@@ -124,52 +267,67 @@ constexpr std::array kColumns{
                .source = "every message's timestamp",
                .kind = ValueKind::timestamp_ns,
                .order = StreamOrder::file,
-               .target = "CR-3"},
+               .target = "CR-3",
+               .exact_entropy = true},
     ColumnSpec{.name = "timestamp_per_locate",
                .source = "every message's timestamp, one stream per stock locate",
                .kind = ValueKind::timestamp_ns,
                .order = StreamOrder::per_locate,
-               .target = "CR-3"},
+               .target = "CR-3",
+               .exact_entropy = false},
     ColumnSpec{.name = "add_price",
                .source = "A and F price",
                .kind = ValueKind::price4,
                .order = StreamOrder::file,
-               .target = "CR-4"},
+               .target = "CR-4",
+               .exact_entropy = true},
     ColumnSpec{.name = "add_price_per_locate",
                .source = "A and F price, one stream per stock locate",
                .kind = ValueKind::price4,
                .order = StreamOrder::per_locate,
-               .target = "CR-4"},
+               .target = "CR-4",
+               .exact_entropy = true},
+    ColumnSpec{.name = "add_price_per_locate_side",
+               .source = "A and F price, one stream per stock locate and side",
+               .kind = ValueKind::price4,
+               .order = StreamOrder::per_locate_side,
+               .target = "CR-4",
+               .exact_entropy = true},
     ColumnSpec{.name = "replace_price",
                .source = "U price",
                .kind = ValueKind::price4,
                .order = StreamOrder::file,
-               .target = ""},
+               .target = "",
+               .exact_entropy = true},
     ColumnSpec{.name = "executed_price",
                .source = "C execution price",
                .kind = ValueKind::price4,
                .order = StreamOrder::file,
-               .target = ""},
+               .target = "",
+               .exact_entropy = true},
     ColumnSpec{.name = "trade_price",
                .source = "P price",
                .kind = ValueKind::price4,
                .order = StreamOrder::file,
-               .target = ""},
+               .target = "",
+               .exact_entropy = true},
     ColumnSpec{.name = "mwcb_level",
                .source = "V levels 1, 2 and 3, in that order: the only Price(8) fields",
                .kind = ValueKind::price8,
                .order = StreamOrder::file,
-               .target = ""},
+               .target = "",
+               .exact_entropy = true},
 };
 
 constexpr std::size_t kColumnTimestamp = 0;
 constexpr std::size_t kColumnTimestampPerLocate = 1;
 constexpr std::size_t kColumnAddPrice = 2;
 constexpr std::size_t kColumnAddPricePerLocate = 3;
-constexpr std::size_t kColumnReplacePrice = 4;
-constexpr std::size_t kColumnExecutedPrice = 5;
-constexpr std::size_t kColumnTradePrice = 6;
-constexpr std::size_t kColumnMwcbLevel = 7;
+constexpr std::size_t kColumnAddPricePerLocateSide = 4;
+constexpr std::size_t kColumnReplacePrice = 5;
+constexpr std::size_t kColumnExecutedPrice = 6;
+constexpr std::size_t kColumnTradePrice = 7;
+constexpr std::size_t kColumnMwcbLevel = 8;
 static_assert(kColumnMwcbLevel + 1 == kColumns.size());
 
 [[nodiscard]] bool applies(const CodecEntry& entry, const ColumnSpec& spec) noexcept {
@@ -185,19 +343,116 @@ static_assert(kColumnMwcbLevel + 1 == kColumns.size());
                                      : std::numeric_limits<std::uint64_t>::max();
 }
 
+// Counts of every distinct 64-bit value, in an open-addressing table, for an exact
+// order-0 entropy. Sixteen bytes a slot, at most half full.
+class ValueCounter {
+public:
+    void add(std::uint64_t value) {
+        if ((used_ + 1) * 2 > slots_.size()) {
+            grow();
+        }
+        Slot& slot = find(value);
+        if (slot.count == 0) {
+            slot.value = value;
+            ++used_;
+        }
+        ++slot.count;
+        ++total_;
+    }
+
+    [[nodiscard]] std::uint64_t distinct() const noexcept { return used_; }
+
+    // Bits per value: log2(N) - sum(c log2 c) / N.
+    [[nodiscard]] double entropy_bits() const noexcept {
+        if (total_ == 0) {
+            return 0;
+        }
+        double sum = 0;
+        for (const Slot& slot : slots_) {
+            if (slot.count > 0) {
+                const auto count = static_cast<double>(slot.count);
+                sum += count * std::log2(count);
+            }
+        }
+        const auto total = static_cast<double>(total_);
+        return std::log2(total) - (sum / total);
+    }
+
+private:
+    struct Slot {
+        std::uint64_t value = 0;
+        std::uint64_t count = 0;
+    };
+
+    // SplitMix64's finaliser, so runs of nearby values spread over the table.
+    [[nodiscard]] static std::uint64_t mix(std::uint64_t z) noexcept {
+        z = (z ^ (z >> 30U)) * 0xBF58476D1CE4E5B9ULL;
+        z = (z ^ (z >> 27U)) * 0x94D049BB133111EBULL;
+        return z ^ (z >> 31U);
+    }
+
+    [[nodiscard]] Slot& find(std::uint64_t value) noexcept {
+        const std::size_t mask = slots_.size() - 1;
+        std::size_t at = static_cast<std::size_t>(mix(value)) & mask;
+        while (slots_[at].count != 0 && slots_[at].value != value) {
+            at = (at + 1) & mask;
+        }
+        return slots_[at];
+    }
+
+    void grow() {
+        const std::vector<Slot> old = std::move(slots_);
+        slots_.assign(old.empty() ? kFirstSlots : old.size() * 2, Slot{});
+        for (const Slot& slot : old) {
+            if (slot.count > 0) {
+                find(slot.value) = slot;
+            }
+        }
+    }
+
+    static constexpr std::size_t kFirstSlots = 1024;
+    std::vector<Slot> slots_;
+    std::uint64_t used_ = 0;
+    std::uint64_t total_ = 0;
+};
+
+[[nodiscard]] double entropy_of_counts(std::span<const std::uint64_t> counts) noexcept {
+    std::uint64_t total = 0;
+    double sum = 0;
+    for (const std::uint64_t count : counts) {
+        if (count > 0) {
+            total += count;
+            sum += static_cast<double>(count) * std::log2(static_cast<double>(count));
+        }
+    }
+    if (total == 0) {
+        return 0;
+    }
+    return std::log2(static_cast<double>(total)) - (sum / static_cast<double>(total));
+}
+
 // The census's view of one stream: deltas from the second value, delta-of-deltas from
-// the third, both as signed differences. Differences wrap like the codecs' do.
+// the third, both as signed differences. Differences wrap like the codecs' do. A column
+// that counts exact entropies passes its counters; the delta-of-delta counter is null
+// for prices.
 struct StreamShape {
     std::uint64_t previous = 0;
     std::uint64_t previous_delta = 0;
     std::uint8_t seen = 0;
 
-    void observe(std::uint64_t value, Log2Histogram& delta, Log2Histogram& dod) noexcept {
+    void observe(std::uint64_t value, Log2Histogram& delta, Log2Histogram& dod,
+                 ValueCounter* deltas, ValueCounter* dods) {
         if (seen > 0) {
             const std::uint64_t step = value - previous;
             delta.add(static_cast<std::int64_t>(step));
+            if (deltas != nullptr) {
+                deltas->add(step);
+            }
             if (seen > 1) {
                 dod.add(static_cast<std::int64_t>(step - previous_delta));
+                if (dods != nullptr) {
+                    dods->add(step - previous_delta);
+                }
             }
             previous_delta = step;
         }
@@ -206,13 +461,25 @@ struct StreamShape {
     }
 };
 
+[[nodiscard]] std::size_t streams_of(StreamOrder order) noexcept {
+    switch (order) {
+        case StreamOrder::file:
+            return 1;
+        case StreamOrder::per_locate:
+            return kLocates;
+        case StreamOrder::per_locate_side:
+            return kLocates * 2;
+    }
+    return 1;
+}
+
 // One column through every codec registered for it, a block at a time.
 class ColumnRun {
 public:
     ColumnRun(const ColumnSpec& spec, const EvalOptions& options)
         : spec_(&spec),
           options_(options),
-          streams_(spec.order == StreamOrder::file ? 1 : kLocates),
+          streams_(streams_of(spec.order)),
           shapes_(streams_.size()) {
         for (const CodecEntry& entry : kRegistry) {
             if (applies(entry, spec)) {
@@ -223,14 +490,22 @@ public:
         }
     }
 
-    void add(std::uint16_t locate, std::uint64_t value) {
-        const std::size_t stream = spec_->order == StreamOrder::file ? 0 : locate;
+    // `sell` picks the side's stream in a per-locate-side column, and is ignored otherwise.
+    void add(std::uint16_t locate, std::uint64_t value, bool sell = false) {
+        std::size_t stream = 0;
+        if (spec_->order == StreamOrder::per_locate) {
+            stream = locate;
+        } else if (spec_->order == StreamOrder::per_locate_side) {
+            stream = (std::size_t{locate} * 2) + (sell ? 1U : 0U);
+        }
         Stream& into = streams_[stream];
         into.pending.push_back(value);
-        shapes_[stream].observe(value, delta_, dod_);
+        const bool count = spec_->exact_entropy;
+        shapes_[stream].observe(value, delta_, dod_, count ? &deltas_ : nullptr,
+                                count && spec_->kind == ValueKind::timestamp_ns ? &dods_ : nullptr);
         ++values_;
         if (into.pending.size() == options_.block_values) {
-            flush(into, static_cast<std::uint16_t>(stream));
+            flush(into, locate);
         }
     }
 
@@ -239,23 +514,41 @@ public:
         for (std::size_t stream = 0; stream < streams_.size(); ++stream) {
             Stream& from = streams_[stream];
             if (!from.pending.empty()) {
-                flush(from, static_cast<std::uint16_t>(stream));
+                flush(from, locate_of(stream));
             }
             if (from.values > 0) {
                 ++streams;
             }
         }
-        const std::uint64_t per_stream =
-            kStreamCountBytes + (spec_->order == StreamOrder::per_locate ? kStreamLocateBytes : 0);
+        std::uint64_t per_stream = kStreamCountBytes;
+        if (spec_->order != StreamOrder::file) {
+            per_stream += kStreamLocateBytes;
+        }
+        if (spec_->order == StreamOrder::per_locate_side) {
+            per_stream += kStreamSideBytes;
+        }
         for (CodecResult& result : results_) {
             result.metadata_bytes = streams * per_stream;
         }
-        return ColumnResult{.spec = spec_,
+        ColumnResult column{.spec = spec_,
                             .values = values_,
                             .streams = streams,
                             .ideal_delta_bits = delta_.ideal_code_bits(),
                             .ideal_delta_of_delta_bits = dod_.ideal_code_bits(),
+                            .entropy_delta_bits = std::nullopt,
+                            .entropy_delta_of_delta_bits = std::nullopt,
+                            .distinct_deltas = 0,
+                            .distinct_delta_of_deltas = 0,
                             .codecs = std::move(results_)};
+        if (spec_->exact_entropy) {
+            column.entropy_delta_bits = deltas_.entropy_bits();
+            column.distinct_deltas = deltas_.distinct();
+            if (spec_->kind == ValueKind::timestamp_ns) {
+                column.entropy_delta_of_delta_bits = dods_.entropy_bits();
+                column.distinct_delta_of_deltas = dods_.distinct();
+            }
+        }
+        return column;
     }
 
 private:
@@ -264,6 +557,12 @@ private:
         // Values already flushed, so an example can name its position in the stream.
         std::uint64_t values = 0;
     };
+
+    // The locate a stream belongs to, for examples.
+    [[nodiscard]] std::uint16_t locate_of(std::size_t stream) const noexcept {
+        return static_cast<std::uint16_t>(spec_->order == StreamOrder::per_locate_side ? stream / 2
+                                                                                       : stream);
+    }
 
     void note(CodecResult& result, const Example& example) const {
         if (result.examples.size() < options_.max_examples) {
@@ -341,6 +640,8 @@ private:
     std::vector<StreamShape> shapes_;
     Log2Histogram delta_;
     Log2Histogram dod_;
+    ValueCounter deltas_;
+    ValueCounter dods_;
     std::uint64_t values_ = 0;
     std::vector<CodecResult> results_;
     std::vector<std::uint64_t> words_;
@@ -351,7 +652,8 @@ private:
 // Feeds each message's fields to the columns that take them.
 class Walk {
 public:
-    explicit Walk(const EvalOptions& options) {
+    explicit Walk(const EvalOptions& options)
+        : add_locates_(kLocates), add_locate_sides_(kLocates * 2), locates_(kLocates) {
         runs_.reserve(kColumns.size());
         for (const ColumnSpec& spec : kColumns) {
             runs_.emplace_back(spec, options);
@@ -371,6 +673,13 @@ public:
         for (ColumnRun& run : runs_) {
             result.columns.push_back(run.finish());
         }
+        result.permutation = PermutationEstimate{
+            .add_messages = adds_,
+            .add_locate_entropy_bits = entropy_of_counts(add_locates_),
+            .add_locate_side_entropy_bits = entropy_of_counts(add_locate_sides_),
+            .messages = messages_ - raw_,
+            .locate_entropy_bits = entropy_of_counts(locates_),
+            .largest_locate = largest_locate_};
         return result;
     }
 
@@ -381,12 +690,19 @@ private:
             ++raw_;
         } else {
             const std::uint16_t locate = typed.header.stock_locate;
+            ++locates_[locate];
+            largest_locate_ = std::max(largest_locate_, locate);
             runs_[kColumnTimestamp].add(locate, typed.header.timestamp_ns);
             runs_[kColumnTimestampPerLocate].add(locate, typed.header.timestamp_ns);
             if constexpr (std::same_as<M, itch::AddOrder> ||
                           std::same_as<M, itch::AddOrderWithMpid>) {
+                const bool sell = typed.buy_sell_indicator == std::byte{'S'};
+                ++adds_;
+                ++add_locates_[locate];
+                ++add_locate_sides_[(std::size_t{locate} * 2) + (sell ? 1U : 0U)];
                 runs_[kColumnAddPrice].add(locate, price(typed.price));
                 runs_[kColumnAddPricePerLocate].add(locate, price(typed.price));
+                runs_[kColumnAddPricePerLocateSide].add(locate, price(typed.price), sell);
             } else if constexpr (std::same_as<M, itch::OrderReplace>) {
                 runs_[kColumnReplacePrice].add(locate, price(typed.price));
             } else if constexpr (std::same_as<M, itch::OrderExecutedWithPrice>) {
@@ -408,6 +724,11 @@ private:
     std::vector<ColumnRun> runs_;
     std::uint64_t messages_ = 0;
     std::uint64_t raw_ = 0;
+    std::uint64_t adds_ = 0;
+    std::vector<std::uint64_t> add_locates_;
+    std::vector<std::uint64_t> add_locate_sides_;
+    std::vector<std::uint64_t> locates_;
+    std::uint16_t largest_locate_ = 0;
 };
 
 [[nodiscard]] std::string_view name_of(ValueKind kind) noexcept {
@@ -423,7 +744,15 @@ private:
 }
 
 [[nodiscard]] std::string_view name_of(StreamOrder order) noexcept {
-    return order == StreamOrder::file ? "file" : "per_locate";
+    switch (order) {
+        case StreamOrder::file:
+            return "file";
+        case StreamOrder::per_locate:
+            return "per_locate";
+        case StreamOrder::per_locate_side:
+            return "per_locate_side";
+    }
+    return "unknown";
 }
 
 [[nodiscard]] std::string_view name_of(Representation representation) noexcept {
@@ -486,6 +815,7 @@ void write_codec(JsonWriter& json, const CodecResult& result) {
     const CodecEntry& entry = *result.entry;
     json.begin_object();
     json.field("codec", entry.name);
+    json.field("family", entry.family);
     json.field("what", entry.what);
     json.field("representation", name_of(entry.representation));
     json.field("values", result.values);
@@ -516,18 +846,45 @@ void write_codec(JsonWriter& json, const CodecResult& result) {
     json.end_object();
 }
 
-// The best codec on a column against its target, and for prices how XOR on the dollar
-// doubles compares with XOR on the integers.
-void write_comparison(JsonWriter& json, const ColumnResult& column) {
-    json.key("comparison");
-    json.begin_object();
+// The smallest exact codec on a column whose family `wanted` accepts.
+template <class Wanted>
+[[nodiscard]] const CodecResult* best_of(const ColumnResult& column, Wanted wanted) {
     const CodecResult* best = nullptr;
     for (const CodecResult& result : column.codecs) {
-        if (result.values > 0 && result.exact() &&
+        if (result.values > 0 && result.exact() && wanted(*result.entry) &&
             (best == nullptr || result.stored_bytes() < best->stored_bytes())) {
             best = &result;
         }
     }
+    return best;
+}
+
+[[nodiscard]] double ratio_of(const CodecResult& over, const CodecResult& under) noexcept {
+    return under.stored_bytes() == 0 ? 0.0
+                                     : static_cast<double>(over.stored_bytes()) /
+                                           static_cast<double>(under.stored_bytes());
+}
+
+// CR-5 on one column: the best integer scheme against a Gorilla codec on the same
+// column, so in the same order.
+void write_cr5_against(JsonWriter& json, std::string_view key, const CodecResult& integer,
+                       const CodecResult& gorilla) {
+    json.key(key);
+    json.begin_object();
+    json.field("gorilla_codec", gorilla.entry->name);
+    json.field("gorilla_bits_per_value", bits_per_value(gorilla));
+    json.field("ratio", ratio_of(gorilla, integer));
+    json.field("ratio_at_least", kCr5Ratio);
+    json.field("met", ratio_of(gorilla, integer) >= kCr5Ratio);
+    json.end_object();
+}
+
+// The best codec on a column against its target; for prices how XOR on the dollar
+// doubles compares with XOR on the integers, and CR-5.
+void write_comparison(JsonWriter& json, const ColumnResult& column) {
+    json.key("comparison");
+    json.begin_object();
+    const CodecResult* best = best_of(column, [](const CodecEntry&) { return true; });
     if (best != nullptr) {
         json.field("best_exact_codec", best->entry->name);
         json.field("best_bits_per_value", bits_per_value(*best));
@@ -549,14 +906,24 @@ void write_comparison(JsonWriter& json, const ColumnResult& column) {
     const CodecResult* as_double = result_of(column, "gorilla-xor-f64-integer");
     if (dollars != nullptr && integer != nullptr && as_double != nullptr &&
         integer->stored_bytes() > 0 && as_double->stored_bytes() > 0) {
-        json.field("xor_dollars_over_xor_u64_integer",
-                   static_cast<double>(dollars->stored_bytes()) /
-                       static_cast<double>(integer->stored_bytes()));
-        json.field("xor_dollars_over_xor_f64_integer",
-                   static_cast<double>(dollars->stored_bytes()) /
-                       static_cast<double>(as_double->stored_bytes()));
+        json.field("xor_dollars_over_xor_u64_integer", ratio_of(*dollars, *integer));
+        json.field("xor_dollars_over_xor_f64_integer", ratio_of(*dollars, *as_double));
         json.field("cr5_bits_per_value_an_integer_scheme_must_reach",
                    bits_per_value(*dollars) / kCr5Ratio);
+    }
+    const CodecResult* best_integer =
+        best_of(column, [](const CodecEntry& entry) { return entry.family != kGorilla; });
+    const CodecResult* best_gorilla =
+        best_of(column, [](const CodecEntry& entry) { return entry.family == kGorilla; });
+    if (column.spec->kind != ValueKind::timestamp_ns && best_integer != nullptr &&
+        best_gorilla != nullptr && dollars != nullptr && dollars->exact()) {
+        json.key("CR-5");
+        json.begin_object();
+        json.field("best_integer_codec", best_integer->entry->name);
+        json.field("best_integer_bits_per_value", bits_per_value(*best_integer));
+        write_cr5_against(json, "against_gorilla_xor_f64_dollars", *best_integer, *dollars);
+        write_cr5_against(json, "against_best_gorilla", *best_integer, *best_gorilla);
+        json.end_object();
     }
     json.end_object();
 }
@@ -571,6 +938,10 @@ void write_column(JsonWriter& json, const ColumnResult& column) {
     json.field("streams", column.streams);
     json.field("ideal_delta_bits", column.ideal_delta_bits);
     json.field("ideal_delta_of_delta_bits", column.ideal_delta_of_delta_bits);
+    json.field("entropy_delta_bits", column.entropy_delta_bits);
+    json.field("distinct_deltas", column.distinct_deltas);
+    json.field("entropy_delta_of_delta_bits", column.entropy_delta_of_delta_bits);
+    json.field("distinct_delta_of_deltas", column.distinct_delta_of_deltas);
     json.key("codecs");
     json.begin_array();
     for (const CodecResult& result : column.codecs) {
@@ -775,7 +1146,26 @@ int run_codec_eval_cli(std::span<const std::string_view> arguments,
     json.field("not_counted",
                std::string_view{"A per-locate column also needs a stored permutation or "
                                 "ordinal to rebuild file order. That cost is not in its "
-                                "stored bytes."});
+                                "stored bytes: see permutation_estimate."});
+    const PermutationEstimate& permutation = result->permutation;
+    json.key("permutation_estimate");
+    json.begin_object();
+    json.field("what", std::string_view{
+                           "Per-locate streams rebuild file order from the locate of each message "
+                           "in file order. A store that keeps a file-order locate column, which "
+                           "re-serialising every message needs anyway, pays nothing more. One "
+                           "that keeps locates only as its partitions must store that sequence: "
+                           "at least its exact order-0 entropy below, in bits per message, with no "
+                           "context, or the fixed width of the largest locate."});
+    json.field("add_messages", permutation.add_messages);
+    json.field("add_locate_entropy_bits", permutation.add_locate_entropy_bits);
+    json.field("add_locate_side_entropy_bits", permutation.add_locate_side_entropy_bits);
+    json.field("messages", permutation.messages);
+    json.field("locate_entropy_bits", permutation.locate_entropy_bits);
+    json.field("largest_locate", permutation.largest_locate);
+    json.field("locate_fixed_width_bits",
+               static_cast<unsigned>(std::bit_width(permutation.largest_locate)));
+    json.end_object();
     json.key("price4_exhaustive_proofs");
     json.begin_array();
     for (const Price4Proof& proof : proofs) {
@@ -801,8 +1191,10 @@ int run_codec_eval_cli(std::span<const std::string_view> arguments,
     json.field("what", std::string_view{"Best integer scheme at least 1.53x smaller than "
                                         "Gorilla XOR on the same price column"});
     json.field("ratio_at_least", kCr5Ratio);
-    json.field("status", std::string_view{"no integer scheme is registered yet: the "
-                                          "gorilla-xor-f64-dollars figures are its baseline"});
+    json.field("status", std::string_view{"judged per price column under comparison.CR-5, "
+                                          "against Gorilla XOR on the dollar doubles and "
+                                          "against the best Gorilla variant, same order on "
+                                          "both sides"});
     json.end_object();
     json.end_object();
     json.key("columns");
@@ -820,7 +1212,7 @@ int run_codec_eval_cli(std::span<const std::string_view> arguments,
 
     for (const ColumnResult& column : result->columns) {
         for (const CodecResult& codec_result : column.codecs) {
-            output.out += std::format("{:<22} {:<24} {:>12} values {:>8.3f} bits/value {}\n",
+            output.out += std::format("{:<25} {:<27} {:>12} values {:>8.3f} bits/value {}\n",
                                       column.spec->name, codec_result.entry->name,
                                       codec_result.values, bits_per_value(codec_result),
                                       codec_result.exact() ? "exact" : "NOT EXACT");

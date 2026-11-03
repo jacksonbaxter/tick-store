@@ -9,6 +9,8 @@
 #include "tick_store/codec/block.hpp"
 #include "tick_store/codec/gorilla_timestamps.hpp"
 #include "tick_store/codec/gorilla_xor.hpp"
+#include "tick_store/codec/pfor.hpp"
+#include "tick_store/codec/stream_vbyte.hpp"
 #include "tick_store/harness/codec_eval.hpp"
 #include "tick_store/harness/roundtrip_cli.hpp"
 #include "tick_store/itch/codec.hpp"
@@ -19,10 +21,12 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <string_view>
@@ -54,28 +58,39 @@ struct Day {
     std::map<std::uint16_t, std::vector<std::uint64_t>> timestamps_by_locate;
     std::vector<std::uint64_t> add_prices;
     std::map<std::uint16_t, std::vector<std::uint64_t>> add_prices_by_locate;
+    std::map<std::pair<std::uint16_t, bool>, std::vector<std::uint64_t>> add_prices_by_side;
+    // Each message's locate in file order, and each add's locate and side.
+    std::vector<std::uint16_t> locates;
+    std::vector<std::pair<std::uint16_t, bool>> add_sides;
     std::vector<std::uint64_t> replace_prices;
     std::vector<std::uint64_t> executed_prices;
     std::vector<std::uint64_t> trade_prices;
     std::vector<std::uint64_t> mwcb_levels;
 
     void stamp(std::uint16_t locate, std::uint64_t timestamp) {
+        locates.push_back(locate);
         timestamps.push_back(timestamp);
         timestamps_by_locate[locate].push_back(timestamp);
     }
 
-    void add(std::uint16_t locate, std::uint64_t timestamp, std::uint32_t price, bool mpid) {
+    void add(std::uint16_t locate, std::uint64_t timestamp, std::uint32_t price, bool mpid,
+             bool sell = false) {
         stamp(locate, timestamp);
         add_prices.push_back(price);
         add_prices_by_locate[locate].push_back(price);
+        add_prices_by_side[{locate, sell}].push_back(price);
+        add_sides.emplace_back(locate, sell);
+        const std::byte side{sell ? std::uint8_t{'S'} : std::uint8_t{'B'}};
         if (mpid) {
             itch::AddOrderWithMpid message;
             message.header = header(locate, timestamp);
+            message.buy_sell_indicator = side;
             message.price = itch::Price4{price};
             append(bytes, message);
         } else {
             itch::AddOrder message;
             message.header = header(locate, timestamp);
+            message.buy_sell_indicator = side;
             message.price = itch::Price4{price};
             append(bytes, message);
         }
@@ -132,14 +147,14 @@ Day small_day(std::uint64_t top_level) {
     day.event(1'000);
     day.mwcb(1'500, {350'000'000'000, 330'000'000'000, top_level});
     day.add(7, 2'000, 1'234'500, false);
-    day.add(9, 2'100, 99'990'000, true);
-    day.add(7, 2'100, 1'234'600, false);
+    day.add(9, 2'100, 99'990'000, true, true);
+    day.add(7, 2'100, 1'234'600, false, true);
     day.add(7, 2'500, 1'234'500, true);
     day.replace(9, 3'000, 99'980'000);
     day.execute(7, 3'001, 1'234'500);
     day.add(9, 3'002, 4'294'967'295, false);
     day.trade(9, 4'000, 100);
-    day.add(7, 3'000, 0, false);
+    day.add(7, 3'000, 0, false, true);
     day.event(5'000);
     return day;
 }
@@ -180,6 +195,129 @@ const CodecResult& codec(const ColumnResult& column, std::string_view name) {
     return *found;
 }
 
+// What the integer codecs take for a column of `values`, from their own column encoders,
+// with the options each name stands for written out here rather than taken from the
+// registry. nullopt for Stream VByte.
+struct IntegerCodec {
+    std::string_view name;
+    std::optional<codec::PforOptions> pfor;
+    bool for_timestamps;
+    bool for_prices;
+};
+
+constexpr codec::PforOptions pfor_options(codec::IntTransform transform, bool scale, bool patch) {
+    return {.transform = transform, .adaptive_scale = scale, .patch = patch};
+}
+
+const std::vector<IntegerCodec>& integer_codecs() {
+    using codec::IntTransform;
+    static const std::vector<IntegerCodec> value{
+        {"pfor-delta", pfor_options(IntTransform::delta, false, true), true, true},
+        {"pfor-delta-unpatched", pfor_options(IntTransform::delta, false, false), true, true},
+        {"pfor-dod", pfor_options(IntTransform::delta_of_delta, false, true), true, false},
+        {"pfor-dod-unpatched", pfor_options(IntTransform::delta_of_delta, false, false), true,
+         false},
+        {"svb-delta", std::nullopt, true, true},
+        {"pfor-for", pfor_options(IntTransform::none, false, true), false, true},
+        {"pfor-for-scaled", pfor_options(IntTransform::none, true, true), false, true},
+        {"pfor-delta-scaled", pfor_options(IntTransform::delta, true, true), false, true},
+        {"pfor-delta-scaled-unpatched", pfor_options(IntTransform::delta, true, false), false,
+         true},
+    };
+    return value;
+}
+
+std::uint64_t integer_bytes(const IntegerCodec& integer, const std::vector<std::uint64_t>& values) {
+    std::vector<std::byte> column;
+    if (integer.pfor.has_value()) {
+        EXPECT_TRUE(codec::encode_pfor(values, kBlock, *integer.pfor, column).has_value());
+    } else {
+        EXPECT_TRUE(codec::encode_svb(values, kBlock, true, column).has_value());
+    }
+    return column.size();
+}
+
+// Every integer codec for this kind of column, on its streams, against the evaluator.
+void expect_integer_sizes(const ColumnResult& got,
+                          const std::vector<std::vector<std::uint64_t>>& streams,
+                          std::uint64_t metadata) {
+    const bool timestamps = got.spec->kind == ValueKind::timestamp_ns;
+    for (const IntegerCodec& integer : integer_codecs()) {
+        if (!(timestamps ? integer.for_timestamps : integer.for_prices)) {
+            continue;
+        }
+        const CodecResult& result = codec(got, integer.name);
+        EXPECT_TRUE(result.exact()) << got.spec->name << " " << integer.name;
+        EXPECT_NE(result.entry->family, "gorilla");
+        std::uint64_t bytes = 0;
+        std::uint64_t values = 0;
+        std::uint64_t blocks = 0;
+        for (const std::vector<std::uint64_t>& stream : streams) {
+            bytes += integer_bytes(integer, stream);
+            values += stream.size();
+            blocks += (stream.size() + kBlock - 1) / kBlock;
+        }
+        EXPECT_EQ(result.block_bytes, bytes) << got.spec->name << " " << integer.name;
+        EXPECT_EQ(result.values, values);
+        EXPECT_EQ(result.blocks, blocks);
+        EXPECT_EQ(result.metadata_bytes, metadata) << got.spec->name << " " << integer.name;
+    }
+}
+
+template <class Key>
+std::vector<std::vector<std::uint64_t>> streams_of(
+    const std::map<Key, std::vector<std::uint64_t>>& by_key) {
+    std::vector<std::vector<std::uint64_t>> streams;
+    streams.reserve(by_key.size());
+    for (const auto& [key, values] : by_key) {
+        streams.push_back(values);
+    }
+    return streams;
+}
+
+// Order-0 entropy in bits per symbol, from a count of each symbol: written out here, apart
+// from the evaluator's own table.
+template <class Symbol>
+double entropy_of(const std::vector<Symbol>& symbols) {
+    std::map<Symbol, double> counts;
+    for (const Symbol& symbol : symbols) {
+        counts[symbol] += 1;
+    }
+    const auto total = static_cast<double>(symbols.size());
+    double bits = 0;
+    for (const auto& [symbol, count] : counts) {
+        bits -= count / total * std::log2(count / total);
+    }
+    return bits;
+}
+
+template <class Symbol>
+std::size_t distinct_of(const std::vector<Symbol>& symbols) {
+    return std::set<Symbol>(symbols.begin(), symbols.end()).size();
+}
+
+// The deltas of each stream from its second value, wrapping, pooled.
+std::vector<std::uint64_t> pooled_deltas(const std::vector<std::vector<std::uint64_t>>& streams) {
+    std::vector<std::uint64_t> deltas;
+    for (const std::vector<std::uint64_t>& stream : streams) {
+        for (std::size_t i = 1; i < stream.size(); ++i) {
+            deltas.push_back(stream[i] - stream[i - 1]);
+        }
+    }
+    return deltas;
+}
+
+std::vector<std::uint64_t> pooled_delta_of_deltas(
+    const std::vector<std::vector<std::uint64_t>>& streams) {
+    std::vector<std::uint64_t> dods;
+    for (const std::vector<std::uint64_t>& stream : streams) {
+        for (std::size_t i = 2; i < stream.size(); ++i) {
+            dods.push_back((stream[i] - stream[i - 1]) - (stream[i - 1] - stream[i - 2]));
+        }
+    }
+    return dods;
+}
+
 // What a column of `values` costs in each price codec, from the codecs' column encoders.
 void expect_price_sizes(const ColumnResult& got, ValueKind kind,
                         const std::vector<std::uint64_t>& values, std::uint64_t metadata) {
@@ -216,7 +354,10 @@ TEST(CodecEval, ReportsTheSizesTheColumnEncodersGiveOnEveryColumn) {
     EXPECT_EQ(timestamps.streams, 1U);
     const CodecResult& dod = codec(timestamps, "gorilla-dod");
     EXPECT_TRUE(dod.exact());
-    EXPECT_EQ(timestamps.codecs.size(), 1U);
+    const auto timestamp_codecs = static_cast<std::size_t>(std::ranges::count_if(
+        codec_registry(), [](const CodecEntry& entry) { return entry.for_timestamps; }));
+    EXPECT_EQ(timestamps.codecs.size(), timestamp_codecs);
+    EXPECT_EQ(timestamp_codecs, 1U + 5U);
     EXPECT_EQ(dod.block_bytes, timestamp_bytes(day.timestamps));
     EXPECT_EQ(dod.metadata_bytes, 8U);
     // Every timestamp is counted once: zero or one of the four buckets, except each
@@ -235,6 +376,9 @@ TEST(CodecEval, ReportsTheSizesTheColumnEncodersGiveOnEveryColumn) {
     }
     EXPECT_EQ(codec(per_locate, "gorilla-dod").block_bytes, per_locate_bytes);
     EXPECT_EQ(codec(per_locate, "gorilla-dod").metadata_bytes, per_locate.streams * (8U + 2U));
+    expect_integer_sizes(timestamps, {day.timestamps}, 8);
+    expect_integer_sizes(per_locate, streams_of(day.timestamps_by_locate),
+                         per_locate.streams * (8U + 2U));
 
     expect_price_sizes(column(*result, "add_price"), ValueKind::price4, day.add_prices, 8);
     expect_price_sizes(column(*result, "replace_price"), ValueKind::price4, day.replace_prices,
@@ -251,6 +395,89 @@ TEST(CodecEval, ReportsTheSizesTheColumnEncodersGiveOnEveryColumn) {
         add_bytes += xor_bytes(values);
     }
     EXPECT_EQ(codec(add_per_locate, "gorilla-xor-u64-integer").block_bytes, add_bytes);
+
+    expect_integer_sizes(column(*result, "add_price"), {day.add_prices}, 8);
+    expect_integer_sizes(column(*result, "replace_price"), {day.replace_prices}, 8);
+    expect_integer_sizes(column(*result, "executed_price"), {day.executed_prices}, 8);
+    expect_integer_sizes(column(*result, "trade_price"), {day.trade_prices}, 8);
+    expect_integer_sizes(column(*result, "mwcb_level"), {day.mwcb_levels}, 8);
+    expect_integer_sizes(add_per_locate, streams_of(day.add_prices_by_locate),
+                         add_per_locate.streams * (8U + 2U));
+
+    // Per locate and side: locate 7 buys and sells, locate 9 buys and sells, so four
+    // streams, each with its count, locate and side.
+    const ColumnResult& by_side = column(*result, "add_price_per_locate_side");
+    EXPECT_EQ(by_side.streams, day.add_prices_by_side.size());
+    EXPECT_EQ(by_side.streams, 4U);
+    std::uint64_t side_bytes = 0;
+    for (const auto& [key, values] : day.add_prices_by_side) {
+        side_bytes += xor_bytes(values);
+    }
+    EXPECT_EQ(codec(by_side, "gorilla-xor-u64-integer").block_bytes, side_bytes);
+    constexpr std::uint64_t kSideMetadata = std::uint64_t{4} * (8U + 2U + 1U);
+    EXPECT_EQ(codec(by_side, "gorilla-xor-u64-integer").metadata_bytes, kSideMetadata);
+    expect_integer_sizes(by_side, streams_of(day.add_prices_by_side), kSideMetadata);
+}
+
+TEST(CodecEval, ExactEntropiesAreThoseOfTheDeltasEachColumnSees) {
+    const Day day = small_day(310'000'000'000);
+    const auto result = evaluate_codecs(day.bytes, EvalOptions{.block_values = kBlock});
+    ASSERT_TRUE(result.has_value()) << result.error();
+
+    const ColumnResult& timestamps = column(*result, "timestamp");
+    const auto deltas = pooled_deltas({day.timestamps});
+    const auto dods = pooled_delta_of_deltas({day.timestamps});
+    ASSERT_TRUE(timestamps.entropy_delta_bits.has_value());
+    ASSERT_TRUE(timestamps.entropy_delta_of_delta_bits.has_value());
+    EXPECT_NEAR(*timestamps.entropy_delta_bits, entropy_of(deltas), 1e-12);
+    EXPECT_NEAR(*timestamps.entropy_delta_of_delta_bits, entropy_of(dods), 1e-12);
+    EXPECT_EQ(timestamps.distinct_deltas, distinct_of(deltas));
+    EXPECT_EQ(timestamps.distinct_delta_of_deltas, distinct_of(dods));
+    // By hand: 11 deltas, 500 three times and 1 twice, the other six once each.
+    EXPECT_EQ(deltas.size(), 11U);
+    EXPECT_EQ(timestamps.distinct_deltas, 8U);
+    EXPECT_NEAR(*timestamps.entropy_delta_bits,
+                std::log2(11.0) - (((3.0 * std::log2(3.0)) + 2.0) / 11.0), 1e-12);
+
+    // The per-locate timestamps count none: their distinct values could be too many.
+    EXPECT_FALSE(column(*result, "timestamp_per_locate").entropy_delta_bits.has_value());
+
+    // Prices count deltas only, pooled over each column's streams.
+    const auto expect_price_entropy = [&](std::string_view name,
+                                          const std::vector<std::vector<std::uint64_t>>& streams) {
+        const ColumnResult& got = column(*result, name);
+        const auto price_deltas = pooled_deltas(streams);
+        ASSERT_TRUE(got.entropy_delta_bits.has_value()) << name;
+        EXPECT_NEAR(*got.entropy_delta_bits, entropy_of(price_deltas), 1e-12) << name;
+        EXPECT_EQ(got.distinct_deltas, distinct_of(price_deltas)) << name;
+        EXPECT_FALSE(got.entropy_delta_of_delta_bits.has_value()) << name;
+    };
+    expect_price_entropy("add_price", {day.add_prices});
+    expect_price_entropy("add_price_per_locate", streams_of(day.add_prices_by_locate));
+    expect_price_entropy("add_price_per_locate_side", streams_of(day.add_prices_by_side));
+    expect_price_entropy("trade_price", {day.trade_prices});
+}
+
+TEST(CodecEval, PermutationEstimateIsTheEntropyOfTheLocateSequence) {
+    const Day day = small_day(310'000'000'000);
+    const auto result = evaluate_codecs(day.bytes, EvalOptions{.block_values = kBlock});
+    ASSERT_TRUE(result.has_value()) << result.error();
+    const PermutationEstimate& permutation = result->permutation;
+    EXPECT_EQ(permutation.messages, day.locates.size());
+    EXPECT_NEAR(permutation.locate_entropy_bits, entropy_of(day.locates), 1e-12);
+    EXPECT_EQ(permutation.add_messages, day.add_sides.size());
+    std::vector<std::uint16_t> add_locates;
+    add_locates.reserve(day.add_sides.size());
+    for (const auto& [locate, sell] : day.add_sides) {
+        add_locates.push_back(locate);
+    }
+    EXPECT_NEAR(permutation.add_locate_entropy_bits, entropy_of(add_locates), 1e-12);
+    EXPECT_NEAR(permutation.add_locate_side_entropy_bits, entropy_of(day.add_sides), 1e-12);
+    EXPECT_EQ(permutation.largest_locate, 9U);
+    // By hand: adds from 7, 9, 7, 7, 9, 7, so 4 and 2 of 6.
+    EXPECT_NEAR(permutation.add_locate_entropy_bits,
+                -((4.0 / 6.0) * std::log2(4.0 / 6.0)) - ((2.0 / 6.0) * std::log2(2.0 / 6.0)),
+                1e-12);
 }
 
 TEST(CodecEval, IdealBitsFollowTheCensusDefinition) {
@@ -405,6 +632,13 @@ TEST(CodecEvalCli, WritesJsonWithNoPathsAndExitsZero) {
     EXPECT_TRUE(text.contains(R"("codec": "gorilla-dod")"));
     EXPECT_TRUE(text.contains(R"("target": "CR-3")"));
     EXPECT_TRUE(text.contains(R"("target": "CR-4")"));
+    EXPECT_TRUE(text.contains(R"("codec": "pfor-delta")"));
+    EXPECT_TRUE(text.contains(R"("family": "gorilla")"));
+    EXPECT_TRUE(text.contains(R"("family": "pfor")"));
+    EXPECT_TRUE(text.contains(R"("against_gorilla_xor_f64_dollars")"));
+    EXPECT_TRUE(text.contains(R"("against_best_gorilla")"));
+    EXPECT_TRUE(text.contains(R"("permutation_estimate")"));
+    EXPECT_TRUE(text.contains(R"("entropy_delta_bits")"));
     EXPECT_TRUE(text.contains(R"("price4_exhaustive_proofs": [])"));
     EXPECT_FALSE(text.contains(dir.path().string()));
     EXPECT_TRUE(output.out.contains("timestamp"));
