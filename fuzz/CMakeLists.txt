@@ -8,6 +8,8 @@ function(tick_store_add_fuzzer name)
 endfunction()
 
 tick_store_add_fuzzer(fuzz_columns)
+tick_store_add_fuzzer(fuzz_gorilla_timestamps)
+tick_store_add_fuzzer(fuzz_gorilla_xor)
 tick_store_add_fuzzer(fuzz_itch_frame)
 tick_store_add_fuzzer(fuzz_itch_message)
 tick_store_add_fuzzer(fuzz_stub_store)

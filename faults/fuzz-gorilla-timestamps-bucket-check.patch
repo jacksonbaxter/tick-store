@@ -1,0 +1,12 @@
+diff --git a/src/codec/gorilla_timestamps.cpp b/src/codec/gorilla_timestamps.cpp
+--- a/src/codec/gorilla_timestamps.cpp
++++ b/src/codec/gorilla_timestamps.cpp
+@@ -146,7 +146,7 @@
+             dod = sign_extend(*raw, width);
+             // A zero belongs in '0', and anything else in its narrowest bucket.
+             const unsigned canonical = dod == 0 ? 0 : kDodBucketBits[bucket_of(dod)];
+-            if (canonical != width) {
++            if (canonical > width) {
+                 return fail(codec_error(CodecErrorKind::non_canonical, "delta-of-delta bucket",
+                                         at, canonical, width));
+             }

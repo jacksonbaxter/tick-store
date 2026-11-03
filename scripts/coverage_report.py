@@ -6,7 +6,7 @@
 scripts/coverage.sh is the normal way in. The report gives line and function coverage per file
 for src/ and include/. The gate fails if a function below is missing from the binary or was
 never called: every decode_as and encode_as for the 23 message types, each parser and validator
-entry point, the fuzz oracles, and the oracle's compare path. A name that stops matching fails too, so the list
+entry point, the codecs' decoders and encoders, the fuzz oracles, and the oracle's compare path. A name that stops matching fails too, so the list
 cannot go stale in silence.
 
 The list holds no SIMD kernel because none exists yet. The Phase 3 kernels add theirs here.
@@ -48,6 +48,12 @@ COLUMNS_READER = "src/harness/columns_reader.cpp"
 MESSAGE_ORACLES = "fuzz/itch_oracles.hpp"
 STORE_ORACLES = "fuzz/store_oracles.hpp"
 COLUMNS_ORACLES = "fuzz/columns_oracles.hpp"
+BIT_STREAM = "include/tick_store/codec/bit_stream.hpp"
+BLOCK = "src/codec/block.cpp"
+GORILLA_TIMESTAMPS = "src/codec/gorilla_timestamps.cpp"
+GORILLA_XOR = "src/codec/gorilla_xor.cpp"
+PRICE_DOUBLE = "src/codec/price_double.cpp"
+CODEC_ORACLES = "fuzz/codec_oracles.hpp"
 
 # Each is (group, file, what to call it, pattern over the demangled name).
 FIXED_REQUIRED = (
@@ -72,6 +78,20 @@ FIXED_REQUIRED = (
     ("parser", STUB_READER, "StubRecordReader::next", r"StubRecordReader::next\("),
     ("parser", COLUMNS_READER, "ColumnsReader::open", r"ColumnsReader::open\("),
     ("parser", COLUMNS_READER, "ColumnsReader::next", r"ColumnsReader::next\("),
+    ("codec", BIT_STREAM, "BitReader::read", r"BitReader::read\("),
+    ("codec", BIT_STREAM, "BitReader::finish", r"BitReader::finish\("),
+    ("codec", BLOCK, "read_block_header", r"read_block_header\("),
+    ("codec", BLOCK, "decode_column", r"codec::decode_column\("),
+    ("codec", GORILLA_TIMESTAMPS, "decode_timestamp_block", r"decode_timestamp_block\("),
+    ("codec", GORILLA_TIMESTAMPS, "decode_timestamps", r"codec::decode_timestamps\("),
+    ("codec", GORILLA_XOR, "decode_xor_block", r"decode_xor_block\("),
+    ("codec", GORILLA_XOR, "decode_xor", r"codec::decode_xor\("),
+    ("codec", GORILLA_XOR, "decode_xor_doubles", r"decode_xor_doubles\("),
+    ("codec", PRICE_DOUBLE, "double_to_scaled", r"double_to_scaled\("),
+    ("codec", BIT_STREAM, "BitWriter::write", r"BitWriter::write\("),
+    ("codec", BIT_STREAM, "BitWriter::finish", r"BitWriter::finish\("),
+    ("codec", GORILLA_TIMESTAMPS, "encode_timestamp_block", r"encode_timestamp_block\("),
+    ("codec", GORILLA_XOR, "encode_xor_block", r"encode_xor_block\("),
     ("validator", COLUMNS, "require_size", r"require_size\("),
     ("validator", COLUMNS, "check_text_ends", r"check_text_ends\("),
     ("validator", COLUMNS, "check_raw_row_empty", r"check_raw_row_empty\("),
@@ -81,6 +101,11 @@ FIXED_REQUIRED = (
     ("validator", MESSAGE_ORACLES, "check_stream", r"oracle::check_stream\("),
     ("validator", STORE_ORACLES, "check_store", r"oracle::check_store\("),
     ("validator", COLUMNS_ORACLES, "check_columns", r"oracle::check_columns\("),
+    ("validator", CODEC_ORACLES, "check_timestamp_column", r"oracle::check_timestamp_column\("),
+    ("validator", CODEC_ORACLES, "check_xor_column", r"oracle::check_xor_column\("),
+    ("validator", CODEC_ORACLES, "check_one_block", r"oracle::check_one_block\("),
+    ("validator", CODEC_ORACLES, "check_as_values", r"oracle::check_as_values\("),
+    ("validator", CODEC_ORACLES, "check_price_mappings", r"oracle::check_price_mappings\("),
     ("oracle", ROUNDTRIP, "verify", r"^tick_store::harness::verify\("),
     ("oracle", ROUNDTRIP, "verify_stub_store", r"^tick_store::harness::verify_stub_store\("),
     ("oracle", COLUMNS_READER, "verify_columns", r"^tick_store::harness::verify_columns\("),

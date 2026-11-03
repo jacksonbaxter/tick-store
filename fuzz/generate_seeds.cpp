@@ -4,12 +4,19 @@
 //   <dir>/frame/    framed streams, for fuzz_itch_frame
 //   <dir>/store/    stub store files, for fuzz_stub_store
 //   <dir>/columns/  column directories as sections, for fuzz_columns
+//   <dir>/gorilla_timestamps/  timestamp columns, for fuzz_gorilla_timestamps
+//   <dir>/gorilla_xor/         XOR columns, for fuzz_gorilla_xor
 //
 // Every valid seed comes from the real encoder or the real store writer, so the
 // seeds follow the code (Z4). Corrupt seeds are those same bytes cut, extended or
 // relabelled, one for each way the decoders and the parser can refuse an input.
 
 #include "columns_oracles.hpp"
+#include "tick_store/codec/block.hpp"
+#include "tick_store/codec/codec_error.hpp"
+#include "tick_store/codec/gorilla_timestamps.hpp"
+#include "tick_store/codec/gorilla_xor.hpp"
+#include "tick_store/codec/price_double.hpp"
 #include "tick_store/itch/codec.hpp"
 #include "tick_store/itch/message.hpp"
 #include "tick_store/store/columns.hpp"
@@ -19,9 +26,11 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <expected>
 #include <filesystem>
 #include <format>
 #include <fstream>
@@ -31,6 +40,7 @@
 #include <print>
 #include <span>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -393,6 +403,235 @@ void write_columns_seeds(SeedDir& seeds) {
     }
 }
 
+
+// SplitMix64, so the generated values are the same on every build and host.
+class SplitMix64 {
+public:
+    explicit constexpr SplitMix64(std::uint64_t seed) noexcept : state_(seed) {}
+
+    constexpr std::uint64_t operator()() noexcept {
+        state_ += 0x9E3779B97F4A7C15ULL;
+        std::uint64_t z = state_;
+        z = (z ^ (z >> 30U)) * 0xBF58476D1CE4E5B9ULL;
+        z = (z ^ (z >> 27U)) * 0x94D049BB133111EBULL;
+        return z ^ (z >> 31U);
+    }
+
+private:
+    std::uint64_t state_;
+};
+
+using Words = std::vector<std::uint64_t>;
+using ColumnEncoder = std::expected<void, tick_store::codec::CodecError> (*)(
+    std::span<const std::uint64_t>, std::size_t, std::vector<std::byte>&);
+
+Bytes column_of(ColumnEncoder encode, const Words& values, std::size_t block_values) {
+    Bytes out;
+    if (const auto done = encode(values, block_values, out); !done.has_value()) {
+        throw std::runtime_error(tick_store::codec::to_string(done.error()));
+    }
+    return out;
+}
+
+std::expected<void, tick_store::codec::CodecError> timestamps_column(
+    std::span<const std::uint64_t> values, std::size_t block_values, std::vector<std::byte>& out) {
+    return tick_store::codec::encode_timestamps(values, block_values, out);
+}
+
+std::expected<void, tick_store::codec::CodecError> xor_column(
+    std::span<const std::uint64_t> values, std::size_t block_values, std::vector<std::byte>& out) {
+    return tick_store::codec::encode_xor(values, block_values, out);
+}
+
+// Each column at a few block sizes, then cut through its first header, its first payload
+// and its last byte.
+void add_columns(SeedDir& seeds, ColumnEncoder encode, const std::vector<Words>& columns) {
+    for (const Words& values : columns) {
+        for (const std::size_t block_values : {std::size_t{1}, std::size_t{3}, std::size_t{4096}}) {
+            const Bytes column = column_of(encode, values, block_values);
+            seeds.add(column);
+            if (block_values == 3 && !column.empty()) {
+                for (const std::size_t cut : {std::size_t{1}, std::size_t{7}, std::size_t{9},
+                                              column.size() / 2, column.size() - 1}) {
+                    seeds.add(std::span{column}.first(std::min(cut, column.size())));
+                }
+            }
+        }
+    }
+}
+
+// A block: a count, a payload size that fits what follows, a first word, then `bits` as
+// a string of 0 and 1, zero-padded to a whole byte.
+Bytes block_from_bits(std::uint32_t count, std::uint64_t first, std::string_view bits) {
+    Bytes payload;
+    for (unsigned i = 8; i > 0; --i) {
+        payload.push_back(static_cast<std::byte>((first >> (8U * (i - 1U))) & 0xFFU));
+    }
+    unsigned filled = 0;
+    for (const char bit : bits) {
+        if (filled % 8 == 0) {
+            payload.push_back(std::byte{0});
+        }
+        if (bit == '1') {
+            payload.back() |= static_cast<std::byte>(0x80U >> (filled % 8U));
+        }
+        ++filled;
+    }
+    Bytes block;
+    const std::size_t at = tick_store::codec::begin_block(block, count);
+    tick_store::codec::patch_block_header(block, at, static_cast<std::uint32_t>(payload.size()));
+    block.insert(block.end(), payload.begin(), payload.end());
+    return block;
+}
+
+std::string bits_of(std::uint64_t value, unsigned width) {
+    std::string out;
+    for (unsigned i = width; i > 0; --i) {
+        out += ((value >> (i - 1U)) & 1U) != 0 ? '1' : '0';
+    }
+    return out;
+}
+
+// A valid block with one header field changed: the count to zero, past the cap and past
+// what the payload holds, and the payload size one past the bytes there.
+void add_header_corruptions(SeedDir& seeds, const Bytes& block) {
+    const auto set = [&](std::size_t offset, std::uint64_t value) {
+        Bytes changed = block;
+        if (!tick_store::store::write_le<4>(changed, offset, value)) {
+            throw std::runtime_error("a seed block is shorter than its header");
+        }
+        seeds.add(changed);
+    };
+    set(0, 0);
+    set(0, tick_store::codec::kMaxBlockValues + 1U);
+    set(0, tick_store::codec::kMaxBlockValues);
+    set(4, block.size() - tick_store::codec::kBlockHeaderSize + 1U);
+    set(4, 0xFFFF'FFFFU);
+    Bytes spare = block;
+    spare.push_back(std::byte{0});
+    tick_store::codec::patch_block_header(spare, 0, static_cast<std::uint32_t>(
+                                                        spare.size() -
+                                                        tick_store::codec::kBlockHeaderSize));
+    seeds.add(spare);
+}
+
+// Timestamps whose delta-of-deltas are `dods`.
+Words from_dods(std::uint64_t first, const Words& dods) {
+    Words values{first};
+    std::uint64_t delta = 0;
+    for (const std::uint64_t dod : dods) {
+        delta += dod;
+        values.push_back(values.back() + delta);
+    }
+    return values;
+}
+
+void write_timestamp_seeds(SeedDir& seeds) {
+    using tick_store::codec::kDodBucketBits;
+    Words edges;
+    for (std::size_t b = 0; b + 1 < kDodBucketBits.size(); ++b) {
+        const std::uint64_t half = std::uint64_t{1} << (kDodBucketBits[b] - 1U);
+        for (const std::uint64_t dod : {half - 2, half - 1, half, half + 1}) {
+            edges.push_back(dod);
+            edges.push_back(std::uint64_t{0} - dod);
+        }
+    }
+    edges.push_back(std::uint64_t{1} << 63U);
+    edges.push_back((std::uint64_t{1} << 63U) - 1U);
+
+    SplitMix64 random{2019};
+    Words itch_like{34'200'000'000'000ULL};
+    for (int i = 0; i < 3000; ++i) {
+        const std::uint64_t pick = random() % 100;
+        // Mostly gaps of tens of microseconds, some repeats, some long jumps.
+        std::uint64_t gap = random() % 60'000;
+        if (pick < 2) {
+            gap = 0;
+        } else if (pick < 4) {
+            gap = random() % (1ULL << 30U);
+        }
+        itch_like.push_back(itch_like.back() + gap);
+    }
+    const Words extremes{0, ~std::uint64_t{0}, 0, 1, std::uint64_t{1} << 63U, 7, 7, 7};
+    add_columns(seeds, &timestamps_column,
+                {from_dods(0x123456789ABCULL, {5, 0, 40'000, 0, 3'000'000, 1ULL << 40U,
+                                               ~std::uint64_t{0}}),
+                 from_dods(1'000'000, edges), itch_like, extremes, {0xFFFF'FFFF'FFFFULL}});
+
+    const Bytes block = column_of(&timestamps_column, from_dods(100, {1, 2, 3}), 4096);
+    add_header_corruptions(seeds, block);
+
+    // Non-canonical buckets, a cut control code and field, and set padding.
+    for (const std::string& bits :
+         {"10" + bits_of(0, 16), "110" + bits_of(5, 19), "1110" + bits_of(262'143, 23),
+          "1111" + bits_of(4'194'303, 64), "1111" + bits_of(0, 64), std::string{"10000000"},
+          std::string{"00000001"}, std::string{"000000000"}}) {
+        seeds.add(block_from_bits(2, 34'200'000'000'000ULL, bits));
+    }
+    seeds.add(block_from_bits(9, 0, "00000001"));
+    seeds.add(Bytes{});
+}
+
+std::string new_window(unsigned leading, unsigned bits, std::uint64_t data) {
+    return "11" + bits_of(leading, 5) + bits_of(bits - 1U, 6) + bits_of(data, bits);
+}
+
+void write_xor_seeds(SeedDir& seeds) {
+    using tick_store::codec::price4_to_dollars;
+    using tick_store::codec::scaled_to_double;
+    SplitMix64 random{2020};
+    Words dollars;
+    Words integers;
+    Words as_doubles;
+    std::uint32_t price = 500'000;
+    for (int i = 0; i < 3000; ++i) {
+        const std::uint64_t step = random() % 11;
+        price = price + (static_cast<std::uint32_t>(step) * 100U) - 500U;
+        // Now and then a sub-dollar price or a stub quote, as ITCH has.
+        std::uint32_t value = price;
+        if (i % 97 == 0) {
+            value = 1'999'999'900U;
+        } else if (i % 89 == 0) {
+            value = 4'321U;
+        }
+        dollars.push_back(std::bit_cast<std::uint64_t>(price4_to_dollars(value)));
+        integers.push_back(value);
+        as_doubles.push_back(std::bit_cast<std::uint64_t>(scaled_to_double(value, 1)));
+    }
+    const Words specials{
+        std::bit_cast<std::uint64_t>(0.0),      std::bit_cast<std::uint64_t>(-0.0),
+        0x7FF8000000000001ULL,                  0xFFF0000000000001ULL,
+        0x7FF0000000000000ULL,                  1,
+        std::bit_cast<std::uint64_t>(3200.0),   std::bit_cast<std::uint64_t>(0.0001),
+    };
+    const Words golden{0x4059000000000000ULL, 0x4059000000000000ULL, 0x4059400000000000ULL,
+                       0x4059000000000000ULL, 0x4059000000000001ULL, 0xBFA6FFFFFFFFFFFEULL,
+                       0x3FA6FFFFFFFFFFFFULL};
+    const Words windows{0, ~std::uint64_t{0}, 0, std::uint64_t{1} << 63U, 0, 1, 0,
+                        std::uint64_t{1} << 32U, 0, std::uint64_t{1} << 31U, 0,
+                        0x00F0000000000000ULL, 0x0060000000000000ULL, 0x01E0000000000000ULL};
+    add_columns(seeds, &xor_column, {golden, windows, specials, dollars, integers, as_doubles});
+
+    const Bytes block = column_of(&xor_column, golden, 4096);
+    add_header_corruptions(seeds, block);
+
+    // Each refusal of the decoder: D4's two window checks, the four canonical checks, a
+    // field cut short, and set padding.
+    for (const auto& [count, bits] : std::vector<std::pair<std::uint32_t, std::string>>{
+             {2, "10" + bits_of(1, 6)},
+             {2, "11" + bits_of(31, 5) + bits_of(63, 6)},
+             {2, new_window(20, 4, 0b1010)},
+             {2, new_window(20, 4, 0b0101)},
+             {3, new_window(24, 8, 0xFF) + new_window(25, 7, 0x41)},
+             {3, new_window(28, 4, 0b1001) + "10" + "0000"},
+             {6, "000011"},
+             {2, "11" + bits_of(0, 5) + bits_of(9, 6)},
+             {2, "00000001"},
+         }) {
+        seeds.add(block_from_bits(count, 0, bits));
+    }
+    seeds.add(Bytes{});
+}
 }  // namespace
 
 // NOLINTNEXTLINE(bugprone-exception-escape): a failed build step should terminate and say why.
@@ -407,11 +646,17 @@ int main(int argc, char** argv) {
     SeedDir stream{root / "frame"};
     SeedDir store{root / "store"};
     SeedDir columns{root / "columns"};
+    SeedDir timestamps{root / "gorilla_timestamps"};
+    SeedDir xor_words{root / "gorilla_xor"};
     write_message_seeds(message);
     write_frame_seeds(stream);
     write_store_seeds(store, root / "store-scratch");
     write_columns_seeds(columns);
-    std::println("wrote {} message, {} frame, {} store and {} columns seeds", message.count(),
-                 stream.count(), store.count(), columns.count());
+    write_timestamp_seeds(timestamps);
+    write_xor_seeds(xor_words);
+    std::println("wrote {} message, {} frame, {} store, {} columns, {} gorilla_timestamps and "
+                 "{} gorilla_xor seeds",
+                 message.count(), stream.count(), store.count(), columns.count(),
+                 timestamps.count(), xor_words.count());
     return 0;
 }

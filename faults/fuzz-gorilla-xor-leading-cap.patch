@@ -1,0 +1,12 @@
+diff --git a/src/codec/gorilla_xor.cpp b/src/codec/gorilla_xor.cpp
+--- a/src/codec/gorilla_xor.cpp
++++ b/src/codec/gorilla_xor.cpp
+@@ -66,7 +66,7 @@
+             counted.data_bits += window.bits();
+             continue;
+         }
+-        window.leading = std::min(static_cast<unsigned>(std::countl_zero(x)), kXorMaxLeading);
++        window.leading = std::min(static_cast<unsigned>(std::countl_zero(x)), kXorMaxLeading + 1U);
+         window.trailing = static_cast<unsigned>(std::countr_zero(x));
+         have_window = true;
+         writer.write(0b11U, 2);

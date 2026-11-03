@@ -109,8 +109,8 @@ std::expected<std::size_t, CodecError> decode_timestamp_block(std::span<const st
         out.resize(start);
         return std::unexpected(error);
     };
-    // The count is at most kMaxBlockValues and within what the payload can hold.
-    out.reserve(start + header->count);
+    // The count is at most kMaxBlockValues and within what the payload can hold (D8).
+    reserve_for_block(out, header->count);
     BitReader reader{block.subspan(kBlockHeaderSize, header->payload_bytes),
                      kBlockHeaderSize * 8U};
 

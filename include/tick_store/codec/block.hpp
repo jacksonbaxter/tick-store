@@ -65,6 +65,10 @@ void patch_block_header(std::vector<std::byte>& out, std::size_t header_offset,
 // Checks an encoder's block size: 1 to kMaxBlockValues.
 [[nodiscard]] std::expected<void, CodecError> check_block_values(std::size_t block_values);
 
+// Makes room for `count` more values, growing geometrically so that a column of many
+// small blocks appends in linear time. `count` must already be checked against the cap.
+void reserve_for_block(std::vector<std::uint64_t>& out, std::uint32_t count);
+
 // Decodes the block at the front of its input, appending its values, and returns the
 // bytes it took. Every codec's block decoder has this shape.
 using BlockDecoder = std::expected<std::size_t, CodecError> (*)(std::span<const std::byte>,

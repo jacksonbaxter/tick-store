@@ -1,0 +1,14 @@
+diff --git a/include/tick_store/codec/bit_stream.hpp b/include/tick_store/codec/bit_stream.hpp
+--- a/include/tick_store/codec/bit_stream.hpp
++++ b/include/tick_store/codec/bit_stream.hpp
+@@ -132,10 +132,6 @@
+             return std::unexpected(
+                 codec_error(CodecErrorKind::bad_width, field, base_ + pos_, kWordBits, width));
+         }
+-        if (width > size_bits_ - pos_) {
+-            return std::unexpected(codec_error(CodecErrorKind::truncated, field, base_ + pos_,
+-                                               width, size_bits_ - pos_));
+-        }
+         const auto first = static_cast<std::size_t>(pos_ / 8U);
+         const auto skip = static_cast<unsigned>(pos_ % 8U);
+         pos_ += width;

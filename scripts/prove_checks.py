@@ -186,6 +186,9 @@ FAULTS = (
           "heap-buffer-overflow"),
     Fault("ubsan-shift-64", "asan-test", "the big-endian reader shifts an 8-byte value by 64",
           EXIT_CTEST, "shift exponent 64 is too large"),
+    Fault("asan-bit-reader-bound", "asan-test", "the codecs' bit reader stops checking a read "
+          "against the bits left, so a cut block is read past its end", EXIT_CTEST,
+          "heap-buffer-overflow"),
     Fault("tsan-queue-race", "tsan-test", "the bounded queue pushes after releasing its lock",
           EXIT_CTEST, "ThreadSanitizer: data race"),
     Fault("tidy-c-style-cast", "clang-tidy", "a C-style cast in src/itch/frame.cpp", CHECK_FAILED,
@@ -208,6 +211,12 @@ FAULTS = (
           arguments=FUZZ_ARGUMENTS),
     Fault("fuzz-columns-text-bound", "fuzz-columns", "the column reader stops checking a text "
           "offset against its file", EXIT_LIBFUZZER, "AddressSanitizer: heap-buffer-overflow",
+          arguments=FUZZ_ARGUMENTS),
+    Fault("fuzz-gorilla-timestamps-bucket-check", "fuzz-gorilla-timestamps", "the timestamp "
+          "decoder stops refusing a delta-of-delta stored in a wider bucket than it needs",
+          EXIT_LIBFUZZER, "check_timestamp_column:", arguments=FUZZ_ARGUMENTS),
+    Fault("fuzz-gorilla-xor-leading-cap", "fuzz-gorilla-xor", "the XOR encoder caps the leading "
+          "zero count at 32, one past what its 5 bits hold", EXIT_LIBFUZZER, "check_xor_column:",
           arguments=FUZZ_ARGUMENTS),
     Fault("g1-store-alters-a-byte", "oracle", "the stub store flips one bit of record 2 as it "
           "writes", CHECK_FAILED, "first difference: bytes at record 2, source byte"),

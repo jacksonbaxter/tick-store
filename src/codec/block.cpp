@@ -3,6 +3,7 @@
 #include "tick_store/codec/codec_error.hpp"
 #include "tick_store/store/little_endian.hpp"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -79,6 +80,13 @@ std::expected<void, CodecError> check_block_values(std::size_t block_values) {
                                            kMaxBlockValues, block_values));
     }
     return {};
+}
+
+void reserve_for_block(std::vector<std::uint64_t>& out, std::uint32_t count) {
+    const std::size_t needed = out.size() + count;
+    if (needed > out.capacity()) {
+        out.reserve(std::max(needed, out.capacity() * 2));
+    }
 }
 
 std::expected<void, CodecError> decode_column(std::span<const std::byte> column,

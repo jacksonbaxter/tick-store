@@ -2,6 +2,7 @@
 // the golden fixtures through them, so the oracles stay exercised on every build
 // even when the crasher directories hold nothing.
 
+#include "codec_oracles.hpp"
 #include "columns_fixture.hpp"
 #include "columns_oracles.hpp"
 #include "itch_fixtures.hpp"
@@ -10,9 +11,13 @@
 #include "store_oracles.hpp"
 #include "stub_fixture.hpp"
 #include "test_bytes.hpp"
+#include "tick_store/codec/gorilla_timestamps.hpp"
+#include "tick_store/codec/gorilla_xor.hpp"
+#include "tick_store/codec/price_double.hpp"
 
 #include <gtest/gtest.h>
 
+#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -21,6 +26,7 @@
 #include <iterator>
 #include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace tick_store::itch {
@@ -79,6 +85,20 @@ TEST(FuzzRegression, ColumnsCrashersStayFixed) {
     for (const auto& path : crashers("columns")) {
         SCOPED_TRACE(path.filename().string());
         EXPECT_EQ(text(store::oracle::check_columns(read_file(path))), "");
+    }
+}
+
+TEST(FuzzRegression, GorillaTimestampCrashersStayFixed) {
+    for (const auto& path : crashers("gorilla_timestamps")) {
+        SCOPED_TRACE(path.filename().string());
+        EXPECT_EQ(text(codec::oracle::check_timestamp_column(read_file(path))), "");
+    }
+}
+
+TEST(FuzzRegression, GorillaXorCrashersStayFixed) {
+    for (const auto& path : crashers("gorilla_xor")) {
+        SCOPED_TRACE(path.filename().string());
+        EXPECT_EQ(text(codec::oracle::check_xor_column(read_file(path))), "");
     }
 }
 
@@ -147,6 +167,41 @@ TEST(FuzzOracles, PassEveryCutAndFlipOfAStore) {
         Bytes flipped = exact_copy(file);
         flipped[bit / 8] ^= static_cast<std::byte>(1U << (bit % 8));
         EXPECT_EQ(text(store::oracle::check_store(flipped)), "") << "bit " << bit;
+    }
+}
+
+// A column from each Gorilla encoder, whole, cut at every length and with every bit
+// flipped in turn, through the fuzz targets' oracles. A flipped column must be refused or
+// re-encode to the flipped bytes, which the oracle checks.
+TEST(FuzzOracles, PassEveryCutAndFlipOfAGorillaColumn) {
+    std::vector<std::uint64_t> timestamps{34'200'000'000'000ULL};
+    std::vector<std::uint64_t> dollars;
+    std::uint64_t price = 1'234'500;
+    for (std::uint64_t i = 1; i < 40; ++i) {
+        timestamps.push_back(timestamps.back() + ((i * 7'919U) % 60'000U) + (i % 5 == 0 ? 0 : 1));
+        price = price + ((i * 37U) % 11U * 100U) - 500U;
+        dollars.push_back(std::bit_cast<std::uint64_t>(
+            codec::price4_to_dollars(static_cast<std::uint32_t>(price))));
+    }
+    Bytes timestamp_column;
+    ASSERT_TRUE(codec::encode_timestamps(timestamps, 16, timestamp_column).has_value());
+    Bytes xor_column;
+    ASSERT_TRUE(codec::encode_xor(dollars, 16, xor_column).has_value());
+
+    using Check = const char* (*)(std::span<const std::byte>);
+    for (const auto& [column, check] :
+         {std::pair<const Bytes&, Check>{timestamp_column, &codec::oracle::check_timestamp_column},
+          std::pair<const Bytes&, Check>{xor_column, &codec::oracle::check_xor_column}}) {
+        EXPECT_EQ(text(check(exact_copy(column))), "");
+        for (std::size_t length = 0; length < column.size(); ++length) {
+            EXPECT_EQ(text(check(exact_copy(std::span{column}.first(length)))), "")
+                << "length " << length;
+        }
+        for (std::size_t bit = 0; bit < column.size() * 8; ++bit) {
+            Bytes flipped = exact_copy(column);
+            flipped[bit / 8] ^= static_cast<std::byte>(1U << (bit % 8));
+            EXPECT_EQ(text(check(flipped)), "") << "bit " << bit;
+        }
     }
 }
 
