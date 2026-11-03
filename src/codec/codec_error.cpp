@@ -34,6 +34,8 @@ std::string to_string(const CodecError& error) {
             return located("bad parameter");
         case CodecErrorKind::not_exact_price:
             return located("not an exact price");
+        case CodecErrorKind::bad_field:
+            return located("field out of range");
     }
     return located("unknown codec error");
 }

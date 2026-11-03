@@ -15,6 +15,7 @@ add_executable(tick_store_unit_tests
     gorilla_timestamps_test.cpp
     gorilla_xor_test.cpp
     hash_worker_test.cpp
+    int_primitives_test.cpp
     itch_boundary_test.cpp
     itch_fixtures.cpp
     itch_golden_test.cpp
@@ -25,9 +26,11 @@ add_executable(tick_store_unit_tests
     oracle_flip_test.cpp
     oracle_test.cpp
     page_cache_test.cpp
+    pfor_test.cpp
     roundtrip_cli_test.cpp
     sha256_test.cpp
     slice_test.cpp
+    stream_vbyte_test.cpp
     stub_store_test.cpp
 )
 target_link_libraries(tick_store_unit_tests PRIVATE

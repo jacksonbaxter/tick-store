@@ -28,6 +28,10 @@ enum class CodecErrorKind : std::uint8_t {
     bad_parameter,
     // A double that is not exactly the stored form of an integer price in range.
     not_exact_price,
+    // A field outside its range: an unknown transform, mode or flag, a patch position
+    // past its list's end or out of order, a remainder not below its scale, or a value
+    // that would not fit 64 bits once scaled back.
+    bad_field,
 };
 
 // `offset` is in bits from the first byte of the input the decoder was given: a
@@ -48,6 +52,8 @@ enum class CodecErrorKind : std::uint8_t {
 //                    reuse with no window, expected = 1 and actual = 0
 //   bad_parameter    expected = the largest value allowed, actual = the value given
 //   not_exact_price  expected = 0, actual = the double's bit pattern
+//   bad_field        expected = the largest value allowed (for a patch position, the
+//                    smallest), actual = the value found
 //
 // `field` points at static storage, so an error outlives its input.
 struct CodecError {
