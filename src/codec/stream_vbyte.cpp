@@ -26,7 +26,9 @@ constexpr unsigned kLowBits = 32;
 constexpr std::uint64_t kLowMask = 0xFFFF'FFFFU;
 constexpr std::size_t kCodesPerByte = 4;
 
-constexpr PatchFields kHighFields{.positions = "svb high position", .values = "svb high bits"};
+constexpr PatchFields kHighFields{.gap_width = "svb high gap width",
+                                  .positions = "svb high position",
+                                  .values = "svb high bits"};
 
 // Bytes the low 32 bits of `value` take: 1 to 4.
 [[nodiscard]] constexpr unsigned low_length(std::uint64_t value) noexcept {
@@ -43,15 +45,22 @@ constexpr PatchFields kHighFields{.positions = "svb high position", .values = "s
     std::size_t data = 0;
     std::size_t highs = 0;
     std::uint64_t highest = 0;
-    for (const std::uint64_t value : values) {
+    // The patch list's gaps: the first position, then each distance less one.
+    std::size_t next = 0;
+    std::size_t widest_gap = 0;
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        const std::uint64_t value = values[i];
         data += low_length(value);
-        const std::uint64_t high = value >> kLowBits;
-        highs += high != 0 ? 1U : 0U;
-        highest = std::max(highest, high);
+        if (const std::uint64_t high = value >> kLowBits; high != 0) {
+            ++highs;
+            highest = std::max(highest, high);
+            widest_gap = std::max(widest_gap, i - next);
+            next = i + 1;
+        }
     }
     std::size_t size = 1 + control_bytes(values.size()) + data + kHighCountBytes;
     if (highs > 0) {
-        size += 1 + patch_list_bytes(highs, values.size(),
+        size += 1 + patch_list_bytes(highs, static_cast<unsigned>(std::bit_width(widest_gap)),
                                      static_cast<unsigned>(std::bit_width(highest)));
     }
     return size;
@@ -99,7 +108,7 @@ std::expected<void, CodecError> encode_svb_block(std::span<const std::uint64_t> 
     if (!highs.positions.empty()) {
         const auto width = static_cast<unsigned>(std::bit_width(std::ranges::max(highs.values)));
         out.push_back(static_cast<std::byte>(width));
-        append_patches(highs, coded.size(), width, out);
+        append_patches(highs, width, out);
     }
     // At most 2^20 values of under 9 bytes each, so the payload fits 32 bits.
     patch_block_header(out, header,

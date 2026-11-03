@@ -216,7 +216,8 @@ TEST(LinearPack, RefusesPaddingThatIsNotZeroAndAWrongSize) {
     EXPECT_FALSE(unpack_linear({}, 65, back));
 }
 
-constexpr PatchFields kFields{.positions = "test position", .values = "test value"};
+constexpr PatchFields kFields{
+    .gap_width = "test gap width", .positions = "test position", .values = "test value"};
 
 std::expected<Patches, CodecError> read_list(const Bytes& list, std::size_t count,
                                              std::size_t limit, unsigned value_bits) {
@@ -232,50 +233,74 @@ std::expected<Patches, CodecError> read_list(const Bytes& list, std::size_t coun
 }
 
 TEST(PatchList, GoldenBytesBothWays) {
-    // Positions 1, 2 and 6 of 8 in 3 bits; values 5, 1 and 9 in 4 bits.
+    // Positions 1, 2 and 6 of 8: gaps 1, 0 and 3, in 2 bits. Values 5, 1 and 9 in 4 bits.
     const Patches patches{.positions = {1, 2, 6}, .values = {5, 1, 9}};
+    EXPECT_EQ(patch_gap_bits(patches.positions), 2U);
     Bytes out;
-    append_patches(patches, 8, 4, out);
-    EXPECT_EQ(out, bytes({0x91, 0x01, 0x15, 0x09}));
-    EXPECT_EQ(out.size(), patch_list_bytes(3, 8, 4));
+    append_patches(patches, 4, out);
+    EXPECT_EQ(out, bytes({0x02, 0x31, 0x15, 0x09}));
+    EXPECT_EQ(out.size(), patch_list_bytes(3, 2, 4));
     const auto back = read_list(out, 3, 8, 4);
     ASSERT_TRUE(back.has_value()) << to_string(back.error());
     EXPECT_EQ(back->positions, patches.positions);
     EXPECT_EQ(back->values, patches.values);
-    // A list over one value spends no bits on its position.
+
+    // Positions 0, 1 and 2 are all gaps of 0, which take no bytes.
+    const Patches dense{.positions = {0, 1, 2}, .values = {1, 2, 3}};
+    out.clear();
+    append_patches(dense, 4, out);
+    EXPECT_EQ(out, bytes({0x00, 0x21, 0x03}));
+    const auto dense_back = read_list(out, 3, 3, 4);
+    ASSERT_TRUE(dense_back.has_value()) << to_string(dense_back.error());
+    EXPECT_EQ(dense_back->positions, dense.positions);
+
+    // The widest gap a list over `limit` values can have: none over one value.
     EXPECT_EQ(patch_position_bits(1), 0U);
     EXPECT_EQ(patch_position_bits(2), 1U);
     EXPECT_EQ(patch_position_bits(1024), 10U);
     EXPECT_EQ(patch_position_bits(1025), 11U);
+    // The largest gap sets the width: the last position of 1,024 alone takes all 10 bits.
+    EXPECT_EQ(patch_gap_bits(std::vector<std::uint32_t>{1023}), 10U);
+    EXPECT_EQ(patch_gap_bits(std::vector<std::uint32_t>{0, 1023}), 10U);
+    EXPECT_EQ(patch_gap_bits(std::vector<std::uint32_t>{0, 1, 2}), 0U);
+    EXPECT_EQ(patch_list_bytes(1024, 0, 64), 1U + 8'192U);
+    // No entries are no bytes.
+    out.clear();
+    append_patches(Patches{}, 4, out);
+    EXPECT_TRUE(out.empty());
+    EXPECT_EQ(patch_list_bytes(0, 0, 4), 0U);
 }
 
 TEST(PatchList, EachCorruptionHasItsError) {
-    // Out of order: positions 2 then 1. Bits of the positions start at 80.
-    EXPECT_EQ(read_list(bytes({0x0A, 0x11}), 2, 8, 4),
-              std::unexpected(error_of(CodecErrorKind::bad_field, "test position", 83, 3, 1)));
-    // A repeat is out of order too.
-    EXPECT_EQ(read_list(bytes({0x12, 0x11}), 2, 8, 4),
-              std::unexpected(error_of(CodecErrorKind::bad_field, "test position", 83, 3, 2)));
-    // A position past the limit of 6, in 3 bits.
-    EXPECT_EQ(read_list(bytes({0x06, 0x01}), 1, 6, 4),
-              std::unexpected(error_of(CodecErrorKind::bad_field, "test position", 80, 5, 6)));
+    // A gap width past what 8 positions can need, and one wider than the largest gap.
+    EXPECT_EQ(read_list(bytes({0x04, 0x01, 0x01}), 1, 8, 4),
+              std::unexpected(error_of(CodecErrorKind::bad_width, "test gap width", 80, 3, 4)));
+    EXPECT_EQ(read_list(bytes({0x03, 0x01, 0x01}), 1, 8, 4),
+              std::unexpected(error_of(CodecErrorKind::non_canonical, "test gap width", 80, 1, 3)));
+    // Gaps 2 and 3 put the second position at 6, past the limit of 6. Gaps start at 88.
+    EXPECT_EQ(read_list(bytes({0x02, 0x0E, 0x11}), 2, 6, 4),
+              std::unexpected(error_of(CodecErrorKind::bad_field, "test position", 90, 5, 6)));
+    EXPECT_EQ(read_list(bytes({0x03, 0x06, 0x01}), 1, 6, 4),
+              std::unexpected(error_of(CodecErrorKind::bad_field, "test position", 88, 5, 6)));
     // A zero value.
-    EXPECT_EQ(read_list(bytes({0x01, 0x00}), 1, 8, 4),
-              std::unexpected(error_of(CodecErrorKind::non_canonical, "test value", 88, 1, 0)));
+    EXPECT_EQ(read_list(bytes({0x01, 0x01, 0x00}), 1, 8, 4),
+              std::unexpected(error_of(CodecErrorKind::non_canonical, "test value", 96, 1, 0)));
     // Padding that is not zero, in each part.
-    EXPECT_EQ(read_list(bytes({0x81, 0x01}), 1, 8, 4),
-              std::unexpected(error_of(CodecErrorKind::trailing_bits, "test position", 80, 0, 1)));
-    EXPECT_EQ(read_list(bytes({0x01, 0x21}), 1, 8, 4),
-              std::unexpected(error_of(CodecErrorKind::trailing_bits, "test value", 88, 0, 1)));
+    EXPECT_EQ(read_list(bytes({0x01, 0x03, 0x01}), 1, 8, 4),
+              std::unexpected(error_of(CodecErrorKind::trailing_bits, "test position", 88, 0, 1)));
+    EXPECT_EQ(read_list(bytes({0x01, 0x01, 0x21}), 1, 8, 4),
+              std::unexpected(error_of(CodecErrorKind::trailing_bits, "test value", 96, 0, 1)));
     // Cut short, in each part.
     EXPECT_EQ(read_list(bytes({}), 1, 8, 4),
-              std::unexpected(error_of(CodecErrorKind::truncated, "test position", 80, 8, 0)));
+              std::unexpected(error_of(CodecErrorKind::truncated, "test gap width", 80, 8, 0)));
     EXPECT_EQ(read_list(bytes({0x01}), 1, 8, 4),
-              std::unexpected(error_of(CodecErrorKind::truncated, "test value", 88, 8, 0)));
+              std::unexpected(error_of(CodecErrorKind::truncated, "test position", 88, 8, 0)));
+    EXPECT_EQ(read_list(bytes({0x01, 0x01}), 1, 8, 4),
+              std::unexpected(error_of(CodecErrorKind::truncated, "test value", 96, 8, 0)));
     // A value width the list cannot have.
-    EXPECT_EQ(read_list(bytes({0x01, 0x01}), 1, 8, 0),
+    EXPECT_EQ(read_list(bytes({0x01, 0x01, 0x01}), 1, 8, 0),
               std::unexpected(error_of(CodecErrorKind::bad_width, "test value", 80, 64, 0)));
-    EXPECT_EQ(read_list(bytes({0x01, 0x01}), 1, 8, 65),
+    EXPECT_EQ(read_list(bytes({0x01, 0x01, 0x01}), 1, 8, 65),
               std::unexpected(error_of(CodecErrorKind::bad_width, "test value", 80, 64, 65)));
 }
 

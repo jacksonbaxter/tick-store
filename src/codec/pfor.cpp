@@ -34,6 +34,7 @@ constexpr unsigned kRemainderCountBytes = 4;
 constexpr unsigned kExceptionCountBytes = 2;
 constexpr std::uint64_t kExceptionCountBits = std::uint64_t{kExceptionCountBytes} * 8U;
 constexpr std::uint64_t kHighWidthBits = 8;
+constexpr std::uint64_t kGapWidthBits = 8;
 // The adaptivity yardstick in PforStats: groups of this many values, each paying a
 // width byte.
 constexpr std::size_t kGroupValues = 128;
@@ -42,9 +43,11 @@ constexpr std::uint64_t kGroupWidthBits = 8;
 constexpr std::size_t kScaleRun = 8;
 constexpr std::size_t kCommonDivisors = 3;
 
-constexpr PatchFields kRemainderFields{.positions = "pfor remainder position",
+constexpr PatchFields kRemainderFields{.gap_width = "pfor remainder gap width",
+                                       .positions = "pfor remainder position",
                                        .values = "pfor remainder"};
-constexpr PatchFields kExceptionFields{.positions = "pfor exception position",
+constexpr PatchFields kExceptionFields{.gap_width = "pfor exception gap width",
+                                       .positions = "pfor exception position",
                                        .values = "pfor exception high bits"};
 
 [[nodiscard]] constexpr unsigned width_of(std::uint64_t value) noexcept {
@@ -55,16 +58,17 @@ constexpr PatchFields kExceptionFields{.positions = "pfor exception position",
     return (bits + 7U) / 8U * 8U;
 }
 
-// Bits `count` values take packed at `width` with `exceptions` of `high` bits each, the
-// exception count and high width included. A full vector is whole words; anything
-// shorter is linear and padded to a byte.
+// Bits `count` values take packed at `width` with `exceptions` of `high` bits each, their
+// gaps `gap_bits` wide, the exception count, high width and gap width included. A full
+// vector is whole words; anything shorter is linear and padded to a byte.
 [[nodiscard]] constexpr std::uint64_t body_bits(std::size_t count, unsigned width,
-                                                std::size_t exceptions, unsigned high) noexcept {
+                                                std::size_t exceptions, unsigned high,
+                                                unsigned gap_bits) noexcept {
     const std::uint64_t raw = std::uint64_t{count} * width;
     std::uint64_t bits = (count == kVectorValues ? raw : round_up_to_byte(raw)) + kExceptionCountBits;
     if (exceptions > 0) {
-        bits += kHighWidthBits +
-                round_up_to_byte(std::uint64_t{exceptions} * patch_position_bits(count)) +
+        bits += kHighWidthBits + kGapWidthBits +
+                round_up_to_byte(std::uint64_t{exceptions} * gap_bits) +
                 round_up_to_byte(std::uint64_t{exceptions} * high);
     }
     return bits;
@@ -77,31 +81,57 @@ struct WidthChoice {
     std::uint64_t bits = 0;
 };
 
-// The width that makes `count` values with these widths smallest. Ties keep the wider
-// width, which has fewer exceptions to patch.
-[[nodiscard]] WidthChoice choose_width(const WidthHistogram& widths, std::size_t count,
-                                       bool patch) noexcept {
+// The width that makes values of these bit widths smallest. Ties keep the wider width,
+// which has fewer exceptions to patch. Widths that would leave more than half the values
+// as exceptions are not tried: there each exception costs a gap and high bits on top of
+// the width, so the next width up is nearly always smaller.
+[[nodiscard]] WidthChoice choose_width(std::span<const std::uint8_t> widths, bool patch) noexcept {
+    const std::size_t count = widths.size();
+    WidthHistogram histogram{};
+    for (const std::uint8_t width : widths) {
+        ++histogram[width];
+    }
     unsigned widest = 0;
     for (unsigned w = kWordBits; w > 0; --w) {
-        if (widths[w] != 0) {
+        if (histogram[w] != 0) {
             widest = w;
             break;
         }
     }
     WidthChoice best{.width = widest, .high = 0, .exceptions = 0,
-                     .bits = body_bits(count, widest, 0, 0)};
-    if (!patch) {
+                     .bits = body_bits(count, widest, 0, 0, 0)};
+    if (!patch || widest == 0) {
         return best;
     }
+    // The narrowest width to try, and the exceptions each width from there leaves.
+    std::array<std::size_t, kWordBits + 1> exceptions{};
+    unsigned lowest = widest;
     std::size_t above = 0;
-    for (unsigned w = widest; w > 0; --w) {
-        // Values at least w bits wide, which a width of w - 1 must patch.
-        above += widths[w];
-        const unsigned width = w - 1;
+    while (lowest > 0 && above + histogram[lowest] <= count / 2) {
+        above += histogram[lowest];
+        --lowest;
+        exceptions[lowest] = above;
+    }
+    if (lowest == widest) {
+        return best;
+    }
+    // The widest gap between the exceptions of each width tried, in one pass: a value w
+    // bits wide is an exception at every width below w.
+    std::array<std::size_t, kWordBits + 1> next{};
+    std::array<std::size_t, kWordBits + 1> widest_gap{};
+    for (std::size_t i = 0; i < count; ++i) {
+        const unsigned top = widths[i];
+        for (unsigned b = lowest; b < top; ++b) {
+            widest_gap[b] = std::max(widest_gap[b], i - next[b]);
+            next[b] = i + 1;
+        }
+    }
+    for (unsigned width = widest; width-- > lowest;) {
         const unsigned high = widest - width;
-        const std::uint64_t bits = body_bits(count, width, above, high);
+        const std::uint64_t bits = body_bits(count, width, exceptions[width], high,
+                                             width_of(widest_gap[width]));
         if (bits < best.bits) {
-            best = {.width = width, .high = high, .exceptions = above, .bits = bits};
+            best = {.width = width, .high = high, .exceptions = exceptions[width], .bits = bits};
         }
     }
     return best;
@@ -134,15 +164,24 @@ struct VectorPlan {
     return least ^ kSignBit;
 }
 
+using VectorWidths = std::array<std::uint8_t, kVectorValues>;
+
+// The bit width of each value's offset from `base` in this mode, into `widths`.
+[[nodiscard]] std::span<const std::uint8_t> widths_of(std::span<const std::uint64_t> y, bool zigzag,
+                                                      std::uint64_t base,
+                                                      VectorWidths& widths) noexcept {
+    for (std::size_t i = 0; i < y.size(); ++i) {
+        widths[i] = static_cast<std::uint8_t>(width_of(mode_value(y[i], zigzag) - base));
+    }
+    return std::span<const std::uint8_t>{widths}.first(y.size());
+}
+
 [[nodiscard]] VectorPlan plan_vector(std::span<const std::uint64_t> y, bool patch) noexcept {
     VectorPlan best;
+    VectorWidths widths{};
     for (const bool zigzag : {false, true}) {
         const std::uint64_t base = base_of(y, zigzag);
-        WidthHistogram widths{};
-        for (const std::uint64_t value : y) {
-            ++widths[width_of(mode_value(value, zigzag) - base)];
-        }
-        const WidthChoice width = choose_width(widths, y.size(), patch);
+        const WidthChoice width = choose_width(widths_of(y, zigzag, base, widths), patch);
         const std::uint64_t total = width.bits + (8U * (kVectorHeaderBytes + bytes_for(base)));
         if (!zigzag || total < best.total_bits) {
             best = {.zigzag = zigzag, .base = base, .width = width, .total_bits = total};
@@ -154,14 +193,13 @@ struct VectorPlan {
 // What a full vector would take with a width per group of 128, in the plan's mode and base.
 [[nodiscard]] std::uint64_t bits_per_group(std::span<const std::uint64_t> y,
                                            const VectorPlan& plan, bool patch) noexcept {
+    VectorWidths storage{};
+    const std::span<const std::uint8_t> widths = widths_of(y, plan.zigzag, plan.base, storage);
     std::uint64_t bits = 0;
-    for (std::size_t at = 0; at < y.size(); at += kGroupValues) {
-        WidthHistogram widths{};
-        const std::span<const std::uint64_t> group = y.subspan(at, std::min(kGroupValues, y.size() - at));
-        for (const std::uint64_t value : group) {
-            ++widths[width_of(mode_value(value, plan.zigzag) - plan.base)];
-        }
-        bits += choose_width(widths, group.size(), patch).bits + kGroupWidthBits;
+    for (std::size_t at = 0; at < widths.size(); at += kGroupValues) {
+        bits += choose_width(widths.subspan(at, std::min(kGroupValues, widths.size() - at)), patch)
+                    .bits +
+                kGroupWidthBits;
     }
     return bits;
 }
@@ -206,7 +244,7 @@ void emit_vector(std::span<const std::uint64_t> y, const VectorPlan& plan,
     append_le(out, scratch.patches.positions.size(), kExceptionCountBytes);
     if (!scratch.patches.positions.empty()) {
         out.push_back(static_cast<std::byte>(plan.width.high));
-        append_patches(scratch.patches, y.size(), plan.width.high, out);
+        append_patches(scratch.patches, plan.width.high, out);
     }
 }
 
@@ -245,7 +283,7 @@ void encode_scaled(std::span<const std::uint64_t> values, std::uint64_t scale,
             }
         }
         append_le(out, remainders.positions.size(), kRemainderCountBytes);
-        append_patches(remainders, count, width_of(scale - 1), out);
+        append_patches(remainders, width_of(scale - 1), out);
         ++stats.scaled_blocks;
         stats.remainders += remainders.positions.size();
     }

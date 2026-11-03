@@ -127,7 +127,8 @@ const Bytes& golden2_payload() {
     static const Bytes value = bytes({
     0x00, 0x01, 0x64,                                // none, scale 100
     0x01, 0x00, 0x00, 0x00,                          // one remainder
-    0x05,                                            // at index 5, in 4 bits
+    0x03,                                            // gaps in 3 bits
+    0x05,                                            // the first, at index 5
     0x25,                                            // of 37, in 7 bits
     0x00, 0x04, 0x02, 0xF0, 0x01,                    // plain, width 4, base 496
     0x74, 0xE1, 0x39, 0x65, 0x82, 0xB4, 0x70, 0x45,  // q - 496, a nibble each
@@ -149,7 +150,7 @@ const Bytes& golden3_payload() {
     0xCF, 0x10, 0x26,                          // low 3 bits: 7, 1, 3, 0, 1, 4, 1, 1
     0x03, 0x00,                                // three exceptions
     0x12,                                      // of 18 high bits
-    0x60, 0x01,                                // at 0, 4 and 5, in 3 bits
+    0x02, 0x0C,                                // at 0, 4 and 5: gaps 0, 3, 0 in 2 bits
     0xF9, 0x00, 0x54, 0x3E, 0x4F, 0xF9, 0x3C,  // 249, 249749, 249748
 });
     return value;
@@ -242,9 +243,9 @@ TEST(Pfor, EveryExceptionEdgeIsPatchedAndRoundTrips) {
             const Bytes block = encoded(values, kPatchedFor, kVectorValues, &stats);
             EXPECT_EQ(stats.exceptions, 1U);
             // Header fields, the vector header, the packed values, the exception count,
-            // its high width, a 10-bit position and the high bits.
-            EXPECT_EQ(block.size(),
-                      kBlockHeaderSize + 3 + 3 + vector_bytes(width) + 2 + 1 + 2 + ((high + 7) / 8));
+            // its high width, a gap width, the 10-bit gap of 777 and the high bits.
+            EXPECT_EQ(block.size(), kBlockHeaderSize + 3 + 3 + vector_bytes(width) + 2 + 1 + 1 +
+                                        2 + ((high + 7) / 8));
             EXPECT_EQ(decoded_block(block), values);
         }
     }
@@ -388,20 +389,21 @@ TEST(Pfor, SeededWalksRoundTripInEveryVariant) {
 // A silent change in the format or the encoder's choices changes these sizes (T4).
 TEST(Pfor, EncodedSizeIsPinned) {
     EXPECT_EQ(block_of(4, golden1_payload()).size(), 20U);
-    EXPECT_EQ(block_of(16, golden2_payload()).size(), 32U);
+    EXPECT_EQ(block_of(16, golden2_payload()).size(), 33U);
     EXPECT_EQ(block_of(8, golden3_payload()).size(), 30U);
 
     // 10,000 timestamps 25 us apart, delta, in blocks of 4,096. Each block's first delta
     // is its first value, a 45-bit exception over a base of 25,000; every other offset is
     // 0, so every vector has width 0. A first vector is 3 header bytes, a 2-byte base, an
-    // exception count, a high width, a 10-bit position and 45 high bits: 16 bytes. Any
-    // other vector is 7. So 8 + 3 + 16 + 3 * 7 = 48 bytes for each full block, and
-    // 8 + 3 + 16 + 7 = 34 for the last, of 1,808 values: 130 in all.
+    // exception count, a high width, a gap width of 0, no gap bytes, since its one
+    // exception is at 0, and 45 high bits: 15 bytes. Any other vector is 7. So
+    // 8 + 3 + 15 + 3 * 7 = 47 bytes for each full block, and 8 + 3 + 15 + 7 = 33 for the
+    // last, of 1,808 values: 127 in all.
     Values regular;
     for (std::uint64_t i = 0; i < 10'000; ++i) {
         regular.push_back(34'200'000'000'000ULL + (i * 25'000));
     }
-    EXPECT_EQ(encoded(regular, kDelta).size(), 130U);
+    EXPECT_EQ(encoded(regular, kDelta).size(), 127U);
 
     // Gaps uniform below 50 us take 16 bits a value as deltas and 17 as delta-of-deltas,
     // and a walk of whole cents with steps of at most 20 takes 6 bits at scale 100: so
@@ -412,19 +414,19 @@ TEST(Pfor, EncodedSizeIsPinned) {
         jittered.push_back(jittered.back() + (random() % 50'000));
     }
     PforStats stats;
-    EXPECT_EQ(encoded(jittered, kDelta, kDefaultBlockValues, &stats).size(), 20'113U);
+    EXPECT_EQ(encoded(jittered, kDelta, kDefaultBlockValues, &stats).size(), 20'110U);
     EXPECT_EQ(stats.full_vectors, 9U);
     EXPECT_EQ(stats.tail_values, 784U);
     EXPECT_EQ(stats.exceptions, 3U);
     EXPECT_EQ(encoded(jittered, PforOptions{.transform = IntTransform::delta_of_delta,
                                             .adaptive_scale = false, .patch = true})
                   .size(),
-              21'364U);
+              21'250U);
     const Values prices = walk(3, 10'000, 100);
     EXPECT_EQ(encoded(prices, PforOptions{.transform = IntTransform::delta,
                                           .adaptive_scale = true, .patch = true})
                   .size(),
-              7'607U);
+              7'604U);
 }
 
 TEST(Pfor, EncoderRefusesBadParameters) {
@@ -497,17 +499,23 @@ TEST(Pfor, EachRemainderCorruptionHasItsError) {
     EXPECT_EQ(decoded_block(with(3, 17)),
               std::unexpected(
                   error_of(CodecErrorKind::bad_count, "pfor remainder count", 88, 16, 17)));
-    EXPECT_EQ(decoded_block(with(8, 100)),
+    EXPECT_EQ(decoded_block(with(9, 100)),
               std::unexpected(error_of(CodecErrorKind::bad_field, "pfor remainder", 120, 99, 100)));
-    EXPECT_EQ(decoded_block(with(8, 0)),
-              std::unexpected(error_of(CodecErrorKind::non_canonical, "pfor remainder", 128, 1, 0)));
-    // Two remainders at the same position.
+    EXPECT_EQ(decoded_block(with(9, 0)),
+              std::unexpected(error_of(CodecErrorKind::non_canonical, "pfor remainder", 136, 1, 0)));
+    EXPECT_EQ(decoded_block(with(7, 5)),
+              std::unexpected(
+                  error_of(CodecErrorKind::bad_width, "pfor remainder gap width", 120, 4, 5)));
+    EXPECT_EQ(decoded_block(with(7, 4)),
+              std::unexpected(
+                  error_of(CodecErrorKind::non_canonical, "pfor remainder gap width", 120, 3, 4)));
+    // Two remainders, gaps 5 and 15: the second at 21, past the block's 16 values.
     EXPECT_EQ(decoded_block(block_of(16, joined({bytes({0x00, 0x01, 0x64, 0x02, 0x00, 0x00, 0x00,
-                                                        0x55, 0x25, 0x00}),
-                                                 Bytes(golden2_payload().begin() + 9,
+                                                        0x04, 0xF5, 0xA5, 0x12}),
+                                                 Bytes(golden2_payload().begin() + 10,
                                                        golden2_payload().end())}))),
               std::unexpected(
-                  error_of(CodecErrorKind::bad_field, "pfor remainder position", 124, 6, 5)));
+                  error_of(CodecErrorKind::bad_field, "pfor remainder position", 132, 15, 21)));
 
     // q * s past 2^64 - 1: scale 2^63 and q = 2.
     EXPECT_EQ(decoded_block(block_of(1, bytes({0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -516,11 +524,11 @@ TEST(Pfor, EachRemainderCorruptionHasItsError) {
               std::unexpected(
                   error_of(CodecErrorKind::bad_field, "pfor scaled value", 224, 1, 2)));
     // q * s + r past 2^64 - 1: scale 3, q = (2^64 - 1) / 3 and a remainder of 1.
-    EXPECT_EQ(decoded_block(block_of(1, bytes({0x00, 0x01, 0x03, 0x01, 0x00, 0x00, 0x00, 0x01,
-                                               0x00, 0x00, 0x08, 0x55, 0x55, 0x55, 0x55, 0x55,
-                                               0x55, 0x55, 0x55, 0x00, 0x00}))),
+    EXPECT_EQ(decoded_block(block_of(1, bytes({0x00, 0x01, 0x03, 0x01, 0x00, 0x00, 0x00, 0x00,
+                                               0x01, 0x00, 0x00, 0x08, 0x55, 0x55, 0x55, 0x55,
+                                               0x55, 0x55, 0x55, 0x55, 0x00, 0x00}))),
               std::unexpected(
-                  error_of(CodecErrorKind::bad_field, "pfor scaled value", 232, kMax - 1, kMax)));
+                  error_of(CodecErrorKind::bad_field, "pfor scaled value", 240, kMax - 1, kMax)));
 }
 
 TEST(Pfor, EachVectorCorruptionHasItsError) {
@@ -584,16 +592,25 @@ TEST(Pfor, EachExceptionCorruptionHasItsError) {
               std::unexpected(error_of(CodecErrorKind::bad_width, "pfor high width", 160, 61, 62)));
     // The same exceptions in 19 bits, one more than the highest needs.
     const Bytes head(golden3_payload().begin(), golden3_payload().begin() + 12);
-    EXPECT_EQ(decoded_block(block_of(8, joined({head, bytes({19}), linear({0, 4, 5}, 3),
+    EXPECT_EQ(decoded_block(block_of(8, joined({head, bytes({19, 2}), linear({0, 3, 0}, 2),
                                                 linear({249, 249'749, 249'748}, 19)}))),
               std::unexpected(
                   error_of(CodecErrorKind::non_canonical, "pfor high width", 160, 18, 19)));
-    // Positions out of order, and a zero high part.
-    EXPECT_EQ(decoded_block(block_of(8, joined({head, bytes({18}), linear({0, 5, 4}, 3),
+    // A gap width past what 8 positions can need, and one wider than the largest gap.
+    EXPECT_EQ(decoded_block(with(13, 4)),
+              std::unexpected(
+                  error_of(CodecErrorKind::bad_width, "pfor exception gap width", 168, 3, 4)));
+    EXPECT_EQ(decoded_block(block_of(8, joined({head, bytes({18, 3}), linear({0, 3, 0}, 3),
                                                 linear({249, 249'749, 249'748}, 18)}))),
               std::unexpected(
-                  error_of(CodecErrorKind::bad_field, "pfor exception position", 174, 6, 4)));
-    EXPECT_EQ(decoded_block(block_of(8, joined({head, bytes({18}), linear({0, 4, 5}, 3),
+                  error_of(CodecErrorKind::non_canonical, "pfor exception gap width", 168, 2, 3)));
+    // Gaps 0, 3 and 5 put the last position at 10, past the vector's 8 values; and a zero
+    // high part.
+    EXPECT_EQ(decoded_block(block_of(8, joined({head, bytes({18, 3}), linear({0, 3, 5}, 3),
+                                                linear({249, 249'749, 249'748}, 18)}))),
+              std::unexpected(
+                  error_of(CodecErrorKind::bad_field, "pfor exception position", 182, 7, 10)));
+    EXPECT_EQ(decoded_block(block_of(8, joined({head, bytes({18, 2}), linear({0, 3, 0}, 2),
                                                 linear({249, 0, 249'748}, 18)}))),
               std::unexpected(
                   error_of(CodecErrorKind::non_canonical, "pfor exception high bits", 202, 1, 0)));

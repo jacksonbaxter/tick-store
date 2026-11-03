@@ -42,9 +42,10 @@
 //   - Per vector, plain against zigzag, whichever is smaller. Plain takes the base as the
 //     smallest value read as signed, so a column that only rises, like timestamps, pays
 //     no sign bit; zigzag puts a large step either way among the exceptions.
-//   - Per vector, the width b that makes the vector smallest, exceptions counted, and the
-//     base as the smallest value in the mode chosen. With patch off, b is the widest
-//     value's width and there are no exceptions.
+//   - Per vector, the width b that makes the vector smallest, exceptions counted, among
+//     the widths that leave at most half its values as exceptions, and the base as the
+//     smallest value in the mode chosen. With patch off, b is the widest value's width
+//     and there are no exceptions.
 //
 // So unlike the Gorilla codecs a sequence has more than one valid encoding, and the
 // decoder checks structure, not the encoder's choices: every field in range, every size

@@ -92,7 +92,8 @@ const Bytes& golden_payload() {
     0x00,                    // the low half of 2^40
     0x01, 0x00, 0x00, 0x00,  // one high patch
     0x09,                    // of 9 bits
-    0x04,                    // at index 4, in 3 bits
+    0x03,                    // its gap in 3 bits
+    0x04,                    // at index 4
     0x00, 0x01,              // 256
 });
     return value;
@@ -109,14 +110,15 @@ TEST(StreamVByte, EmptyColumnHasNoBlocks) {
 }
 
 // What a block of one value takes, from the format: its fields, one control byte, the
-// low bytes, the high count, and a high width and patch if the high half is not zero.
+// low bytes, the high count, and if the high half is not zero a high width, a gap width
+// of 0, no gap bytes since the one position is 0, and the high bits.
 std::size_t one_value_size(std::uint64_t value) {
     const auto low = static_cast<std::uint32_t>(value);
     const std::size_t length =
         std::max<std::size_t>(1, (static_cast<std::size_t>(std::bit_width(low)) + 7) / 8);
     const std::uint64_t high = value >> 32U;
     const std::size_t patch =
-        high == 0 ? 0 : 1 + ((static_cast<std::size_t>(std::bit_width(high)) + 7) / 8);
+        high == 0 ? 0 : 2 + ((static_cast<std::size_t>(std::bit_width(high)) + 7) / 8);
     return kBlockHeaderSize + 1 + 1 + length + 4 + patch;
 }
 
@@ -178,20 +180,20 @@ TEST(StreamVByte, SeededWalksRoundTripAtEveryBlockSize) {
 
 // A silent change in the format changes these sizes (T4).
 TEST(StreamVByte, EncodedSizeIsPinned) {
-    EXPECT_EQ(block_of(5, golden_payload()).size(), 27U);
+    EXPECT_EQ(block_of(5, golden_payload()).size(), 28U);
 
     // 10,000 timestamps 25 us apart: each block's first delta is its first value, 4 low
     // bytes and a 13-bit high patch, and every other delta is 25,000 in 2 bytes. A block
     // of 4,096 is a header, flags, 1,024 control bytes, 4 + 4,095 * 2 data bytes, the
-    // high count, a high width, a 12-bit position and 13 high bits: 8 + 1 + 1,024 + 8,194
-    // + 4 + 1 + 2 + 2 = 9,236. The last, of 1,808, is 8 + 1 + 452 + 3,618 + 4 + 1 + 2 + 2
-    // = 4,088: 22,560 in all.
+    // high count, a high width, a gap width of 0 with no gap bytes, since the one position
+    // is 0, and 13 high bits: 8 + 1 + 1,024 + 8,194 + 4 + 1 + 1 + 2 = 9,235. The last, of
+    // 1,808, is 8 + 1 + 452 + 3,618 + 4 + 1 + 1 + 2 = 4,087: 22,557 in all.
     Values regular;
     for (std::uint64_t i = 0; i < 10'000; ++i) {
         regular.push_back(34'200'000'000'000ULL + (i * 25'000));
     }
     SvbStats stats;
-    EXPECT_EQ(encoded(regular, true, kDefaultBlockValues, &stats).size(), 22'560U);
+    EXPECT_EQ(encoded(regular, true, kDefaultBlockValues, &stats).size(), 22'557U);
     EXPECT_EQ(stats.lengths, (std::array<std::uint64_t, 4>{0, 9'997, 0, 3}));
     EXPECT_EQ(stats.highs, 3U);
     EXPECT_EQ(stats.zigzag_blocks, 0U);
@@ -210,19 +212,20 @@ TEST(StreamVByte, EncoderRefusesBadBlockSizes) {
 
 // One fixture per check in the decoder, each asserting the exact error (T1). Offsets are
 // bits from the start of the block: flags at 64, control at 72, data at 88, the high
-// count at 152, its width at 184, the position at 192 and the high bits at 200.
+// count at 152, its width at 184, the gap width at 192, the gap at 200 and the high bits
+// at 208.
 TEST(StreamVByte, EachCorruptionHasItsError) {
     EXPECT_EQ(decoded_block(Bytes{}),
               std::unexpected(error_of(CodecErrorKind::truncated, "block header", 0, 64, 0)));
     EXPECT_EQ(decoded_block(block_of(0, golden_payload())),
               std::unexpected(error_of(CodecErrorKind::bad_count, "block count", 0, 1, 0)));
-    // Twenty values need at least 26 payload bytes; 19 hold at most 13.
+    // Twenty values need at least 26 payload bytes; 20 hold at most 14.
     EXPECT_EQ(decoded_block(block_of(20, golden_payload())),
-              std::unexpected(error_of(CodecErrorKind::bad_count, "block count", 0, 13, 20)));
+              std::unexpected(error_of(CodecErrorKind::bad_count, "block count", 0, 14, 20)));
     Bytes cut = block_of(5, golden_payload());
     cut.pop_back();
     EXPECT_EQ(decoded_block(cut),
-              std::unexpected(error_of(CodecErrorKind::truncated, "block payload", 64, 152, 144)));
+              std::unexpected(error_of(CodecErrorKind::truncated, "block payload", 64, 160, 152)));
 
     const auto with = [](std::size_t at, unsigned value) {
         Bytes payload = golden_payload();
@@ -237,7 +240,7 @@ TEST(StreamVByte, EachCorruptionHasItsError) {
     // 5 in two bytes.
     EXPECT_EQ(decoded_block(block_of(5, bytes({0x01, 0x85, 0x00, 0x05, 0x00, 0x27, 0x01, 0x00,
                                                0x44, 0x10, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00,
-                                               0x09, 0x04, 0x00, 0x01}))),
+                                               0x09, 0x03, 0x04, 0x00, 0x01}))),
               std::unexpected(error_of(CodecErrorKind::non_canonical, "svb length", 88, 1, 2)));
     // Five codes of 4 bytes, and 8 data bytes.
     EXPECT_EQ(decoded_block(block_of(5, bytes({0x01, 0xFF, 0x03, 0, 0, 0, 0, 0, 0, 0, 0}))),
@@ -250,21 +253,24 @@ TEST(StreamVByte, EachCorruptionHasItsError) {
               std::unexpected(error_of(CodecErrorKind::bad_width, "svb high width", 184, 32, 33)));
     // 256 in 10 bits, one more than it needs.
     Bytes wide(golden_payload().begin(), golden_payload().begin() + 15);
-    wide.insert(wide.end(), {std::byte{10}, std::byte{0x04}, std::byte{0x00}, std::byte{0x01}});
+    wide.insert(wide.end(), {std::byte{10}, std::byte{0x03}, std::byte{0x04}, std::byte{0x00},
+                             std::byte{0x01}});
     EXPECT_EQ(decoded_block(block_of(5, wide)),
               std::unexpected(
                   error_of(CodecErrorKind::non_canonical, "svb high width", 184, 9, 10)));
-    EXPECT_EQ(decoded_block(with(16, 5)),
-              std::unexpected(error_of(CodecErrorKind::bad_field, "svb high position", 192, 4, 5)));
+    EXPECT_EQ(decoded_block(with(16, 4)),
+              std::unexpected(error_of(CodecErrorKind::bad_width, "svb high gap width", 192, 3, 4)));
+    EXPECT_EQ(decoded_block(with(17, 5)),
+              std::unexpected(error_of(CodecErrorKind::bad_field, "svb high position", 200, 4, 5)));
     Bytes zero = golden_payload();
-    zero[17] = std::byte{0};
     zero[18] = std::byte{0};
+    zero[19] = std::byte{0};
     EXPECT_EQ(decoded_block(block_of(5, zero)),
-              std::unexpected(error_of(CodecErrorKind::non_canonical, "svb high bits", 200, 1, 0)));
+              std::unexpected(error_of(CodecErrorKind::non_canonical, "svb high bits", 208, 1, 0)));
     Bytes spare = golden_payload();
     spare.push_back(std::byte{0});
     EXPECT_EQ(decoded_block(block_of(5, spare)),
-              std::unexpected(error_of(CodecErrorKind::trailing_bits, "svb block", 216, 0, 8)));
+              std::unexpected(error_of(CodecErrorKind::trailing_bits, "svb block", 224, 0, 8)));
 }
 
 TEST(StreamVByte, ColumnCountMustMatchExactly) {
