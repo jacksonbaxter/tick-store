@@ -10,6 +10,7 @@ add_executable(tick_store_unit_tests
     columns_test.cpp
     frame_cursor_test.cpp
     fuzz_regression_test.cpp
+    gorilla_timestamps_test.cpp
     hash_worker_test.cpp
     itch_boundary_test.cpp
     itch_fixtures.cpp

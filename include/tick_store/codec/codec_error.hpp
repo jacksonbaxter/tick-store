@@ -35,7 +35,8 @@ enum class CodecErrorKind : std::uint8_t {
 // at whole bytes, so their offsets are multiples of 8. `expected` and `actual` are
 // the values in conflict:
 //
-//   truncated        expected = bits `field` needs, actual = bits left
+//   truncated        expected = bits `field` needs, actual = bits left; for a whole
+//                    column, expected = its values and actual = the values found
 //   bad_width        expected = 64, actual = the width asked for
 //   bad_count        expected = the largest count allowed (or 1 for an empty block),
 //                    actual = the count found

@@ -81,4 +81,39 @@ std::expected<void, CodecError> check_block_values(std::size_t block_values) {
     return {};
 }
 
+std::expected<void, CodecError> decode_column(std::span<const std::byte> column,
+                                              std::uint64_t count, std::vector<std::uint64_t>& out,
+                                              BlockDecoder decode_block) {
+    const std::size_t start = out.size();
+    const auto fail = [&](CodecError error) {
+        out.resize(start);
+        return std::unexpected(error);
+    };
+    std::size_t offset = 0;
+    std::uint64_t decoded = 0;
+    while (offset < column.size()) {
+        if (decoded == count) {
+            return fail(codec_error(CodecErrorKind::trailing_bits, "column", offset * 8U, 0,
+                                    (column.size() - offset) * 8U));
+        }
+        const auto taken = decode_block(column.subspan(offset), out);
+        if (!taken.has_value()) {
+            CodecError error = taken.error();
+            error.offset += offset * 8U;
+            return fail(error);
+        }
+        decoded = out.size() - start;
+        if (decoded > count) {
+            return fail(codec_error(CodecErrorKind::bad_count, "column count", offset * 8U,
+                                    count, decoded));
+        }
+        offset += *taken;
+    }
+    if (decoded < count) {
+        return fail(codec_error(CodecErrorKind::truncated, "column values", column.size() * 8U,
+                                count, decoded));
+    }
+    return {};
+}
+
 }  // namespace tick_store::codec

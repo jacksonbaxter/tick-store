@@ -65,4 +65,19 @@ void patch_block_header(std::vector<std::byte>& out, std::size_t header_offset,
 // Checks an encoder's block size: 1 to kMaxBlockValues.
 [[nodiscard]] std::expected<void, CodecError> check_block_values(std::size_t block_values);
 
+// Decodes the block at the front of its input, appending its values, and returns the
+// bytes it took. Every codec's block decoder has this shape.
+using BlockDecoder = std::expected<std::size_t, CodecError> (*)(std::span<const std::byte>,
+                                                                std::vector<std::uint64_t>&);
+
+// Walks a column of blocks back to back, which must hold exactly `count` values, and
+// appends them to `out`. Errors carry offsets from the column's first byte. On error,
+// `out` keeps what it held before. For a column short of `count`, the error is
+// truncated with expected = `count` and actual = the values found; for one with more,
+// bad_count with the same two values, or trailing_bits for bytes after the last value.
+[[nodiscard]] std::expected<void, CodecError> decode_column(std::span<const std::byte> column,
+                                                            std::uint64_t count,
+                                                            std::vector<std::uint64_t>& out,
+                                                            BlockDecoder decode_block);
+
 }  // namespace tick_store::codec
