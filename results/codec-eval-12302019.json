@@ -1,0 +1,687 @@
+{
+  "tool": "tick_codec_eval",
+  "schema": 1,
+  "tool_version": "1",
+  "day": "12302019",
+  "source": "12302019.NASDAQ_ITCH50",
+  "host": "macOS",
+  "commit": "b9f4407e793a",
+  "tree_dirty": false,
+  "compiler": "Clang 23.1.4",
+  "build_type": "Release",
+  "sanitizers": "none",
+  "build_preset": "bench",
+  "peak_rss_bytes": 8726970368,
+  "peak_rss_note": "Peak resident size counts the clean file-backed pages of the read-only mapping of the source. peak_memory_footprint_bytes is what the process held beyond that mapping. Both are from /usr/bin/time -l around the whole run, the two exhaustive Price(4) proofs included.",
+  "peak_memory_footprint_bytes": 462051832,
+  "block_values": 4096,
+  "messages": 268744780,
+  "raw_messages_skipped": 0,
+  "stop": "end at offset 8251407909: expected 0 bytes, have 0",
+  "every_value_exact": true,
+  "not_counted": "A per-locate column also needs a stored permutation or ordinal to rebuild file order. That cost is not in its stored bytes.",
+  "price4_exhaustive_proofs": [
+    {
+      "representation": "dollars",
+      "checked": 4294967296,
+      "failures": 0,
+      "first_failure": null
+    },
+    {
+      "representation": "integer_as_double",
+      "checked": 4294967296,
+      "failures": 0,
+      "first_failure": null
+    }
+  ],
+  "targets": {
+    "CR-3": {
+      "what": "Timestamp column at most 20.0 bits per value",
+      "bits_per_value_at_most": 20.000000
+    },
+    "CR-4": {
+      "what": "Add-order price column at most 7.9 bits per value",
+      "bits_per_value_at_most": 7.900000
+    },
+    "CR-5": {
+      "what": "Best integer scheme at least 1.53x smaller than Gorilla XOR on the same price column",
+      "ratio_at_least": 1.530000,
+      "status": "no integer scheme is registered yet: the gorilla-xor-f64-dollars figures are its baseline"
+    }
+  },
+  "columns": [
+    {
+      "name": "timestamp",
+      "source": "every message's timestamp",
+      "kind": "timestamp_ns",
+      "order": "file",
+      "values": 268744780,
+      "streams": 1,
+      "ideal_delta_bits": 17.146540,
+      "ideal_delta_of_delta_bits": 18.437192,
+      "codecs": [
+        {
+          "codec": "gorilla-dod",
+          "what": "Gorilla delta-of-delta, nanosecond buckets of 16, 19 and 23 bits",
+          "representation": "identity",
+          "values": 268744780,
+          "blocks": 65612,
+          "block_bytes": 685445226,
+          "header_bytes": 524896,
+          "metadata_bytes": 8,
+          "stored_bytes": 685445234,
+          "bits_per_value": 20.404347,
+          "exact": true,
+          "blocks_refused": 0,
+          "word_mismatches": 0,
+          "representation_failures": 0,
+          "examples": [],
+          "counters": {
+            "zero": 2015081,
+            "bucket_16_bits": 153730499,
+            "bucket_19_bits": 79955039,
+            "bucket_23_bits": 31604452,
+            "escape_64_bits": 1374097
+          }
+        }
+      ],
+      "comparison": {
+        "best_exact_codec": "gorilla-dod",
+        "best_bits_per_value": 20.404347,
+        "target": "CR-3",
+        "target_what": "Timestamp column at most 20.0 bits per value",
+        "target_bits_per_value_at_most": 20.000000,
+        "met": false,
+        "gap_bits_per_value": 0.404347,
+        "census_ideal_delta_bits": 17.146540,
+        "census_ideal_delta_of_delta_bits": 18.437192
+      }
+    },
+    {
+      "name": "timestamp_per_locate",
+      "source": "every message's timestamp, one stream per stock locate",
+      "kind": "timestamp_ns",
+      "order": "per_locate",
+      "values": 268744780,
+      "streams": 8907,
+      "ideal_delta_bits": 23.365792,
+      "ideal_delta_of_delta_bits": 26.782485,
+      "codecs": [
+        {
+          "codec": "gorilla-dod",
+          "what": "Gorilla delta-of-delta, nanosecond buckets of 16, 19 and 23 bits",
+          "representation": "identity",
+          "values": 268744780,
+          "blocks": 70686,
+          "block_bytes": 1493998891,
+          "header_bytes": 565488,
+          "metadata_bytes": 89070,
+          "stored_bytes": 1494087961,
+          "bits_per_value": 44.476040,
+          "exact": true,
+          "blocks_refused": 0,
+          "word_mismatches": 0,
+          "representation_failures": 0,
+          "examples": [],
+          "counters": {
+            "zero": 1972629,
+            "bucket_16_bits": 54337055,
+            "bucket_19_bits": 34644847,
+            "bucket_23_bits": 45962446,
+            "escape_64_bits": 131757117
+          }
+        }
+      ],
+      "comparison": {
+        "best_exact_codec": "gorilla-dod",
+        "best_bits_per_value": 44.476040,
+        "target": "CR-3",
+        "target_what": "Timestamp column at most 20.0 bits per value",
+        "target_bits_per_value_at_most": 20.000000,
+        "met": false,
+        "gap_bits_per_value": 24.476040,
+        "census_ideal_delta_bits": 23.365792,
+        "census_ideal_delta_of_delta_bits": 26.782485
+      }
+    },
+    {
+      "name": "add_price",
+      "source": "A and F price",
+      "kind": "price4",
+      "order": "file",
+      "values": 118631456,
+      "streams": 1,
+      "ideal_delta_bits": 18.646124,
+      "ideal_delta_of_delta_bits": 21.403875,
+      "codecs": [
+        {
+          "codec": "gorilla-xor-f64-dollars",
+          "what": "Gorilla XOR on the dollar value as a double, price / 10^4 or / 10^8",
+          "representation": "dollars",
+          "values": 118631456,
+          "blocks": 28963,
+          "block_bytes": 803993799,
+          "header_bytes": 231704,
+          "metadata_bytes": 8,
+          "stored_bytes": 803993807,
+          "bits_per_value": 54.217917,
+          "exact": true,
+          "blocks_refused": 0,
+          "word_mismatches": 0,
+          "representation_failures": 0,
+          "examples": [],
+          "counters": {
+            "zero": 18803606,
+            "reuse": 99573368,
+            "new_window": 225519,
+            "data_bits": 6207261340
+          }
+        },
+        {
+          "codec": "gorilla-xor-f64-integer",
+          "what": "Gorilla XOR on the integer price as a double",
+          "representation": "integer_as_double",
+          "values": 118631456,
+          "blocks": 28963,
+          "block_bytes": 339953930,
+          "header_bytes": 231704,
+          "metadata_bytes": 8,
+          "stored_bytes": 339953938,
+          "bits_per_value": 22.925045,
+          "exact": true,
+          "blocks_refused": 0,
+          "word_mismatches": 0,
+          "representation_failures": 0,
+          "examples": [],
+          "counters": {
+            "zero": 18803606,
+            "reuse": 97001754,
+            "new_window": 2797133,
+            "data_bits": 2466652800
+          }
+        },
+        {
+          "codec": "gorilla-xor-u64-integer",
+          "what": "Gorilla XOR on the raw integer price",
+          "representation": "identity",
+          "values": 118631456,
+          "blocks": 28963,
+          "block_bytes": 433481590,
+          "header_bytes": 231704,
+          "metadata_bytes": 8,
+          "stored_bytes": 433481598,
+          "bits_per_value": 29.232152,
+          "exact": true,
+          "blocks_refused": 0,
+          "word_mismatches": 0,
+          "representation_failures": 0,
+          "examples": [],
+          "counters": {
+            "zero": 18803606,
+            "reuse": 99715920,
+            "new_window": 82967,
+            "data_bits": 3244724160
+          }
+        }
+      ],
+      "comparison": {
+        "best_exact_codec": "gorilla-xor-f64-integer",
+        "best_bits_per_value": 22.925045,
+        "target": "CR-4",
+        "target_what": "Add-order price column at most 7.9 bits per value",
+        "target_bits_per_value_at_most": 7.900000,
+        "met": false,
+        "gap_bits_per_value": 15.025045,
+        "xor_dollars_over_xor_u64_integer": 1.854736,
+        "xor_dollars_over_xor_f64_integer": 2.365008,
+        "cr5_bits_per_value_an_integer_scheme_must_reach": 35.436547
+      }
+    },
+    {
+      "name": "add_price_per_locate",
+      "source": "A and F price, one stream per stock locate",
+      "kind": "price4",
+      "order": "per_locate",
+      "values": 118631456,
+      "streams": 8892,
+      "ideal_delta_bits": 9.545864,
+      "ideal_delta_of_delta_bits": 11.691721,
+      "codecs": [
+        {
+          "codec": "gorilla-xor-f64-dollars",
+          "what": "Gorilla XOR on the dollar value as a double, price / 10^4 or / 10^8",
+          "representation": "dollars",
+          "values": 118631456,
+          "blocks": 34946,
+          "block_bytes": 546997543,
+          "header_bytes": 279568,
+          "metadata_bytes": 88920,
+          "stored_bytes": 547086463,
+          "bits_per_value": 36.893180,
+          "exact": true,
+          "blocks_refused": 0,
+          "word_mismatches": 0,
+          "representation_failures": 0,
+          "examples": [],
+          "counters": {
+            "zero": 37686915,
+            "reuse": 80654266,
+            "new_window": 255329,
+            "data_bits": 4169067005
+          }
+        },
+        {
+          "codec": "gorilla-xor-f64-integer",
+          "what": "Gorilla XOR on the integer price as a double",
+          "representation": "integer_as_double",
+          "values": 118631456,
+          "blocks": 34946,
+          "block_bytes": 196612456,
+          "header_bytes": 279568,
+          "metadata_bytes": 88920,
+          "stored_bytes": 196701376,
+          "bits_per_value": 13.264703,
+          "exact": true,
+          "blocks_refused": 0,
+          "word_mismatches": 0,
+          "representation_failures": 0,
+          "examples": [],
+          "counters": {
+            "zero": 37686915,
+            "reuse": 80651032,
+            "new_window": 258563,
+            "data_bits": 1365953958
+          }
+        },
+        {
+          "codec": "gorilla-xor-u64-integer",
+          "what": "Gorilla XOR on the raw integer price",
+          "representation": "identity",
+          "values": 118631456,
+          "blocks": 34946,
+          "block_bytes": 340623955,
+          "header_bytes": 279568,
+          "metadata_bytes": 88920,
+          "stored_bytes": 340712875,
+          "bits_per_value": 22.976225,
+          "exact": true,
+          "blocks_refused": 0,
+          "word_mismatches": 0,
+          "representation_failures": 0,
+          "examples": [],
+          "counters": {
+            "zero": 37686915,
+            "reuse": 80852567,
+            "new_window": 57028,
+            "data_bits": 2520215904
+          }
+        }
+      ],
+      "comparison": {
+        "best_exact_codec": "gorilla-xor-f64-integer",
+        "best_bits_per_value": 13.264703,
+        "target": "CR-4",
+        "target_what": "Add-order price column at most 7.9 bits per value",
+        "target_bits_per_value_at_most": 7.900000,
+        "met": false,
+        "gap_bits_per_value": 5.364703,
+        "xor_dollars_over_xor_u64_integer": 1.605711,
+        "xor_dollars_over_xor_f64_integer": 2.781305,
+        "cr5_bits_per_value_an_integer_scheme_must_reach": 24.113190
+      }
+    },
+    {
+      "name": "replace_price",
+      "source": "U price",
+      "kind": "price4",
+      "order": "file",
+      "values": 21639067,
+      "streams": 1,
+      "ideal_delta_bits": 19.600910,
+      "ideal_delta_of_delta_bits": 21.156658,
+      "codecs": [
+        {
+          "codec": "gorilla-xor-f64-dollars",
+          "what": "Gorilla XOR on the dollar value as a double, price / 10^4 or / 10^8",
+          "representation": "dollars",
+          "values": 21639067,
+          "blocks": 5283,
+          "block_bytes": 149556892,
+          "header_bytes": 42264,
+          "metadata_bytes": 8,
+          "stored_bytes": 149556900,
+          "bits_per_value": 55.291441,
+          "exact": true,
+          "blocks_refused": 0,
+          "word_mismatches": 0,
+          "representation_failures": 0,
+          "examples": [],
+          "counters": {
+            "zero": 2879121,
+            "reuse": 18705271,
+            "new_window": 49392,
+            "data_bits": 1154829033
+          }
+        },
+        {
+          "codec": "gorilla-xor-f64-integer",
+          "what": "Gorilla XOR on the integer price as a double",
+          "representation": "integer_as_double",
+          "values": 21639067,
+          "blocks": 5283,
+          "block_bytes": 63503613,
+          "header_bytes": 42264,
+          "metadata_bytes": 8,
+          "stored_bytes": 63503621,
+          "bits_per_value": 23.477397,
+          "exact": true,
+          "blocks_refused": 0,
+          "word_mismatches": 0,
+          "representation_failures": 0,
+          "examples": [],
+          "counters": {
+            "zero": 2879121,
+            "reuse": 18074940,
+            "new_window": 679723,
+            "data_bits": 459468904
+          }
+        },
+        {
+          "codec": "gorilla-xor-u64-integer",
+          "what": "Gorilla XOR on the raw integer price",
+          "representation": "identity",
+          "values": 21639067,
+          "blocks": 5283,
+          "block_bytes": 80413518,
+          "header_bytes": 42264,
+          "metadata_bytes": 8,
+          "stored_bytes": 80413526,
+          "bits_per_value": 29.729018,
+          "exact": true,
+          "blocks_refused": 0,
+          "word_mismatches": 0,
+          "representation_failures": 0,
+          "examples": [],
+          "counters": {
+            "zero": 2879121,
+            "reuse": 18740603,
+            "new_window": 14060,
+            "data_bits": 602067981
+          }
+        }
+      ],
+      "comparison": {
+        "best_exact_codec": "gorilla-xor-f64-integer",
+        "best_bits_per_value": 23.477397,
+        "xor_dollars_over_xor_u64_integer": 1.859848,
+        "xor_dollars_over_xor_f64_integer": 2.355092,
+        "cr5_bits_per_value_an_integer_scheme_must_reach": 36.138197
+      }
+    },
+    {
+      "name": "executed_price",
+      "source": "C execution price",
+      "kind": "price4",
+      "order": "file",
+      "values": 99917,
+      "streams": 1,
+      "ideal_delta_bits": 15.381958,
+      "ideal_delta_of_delta_bits": 19.137323,
+      "codecs": [
+        {
+          "codec": "gorilla-xor-f64-dollars",
+          "what": "Gorilla XOR on the dollar value as a double, price / 10^4 or / 10^8",
+          "representation": "dollars",
+          "values": 99917,
+          "blocks": 25,
+          "block_bytes": 547720,
+          "header_bytes": 200,
+          "metadata_bytes": 8,
+          "stored_bytes": 547728,
+          "bits_per_value": 43.854639,
+          "exact": true,
+          "blocks_refused": 0,
+          "word_mismatches": 0,
+          "representation_failures": 0,
+          "examples": [],
+          "counters": {
+            "zero": 32698,
+            "reuse": 67036,
+            "new_window": 158,
+            "data_bits": 4209642
+          }
+        },
+        {
+          "codec": "gorilla-xor-f64-integer",
+          "what": "Gorilla XOR on the integer price as a double",
+          "representation": "integer_as_double",
+          "values": 99917,
+          "blocks": 25,
+          "block_bytes": 226874,
+          "header_bytes": 200,
+          "metadata_bytes": 8,
+          "stored_bytes": 226882,
+          "bits_per_value": 18.165637,
+          "exact": true,
+          "blocks_refused": 0,
+          "word_mismatches": 0,
+          "representation_failures": 0,
+          "examples": [],
+          "counters": {
+            "zero": 32698,
+            "reuse": 66566,
+            "new_window": 628,
+            "data_bits": 1637715
+          }
+        },
+        {
+          "codec": "gorilla-xor-u64-integer",
+          "what": "Gorilla XOR on the raw integer price",
+          "representation": "identity",
+          "values": 99917,
+          "blocks": 25,
+          "block_bytes": 294775,
+          "header_bytes": 200,
+          "metadata_bytes": 8,
+          "stored_bytes": 294783,
+          "bits_per_value": 23.602230,
+          "exact": true,
+          "blocks_refused": 0,
+          "word_mismatches": 0,
+          "representation_failures": 0,
+          "examples": [],
+          "counters": {
+            "zero": 32698,
+            "reuse": 67118,
+            "new_window": 76,
+            "data_bits": 2186984
+          }
+        }
+      ],
+      "comparison": {
+        "best_exact_codec": "gorilla-xor-f64-integer",
+        "best_bits_per_value": 18.165637,
+        "xor_dollars_over_xor_u64_integer": 1.858072,
+        "xor_dollars_over_xor_f64_integer": 2.414154,
+        "cr5_bits_per_value_an_integer_scheme_must_reach": 28.663163
+      }
+    },
+    {
+      "name": "trade_price",
+      "source": "P price",
+      "kind": "price4",
+      "order": "file",
+      "values": 1218602,
+      "streams": 1,
+      "ideal_delta_bits": 17.810778,
+      "ideal_delta_of_delta_bits": 21.083602,
+      "codecs": [
+        {
+          "codec": "gorilla-xor-f64-dollars",
+          "what": "Gorilla XOR on the dollar value as a double, price / 10^4 or / 10^8",
+          "representation": "dollars",
+          "values": 1218602,
+          "blocks": 298,
+          "block_bytes": 7728266,
+          "header_bytes": 2384,
+          "metadata_bytes": 8,
+          "stored_bytes": 7728274,
+          "bits_per_value": 50.735344,
+          "exact": true,
+          "blocks_refused": 0,
+          "word_mismatches": 0,
+          "representation_failures": 0,
+          "examples": [],
+          "counters": {
+            "zero": 270074,
+            "reuse": 946429,
+            "new_window": 1801,
+            "data_bits": 59600631
+          }
+        },
+        {
+          "codec": "gorilla-xor-f64-integer",
+          "what": "Gorilla XOR on the integer price as a double",
+          "representation": "integer_as_double",
+          "values": 1218602,
+          "blocks": 298,
+          "block_bytes": 3430216,
+          "header_bytes": 2384,
+          "metadata_bytes": 8,
+          "stored_bytes": 3430224,
+          "bits_per_value": 22.519077,
+          "exact": true,
+          "blocks_refused": 0,
+          "word_mismatches": 0,
+          "representation_failures": 0,
+          "examples": [],
+          "counters": {
+            "zero": 270074,
+            "reuse": 934052,
+            "new_window": 14178,
+            "data_bits": 25080022
+          }
+        },
+        {
+          "codec": "gorilla-xor-u64-integer",
+          "what": "Gorilla XOR on the raw integer price",
+          "representation": "identity",
+          "values": 1218602,
+          "blocks": 298,
+          "block_bytes": 4181021,
+          "header_bytes": 2384,
+          "metadata_bytes": 8,
+          "stored_bytes": 4181029,
+          "bits_per_value": 27.448036,
+          "exact": true,
+          "blocks_refused": 0,
+          "word_mismatches": 0,
+          "representation_failures": 0,
+          "examples": [],
+          "counters": {
+            "zero": 270074,
+            "reuse": 947406,
+            "new_window": 824,
+            "data_bits": 31233321
+          }
+        }
+      ],
+      "comparison": {
+        "best_exact_codec": "gorilla-xor-f64-integer",
+        "best_bits_per_value": 22.519077,
+        "xor_dollars_over_xor_u64_integer": 1.848414,
+        "xor_dollars_over_xor_f64_integer": 2.252994,
+        "cr5_bits_per_value_an_integer_scheme_must_reach": 33.160356
+      }
+    },
+    {
+      "name": "mwcb_level",
+      "source": "V levels 1, 2 and 3, in that order: the only Price(8) fields",
+      "kind": "price8",
+      "order": "file",
+      "values": 3,
+      "streams": 1,
+      "ideal_delta_bits": 34.000000,
+      "ideal_delta_of_delta_bits": 31.000000,
+      "codecs": [
+        {
+          "codec": "gorilla-xor-f64-dollars",
+          "what": "Gorilla XOR on the dollar value as a double, price / 10^4 or / 10^8",
+          "representation": "dollars",
+          "values": 3,
+          "blocks": 1,
+          "block_bytes": 32,
+          "header_bytes": 8,
+          "metadata_bytes": 8,
+          "stored_bytes": 40,
+          "bits_per_value": 106.666667,
+          "exact": true,
+          "blocks_refused": 0,
+          "word_mismatches": 0,
+          "representation_failures": 0,
+          "examples": [],
+          "counters": {
+            "zero": 0,
+            "reuse": 0,
+            "new_window": 2,
+            "data_bits": 99
+          }
+        },
+        {
+          "codec": "gorilla-xor-f64-integer",
+          "what": "Gorilla XOR on the integer price as a double",
+          "representation": "integer_as_double",
+          "values": 3,
+          "blocks": 1,
+          "block_bytes": 27,
+          "header_bytes": 8,
+          "metadata_bytes": 8,
+          "stored_bytes": 35,
+          "bits_per_value": 93.333333,
+          "exact": true,
+          "blocks_refused": 0,
+          "word_mismatches": 0,
+          "representation_failures": 0,
+          "examples": [],
+          "counters": {
+            "zero": 0,
+            "reuse": 0,
+            "new_window": 2,
+            "data_bits": 58
+          }
+        },
+        {
+          "codec": "gorilla-xor-u64-integer",
+          "what": "Gorilla XOR on the raw integer price",
+          "representation": "identity",
+          "values": 3,
+          "blocks": 1,
+          "block_bytes": 27,
+          "header_bytes": 8,
+          "metadata_bytes": 8,
+          "stored_bytes": 35,
+          "bits_per_value": 93.333333,
+          "exact": true,
+          "blocks_refused": 0,
+          "word_mismatches": 0,
+          "representation_failures": 0,
+          "examples": [],
+          "counters": {
+            "zero": 0,
+            "reuse": 0,
+            "new_window": 2,
+            "data_bits": 55
+          }
+        }
+      ],
+      "comparison": {
+        "best_exact_codec": "gorilla-xor-f64-integer",
+        "best_bits_per_value": 93.333333,
+        "xor_dollars_over_xor_u64_integer": 1.142857,
+        "xor_dollars_over_xor_f64_integer": 1.142857,
+        "cr5_bits_per_value_an_integer_scheme_must_reach": 69.716776
+      }
+    }
+  ],
+  "wall_seconds": 56.399892
+}
