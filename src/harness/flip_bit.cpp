@@ -50,7 +50,10 @@ std::expected<FlippedByte, std::string> flip_bit(const std::filesystem::path& pa
     if (bit > 7U) {
         return std::unexpected(std::format("bit {} is not in 0..7", bit));
     }
-    if (std::cmp_greater(byte_offset, std::numeric_limits<off_t>::max())) {
+    // pread and pwrite take an off_t, spelled std::int64_t here because glibc defines off_t in
+    // whichever libc header comes first, which clang-tidy's include-cleaner then asks for. A
+    // narrower off_t would fail -Wconversion at those calls.
+    if (std::cmp_greater(byte_offset, std::numeric_limits<std::int64_t>::max())) {
         return std::unexpected(
             std::format("byte offset {} is past the end of the file", byte_offset));
     }
@@ -71,7 +74,7 @@ std::expected<FlippedByte, std::string> flip_bit(const std::filesystem::path& pa
                                            byte_offset, info.st_size));
     }
 
-    const auto offset = static_cast<off_t>(byte_offset);
+    const auto offset = static_cast<std::int64_t>(byte_offset);
     std::array<std::uint8_t, 1> value{};
     if (::pread(file.get(), value.data(), value.size(), offset) != 1) {
         return system_failure("pread");

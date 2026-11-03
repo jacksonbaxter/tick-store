@@ -247,8 +247,7 @@ public:
                 const auto got = ::read(in, buffer.data(), buffer.size());
                 ASSERT_GT(got, 0);
                 seen.append(buffer.data(), static_cast<std::size_t>(got));
-                ASSERT_EQ(::write(out, reply.data(), reply.size()),
-                          static_cast<ssize_t>(reply.size()));
+                ASSERT_EQ(::write(out, reply.data(), reply.size()), std::ssize(reply));
             }
             ::close(in);
             ::close(out);

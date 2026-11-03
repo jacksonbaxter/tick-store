@@ -777,7 +777,7 @@ std::expected<void, StoreError> ColumnsWriter::drain(std::size_t threshold) {
         }
         std::span<const std::byte> left = buffer;
         while (!left.empty()) {
-            const ssize_t written = ::write(fds_[i], left.data(), left.size());
+            const auto written = ::write(fds_[i], left.data(), left.size());
             if (written < 0) {
                 if (errno == EINTR) {
                     continue;
@@ -815,7 +815,7 @@ std::expected<ColumnsSummary, StoreError> ColumnsWriter::finish(std::span<const 
     }
     std::span<const std::byte> left = text_bytes(manifest);
     while (!left.empty()) {
-        const ssize_t written = ::write(fd, left.data(), left.size());
+        const auto written = ::write(fd, left.data(), left.size());
         if (written < 0) {
             if (errno == EINTR) {
                 continue;

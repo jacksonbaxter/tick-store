@@ -176,7 +176,7 @@ std::expected<void, std::string> read_through(const std::filesystem::path& path)
     }
     std::vector<char> buffer(kReadChunk);
     while (true) {
-        const ssize_t got = ::read(fd, buffer.data(), buffer.size());
+        const auto got = ::read(fd, buffer.data(), buffer.size());
         if (got == 0) {
             ::close(fd);
             return {};

@@ -114,7 +114,7 @@ std::expected<void, std::string> CounterGate::command(std::string_view text) {
     if (status_ != CounterStatus::gated) {
         return {};
     }
-    if (::write(control_fd_, text.data(), text.size()) != static_cast<ssize_t>(text.size())) {
+    if (::write(control_fd_, text.data(), text.size()) != std::ssize(text)) {
         return std::unexpected(
             std::format("cannot write to the perf control FIFO: {}", last_error()));
     }
@@ -125,7 +125,7 @@ std::expected<void, std::string> CounterGate::command(std::string_view text) {
             std::format("perf did not acknowledge within {} ms", ack_timeout_.count()));
     }
     std::array<char, 16> reply{};
-    const ssize_t got = ::read(acknowledge_fd_, reply.data(), reply.size());
+    const auto got = ::read(acknowledge_fd_, reply.data(), reply.size());
     if (got < 3 || !std::string_view{reply.data(), static_cast<std::size_t>(got)}.starts_with("ack")) {
         return std::unexpected(std::string{"perf sent something other than an acknowledgement"});
     }

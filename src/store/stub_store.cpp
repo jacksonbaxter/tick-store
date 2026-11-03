@@ -66,7 +66,7 @@ static_assert(kLargestFrame < kWriteBufferSize);
 [[nodiscard]] std::expected<void, StoreError> write_all(int fd,
                                                         std::span<const std::byte> bytes) noexcept {
     while (!bytes.empty()) {
-        const ssize_t written = ::write(fd, bytes.data(), bytes.size());
+        const auto written = ::write(fd, bytes.data(), bytes.size());
         if (written < 0) {
             if (errno == EINTR) {
                 continue;
@@ -78,11 +78,13 @@ static_assert(kLargestFrame < kWriteBufferSize);
     return {};
 }
 
+// The offset is pwrite's off_t, spelled std::int64_t as in flip_bit.cpp, and a narrower off_t
+// would fail -Wconversion at the call.
 [[nodiscard]] std::expected<void, StoreError> write_all_at(int fd,
                                                            std::span<const std::byte> bytes,
-                                                           off_t offset) noexcept {
+                                                           std::int64_t offset) noexcept {
     while (!bytes.empty()) {
-        const ssize_t written = ::pwrite(fd, bytes.data(), bytes.size(), offset);
+        const auto written = ::pwrite(fd, bytes.data(), bytes.size(), offset);
         if (written < 0) {
             if (errno == EINTR) {
                 continue;
