@@ -5,12 +5,14 @@ add_executable(tick_store_unit_tests
     big_endian_test.cpp
     bit_stream_test.cpp
     census_test.cpp
+    codec_real_day_test.cpp
     columns_cli_test.cpp
     columns_flip_test.cpp
     columns_test.cpp
     frame_cursor_test.cpp
     fuzz_regression_test.cpp
     gorilla_timestamps_test.cpp
+    gorilla_xor_test.cpp
     hash_worker_test.cpp
     itch_boundary_test.cpp
     itch_fixtures.cpp
@@ -34,7 +36,7 @@ target_include_directories(tick_store_unit_tests PRIVATE ${PROJECT_SOURCE_DIR}/f
 set_source_files_properties(fuzz_regression_test.cpp PROPERTIES
     COMPILE_DEFINITIONS "TICK_STORE_CRASHER_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/crashers\""
 )
-set_source_files_properties(itch_real_day_test.cpp PROPERTIES
+set_source_files_properties(itch_real_day_test.cpp codec_real_day_test.cpp PROPERTIES
     COMPILE_DEFINITIONS "TICK_STORE_DATA_DIR=\"${TICK_STORE_DATA_DIR}\""
 )
 

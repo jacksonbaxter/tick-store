@@ -4,6 +4,7 @@
 #include "tick_store/codec/block.hpp"
 #include "tick_store/codec/codec_error.hpp"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -167,11 +168,12 @@ std::expected<void, CodecError> encode_timestamps(std::span<const std::uint64_t>
     if (const auto checked = check_block_values(block_values); !checked.has_value()) {
         return checked;
     }
+    const std::size_t start = out.size();
     for (std::size_t at = 0; at < values.size(); at += block_values) {
-        const std::size_t size = values.size() - at < block_values ? values.size() - at
-                                                                   : block_values;
+        const std::size_t size = std::min(values.size() - at, block_values);
         if (const auto block = encode_timestamp_block(values.subspan(at, size), out, stats);
             !block.has_value()) {
+            out.resize(start);
             return block;
         }
     }

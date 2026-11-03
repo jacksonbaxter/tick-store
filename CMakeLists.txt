@@ -32,6 +32,8 @@ target_sources(tick_store_core PRIVATE
     src/codec/block.cpp
     src/codec/codec_error.cpp
     src/codec/gorilla_timestamps.cpp
+    src/codec/gorilla_xor.cpp
+    src/codec/price_double.cpp
     src/itch/codec.cpp
     src/itch/frame.cpp
     src/store/columns.cpp
