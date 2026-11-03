@@ -501,8 +501,12 @@ public:
         Stream& into = streams_[stream];
         into.pending.push_back(value);
         const bool count = spec_->exact_entropy;
+        const bool timestamps = spec_->kind == ValueKind::timestamp_ns;
         shapes_[stream].observe(value, delta_, dod_, count ? &deltas_ : nullptr,
-                                count && spec_->kind == ValueKind::timestamp_ns ? &dods_ : nullptr);
+                                count && timestamps ? &dods_ : nullptr);
+        if (count && !timestamps) {
+            values_seen_.add(value);
+        }
         ++values_;
         if (into.pending.size() == options_.block_values) {
             flush(into, locate);
@@ -539,6 +543,8 @@ public:
                             .entropy_delta_of_delta_bits = std::nullopt,
                             .distinct_deltas = 0,
                             .distinct_delta_of_deltas = 0,
+                            .entropy_value_bits = std::nullopt,
+                            .distinct_values = 0,
                             .codecs = std::move(results_)};
         if (spec_->exact_entropy) {
             column.entropy_delta_bits = deltas_.entropy_bits();
@@ -546,6 +552,9 @@ public:
             if (spec_->kind == ValueKind::timestamp_ns) {
                 column.entropy_delta_of_delta_bits = dods_.entropy_bits();
                 column.distinct_delta_of_deltas = dods_.distinct();
+            } else {
+                column.entropy_value_bits = values_seen_.entropy_bits();
+                column.distinct_values = values_seen_.distinct();
             }
         }
         return column;
@@ -642,6 +651,7 @@ private:
     Log2Histogram dod_;
     ValueCounter deltas_;
     ValueCounter dods_;
+    ValueCounter values_seen_;
     std::uint64_t values_ = 0;
     std::vector<CodecResult> results_;
     std::vector<std::uint64_t> words_;
@@ -942,6 +952,8 @@ void write_column(JsonWriter& json, const ColumnResult& column) {
     json.field("distinct_deltas", column.distinct_deltas);
     json.field("entropy_delta_of_delta_bits", column.entropy_delta_of_delta_bits);
     json.field("distinct_delta_of_deltas", column.distinct_delta_of_deltas);
+    json.field("entropy_value_bits", column.entropy_value_bits);
+    json.field("distinct_values", column.distinct_values);
     json.key("codecs");
     json.begin_array();
     for (const CodecResult& result : column.codecs) {

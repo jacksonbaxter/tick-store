@@ -163,6 +163,11 @@ struct ColumnResult {
     std::optional<double> entropy_delta_of_delta_bits;
     std::uint64_t distinct_deltas = 0;
     std::uint64_t distinct_delta_of_deltas = 0;
+    // For prices, the exact order-0 entropy of the values themselves, in bits per value:
+    // the floor for a code with no context at all, the same in every order. Absent for
+    // timestamps, which are nearly all distinct.
+    std::optional<double> entropy_value_bits;
+    std::uint64_t distinct_values = 0;
     std::vector<CodecResult> codecs;
 };
 

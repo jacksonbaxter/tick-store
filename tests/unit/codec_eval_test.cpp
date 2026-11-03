@@ -433,6 +433,7 @@ TEST(CodecEval, ExactEntropiesAreThoseOfTheDeltasEachColumnSees) {
     EXPECT_NEAR(*timestamps.entropy_delta_of_delta_bits, entropy_of(dods), 1e-12);
     EXPECT_EQ(timestamps.distinct_deltas, distinct_of(deltas));
     EXPECT_EQ(timestamps.distinct_delta_of_deltas, distinct_of(dods));
+    EXPECT_FALSE(timestamps.entropy_value_bits.has_value());
     // By hand: 11 deltas, 500 three times and 1 twice, the other six once each.
     EXPECT_EQ(deltas.size(), 11U);
     EXPECT_EQ(timestamps.distinct_deltas, 8U);
@@ -451,11 +452,23 @@ TEST(CodecEval, ExactEntropiesAreThoseOfTheDeltasEachColumnSees) {
         EXPECT_NEAR(*got.entropy_delta_bits, entropy_of(price_deltas), 1e-12) << name;
         EXPECT_EQ(got.distinct_deltas, distinct_of(price_deltas)) << name;
         EXPECT_FALSE(got.entropy_delta_of_delta_bits.has_value()) << name;
+        // The values' own entropy, the same whatever the order.
+        std::vector<std::uint64_t> values;
+        for (const std::vector<std::uint64_t>& stream : streams) {
+            values.insert(values.end(), stream.begin(), stream.end());
+        }
+        ASSERT_TRUE(got.entropy_value_bits.has_value()) << name;
+        EXPECT_NEAR(*got.entropy_value_bits, entropy_of(values), 1e-12) << name;
+        EXPECT_EQ(got.distinct_values, distinct_of(values)) << name;
     };
     expect_price_entropy("add_price", {day.add_prices});
     expect_price_entropy("add_price_per_locate", streams_of(day.add_prices_by_locate));
     expect_price_entropy("add_price_per_locate_side", streams_of(day.add_prices_by_side));
     expect_price_entropy("trade_price", {day.trade_prices});
+    // By hand: six add prices, 1,234,500 twice and four others once each.
+    const std::optional<double> add_values = column(*result, "add_price").entropy_value_bits;
+    ASSERT_TRUE(add_values.has_value());
+    EXPECT_NEAR(*add_values, std::log2(6.0) - (2.0 / 6.0), 1e-12);
 }
 
 TEST(CodecEval, PermutationEstimateIsTheEntropyOfTheLocateSequence) {
@@ -639,6 +652,7 @@ TEST(CodecEvalCli, WritesJsonWithNoPathsAndExitsZero) {
     EXPECT_TRUE(text.contains(R"("against_best_gorilla")"));
     EXPECT_TRUE(text.contains(R"("permutation_estimate")"));
     EXPECT_TRUE(text.contains(R"("entropy_delta_bits")"));
+    EXPECT_TRUE(text.contains(R"("entropy_value_bits")"));
     EXPECT_TRUE(text.contains(R"("price4_exhaustive_proofs": [])"));
     EXPECT_FALSE(text.contains(dir.path().string()));
     EXPECT_TRUE(output.out.contains("timestamp"));
