@@ -50,6 +50,7 @@ if(TICK_STORE_BUILD_TESTS OR TICK_STORE_BUILD_TOOLS OR TICK_STORE_BUILD_BENCH)
     add_library(tick_store_harness STATIC)
     target_sources(tick_store_harness PRIVATE
         src/harness/census.cpp
+        src/harness/codec_eval.cpp
         src/harness/columns_reader.cpp
         src/harness/compare_tools_cli.cpp
         src/harness/data_tools_cli.cpp

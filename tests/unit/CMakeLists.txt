@@ -5,6 +5,7 @@ add_executable(tick_store_unit_tests
     big_endian_test.cpp
     bit_stream_test.cpp
     census_test.cpp
+    codec_eval_test.cpp
     codec_real_day_test.cpp
     columns_cli_test.cpp
     columns_flip_test.cpp

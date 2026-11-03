@@ -9,3 +9,9 @@ tick_store_add_tool(tick_coldcache)
 tick_store_add_tool(tick_export)
 tick_store_add_tool(tick_roundtrip)
 tick_store_add_tool(tick_slice)
+
+# The codec measurement names the build that made it, which only bench_support knows.
+if(TARGET tick_store_bench_support)
+    tick_store_add_tool(tick_codec_eval)
+    target_link_libraries(tick_codec_eval PRIVATE tick_store_bench_support)
+endif()
