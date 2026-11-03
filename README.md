@@ -176,8 +176,8 @@ The tables below are generated from the results files by `scripts/render_results
 
 | Case | Commit | Passes | Messages/s | Spread (CV) | Batch | p50 µs | p99 µs | p99.9 µs | Cycles/msg | Instr/msg | Branch misses/msg | Load at start |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `itch_decode` | `40bc4b4ea765` | 10 | 59.64 M | 0.58% | 1024 msgs | 17.35 | 20.98 | 34.98 | 59.71 | 134.96 | 0.51 | 1.40 |
-| `itch_decode_encode` | `40bc4b4ea765` | 10 | 33.98 M | 0.90% | 1024 msgs | 29.98 | 40.55 | 53.08 | 105.13 | 271.38 | 0.51 | 1.34 |
+| `itch_decode` | `1b7cfe196483` | 10 | 59.79 M | 0.25% | 1024 msgs | 17.44 | 21.80 | 35.08 | 59.76 | 134.96 | 0.51 | 0.78 |
+| `itch_decode_encode` | `1b7cfe196483` | 10 | 33.88 M | 0.24% | 1024 msgs | 29.98 | 39.27 | 51.19 | 105.18 | 271.38 | 0.51 | 0.81 |
 
 Percentiles are the time for one whole batch, in microseconds, with the timer resolving 10.01 ns.
 
@@ -185,8 +185,8 @@ Percentiles are the time for one whole batch, in microseconds, with the timer re
 
 | Case | Commit | Passes | Messages/s | Spread (CV) | Batch | p50 µs | p99 µs | p99.9 µs | Cycles/msg | Instr/msg | Branch misses/msg | Load at start |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `itch_decode` | `40bc4b4ea765` | 10 | 124.12 M | 0.67% | 1024 msgs | 8.38 | 10.92 | 13.88 | n/a | n/a | n/a | 3.90 |
-| `itch_decode_encode` | `40bc4b4ea765` | 10 | 69.02 M | 0.42% | 1024 msgs | 14.62 | 17.58 | 21.88 | n/a | n/a | n/a | 3.75 |
+| `itch_decode` | `ad2bab57a412` | 10 | 130.06 M | 0.80% | 1024 msgs | 8.21 | 9.46 | 12.79 | n/a | n/a | n/a | 3.80 |
+| `itch_decode_encode` | `ad2bab57a412` | 10 | 69.86 M | 0.67% | 1024 msgs | 14.42 | 17.08 | 21.92 | n/a | n/a | n/a | 3.65 |
 
 Percentiles are the time for one whole batch, in microseconds, with the timer resolving 41.67 ns.
 <!-- results:end -->
