@@ -441,6 +441,11 @@ With no file list given, the step fails on the Linux host on an injected C-style
 741 s, and in `affinity_linux.cpp` in 717 s. A first cast in `affinity_linux.cpp`, inside an argument of the `CPU_SET` macro, went
 unreported, so the check does not look inside that macro's expansion, and the proof used a cast outside any macro.
 
+The whole of `scripts/check.sh` ran on the Linux host at `469e9cd`, in 1,491 s on three cores: 17 of 21 steps pass, clang-tidy
+among them. `coverage` and `hygiene` fail because `coverage_report.py` and `check_hygiene.py` call git, and the exported tree has
+none. `actionlint` fails because it is not installed there, and `py-compare` skips with no `.venv`. On macOS the same commit's
+code passes all 21, and a checkout on a Linux CI runner has git.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
