@@ -443,8 +443,8 @@ unreported, so the check does not look inside that macro's expansion, and the pr
 
 The whole of `scripts/check.sh` ran on the Linux host at `469e9cd`, in 1,491 s on three cores: 17 of 21 steps pass, clang-tidy
 among them. `coverage` and `hygiene` fail because `coverage_report.py` and `check_hygiene.py` call git, and the exported tree has
-none. `actionlint` fails because it is not installed there, and `py-compare` skips with no `.venv`. On macOS the same commit's
-code passes all 21, and a checkout on a Linux CI runner has git.
+none. `actionlint` fails because it is not installed there, and `py-compare` skips with no `.venv`. On macOS all 21 pass at
+`55ab1d2`, whose code differs only by a workflow comment, and a checkout on a Linux CI runner has git.
 
 ## Process notes
 
