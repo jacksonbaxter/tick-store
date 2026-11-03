@@ -242,6 +242,20 @@ files_of_other_platforms() {
     fi
 }
 
+# The tracked C++ sources. A tree exported with git archive, as a sync to the Linux host
+# makes, has no .git and carries a COMMIT file instead, and every file in it is tracked.
+# Without this, clang-tidy on that host found no files, and so never saw the Linux-only ones.
+tracked_sources() {
+    if [[ $(git rev-parse --show-toplevel 2>/dev/null) == "$ROOT" ]]; then
+        git ls-files 'src/*.cpp' 'tests/*.cpp' 'fuzz/*.cpp' 'tools/*.cpp' 'bench/*.cpp'
+    elif [[ -f COMMIT ]]; then
+        find src tests fuzz tools bench -type f -name '*.cpp' | LC_ALL=C sort
+    else
+        echo "neither a git work tree nor an exported tree with a COMMIT file, so no sources"
+        return 1
+    fi
+}
+
 # Each tracked source has to be found in a compile database, or be named above. A new file
 # in no build fails here rather than going unchecked. Headers are covered through the
 # sources that include them, by HeaderFilterRegex in .clang-tidy.
@@ -256,7 +270,7 @@ step_clang_tidy() {
     if [[ -n $TIDY_FILES ]]; then
         selected=${TIDY_FILES//,/ }
     else
-        selected=$(git ls-files 'src/*.cpp' 'tests/*.cpp' 'fuzz/*.cpp' 'tools/*.cpp' 'bench/*.cpp')
+        selected=$(tracked_sources) || { echo "$selected"; return 1; }
     fi
     for file in $selected; do
         if printf '%s\n' "$other" | grep -qx -- "$file"; then
@@ -274,6 +288,8 @@ step_clang_tidy() {
     done
     for preset in $presets; do
         if [[ -s $LOG_DIR/.tidy-$preset ]]; then
+            echo "== clang-tidy -p build/$preset:"
+            sed 's/^/   /' "$LOG_DIR/.tidy-$preset"
             xargs -n 1 -P "$JOBS" clang-tidy --quiet -p "build/$preset" \
                 <"$LOG_DIR/.tidy-$preset" || code=1
         fi
