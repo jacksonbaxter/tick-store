@@ -115,9 +115,12 @@ shift 2
 exec "$@"
 """
 
+# Each run adds one case's jiffies to the stand-in stat file, so every case sees time pass.
 PERF = """#!/bin/bash
 echo "perf $*" >> {record}
-cp {stat}.after {stat}
+awk 'NR == FNR {{ step[$1] = $0; next }}
+     $1 in step {{ split(step[$1], add); for (i = 2; i <= NF; i++) $i += add[i] }}
+     {{ print }}' {stat}.step {stat} > {stat}.next && mv {stat}.next {stat}
 while [ "$1" != "--" ]; do
   if [ "$1" = "-o" ]; then out=$2; fi
   shift
@@ -145,6 +148,21 @@ STAT_AFTER = ("cpu  9 9 9 9 9 9 9 9 0 0\ncpu4 9000 0 9000 1000 0 0 0 0 0 0\n"
 # 2000 busy jiffies on the sibling while another job held the lock, and then the same case.
 STAT_AFTER_A_WAIT = STAT_BEFORE.replace("cpu5 100 0 100", "cpu5 1100 0 1100")
 STAT_AFTER_THE_WAIT_AND_CASE = STAT_AFTER.replace("cpu5 102 1 101", "cpu5 1102 1 1101")
+
+
+def stat_step(before, after):
+    """The lines one case moves, as what it adds to each field."""
+    lines = []
+    for old, new in zip(before.splitlines(), after.splitlines()):
+        if old != new:
+            name, *values = new.split()
+            added = (int(n) - int(o) for n, o in zip(values, old.split()[1:]))
+            lines.append(" ".join([name, *map(str, added)]))
+    return "\n".join(lines) + "\n"
+
+
+STAT_STEP = stat_step(STAT_BEFORE, STAT_AFTER)
+
 WAITING_WRAPPER = """#!/bin/bash
 cp STAT.waited STAT
 "$@"
@@ -192,14 +210,13 @@ class RunBenchTest(unittest.TestCase):
         self.pins.write_text(json.dumps(PINS), encoding="utf-8")
         self.slice = self.dir / "slice.itch"
         self.slice.write_bytes(b"\0")
-        self.commit = subprocess.run(
-            ["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"], capture_output=True, text=True,
-            check=False).stdout.strip() or COMMIT
+        # The script's own lookup: git in a checkout, the COMMIT file in an exported tree.
+        self.commit = RUN_BENCH.current_commit()
         self.bin = self.dir / "bin"
         self.bin.mkdir()
         self.stat = self.dir / "stat"
         self.stat.write_text(STAT_BEFORE, encoding="ascii")
-        (self.dir / "stat.after").write_text(STAT_AFTER, encoding="ascii")
+        (self.dir / "stat.step").write_text(STAT_STEP, encoding="ascii")
         self.sysfs = self.dir / "cpu"
         self.write_topology("thread_siblings_list", "4-5")
         write_script(self.bin / "taskset", TASKSET.format(record=self.record))
@@ -333,7 +350,8 @@ class RunBenchTest(unittest.TestCase):
         self.assertEqual(counters["cycles"]["value"], 4000)
         self.assertEqual(counters["cache_misses"]["status"], "unavailable")
         self.assertEqual(counters["per_message"]["cycles"], 0.4)
-        self.assertEqual(header["sibling_busy_percent"]["cases"]["itch_decode"], 0.5)
+        self.assertEqual(header["sibling_busy_percent"]["cases"],
+                         {"itch_decode": 0.5, "itch_decode_encode": 0.5})
 
     @unittest.skipUnless(HOST == "macOS", "the unpinned path exists only on macOS")
     def test_macos_stays_unpinned_with_no_counters(self):
@@ -379,9 +397,9 @@ class RunBenchTest(unittest.TestCase):
 
     def test_a_wait_for_the_lock_is_outside_the_window(self):
         self.stat.with_suffix(".waited").write_text(STAT_AFTER_A_WAIT, encoding="ascii")
-        self.stat.with_suffix(".after").write_text(STAT_AFTER_THE_WAIT_AND_CASE, encoding="ascii")
         wrapper = self.make_wrapper(WAITING_WRAPPER.replace("STAT", str(self.stat)))
         self.assertEqual(self.linux_case(wrapper)["sibling_busy_percent"], 0.5)
+        self.assertEqual(self.stat.read_text(encoding="ascii"), STAT_AFTER_THE_WAIT_AND_CASE)
 
     def test_the_document_carries_the_reading_for_each_case(self):
         meter = RUN_BENCH.SiblingMeter(self.sysfs, self.stat)
