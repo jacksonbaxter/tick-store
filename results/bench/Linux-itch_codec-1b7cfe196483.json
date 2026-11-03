@@ -1,0 +1,283 @@
+{
+  "header": {
+    "schema": 1,
+    "host": "Linux",
+    "measurement": "reported",
+    "statement": "Pinned with taskset -c 4 and verified by sched_getcpu. Counters come from perf stat user-mode events. perf cycles and timer ticks are different units.",
+    "cpu_model": "AMD Ryzen Embedded V1605B with Radeon Vega Gfx",
+    "kernel": "Linux 6.12.115+deb13.1-amd64",
+    "compiler": "Clang 23.1.4",
+    "compile_flags": "-O3 -DNDEBUG -std=c++23",
+    "build_type": "Release",
+    "sanitizers": "none",
+    "isa": "x86-64 baseline, scalar kernels",
+    "commit": "1b7cfe19648370af56e7494621d80306fe9e5930",
+    "core": 4,
+    "sibling": "cpu5 idle as stated, not enforced: see sibling_busy_percent",
+    "sibling_busy_percent": {
+      "core": 4,
+      "sibling": 5,
+      "topology": "thread_siblings_list",
+      "method": "Busy jiffies over total jiffies from the kernel's proc stat file, read once the measurement lock is held and again when the wrapper exits. Busy is everything but idle and iowait, and a wait for the lock is not in the window.",
+      "cases": {
+        "itch_decode": 0.33707865168539325,
+        "itch_decode_encode": 0.14524328249818447
+      }
+    },
+    "second_thread": "cpu6 reserved, unused: every case is single-threaded",
+    "governor": "performance",
+    "frequency": {
+      "snapshot_khz": [
+        2108083,
+        3169640,
+        2690338,
+        2150218
+      ],
+      "effective_mhz": {
+        "itch_decode": 3573.4186175421337,
+        "itch_decode_encode": 3567.1924872922323
+      },
+      "note": "snapshot_khz is scaling_cur_freq at each load line. effective_mhz is user-mode cycles over the wall time of the timed passes."
+    },
+    "turbo": "enabled",
+    "pinning": "pinned",
+    "counters": "perf stat, :u events",
+    "timer": {
+      "source": "rdtscp+lfence",
+      "calibrated_against": "CLOCK_MONOTONIC_RAW",
+      "ticks_per_second": 1997962121.609924,
+      "resolution_ticks": 20,
+      "resolution_ns": 10.0102,
+      "read_cost_ns": 25.234074,
+      "min_publishable_ns": 126.17037,
+      "calibration_window_ns": 200000158.0
+    },
+    "load_lines": [
+      "measure.sh: start load1=0.78 at=2026-11-03T16:25:13Z cpus=4 governor=performance freq_khz=cpu4:2108083 perf_event_paranoid=2",
+      "measure.sh: end load1=0.81 exit=0 at=2026-11-03T16:25:22Z cpus=4 governor=performance freq_khz=cpu4:3169640 perf_event_paranoid=2",
+      "measure.sh: start load1=0.81 at=2026-11-03T16:25:22Z cpus=4 governor=performance freq_khz=cpu4:2690338 perf_event_paranoid=2",
+      "measure.sh: end load1=0.86 exit=0 at=2026-11-03T16:25:36Z cpus=4 governor=performance freq_khz=cpu4:2150218 perf_event_paranoid=2"
+    ],
+    "peak_rss_bytes": 417312768
+  },
+  "benchmark": "itch_codec",
+  "input": {
+    "slice": "12302019-open",
+    "sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+    "messages": 6125294,
+    "bytes": 206138339,
+    "seed": "the input is a pinned file. Only batch boundaries are seeded, per case"
+  },
+  "results": [
+    {
+      "case": "itch_decode",
+      "host": "Linux",
+      "timer": {
+        "source": "rdtscp+lfence",
+        "calibrated_against": "CLOCK_MONOTONIC_RAW",
+        "ticks_per_second": 1997962121.609924,
+        "resolution_ticks": 20,
+        "resolution_ns": 10.0102,
+        "read_cost_ns": 25.234074,
+        "min_publishable_ns": 126.17037,
+        "calibration_window_ns": 200000158.0
+      },
+      "timer_end_ticks_per_second": 1997962170.947591,
+      "warmup": {
+        "passes_per_repetition": 2,
+        "first_repetition_pass_ms": [
+          102.774981,
+          103.336063
+        ]
+      },
+      "verification": {
+        "messages": 6125294,
+        "bytes": 206138339,
+        "input_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "reencoded_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a"
+      },
+      "throughput": {
+        "repetitions": 10,
+        "pass_ms_median": 102.44223150039033,
+        "messages_per_second": {
+          "median": 59792665.18737031,
+          "mean": 59744707.70968812,
+          "stddev": 148094.61905034454,
+          "cv": 0.0024787905862719574
+        },
+        "bytes_per_second_median": 2012239851.0353363
+      },
+      "counters": {
+        "cycles": {
+          "value": 3660759987,
+          "unit": "core cycles, user mode",
+          "coverage_percent": 100.0
+        },
+        "instructions": {
+          "value": 8266954911,
+          "unit": "instructions, user mode",
+          "coverage_percent": 100.0
+        },
+        "branch_misses": {
+          "value": 31280947,
+          "unit": "mispredicted branches, user mode",
+          "coverage_percent": 100.0
+        },
+        "cache_misses": {
+          "status": "unavailable",
+          "reason": "not collected until what the event counts on Zen 1 is confirmed"
+        },
+        "scope": "timed throughput passes only, gated by perf's control FIFOs",
+        "gated_messages": 61252940,
+        "per_message": {
+          "cycles": 59.76464128905486,
+          "instructions": 134.96421414221098,
+          "branch_misses": 0.5106848259038668
+        }
+      },
+      "ratio": {
+        "status": "not-applicable",
+        "reason": "decode only, so nothing is stored"
+      },
+      "latency": {
+        "unit": "ns per batch",
+        "batch_messages": 1024,
+        "batches": 59806,
+        "batch_phase_seed": 130816448909017089,
+        "timer_resolution_ns": 10.0102,
+        "min_publishable_ns": 126.17037,
+        "significant_figures": 3,
+        "min_ns": 15984.287017,
+        "max_ns": 4036624.574995,
+        "percentiles": [
+          {
+            "percentile": 50.0,
+            "value_ns": 17441.271595
+          },
+          {
+            "percentile": 90.0,
+            "value_ns": 18226.071258
+          },
+          {
+            "percentile": 99.0,
+            "value_ns": 21797.710542
+          },
+          {
+            "percentile": 99.9,
+            "value_ns": 35075.239536
+          },
+          {
+            "percentile": 99.99,
+            "value_ns": 65121.855211
+          }
+        ]
+      }
+    },
+    {
+      "case": "itch_decode_encode",
+      "host": "Linux",
+      "timer": {
+        "source": "rdtscp+lfence",
+        "calibrated_against": "CLOCK_MONOTONIC_RAW",
+        "ticks_per_second": 1997962120.692879,
+        "resolution_ticks": 20,
+        "resolution_ns": 10.0102,
+        "read_cost_ns": 25.234074,
+        "min_publishable_ns": 126.17037,
+        "calibration_window_ns": 200000068.0
+      },
+      "timer_end_ticks_per_second": 1997962072.577978,
+      "warmup": {
+        "passes_per_repetition": 2,
+        "first_repetition_pass_ms": [
+          180.411018,
+          181.125566
+        ]
+      },
+      "verification": {
+        "messages": 6125294,
+        "bytes": 206138339,
+        "input_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "reencoded_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a"
+      },
+      "throughput": {
+        "repetitions": 10,
+        "pass_ms_median": 180.77620250005566,
+        "messages_per_second": {
+          "median": 33883301.44647199,
+          "mean": 33889278.303009495,
+          "stddev": 82585.06421327716,
+          "cv": 0.0024369083187570652
+        },
+        "bytes_per_second_median": 1140295874.7795672
+      },
+      "counters": {
+        "cycles": {
+          "value": 6442594359,
+          "unit": "core cycles, user mode",
+          "coverage_percent": 100.0
+        },
+        "instructions": {
+          "value": 16622673765,
+          "unit": "instructions, user mode",
+          "coverage_percent": 100.0
+        },
+        "branch_misses": {
+          "value": 31290233,
+          "unit": "mispredicted branches, user mode",
+          "coverage_percent": 100.0
+        },
+        "cache_misses": {
+          "status": "unavailable",
+          "reason": "not collected until what the event counts on Zen 1 is confirmed"
+        },
+        "scope": "timed throughput passes only, gated by perf's control FIFOs",
+        "gated_messages": 61252940,
+        "per_message": {
+          "cycles": 105.18016537655173,
+          "instructions": 271.3775659584666,
+          "branch_misses": 0.5108364267902896
+        }
+      },
+      "ratio": {
+        "value": 1.0,
+        "source_bytes": 206138339,
+        "output_bytes": 206138339,
+        "note": "the wire format re-encoded, with no compression yet"
+      },
+      "latency": {
+        "unit": "ns per batch",
+        "batch_messages": 1024,
+        "batches": 59808,
+        "batch_phase_seed": 130816448909017090,
+        "timer_resolution_ns": 10.0102,
+        "min_publishable_ns": 126.17037,
+        "significant_figures": 3,
+        "min_ns": 25033.507634,
+        "max_ns": 100453.856418,
+        "percentiles": [
+          {
+            "percentile": 50.0,
+            "value_ns": 29982.0499
+          },
+          {
+            "percentile": 90.0,
+            "value_ns": 31920.024579
+          },
+          {
+            "percentile": 99.0,
+            "value_ns": 39271.515304
+          },
+          {
+            "percentile": 99.9,
+            "value_ns": 51187.657134
+          },
+          {
+            "percentile": 99.99,
+            "value_ns": 82451.513116
+          }
+        ]
+      }
+    }
+  ]
+}
