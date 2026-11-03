@@ -1,0 +1,12 @@
+diff --git a/src/codec/pfor.cpp b/src/codec/pfor.cpp
+--- a/src/codec/pfor.cpp
++++ b/src/codec/pfor.cpp
+@@ -626,7 +626,7 @@
+         const std::uint64_t offset = *base;
+         if (*mode == 1) {
+             for (std::uint64_t& value : vector) {
+-                value = zigzag_decode(value + offset);
++                value = zigzag_decode(value) + offset;
+             }
+         } else {
+             for (std::uint64_t& value : vector) {

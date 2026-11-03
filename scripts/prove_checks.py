@@ -218,6 +218,12 @@ FAULTS = (
     Fault("fuzz-gorilla-xor-leading-cap", "fuzz-gorilla-xor", "the XOR encoder caps the leading "
           "zero count at 32, one past what its 5 bits hold", EXIT_LIBFUZZER, "check_xor_column:",
           arguments=FUZZ_ARGUMENTS),
+    Fault("fuzz-pfor-zigzag-order", "fuzz-pfor", "the PFOR decoder zigzag-decodes a vector's "
+          "offsets before adding its base, not after", EXIT_LIBFUZZER, "check_pfor_column:",
+          arguments=FUZZ_ARGUMENTS),
+    Fault("fuzz-stream-vbyte-length-check", "fuzz-stream-vbyte", "the Stream VByte decoder "
+          "accepts a value stored in more bytes than it needs", EXIT_LIBFUZZER,
+          "check_svb_column:", arguments=FUZZ_ARGUMENTS),
     Fault("g1-store-alters-a-byte", "oracle", "the stub store flips one bit of record 2 as it "
           "writes", CHECK_FAILED, "first difference: bytes at record 2, source byte"),
     Fault("g2-weakened-compare", "dev-test", "the oracle's compare ignores bit 0 and stops "

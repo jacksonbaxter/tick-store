@@ -54,6 +54,10 @@ GORILLA_TIMESTAMPS = "src/codec/gorilla_timestamps.cpp"
 GORILLA_XOR = "src/codec/gorilla_xor.cpp"
 PRICE_DOUBLE = "src/codec/price_double.cpp"
 CODEC_ORACLES = "fuzz/codec_oracles.hpp"
+LANE_PACK = "src/codec/lane_pack.cpp"
+PATCH_LIST = "src/codec/patch_list.cpp"
+PFOR = "src/codec/pfor.cpp"
+STREAM_VBYTE = "src/codec/stream_vbyte.cpp"
 
 # Each is (group, file, what to call it, pattern over the demangled name).
 FIXED_REQUIRED = (
@@ -92,6 +96,20 @@ FIXED_REQUIRED = (
     ("codec", BIT_STREAM, "BitWriter::finish", r"BitWriter::finish\("),
     ("codec", GORILLA_TIMESTAMPS, "encode_timestamp_block", r"encode_timestamp_block\("),
     ("codec", GORILLA_XOR, "encode_xor_block", r"encode_xor_block\("),
+    ("codec", LANE_PACK, "unpack_vector", r"codec::unpack_vector\("),
+    ("codec", LANE_PACK, "unpack_linear", r"codec::unpack_linear\("),
+    ("codec", LANE_PACK, "pack_vector", r"codec::pack_vector\("),
+    ("codec", LANE_PACK, "pack_linear", r"codec::pack_linear\("),
+    ("codec", PATCH_LIST, "read_patches", r"codec::read_patches\("),
+    ("codec", PATCH_LIST, "append_patches", r"codec::append_patches\("),
+    ("codec", PFOR, "decode_pfor_block", r"decode_pfor_block\("),
+    ("codec", PFOR, "decode_pfor", r"codec::decode_pfor\("),
+    ("codec", PFOR, "encode_pfor_block", r"encode_pfor_block\("),
+    ("codec", PFOR, "encode_pfor", r"codec::encode_pfor\("),
+    ("codec", STREAM_VBYTE, "decode_svb_block", r"decode_svb_block\("),
+    ("codec", STREAM_VBYTE, "decode_svb", r"codec::decode_svb\("),
+    ("codec", STREAM_VBYTE, "encode_svb_block", r"encode_svb_block\("),
+    ("codec", STREAM_VBYTE, "encode_svb", r"codec::encode_svb\("),
     ("validator", COLUMNS, "require_size", r"require_size\("),
     ("validator", COLUMNS, "check_text_ends", r"check_text_ends\("),
     ("validator", COLUMNS, "check_raw_row_empty", r"check_raw_row_empty\("),
@@ -106,6 +124,10 @@ FIXED_REQUIRED = (
     ("validator", CODEC_ORACLES, "check_one_block", r"oracle::check_one_block\("),
     ("validator", CODEC_ORACLES, "check_as_values", r"oracle::check_as_values\("),
     ("validator", CODEC_ORACLES, "check_price_mappings", r"oracle::check_price_mappings\("),
+    ("validator", CODEC_ORACLES, "check_pfor_column", r"oracle::check_pfor_column\("),
+    ("validator", CODEC_ORACLES, "check_svb_column", r"oracle::check_svb_column\("),
+    ("validator", CODEC_ORACLES, "check_svb_block", r"oracle::detail::check_svb_block\("),
+    ("validator", CODEC_ORACLES, "pfor_block_encoders", r"oracle::detail::pfor_block_encoders\("),
     ("oracle", ROUNDTRIP, "verify", r"^tick_store::harness::verify\("),
     ("oracle", ROUNDTRIP, "verify_stub_store", r"^tick_store::harness::verify_stub_store\("),
     ("oracle", COLUMNS_READER, "verify_columns", r"^tick_store::harness::verify_columns\("),

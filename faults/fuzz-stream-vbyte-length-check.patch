@@ -1,0 +1,12 @@
+diff --git a/src/codec/stream_vbyte.cpp b/src/codec/stream_vbyte.cpp
+--- a/src/codec/stream_vbyte.cpp
++++ b/src/codec/stream_vbyte.cpp
+@@ -186,7 +186,7 @@
+         for (unsigned b = length; b > 0; --b) {
+             value = (value << 8U) | std::to_integer<std::uint64_t>((*data)[at + b - 1]);
+         }
+-        if (low_length(value) != length) {
++        if (low_length(value) > length) {
+             return fail(codec_error(CodecErrorKind::non_canonical, "svb length",
+                                     data_at + (at * 8U), low_length(value), length));
+         }

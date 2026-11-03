@@ -35,7 +35,7 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 cd "$ROOT" || exit 2
 
 FUZZ_TARGETS="fuzz-columns fuzz-gorilla-timestamps fuzz-gorilla-xor fuzz-itch-frame
-fuzz-itch-message fuzz-stub-store"
+fuzz-itch-message fuzz-pfor fuzz-stream-vbyte fuzz-stub-store"
 ALL_STEPS="dev-build dev-test oracle asan-build asan-test tsan-build tsan-test clang-tidy
 fuzz-build $FUZZ_TARGETS coverage py-scripts py-compare check-results check-compare
 render-check actionlint hygiene"
@@ -338,6 +338,8 @@ step_fuzz_gorilla_timestamps() {
 step_fuzz_gorilla_xor() { run_fuzzer "$1" fuzz_gorilla_xor gorilla_xor gorilla_xor 70000; }
 step_fuzz_itch_frame() { run_fuzzer "$1" fuzz_itch_frame itch_frame frame 70000; }
 step_fuzz_itch_message() { run_fuzzer "$1" fuzz_itch_message itch_message message 256; }
+step_fuzz_pfor() { run_fuzzer "$1" fuzz_pfor pfor pfor 16384; }
+step_fuzz_stream_vbyte() { run_fuzzer "$1" fuzz_stream_vbyte stream_vbyte stream_vbyte 70000; }
 step_fuzz_stub_store() { run_fuzzer "$1" fuzz_stub_store stub_store store 70000; }
 
 step_coverage() {

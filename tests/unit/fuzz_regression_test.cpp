@@ -13,7 +13,9 @@
 #include "test_bytes.hpp"
 #include "tick_store/codec/gorilla_timestamps.hpp"
 #include "tick_store/codec/gorilla_xor.hpp"
+#include "tick_store/codec/pfor.hpp"
 #include "tick_store/codec/price_double.hpp"
+#include "tick_store/codec/stream_vbyte.hpp"
 
 #include <gtest/gtest.h>
 
@@ -99,6 +101,20 @@ TEST(FuzzRegression, GorillaXorCrashersStayFixed) {
     for (const auto& path : crashers("gorilla_xor")) {
         SCOPED_TRACE(path.filename().string());
         EXPECT_EQ(text(codec::oracle::check_xor_column(read_file(path))), "");
+    }
+}
+
+TEST(FuzzRegression, PforCrashersStayFixed) {
+    for (const auto& path : crashers("pfor")) {
+        SCOPED_TRACE(path.filename().string());
+        EXPECT_EQ(text(codec::oracle::check_pfor_column(read_file(path))), "");
+    }
+}
+
+TEST(FuzzRegression, StreamVByteCrashersStayFixed) {
+    for (const auto& path : crashers("stream_vbyte")) {
+        SCOPED_TRACE(path.filename().string());
+        EXPECT_EQ(text(codec::oracle::check_svb_column(read_file(path))), "");
     }
 }
 
@@ -192,6 +208,50 @@ TEST(FuzzOracles, PassEveryCutAndFlipOfAGorillaColumn) {
     for (const auto& [column, check] :
          {std::pair<const Bytes&, Check>{timestamp_column, &codec::oracle::check_timestamp_column},
           std::pair<const Bytes&, Check>{xor_column, &codec::oracle::check_xor_column}}) {
+        EXPECT_EQ(text(check(exact_copy(column))), "");
+        for (std::size_t length = 0; length < column.size(); ++length) {
+            EXPECT_EQ(text(check(exact_copy(std::span{column}.first(length)))), "")
+                << "length " << length;
+        }
+        for (std::size_t bit = 0; bit < column.size() * 8; ++bit) {
+            Bytes flipped = exact_copy(column);
+            flipped[bit / 8] ^= static_cast<std::byte>(1U << (bit % 8));
+            EXPECT_EQ(text(check(flipped)), "") << "bit " << bit;
+        }
+    }
+}
+
+// A column from each integer encoder, whole, cut at every length and with every bit
+// flipped in turn, through the fuzz targets' oracles. These formats leave the encoder
+// choices, so a flipped column must be refused or decode to values that every encoder
+// round-trips, which the oracle checks.
+TEST(FuzzOracles, PassEveryCutAndFlipOfAnIntegerColumn) {
+    std::vector<std::uint64_t> values{34'200'000'000'000ULL};
+    for (std::uint64_t i = 1; i < 40; ++i) {
+        values.push_back(values.back() + ((i * 7'919U) % 60'000U) + (i == 20 ? 1ULL << 36U : 0));
+    }
+    std::vector<std::uint64_t> prices;
+    prices.reserve(40);
+    for (std::uint64_t i = 0; i < 40; ++i) {
+        prices.push_back(i == 17 ? 1'999'999'900U : 1'234'500U + ((i * 37U) % 11U * 100U));
+    }
+    Bytes timestamp_column;
+    ASSERT_TRUE(codec::encode_pfor(values, 16, codec::PforOptions{}, timestamp_column).has_value());
+    Bytes price_column;
+    ASSERT_TRUE(codec::encode_pfor(prices, 16,
+                                   codec::PforOptions{.transform = codec::IntTransform::none,
+                                                      .adaptive_scale = true,
+                                                      .patch = true},
+                                   price_column)
+                    .has_value());
+    Bytes svb_column;
+    ASSERT_TRUE(codec::encode_svb(values, 16, true, svb_column).has_value());
+
+    using Check = const char* (*)(std::span<const std::byte>);
+    for (const auto& [column, check] :
+         {std::pair<const Bytes&, Check>{timestamp_column, &codec::oracle::check_pfor_column},
+          std::pair<const Bytes&, Check>{price_column, &codec::oracle::check_pfor_column},
+          std::pair<const Bytes&, Check>{svb_column, &codec::oracle::check_svb_column}}) {
         EXPECT_EQ(text(check(exact_copy(column))), "");
         for (std::size_t length = 0; length < column.size(); ++length) {
             EXPECT_EQ(text(check(exact_copy(std::span{column}.first(length)))), "")

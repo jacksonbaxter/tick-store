@@ -1,17 +1,24 @@
 #pragma once
 
-// The checks fuzz_gorilla_timestamps and fuzz_gorilla_xor run, kept apart from libFuzzer
-// so that the unit suite replays crashers through the same code. Each returns nullptr
-// if the input passed, or a description of the broken property.
+// The checks the codec fuzz targets run, kept apart from libFuzzer so that the unit suite
+// replays crashers through the same code. Each returns nullptr if the input passed, or a
+// description of the broken property.
 //
 // One input is read two ways:
 //
 //   1. As a column of encoded blocks, straight into the block decoder (Z1). Whatever a
-//      block decoder accepts must re-encode to exactly its bytes, since the format has
-//      one encoding per sequence; must decode the same again; and must be refused once
-//      cut short. A refusal must repeat. The accepted values are then re-encoded at
-//      several block sizes and decoded as whole columns with their exact count (Z2).
-//   2. As values: its bytes, eight at a time, are a sequence of 64-bit words for the
+//      block decoder accepts must decode the same from an exact copy, and must be refused
+//      once cut short. A refusal must repeat and leave the output alone. The accepted
+//      values then go through every encoder the codec has:
+//        - canonical codecs (Gorilla), where a sequence has one encoding: the block must
+//          re-encode to exactly its bytes.
+//        - non-canonical codecs (PFOR, Stream VByte), where the encoder makes choices the
+//          format leaves open: the re-encoded block must decode to the same values, the
+//          encoder must give the same bytes twice, and a codec-specific check may hold
+//          the re-encoding to more, such as never being larger.
+//      The accepted values are then re-encoded at several block sizes and decoded as
+//      whole columns with their exact count (Z2).
+//   2. As values: its bytes, eight at a time, are a sequence of 64-bit words for each
 //      real encoder, at a block size the input picks. The blocks must decode to exactly
 //      those values. This catches an encoder writing what its decoder refuses.
 //
@@ -22,7 +29,9 @@
 #include "tick_store/codec/codec_error.hpp"
 #include "tick_store/codec/gorilla_timestamps.hpp"
 #include "tick_store/codec/gorilla_xor.hpp"
+#include "tick_store/codec/pfor.hpp"
 #include "tick_store/codec/price_double.hpp"
+#include "tick_store/codec/stream_vbyte.hpp"
 
 #include <algorithm>
 #include <array>
@@ -39,15 +48,35 @@ namespace tick_store::codec::oracle {
 using Bytes = std::vector<std::byte>;
 using Words = std::vector<std::uint64_t>;
 
+// One way of encoding: a block, and a column at a given block size.
+struct Encoder {
+    std::expected<void, CodecError> (*encode_block)(std::span<const std::uint64_t>,
+                                                    std::vector<std::byte>&);
+    std::expected<void, CodecError> (*encode_column)(std::span<const std::uint64_t>, std::size_t,
+                                                     std::vector<std::byte>&);
+};
+
+// A check a non-canonical codec adds on an accepted block and the values it held: nullptr
+// if it passed.
+using BlockCheck = const char* (*)(std::span<const std::byte> block,
+                                   std::span<const std::uint64_t> values);
+
+// Which of a codec's encoders an accepted block is re-encoded with, given its bytes.
+using BlockEncoders = std::span<const Encoder> (*)(std::span<const std::byte> block);
+
 // The functions one codec family gives the oracle.
 struct CodecUnderTest {
     BlockDecoder decode_block;
-    std::expected<void, CodecError> (*encode_block)(std::span<const std::uint64_t>,
-                                                    std::vector<std::byte>&);
     std::expected<void, CodecError> (*decode_column)(std::span<const std::byte>, std::uint64_t,
                                                      std::vector<std::uint64_t>&);
-    std::expected<void, CodecError> (*encode_column)(std::span<const std::uint64_t>, std::size_t,
-                                                     std::vector<std::byte>&);
+    // Every encoder: the column checks and part 2 use them all.
+    std::span<const Encoder> encoders;
+    // Whether the format has one encoding per sequence, so a block must re-encode to
+    // exactly its bytes.
+    bool canonical = true;
+    BlockCheck extra_block_check = nullptr;
+    // The encoders each accepted block is re-encoded with, if not all of them.
+    BlockEncoders block_encoders = nullptr;
 };
 
 [[nodiscard]] inline Bytes exact_bytes(std::span<const std::byte> input) {
@@ -59,6 +88,9 @@ struct CodecUnderTest {
 // Block sizes the accepted values are re-encoded at, as whole columns.
 // Part 2 covers blocks of one value, at a block size the input picks.
 inline constexpr std::array<std::size_t, 3> kOracleBlockSizes{3, 64, kDefaultBlockValues};
+// A block size just past one vector of the packed codecs, so part 2 reaches a full vector
+// and a tail in one block.
+inline constexpr std::size_t kOracleLongBlock = 1'025;
 
 // Part 1 for one block at the front of `input`. Sets `taken` to its size if accepted,
 // or to 0 if refused. The block is decoded in place first, to learn its size, and then
@@ -95,18 +127,33 @@ inline constexpr std::array<std::size_t, 3> kOracleBlockSizes{3, 64, kDefaultBlo
         return "an accepted block held no values or too many";
     }
 
-    Bytes reencoded;
-    if (!codec.encode_block(got, reencoded).has_value()) {
-        return "the encoder refused values its decoder accepted";
+    const std::span<const Encoder> encoders =
+        codec.block_encoders != nullptr ? codec.block_encoders(block) : codec.encoders;
+    for (const Encoder& encoder : encoders) {
+        Bytes reencoded;
+        if (!encoder.encode_block(got, reencoded).has_value()) {
+            return "the encoder refused values its decoder accepted";
+        }
+        if (codec.canonical && !std::ranges::equal(reencoded, block)) {
+            return "the re-encoded block differs from the input";
+        }
+        Words twice;
+        const Bytes again = exact_bytes(reencoded);
+        const auto second = codec.decode_block(again, twice);
+        if (!second.has_value() || *second != again.size() || !std::ranges::equal(twice, got)) {
+            return "the re-encoded block did not decode to the same values";
+        }
+        if (!codec.canonical) {
+            Bytes repeat;
+            if (!encoder.encode_block(got, repeat).has_value() || repeat != reencoded) {
+                return "the encoder gave different bytes for the same values";
+            }
+        }
     }
-    if (!std::ranges::equal(reencoded, block)) {
-        return "the re-encoded block differs from the input";
-    }
-    Words twice;
-    const Bytes again = exact_bytes(reencoded);
-    const auto second = codec.decode_block(again, twice);
-    if (!second.has_value() || *second != again.size() || !std::ranges::equal(twice, got)) {
-        return "the re-encoded block did not decode to the same values";
+    if (codec.extra_block_check != nullptr) {
+        if (const char* failure = codec.extra_block_check(block, got)) {
+            return failure;
+        }
     }
 
     // D10: a block cut anywhere is refused. The input picks where.
@@ -152,15 +199,17 @@ inline constexpr std::array<std::size_t, 3> kOracleBlockSizes{3, 64, kDefaultBlo
             return "a column was accepted at the wrong count";
         }
     }
-    for (const std::size_t block_values : kOracleBlockSizes) {
-        Bytes column;
-        if (!codec.encode_column(values, block_values, column).has_value()) {
-            return "the encoder refused a column of accepted values";
-        }
-        Words decoded;
-        if (!codec.decode_column(exact_bytes(column), values.size(), decoded).has_value() ||
-            decoded != values) {
-            return "a re-encoded column did not decode to the same values";
+    for (const Encoder& encoder : codec.encoders) {
+        for (const std::size_t block_values : kOracleBlockSizes) {
+            Bytes column;
+            if (!encoder.encode_column(values, block_values, column).has_value()) {
+                return "the encoder refused a column of accepted values";
+            }
+            Words decoded;
+            if (!codec.decode_column(exact_bytes(column), values.size(), decoded).has_value() ||
+                decoded != values) {
+                return "a re-encoded column did not decode to the same values";
+            }
         }
     }
     return nullptr;
@@ -177,19 +226,25 @@ inline constexpr std::array<std::size_t, 3> kOracleBlockSizes{3, 64, kDefaultBlo
         }
         values.push_back(word);
     }
-    const std::size_t block_values =
-        input.empty() ? 1 : 1 + (std::to_integer<std::size_t>(input.back()) % 97U);
-    Bytes column;
-    if (!codec.encode_column(values, block_values, column).has_value()) {
-        return "the encoder refused a column of values";
+    // Up to 97 values a block, or past one vector of 1,024 when the input asks.
+    std::size_t block_values = 1;
+    if (!input.empty()) {
+        const auto pick = std::to_integer<std::size_t>(input.back());
+        block_values = pick >= 0xF0U ? kOracleLongBlock + (pick - 0xF0U) : 1 + (pick % 97U);
     }
-    Words decoded;
-    const auto done = codec.decode_column(exact_bytes(column), values.size(), decoded);
-    if (!done.has_value()) {
-        return "a block from the encoder did not decode";
-    }
-    if (decoded != values) {
-        return "a block from the encoder decoded to other values";
+    for (const Encoder& encoder : codec.encoders) {
+        Bytes column;
+        if (!encoder.encode_column(values, block_values, column).has_value()) {
+            return "the encoder refused a column of values";
+        }
+        Words decoded;
+        const auto done = codec.decode_column(exact_bytes(column), values.size(), decoded);
+        if (!done.has_value()) {
+            return "a block from the encoder did not decode";
+        }
+        if (decoded != values) {
+            return "a block from the encoder decoded to other values";
+        }
     }
     return nullptr;
 }
@@ -226,21 +281,150 @@ inline std::expected<void, CodecError> encode_xor_plain(std::span<const std::uin
     return encode_xor(words, block_values, out);
 }
 
+template <IntTransform Transform, bool Scale, bool Patch>
+std::expected<void, CodecError> encode_pfor_block_as(std::span<const std::uint64_t> values,
+                                                     std::vector<std::byte>& out) {
+    return encode_pfor_block(
+        values, PforOptions{.transform = Transform, .adaptive_scale = Scale, .patch = Patch}, out);
+}
+
+template <IntTransform Transform, bool Scale, bool Patch>
+std::expected<void, CodecError> encode_pfor_as(std::span<const std::uint64_t> values,
+                                               std::size_t block_values,
+                                               std::vector<std::byte>& out) {
+    return encode_pfor(values, block_values,
+                       PforOptions{.transform = Transform, .adaptive_scale = Scale, .patch = Patch},
+                       out);
+}
+
+template <IntTransform Transform, bool Scale, bool Patch>
+constexpr Encoder pfor_encoder() {
+    return {.encode_block = &encode_pfor_block_as<Transform, Scale, Patch>,
+            .encode_column = &encode_pfor_as<Transform, Scale, Patch>};
+}
+
+template <bool Delta>
+std::expected<void, CodecError> encode_svb_block_as(std::span<const std::uint64_t> values,
+                                                    std::vector<std::byte>& out) {
+    return encode_svb_block(values, Delta, out);
+}
+
+template <bool Delta>
+std::expected<void, CodecError> encode_svb_as(std::span<const std::uint64_t> values,
+                                              std::size_t block_values,
+                                              std::vector<std::byte>& out) {
+    return encode_svb(values, block_values, Delta, out);
+}
+
+inline constexpr std::array<Encoder, 1> kTimestampEncoders{
+    Encoder{.encode_block = &encode_timestamp_block_plain,
+            .encode_column = &encode_timestamps_plain}};
+inline constexpr std::array<Encoder, 1> kXorEncoders{
+    Encoder{.encode_block = &encode_xor_block_plain, .encode_column = &encode_xor_plain}};
+
+// Every PFOR option set: each transform, with and without the adaptive scale and patching.
+inline constexpr std::array<Encoder, 12> kPforEncoders{
+    pfor_encoder<IntTransform::none, false, false>(),
+    pfor_encoder<IntTransform::none, false, true>(),
+    pfor_encoder<IntTransform::none, true, false>(),
+    pfor_encoder<IntTransform::none, true, true>(),
+    pfor_encoder<IntTransform::delta, false, false>(),
+    pfor_encoder<IntTransform::delta, false, true>(),
+    pfor_encoder<IntTransform::delta, true, false>(),
+    pfor_encoder<IntTransform::delta, true, true>(),
+    pfor_encoder<IntTransform::delta_of_delta, false, false>(),
+    pfor_encoder<IntTransform::delta_of_delta, false, true>(),
+    pfor_encoder<IntTransform::delta_of_delta, true, false>(),
+    pfor_encoder<IntTransform::delta_of_delta, true, true>(),
+};
+
+// A PFOR block names its transform, so it is re-encoded with the four option sets of that
+// transform; the column checks and part 2 still use all twelve. The decoder accepted the
+// block, so the transform is 0 to 2.
+[[nodiscard]] inline std::span<const Encoder> pfor_block_encoders(std::span<const std::byte> block) {
+    constexpr std::size_t kPerTransform = 4;
+    const auto transform = std::to_integer<std::size_t>(block[kBlockHeaderSize]);
+    return std::span<const Encoder>{kPforEncoders}.subspan(transform * kPerTransform,
+                                                           kPerTransform);
+}
+
+inline constexpr std::array<Encoder, 2> kSvbEncoders{
+    Encoder{.encode_block = &encode_svb_block_as<false>, .encode_column = &encode_svb_as<false>},
+    Encoder{.encode_block = &encode_svb_block_as<true>, .encode_column = &encode_svb_as<true>},
+};
+
+// Stream VByte leaves the encoder one choice, zigzag or not, and every other field has one
+// valid value. So re-encoding a block's values with its own delta flag gives exactly its
+// bytes when the encoder makes the same choice, and otherwise a block that is smaller, or
+// the same size when the input took zigzag, since the encoder takes zigzag only when it is
+// strictly smaller.
+[[nodiscard]] inline const char* check_svb_block(std::span<const std::byte> block,
+                                                 std::span<const std::uint64_t> values) {
+    constexpr std::uint8_t kDeltaFlag = 1;
+    constexpr std::uint8_t kZigzagFlag = 2;
+    const auto flags = std::to_integer<std::uint8_t>(block[kBlockHeaderSize]);
+    Bytes reencoded;
+    if (!encode_svb_block(values, (flags & kDeltaFlag) != 0, reencoded).has_value()) {
+        return "the encoder refused values its decoder accepted";
+    }
+    if (std::to_integer<std::uint8_t>(reencoded[kBlockHeaderSize]) == flags) {
+        if (!std::ranges::equal(reencoded, block)) {
+            return "a block re-encoded with its own flags differs from the input";
+        }
+        return nullptr;
+    }
+    const bool tie_to_plain = (flags & kZigzagFlag) != 0 && reencoded.size() == block.size();
+    if (reencoded.size() >= block.size() && !tie_to_plain) {
+        return "the encoder chose zigzag the other way from a block no larger";
+    }
+    return nullptr;
+}
+
 }  // namespace detail
 
 inline constexpr CodecUnderTest kTimestampCodec{
     .decode_block = &decode_timestamp_block,
-    .encode_block = &detail::encode_timestamp_block_plain,
     .decode_column = &decode_timestamps,
-    .encode_column = &detail::encode_timestamps_plain,
+    .encoders = detail::kTimestampEncoders,
+    .canonical = true,
+    .extra_block_check = nullptr,
+    .block_encoders = nullptr,
 };
 
 inline constexpr CodecUnderTest kXorCodec{
     .decode_block = &decode_xor_block,
-    .encode_block = &detail::encode_xor_block_plain,
     .decode_column = &decode_xor,
-    .encode_column = &detail::encode_xor_plain,
+    .encoders = detail::kXorEncoders,
+    .canonical = true,
+    .extra_block_check = nullptr,
+    .block_encoders = nullptr,
 };
+
+inline constexpr CodecUnderTest kPforCodec{
+    .decode_block = &decode_pfor_block,
+    .decode_column = &decode_pfor,
+    .encoders = detail::kPforEncoders,
+    .canonical = false,
+    .extra_block_check = nullptr,
+    .block_encoders = &detail::pfor_block_encoders,
+};
+
+inline constexpr CodecUnderTest kSvbCodec{
+    .decode_block = &decode_svb_block,
+    .decode_column = &decode_svb,
+    .encoders = detail::kSvbEncoders,
+    .canonical = false,
+    .extra_block_check = &detail::check_svb_block,
+    .block_encoders = nullptr,
+};
+
+[[nodiscard]] inline const char* check_pfor_column(std::span<const std::byte> input) {
+    return check_codec(kPforCodec, input);
+}
+
+[[nodiscard]] inline const char* check_svb_column(std::span<const std::byte> input) {
+    return check_codec(kSvbCodec, input);
+}
 
 [[nodiscard]] inline const char* check_timestamp_column(std::span<const std::byte> input) {
     return check_codec(kTimestampCodec, input);

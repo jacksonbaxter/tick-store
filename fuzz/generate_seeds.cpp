@@ -6,11 +6,14 @@
 //   <dir>/columns/  column directories as sections, for fuzz_columns
 //   <dir>/gorilla_timestamps/  timestamp columns, for fuzz_gorilla_timestamps
 //   <dir>/gorilla_xor/         XOR columns, for fuzz_gorilla_xor
+//   <dir>/pfor/                PFOR columns in every option set, for fuzz_pfor
+//   <dir>/stream_vbyte/        Stream VByte columns, for fuzz_stream_vbyte
 //
 // Every valid seed comes from the real encoder or the real store writer, so the
 // seeds follow the code (Z4). Corrupt seeds are those same bytes cut, extended or
 // relabelled, one for each way the decoders and the parser can refuse an input.
 
+#include "codec_oracles.hpp"
 #include "columns_oracles.hpp"
 #include "tick_store/codec/block.hpp"
 #include "tick_store/codec/codec_error.hpp"
@@ -632,6 +635,135 @@ void write_xor_seeds(SeedDir& seeds) {
     }
     seeds.add(Bytes{});
 }
+
+// Values for the integer codecs: timestamps as ITCH has them, whole-cent prices with stub
+// quotes, a regular clock, multiples of a scale with values off it, the 64-bit extremes,
+// and each width edge over a full vector and a tail.
+std::vector<Words> integer_value_sets() {
+    SplitMix64 random{2021};
+    Words itch_like{34'200'000'000'000ULL};
+    for (int i = 0; i < 2500; ++i) {
+        const std::uint64_t pick = random() % 100;
+        std::uint64_t gap = random() % 60'000;
+        if (pick < 3) {
+            gap = 0;
+        } else if (pick < 5) {
+            gap = random() % (1ULL << 30U);
+        }
+        itch_like.push_back(itch_like.back() + gap);
+    }
+    Words prices;
+    std::uint64_t price = 1'234'500;
+    for (int i = 0; i < 2500; ++i) {
+        price = price + ((random() % 11) * 100U) - 500U;
+        std::uint64_t value = price;
+        if (i % 97 == 0) {
+            value = 1'999'999'900U;
+        } else if (i % 89 == 0) {
+            value = 4'321U;
+        }
+        prices.push_back(value);
+    }
+    Words regular;
+    for (std::uint64_t i = 0; i < 1'100; ++i) {
+        regular.push_back(34'200'000'000'000ULL + (i * 25'000));
+    }
+    Words sevens;
+    for (std::uint64_t i = 0; i < 300; ++i) {
+        sevens.push_back((i % 41 == 0) ? (i * 7) + 3 : (500 + (random() % 50)) * 7);
+    }
+    constexpr std::uint64_t kTop = ~std::uint64_t{0};
+    Words threes;
+    for (std::uint64_t k = 1; k <= 8; ++k) {
+        threes.push_back(kTop - (3 * k));
+    }
+    threes.insert(threes.end(), {kTop - 1, kTop});
+    std::vector<Words> sets{itch_like, prices, regular, sevens, threes,
+                            {0, kTop, 0, 1, std::uint64_t{1} << 63U, 7, 7, 7},
+                            {5, 300, 300, 70'000, (std::uint64_t{1} << 40U) + 70'000},
+                            {0, 255, 256, 65'535, 65'536, (1ULL << 24U) - 1, 1ULL << 24U,
+                             (1ULL << 32U) - 1, 1ULL << 32U, kTop}};
+    for (const unsigned width : {0U, 1U, 7U, 8U, 31U, 32U, 33U, 63U, 64U}) {
+        const std::uint64_t top = width == 64 ? kTop : (std::uint64_t{1} << width) - 1U;
+        Words edge(1'025);
+        for (std::size_t i = 0; i < edge.size(); ++i) {
+            edge[i] = i % 2 == 0 ? 0 : top;
+        }
+        // One exception in the full vector, so patching has something to patch.
+        edge[777] = kTop;
+        sets.push_back(edge);
+    }
+    return sets;
+}
+
+// A small valid block with each byte from the payload's start set to 0, to 0xFF and to
+// one more, so every field's refusal has a seed one change from the encoder's bytes.
+void add_byte_corruptions(SeedDir& seeds, const Bytes& block) {
+    constexpr std::size_t kFirstBytes = 48;
+    for (std::size_t at = tick_store::codec::kBlockHeaderSize;
+         at < std::min(block.size(), tick_store::codec::kBlockHeaderSize + kFirstBytes); ++at) {
+        const auto one_more = static_cast<std::byte>(std::to_integer<unsigned>(block[at]) + 1U);
+        for (const std::byte value : {std::byte{0}, std::byte{0xFF}, one_more}) {
+            Bytes changed = block;
+            changed[at] = value;
+            if (changed != block) {
+                seeds.add(changed);
+            }
+        }
+    }
+}
+
+// A Stream VByte block of deltas 5, 295, 0, 69,700 and 2^40, built by hand, and one
+// change to it for each refusal the decoder makes, as in stream_vbyte_test.cpp.
+void add_svb_refusals(SeedDir& seeds) {
+    const std::vector<std::uint8_t> golden{0x01, 0x84, 0x00, 0x05, 0x27, 0x01, 0x00, 0x44, 0x10,
+                                           0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x09, 0x03, 0x04,
+                                           0x00, 0x01};
+    const auto block = [&seeds](std::vector<std::uint8_t> payload) {
+        Bytes bytes(payload.size());
+        std::ranges::transform(payload, bytes.begin(),
+                               [](std::uint8_t b) { return static_cast<std::byte>(b); });
+        Bytes framed;
+        const std::size_t at = tick_store::codec::begin_block(framed, 5);
+        tick_store::codec::patch_block_header(framed, at, static_cast<std::uint32_t>(bytes.size()));
+        framed.insert(framed.end(), bytes.begin(), bytes.end());
+        seeds.add(framed);
+    };
+    block(golden);
+    const auto with = [&](std::size_t at, std::uint8_t value) {
+        std::vector<std::uint8_t> changed = golden;
+        changed[at] = value;
+        block(changed);
+    };
+    with(0, 5);       // an unknown flag
+    with(2, 0x04);    // a code past the last value
+    with(11, 6);      // more highs than values
+    with(15, 0);      // a high width of 0
+    with(15, 33);     // and of 33
+    with(15, 10);     // and wider than the highest needs
+    with(16, 4);      // a gap width past what 5 positions can need
+    with(17, 5);      // a position past the last value
+    with(19, 0);      // a high part of 0
+    // 5 in two bytes, a length longer than its value needs.
+    block({0x01, 0x85, 0x00, 0x05, 0x00, 0x27, 0x01, 0x00, 0x44, 0x10, 0x01, 0x00, 0x01, 0x00,
+           0x00, 0x00, 0x09, 0x03, 0x04, 0x00, 0x01});
+    // Zigzag set on values plain codes no larger: the encoder takes plain.
+    block({0x03, 0x84, 0x00, 0x0A, 0x4E, 0x02, 0x00, 0x88, 0x20, 0x02, 0x00, 0x01, 0x00,
+           0x00, 0x00, 0x0A, 0x03, 0x04, 0x00, 0x02});
+}
+
+void write_integer_seeds(SeedDir& seeds, std::span<const tick_store::codec::oracle::Encoder> encoders) {
+    const std::vector<Words> sets = integer_value_sets();
+    const Words small{1000, 1001, 1003, 1002, 999'999, 1004, 1005, 1006,
+                      50'000, 50'300, 49'700, 51'000, 50'500, 49'937, 50'100, 50'200};
+    for (const auto& encoder : encoders) {
+        add_columns(seeds, encoder.encode_column, sets);
+        const Bytes block = column_of(encoder.encode_column, small, 4096);
+        add_header_corruptions(seeds, block);
+        add_byte_corruptions(seeds, block);
+    }
+    seeds.add(Bytes{});
+}
 }  // namespace
 
 // NOLINTNEXTLINE(bugprone-exception-escape): a failed build step should terminate and say why.
@@ -648,15 +780,20 @@ int main(int argc, char** argv) {
     SeedDir columns{root / "columns"};
     SeedDir timestamps{root / "gorilla_timestamps"};
     SeedDir xor_words{root / "gorilla_xor"};
+    SeedDir pfor{root / "pfor"};
+    SeedDir svb{root / "stream_vbyte"};
     write_message_seeds(message);
     write_frame_seeds(stream);
     write_store_seeds(store, root / "store-scratch");
     write_columns_seeds(columns);
     write_timestamp_seeds(timestamps);
     write_xor_seeds(xor_words);
-    std::println("wrote {} message, {} frame, {} store, {} columns, {} gorilla_timestamps and "
-                 "{} gorilla_xor seeds",
+    write_integer_seeds(pfor, tick_store::codec::oracle::detail::kPforEncoders);
+    write_integer_seeds(svb, tick_store::codec::oracle::detail::kSvbEncoders);
+    add_svb_refusals(svb);
+    std::println("wrote {} message, {} frame, {} store, {} columns, {} gorilla_timestamps, "
+                 "{} gorilla_xor, {} pfor and {} stream_vbyte seeds",
                  message.count(), stream.count(), store.count(), columns.count(),
-                 timestamps.count(), xor_words.count());
+                 timestamps.count(), xor_words.count(), pfor.count(), svb.count());
     return 0;
 }
