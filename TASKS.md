@@ -76,8 +76,8 @@ Benchmarks
 - [x] Linux counters through `perf stat` with `:u` events, limited to the timed passes by perf's control FIFOs
 - [ ] Confirm what `cache-misses` counts on Zen 1 against AMD documentation before quoting it. Until then the results mark it unavailable
 - [x] Results table in the README generated from results files, never typed. `--check` fails on a hand edit
-- [x] Record whether `cpu5` really stayed idle during a run: `sibling_busy_percent` per case in the bench and compare headers, from `/proc/stat` inside the lock, with the sibling read from the kernel's topology. The validators refuse over 5%, a limit of our choosing. Nothing enforces idleness, and no real Linux reading exists until the re-run
-- [ ] Boost cannot be turned off without root, so pinned numbers ran near 3.56 GHz with the clock free to move. Decide before Phase 3 whether to ask for a fixed-clock run, or to report cycles as the headline
+- [x] Record whether `cpu5` really stayed idle during a run: `sibling_busy_percent` per case in the bench and compare headers, from `/proc/stat` inside the lock, with the sibling read from the kernel's topology. The validators refuse over 5%, a limit of our choosing. Nothing enforces idleness. First real readings at `1b7cfe1`: 0.34% and 0.15% for the two bench cases, 1.25%, 0.37% and 0.41% for Parquet, ArcticDB and QuestDB
+- [ ] Boost cannot be turned off without root, so pinned numbers ran near 3.57 GHz with the clock free to move. Decide before Phase 3 whether to ask for a fixed-clock run, or to report cycles as the headline
 - [ ] Nothing uses `cpu6` yet. The first two-thread benchmark must pin its second thread there, past the `taskset -c 4` it inherits
 
 Comparison harness
@@ -92,7 +92,7 @@ Comparison harness
 - [x] macOS cold-cache tool built on the probe's result: stop the server, `msync(MS_INVALIDATE)` on a fresh read-only mapping of every file, `mincore` must read 0 on every file with a retry otherwise, start, query, disk0 byte delta must reach the expected bytes. State that metadata stays warm
 - [x] Linux cold-cache tool: stop the process, fsync, `posix_fadvise(POSIX_FADV_DONTNEED)`, prove with `fincore` or `mincore`. Show it on real QuestDB and ArcticDB data files, since only a fresh test file is proven so far
 - [x] QuestDB on `debian`: record the heap, `-Xmx1g` for the slice, and read bind addresses with `ss`, not `SHOW PARAMETERS`
-- [x] Record GraalVM and jemalloc in the results header: `questdb_runtime`, with the vendor and version from the running JVM's own properties and jemalloc from the libraries mapped into the running server, on both hosts. `scripts/check_compare.py` requires it. Shown on the real server on macOS, and awaits the re-run on `debian`
+- [x] Record GraalVM and jemalloc in the results header: `questdb_runtime`, with the vendor and version from the running JVM's own properties and jemalloc from the libraries mapped into the running server, on both hosts. `scripts/check_compare.py` requires it. Shown on the real server on both hosts: Temurin 25.0.5+8 without jemalloc on macOS, GraalVM CE 25.0.2+10.1 with jemalloc preloaded on `debian`
 - [x] Check QuestDB's `debian` heap against the full day before relying on any `-Xmx1g` result: adequate in classes A and B, and the Phase 3 setting. See `results/fullday-capacity-12302019.json`
 - [x] ArcticDB and pyarrow on `debian`: check for SIGILL at full size, since the wheels' zmm code is untraced and the CPU has no AVX-512. No SIGILL on streamed write, one column read and one window read, the paths that ran
 - [x] Name the sync primitive beside every macOS class B number: `fsync`, `F_BARRIERFSYNC` and `F_FULLFSYNC` differ by about 80x at p50
@@ -102,9 +102,9 @@ Comparison harness
 - [x] `fuzz_columns` covers the column directory and manifest parsers: clean for 60 s, 2,318,532 runs. The 30 minutes stay under the G-3 task below
 - [ ] Parquet sweep gaps against section 7: no `none` codec variant, and no run of `ts` on its default encoding against `DELTA_BINARY_PACKED`
 - [ ] ArcticDB sweep gap against section 7: only one symbol for the whole table ran, not one symbol per security
-- [x] `pq.read_table` imported `pyarrow.dataset` inside the timed call, so `cold_includes` was wrong for Parquet. `ParquetSystem.open` now imports it first, and `pyarrow.acero` too, and `tests/compare/test_system_worker.py` fails if any module loads inside the clock. On macOS that import was the whole cold floor, 116 ms: see "A fault in the Parquet cold numbers" in `NOTES.md`
-- [ ] Re-run the comparison and the benchmarks on both hosts at the final code. The files in `results/` predate `questdb_runtime`, the heap check, `sibling_busy_percent` and the import fix, and the validators refuse them until then
-- [ ] macOS `st_blocks` reads 17% to 24% above the apparent size on five of six Parquet variants, and on ArcticDB `rows100k-cols1` in class B. Find why before quoting a macOS stored ratio for them
+- [x] `pq.read_table` imported `pyarrow.dataset` inside the timed call, so `cold_includes` was wrong for Parquet. `ParquetSystem.open` now imports it first, and `pyarrow.acero` too, and `tests/compare/test_system_worker.py` fails if any module loads inside the clock. On macOS that import was the whole cold floor, 116 ms: see "The Parquet cold numbers at `53a3317` held an import" in `NOTES.md`
+- [x] Re-run the comparison and the benchmarks on both hosts at the current harness: macOS bench at `ad2bab5` and compare at `8251c0b`, Linux bench and compare at `1b7cfe1`, all one code state. The validators accept all four, and the files they superseded are removed
+- [ ] macOS `st_blocks` reads 17% to 24% above the apparent size on all six Parquet variants, and on ArcticDB `rows100k-cols1` and `rows10M-cols127` in class B. Find why before quoting a macOS stored ratio for them
 - [ ] Repeat the read-back on QuestDB's converted Parquet partition before quoting its size as proven
 
 Checks
@@ -116,6 +116,10 @@ Checks
 - [x] Every check shown failing on an injected fault: `scripts/prove_checks.py`, `faults/`, `results/check-proofs.json`. Each fault must pass its baseline, then fail with the expected exit code and string
 
 ## Phase 3: Implementation
+
+Checks carried from Phase 2
+- [ ] A `taskset-removed` fault patch, so `scripts/prove_checks.py` covers `scripts/run_bench.py`'s pinning. No patch in `faults/` targets its pinning or its sibling meter
+- [ ] CI has never run on GitHub, and the Linux `run_bench` fixture bug means its Linux job would have failed until `a6a82fa`. The first real run is the open item under Phase 2 Checks
 
 Storage
 - [ ] File format: header, per-block CRC32C, footer, codec registry, little-endian helpers (F1-F7)
