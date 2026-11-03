@@ -88,7 +88,7 @@ if "--list-cases" in sys.argv:
     print("itch_decode\\nitch_decode_encode")
     sys.exit(0)
 with open({record!r}, "a") as out:
-    out.write(" ".join(sys.argv[1:]) + "\\n")
+    out.write("binary " + " ".join(sys.argv[1:]) + "\\n")
 with open(arguments["report"], "w") as out:
     out.write({reports!r}[arguments["case"]])
 with open(arguments["benchmark_out"], "w") as out:
@@ -331,9 +331,11 @@ class RunBenchTest(unittest.TestCase):
 
     def test_each_case_runs_directly_under_the_wrapper(self):
         self.run_bench(self.make_binary(), self.make_wrapper())
-        commands = self.record.read_text(encoding="utf-8")
-        self.assertEqual(commands.count("--case=itch_decode "), 1)
-        self.assertEqual(commands.count("--case=itch_decode_encode "), 1)
+        # On Linux the fake taskset and perf record the same arguments, so only the binary's.
+        runs = [line for line in self.record.read_text(encoding="utf-8").splitlines()
+                if line.startswith("binary ")]
+        self.assertEqual(sum("--case=itch_decode " in line for line in runs), 1)
+        self.assertEqual(sum("--case=itch_decode_encode " in line for line in runs), 1)
 
     @unittest.skipUnless(HOST == "Linux", "the pinned path exists only on Linux")
     def test_linux_pins_and_counts_as_the_brief_says(self):
