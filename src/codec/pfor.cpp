@@ -204,12 +204,20 @@ using VectorWidths = std::array<std::uint8_t, kVectorValues>;
     return bits;
 }
 
+// Buffers an encoder reuses from block to block and scale to scale, so a column of small
+// blocks does not allocate for each.
 struct Scratch {
     std::vector<std::uint64_t> q;
     std::vector<std::uint64_t> y;
     std::vector<std::uint64_t> offsets;
     std::vector<std::uint64_t> words;
     Patches patches;
+    Patches remainders;
+    std::vector<std::uint64_t> candidates;
+    std::vector<std::uint64_t> runs;
+    std::vector<std::pair<std::size_t, std::uint64_t>> counted;
+    std::vector<std::byte> best;
+    std::vector<std::byte> trial;
 };
 
 void emit_vector(std::span<const std::uint64_t> y, const VectorPlan& plan,
@@ -273,7 +281,9 @@ void encode_scaled(std::span<const std::uint64_t> values, std::uint64_t scale,
 
     scratch.q.assign(values.begin(), values.end());
     if (scale > 1) {
-        Patches remainders;
+        Patches& remainders = scratch.remainders;
+        remainders.positions.clear();
+        remainders.values.clear();
         for (std::size_t i = 0; i < count; ++i) {
             const std::uint64_t remainder = values[i] % scale;
             scratch.q[i] = values[i] / scale;
@@ -327,8 +337,9 @@ void encode_scaled(std::span<const std::uint64_t> values, std::uint64_t scale,
 
 // Candidate scales, all from the block: 1, the divisor common to every value, and the
 // commonest divisors of runs of kScaleRun values with what those share.
-[[nodiscard]] std::vector<std::uint64_t> scale_candidates(std::span<const std::uint64_t> values) {
-    std::vector<std::uint64_t> candidates{1};
+void scale_candidates(std::span<const std::uint64_t> values, Scratch& scratch) {
+    std::vector<std::uint64_t>& candidates = scratch.candidates;
+    candidates.assign(1, 1);
     const auto add = [&candidates](std::uint64_t scale) {
         if (scale > 1 && std::ranges::find(candidates, scale) == candidates.end()) {
             candidates.push_back(scale);
@@ -340,7 +351,8 @@ void encode_scaled(std::span<const std::uint64_t> values, std::uint64_t scale,
     }
     add(all);
 
-    std::vector<std::uint64_t> runs;
+    std::vector<std::uint64_t>& runs = scratch.runs;
+    runs.clear();
     for (std::size_t at = 0; at + kScaleRun <= values.size(); at += kScaleRun) {
         std::uint64_t divisor = 0;
         for (const std::uint64_t value : values.subspan(at, kScaleRun)) {
@@ -351,7 +363,8 @@ void encode_scaled(std::span<const std::uint64_t> values, std::uint64_t scale,
         }
     }
     std::ranges::sort(runs);
-    std::vector<std::pair<std::size_t, std::uint64_t>> counted;
+    std::vector<std::pair<std::size_t, std::uint64_t>>& counted = scratch.counted;
+    counted.clear();
     for (std::size_t at = 0; at < runs.size();) {
         std::size_t end = at;
         while (end < runs.size() && runs[end] == runs[at]) {
@@ -372,7 +385,46 @@ void encode_scaled(std::span<const std::uint64_t> values, std::uint64_t scale,
             add(shared);
         }
     }
-    return candidates;
+}
+
+// One block, its values already checked, with the caller's buffers.
+void encode_block_with(std::span<const std::uint64_t> values, const PforOptions& options,
+                       std::vector<std::byte>& out, PforStats* stats, Scratch& scratch) {
+    PforStats chosen;
+    if (!options.adaptive_scale) {
+        encode_scaled(values, 1, options, out, chosen, scratch);
+    } else {
+        scale_candidates(values, scratch);
+        bool have_best = false;
+        for (const std::uint64_t scale : scratch.candidates) {
+            scratch.trial.clear();
+            PforStats counted;
+            encode_scaled(values, scale, options, scratch.trial, counted, scratch);
+            if (!have_best || scratch.trial.size() < scratch.best.size()) {
+                std::swap(scratch.best, scratch.trial);
+                chosen = counted;
+                have_best = true;
+            }
+        }
+        out.insert(out.end(), scratch.best.begin(), scratch.best.end());
+    }
+    if (stats != nullptr) {
+        accumulate(*stats, chosen);
+    }
+}
+
+[[nodiscard]] std::expected<void, CodecError> check_options(std::size_t count,
+                                                            const PforOptions& options) {
+    if (count == 0 || count > kMaxBlockValues) {
+        return std::unexpected(codec_error(CodecErrorKind::bad_parameter, "block values", 0,
+                                           kMaxBlockValues, count));
+    }
+    if (static_cast<unsigned>(options.transform) > kLastTransform) {
+        return std::unexpected(codec_error(CodecErrorKind::bad_parameter, "pfor transform", 0,
+                                           kLastTransform,
+                                           static_cast<unsigned>(options.transform)));
+    }
+    return {};
 }
 
 }  // namespace
@@ -380,38 +432,11 @@ void encode_scaled(std::span<const std::uint64_t> values, std::uint64_t scale,
 std::expected<void, CodecError> encode_pfor_block(std::span<const std::uint64_t> values,
                                                   const PforOptions& options,
                                                   std::vector<std::byte>& out, PforStats* stats) {
-    if (values.empty() || values.size() > kMaxBlockValues) {
-        return std::unexpected(codec_error(CodecErrorKind::bad_parameter, "block values", 0,
-                                           kMaxBlockValues, values.size()));
-    }
-    if (static_cast<unsigned>(options.transform) > kLastTransform) {
-        return std::unexpected(codec_error(CodecErrorKind::bad_parameter, "pfor transform", 0,
-                                           kLastTransform,
-                                           static_cast<unsigned>(options.transform)));
+    if (const auto checked = check_options(values.size(), options); !checked.has_value()) {
+        return checked;
     }
     Scratch scratch;
-    PforStats chosen;
-    if (!options.adaptive_scale) {
-        encode_scaled(values, 1, options, out, chosen, scratch);
-    } else {
-        std::vector<std::byte> best;
-        std::vector<std::byte> trial;
-        bool have_best = false;
-        for (const std::uint64_t scale : scale_candidates(values)) {
-            trial.clear();
-            PforStats counted;
-            encode_scaled(values, scale, options, trial, counted, scratch);
-            if (!have_best || trial.size() < best.size()) {
-                std::swap(best, trial);
-                chosen = counted;
-                have_best = true;
-            }
-        }
-        out.insert(out.end(), best.begin(), best.end());
-    }
-    if (stats != nullptr) {
-        accumulate(*stats, chosen);
-    }
+    encode_block_with(values, options, out, stats, scratch);
     return {};
 }
 
@@ -654,14 +679,17 @@ std::expected<void, CodecError> encode_pfor(std::span<const std::uint64_t> value
     if (const auto checked = check_block_values(block_values); !checked.has_value()) {
         return checked;
     }
-    const std::size_t start = out.size();
+    if (values.empty()) {
+        return {};
+    }
+    // Every block is 1 to block_values values, so the options are all that can be wrong.
+    if (const auto checked = check_options(1, options); !checked.has_value()) {
+        return checked;
+    }
+    Scratch scratch;
     for (std::size_t at = 0; at < values.size(); at += block_values) {
         const std::size_t size = std::min(values.size() - at, block_values);
-        if (const auto block = encode_pfor_block(values.subspan(at, size), options, out, stats);
-            !block.has_value()) {
-            out.resize(start);
-            return block;
-        }
+        encode_block_with(values.subspan(at, size), options, out, stats, scratch);
     }
     return {};
 }
