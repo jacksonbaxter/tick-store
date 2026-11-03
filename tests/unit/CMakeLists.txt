@@ -7,6 +7,7 @@ add_executable(tick_store_unit_tests
     census_test.cpp
     codec_eval_test.cpp
     codec_real_day_test.cpp
+    dictionary_test.cpp
     columns_cli_test.cpp
     columns_flip_test.cpp
     columns_test.cpp
@@ -28,6 +29,7 @@ add_executable(tick_store_unit_tests
     page_cache_test.cpp
     pfor_test.cpp
     roundtrip_cli_test.cpp
+    run_length_test.cpp
     sha256_test.cpp
     slice_test.cpp
     stream_vbyte_test.cpp

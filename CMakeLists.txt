@@ -31,12 +31,14 @@ add_library(tick_store_core STATIC)
 target_sources(tick_store_core PRIVATE
     src/codec/block.cpp
     src/codec/codec_error.cpp
+    src/codec/dictionary.cpp
     src/codec/gorilla_timestamps.cpp
     src/codec/gorilla_xor.cpp
     src/codec/lane_pack.cpp
     src/codec/patch_list.cpp
     src/codec/pfor.cpp
     src/codec/price_double.cpp
+    src/codec/run_length.cpp
     src/codec/stream_vbyte.cpp
     src/itch/codec.cpp
     src/itch/frame.cpp
