@@ -516,7 +516,8 @@ stream and never the day.
 **Checks.** Both decoders have libFuzzer targets, and each ran clean for 240 s under `heavy.sh`. `fuzz_gorilla_timestamps` did
 732,198 runs and `fuzz_gorilla_xor` 276,557, peaking at 562 and 533 MB. Neither found a crash, so there are no crasher files.
 Three injected faults are proven caught: a decoder that accepts a wider bucket than it needs, an encoder that writes a leading
-count of 32 into a 5-bit field, and a bit reader without its bounds check, caught by ASan.
+count of 32 into a 5-bit field, and a bit reader without its bounds check, caught by ASan. The whole of `scripts/check.sh` passes
+on macOS at `f4d99b8`, all 23 steps, in 454 s, and coverage reaches all 108 required functions.
 
 ## Process notes
 

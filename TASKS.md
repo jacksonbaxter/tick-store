@@ -58,8 +58,8 @@ Correctness oracle
 Tests and fuzzing
 - [x] Unit tests for everything built so far, including corrupt fixtures and boundary lists (T1, T3). T2 and T4 wait for the Phase 3 codecs
 - [x] One libFuzzer target per parser and decoder built so far: the ITCH message decoder, the frame cursor and the stub store, following Z1-Z7
-- [ ] Phase 3's parsers and decoders get theirs
-- [x] Coverage report shows every validator is reached (`scripts/coverage.sh`, `results/coverage.json`). It gates on 89 required functions: `decode_as` and `encode_as` for all 23 types, the parsers, the validators, the fuzz oracles and the oracle's compare path. No SIMD kernels exist yet, so none are claimed
+- [ ] Phase 3's parsers and decoders get theirs. The two Gorilla decoders have theirs, `fuzz_gorilla_timestamps` and `fuzz_gorilla_xor`, each clean for 240 s under `heavy.sh`
+- [x] Coverage report shows every validator is reached (`scripts/coverage.sh`, `results/coverage.json`). It gates on 108 required functions: `decode_as` and `encode_as` for all 23 types, the parsers, the validators, the codecs' decoders and encoders, the fuzz oracles and the oracle's compare path. No SIMD kernels exist yet, so none are claimed
 - [ ] Phase 3's kernels join the required list in `scripts/coverage_report.py`
 
 Slice for the comparison harness
