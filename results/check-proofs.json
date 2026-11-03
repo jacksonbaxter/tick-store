@@ -1,6 +1,6 @@
 {
   "schema": "tick-store-check-proofs-1",
-  "source_commit": "9453fd7c5e63",
+  "source_commit": "49b21c19f7e3",
   "platform": "Darwin arm64",
   "compiler": "clang version 23.1.4",
   "statement": "Each fault ran in a throwaway clone. Baseline passed, the fault applied, the same step failed with this exit code and string, the fault reverted.",
@@ -210,6 +210,19 @@
       "expected_string": "FAIL: test_one_flipped_byte (__main__.CompressedHash",
       "actual_exit": 1,
       "matched_string": "FAIL: test_one_flipped_byte (__main__.CompressedHash",
+      "baseline_passed": true,
+      "verdict": "PROVEN"
+    },
+    {
+      "fault_id": "taskset-removed",
+      "check": "py-scripts",
+      "what": "run_bench.py drops the taskset -c 4 pin from a Linux case's command",
+      "kind": "patch",
+      "fingerprint": "3e8a4aa67bd2",
+      "expected_exit": 1,
+      "expected_string": "FAIL: test_a_linux_case_records_its_siblings_busy_share (__main__.RunBenchTest",
+      "actual_exit": 1,
+      "matched_string": "FAIL: test_a_linux_case_records_its_siblings_busy_share (__main__.RunBenchTest",
       "baseline_passed": true,
       "verdict": "PROVEN"
     },
