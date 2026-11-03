@@ -10,7 +10,9 @@
 # shows as SKIP. No job uses a secret.
 #
 # This workflow has never executed on GitHub, because the repository has no remote yet. It is
-# validated by actionlint, and its commands have been run by hand on macOS arm64 only.
+# validated by actionlint, and its commands have been run by hand on macOS arm64. On Linux x86-64
+# the clang-tidy job's command has run too, from an exported tree rather than a checkout, and it
+# covers the Linux-only sources the macOS job cannot see.
 
 name: CI
 
