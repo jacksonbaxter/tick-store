@@ -58,8 +58,9 @@ Correctness oracle
 Tests and fuzzing
 - [x] Unit tests for everything built so far, including corrupt fixtures and boundary lists (T1, T3). T2 and T4 wait for the Phase 3 codecs
 - [x] One libFuzzer target per parser and decoder built so far: the ITCH message decoder, the frame cursor and the stub store, following Z1-Z7
-- [ ] Phase 3's parsers and decoders get theirs. The two Gorilla decoders have theirs, `fuzz_gorilla_timestamps` and `fuzz_gorilla_xor`, each clean for 240 s under `heavy.sh`
-- [x] Coverage report shows every validator is reached (`scripts/coverage.sh`, `results/coverage.json`). It gates on 108 required functions: `decode_as` and `encode_as` for all 23 types, the parsers, the validators, the codecs' decoders and encoders, the fuzz oracles and the oracle's compare path. No SIMD kernels exist yet, so none are claimed
+- [ ] Phase 3's parsers and decoders get theirs. The two Gorilla decoders have theirs, `fuzz_gorilla_timestamps` and `fuzz_gorilla_xor`, and so do PFOR and Stream VByte, `fuzz_pfor` and `fuzz_stream_vbyte`, each clean for 240 s under `heavy.sh`
+- [ ] The PFOR fuzz oracle checks values, not bytes, since the encoder makes choices. A field the decoder wrongly accepts without changing a value, such as non-zero tail padding, is caught only by the unit tests' corrupt fixtures
+- [x] Coverage report shows every validator is reached (`scripts/coverage.sh`, `results/coverage.json`). It gates on 126 required functions: `decode_as` and `encode_as` for all 23 types, the parsers, the validators, the codecs' decoders and encoders, PFOR, Stream VByte, lane packing and patch lists among them, the fuzz oracles and the oracle's compare path. No SIMD kernels exist yet, so none are claimed
 - [ ] Phase 3's kernels join the required list in `scripts/coverage_report.py`
 
 Slice for the comparison harness
@@ -142,14 +143,18 @@ Required codecs
 - [x] XOR on the raw integers, for comparison. 29.2 and 29.5 bits per value on add-order prices, and the integer as a double 22.9 and 23.1
 
 Competing codecs
-- [ ] Timestamps: delta against delta-of-delta, frame of reference per block, Stream VByte
-- [ ] Prices: per-block frame of reference, delta, per-symbol delta, adaptive scale (never a hard-coded 100), patched outliers for stub quotes
+- [x] Timestamps: delta against delta-of-delta, frame of reference per block, Stream VByte. PFOR on deltas meets CR-3 in file order at 18.76 and 18.69 bits; delta beats delta-of-delta by 1.2 bits; per locate every codec misses, Stream VByte best at 25.5 (NOTES.md, "Integer codecs on ITCH")
+- [x] Prices: per-block frame of reference, delta, per-symbol delta, adaptive scale (never a hard-coded 100), patched outliers for stub quotes. Add prices 15.25 and 15.03 bits in file order, missing CR-4 by 7.1 to 7.4 against order-0 floors of 13.1 (delta) and 13.9 (value); per locate 6.26 and 6.42, and per locate and side 5.48 and 5.62, meeting CR-4 with the locate column stored. CR-5 met against XOR on dollars everywhere, and against the best Gorilla per locate; in file order 1.50 and 1.54
+- [ ] Per-locate CR-4 rests on the store keeping a file-order locate column. Without one, the permutation costs at least 11.05 bits per add, its order-0 entropy, and per locate loses to file order. The layout experiment below must count that column
+- [ ] Record each block's chosen scale in `tick_codec_eval`, so the factor the adaptive scale finds is shown, not only the remainders it leaves
+- [ ] Per-locate timestamps: PFOR patches 28% of values. Try a smaller vector or a second patch width there before giving them up to Stream VByte
+- [ ] The PFOR encoder made a whole-day `tick_codec_eval` run 3.7 times longer, 207 s against 56 s, mostly trying each candidate scale. Its speed is unmeasured; measure it before choosing it for the writer
 - [ ] Order references: delta against the running maximum, patched outliers, per-type streams. The census favours the previous value in the same field over the running maximum on both days, so find what `A`'s two modes of delta follow before choosing
 - [ ] Shares, locate, type and flags: dictionary, run-length and bit-packing as the census suggests
 - [ ] Decide whether a general-purpose block codec on top pays for itself
 
 SIMD on both architectures
-- [ ] Scalar kernels always built, written to auto-vectorise, because FastLanes found clang's output matched intrinsics
+- [ ] Scalar kernels always built, written to auto-vectorise, because FastLanes found clang's output matched intrinsics. The interleaved pack and unpack loops now compile to NEON on arm64 at `-O2` and `-O3`, after clang had kept them scalar for fear of aliasing (NOTES.md). Still to check: the x86-64 output, and the decoder's base add and zigzag loops
 - [ ] One dispatch table, one shared prolog, kernel and tail driver, callers free of `#ifdef`. CMake selects kernel files by `CMAKE_SYSTEM_PROCESSOR`, so a Linux build needs no code change
 - [ ] arm64: NEON is baseline, so no runtime dispatch. No SVE or SME, and no bit-deposit instructions exist on the M4
 - [ ] x86-64: runtime dispatch to AVX2 from cached CPUID, with AVX2 kernels in their own translation units to avoid the ODR problem Arrow documents. A CPU check for BMI2 is not enough on Zen 1, so kernels use no PEXT, PDEP or gather

@@ -519,6 +519,173 @@ Three injected faults are proven caught: a decoder that accepts a wider bucket t
 count of 32 into a 5-bit field, and a bit reader without its bounds check, caught by ASan. The whole of `scripts/check.sh` passes
 on macOS at `f4d99b8`, all 23 steps, in 454 s, and coverage reaches all 108 required functions.
 
+### Integer codecs on ITCH
+
+CR-3 is met in file order, by patched frame of reference on deltas. CR-4 is met per locate and missed in file order. CR-5 is met
+against Gorilla XOR on the dollar doubles on every price column. Against the best Gorilla variant it is met per locate, and only
+borderline in file order. The figures are from `results/codec-eval-*.json`, written by `tools/tick_codec_eval` at `7ad720f`,
+with the same accounting as the Gorilla section: block payloads, 8-byte block headers and per-stream counts. Per-stream locates
+are counted too, 2 bytes each, plus 1 byte for side in the per-locate-and-side column. Every value of every column, codec and day
+came back exact. Days are `12302019` then `10302019` throughout.
+
+**What was built** (`include/tick_store/codec/`):
+
+- `int_transform.hpp`: zigzag, delta and delta-of-delta, in unsigned arithmetic that wraps.
+- `lane_pack.hpp`: the bit-packed layout. `pfor.hpp`: patched frame of reference. One decoder covers no transform, delta and
+  delta-of-delta, an optional scale with remainders, and patched exceptions.
+- `stream_vbyte.hpp`: Stream VByte on the low 32 bits, with the high halves patched.
+- `patch_list.hpp`: the exception and remainder lists both use.
+
+The decoders check every field and every size before trusting a count, and widths 0 and 64 are explicit. PFOR's encoder chooses
+the scale, the mode and the width, so a sequence has more than one valid encoding. The tests therefore pin golden bytes from an
+independent Python model of the format, and pin encoded sizes.
+
+**The layout and its cost.** A full vector is 1,024 values in 16 lanes of 64-bit words, FastLanes style. Value i goes to lane
+i mod 16, row i / 16. Word k of lane l is stored at index 16k + l. Each row unpacks to 16 consecutive values, so a NEON or AVX2
+kernel needs no transpose and no format change. Deltas stay in value order, with no per-lane bases, so decoding needs a prefix sum
+across each row. Speed was not measured. A vector shorter than 1,024 values, at the end of a block, is packed linearly and padded
+to a byte.
+
+The scalar pack and unpack loops now auto-vectorise. Clang 23 at `-O2` and `-O3` on arm64 had compiled all 16 lanes as scalar
+code: it fully unrolled them, with no NEON, because it had to assume the input and output spans overlapped. Each row now loads
+its lanes into local arrays, computes there, and stores them whole. The loops then compile to `ushl.2d` and `orr.16b` on paired
+128-bit loads. The assembly is kept with the raw logs. The linear tail and the inverse delta stay scalar.
+
+Measured costs:
+
+| Cost | Timestamps, file order (`pfor-delta`) | Timestamps, per locate (`pfor-delta`) | Add prices, file order (`pfor-for-scaled`) | Add prices, per locate (`pfor-delta-scaled`) | Add prices, per locate and side (`pfor-delta-scaled`) |
+|---|---|---|---|---|---|
+| Lost adaptivity: bits per value saved if each 128 values had its own width | 0.621, 0.568 | 1.474, 1.451 | 0.031, 0.027 | 0.196, 0.214 | 0.262, 0.276 |
+| Block-size floor: share of values in vectors under 1,024 | 0.0%, 0.0% | 1.8%, 1.6% | 0.0%, 0.0% | 3.1%, 2.9% | 5.6%, 5.2% |
+| Padding: bits per value if those tails were padded to 1,024 | 0.00, 0.00 | 0.42, 0.39 | 0.00, 0.00 | 0.37, 0.33 | 0.58, 0.54 |
+| Exceptions patched, share of values | 9.2%, 8.8% | 28.2%, 28.0% | 5.7%, 6.7% | 6.8%, 7.9% | 8.7%, 9.0% |
+
+- The adaptivity yardstick charges each 128-value group a width byte and a 2-byte exception count, against one of each per 1,024
+  values. The vector's 3-byte header is not counted on either side.
+- The layout pays no padding, because tails are linear. That is not the same as costing nothing: a kernel will need a separate
+  tail path. The padding row is what one interleaved layout for every vector would have cost.
+- Patching is essential. Without it, timestamps cost 27.16 and 27.06 bits, 8.4 more, and add prices per locate 10.33 and 10.26,
+  4.1 and 3.8 more.
+- Patch positions are gap coded: a gap width byte, then each position's distance from the one before. On the open slice this saved
+  0.26 bits per value on timestamps against 10-bit positions.
+
+**CR-3, timestamps, at most 20.0 bits: met in file order. Delta beats delta-of-delta.**
+
+| Codec | File order | Per locate |
+|---|---|---|
+| `pfor-delta` | **18.757, 18.691** | 27.745, 27.743 |
+| `svb-delta` | 19.889, 19.921 | **25.488, 25.504** |
+| `pfor-dod` | 19.982, 19.898 | 31.141, 31.090 |
+| `gorilla-dod` | 20.404, 20.418 | 44.476, 44.574 |
+| `pfor-delta-unpatched` | 27.159, 27.063 | 36.693, 36.600 |
+| `pfor-dod-unpatched` | 27.831, 27.734 | 37.434, 37.334 |
+| Exact order-0 entropy of the delta | 16.932, 16.941 | not counted |
+| Exact order-0 entropy of the delta-of-delta | 18.344, 18.329 | not counted |
+
+- CR-3 is met by `pfor-delta`, 1.24 and 1.31 bits under 20.0. Stream VByte on deltas and PFOR on delta-of-deltas are also under,
+  by 0.02 to 0.11. PFOR delta is 1.65 and 1.73 bits smaller than Gorilla.
+- Delta beats delta-of-delta by 1.22 and 1.21 bits under the same PFOR, and the entropy floors agree: delta's order-0 entropy is
+  1.41 and 1.39 bits below delta-of-delta's. ITCH timestamps are not regular, so a second difference only adds noise. The census
+  said this, and the codecs confirm it.
+- `pfor-delta` is 1.83 and 1.75 bits above its order-0 floor. That floor counts every distinct delta with no context: 3,430,981
+  and 3,604,584 of them. About 0.6 of the gap is the 1,024-value width.
+- Per locate, CR-3 is missed by every codec. The best is Stream VByte, 25.49 and 25.50, a gap of 5.5. A stock's gaps are wide
+  and heavy-tailed, so PFOR patches 28% of values. Stream VByte's whole bytes cost less there. Exact entropies were not counted per
+  locate, because the distinct deltas would not fit in memory comfortably. The census ideal for delta there is 23.4.
+
+**CR-4, add-order prices, at most 7.9 bits: met per locate, missed in file order.** `A` and `F` prices:
+
+| Codec | File order | Per locate | Per locate and side |
+|---|---|---|---|
+| `pfor-for-scaled` | **15.254, 15.030** | 7.373, 7.478 | 6.624, 6.745 |
+| `pfor-delta-scaled` | 16.229, 16.009 | **6.264, 6.421** | **5.480, 5.617** |
+| `pfor-delta-scaled-unpatched` | 18.982, 18.651 | 10.332, 10.262 | 10.076, 10.039 |
+| `pfor-for` | 21.889, 21.641 | 13.968, 14.064 | 13.174, 13.302 |
+| `svb-delta` | 22.197, 22.311 | 14.334, 14.469 | 13.474, 13.605 |
+| `pfor-delta` | 22.800, 22.616 | 12.579, 12.742 | 11.273, 11.494 |
+| `gorilla-xor-f64-integer` | 22.925, 23.115 | 13.265, 13.370 | 11.628, 11.848 |
+| `pfor-delta-unpatched` | 25.638, 25.447 | 16.871, 16.845 | 16.642, 16.621 |
+| `gorilla-xor-u64-integer` | 29.232, 29.506 | 22.976, 23.506 | 20.557, 21.207 |
+| `gorilla-xor-f64-dollars` | 54.218, 54.904 | 36.893, 37.881 | 32.746, 33.900 |
+| Exact order-0 entropy of the delta | 13.090, 13.062 | 5.123, 5.278 | 4.256, 4.422 |
+| Exact order-0 entropy of the value | 13.987, 13.880 | the same | the same |
+
+- The rows are sorted by file order. Per locate, `pfor-delta-scaled` meets CR-4 at 6.264 and 6.421, 1.64 and 1.48 bits under.
+  Split by side as well, it reaches 5.480 and 5.617. Side does lower it, by 0.78 and 0.80 bits.
+- In file order the best is `pfor-for-scaled`, 15.254 and 15.030, which misses by 7.35 and 7.13 bits. The reason is the ordering.
+  File order interleaves about 8,900 stocks, so consecutive add prices belong to different stocks. With the previous value in file
+  order as context, the delta's order-0 entropy is 13.09 and 13.06 bits. With no context, the value's own entropy is 13.99 and
+  13.88. Both are 5 to 6 bits above 7.9, so no code that sees file-order values or deltas one at a time can reach CR-4. Frame of
+  reference without delta beats delta in file order for the same reason: a delta between two stocks is as wide as either price.
+- Per locate, `pfor-delta-scaled` is 1.14 bits above the per-locate delta floor of 5.12 and 5.28.
+- The adaptive scale finds the factor in each block from the data: 1, the block's common divisor, and the three commonest divisors
+  of runs of 8 with their shared divisor, keeping whichever encodes smallest. Nothing is built around 100. In file order every add
+  price block took a scale above 1, with remainders on 0.51% and 0.43% of values, the sub-penny prices. Per locate, 98.7% of blocks
+  were scaled. Blocks the factor fits nowhere fall back to scale 1. The tests round-trip a factor of 7, partial factors, and scales
+  next to 2^64. Without the scale, the same codecs cost 6.6 bits more in file order on both days, and 6.3 more per locate.
+- Stub quotes are patched exceptions. In file order 5.7% and 6.7% of add-price offsets are patched.
+- The other price columns follow file order, with the best integer codec, then the best Gorilla, which is the integer as a double,
+  then Gorilla on dollars. `U` is 15.53, 23.48, 55.29 and 15.30, 23.63, 55.52. `C` is 14.68, 18.17, 43.86 and 14.57, 17.89, 43.79.
+  `P` is 16.82, 22.52, 50.74 and 16.42, 21.81, 50.12. The best integer codec is `pfor-for-scaled` on each. The MWCB levels are three
+  values a day, too few to judge.
+
+**Per-locate figures exclude the permutation back to file order.** The tool estimates what it would cost:
+
+- The exact order-0 entropy of the locate of each add in file order is 11.05 and 11.08 bits per add. It is 12.04 and 12.07 with
+  side, and 11.17 and 11.20 for the locate of every message. The largest locate is 8,906 and 8,886, so a fixed width is 14 bits.
+- A store that keeps a file-order locate column pays nothing more. Re-serialising every message needs that column anyway, and a
+  file-order layout stores the same column.
+- A store that keeps locates only as its partitions must add at least 11.05 bits per add. That makes the per-locate add price 17.3
+  and 17.5 bits, worse than file order.
+- So CR-4 is met per locate only if the locate column is stored, as the planned schema stores it. The layout experiment in
+  TASKS.md decides that, with the column's own cost counted.
+
+**CR-5, best integer scheme at least 1.53x smaller than Gorilla on the same column and ordering.**
+
+| Column | Best integer, bits | Over `gorilla-xor-f64-dollars` | Over the best Gorilla, `gorilla-xor-f64-integer` |
+|---|---|---|---|
+| Add, file order | 15.254, 15.030 | 3.554x, 3.653x: met | 1.503x, 1.538x: missed by 0.027, then met by 0.008 |
+| Add, per locate | 6.264, 6.421 | 5.889x, 5.900x: met | 2.117x, 2.082x: met |
+| Add, per locate and side | 5.480, 5.617 | 5.976x, 6.035x: met | 2.122x, 2.109x: met |
+| `U`, file order | 15.534, 15.300 | 3.559x, 3.629x: met | 1.511x, 1.545x: missed by 0.019, then met |
+| `C`, file order | 14.684, 14.567 | 2.987x, 3.006x: met | 1.237x, 1.228x: missed by 0.29 and 0.30 |
+| `P`, file order | 16.816, 16.415 | 3.017x, 3.053x: met | 1.339x, 1.329x: missed by 0.19 and 0.20 |
+
+- Against XOR on the dollar doubles, which is what a system storing prices as doubles would run, integers win by 3 to 6 times.
+- Against Gorilla on the integer as a double, the scaled integer codec wins by 2.1 per locate. In file order it wins by 1.5,
+  on the threshold. File order leaves little for either side to exploit.
+
+**Exactness and cost of a run.** 0 blocks refused, 0 words changed and 0 representation failures, in all 82 column and codec pairs
+on both days. All 2^32 Price(4) values came back through each double. Each run took 206.7 and 225.2 s, against 56.4 and 60.5 s
+before. The difference is the PFOR encoder trying each candidate scale. Max RSS was 9.54 and 10.33 GB, which is the source
+mapped. The peak footprint was 1.36 and 1.27 GB, up from 462 and 459 MB, because of the exact-entropy tables: 16 bytes a slot,
+at most half full, over 3.4 million distinct timestamp deltas and 5.8 million delta-of-deltas. Raw `/usr/bin/time -l` output is
+kept with the raw logs.
+
+**Checks.**
+
+- `fuzz_pfor` and `fuzz_stream_vbyte` ran clean for 240 s each under `heavy.sh`: 23,681 and 74,662 runs, with 1.03 GB peak RSS
+  for the two. Neither found a crash.
+- PFOR's encoder makes choices, so the oracle cannot demand byte equality. It checks values through every encoder instead, all
+  twelve PFOR option sets on columns and as values, and the four of a block's own transform on each accepted block. It also checks
+  the encoder is deterministic. For Stream VByte, whose only open choice is zigzag, it demands the exact bytes when the encoder
+  makes the same choice.
+- The PFOR oracle still cannot see a field the decoder wrongly accepts without changing values, such as non-zero tail padding.
+  The unit tests' corrupt fixtures, one per validated field, are the check for those.
+- `fuzz_pfor` runs at about 100 runs per second under ASan, against Stream VByte's 300 to 400, because each input goes through
+  twelve encoders. Its `-max_len` is 16,384 for that reason. Inputs of 70,000 bytes halved its rate, and 16,384 bytes still holds
+  a full vector at width 64.
+- Two faults are proven caught:
+  - A PFOR decoder that zigzag-decodes before adding the base. `check_pfor_column` caught it after 614 runs: "a re-encoded column
+    did not decode to the same values".
+  - A Stream VByte decoder that accepts an over-long length. It was caught after 121 runs: "a block re-encoded with its own flags
+    differs from the input".
+- CI's job timeout rose from 180 to 300 minutes. The scheduled fuzz job runs eight targets for 30 minutes each, and six already
+  filled 180.
+- The whole of `scripts/check.sh` passes on macOS at `203d9dc`, all 25 steps, in 572 s under `heavy.sh`, peaking at 1.03 GB
+  resident. Coverage reaches all 126 required functions, now including the PFOR, Stream VByte, lane-packing and patch-list
+  decoders and encoders and the new oracles, with lines at 93.9% and functions at 98.1%.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
