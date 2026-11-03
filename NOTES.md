@@ -285,23 +285,44 @@ FIFOs; that needs one process per workload, so each results file holds one lock 
 four load lines. `measure.sh` sets the governor only once it has the lock, so sysfs read outside
 the run says `schedutil` while the run used `performance`; governor and frequency are taken from
 the load lines, which also print the hostname, and that token is stripped. Core clock is not what
-sysfs suggests: `scaling_max_freq` says 2.0 GHz, single reads at the load lines ranged from 2.0 to
-3.43 GHz, and cycles over wall time gave 3.56 GHz, so both are recorded and only the second is a
-measurement. The first process after the governor change ran its two warm-up passes in 134 ms
-against 102.5 ms for every timed pass. The cause is not established, but warm-up absorbed it and
-no timed pass shows it. Batch timers cost about 2.5% (105 against 102.5 ms a pass), which is why the distribution
-comes from separate passes and never touches the throughput figure or the counters. One result
-worth carrying forward: encoding adds 45 cycles and 136 instructions a message on Zen 1 but no
-branch misses at all (0.51 a message in both cases), so every miss is in the decode half. Why
-encode's own dispatch on type predicts so well is not established. Full-day G-1 on `debian` took
+sysfs suggests: `scaling_max_freq` says 2.0 GHz, single reads at the load lines of the run at
+`1b7cfe1` ranged from 2.11 to 3.17 GHz, and cycles over wall time gave 3.57 GHz, so both are
+recorded and only the second is a measurement. In the run at `40bc4b4`, the first process after
+the governor change ran its two warm-up passes in 134 ms against a median timed pass of 102.7 ms.
+The cause is not established, but warm-up absorbed it and no timed pass showed it. In the run at
+`1b7cfe1` it did not recur: 102.8 and 103.3 ms against a median of 102.4 ms. Batch timers cost
+about 2.5% (105 against 102.5 ms a pass), which is why the distribution comes from separate passes
+and never touches the throughput figure or the counters. One result worth carrying forward:
+encoding adds 45 cycles and 136 instructions a message on Zen 1 but no branch misses at all (0.51
+a message in both cases), so every miss is in the decode half. Why encode's own dispatch on type predicts so well is not established. Full-day G-1 on `debian` took
 63 s to ingest and 116 s to verify, 3.0x and 3.6x the Mac, at 9.2 GB peak RSS of clean mapped
 pages, with `MemAvailable` steady at 12.9 GB. The first Linux build needed no code change.
 
+The current files measure one code state: Linux at `1b7cfe1` and macOS at `ad2bab5`, with only
+results files changed between them. Decode runs at 59.79 M messages/s with a CV of 0.25% on Linux
+and 130.06 M with a CV of 0.80% on macOS. Decode then encode runs at 33.88 M, CV 0.24%, and
+69.86 M, CV 0.67%. On Linux, cpu5 was busy 0.34% of the decode case and 0.15% of decode then
+encode, the first real readings of `sibling_busy_percent`, well under the 5% limit. macOS decode
+is 4.8% above the 124.12 M of the run at `40bc4b4`, with neither the codec's sources nor the
+benchmark's changed between the two commits, against a CV of 0.80% in the newer run and 0.67% in
+the older. On the unpinned Mac the spread between runs is several times the spread within one,
+so a macOS difference of a few percent between runs is not evidence of a change. Linux decode
+moved 0.3%, from 59.64 M.
+
 ### Comparison harness
 
-These are slice results, from `results/compare/` at commit `53a3317`: 6,125,294 records and 206,138,339 source bytes of one five-minute
-window. They prove the harness works and are not full-day claims. `compare/README.md` has the method. Each host ran 22 variant-and-class
-stores: Parquet 12, ArcticDB 6, QuestDB 4. Ratios are stored bytes over source bytes, to six places.
+These are slice results, from `results/compare/`: Linux at commit `1b7cfe1` and macOS at `8251c0b`, which measure the code at `ad2bab5`,
+since the commits after it change only results files. They replace the files at `53a3317`, which predate the harness fixes in `c8ad140`,
+`121803a` and `ad2bab5` and which the validators now refuse. The slice is 6,125,294 records and 206,138,339 source bytes of one five-minute
+window. These files prove the harness works and are not full-day claims. `compare/README.md` has the method. Each host ran 22
+variant-and-class stores: Parquet 12, ArcticDB 6, QuestDB 4. Ratios are stored bytes over source bytes, to six places.
+
+**Runtime, heap and sibling.** QuestDB 10.1.0 ran on Temurin 25.0.5+8 on macOS, with no jemalloc mapped into the server, and on GraalVM CE
+25.0.2+10.1 on Linux, with jemalloc preloaded. Both are the header's `questdb_runtime`, read from the running server. Both hosts ran
+`-Xms1g -Xmx1g`. On Linux that is the heap `results/fullday-capacity-12302019.json` records as checked and adequate for a full day, and
+`scripts/check_compare.py` refuses any other there. On macOS it was set to match Linux, and the file states that the full-day check is
+Linux only. On both, the validator requires every class's running command to hold the stated heap. On Linux, cpu5 was busy 1.25% of the
+Parquet run, 0.37% of ArcticDB's and 0.41% of QuestDB's, against the 5% limit.
 
 **Read-back.** The oracle's verdict is `pass` for all 22 on both hosts, so Parquet, ArcticDB and QuestDB each rebuilt the slice with its
 stored SHA-256 equal to the pin. Query agreement has no surprise: all 110 digests (11 variants, 5 queries, 2 hosts) equal the ground
@@ -318,10 +339,10 @@ and QuestDB would silently run nosync". All 22 classes read `proven` on both hos
   every variant. So macOS rests only on the count of harness flushes: 0 in A, 2 by `F_FULLFSYNC` in B.
 - ArcticDB, both hosts: 10 settings from `lib.options()`, the library config in storage and the engine's config. Class A left 438 dirty
   pages in the probe on Linux and 120 on macOS, class B 0. LZ4 is shown from stored bytes. Its acceleration is not readable on either host.
-- QuestDB, both hosts: 14 settings, with the commit mode from the conf, the echo and the same jar's parser. Class A left 2,390 dirty pages
-  in the probe on Linux and 602 on macOS, class B 0 data pages.
+- QuestDB, both hosts: 15 settings, with the commit mode from the conf, the echo and the same jar's parser, and the initial heap beside
+  the maximum. Class A left 2,390 dirty pages in the probe on Linux and 602 on macOS, class B 0 data pages.
 - Not provable on macOS: that QuestDB's class B reached the device. 0 dirty pages shows the page cache is clean, and its plain `fsync`
-  stops short of the device's cache, so the file marks class B not like-for-like. Median write time barely moves, 0.82 s in A and 0.84 s
+  stops short of the device's cache, so the file marks class B not like-for-like. Median write time barely moves, 0.83 s in A and 0.86 s
   in B, for `plain`. `MemAvailable`, pinning and hardware counters are not available there.
 - QuestDB's class B is marked not like-for-like on Linux too, for another reason. `sync` flushes the WAL at commit and not the table:
   after a full write 31,344 pages of the table's own files were still dirty on Linux and 2,832 on macOS, once the rows were readable. The
@@ -332,42 +353,59 @@ and QuestDB would silently run nosync". All 22 classes read `proven` on both hos
 
 | Store | Linux bytes | Linux ratio | macOS bytes | macOS ratio |
 |---|---|---|---|---|
-| Parquet `zstd1-rg1Mi` | 70,483,968 | 0.341926 | 83,968,000 in A, 84,471,808 in B | 0.407338, 0.409782 |
+| Parquet `zstd1-rg1Mi` | 70,483,968 | 0.341926 | 84,086,784 | 0.407914 |
 | ArcticDB `rows100k-cols127` | 141,168,640 | 0.684825 | 141,860,864 | 0.688183 |
-| ArcticDB `rows100k-cols1` | 504,848,384 in A, 504,864,768 in B | 2.449076, 2.449155 | 510,418,944 in A, 521,445,376 in B | 2.476099, 2.529589 |
+| ArcticDB `rows100k-cols1` | 504,856,576 in A, 504,860,672 in B | 2.449115, 2.449135 | 510,402,560 in A, 520,101,888 in B | 2.476020, 2.523072 |
 | QuestDB `plain` | 537,550,848 | 2.607719 | 537,772,032 | 2.608792 |
-| QuestDB `plain`, partition converted | 129,056,768 | 0.626069 | 137,641,984 | 0.667717 |
+| QuestDB `plain`, partition converted | 129,056,768 | 0.626069 | 139,776,000 | 0.678069 |
 | QuestDB `locate-index` | 597,078,016 | 2.896492 | 597,344,256 | 2.897783 |
-| QuestDB `locate-index`, partition converted | 188,964,864 | 0.916690 | 194,932,736 | 0.945640 |
+| QuestDB `locate-index`, partition converted | 188,964,864 | 0.916690 | 200,302,592 | 0.971690 |
 
 - QuestDB's hot tier is larger than the source, at 2.6 times it. The twelve fixed columns alone are 60 bytes a row, 367,517,640 bytes,
   against 33.65 bytes a record at source. Converting the partition to Parquet gives a file of 128,174,106 bytes on both hosts, 0.621787 of
   the source, and 128,555,797 bytes with the index. The converted ratios above are computed here from the file's `allocated_bytes_after`,
   which covers the whole table directory. The read-back was not repeated on the converted form, so no converted size is oracle-proven.
 - **macOS's Parquet ratios are not the files' sizes.** `apparent_bytes` is the same on both hosts: 70,478,425 for `zstd1-rg1Mi`, 0.341899
-  of the source. macOS's `st_blocks` total is 17.47% to 23.90% above that on five of the six variants, and on some it differs between
-  classes for the same bytes. The sixth, `zstd1-rg1Mi-delta-price`, is at 82,264,064 against 82,262,783. So the macOS column makes zstd level 9 look no
-  better than level 1 (84,074,496 against 83,968,000) and delta encoding look best, while the apparent sizes give 67,854,290, 70,478,425
-  and 82,262,783, the other way round. Read Parquet's sweep from Linux. ArcticDB's `rows100k-cols1` shows the same in class B, at
-  521,445,376 allocated over 510,394,624 apparent. The cause is not established.
+  of the source. macOS's `st_blocks` total is 17.43% to 23.90% above that on all six variants, and on four of them it differs between
+  classes for the same bytes. At `53a3317` the sixth, `zstd1-rg1Mi-delta-price`, matched its apparent size, and it is now 20.35% above
+  it in class A, so the excess is not a fixed property of a variant. The macOS column makes zstd level 9 look no better than level 1
+  (84,045,824 against 84,086,784 in class A), while the apparent sizes give 67,854,290 against 70,478,425. Read Parquet's sweep from
+  Linux. ArcticDB shows the same in class B, where its class A matches: `rows100k-cols1` at 520,101,888 allocated over 510,394,624
+  apparent, and `rows10M-cols127` at 154,771,456 over 138,100,992, 12.07% above. The cause is not established.
 
-**Cold proof.** All 385 cold proofs on each host passed, each eviction in one pass, with no shortfall. On Linux it is tight: device reads
-equal the resident bytes exactly in 273 proofs, and exceed them by 8,192 in every ArcticDB proof and by at most 659,456 for QuestDB.
-On macOS it is weak: `iostat` is machine-wide reads and writes, and its excess runs from 2,621 to 109,320,602 bytes, and is never under
-11,193,548 for QuestDB. It can only catch a shortfall.
+**Cold proof.** All 385 cold proofs on each host passed. Every eviction took one pass but one, a macOS QuestDB `locate-index` Q2 proof
+that took 4. On Linux it is tight, with no shortfall: device reads equal the resident bytes exactly in 273 proofs, and exceed them by
+8,192 in 104 of the 105 ArcticDB proofs and 73,728 in the last, by 53,248 in one Parquet proof, and by at most 110,592 for QuestDB. On
+macOS it is weak: `iostat` is machine-wide reads and writes, in hundredths of a MiB. Its excess runs from -656 to 68,441,211 bytes, and
+is never under 11,207,311 for QuestDB. The -656, in a Parquet `zstd1-rg128k` Q1 proof, is inside the 20,972 bytes of rounding the check
+allows, so the macOS counter can only catch a shortfall larger than that.
 
-**A fault in the Parquet cold numbers.** Parquet has a floor that does not depend on bytes read. Q5 reads 4,259,840 bytes cold on macOS,
-with a median of 148,133 µs against 7,800 µs warm, and 4,182,016 bytes on Linux, 240,523 µs against 24,901 µs. ArcticDB's Q4 is 6,326 µs
-and 21,307 µs cold. Parquet's warm Q1, the first query a worker runs, has a maximum of 156,078 µs and 281,651 µs against medians of 18,086
-µs and 55,365 µs. Part of this is the harness: `pq.read_table` imports `pyarrow.dataset` itself, inside the timed call, so the files'
-`cold_includes` line, that imports fall before the clock, is wrong for Parquet. A spot check on macOS, outside any run, put that first read
-at 16 to 22 ms with warm caches, against under 1 ms for the second. That spot check undercounted, and the import is the whole floor. On
-macOS, in a fresh process, Q5 took 126 ms cold and 125 ms warm with the import left to `pq.read_table`, 10.3 ms and 9.1 ms with it before
-the clock, and 7.8 ms on a second call, while the import timed alone took 116 ms, cold or warm, 6 repetitions each. Page residency does
-not move it, which is why warm Q1's first repetition showed it too. An iteration run of `zstd1-rg1Mi` with the import before the clock
-had a warm Q1 maximum of 25 ms against a median of 18 ms. What is left is about 1 ms of first-call start-up and the cold bytes, and the
-cause was not traced further. `Table.group_by` likewise imported `pyarrow.acero` inside Q3's clock. Linux's floor was not measured apart.
-The numbers quoted above, and every Parquet cold median and Q1 tail in the files at `53a3317`, hold the import.
+**The Parquet cold numbers at `53a3317` held an import.** `pq.read_table` imported `pyarrow.dataset` inside the timed call, and
+`Table.group_by` imported `pyarrow.acero` inside Q3's, so those files' `cold_includes` line, that imports fall before the clock, was wrong
+for Parquet. On macOS, in a fresh process outside any run, Q5 took 126 ms cold and 125 ms warm with the import left to `pq.read_table`,
+10.3 ms and 9.1 ms with it before the clock, and 7.8 ms on a second call, while the import timed alone took 116 ms, cold or warm, 6
+repetitions each. An earlier spot check had put it at 16 to 22 ms, and undercounted. Page residency does not move it, which is why warm
+Q1's first repetition showed it too. `c8ad140` imports both modules in `ParquetSystem.open`, and `tests/compare/test_system_worker.py`
+fails if any module loads inside the clock.
+
+The current files show the size of it. Against the files at `53a3317`, Parquet `zstd1-rg1Mi`'s cold medians fell by 133 to 140 ms on
+macOS and by 201 to 207 ms on Linux, across all five queries, where Linux's floor had not been measured apart. Q5 reads 4,259,840 bytes
+cold on macOS, and its cold median is now 9,997 µs against 7,551 µs warm, down from 148,133 µs. On Linux it reads 4,182,016 bytes, at
+37,382 µs against 25,000 µs warm, down from 240,523 µs. ArcticDB's Q4, which reads fewer bytes, is 6,846 µs and 20,910 µs cold. Parquet's
+warm Q1, the first query a worker runs, has a maximum of 22,236 µs on macOS and 83,260 µs on Linux, against medians of 17,558 µs and
+54,981 µs, where it was 156,078 µs and 281,651 µs. What is left on macOS is about 1 ms of first-call start-up, which `cold_includes` now
+states, and the cold bytes.
+
+### The Linux run_bench tests had never passed
+
+The tests in `tests/scripts/test_run_bench.py` that run the whole of `scripts/run_bench.py` on its Linux path, with stand-in `taskset`
+and `perf`, run only on a Linux host, and macOS takes the unpinned path instead. They had never passed on Linux, and failed there three
+ways, all in the fixtures. The fake `perf` copied one fixed file over the stand-in for `/proc/stat`, so from the second case on
+no jiffies passed on the sibling, and `run_bench.py` rightly refused the run. The expected commit did not match in an exported tree,
+which carries a `COMMIT` file and no git. And the fake `taskset` and `perf` wrote the binary's arguments to the same record, so each
+case was counted three times. `1279de5` and `a6a82fa` fix the fixtures, with `run_bench.py` unchanged, and the fixed tests were shown
+failing again on injected faults: a frozen stat file, and `taskset -c 4` removed. No `faults/*.patch` targets `run_bench.py`'s pinning or
+its sibling meter, so `scripts/prove_checks.py` does not cover them, which is a gap.
 
 ## Process notes
 
