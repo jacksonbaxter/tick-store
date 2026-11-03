@@ -1,0 +1,13 @@
+diff --git a/scripts/run_bench.py b/scripts/run_bench.py
+--- a/scripts/run_bench.py
++++ b/scripts/run_bench.py
+@@ -306,8 +306,7 @@ def wrapped_command(host, measure, case_files, binary_args, meter=None):
+     if measure:
+         command.append(measure)
+     if host == "Linux":
+-        command += ["taskset", "-c", str(LINUX_CORE),
+-                    *meter.snapshot_command(case_files["stat"]), "perf", "stat", "-x,",
++        command += [*meter.snapshot_command(case_files["stat"]), "perf", "stat", "-x,",
+                     "-e", ",".join(PERF_EVENTS), "--delay=-1",
+                     f"--control=fifo:{case_files['control']},{case_files['ack']}",
+                     "-o", str(case_files["perf"]), "--"]

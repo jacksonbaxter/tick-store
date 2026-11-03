@@ -216,6 +216,9 @@ FAULTS = (
           arguments=("--test-regex", "OracleExhaustiveFlip")),
     Fault("data-sha256-removed", "py-scripts", "fetch_data.py stops comparing SHA-256 digests",
           CHECK_FAILED, "FAIL: test_one_flipped_byte (__main__.CompressedHash"),
+    Fault("taskset-removed", "py-scripts", "run_bench.py drops the taskset -c 4 pin from a "
+          "Linux case's command", CHECK_FAILED,
+          "FAIL: test_a_linux_case_records_its_siblings_busy_share (__main__.RunBenchTest"),
     Fault("compare-tests-settings", "py-compare", "the QuestDB commit mode check stops checking",
           CHECK_FAILED, "FAIL: test_the_parser_outranks_a_matching_echo"),
     Fault("results-no-load-lines", "check-results", "a macOS results file with no load lines",
