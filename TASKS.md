@@ -137,9 +137,9 @@ Layout experiments, measured and recorded in NOTES.md whichever way they go
 - [ ] Per-locate layouts cannot trust locate 0: `K` records carry it while naming real stocks, so a symbol filter has to read the stock field there
 
 Required codecs
-- [ ] Gorilla delta-of-delta timestamps. Prometheus widened Gorilla's buckets for milliseconds, so choose nanosecond buckets from the census
-- [ ] Gorilla XOR on prices as doubles, proving each value round-trips to its exact integer
-- [ ] XOR on the raw integers, for comparison
+- [x] Gorilla delta-of-delta timestamps. Prometheus widened Gorilla's buckets for milliseconds, so choose nanosecond buckets from the census. Buckets of 16, 19 and 23 bits; 20.40 and 20.42 bits per value in file order, missing CR-3 by 0.4 (NOTES.md, "Gorilla on ITCH")
+- [x] Gorilla XOR on prices as doubles, proving each value round-trips to its exact integer. Every value on both days exact, and all 2^32 Price(4) values; add-order prices 54.2 and 54.9 bits per value
+- [x] XOR on the raw integers, for comparison. 29.2 and 29.5 bits per value on add-order prices, and the integer as a double 22.9 and 23.1
 
 Competing codecs
 - [ ] Timestamps: delta against delta-of-delta, frame of reference per block, Stream VByte

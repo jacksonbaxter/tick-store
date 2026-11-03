@@ -446,6 +446,78 @@ among them. `coverage` and `hygiene` fail because `coverage_report.py` and `chec
 none. `actionlint` fails because it is not installed there, and `py-compare` skips with no `.venv`. On macOS all 21 pass at
 `55ab1d2`, whose code differs only by a workflow comment, and a checkout on a Linux CI runner has git.
 
+### Gorilla on ITCH
+
+G-4 is met: Gorilla delta-of-delta timestamps and Gorilla XOR prices are built, fuzzed, and measured on both full days. Every
+value of every column came back exact. The figures below are from `results/codec-eval-*.json`, written by `tools/tick_codec_eval`
+at `b9f4407`. "Bits per value" counts everything a reader needs: block payloads, the 8-byte block headers, and 8 bytes per stream
+for its count, plus 2 for its locate in a per-locate column. A per-locate column also needs a permutation to rebuild file order.
+That cost is not counted, so per-locate figures flatter per-locate layouts. Days are `12302019` then `10302019` throughout.
+
+**Choices.** The nanosecond buckets are 16, 19 and 23 bits, with Gorilla's control codes and a 64-bit escape. An exhaustive search
+over every three widths from 2 to 44, costing the census's delta-of-delta histograms, puts them first on both days together at
+20.385 bits per value. Taken alone, `10302019` prefers 16, 20 and 25 by 0.006 bits. On the same histograms Prometheus's 14, 17
+and 20 cost 22.3 and 22.1, and Gorilla's 7, 9 and 12 cost 59.1 and 59.2. Measured, the codec costs 0.027 bits more than the
+search predicts. The block header and each block's first value, stored whole, add 128 bits per block, or 0.031 bits per value at the
+default block of 4,096 values. The search costs a value on a power-of-two edge only approximately, so the two need not agree exactly.
+A block is that size so a one-millisecond read near the open touches one or two blocks. The size is a parameter, from 1 to 2^20.
+The search script and its output are kept with the raw logs, not in the repository.
+
+**Timestamps miss CR-3 by 0.4 bits.**
+
+| Column | Gorilla DoD | Census ideal, delta | Census ideal, DoD | CR-3, at most 20.0 |
+|---|---|---|---|---|
+| All messages, file order | 20.404, 20.418 | 17.147, 17.139 | 18.437, 18.420 | missed by 0.404, 0.418 |
+| Per locate | 44.476, 44.574 | 23.366, 23.387 | 26.782, 26.787 | missed by 24.5, 24.6 |
+
+- In file order, 57.2% of values take the 16-bit bucket, 29.8% the 19-bit one, 11.8% the 23-bit one, 0.75% are zero and 0.51%
+  escape, on `12302019`. Gorilla is 2.0 bits above the ideal for its own transform and 3.3 above the ideal for plain delta.
+- DoD against delta: no delta codec is built yet, so the census figure stands. Plain delta's ideal is 1.3 bits below
+  delta-of-delta's on both days, 17.1 against 18.4. The tool computes these ideals itself, the same way, and they match the census
+  to every printed digit on both days.
+- Per-locate streams hurt timestamps. 49% of per-locate values escape to 64 bits, since a stock's gaps are far wider than the
+  venue's. Even the best widths for that view, 21, 30 and 36, would cost about 29.6 on the census histograms, half again the
+  file-order figure.
+
+**Prices: XOR on the dollar doubles is the worst choice measured.** Add-order prices, `A` and `F`, 118,631,456 and 128,638,557 values:
+
+| Representation | File order | Per locate | XOR on dollars over this |
+|---|---|---|---|
+| Dollars, price / 10^4, as a double | 54.218, 54.904 | 36.893, 37.881 | |
+| Integer as a double | 22.925, 23.115 | 13.265, 13.370 | 2.37x, 2.38x file order; 2.78x, 2.83x per locate |
+| Raw integer, XOR on the 64-bit word | 29.232, 29.506 | 22.976, 23.506 | 1.86x, 1.86x file order; 1.61x, 1.61x per locate |
+| Ideal code of the integer delta | 18.646, 18.712 | 9.546, 9.822 | |
+
+- On dollars, a non-zero XOR carries 62.2 data bits on average, so the stream saves 15% against raw 64-bit doubles. A price over
+  10^4 is not a short binary fraction, so its mantissa fills all 52 bits and consecutive prices share almost none of them.
+  The integer as a double has at least 21 trailing zero bits in its mantissa, and its non-zero XORs carry 24.7 bits. It also beats XOR
+  on the raw integer, which carries 32.5. A likely reason is that the double's exponent sorts prices by magnitude first. That is not
+  proven.
+- Per locate, XOR on dollars is 36.9 and 37.9 bits, beside the published 37.7 for Gorilla on Stocks-USA. File order interleaves
+  every stock, and that costs about 17 more bits.
+- CR-4, at most 7.9 bits: missed by every Gorilla variant. The best is the integer as a double per locate, 13.265 and 13.370, a gap
+  of 5.4 and 5.5 bits. In file order the best is 22.9 and 23.1. Even the per-locate delta ideal, 9.5 and 9.8, is above 7.9, so
+  delta alone will not reach CR-4. The scale and the layout will have to.
+- CR-5 is not judged here, because no integer scheme is built. To meet it on add-order prices, the best integer scheme must reach
+  35.4 and 35.9 bits in file order, or 24.1 and 24.8 per locate. XOR on the raw integers is already 1.86x smaller than XOR on
+  dollars in file order, but it is still Gorilla.
+- Other price columns, file order, XOR on dollars, then integer as a double, then raw integer: `U` 55.3, 23.5, 29.7 and 55.5, 23.6,
+  29.8; `C` 43.9, 18.2, 23.6 and 43.8, 17.9, 23.3; `P` 50.7, 22.5, 27.4 and 50.1, 21.8, 27.1. The MWCB levels are three values a
+  day, too few to mean anything.
+
+**Exactness.** On both days, 0 blocks refused, 0 words changed, and 0 values that failed to map back, in all 20 column and codec
+pairs. All 2^32 Price(4) values were sent through each double and back, 4,294,967,296 per representation, with 0 failures. A
+Price(8) above 2^53 does not survive a double, and the unit tests show that this is counted and reported with its value.
+
+**Cost of a run.** 56.4 s and 60.5 s per day, the two exhaustive proofs included. Max RSS is 8.73 and 9.51 GB, which is the source
+mapped. The peak footprint, what the process held beyond the mapping, is 462 and 459 MB, because the tool keeps one block per
+stream and never the day.
+
+**Checks.** Both decoders have libFuzzer targets, and each ran clean for 240 s under `heavy.sh`. `fuzz_gorilla_timestamps` did
+732,198 runs and `fuzz_gorilla_xor` 276,557, peaking at 562 and 533 MB. Neither found a crash, so there are no crasher files.
+Three injected faults are proven caught: a decoder that accepts a wider bucket than it needs, an encoder that writes a leading
+count of 32 into a 5-bit field, and a bit reader without its bounds check, caught by ASan.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
