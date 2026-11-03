@@ -28,7 +28,7 @@ using WidthHistogram = std::array<std::uint32_t, kWordBits + 1>;
 
 constexpr std::uint64_t kMaxWord = std::numeric_limits<std::uint64_t>::max();
 constexpr std::uint64_t kSignBit = std::uint64_t{1} << 63U;
-constexpr unsigned kLastTransform = static_cast<unsigned>(IntTransform::delta_of_delta);
+constexpr unsigned kLastTransform = static_cast<unsigned>(IntTransform::head_delta);
 constexpr std::size_t kVectorHeaderBytes = 3;
 constexpr unsigned kRemainderCountBytes = 4;
 constexpr unsigned kExceptionCountBytes = 2;
@@ -266,6 +266,7 @@ void accumulate(PforStats& into, const PforStats& from) noexcept {
     into.full_vector_bits += from.full_vector_bits;
     into.full_vector_bits_per_128 += from.full_vector_bits_per_128;
     into.tail_padding_bits += from.tail_padding_bits;
+    into.head_delta_fallbacks += from.head_delta_fallbacks;
 }
 
 // One block at scale `scale`, appended to `out`.
@@ -274,6 +275,7 @@ void encode_scaled(std::span<const std::uint64_t> values, std::uint64_t scale,
                    Scratch& scratch) {
     const std::size_t count = values.size();
     const std::size_t header = begin_block(out, static_cast<std::uint32_t>(count));
+    const std::size_t transform_at = out.size();
     out.push_back(static_cast<std::byte>(options.transform));
     const unsigned scale_bytes = bytes_for(scale);
     out.push_back(static_cast<std::byte>(scale_bytes));
@@ -308,6 +310,13 @@ void encode_scaled(std::span<const std::uint64_t> values, std::uint64_t scale,
             break;
         case IntTransform::delta_of_delta:
             delta_of_delta_encode(scratch.q, scratch.y);
+            break;
+        case IntTransform::head_delta:
+            if (!head_delta_encode(scratch.q, scratch.y)) {
+                delta_encode(scratch.q, scratch.y);
+                out[transform_at] = static_cast<std::byte>(IntTransform::delta);
+                ++stats.head_delta_fallbacks;
+            }
             break;
     }
 
@@ -643,6 +652,9 @@ std::expected<std::size_t, CodecError> decode_pfor_block(std::span<const std::by
             break;
         case IntTransform::delta_of_delta:
             delta_of_delta_decode(y);
+            break;
+        case IntTransform::head_delta:
+            head_delta_decode(y);
             break;
     }
 

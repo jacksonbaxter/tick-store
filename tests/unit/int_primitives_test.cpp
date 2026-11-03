@@ -92,6 +92,56 @@ TEST(Delta, HandlesEmptyAndSingleInputs) {
     EXPECT_EQ(coded, one);
 }
 
+// The token and payload of each value, worked out by hand from int_transform.hpp. 700
+// down to 100 fill the seven heads, each taking the first head still at 0. Then 50 is
+// below every head and escapes, which drops the last head, 700. 701 is then 101 above
+// 600, at head 6, and 101 is 1 above 100, which has moved to head 2.
+TEST(HeadDelta, TakesTheNearestHeadBelowAndEscapesBelowThemAll) {
+    const Values values{700, 600, 500, 400, 300, 200, 100, 50, 701, 101};
+    Values coded(values.size());
+    ASSERT_TRUE(head_delta_encode(values, coded));
+    const Values expected{
+        700U << 3U,           (600U << 3U) | 1U, (500U << 3U) | 2U, (400U << 3U) | 3U,
+        (300U << 3U) | 4U,    (200U << 3U) | 5U, (100U << 3U) | 6U, (50U << 3U) | 7U,
+        (101U << 3U) | 6U,    (1U << 3U) | 2U,
+    };
+    EXPECT_EQ(coded, expected);
+    head_delta_decode(coded);
+    EXPECT_EQ(coded, values);
+}
+
+TEST(HeadDelta, RoundTripsThroughTheTopAndRefusesWhatItCannotReach) {
+    // Steps of 2^60 climb to 2^64 - 1, and gaps wrap past it: 3 is 4 above 2^64 - 1, but 3
+    // above a head still at 0, which wins.
+    Values climb;
+    for (std::uint64_t k = 1; k <= 15; ++k) {
+        climb.push_back(k << 60U);
+    }
+    climb.insert(climb.end(), {kMax, 3, 0, (std::uint64_t{1} << 61U) - 1U});
+    Values coded(climb.size());
+    ASSERT_TRUE(head_delta_encode(climb, coded));
+    EXPECT_EQ(coded[15], ((std::uint64_t{1} << 60U) - 1U) << 3U);
+    EXPECT_EQ(coded[16], (3U << 3U) | 1U);
+    head_delta_decode(coded);
+    EXPECT_EQ(coded, climb);
+    // 2^61 and above are more than 2^61 from a head at 0, and too wide to escape.
+    Values none(1);
+    EXPECT_FALSE(head_delta_encode(Values{std::uint64_t{1} << 61U}, none));
+    EXPECT_FALSE(head_delta_encode(Values{kMax}, none));
+    // Every word decodes, whatever its token: an escape is the payload itself, and a head
+    // never set is 0.
+    Values words{kMax, 7, 0, kSignBit | 7U, 6};
+    head_delta_decode(words);
+    EXPECT_EQ(words, (Values{kMax >> 3U, 0, 0, std::uint64_t{1} << 60U, 0}));
+}
+
+TEST(HeadDelta, HandlesEmptyInput) {
+    Values none;
+    EXPECT_TRUE(head_delta_encode({}, none));
+    head_delta_decode(none);
+    EXPECT_TRUE(none.empty());
+}
+
 // Where each bit of each value lands, written from the layout's description and nothing
 // else: value i in lane i % 16, row i / 16, its bit j at bit row * width + j of the lane,
 // and the lane's word k at index k * 16 + lane.

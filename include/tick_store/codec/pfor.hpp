@@ -6,7 +6,8 @@
 // A block is the frame in block.hpp around this payload, every field on whole bytes and
 // little-endian:
 //
-//   u8      transform     0 none, 1 delta, 2 delta-of-delta (int_transform.hpp)
+//   u8      transform     0 none, 1 delta, 2 delta-of-delta, 3 head delta
+//                         (int_transform.hpp)
 //   u8      scale bytes   1 to 8
 //   ...     scale s       that many bytes, s >= 1, its top byte not zero
 //   if s > 1, the remainders:
@@ -33,6 +34,8 @@
 //
 // The encoder's choices, which the format leaves open:
 //
+//   - Head delta falls back to delta for a block it cannot code, one with a value of 2^61
+//     or more far from every head, and the block's transform byte says delta.
 //   - The scale. With adaptive_scale off it is 1. With it on, the candidates are 1, the
 //     greatest common divisor of the whole block, and the commonest divisors of runs of
 //     8 values, with the divisors those have in common, all taken from the block itself:
@@ -68,6 +71,7 @@ enum class IntTransform : std::uint8_t {
     none = 0,
     delta = 1,
     delta_of_delta = 2,
+    head_delta = 3,
 };
 
 struct PforOptions {
@@ -101,6 +105,8 @@ struct PforStats {
     // What padding each shorter vector to 1,024 values, as an interleaved layout over
     // every vector would, would have added.
     std::uint64_t tail_padding_bits = 0;
+    // Blocks asked for head delta that fell back to delta.
+    std::uint64_t head_delta_fallbacks = 0;
 };
 
 // Appends one block holding `values`, which must hold 1 to kMaxBlockValues values.

@@ -323,7 +323,7 @@ inline constexpr std::array<Encoder, 1> kXorEncoders{
     Encoder{.encode_block = &encode_xor_block_plain, .encode_column = &encode_xor_plain}};
 
 // Every PFOR option set: each transform, with and without the adaptive scale and patching.
-inline constexpr std::array<Encoder, 12> kPforEncoders{
+inline constexpr std::array<Encoder, 16> kPforEncoders{
     pfor_encoder<IntTransform::none, false, false>(),
     pfor_encoder<IntTransform::none, false, true>(),
     pfor_encoder<IntTransform::none, true, false>(),
@@ -336,11 +336,16 @@ inline constexpr std::array<Encoder, 12> kPforEncoders{
     pfor_encoder<IntTransform::delta_of_delta, false, true>(),
     pfor_encoder<IntTransform::delta_of_delta, true, false>(),
     pfor_encoder<IntTransform::delta_of_delta, true, true>(),
+    pfor_encoder<IntTransform::head_delta, false, false>(),
+    pfor_encoder<IntTransform::head_delta, false, true>(),
+    pfor_encoder<IntTransform::head_delta, true, false>(),
+    pfor_encoder<IntTransform::head_delta, true, true>(),
 };
 
 // A PFOR block names its transform, so it is re-encoded with the four option sets of that
-// transform; the column checks and part 2 still use all twelve. The decoder accepted the
-// block, so the transform is 0 to 2.
+// transform; the column checks and part 2 still use all sixteen. The decoder accepted the
+// block, so the transform is 0 to 3. A head-delta encoder may fall back to delta, which
+// only changes the transform byte, and the oracle checks values, so that is allowed.
 [[nodiscard]] inline std::span<const Encoder> pfor_block_encoders(std::span<const std::byte> block) {
     constexpr std::size_t kPerTransform = 4;
     const auto transform = std::to_integer<std::size_t>(block[kBlockHeaderSize]);

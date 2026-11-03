@@ -1,5 +1,5 @@
 // libFuzzer target: raw bytes straight into the patched frame of reference block decoder,
-// as a column of blocks, and through all twelve encoder option sets as values. A block has
+// as a column of blocks, and through all sixteen encoder option sets as values. A block has
 // no checksum to get past (Z1). The format leaves the encoder choices, so the oracle in
 // codec_oracles.hpp checks values and the encoder's own consistency, not bytes; run
 // commands, limits and the reach check are in fuzz/README.md.

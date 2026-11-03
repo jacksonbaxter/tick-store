@@ -36,6 +36,8 @@ constexpr std::uint64_t kMax = std::numeric_limits<std::uint64_t>::max();
 constexpr std::uint64_t kSignBit = std::uint64_t{1} << 63U;
 
 constexpr PforOptions kDelta{.transform = IntTransform::delta, .adaptive_scale = false, .patch = true};
+constexpr PforOptions kHeadDelta{.transform = IntTransform::head_delta,
+                                  .adaptive_scale = false, .patch = true};
 constexpr PforOptions kScaledFor{.transform = IntTransform::none, .adaptive_scale = true,
                                  .patch = true};
 constexpr PforOptions kPatchedFor{.transform = IntTransform::none, .adaptive_scale = false,
@@ -156,6 +158,26 @@ const Bytes& golden3_payload() {
     return value;
 }
 
+// Golden 4: head delta on two interleaved sequences. The heads start at 0, so 1000 takes
+// head 0 with a gap of 1000; 1004 takes head 0 again, 4 on; 900 is below head 0, so it
+// takes head 1, still 0, and 1004 moves down to head 1; 1009 and 905 then each take head
+// 1, 5 on. y = 8000, 32, 7201, 41, 41, plain, base 32, width 13: a narrower width with
+// the two widest as exceptions ties at 88 bits, and a tie keeps the wider width.
+const Values& golden4() {
+    static const Values value{1000, 1004, 900, 1009, 905};
+    return value;
+}
+const Bytes& golden4_payload() {
+    static const Bytes value = bytes({
+    0x03, 0x01, 0x01,                          // head delta, scale 1
+    0x00, 0x0D, 0x01, 0x20,                    // plain, width 13, base 32 in 1 byte
+    0x20, 0x1F, 0x00, 0x04, 0xF0, 0x04, 0x90,  // 7968, 0, 7169, 9, 9 in 13 bits each
+    0x00, 0x00,
+    0x00, 0x00,                                // no exceptions
+});
+    return value;
+}
+
 TEST(Pfor, GoldenBytesBothWays) {
     EXPECT_EQ(encoded(golden1(), kDelta), block_of(4, golden1_payload()));
     EXPECT_EQ(decoded_block(block_of(4, golden1_payload())), golden1());
@@ -169,6 +191,26 @@ TEST(Pfor, GoldenBytesBothWays) {
 
     EXPECT_EQ(encoded(golden3(), kDelta), block_of(8, golden3_payload()));
     EXPECT_EQ(decoded_block(block_of(8, golden3_payload())), golden3());
+
+    EXPECT_EQ(encoded(golden4(), kHeadDelta), block_of(5, golden4_payload()));
+    EXPECT_EQ(decoded_block(block_of(5, golden4_payload())), golden4());
+}
+
+// A block head delta cannot code, with a value of 2^61 or more far from every head, falls
+// back to delta and says so in its transform byte.
+TEST(Pfor, HeadDeltaFallsBackToDeltaWhereItCannotCode) {
+    const Values values{5, kSignBit, 7};
+    PforStats stats;
+    const Bytes column = encoded(values, kHeadDelta, kDefaultBlockValues, &stats);
+    EXPECT_EQ(stats.head_delta_fallbacks, 1U);
+    EXPECT_EQ(column, encoded(values, kDelta));
+    EXPECT_EQ(column[kBlockHeaderSize], std::byte{1});
+    EXPECT_EQ(decoded(column, values.size()), values);
+    // Blocks of one value: 5 and 7 have head-delta forms, 2^63 does not.
+    PforStats one;
+    const Bytes ones = encoded(values, kHeadDelta, 1, &one);
+    EXPECT_EQ(one.head_delta_fallbacks, 1U);
+    EXPECT_EQ(decoded(ones, values.size()), values);
 }
 
 TEST(Pfor, EmptyColumnHasNoBlocks) {
@@ -337,8 +379,8 @@ TEST(Pfor, ScalesNearTwoToTheSixtyFourRoundTrip) {
     for (const Values& values :
          {Values{kMax, kMax}, Values{kSignBit, kSignBit, 0}, Values{kMax - 1, kMax - 1, 1},
           threes}) {
-        for (const IntTransform transform :
-             {IntTransform::none, IntTransform::delta, IntTransform::delta_of_delta}) {
+        for (const IntTransform transform : {IntTransform::none, IntTransform::delta,
+                                             IntTransform::delta_of_delta, IntTransform::head_delta}) {
             const PforOptions options{.transform = transform, .adaptive_scale = true, .patch = true};
             EXPECT_EQ(decoded(encoded(values, options), values.size()), values);
         }
@@ -363,8 +405,8 @@ TEST(Pfor, SeededWalksRoundTripInEveryVariant) {
         values.push_back(t);
     }
     values.insert(values.end(), {0, kMax, 0, kMax, kSignBit, kSignBit - 1, 1, kMax - 1});
-    for (const IntTransform transform :
-         {IntTransform::none, IntTransform::delta, IntTransform::delta_of_delta}) {
+    for (const IntTransform transform : {IntTransform::none, IntTransform::delta,
+                                         IntTransform::delta_of_delta, IntTransform::head_delta}) {
         for (const bool scale : {false, true}) {
             for (const bool patch : {false, true}) {
                 const PforOptions options{.transform = transform, .adaptive_scale = scale,
@@ -391,6 +433,7 @@ TEST(Pfor, EncodedSizeIsPinned) {
     EXPECT_EQ(block_of(4, golden1_payload()).size(), 20U);
     EXPECT_EQ(block_of(16, golden2_payload()).size(), 33U);
     EXPECT_EQ(block_of(8, golden3_payload()).size(), 30U);
+    EXPECT_EQ(block_of(5, golden4_payload()).size(), 26U);
 
     // 10,000 timestamps 25 us apart, delta, in blocks of 4,096. Each block's first delta
     // is its first value, a 45-bit exception over a base of 25,000; every other offset is
@@ -439,10 +482,10 @@ TEST(Pfor, EncoderRefusesBadParameters) {
                                        kMaxBlockValues, 0)));
     EXPECT_EQ(encode_pfor_block(golden1(),
                                 // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange): an out-of-range transform is what this checks
-                                PforOptions{.transform = static_cast<IntTransform>(3),
+                                PforOptions{.transform = static_cast<IntTransform>(4),
                                             .adaptive_scale = false, .patch = true},
                                 out),
-              std::unexpected(error_of(CodecErrorKind::bad_parameter, "pfor transform", 0, 2, 3)));
+              std::unexpected(error_of(CodecErrorKind::bad_parameter, "pfor transform", 0, 3, 4)));
     EXPECT_TRUE(out.empty());
 }
 
@@ -472,8 +515,8 @@ TEST(Pfor, EachHeaderCorruptionHasItsError) {
         payload[at] = static_cast<std::byte>(value);
         return block_of(4, payload);
     };
-    EXPECT_EQ(decoded_block(with(0, 3)),
-              std::unexpected(error_of(CodecErrorKind::bad_field, "pfor transform", 64, 2, 3)));
+    EXPECT_EQ(decoded_block(with(0, 4)),
+              std::unexpected(error_of(CodecErrorKind::bad_field, "pfor transform", 64, 3, 4)));
     EXPECT_EQ(decoded_block(with(1, 0)),
               std::unexpected(error_of(CodecErrorKind::bad_field, "pfor scale bytes", 72, 8, 0)));
     EXPECT_EQ(decoded_block(with(1, 9)),
