@@ -1,6 +1,6 @@
 {
   "schema": "tick-store-check-proofs-1",
-  "source_commit": "28eaa3daab21",
+  "source_commit": "971ba4047573",
   "platform": "Darwin arm64",
   "compiler": "clang version 23.1.4",
   "statement": "Each fault ran in a throwaway clone. Baseline passed, the fault applied, the same step failed with this exit code and string, the fault reverted.",
@@ -227,32 +227,6 @@
       "verdict": "PROVEN"
     },
     {
-      "fault_id": "results-no-load-lines",
-      "check": "check-results",
-      "what": "a macOS results file with no load lines",
-      "kind": "mutation",
-      "fingerprint": "6594a5443da6",
-      "expected_exit": 1,
-      "expected_string": "no load lines",
-      "actual_exit": 1,
-      "matched_string": "no load lines",
-      "baseline_passed": true,
-      "verdict": "PROVEN"
-    },
-    {
-      "fault_id": "results-macos-pinned",
-      "check": "check-results",
-      "what": "a macOS results file claiming pinned",
-      "kind": "mutation",
-      "fingerprint": "948a95408f6a",
-      "expected_exit": 1,
-      "expected_string": "macOS cannot be pinned",
-      "actual_exit": 1,
-      "matched_string": "macOS cannot be pinned",
-      "baseline_passed": true,
-      "verdict": "PROVEN"
-    },
-    {
       "fault_id": "results-empty-folder",
       "check": "check-results",
       "what": "no results files at all, which must not pass as nothing wrong",
@@ -266,19 +240,6 @@
       "verdict": "PROVEN"
     },
     {
-      "fault_id": "guard-sub-resolution-data",
-      "check": "check-results",
-      "what": "a percentile below the timer's floor in a results file",
-      "kind": "mutation",
-      "fingerprint": "a1cf7a4a5f70",
-      "expected_exit": 1,
-      "expected_string": "the timer can resolve",
-      "actual_exit": 1,
-      "matched_string": "the timer can resolve",
-      "baseline_passed": true,
-      "verdict": "PROVEN"
-    },
-    {
       "fault_id": "guard-cpp-removed",
       "check": "dev-test",
       "what": "ResolutionGuard stops refusing a value below its floor",
@@ -288,45 +249,6 @@
       "expected_string": "ResolutionGuard.RefusesAValueBelowTheFloor",
       "actual_exit": 8,
       "matched_string": "ResolutionGuard.RefusesAValueBelowTheFloor",
-      "baseline_passed": true,
-      "verdict": "PROVEN"
-    },
-    {
-      "fault_id": "compare-commit-mode",
-      "check": "check-compare",
-      "what": "QuestDB class B reads back commit mode nosync",
-      "kind": "mutation",
-      "fingerprint": "cb52fe69edc2",
-      "expected_exit": 1,
-      "expected_string": "requested 'sync', in force 'nosync'",
-      "actual_exit": 1,
-      "matched_string": "requested 'sync', in force 'nosync'",
-      "baseline_passed": true,
-      "verdict": "PROVEN"
-    },
-    {
-      "fault_id": "compare-read-back",
-      "check": "check-compare",
-      "what": "a store failed its read-back",
-      "kind": "mutation",
-      "fingerprint": "d2a4026abe04",
-      "expected_exit": 1,
-      "expected_string": "the oracle said mismatch",
-      "actual_exit": 1,
-      "matched_string": "the oracle said mismatch",
-      "baseline_passed": true,
-      "verdict": "PROVEN"
-    },
-    {
-      "fault_id": "compare-query-digest",
-      "check": "check-compare",
-      "what": "a query's digest differs from the ground truth",
-      "kind": "mutation",
-      "fingerprint": "1a5e07c73114",
-      "expected_exit": 1,
-      "expected_string": "ground truth",
-      "actual_exit": 1,
-      "matched_string": "ground truth",
       "baseline_passed": true,
       "verdict": "PROVEN"
     },
