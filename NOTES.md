@@ -421,6 +421,26 @@ its sibling meter, so `scripts/prove_checks.py` does not cover them, which is a 
   which is what an unpinned host gives, and nothing to chase. macOS figures are context. Headline numbers come from the pinned Linux
   host.
 
+### clang-tidy had never seen the Linux-only sources
+
+Linux builds two sources macOS does not, `affinity_linux.cpp` and `page_cache_linux.cpp`, and no clang-tidy run had analysed either. The
+Mac's compile databases do not hold them, and on the Linux host `scripts/check.sh` listed its sources with `git ls-files`, which finds
+nothing in the exported tree a sync makes: at `4d5c14f` the step failed there with 0 files analysed. It now lists them from the tree
+when there is no git and a `COMMIT` file, and at `1727ba7` it analysed 57 files on three cores in 725 s, the 59 tracked sources less
+the two only macOS builds.
+
+Both Linux-only files were clean. Seven findings came from six files every host builds: `misc-include-cleaner` asked for a header
+providing `ssize_t` in five and `off_t` in two. glibc defines both in whichever libc header is included first, `stdio.h` in the three
+files whose preprocessed source was checked, and `<unistd.h>`, which POSIX says provides both and which every one of the six
+includes, does not count. Adding `<sys/types.h>` did not help: macOS's include-cleaner called it unused in all six, because
+`IgnoreHeaders` hides the private headers macOS defines the types in, and on Linux the definition would still have been in
+`stdio.h`. `469e9cd` stops naming the two types instead: `auto` for the results of `read`, `write` and `pwrite`, `std::ssize` in two
+comparisons, and `std::int64_t` for two file offsets, where `-Wconversion` would catch an `off_t` narrower than 64 bits.
+
+With no file list given, the step fails on the Linux host on an injected C-style cast in either file: in `page_cache_linux.cpp` in
+741 s, and in `affinity_linux.cpp` in 717 s. A first cast in `affinity_linux.cpp`, inside an argument of the `CPU_SET` macro, went
+unreported, so the check does not look inside that macro's expansion, and the proof used a cast outside any macro.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from

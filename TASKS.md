@@ -118,7 +118,9 @@ Checks
 ## Phase 3: Implementation
 
 Checks carried from Phase 2
-- [ ] A `taskset-removed` fault patch, so `scripts/prove_checks.py` covers `scripts/run_bench.py`'s pinning. No patch in `faults/` targets its pinning or its sibling meter
+- [x] A `taskset-removed` fault patch, so `scripts/prove_checks.py` covers `scripts/run_bench.py`'s pinning. On macOS `test_a_linux_case_records_its_siblings_busy_share` catches it
+- [ ] A fault patch for `scripts/run_bench.py`'s sibling meter. No patch in `faults/` targets it
+- [x] clang-tidy on the Linux-only sources, `affinity_linux.cpp` and `page_cache_linux.cpp`: `scripts/check.sh` lists its sources without git in an exported tree, so its clang-tidy step on Linux covers every translation unit Linux builds, and fails on an injected violation in either file
 - [ ] CI has never run on GitHub, and the Linux `run_bench` fixture bug means its Linux job would have failed until `a6a82fa`. The first real run is the open item under Phase 2 Checks
 
 Storage
