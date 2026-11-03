@@ -407,6 +407,20 @@ case was counted three times. `1279de5` and `a6a82fa` fix the fixtures, with `ru
 failing again on injected faults: a frozen stat file, and `taskset -c 4` removed. No `faults/*.patch` targets `run_bench.py`'s pinning or
 its sibling meter, so `scripts/prove_checks.py` does not cover them, which is a gap.
 
+## Phase 3 notes
+
+### Rulings on the Phase 2 report
+
+- **A sync to the Linux host rebuilds nearly everything, and that is expected.** Each sync replaces the source folder there with a
+  fresh `git archive` extract, and every file in it carries the commit's timestamp, which is newer than the build outputs. So ninja
+  rebuilds almost the whole tree after every sync: in the Phase 2 re-run the bench build ran 89 steps, all of it. That is the cost of
+  building only committed code, and no timestamp workaround is used.
+- **The 4.8% move in macOS decode is unpinned-host noise.** Decode ran at 124.12 M messages/s at `40bc4b4` and 130.06 M at `ad2bab5`,
+  4.8% higher, with neither the codec's sources nor the benchmark's changed between the two, against CVs within each run of 0.67% and
+  0.80%. Decode then encode moved 1.2%, from 69.02 M to 69.86 M. The difference between runs is several times the spread within one,
+  which is what an unpinned host gives, and nothing to chase. macOS figures are context. Headline numbers come from the pinned Linux
+  host.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
