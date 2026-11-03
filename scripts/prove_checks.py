@@ -50,9 +50,6 @@ NOT_CODE = (":(exclude)results/check-proofs.json", ":(exclude)results/coverage.j
 CHECK_FAILED = 1
 FUZZ_ARGUMENTS = ("--fuzz-seconds", "45", "--fuzz-seed", "1", "--fresh-corpus")
 
-MACOS_BENCH = "results/bench/macOS-itch_codec-40bc4b4ea765.json"
-MACOS_COMPARE = "results/compare/macOS-12302019-open-53a3317524f1.json"
-
 # What a run of ctest and libFuzzer exit with on a detection.
 EXIT_CTEST = 8
 EXIT_BUILD = 1
@@ -76,6 +73,16 @@ def edit_text(path, old, new):
     target.write_text(text.replace(old, new, 1))
 
 
+def macos_results(folder, root=TREE):
+    """The one macOS results file in results/<folder>, by pattern, so a re-measure cannot
+    strand the faults that edit it."""
+    found = sorted((root / "results" / folder).glob("macOS-*.json"))
+    if len(found) != 1:
+        raise SystemExit(f"prove_checks: results/{folder} needs exactly one macOS-*.json, "
+                         f"and has {len(found)}: {[path.name for path in found]}")
+    return found[0]
+
+
 def add_file(path, content):
     target = TREE / path
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -84,17 +91,17 @@ def add_file(path, content):
 
 
 def drop_load_lines():
-    edit_json(MACOS_BENCH, lambda d: d["header"].update(load_lines=[]))
+    edit_json(macos_results("bench"), lambda d: d["header"].update(load_lines=[]))
 
 
 def claim_pinned_on_macos():
-    edit_json(MACOS_BENCH, lambda d: d["header"].update(pinning="pinned"))
+    edit_json(macos_results("bench"), lambda d: d["header"].update(pinning="pinned"))
 
 
 def sub_resolution_percentile():
     def change(document):
         document["results"][0]["latency"]["percentiles"][0]["value_ns"] = 0.5
-    edit_json(MACOS_BENCH, change)
+    edit_json(macos_results("bench"), change)
 
 
 def questdb_variant(document):
@@ -106,7 +113,7 @@ def mismatched_commit_mode():
         for setting in questdb_variant(document)["classes"]["B"]["settings"]:
             if setting["name"] == "cairo.commit.mode (conf file)":
                 setting["in_force"] = "nosync"
-    edit_json(MACOS_COMPARE, change)
+    edit_json(macos_results("compare"), change)
 
 
 def failed_read_back():
@@ -114,13 +121,13 @@ def failed_read_back():
         oracle = questdb_variant(document)["classes"]["B"]["read_back"]["oracle"]
         oracle["verdict"] = "mismatch"
         oracle["exit_code"] = 1
-    edit_json(MACOS_COMPARE, change)
+    edit_json(macos_results("compare"), change)
 
 
 def query_digest_mismatch():
     def change(document):
         questdb_variant(document)["queries"]["Q1"]["digest"] = "0" * 64
-    edit_json(MACOS_COMPARE, change)
+    edit_json(macos_results("compare"), change)
 
 
 def hand_edit_readme():

@@ -9,12 +9,15 @@ every check has a fault, and every patch in faults/ is used.
 """
 
 import importlib.util
+import shutil
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+SCRATCH_ROOT = REPO_ROOT / "build" / "test_prove_checks"
 SPEC = importlib.util.spec_from_file_location("prove_checks",
                                               REPO_ROOT / "scripts" / "prove_checks.py")
 prove = importlib.util.module_from_spec(SPEC)
@@ -94,6 +97,41 @@ class FaultList(unittest.TestCase):
     def test_a_changed_fault_has_a_changed_fingerprint(self):
         other = prove.Fault("example", "dev-test", "an example", 8, "another string")
         self.assertNotEqual(prove.fingerprint(FAULT), prove.fingerprint(other))
+
+
+class MacosResults(unittest.TestCase):
+    """The faults that edit a macOS results file find it by pattern, since its name carries the
+    commit it was measured at and changes on every re-measure."""
+
+    def setUp(self):
+        SCRATCH_ROOT.mkdir(parents=True, exist_ok=True)
+        self.root = Path(tempfile.mkdtemp(dir=SCRATCH_ROOT))
+        self.addCleanup(shutil.rmtree, self.root)
+        (self.root / "results" / "bench").mkdir(parents=True)
+
+    def add(self, name):
+        (self.root / "results" / "bench" / name).write_text("{}")
+
+    def test_the_one_file_is_found_whatever_its_commit(self):
+        self.add("macOS-itch_codec-0123456789ab.json")
+        self.add("Linux-itch_codec-0123456789ab.json")
+        found = prove.macos_results("bench", self.root)
+        self.assertEqual(found.name, "macOS-itch_codec-0123456789ab.json")
+
+    def test_no_file_is_a_clear_stop(self):
+        self.add("Linux-itch_codec-0123456789ab.json")
+        with self.assertRaisesRegex(SystemExit, "exactly one macOS-.*has 0"):
+            prove.macos_results("bench", self.root)
+
+    def test_two_files_are_a_clear_stop(self):
+        self.add("macOS-itch_codec-0123456789ab.json")
+        self.add("macOS-itch_codec-ba9876543210.json")
+        with self.assertRaisesRegex(SystemExit, "exactly one macOS-.*has 2"):
+            prove.macos_results("bench", self.root)
+
+    def test_the_committed_tree_has_one_of_each(self):
+        for folder in ("bench", "compare"):
+            self.assertTrue(prove.macos_results(folder, REPO_ROOT).is_file(), folder)
 
 
 if __name__ == "__main__":
