@@ -22,9 +22,9 @@
 // so the fuzzer can steer them; locates: every one, locate 0, the first locate of the
 // first segment's bitmap, and the steered one.
 //
-// The segment size is capped at kQueryFuzzMaxSegmentRecords, three seek groups and a few
-// records, so a file reaches several groups and a short last one while one input stays
-// within libFuzzer's limits.
+// The segment size is capped at kQueryFuzzMaxSegmentRecords, a piece and a seek group and a
+// few records, so a file reaches several groups, a short last one and a column's second
+// piece while one input stays within libFuzzer's limits.
 
 #include "container_oracles.hpp"
 #include "tick_store/store/container.hpp"
@@ -43,7 +43,7 @@
 
 namespace tick_store::store::oracle {
 
-inline constexpr std::uint32_t kQueryFuzzMaxSegmentRecords = (3 * kSeekGroupRecords) + 7;
+inline constexpr std::uint32_t kQueryFuzzMaxSegmentRecords = kPieceValues + kSeekGroupRecords + 7;
 
 namespace query_detail {
 

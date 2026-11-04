@@ -176,13 +176,16 @@ TEST(ItchStoreColumns, EachTypeFillsExactlyItsColumnsWithItsFields) {
 
         Expected expected = expected_columns(*message, fixture.bytes);
         expected[Column::type] = {static_cast<std::uint64_t>(fixture.type)};
-        // The locate is one run: the record's typed index, 0, under its locate.
+        // The locate is one run: the record's index in the segment, 0, under its locate,
+        // starting at record, add and import 0.
         expected[Column::locate] = {0};
         expected[Column::locate_run] = {kLocate};
-        expected[Column::locate_run_records] = {1};
-        const bool adds = fixture.type == 'A' || fixture.type == 'F';
-        expected[Column::locate_run_adds] = {adds ? 1U : 0U};
-        expected[Column::timestamp] = {kTime};
+        expected[Column::locate_run_start] = {0};
+        expected[Column::locate_run_add_start] = {0};
+        expected[Column::locate_run_import_start] = {0};
+        // The one time is its own base, so its residual is 0.
+        expected[Column::timestamp] = {0};
+        expected[Column::time_base] = {kTime};
         expected[Column::tracking] = {kTracking};
         // The seek index: one group of one record of this type at kTime.
         auto seek = parse_seek((*columns)[Column::seek], 1);
@@ -197,10 +200,10 @@ TEST(ItchStoreColumns, EachTypeFillsExactlyItsColumnsWithItsFields) {
             for (const Column column : known->second) {
                 EXPECT_TRUE(expected.contains(column)) << column_info(column).name;
             }
-            EXPECT_EQ(expected.size(), known->second.size() + 8);
+            EXPECT_EQ(expected.size(), known->second.size() + 10);
         } else {
             EXPECT_TRUE(is_rare_type(static_cast<std::uint8_t>(fixture.type)));
-            EXPECT_EQ(expected.size(), 9U);
+            EXPECT_EQ(expected.size(), 11U);
         }
         for (std::size_t c = 0; c < kColumnCount; ++c) {
             const auto column = static_cast<Column>(c);
@@ -269,8 +272,8 @@ TEST(ItchStoreColumns, CountsFromTypesMatchWhatTheBuilderWrites) {
         const auto column = static_cast<Column>(c);
         if (column == Column::import_ref || column == Column::raw_bytes ||
             column == Column::stock_exception_record || column == Column::stock_exception_value ||
-            column == Column::locate_run || column == Column::locate_run_records ||
-            column == Column::locate_run_adds) {
+            column == Column::locate_run || column == Column::locate_run_start ||
+            column == Column::locate_run_add_start || column == Column::locate_run_import_start) {
             EXPECT_EQ(counts[c], 0U);
             continue;
         }
@@ -286,11 +289,14 @@ TEST(ItchStoreColumns, EveryColumnRoundTripsThroughItsCodecAtItsLimits) {
         for (std::uint64_t i = 0; i < (3 * kColumnBlockValues) + 17; ++i) {
             values.push_back(i % 5 == 0 ? info.max_value : (i * 2654435761U) & info.max_value);
         }
-        auto chunk = encode_column(info.id, values);
-        ASSERT_TRUE(chunk.has_value()) << to_string(chunk.error());
-        EXPECT_TRUE(chunk->codec == primary_codec(info.id) ||
-                    (info.zstd && chunk->codec == codec::CodecId::zstd));
-        auto decoded = decode_column(info.id, chunk->codec, chunk->bytes, values.size());
+        auto chunks = encode_column(info.id, values);
+        ASSERT_TRUE(chunks.has_value()) << to_string(chunks.error());
+        ASSERT_EQ(chunks->size(), 1U);
+        const ColumnChunk& chunk = chunks->front();
+        EXPECT_EQ(chunk.values, values.size());
+        EXPECT_TRUE(chunk.codec == primary_codec(info.id) ||
+                    (info.zstd && chunk.codec == codec::CodecId::zstd));
+        auto decoded = decode_column(info.id, chunk.codec, chunk.bytes, values.size());
         ASSERT_TRUE(decoded.has_value()) << to_string(decoded.error());
         EXPECT_EQ(*decoded, values);
 
@@ -304,13 +310,90 @@ TEST(ItchStoreColumns, EveryColumnRoundTripsThroughItsCodecAtItsLimits) {
     EXPECT_FALSE(encode_column(Column::type, {}).has_value());
 }
 
+TEST(ItchStoreColumns, ALongColumnIsStoredInPiecesOfFourCodecBlocks) {
+    // Integer columns split at kPieceValues, each piece decoding alone; a byte column stays
+    // one piece however long.
+    std::vector<std::uint64_t> values;
+    for (std::uint64_t i = 0; i < (2 * kPieceValues) + 5; ++i) {
+        values.push_back((i * 2654435761U) % 1000U);
+    }
+    EXPECT_EQ(pieces_of(Column::add_shares, values.size()), 3U);
+    EXPECT_EQ(pieces_of(Column::rare_bytes, values.size()), 1U);
+    EXPECT_EQ(pieces_of(Column::add_shares, kPieceValues), 1U);
+    EXPECT_EQ(pieces_of(Column::add_shares, kPieceValues + 1), 2U);
+    for (const Column column : {Column::add_shares, Column::creation_ref, Column::timestamp}) {
+        SCOPED_TRACE(std::string{column_info(column).name});
+        auto chunks = encode_column(column, values);
+        ASSERT_TRUE(chunks.has_value()) << to_string(chunks.error());
+        ASSERT_EQ(chunks->size(), 3U);
+        std::vector<std::uint64_t> joined;
+        for (std::size_t p = 0; p < chunks->size(); ++p) {
+            const ColumnChunk& chunk = (*chunks)[p];
+            EXPECT_EQ(chunk.values, p + 1 < chunks->size() ? kPieceValues : 5U);
+            auto decoded = decode_column(column, chunk.codec, chunk.bytes, chunk.values);
+            ASSERT_TRUE(decoded.has_value()) << to_string(decoded.error());
+            joined.insert(joined.end(), decoded->begin(), decoded->end());
+        }
+        EXPECT_EQ(joined, values);
+    }
+    const std::vector<std::uint64_t> bytes(values.size(), 'A');
+    auto one = encode_column(Column::rare_bytes, bytes);
+    ASSERT_TRUE(one.has_value());
+    ASSERT_EQ(one->size(), 1U);
+    EXPECT_EQ(one->front().values, bytes.size());
+}
+
+TEST(ItchStoreColumns, TimesRoundTripThroughResidualsOverTheirBases) {
+    // Two runs over a segment of 200 records, 130 typed: run 0 at indices 0, 3, 70, 199 and
+    // run 1 at the rest of 1..128, with one time below the one
+    // before it in its run, which wraps and comes back.
+    std::vector<std::uint64_t> positions{0, 3, 70, 199};
+    for (std::uint64_t i = 1; positions.size() < 130; ++i) {
+        if (i != 3 && i != 70) {
+            positions.push_back(i);
+        }
+    }
+    std::vector<std::uint64_t> times;
+    for (std::size_t k = 0; k < positions.size(); ++k) {
+        times.push_back(1'000'000 + (positions[k] * 1000));
+    }
+    times[2] = 5;  // below its base and the time before it
+    const std::vector<std::uint64_t> starts{0, 4};
+    const std::uint64_t records = 200;
+    const auto bases = time_bases(times, positions, records);
+    ASSERT_EQ(bases.size(), time_base_count(records, times.size()));
+    ASSERT_EQ(bases.size(), 4U);
+    EXPECT_EQ(bases[0], 1'000'000U);
+    EXPECT_EQ(bases[1], 5U);
+    EXPECT_EQ(bases[2], 1'000'000U + (128 * 1000));
+    EXPECT_EQ(bases[3], 1'000'000U + (199 * 1000));
+    const auto residuals = time_residuals(times, positions, starts, bases);
+    EXPECT_EQ(residuals[0], 0U);
+    EXPECT_EQ(residuals[1], 3000U);
+    auto back = times_from_residuals(residuals, positions, starts, bases);
+    ASSERT_TRUE(back.has_value()) << to_string(back.error());
+    EXPECT_EQ(*back, times);
+
+    // A residual that takes a time past 48 bits is refused at its index.
+    std::vector<std::uint64_t> over = residuals;
+    over[5] = kMax48;
+    auto refused = times_from_residuals(over, positions, starts, bases);
+    ASSERT_FALSE(refused.has_value());
+    EXPECT_EQ(refused.error().field, "timestamp value");
+    EXPECT_EQ(refused.error().index, 5U);
+    EXPECT_EQ(time_base_count(records, 0), 0U);
+    EXPECT_EQ(time_base_count(64, 1), 1U);
+    EXPECT_EQ(time_base_count(65, 1), 2U);
+}
+
 TEST(ItchStoreColumns, ZstdIsKeptOnlyWhereItIsSmaller) {
     // A byte column of one repeated value compresses; one of noise does not.
     const std::vector<std::uint64_t> same(10000, 'A');
     auto squeezed = encode_column(Column::rare_bytes, same);
     ASSERT_TRUE(squeezed.has_value());
-    EXPECT_EQ(squeezed->codec, codec::CodecId::zstd);
-    EXPECT_LT(squeezed->bytes.size(), same.size());
+    ASSERT_EQ(squeezed->size(), 1U);
+    EXPECT_EQ(squeezed->front().codec, codec::CodecId::zstd);
+    EXPECT_LT(squeezed->front().bytes.size(), same.size());
 
     std::vector<std::uint64_t> noise;
     std::uint64_t state = 1;
@@ -320,13 +403,15 @@ TEST(ItchStoreColumns, ZstdIsKeptOnlyWhereItIsSmaller) {
     }
     auto plain = encode_column(Column::rare_bytes, noise);
     ASSERT_TRUE(plain.has_value());
-    EXPECT_EQ(plain->codec, codec::CodecId::raw);
-    EXPECT_EQ(plain->bytes.size(), noise.size());
+    ASSERT_EQ(plain->size(), 1U);
+    EXPECT_EQ(plain->front().codec, codec::CodecId::raw);
+    EXPECT_EQ(plain->front().bytes.size(), noise.size());
 
     // A column without zstd never gets it.
     auto timestamps = encode_column(Column::timestamp, std::vector<std::uint64_t>(10000, 7));
     ASSERT_TRUE(timestamps.has_value());
-    EXPECT_EQ(timestamps->codec, codec::CodecId::pfor);
+    ASSERT_EQ(timestamps->size(), 1U);
+    EXPECT_EQ(timestamps->front().codec, codec::CodecId::pfor);
 }
 
 // --- Round trips ------------------------------------------------------------------------
@@ -424,8 +509,9 @@ TEST(ItchStoreReferences, AnOrderCreatedInTheSegmentIsADistanceInItsLocatesList)
     EXPECT_EQ(column_values(file, 0, Column::ref_distance),
               (std::vector<std::uint64_t>{1, 1, 2, 2, 1}));
     EXPECT_TRUE(column_values(file, 0, Column::import_ref).empty());
+    // Creations in stored order: locate 1's (100, 101 and U's 102), then locate 2's.
     EXPECT_EQ(column_values(file, 0, Column::creation_ref),
-              (std::vector<std::uint64_t>{100, 200, 101, 102}));
+              (std::vector<std::uint64_t>{100, 101, 102, 200}));
 }
 
 TEST(ItchStoreReferences, AnOrderFromAnEarlierSegmentIsImportedOnceThenADistance) {
@@ -449,23 +535,24 @@ TEST(ItchStoreReferences, AnOrderFromAnEarlierSegmentIsImportedOnceThenADistance
 
 TEST(ItchStoreReferences, AnOrderUnderAnotherLocateOrNeverCreatedIsImported) {
     // The writer keeps one entry per reference, holding the locate that last named or
-    // created it, so a reference named under alternating locates is imported each time.
+    // created it, and reads the records in stored order, each locate's together: so a
+    // reference is imported once by each locate that names it after another locate had it.
     const std::vector<itch::Message> messages{
         test::add(1, 10, 100),
-        test::executed(2, 11, 100),  // Created under locate 1: import on locate 2.
-        test::executed(1, 12, 100),  // The entry now says locate 2: import on locate 1.
-        test::executed(2, 13, 100),  // And back: import.
+        test::executed(2, 11, 100),  // Stored after locate 1's: import on locate 2.
+        test::executed(1, 12, 100),  // Stored next to its add: distance 1.
+        test::executed(2, 13, 100),  // distance 1
         test::deleted(3, 14, 999),   // Never created: import.
         test::deleted(3, 15, 999),   // distance 1
         test::executed(3, 16, 999),  // distance 1
     };
     const Bytes file = test::store_of_messages(messages);
     EXPECT_EQ(test::all_payloads(file).value(), payloads_of(messages));
-    // D (14, 15), then E (11, 12, 13, 16).
+    // D (14, 15), then E in stored order (12, 11, 13, 16).
     EXPECT_EQ(column_values(file, 0, Column::ref_distance),
-              (std::vector<std::uint64_t>{0, 1, 0, 0, 0, 1}));
+              (std::vector<std::uint64_t>{0, 1, 1, 0, 1, 1}));
     EXPECT_EQ(column_values(file, 0, Column::import_ref),
-              (std::vector<std::uint64_t>{100, 100, 100, 999}));
+              (std::vector<std::uint64_t>{100, 999}));
 }
 
 TEST(ItchStoreReferences, AReferenceCreatedTwiceNamesTheLatestCreation) {
@@ -655,9 +742,9 @@ TEST(ItchStoreSegments, AddPriceIsGroupedByLocateAndSideAndAddSharesByLocate) {
               (std::vector<std::uint64_t>{10, 11, 20, 30, 31}));
     EXPECT_EQ(column_values(file, 0, Column::add_shares),
               (std::vector<std::uint64_t>{1, 4, 3, 2, 5}));
-    // Side stays in file order.
+    // Side stays in stored order: locate 1's adds, then locate 2's.
     EXPECT_EQ(column_values(file, 0, Column::add_side),
-              (std::vector<std::uint64_t>{'S', 'B', 'B', 'B', 'S'}));
+              (std::vector<std::uint64_t>{'B', 'B', 'S', 'B', 'S'}));
 }
 
 // --- The writer's refusals ------------------------------------------------------------

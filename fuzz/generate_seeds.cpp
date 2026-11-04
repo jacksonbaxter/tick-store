@@ -469,6 +469,7 @@ void write_itch_store_seeds(SeedDir& seeds) {
     for (const auto& [at, width, value] :
          std::vector<std::tuple<std::size_t, std::size_t, std::uint64_t>>{
              {st::kStoreVersionOffset, 4, 2},
+             {st::kStoreVersionOffset, 4, 4},
              {st::kStoreSegmentRecordsOffset, 4, 0},
              {st::kStoreSegmentRecordsOffset, 4, 7},
              {st::kStoreRecordCountOffset, 8, 24},
@@ -490,7 +491,9 @@ void write_itch_store_seeds(SeedDir& seeds) {
          std::vector<std::tuple<std::size_t, std::size_t, std::uint64_t>>{
              {st::kMetaSegmentOffset, 4, 1},
              {st::kMetaColumnOffset, 2, st::kColumnCount},
-             {st::kMetaReservedOffset, 2, 1},
+             {st::kMetaPieceOffset, 2, 1},
+             {st::kMetaRecordsOffset, 4, 1},
+             {st::kMetaRecordsOffset, 4, 9},
              {st::kMetaValueCountOffset, 4, 0},
              {st::kMetaValueCountOffset, 4, 7},
              {st::kMetaFirstRecordOffset, 8, 1},
@@ -822,6 +825,10 @@ void write_itch_query_seeds(SeedDir& seeds) {
     for (const std::uint32_t n : {4'500U, 9'000U, st::oracle::kQueryFuzzMaxSegmentRecords}) {
         seeds.add(written_itch_store(day, {}, n));
     }
+    // Segments long enough that every column a record of each takes is in two pieces.
+    const std::vector<Message> long_day = query_messages(st::kPieceValues + 2'000);
+    const Bytes pieces = written_itch_store(long_day, {}, st::oracle::kQueryFuzzMaxSegmentRecords);
+    seeds.add(pieces);
     std::vector<Message> mixed = day;
     const Bytes unknown = filled(std::byte{'z'}, 9, std::byte{0xA5});
     mixed[0] = RawMessage{.bytes = unknown, .reason = RawReason::unknown_type};
@@ -839,9 +846,10 @@ void write_itch_query_seeds(SeedDir& seeds) {
         }
         throw std::runtime_error("no such block");
     };
-    for (const st::Column column : {st::Column::seek, st::Column::locate_run,
-                                    st::Column::locate_run_records, st::Column::locate_run_adds,
-                                    st::Column::locate, st::Column::type, st::Column::timestamp}) {
+    for (const st::Column column :
+         {st::Column::seek, st::Column::locate_run, st::Column::locate_run_start,
+          st::Column::locate_run_add_start, st::Column::locate_run_import_start,
+          st::Column::locate, st::Column::type, st::Column::timestamp, st::Column::time_base}) {
         for (const std::size_t at : {std::size_t{0}, std::size_t{9}, std::size_t{40}, std::size_t{200}}) {
             seeds.add(with_itch_store_part(base, [&](Parts& blocks, Parts&) {
                 Bytes& payload = blocks[block_of(blocks, column)].bytes;
@@ -851,6 +859,15 @@ void write_itch_query_seeds(SeedDir& seeds) {
             }));
         }
     }
+    // The type column's second piece renumbered, and its first piece a value short.
+    seeds.add(with_itch_store_part(pieces, [&](Parts& blocks, Parts&) {
+        put_le_field(blocks[block_of(blocks, st::Column::type) + 1].metadata, st::kMetaPieceOffset,
+                     2, 2);
+    }));
+    seeds.add(with_itch_store_part(pieces, [&](Parts& blocks, Parts&) {
+        put_le_field(blocks[block_of(blocks, st::Column::type)].metadata,
+                     st::kMetaValueCountOffset, 4, st::kPieceValues - 1);
+    }));
     // The plain flag cleared on a plain segment, and set on one that is not.
     seeds.add(with_itch_store_part(base, [&](Parts& blocks, Parts&) {
         put_le_field(blocks[block_of(blocks, st::Column::type)].metadata, st::kMetaPlainOffset, 1, 0);

@@ -457,6 +457,14 @@ TEST(ItchQuery, IndexedReadsLessThanExactForAShortWindow) {
     EXPECT_EQ(indexed.stats().exact_segments, 0U);
     EXPECT_EQ(exact.stats().exact_segments, 1U);
     EXPECT_GT(indexed.stats().bytes_decoded, 0U);
+    // Every locate reads each run from its first record to the window, which in a day of
+    // nine locates is most of the segment; one locate reads its own run, though a zstd
+    // piece inflates whole and here a piece is most of a column.
+    const auto locate = static_cast<std::uint16_t>(all[25'000].locate);
+    ASSERT_TRUE(indexed.rows(t, t + 1'000'000, locate).has_value());
+    ASSERT_TRUE(exact.rows(t, t + 1'000'000, locate).has_value());
+    EXPECT_EQ(indexed.stats().exact_segments, 0U);
+    EXPECT_GT(indexed.stats().bytes_decoded, 0U);
     EXPECT_LT(indexed.stats().bytes_decoded, exact.stats().bytes_decoded);
     // A window before the day reads nothing.
     ASSERT_TRUE(indexed.rows(0, 1, std::nullopt).has_value());
@@ -530,7 +538,9 @@ TEST(ItchQueryCorrupt, SeekTimesThatLieOnlyMissRowsTheWholeDecodeRefuses) {
 TEST(ItchQueryCorrupt, LocateRunFieldsRefusedByTheQuery) {
     const Bytes file = store_for_corruption();
     const auto ids = test::column_values(file, 0, Column::locate_run);
-    const auto records = test::column_values(file, 0, Column::locate_run_records);
+    const auto starts = test::column_values(file, 0, Column::locate_run_start);
+    const auto add_starts = test::column_values(file, 0, Column::locate_run_add_start);
+    const auto import_starts = test::column_values(file, 0, Column::locate_run_import_start);
     const auto gaps = test::column_values(file, 0, Column::locate);
     ASSERT_GE(ids.size(), 3U);
     struct Case {
@@ -541,15 +551,34 @@ TEST(ItchQueryCorrupt, LocateRunFieldsRefusedByTheQuery) {
     };
     std::vector<Case> cases;
     {
+        // Ids out of order: the all-locates path checks the directory whole.
         auto v = ids;
         std::swap(v[1], v[2]);
-        cases.push_back({"locate run order", Column::locate_run, v, std::uint16_t{9}});
+        cases.push_back({"locate run order", Column::locate_run, v, std::nullopt});
+        // One locate's run read through a directory that names another there.
+        cases.push_back({"locate run id", Column::locate_run, v, static_cast<std::uint16_t>(ids[1])});
     }
     {
-        auto v = records;
-        v[0] += gaps.size();
-        cases.push_back({"locate run records", Column::locate_run_records, v,
+        // A run ending past the typed records, by either path.
+        auto v = starts;
+        v[1] = gaps.size() + 1;
+        cases.push_back({"locate run start", Column::locate_run_start, v,
                          static_cast<std::uint16_t>(ids[0])});
+        cases.push_back({"locate run start", Column::locate_run_start, v, std::nullopt});
+    }
+    {
+        // A run's adds starting where the records before it do not put them.
+        auto v = add_starts;
+        v[1] += 1;
+        cases.push_back({"locate run add start", Column::locate_run_add_start, v,
+                         static_cast<std::uint16_t>(ids[1])});
+    }
+    {
+        // Imports past the segment's.
+        auto v = import_starts;
+        v.back() += gaps.size();
+        cases.push_back({"locate run import start", Column::locate_run_import_start, v,
+                         std::nullopt});
     }
     {
         auto v = gaps;
@@ -560,6 +589,14 @@ TEST(ItchQueryCorrupt, LocateRunFieldsRefusedByTheQuery) {
         auto v = gaps;
         v[0] = 9'000;
         cases.push_back({"locate run index", Column::locate, v, std::nullopt});
+    }
+    {
+        // A time past 48 bits, by either path.
+        auto v = test::column_values(file, 0, Column::timestamp);
+        v[starts[1]] = kMax48;
+        cases.push_back({"timestamp value", Column::timestamp, v,
+                         static_cast<std::uint16_t>(ids[1])});
+        cases.push_back({"timestamp value", Column::timestamp, v, std::nullopt});
     }
     for (const Case& c : cases) {
         test::StoreParts parts = test::parts_of(file);

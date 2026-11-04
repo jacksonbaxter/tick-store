@@ -126,22 +126,28 @@ std::expected<void, ItchStoreError> ItchStoreWriter::write_segment() {
             error.actual = values.size();
             return std::unexpected(error);
         }
-        auto chunk = encode_column(column, values);
-        if (!chunk.has_value()) {
-            ItchStoreError error = chunk.error();
+        auto pieces = encode_column(column, values);
+        if (!pieces.has_value()) {
+            ItchStoreError error = pieces.error();
             error.segment = segments_;
             return std::unexpected(error);
         }
-        ColumnMetadata metadata{.segment = static_cast<std::uint32_t>(segments_),
-                                .column = column,
-                                .values = static_cast<std::uint32_t>(values.size()),
-                                .summary = std::nullopt};
-        if (column == Column::type) {
-            metadata.summary = summary;
-        }
-        const std::vector<std::byte> encoded = encode_column_metadata(metadata);
-        if (auto added = add_block(chunk->codec, encoded, chunk->bytes); !added.has_value()) {
-            return added;
+        for (std::size_t p = 0; p < pieces->size(); ++p) {
+            const ColumnChunk& piece = (*pieces)[p];
+            // At most kMax32 values, so at most 2^18 pieces of 2^14; the column's own count
+            // keeps it far below that.
+            ColumnMetadata metadata{.segment = static_cast<std::uint32_t>(segments_),
+                                    .column = column,
+                                    .piece = static_cast<std::uint16_t>(p),
+                                    .values = piece.values,
+                                    .summary = std::nullopt};
+            if (column == Column::type && p == 0) {
+                metadata.summary = summary;
+            }
+            const std::vector<std::byte> encoded = encode_column_metadata(metadata);
+            if (auto added = add_block(piece.codec, encoded, piece.bytes); !added.has_value()) {
+                return added;
+            }
         }
     }
     ++segments_;

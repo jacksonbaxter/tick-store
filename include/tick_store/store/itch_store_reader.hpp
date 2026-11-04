@@ -34,9 +34,12 @@ namespace tick_store::store {
 // One segment as the footer describes it.
 struct SegmentEntry {
     SegmentSummary summary;
-    // The container block holding each column, or kNoIndex where the segment has none.
+    // The container block holding each column's first piece, or kNoIndex where the segment
+    // has none; its pieces are that block and the ones after it.
     std::array<std::uint64_t, kColumnCount> block{};
-    // Each column's value count, from its block's metadata; 0 where absent.
+    // Each column's pieces, and its values over them all, from their metadata; 0 where
+    // absent.
+    std::array<std::uint32_t, kColumnCount> pieces{};
     std::array<std::uint32_t, kColumnCount> values{};
 };
 
@@ -61,14 +64,15 @@ struct StoreSizes {
     std::uint64_t tail_section_bytes = 0;
 };
 
-// One column's container block as stored, for a reader that decodes part of it.
+// One piece of a column as stored, for a reader that decodes part of it.
 struct ColumnView {
     codec::CodecId codec = codec::CodecId::none;
     std::span<const std::byte> payload;
     // The container block, kNoIndex where the segment has no values in the column.
     std::uint64_t block = kNoIndex;
-    // The value count its metadata gives, 0 where absent.
+    // The piece's value count, 0 where absent, and its first value's index in the column.
     std::uint64_t values = 0;
+    std::uint64_t first_value = 0;
     // Where the payload starts in the file.
     std::uint64_t file_offset = 0;
 };
@@ -99,10 +103,12 @@ public:
     [[nodiscard]] std::expected<SegmentColumns, ItchStoreError> read_columns(
         std::uint64_t segment) const;
 
-    // One column of one segment as stored, the block's CRC checked unless skipped at open.
-    // The segment must exist.
+    // One piece of one column of one segment as stored, the block's CRC checked unless
+    // skipped at open. The segment must exist, and the piece too where the column has
+    // values; a column with none gives a view with block kNoIndex.
     [[nodiscard]] std::expected<ColumnView, ItchStoreError> column_view(std::uint64_t segment,
-                                                                        Column column) const;
+                                                                        Column column,
+                                                                        std::uint64_t piece = 0) const;
 
     [[nodiscard]] StoreSizes sizes() const;
 
@@ -116,6 +122,9 @@ private:
         ReadOptions options);
     [[nodiscard]] std::expected<void, ItchStoreError> read_sections();
     [[nodiscard]] std::expected<void, ItchStoreError> read_directory();
+    [[nodiscard]] std::expected<void, ItchStoreError> close_column(const SegmentEntry& entry,
+                                                                   Column column,
+                                                                   std::uint64_t block) const;
     [[nodiscard]] std::expected<std::vector<std::uint64_t>, ItchStoreError> read_column(
         std::uint64_t segment, Column column, std::uint64_t count) const;
 

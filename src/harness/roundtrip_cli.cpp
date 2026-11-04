@@ -222,7 +222,7 @@ int run_verify(std::string_view source_path, std::string_view store_path,
     }
     const bool skip = checksums == store::Checksums::skip;
     return report_verdict(
-        "verify", "itch-store-v2", skip ? "skip" : "verify",
+        "verify", "itch-store-v3", skip ? "skip" : "verify",
         verify_itch_store(source->bytes(), store_file->bytes(), options, {.checksums = checksums}),
         output);
 }
@@ -361,7 +361,7 @@ int run_ingest(std::string_view source_path, std::string_view store_path,
     json.begin_object();
     json.field("tool", std::string_view{"tick_roundtrip"});
     json.field("command", std::string_view{"ingest"});
-    json.field("store_format", std::string_view{"itch-store-v2"});
+    json.field("store_format", std::string_view{"itch-store-v3"});
     json.field("durability", to_string(durability));
     json.field("segment_records", std::uint64_t{options.segment_records});
     write_ingest_fields(json, counts, source->bytes().size(), stored);
@@ -386,7 +386,7 @@ int run_layout(std::string_view store_path, bool blocks, CliOutput& output) {
     json.begin_object();
     json.field("tool", std::string_view{"tick_roundtrip"});
     json.field("command", std::string_view{"layout"});
-    json.field("store_format", std::string_view{"itch-store-v2"});
+    json.field("store_format", std::string_view{"itch-store-v3"});
     json.field("records", reader->header().record_count);
     json.field("segment_records", std::uint64_t{reader->header().segment_records});
     json.field("segments", reader->segment_count());
@@ -431,18 +431,23 @@ int run_layout(std::string_view store_path, bool blocks, CliOutput& output) {
                 if (entry.block[c] == store::kNoIndex) {
                     continue;
                 }
-                const auto info = reader->container().block_info(entry.block[c]);
-                if (!info.has_value()) {
-                    continue;
+                for (std::uint64_t p = 0; p < entry.pieces[c]; ++p) {
+                    const std::uint64_t block = entry.block[c] + p;
+                    const auto info = reader->container().block_info(block);
+                    if (!info.has_value()) {
+                        continue;
+                    }
+                    json.begin_object();
+                    json.field("block", block);
+                    json.field("segment", s);
+                    json.field("column", store::kColumns[c].name);
+                    json.field("piece", p);
+                    json.field("codec",
+                               codec::find_codec(static_cast<std::uint16_t>(info->codec))->name);
+                    json.field("payload_offset", info->payload_offset);
+                    json.field("payload_bytes", std::uint64_t{info->payload_size});
+                    json.end_object();
                 }
-                json.begin_object();
-                json.field("block", entry.block[c]);
-                json.field("segment", s);
-                json.field("column", store::kColumns[c].name);
-                json.field("codec", codec::find_codec(static_cast<std::uint16_t>(info->codec))->name);
-                json.field("payload_offset", info->payload_offset);
-                json.field("payload_bytes", std::uint64_t{info->payload_size});
-                json.end_object();
             }
         }
         json.end_array();

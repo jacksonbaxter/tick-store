@@ -241,7 +241,7 @@ TEST(FuzzOracles, PassEveryCutAndFlipOfAContainer) {
 // bit chosen by the byte's offset; and the same file with segments over the fuzzing cap.
 TEST(FuzzOracles, PassEveryCutAndFlipOfAnItchStore) {
     const Bytes file =
-        read_file(std::filesystem::path{TICK_STORE_GOLDEN_DIR} / "itch-store-v2.tsc");
+        read_file(std::filesystem::path{TICK_STORE_GOLDEN_DIR} / "itch-store-v3.tsc");
     ASSERT_FALSE(file.empty());
     EXPECT_EQ(text(store::oracle::check_itch_store(file)), "");
     for (std::size_t length = 0; length < file.size(); ++length) {
@@ -259,7 +259,7 @@ TEST(FuzzOracles, PassEveryCutAndFlipOfAnItchStore) {
 // on a store of several seek groups a segment whose index columns each have a byte changed.
 TEST(FuzzOracles, PassEveryCutAndFlipThroughTheQueryOracle) {
     const Bytes file =
-        read_file(std::filesystem::path{TICK_STORE_GOLDEN_DIR} / "itch-store-v2.tsc");
+        read_file(std::filesystem::path{TICK_STORE_GOLDEN_DIR} / "itch-store-v3.tsc");
     ASSERT_FALSE(file.empty());
     EXPECT_EQ(text(store::oracle::check_itch_query(file)), "");
     // Every 11th length and every 5th byte: the whole decode, which most cuts and flips
@@ -286,8 +286,10 @@ TEST(FuzzOracles, PassEveryCutAndFlipThroughTheQueryOracle) {
     }
     const Bytes store_file = store::test::store_of_messages(messages, 4'500);
     EXPECT_EQ(text(store::oracle::check_itch_query(store_file)), "");
-    for (const store::Column column : {store::Column::seek, store::Column::locate_run,
-                                       store::Column::locate_run_records, store::Column::locate}) {
+    for (const store::Column column :
+         {store::Column::seek, store::Column::locate_run, store::Column::locate_run_start,
+          store::Column::locate_run_add_start, store::Column::locate_run_import_start,
+          store::Column::locate, store::Column::time_base, store::Column::timestamp}) {
         for (const std::size_t at : {std::size_t{0}, std::size_t{12}, std::size_t{60}}) {
             store::test::StoreParts parts = store::test::parts_of(store_file);
             Bytes& payload = parts.block(0, column).bytes;

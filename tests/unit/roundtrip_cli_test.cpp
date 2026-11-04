@@ -255,7 +255,7 @@ TEST_F(RoundTripCliStore, IngestReportsTheStoreItWrote) {
     const CliRun ingest = run({"ingest", source_path.string(), store_path.string(),
                                "--durability", "device_flush"});
     ASSERT_EQ(ingest.code, kExitPass) << ingest.output.err;
-    EXPECT_TRUE(contains(ingest.output.out, R"("store_format": "itch-store-v2")"));
+    EXPECT_TRUE(contains(ingest.output.out, R"("store_format": "itch-store-v3")"));
     EXPECT_TRUE(contains(ingest.output.out, R"("durability": "device_flush")"));
     EXPECT_TRUE(contains(ingest.output.out,
                          std::format(R"("segment_records": {})", store::kDefaultSegmentRecords)));
@@ -272,7 +272,7 @@ TEST_F(RoundTripCliStore, VerifyPassesAgainstThePinWithAndWithoutChecksums) {
     const CliRun verify =
         run({"verify", source_path.string(), store_path.string(), "--expect-sha256", pin});
     EXPECT_EQ(verify.code, kExitPass) << verify.output.err;
-    EXPECT_TRUE(contains(verify.output.out, R"("store_format": "itch-store-v2")"));
+    EXPECT_TRUE(contains(verify.output.out, R"("store_format": "itch-store-v3")"));
     EXPECT_TRUE(contains(verify.output.out, R"("checksums": "verify")"));
     EXPECT_TRUE(contains(verify.output.out, R"("records": 26)"));
     EXPECT_TRUE(contains(verify.output.out, std::format(R"("stored_sha256": "{}")", pin)));
@@ -284,10 +284,12 @@ TEST_F(RoundTripCliStore, VerifyPassesAgainstThePinWithAndWithoutChecksums) {
 }
 
 TEST_F(RoundTripCliStore, ADataBlockFlipIsACrcFailureNamingTheBlockAndWithoutCrcsTheRecord) {
-    // Segment 0's timestamps: a flip there changes a value, never the layout.
-    const auto [offset, size] = block_extent(0, store::Column::timestamp);
-    ASSERT_GT(size, 8U);
-    const std::string offset_text = std::to_string(offset + size - 1);
+    // Segment 0's one time base, a PFOR block of one value: the frame (8 bytes), transform,
+    // scale size and scale, then the vector's mode, width 0 and base size, and the base,
+    // which is the value. A flip of its low bit moves the time, never the layout.
+    const auto [offset, size] = block_extent(0, store::Column::time_base);
+    ASSERT_GT(size, 16U);
+    const std::string offset_text = std::to_string(offset + 14);
     ASSERT_EQ(run({"flip-bit", store_path.string(), offset_text, "0"}).code, kExitPass);
 
     const CliRun checked =
@@ -295,13 +297,13 @@ TEST_F(RoundTripCliStore, ADataBlockFlipIsACrcFailureNamingTheBlockAndWithoutCrc
     EXPECT_EQ(checked.code, kExitMismatch);
     EXPECT_TRUE(contains(checked.output.err, "bad checksum: block at offset"));
     EXPECT_TRUE(contains(checked.output.err, std::format("store byte {}", offset)));
-    EXPECT_TRUE(contains(checked.output.err, "segment 0, column timestamp, block "));
+    EXPECT_TRUE(contains(checked.output.err, "segment 0, column time_base, block "));
 
     const CliRun unchecked = run({"verify", source_path.string(), store_path.string(),
                                   "--no-checksums", "--expect-sha256", pin});
     EXPECT_EQ(unchecked.code, kExitMismatch);
-    // The last timestamp of the block no longer agrees with the segment's summary, so the
-    // decoder names the column and the value's index in it.
+    // Every time based on it moves with it, so the times no longer agree with the segment's
+    // summary, and the decoder names the column and the value's index in it.
     EXPECT_TRUE(contains(unchecked.output.err, "segment 0, column timestamp, value "))
         << unchecked.output.err;
 

@@ -235,12 +235,16 @@ inline std::uint64_t get_field(std::span<const std::byte> bytes, std::size_t at,
 inline void set_column(StoreParts& parts, std::uint32_t segment, Column column,
                        std::span<const std::uint64_t> values) {
     const std::size_t b = parts.block_index(segment, column);
-    auto chunk = encode_column(column, values);
-    if (!chunk.has_value()) {
-        throw std::runtime_error(to_string(chunk.error()));
+    auto chunks = encode_column(column, values);
+    if (!chunks.has_value()) {
+        throw std::runtime_error(to_string(chunks.error()));
     }
-    parts.blocks[b].codec = chunk->codec;
-    parts.blocks[b].bytes = std::move(chunk->bytes);
+    // The fixtures' segments are small enough that every column is one piece.
+    if (chunks->size() != 1) {
+        throw std::runtime_error("set_column re-encodes a single piece");
+    }
+    parts.blocks[b].codec = chunks->front().codec;
+    parts.blocks[b].bytes = std::move(chunks->front().bytes);
     put_field(parts.blocks[b].metadata, kMetaValueCountOffset, 4, values.size());
 }
 

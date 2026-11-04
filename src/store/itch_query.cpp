@@ -10,11 +10,11 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <expected>
-#include <map>
 #include <memory>
 #include <optional>
 #include <span>
@@ -27,6 +27,7 @@ namespace {
 
 constexpr std::size_t kLocates = std::size_t{kMax16} + 1;
 constexpr std::uint64_t kNanosPerMinute = 60ULL * 1'000'000'000ULL;
+constexpr std::size_t kSymbols = kSeekSymbols.size();
 
 [[nodiscard]] ItchStoreError query_error(ItchStoreErrorKind kind, std::string_view field,
                                          std::uint64_t segment, Column column,
@@ -49,110 +50,84 @@ constexpr std::uint64_t kNanosPerMinute = 60ULL * 1'000'000'000ULL;
            (std::to_integer<unsigned>(bitmap[byte]) & (1U << (locate % 8U))) != 0;
 }
 
+// The bits set below `locate`: its run's index among the segment's runs.
+[[nodiscard]] std::uint64_t rank_of(std::span<const std::byte> bitmap, std::uint64_t locate) noexcept {
+    std::uint64_t rank = 0;
+    const std::uint64_t whole = std::min<std::uint64_t>(locate / 8U, bitmap.size());
+    for (std::uint64_t b = 0; b < whole; ++b) {
+        rank += static_cast<std::uint64_t>(std::popcount(std::to_integer<unsigned>(bitmap[b])));
+    }
+    if (whole < bitmap.size()) {
+        const unsigned below = (1U << (locate % 8U)) - 1U;
+        rank += static_cast<std::uint64_t>(
+            std::popcount(std::to_integer<unsigned>(bitmap[whole]) & below));
+    }
+    return rank;
+}
+
 [[nodiscard]] bool is_add(std::uint64_t type) noexcept { return type == 'A' || type == 'F'; }
 
-// One column of one segment, decoded a codec block at a time as values are asked for. The
-// container block is read and CRC-checked when the column is opened, and a zstd chunk
-// inflated then, since zstd has no block boundaries inside it. Every value is checked
-// against the column's range as its block is decoded.
+// Indices into kSeekSymbols, which the type column's values are checked against.
+const std::size_t kSymA = seek_symbol_index('A');
+const std::size_t kSymC = seek_symbol_index('C');
+const std::size_t kSymD = seek_symbol_index('D');
+const std::size_t kSymE = seek_symbol_index('E');
+const std::size_t kSymF = seek_symbol_index('F');
+const std::size_t kSymP = seek_symbol_index('P');
+const std::size_t kSymU = seek_symbol_index('U');
+const std::size_t kSymX = seek_symbol_index('X');
+const std::size_t kSymRaw = seek_symbol_index(0);
+
+[[nodiscard]] bool names(std::size_t symbol) noexcept {
+    return symbol == kSymC || symbol == kSymD || symbol == kSymE || symbol == kSymU ||
+           symbol == kSymX;
+}
+
+using TypeCounts = std::array<std::uint64_t, kSymbols>;
+
+// One column of one segment, decoded a codec block at a time as values are asked for. A
+// piece (a container block) is read, CRC-checked and, if zstd, inflated the first time a
+// value in it is wanted, since zstd has no block boundaries inside a piece. Every value is
+// checked against the column's range as its block is decoded.
 class ColumnAccess {
 public:
     // `most` bounds the values the segment's records can give the column, checked before
-    // anything is inflated or allocated.
+    // anything is read or allocated.
     [[nodiscard]] std::expected<void, ItchStoreError> open(const ItchStoreReader& reader,
                                                            std::uint64_t segment, Column column,
                                                            std::uint64_t most, QueryStats& stats) {
+        reader_ = &reader;
         column_ = column;
         segment_ = segment;
         stats_ = &stats;
-        starts_.clear();
-        offsets_.clear();
-        decoded_.clear();
         count_ = 0;
-        bytes_ = {};
-        auto view = reader.column_view(segment, column);
-        if (!view.has_value()) {
-            return std::unexpected(view.error());
-        }
-        block_ = view->block;
-        file_offset_ = view->file_offset;
-        if (view->block == kNoIndex) {
+        pieces_used_ = 0;
+        const SegmentEntry& entry = reader.segment(segment);
+        const auto c = static_cast<std::size_t>(column);
+        block_ = entry.block[c];
+        if (block_ == kNoIndex) {
             return {};
         }
-        if (view->values > most) {
+        if (entry.values[c] > most) {
             return std::unexpected(refuse(ItchStoreErrorKind::bad_segment, "column value count",
-                                          kNoIndex, most, view->values));
+                                          kNoIndex, most, entry.values[c]));
         }
-        count_ = view->values;
-        auto unwrapped = unwrap_column(column, view->codec, view->payload, count_);
-        if (!unwrapped.has_value()) {
-            return std::unexpected(located(unwrapped.error(), 0));
-        }
-        bytes_ = std::move(*unwrapped);
-        const std::span<const std::byte> bytes = bytes_.bytes();
+        count_ = entry.values[c];
+        pieces_used_ = entry.pieces[c];
+        bytes_column_ = column_info(column).codec == ColumnCodec::raw_bytes;
         decoder_ = column_block_decoder(column);
-        if (bytes_.zstd) {
-            // The whole compressed chunk is read to reach any value of it.
-            stats.bytes_decoded += view->payload.size();
+        if (pieces_.size() < pieces_used_) {
+            pieces_.resize(pieces_used_);
         }
-        if (decoder_ == nullptr) {
-            // A byte column: the chunk is the values.
-            if (bytes.size() != count_) {
-                return std::unexpected(refuse(ItchStoreErrorKind::bad_segment, "column bytes",
-                                              kNoIndex, count_, bytes.size()));
-            }
-            reserve();
-            for (std::uint64_t i = 0; i < count_; ++i) {
-                values_[i] = std::to_integer<std::uint64_t>(bytes[i]);
-            }
-            starts_ = {0, count_};
-            offsets_ = {0, bytes.size()};
-            decoded_.assign(1, 1);
-            ++stats.blocks;
-            if (!bytes_.zstd) {
-                stats.bytes_decoded += bytes.size();
-            }
-            stats.values_decoded += count_;
-            return {};
+        for (std::size_t p = 0; p < pieces_used_; ++p) {
+            Piece& piece = pieces_[p];
+            piece.opened = false;
+            piece.first = bytes_column_ ? 0 : p * std::uint64_t{kPieceValues};
+            piece.count = p + 1 == pieces_used_ ? count_ - piece.first : std::uint64_t{kPieceValues};
         }
-        // The codec blocks' headers, so a value index finds its block without decoding the
-        // ones before it.
-        std::uint64_t offset = 0;
-        std::uint64_t total = 0;
-        while (offset < bytes.size()) {
-            if (total == count_) {
-                return std::unexpected(refuse(ItchStoreErrorKind::bad_segment, "column trailing bytes",
-                                              kNoIndex, 0, bytes.size() - offset));
-            }
-            const auto values = read_le<4>(bytes, offset);
-            const auto payload = read_le<4>(bytes, offset + 4);
-            if (!values.has_value() || !payload.has_value()) {
-                return std::unexpected(refuse(ItchStoreErrorKind::bad_segment, "column block header",
-                                              kNoIndex, codec::kBlockHeaderSize,
-                                              bytes.size() - offset));
-            }
-            const std::uint64_t end = offset + codec::kBlockHeaderSize + *payload;
-            if (*values == 0 || end > bytes.size()) {
-                return std::unexpected(refuse(ItchStoreErrorKind::bad_segment, "column block size",
-                                              kNoIndex, bytes.size() - offset, end - offset));
-            }
-            starts_.push_back(total);
-            offsets_.push_back(offset);
-            total += *values;
-            offset = end;
-            if (total > count_) {
-                return std::unexpected(refuse(ItchStoreErrorKind::bad_segment, "column value count",
-                                              kNoIndex, count_, total));
-            }
+        if (count_ > values_.size()) {
+            values_.resize(count_);
         }
-        if (total != count_) {
-            return std::unexpected(
-                refuse(ItchStoreErrorKind::bad_segment, "column value count", kNoIndex, count_, total));
-        }
-        starts_.push_back(total);
-        offsets_.push_back(bytes.size());
-        decoded_.assign(starts_.size() - 1, 0);
-        reserve();
         return {};
     }
 
@@ -168,16 +143,27 @@ public:
             return std::unexpected(
                 refuse(ItchStoreErrorKind::bad_value, "value index", last - 1, count_, last - 1));
         }
-        const auto block_of = [&](std::uint64_t index) {
-            return static_cast<std::size_t>(
-                std::ranges::upper_bound(starts_, index) - starts_.begin() - 1);
-        };
-        const std::size_t from = block_of(first);
-        const std::size_t to = block_of(last - 1);
-        for (std::size_t b = from; b <= to; ++b) {
-            if (decoded_[b] == 0) {
-                if (auto done = decode_block(b); !done.has_value()) {
+        const std::size_t from = piece_of(first);
+        const std::size_t to = piece_of(last - 1);
+        for (std::size_t p = from; p <= to; ++p) {
+            Piece& piece = pieces_[p];
+            if (!piece.opened) {
+                if (auto done = open_piece(p); !done.has_value()) {
                     return done;
+                }
+            }
+            if (bytes_column_) {
+                continue;
+            }
+            const std::uint64_t low = std::max(first, piece.first);
+            const std::uint64_t high = std::min(last, piece.first + piece.count);
+            const std::size_t b_from = block_in(piece, low);
+            const std::size_t b_to = block_in(piece, high - 1);
+            for (std::size_t b = b_from; b <= b_to; ++b) {
+                if (piece.decoded[b] == 0) {
+                    if (auto done = decode_block(piece, b); !done.has_value()) {
+                        return done;
+                    }
                 }
             }
         }
@@ -192,14 +178,8 @@ public:
     }
 
     [[nodiscard]] std::expected<std::uint64_t, ItchStoreError> get(std::uint64_t index) {
-        if (index >= count_) {
-            return std::unexpected(
-                refuse(ItchStoreErrorKind::bad_value, "value index", index, count_, index));
-        }
-        if (decoded_[block_index(index)] == 0) {
-            if (auto done = ensure(index, index + 1); !done.has_value()) {
-                return std::unexpected(done.error());
-            }
+        if (auto done = ensure(index, index + 1); !done.has_value()) {
+            return std::unexpected(done.error());
         }
         return values_[index];
     }
@@ -210,37 +190,138 @@ public:
     }
 
 private:
-    // Room for the column's values, kept from segment to segment so it grows to the
-    // largest column once.
-    void reserve() {
-        if (count_ > values_.size()) {
-            values_.resize(count_);
-        }
+    struct Piece {
+        bool opened = false;
+        std::uint64_t first = 0;
+        std::uint64_t count = 0;
+        std::uint64_t block = kNoIndex;
+        std::uint64_t file_offset = 0;
+        ChunkBytes bytes;
+        // Each codec block's first value, in the column, and its offset in the piece's
+        // coded bytes; one more entry closes the last.
+        std::vector<std::uint64_t> starts;
+        std::vector<std::uint64_t> offsets;
+        std::vector<std::uint8_t> decoded;
+    };
+
+    [[nodiscard]] std::size_t piece_of(std::uint64_t index) const noexcept {
+        return bytes_column_ ? 0 : static_cast<std::size_t>(index / kPieceValues);
     }
 
-    [[nodiscard]] std::size_t block_index(std::uint64_t index) const noexcept {
+    [[nodiscard]] static std::size_t block_in(const Piece& piece, std::uint64_t index) noexcept {
         // Blocks are almost always kColumnBlockValues long, so guess, then search.
-        const std::uint64_t guess = index / kColumnBlockValues;
-        if (guess + 1 < starts_.size() && starts_[guess] <= index && index < starts_[guess + 1]) {
+        const std::uint64_t guess = (index - piece.first) / kColumnBlockValues;
+        if (guess + 1 < piece.starts.size() && piece.starts[guess] <= index &&
+            index < piece.starts[guess + 1]) {
             return static_cast<std::size_t>(guess);
         }
-        return static_cast<std::size_t>(
-            std::ranges::upper_bound(starts_, index) - starts_.begin() - 1);
+        return static_cast<std::size_t>(std::ranges::upper_bound(piece.starts, index) -
+                                        piece.starts.begin() - 1);
     }
 
-    [[nodiscard]] std::expected<void, ItchStoreError> decode_block(std::size_t b) {
-        const std::span<const std::byte> bytes = bytes_.bytes();
+    [[nodiscard]] std::expected<void, ItchStoreError> open_piece(std::size_t p) {
+        Piece& piece = pieces_[p];
+        auto view = reader_->column_view(segment_, column_, p);
+        if (!view.has_value()) {
+            return std::unexpected(view.error());
+        }
+        piece.block = view->block;
+        piece.file_offset = view->file_offset;
+        if (view->values != piece.count) {
+            return std::unexpected(refuse(ItchStoreErrorKind::bad_segment, "piece value count",
+                                          kNoIndex, piece.count, view->values));
+        }
+        auto unwrapped = unwrap_column(column_, view->codec, view->payload, piece.count);
+        if (!unwrapped.has_value()) {
+            ItchStoreError error = unwrapped.error();
+            error.segment = segment_;
+            error.block = piece.block;
+            error.offset = piece.file_offset;
+            return std::unexpected(error);
+        }
+        piece.bytes = std::move(*unwrapped);
+        const std::span<const std::byte> bytes = piece.bytes.bytes();
+        if (piece.bytes.zstd) {
+            // The whole compressed piece is read to reach any value of it.
+            stats_->bytes_decoded += view->payload.size();
+        }
+        piece.starts.clear();
+        piece.offsets.clear();
+        if (decoder_ == nullptr) {
+            // A byte column: the piece is the values.
+            if (bytes.size() != piece.count) {
+                return std::unexpected(refuse(ItchStoreErrorKind::bad_segment, "column bytes",
+                                              kNoIndex, piece.count, bytes.size()));
+            }
+            for (std::uint64_t i = 0; i < piece.count; ++i) {
+                values_[piece.first + i] = std::to_integer<std::uint64_t>(bytes[i]);
+            }
+            ++stats_->blocks;
+            if (!piece.bytes.zstd) {
+                stats_->bytes_decoded += bytes.size();
+            }
+            stats_->values_decoded += piece.count;
+            piece.opened = true;
+            return {};
+        }
+        // The codec blocks' headers, so a value index finds its block without decoding the
+        // ones before it.
+        std::uint64_t offset = 0;
+        std::uint64_t total = 0;
+        while (offset < bytes.size()) {
+            if (total == piece.count) {
+                return std::unexpected(refuse(ItchStoreErrorKind::bad_segment,
+                                              "column trailing bytes", kNoIndex, 0,
+                                              bytes.size() - offset));
+            }
+            const auto values = read_le<4>(bytes, offset);
+            const auto payload = read_le<4>(bytes, offset + 4);
+            if (!values.has_value() || !payload.has_value()) {
+                return std::unexpected(refuse(ItchStoreErrorKind::bad_segment,
+                                              "column block header", kNoIndex,
+                                              codec::kBlockHeaderSize, bytes.size() - offset));
+            }
+            const std::uint64_t end = offset + codec::kBlockHeaderSize + *payload;
+            if (*values == 0 || end > bytes.size()) {
+                return std::unexpected(refuse(ItchStoreErrorKind::bad_segment, "column block size",
+                                              kNoIndex, bytes.size() - offset, end - offset));
+            }
+            piece.starts.push_back(piece.first + total);
+            piece.offsets.push_back(offset);
+            total += *values;
+            offset = end;
+            if (total > piece.count) {
+                return std::unexpected(refuse(ItchStoreErrorKind::bad_segment,
+                                              "column value count", kNoIndex, piece.count, total));
+            }
+        }
+        if (total != piece.count) {
+            return std::unexpected(refuse(ItchStoreErrorKind::bad_segment, "column value count",
+                                          kNoIndex, piece.count, total));
+        }
+        piece.starts.push_back(piece.first + total);
+        piece.offsets.push_back(bytes.size());
+        piece.decoded.assign(piece.starts.size() - 1, 0);
+        piece.opened = true;
+        return {};
+    }
+
+    [[nodiscard]] std::expected<void, ItchStoreError> decode_block(Piece& piece, std::size_t b) {
+        const std::span<const std::byte> bytes = piece.bytes.bytes();
         const std::span<const std::byte> block =
-            bytes.subspan(offsets_[b], offsets_[b + 1] - offsets_[b]);
-        const std::uint64_t first = starts_[b];
-        const std::uint64_t n = starts_[b + 1] - first;
+            bytes.subspan(piece.offsets[b], piece.offsets[b + 1] - piece.offsets[b]);
+        const std::uint64_t first = piece.starts[b];
+        const std::uint64_t n = piece.starts[b + 1] - first;
         scratch_.clear();
         const auto taken = decoder_(block, scratch_);
         if (!taken.has_value()) {
-            ItchStoreError error = refuse(ItchStoreErrorKind::codec, taken.error().field, kNoIndex, 0, 0);
+            ItchStoreError error =
+                refuse(ItchStoreErrorKind::codec, taken.error().field, kNoIndex, 0, 0);
             error.codec = taken.error();
-            error.offset = bytes_.zstd ? file_offset_
-                                       : file_offset_ + offsets_[b] + (taken.error().offset / 8U);
+            error.block = piece.block;
+            error.offset = piece.bytes.zstd
+                               ? piece.file_offset
+                               : piece.file_offset + piece.offsets[b] + (taken.error().offset / 8U);
             return std::unexpected(error);
         }
         if (*taken != block.size() || scratch_.size() != n) {
@@ -248,27 +329,26 @@ private:
                                           first, n, scratch_.size()));
         }
         const std::uint64_t max = column_info(column_).max_value;
+        std::uint64_t highest = 0;
         for (std::uint64_t i = 0; i < n; ++i) {
-            if (scratch_[i] > max) {
-                return std::unexpected(
-                    refuse(ItchStoreErrorKind::bad_value, "column value", first + i, max, scratch_[i]));
+            highest = std::max(highest, scratch_[i]);
+        }
+        if (highest > max) {
+            for (std::uint64_t i = 0; i < n; ++i) {
+                if (scratch_[i] > max) {
+                    return std::unexpected(refuse(ItchStoreErrorKind::bad_value, "column value",
+                                                  first + i, max, scratch_[i]));
+                }
             }
         }
         std::memcpy(values_.data() + first, scratch_.data(), n * sizeof(std::uint64_t));
-        decoded_[b] = 1;
+        piece.decoded[b] = 1;
         ++stats_->blocks;
-        if (!bytes_.zstd) {
+        if (!piece.bytes.zstd) {
             stats_->bytes_decoded += block.size();
         }
         stats_->values_decoded += n;
         return {};
-    }
-
-    [[nodiscard]] ItchStoreError located(ItchStoreError error, std::uint64_t at) const {
-        error.segment = segment_;
-        error.block = block_;
-        error.offset = file_offset_ + at;
-        return error;
     }
 
     [[nodiscard]] ItchStoreError refuse(ItchStoreErrorKind kind, std::string_view field,
@@ -279,62 +359,40 @@ private:
         return error;
     }
 
+    const ItchStoreReader* reader_ = nullptr;
     Column column_ = Column::type;
     std::uint64_t segment_ = 0;
     std::uint64_t block_ = kNoIndex;
-    std::uint64_t file_offset_ = 0;
     std::uint64_t count_ = 0;
-    ChunkBytes bytes_;
+    std::size_t pieces_used_ = 0;
+    bool bytes_column_ = false;
     codec::BlockDecoder decoder_ = nullptr;
-    std::vector<std::uint64_t> starts_;
-    std::vector<std::uint64_t> offsets_;
-    std::vector<std::uint8_t> decoded_;
+    std::vector<Piece> pieces_;
     std::vector<std::uint64_t> values_;
     std::vector<std::uint64_t> scratch_;
     QueryStats* stats_ = nullptr;
 };
 
-// What a pass over a segment's records hands on: rows in full, or for the minute aggregate
-// the add orders alone with their time, shares and price.
+// What a scan of a run hands on: rows in full, or for the minute aggregate the add orders
+// alone with their time, shares and price.
 enum class Need : std::uint8_t { rows, adds };
-
-// Indices into kSeekSymbols, which the type column's values are checked against.
-const std::size_t kSymA = seek_symbol_index('A');
-const std::size_t kSymC = seek_symbol_index('C');
-const std::size_t kSymD = seek_symbol_index('D');
-const std::size_t kSymE = seek_symbol_index('E');
-const std::size_t kSymF = seek_symbol_index('F');
-const std::size_t kSymP = seek_symbol_index('P');
-const std::size_t kSymU = seek_symbol_index('U');
-const std::size_t kSymX = seek_symbol_index('X');
 
 }  // namespace
 
 struct ItchQuery::Engine {
     std::array<ColumnAccess, kColumnCount> cols;
-    // Each locate's known orders in the segment being read, as the assembler keeps them.
-    std::vector<std::vector<std::uint64_t>> lists = std::vector<std::vector<std::uint64_t>>(kLocates);
-    std::vector<std::uint16_t> touched;
+    // The known orders of the locate being scanned, as the assembler keeps them.
+    std::vector<std::uint64_t> list;
     // The timestamp of each segment's last row, once known.
     std::vector<std::optional<std::uint64_t>> last_ts;
     std::array<std::byte, itch::kMaxPayloadSize> scratch{};
+    // The all-locates path: each stored typed record's index in the segment, and the rows
+    // of a segment by their index in it, with which are filled.
+    std::vector<std::uint64_t> positions;
+    std::vector<QueryRow> by_position;
+    std::vector<std::uint8_t> filled;
 
     ColumnAccess& col(Column column) { return cols[static_cast<std::size_t>(column)]; }
-
-    void clear_lists() {
-        for (const std::uint16_t locate : touched) {
-            lists[locate].clear();
-        }
-        touched.clear();
-    }
-
-    void append(std::uint16_t locate, std::uint64_t reference) {
-        std::vector<std::uint64_t>& list = lists[locate];
-        if (list.empty()) {
-            touched.push_back(locate);
-        }
-        list.push_back(reference);
-    }
 };
 
 namespace {
@@ -346,8 +404,11 @@ void count_whole_segment(const ItchStoreReader& reader, std::uint64_t segment, Q
         if (entry.block[c] == kNoIndex) {
             continue;
         }
-        if (const auto info = reader.container().block_info(entry.block[c]); info.has_value()) {
-            stats.bytes_decoded += info->payload_size;
+        for (std::uint64_t p = 0; p < entry.pieces[c]; ++p) {
+            if (const auto info = reader.container().block_info(entry.block[c] + p);
+                info.has_value()) {
+                stats.bytes_decoded += info->payload_size;
+            }
         }
         stats.blocks += (entry.values[c] + kColumnBlockValues - 1) / kColumnBlockValues;
         stats.values_decoded += entry.values[c];
@@ -417,6 +478,18 @@ template <class Sink>
     return previous;
 }
 
+// One locate's run in a plain segment: its stored records [start, end), and where its
+// adds and imports start in their columns.
+struct Run {
+    std::uint16_t locate = 0;
+    std::uint64_t start = 0;
+    std::uint64_t end = 0;
+    std::uint64_t add_start = 0;
+    std::uint64_t add_end = 0;
+    std::uint64_t import_start = 0;
+    std::uint64_t import_end = 0;
+};
+
 // What the indexed path keeps of one plain segment while it answers.
 struct PlainSegment {
     const ItchStoreReader* reader = nullptr;
@@ -425,11 +498,14 @@ struct PlainSegment {
     std::uint64_t segment = 0;
     const SegmentSummary* summary = nullptr;
     SeekIndex seek;
-    // The record range the time zone maps leave, [lo, hi).
-    std::uint64_t lo = 0;
-    std::uint64_t hi = 0;
-    // Records of each type byte, once types() has run.
-    std::array<std::uint64_t, 256> per_type{};
+    // Each kSeekSymbols entry's records in the segment, from the seek index.
+    TypeCounts total{};
+    // Where each type's values start in the columns grouped by type: ref_distance in the
+    // order C, D, E, U, X and reduce_shares in the order C, E, X.
+    TypeCounts ref_group{};
+    TypeCounts reduce_group{};
+    std::uint64_t adds = 0;
+    std::uint64_t imports = 0;
 
     [[nodiscard]] ItchStoreError error(ItchStoreErrorKind kind, std::string_view field,
                                        Column column, std::uint64_t index, std::uint64_t expected,
@@ -450,22 +526,33 @@ struct PlainSegment {
         return engine->col(column).open(*reader, segment, column, most, *stats);
     }
 
-    // Parses the seek index and narrows [lo, hi) to the groups whose times can fall in
-    // [start, end). Returns false if none can.
-    [[nodiscard]] std::expected<bool, ItchStoreError> narrow(std::uint64_t start,
-                                                             std::uint64_t end) {
+    // Opens `column` and checks it holds `want` values.
+    [[nodiscard]] std::expected<void, ItchStoreError> open_counted(Column column,
+                                                                   std::uint64_t want) const {
+        if (auto opened = open(column); !opened.has_value()) {
+            return opened;
+        }
+        if (engine->col(column).size() != want) {
+            return std::unexpected(error(ItchStoreErrorKind::bad_segment, "column value count",
+                                         column, kNoIndex, want, engine->col(column).size()));
+        }
+        return {};
+    }
+
+    // Parses the seek index, and from it each type's total and group starts.
+    [[nodiscard]] std::expected<void, ItchStoreError> parse() {
         const std::uint32_t records = summary->records;
         if (summary->typed_records != records) {
-            const ItchStoreError e = error(ItchStoreErrorKind::bad_metadata, "plain typed records",
-                                     Column::type, kNoIndex, records, summary->typed_records);
-            return std::unexpected(e);
+            return std::unexpected(error(ItchStoreErrorKind::bad_metadata, "plain typed records",
+                                         Column::type, kNoIndex, records,
+                                         summary->typed_records));
         }
         if (auto opened = open(Column::seek); !opened.has_value()) {
-            return std::unexpected(opened.error());
+            return opened;
         }
         ColumnAccess& column = engine->col(Column::seek);
         if (auto done = column.all(); !done.has_value()) {
-            return std::unexpected(done.error());
+            return done;
         }
         auto parsed = parse_seek(column.values(), records);
         if (!parsed.has_value()) {
@@ -474,62 +561,125 @@ struct PlainSegment {
             return std::unexpected(e);
         }
         seek = std::move(*parsed);
-        std::optional<std::uint64_t> first;
-        std::uint64_t last = 0;
-        for (std::uint64_t g = 0; g < seek.groups; ++g) {
-            if (seek.max_time[g] >= start && seek.min_time[g] < end) {
-                if (!first.has_value()) {
-                    first = g;
-                }
-                last = g;
-            }
+        for (std::size_t symbol = 0; symbol < kSymbols; ++symbol) {
+            total[symbol] = seek.symbol_total(symbol);
         }
-        if (!first.has_value()) {
-            return false;
+        if (total[kSymRaw] != 0) {
+            return std::unexpected(error(ItchStoreErrorKind::bad_value, "plain raw records",
+                                         Column::seek, kNoIndex, 0, total[kSymRaw]));
         }
-        lo = *first * kSeekGroupRecords;
-        hi = std::min<std::uint64_t>((last + 1) * kSeekGroupRecords, records);
-        return true;
+        std::uint64_t at = 0;
+        for (const std::size_t symbol : {kSymC, kSymD, kSymE, kSymU, kSymX}) {
+            ref_group[symbol] = at;
+            at += total[symbol];
+        }
+        at = 0;
+        for (const std::size_t symbol : {kSymC, kSymE, kSymX}) {
+            reduce_group[symbol] = at;
+            at += total[symbol];
+        }
+        adds = total[kSymA] + total[kSymF];
+        imports = seek.imports_before[seek.groups];
+        return {};
     }
 
-    // The type column whole, every value a type symbol a typed record may carry.
-    [[nodiscard]] std::expected<std::span<const std::uint64_t>, ItchStoreError> types() {
-        if (auto opened = open(Column::type); !opened.has_value()) {
-            return std::unexpected(opened.error());
-        }
+    // The type column's values in [first, last), each a typed record's symbol.
+    [[nodiscard]] std::expected<void, ItchStoreError> types(std::uint64_t first,
+                                                            std::uint64_t last) const {
         ColumnAccess& column = engine->col(Column::type);
-        if (column.size() != summary->records) {
-            return std::unexpected(error(ItchStoreErrorKind::bad_segment, "column value count",
-                                         Column::type, kNoIndex, summary->records, column.size()));
+        if (auto done = column.ensure(first, last); !done.has_value()) {
+            return done;
         }
-        if (auto done = column.all(); !done.has_value()) {
-            return std::unexpected(done.error());
-        }
-        const std::span<const std::uint64_t> values = column.values();
-        per_type.fill(0);
-        for (std::size_t i = 0; i < values.size(); ++i) {
+        for (std::uint64_t k = first; k < last; ++k) {
             // The column's range is 8 bits, which decoding checked.
-            if (values[i] == 0 || kSeekSymbolIndex[values[i]] == kSeekSymbols.size()) {
-                return std::unexpected(error(ItchStoreErrorKind::bad_value, "type symbol",
-                                             Column::type, i, 0, values[i]));
+            const std::uint64_t type = column[k];
+            if (type == 0 || kSeekSymbolIndex[type] == kSymbols) {
+                return std::unexpected(
+                    error(ItchStoreErrorKind::bad_value, "type symbol", Column::type, k, 0, type));
             }
-            ++per_type[values[i]];
-        }
-        return values;
-    }
-
-    // Opens `column` and checks it holds the values the types give.
-    [[nodiscard]] std::expected<void, ItchStoreError> open_counted(
-        Column column, const std::array<std::uint64_t, kColumnCount>& counts) const {
-        if (auto opened = open(column); !opened.has_value()) {
-            return opened;
-        }
-        const std::uint64_t want = counts[static_cast<std::size_t>(column)];
-        if (engine->col(column).size() != want) {
-            return std::unexpected(error(ItchStoreErrorKind::bad_segment, "column value count",
-                                         column, kNoIndex, want, engine->col(column).size()));
         }
         return {};
+    }
+
+    // Each type's stored records before `at`: the seek index's count before at's group,
+    // plus those from the group's first record to `at`.
+    [[nodiscard]] std::expected<TypeCounts, ItchStoreError> before(std::uint64_t at) const {
+        const std::uint64_t group = at / kSeekGroupRecords;
+        TypeCounts counts{};
+        if (group >= seek.groups) {
+            for (std::size_t symbol = 0; symbol < kSymbols; ++symbol) {
+                counts[symbol] = total[symbol];
+            }
+            return counts;
+        }
+        for (std::size_t symbol = 0; symbol < kSymbols; ++symbol) {
+            counts[symbol] = seek.symbol_before(symbol, group);
+        }
+        const std::uint64_t first = group * kSeekGroupRecords;
+        if (auto done = types(first, at); !done.has_value()) {
+            return std::unexpected(done.error());
+        }
+        const ColumnAccess& column = engine->col(Column::type);
+        for (std::uint64_t k = first; k < at; ++k) {
+            ++counts[kSeekSymbolIndex[column[k]]];
+        }
+        return counts;
+    }
+
+    // Run r of the segment's `runs`, from the directory, with its limits checked against the
+    // totals. `locate` is the id it must have.
+    [[nodiscard]] std::expected<Run, ItchStoreError> run(std::uint64_t r, std::uint64_t runs,
+                                                         std::uint16_t locate) const {
+        ColumnAccess& ids = engine->col(Column::locate_run);
+        ColumnAccess& starts = engine->col(Column::locate_run_start);
+        ColumnAccess& add_starts = engine->col(Column::locate_run_add_start);
+        ColumnAccess& import_starts = engine->col(Column::locate_run_import_start);
+        const std::uint64_t last = std::min(r + 2, runs);
+        for (ColumnAccess* column : {&ids, &starts, &add_starts, &import_starts}) {
+            if (auto done = column->ensure(r, last); !done.has_value()) {
+                return std::unexpected(done.error());
+            }
+        }
+        if (ids[r] != locate) {
+            return std::unexpected(error(ItchStoreErrorKind::bad_value, "locate run id",
+                                         Column::locate_run, r, locate, ids[r]));
+        }
+        Run out;
+        out.locate = locate;
+        out.start = starts[r];
+        out.add_start = add_starts[r];
+        out.import_start = import_starts[r];
+        const bool final_run = r + 1 == runs;
+        out.end = final_run ? summary->typed_records : starts[r + 1];
+        out.add_end = final_run ? adds : add_starts[r + 1];
+        out.import_end = final_run ? imports : import_starts[r + 1];
+        if (out.start >= out.end || out.end > summary->typed_records) {
+            return std::unexpected(error(ItchStoreErrorKind::bad_value, "locate run start",
+                                         Column::locate_run_start, r, out.end, out.start));
+        }
+        if (out.add_start > out.add_end || out.add_end > adds) {
+            return std::unexpected(error(ItchStoreErrorKind::bad_value, "locate run add start",
+                                         Column::locate_run_add_start, r, out.add_end,
+                                         out.add_start));
+        }
+        if (out.import_start > out.import_end || out.import_end > imports) {
+            return std::unexpected(error(ItchStoreErrorKind::bad_value, "locate run import start",
+                                         Column::locate_run_import_start, r, out.import_end,
+                                         out.import_start));
+        }
+        return out;
+    }
+
+    // The directory columns, opened and checked to hold one value per run.
+    [[nodiscard]] std::expected<std::uint64_t, ItchStoreError> open_directory() const {
+        const std::uint64_t runs = locate_runs_of(*summary);
+        for (const Column column : {Column::locate_run, Column::locate_run_start,
+                                    Column::locate_run_add_start, Column::locate_run_import_start}) {
+            if (auto opened = open_counted(column, runs); !opened.has_value()) {
+                return std::unexpected(opened.error());
+            }
+        }
+        return runs;
     }
 };
 
@@ -545,111 +695,10 @@ struct PlainSegment {
     return seg;
 }
 
-// One locate's records in a plain segment, from its run in the locate column.
-struct LocateRun {
-    bool found = false;
-    std::vector<std::uint64_t> positions;
-    // Where the locate's adds start in add_shares and add_price.
-    std::uint64_t add_offset = 0;
-    std::uint64_t adds = 0;
-};
-
-[[nodiscard]] std::expected<LocateRun, ItchStoreError> locate_run(const PlainSegment& seg,
-                                                                  std::uint16_t locate) {
-    for (const Column column : {Column::locate_run, Column::locate_run_records,
-                                Column::locate_run_adds, Column::locate}) {
-        if (auto opened = seg.open(column); !opened.has_value()) {
-            return std::unexpected(opened.error());
-        }
-    }
-    ColumnAccess& ids = seg.engine->col(Column::locate_run);
-    ColumnAccess& records = seg.engine->col(Column::locate_run_records);
-    ColumnAccess& adds = seg.engine->col(Column::locate_run_adds);
-    ColumnAccess& gaps = seg.engine->col(Column::locate);
-    for (ColumnAccess* column : {&ids, &records, &adds}) {
-        if (auto done = column->all(); !done.has_value()) {
-            return std::unexpected(done.error());
-        }
-    }
-    const std::uint64_t runs = ids.size();
-    if (records.size() != runs || adds.size() != runs) {
-        return std::unexpected(seg.error(ItchStoreErrorKind::bad_segment, "locate run count",
-                                         Column::locate_run_records, kNoIndex, runs,
-                                         records.size() != runs ? records.size() : adds.size()));
-    }
-    LocateRun run;
-    std::uint64_t record_offset = 0;
-    for (std::uint64_t r = 0; r < runs; ++r) {
-        if (r > 0 && ids[r] <= ids[r - 1]) {
-            return std::unexpected(seg.error(ItchStoreErrorKind::bad_value, "locate run order",
-                                             Column::locate_run, r, ids[r - 1] + 1, ids[r]));
-        }
-        if (ids[r] == locate) {
-            run.found = true;
-            const std::uint64_t n = records[r];
-            if (n == 0 || n > gaps.size() - record_offset) {
-                return std::unexpected(seg.error(ItchStoreErrorKind::bad_value, "locate run records",
-                                                 Column::locate_run_records, r,
-                                                 gaps.size() - record_offset, n));
-            }
-            run.adds = adds[r];
-            if (auto done = gaps.ensure(record_offset, record_offset + n); !done.has_value()) {
-                return std::unexpected(done.error());
-            }
-            run.positions.reserve(n);
-            std::uint64_t at = gaps[record_offset];
-            for (std::uint64_t i = 0; i < n; ++i) {
-                if (i > 0) {
-                    at += gaps[record_offset + i] + 1U;
-                }
-                if (at >= seg.summary->records) {
-                    return std::unexpected(seg.error(ItchStoreErrorKind::bad_value, "locate run index",
-                                                     Column::locate, record_offset + i,
-                                                     seg.summary->records, at));
-                }
-                run.positions.push_back(at);
-            }
-            break;
-        }
-        record_offset += records[r];
-        run.add_offset += adds[r];
-        if (record_offset > gaps.size()) {
-            return std::unexpected(seg.error(ItchStoreErrorKind::bad_value, "locate run records",
-                                             Column::locate_run_records, r, gaps.size(),
-                                             record_offset));
-        }
-    }
-    return run;
-}
-
-// Every record's locate in a plain segment, from all the runs.
-[[nodiscard]] std::expected<std::vector<std::uint64_t>, ItchStoreError> all_locates(
-    const PlainSegment& seg) {
-    for (const Column column : {Column::locate_run, Column::locate_run_records, Column::locate}) {
-        if (auto opened = seg.open(column); !opened.has_value()) {
-            return std::unexpected(opened.error());
-        }
-        if (auto done = seg.engine->col(column).all(); !done.has_value()) {
-            return std::unexpected(done.error());
-        }
-    }
-    auto placed = locates_from_runs(seg.engine->col(Column::locate).values(),
-                                    seg.engine->col(Column::locate_run).values(),
-                                    seg.engine->col(Column::locate_run_records).values(),
-                                    seg.summary->records);
-    if (!placed.has_value()) {
-        ItchStoreError e = placed.error();
-        e.segment = seg.segment;
-        return std::unexpected(e);
-    }
-    return std::move(*placed);
-}
-
 // The stock of a derived-stock record: its exception, or its locate's symbol.
 struct Stocks {
     std::span<const std::uint64_t> records;
     std::span<const std::uint64_t> bytes;
-    std::size_t next = 0;
 };
 
 [[nodiscard]] std::expected<Stocks, ItchStoreError> open_stocks(const PlainSegment& seg) {
@@ -695,59 +744,27 @@ struct Stocks {
     const itch::Stock* known = seg.reader->symbols().find(locate);
     if (known == nullptr) {
         return std::unexpected(seg.error(ItchStoreErrorKind::bad_value, "symbol for locate",
-                                         Column::locate, kNoIndex, 1, 0));
+                                         Column::locate_run, kNoIndex, 1, 0));
     }
     return *known;
 }
 
-// The indexed path over one plain segment: the rows in [start, end), of `locate` if set.
-template <class Sink>
-[[nodiscard]] std::expected<void, ItchStoreError> indexed_segment(
-    const ItchStoreReader& reader, ItchQuery::Engine& engine, std::uint64_t segment,
-    std::uint64_t start, std::uint64_t end, std::optional<std::uint16_t> locate, Need need,
-    QueryStats& stats, Sink&& sink) {
-    ++stats.segments;
-    PlainSegment seg = plain_segment(&reader, &engine, &stats, segment);
-    auto any = seg.narrow(start, end);
-    if (!any.has_value()) {
-        return std::unexpected(any.error());
-    }
-    if (!*any) {
-        return {};
-    }
-    auto typed = seg.types();
-    if (!typed.has_value()) {
-        return std::unexpected(typed.error());
-    }
-    const std::span<const std::uint64_t> types = *typed;
-    const std::uint64_t records = types.size();
-    const auto counts = counts_from_type_counts(seg.per_type);
-
-    // Which records the query is about.
-    LocateRun run;
-    std::vector<std::uint64_t> locates;
-    if (locate.has_value()) {
-        auto found = locate_run(seg, *locate);
-        if (!found.has_value()) {
-            return std::unexpected(found.error());
+// The columns a scan reads, opened for the segment: what rows need, or what the minute
+// aggregate needs.
+[[nodiscard]] std::expected<void, ItchStoreError> open_scan_columns(const PlainSegment& seg,
+                                                                    Need need) {
+    const auto counts = [&] {
+        std::array<std::uint64_t, 256> per_type{};
+        for (std::size_t symbol = 0; symbol < kSymbols; ++symbol) {
+            per_type[kSeekSymbols[symbol]] = seg.total[symbol];
         }
-        run = std::move(*found);
-        if (!run.found) {
-            return {};
-        }
-    } else {
-        auto placed = all_locates(seg);
-        if (!placed.has_value()) {
-            return std::unexpected(placed.error());
-        }
-        locates = std::move(*placed);
-    }
-    const auto locate_at = [&](std::uint64_t record) -> std::uint16_t {
-        return locate.has_value() ? *locate : static_cast<std::uint16_t>(locates[record]);
+        return counts_from_type_counts(per_type);
+    }();
+    const auto open = [&](Column column) {
+        return seg.open_counted(column, counts[static_cast<std::size_t>(column)]);
     };
-
-    std::vector<Column> needed{Column::timestamp, Column::add_side, Column::add_shares,
-                               Column::add_price};
+    std::vector<Column> needed{Column::type, Column::locate, Column::timestamp, Column::add_side,
+                               Column::add_shares, Column::add_price};
     if (need == Need::rows) {
         needed.insert(needed.end(),
                       {Column::creation_ref, Column::ref_distance, Column::reduce_shares,
@@ -756,265 +773,232 @@ template <class Sink>
                        Column::trade_price});
     }
     for (const Column column : needed) {
-        if (auto opened = seg.open_counted(column, counts); !opened.has_value()) {
+        if (auto opened = open(column); !opened.has_value()) {
             return opened;
         }
     }
+    if (need == Need::rows) {
+        if (auto opened = seg.open_counted(Column::import_ref, seg.imports); !opened.has_value()) {
+            return opened;
+        }
+    }
+    // The time bases whole: a run's records fall anywhere in the segment.
+    if (auto opened = seg.open_counted(
+            Column::time_base, time_base_count(seg.summary->records, seg.summary->typed_records));
+        !opened.has_value()) {
+        return opened;
+    }
+    return seg.engine->col(Column::time_base).all();
+}
+
+// One run's records, scanned from its first stored record to `stop`: each one's place in
+// every column, the locate's known orders, and the rows of [emit_from, stop) whose time is in
+// [start, end), each handed to `emit` with its index in the segment. `before` holds each
+// type's stored records before the run (rows only; the minute aggregate reads adds alone).
+template <class Emit>
+[[nodiscard]] std::expected<void, ItchStoreError> scan_run(
+    const PlainSegment& seg, const Stocks& stocks, const Run& run, const TypeCounts& before,
+    std::uint64_t emit_from, std::uint64_t stop, std::uint64_t start, std::uint64_t end,
+    Need need, Emit&& emit) {
+    ItchQuery::Engine& engine = *seg.engine;
+    ColumnAccess& types = engine.col(Column::type);
     ColumnAccess& times = engine.col(Column::timestamp);
+    ColumnAccess& gaps = engine.col(Column::locate);
     ColumnAccess& add_side = engine.col(Column::add_side);
     ColumnAccess& add_shares = engine.col(Column::add_shares);
     ColumnAccess& add_price = engine.col(Column::add_price);
+    const std::uint64_t first_record = seg.summary->first_record;
+    const std::uint64_t first = need == Need::rows ? run.start : emit_from;
 
-    // Each add's place in add_shares, grouped by locate, and in add_price, grouped by
-    // locate and side, both stable: what the writer sorted them into.
-    struct AddPlace {
-        std::uint64_t record;
-        std::uint64_t side;
-        std::uint64_t shares_at;
-        std::uint64_t price_at;
-    };
-    std::vector<AddPlace> places;
-    if (locate.has_value()) {
-        // The locate's adds alone: its run against the types.
-        std::uint64_t add_index = 0;
-        std::size_t next = 0;
-        for (std::uint64_t j = 0; j < records && next < run.positions.size(); ++j) {
-            const bool mine = run.positions[next] == j;
-            next += mine ? 1U : 0U;
-            if (!is_add(types[j])) {
-                continue;
-            }
-            if (mine) {
-                auto side = add_side.get(add_index);
-                if (!side.has_value()) {
-                    return std::unexpected(side.error());
-                }
-                places.push_back({.record = j, .side = *side, .shares_at = 0, .price_at = 0});
-            }
-            ++add_index;
-        }
-        if (places.size() != run.adds) {
-            return std::unexpected(seg.error(ItchStoreErrorKind::bad_value, "locate run adds",
-                                             Column::locate_run_adds, kNoIndex, places.size(),
-                                             run.adds));
-        }
-        std::array<std::uint64_t, 256> base{};
-        for (const AddPlace& place : places) {
-            ++base[place.side];
-        }
+    // The run's types from where the scan starts, and its counts per type there.
+    if (auto done = seg.types(run.start, stop); !done.has_value()) {
+        return done;
+    }
+    TypeCounts in_run{};
+    for (std::uint64_t k = run.start; k < stop; ++k) {
+        ++in_run[kSeekSymbolIndex[types[k]]];
+    }
+    const std::uint64_t run_adds = run.add_end - run.add_start;
+    if (in_run[kSymA] + in_run[kSymF] > run_adds) {
+        return std::unexpected(seg.error(ItchStoreErrorKind::bad_value, "locate run add start",
+                                         Column::locate_run_add_start, kNoIndex, run_adds,
+                                         in_run[kSymA] + in_run[kSymF]));
+    }
+    // Every add's side, so each add's place in add_price, grouped by side within the run,
+    // follows; add_shares is grouped by locate alone.
+    if (auto done = add_side.ensure(run.add_start, run.add_end); !done.has_value()) {
+        return done;
+    }
+    std::array<std::uint64_t, 256> side_base{};
+    for (std::uint64_t a = run.add_start; a < run.add_end; ++a) {
+        ++side_base[add_side[a]];
+    }
+    {
         std::uint64_t sum = 0;
-        for (std::uint64_t& slot : base) {
+        for (std::uint64_t& slot : side_base) {
             const std::uint64_t n = slot;
-            slot = sum;
+            slot = run.add_start + sum;
             sum += n;
         }
-        for (std::size_t i = 0; i < places.size(); ++i) {
-            places[i].shares_at = run.add_offset + i;
-            places[i].price_at = run.add_offset + base[places[i].side]++;
-        }
-    } else {
-        if (auto done = add_side.all(); !done.has_value()) {
-            return done;
-        }
-        places.reserve(add_side.size());
-        std::vector<std::uint64_t> per_locate(kLocates, 0);
-        for (std::uint64_t j = 0; j < records; ++j) {
-            if (is_add(types[j])) {
-                const std::uint64_t a = places.size();
-                places.push_back({.record = j, .side = add_side[a], .shares_at = 0, .price_at = 0});
-                ++per_locate[locates[j]];
-            }
-        }
-        // Shares: by locate. Prices: by side, then stably by locate, two counting passes.
-        std::vector<std::uint64_t> locate_base(kLocates, 0);
-        for (std::size_t l = 1; l < kLocates; ++l) {
-            locate_base[l] = locate_base[l - 1] + per_locate[l - 1];
-        }
-        std::vector<std::uint64_t> next = locate_base;
-        for (AddPlace& place : places) {
-            place.shares_at = next[locates[place.record]]++;
-        }
-        std::array<std::uint64_t, 257> side_base{};
-        for (const AddPlace& place : places) {
-            ++side_base[place.side + 1];
-        }
-        for (std::size_t s = 1; s < side_base.size(); ++s) {
-            side_base[s] += side_base[s - 1];
-        }
-        std::vector<std::uint32_t> by_side(places.size());
-        for (std::size_t a = 0; a < places.size(); ++a) {
-            by_side[side_base[places[a].side]++] = static_cast<std::uint32_t>(a);
-        }
-        next = locate_base;
-        for (const std::uint32_t a : by_side) {
-            places[a].price_at = next[locates[places[a].record]]++;
-        }
     }
-
-    Stocks stocks;
-    std::array<std::uint64_t, 6> ref_start{};
-    std::array<std::uint64_t, 3> reduce_start{};
-    if (need == Need::rows) {
-        auto opened = open_stocks(seg);
-        if (!opened.has_value()) {
-            return std::unexpected(opened.error());
-        }
-        stocks = *opened;
-        if (auto import = seg.open(Column::import_ref); !import.has_value()) {
-            return import;
-        }
-        // ref_distance by type: C, D, E, U, X. reduce_shares: C, E, X.
-        const std::array<std::size_t, 5> ref_order{kSymC, kSymD, kSymE, kSymU, kSymX};
-        std::array<std::uint64_t, kSeekSymbols.size()> total{};
-        for (std::size_t t = 0; t < seg.per_type.size(); ++t) {
-            if (kSeekSymbolIndex[t] < total.size()) {
-                total[kSeekSymbolIndex[t]] += seg.per_type[t];
-            }
-        }
-        for (std::size_t i = 0; i < ref_order.size(); ++i) {
-            ref_start[i + 1] = ref_start[i] + total[ref_order[i]];
-        }
-        reduce_start = {0, total[kSymC], total[kSymC] + total[kSymE]};
+    if (auto done = add_price.ensure(run.add_start, run.add_end); !done.has_value()) {
+        return done;
     }
-    const auto ref_slot = [&](std::size_t symbol) -> std::uint64_t {
-        if (symbol == kSymC) {
-            return ref_start[0];
-        }
-        if (symbol == kSymD) {
-            return ref_start[1];
-        }
-        if (symbol == kSymE) {
-            return ref_start[2];
-        }
-        if (symbol == kSymU) {
-            return ref_start[3];
-        }
-        return ref_start[4];
-    };
-
-    ColumnAccess& creation = engine.col(Column::creation_ref);
-    ColumnAccess& distance = engine.col(Column::ref_distance);
-    ColumnAccess& imports = engine.col(Column::import_ref);
-    if (!locate.has_value()) {
-        if (auto done = times.ensure(seg.lo, seg.hi); !done.has_value()) {
-            return done;
-        }
+    if (auto done = add_shares.ensure(run.add_start, run.add_end); !done.has_value()) {
+        return done;
     }
-    if (need == Need::rows) {
-        // The pass reads every naming record's distance and every creation before hi, so
-        // their blocks are decoded up front and read without a check each.
-        std::array<std::uint64_t, 256> before{};
-        for (std::uint64_t j = 0; j < seg.hi; ++j) {
-            ++before[types[j]];
-        }
-        const std::array<std::pair<char, std::size_t>, 5> named{
-            {{'C', 0}, {'D', 1}, {'E', 2}, {'U', 3}, {'X', 4}}};
-        for (const auto& [type, slot] : named) {
-            const std::uint64_t first = ref_start[slot];
-            if (auto done = distance.ensure(first, first + before[static_cast<unsigned char>(type)]);
-                !done.has_value()) {
-                return done;
-            }
-        }
-        if (auto done = creation.ensure(0, before['A'] + before['F'] + before['U']);
-            !done.has_value()) {
-            return done;
-        }
+    if (auto done = times.ensure(run.start, stop); !done.has_value()) {
+        return done;
     }
-    engine.clear_lists();
-
-    // One pass over [0, hi): the counters every column index needs, the locates' lists of
-    // known orders, and the rows in the window.
-    std::array<std::uint64_t, kSeekSymbols.size()> rank{};
-    std::uint64_t add_index = 0;
-    std::uint64_t created = 0;
-    std::uint64_t imported = 0;
-    std::size_t next_mine = 0;
-    std::size_t next_add = 0;
-    const std::uint64_t first_record = seg.summary->first_record;
-    const auto value = [](ColumnAccess& column, std::uint64_t index,
-                          std::uint64_t& out) -> std::expected<void, ItchStoreError> {
-        auto got = column.get(index);
-        if (!got.has_value()) {
-            return std::unexpected(got.error());
+    if (auto done = gaps.ensure(run.start, stop); !done.has_value()) {
+        return done;
+    }
+    // From the run's first record: the index in the segment of each, as the gaps add up,
+    // and its time, its residual over the larger of the time before it and its time base.
+    const ColumnAccess& bases = engine.col(Column::time_base);
+    std::uint64_t position = 0;
+    std::uint64_t time = 0;
+    const auto advance = [&](std::uint64_t k) -> std::expected<void, ItchStoreError> {
+        const std::uint64_t gap = gaps[k];
+        const std::uint64_t records = seg.summary->records;
+        const bool first_of_run = k == run.start;
+        const std::uint64_t room = first_of_run ? records : records - position - 1;
+        if (gap >= room) {
+            return std::unexpected(seg.error(ItchStoreErrorKind::bad_value, "locate run index",
+                                             Column::locate, k, room - 1, gap));
         }
-        out = *got;
+        position = first_of_run ? gap : position + gap + 1;
+        const std::uint64_t base = bases[position / kTimeBaseRecords];
+        time = times[k] + (first_of_run ? base : std::max(time, base));
+        if (time > kMax48) {
+            return std::unexpected(seg.error(ItchStoreErrorKind::bad_value, "timestamp value",
+                                             Column::timestamp, k, kMax48, time));
+        }
         return {};
     };
-    for (std::uint64_t j = 0; j < seg.hi; ++j) {
-        const std::uint64_t type = types[j];
-        const std::size_t symbol = kSeekSymbolIndex[type];
-        const std::uint64_t r = rank[symbol]++;
-        bool mine = true;
-        if (locate.has_value()) {
-            mine = next_mine < run.positions.size() && run.positions[next_mine] == j;
-            next_mine += mine ? 1U : 0U;
-            if (!mine && next_mine == run.positions.size()) {
-                // Nothing after the locate's last record bears on it.
-                break;
+
+    if (need == Need::adds) {
+        // Adds alone: no reference to resolve, so the scan starts at emit_from, with the
+        // adds before it counted from the run's types.
+        std::uint64_t add_index = run.add_start;
+        std::array<std::uint64_t, 256> side_next = side_base;
+        for (std::uint64_t k = run.start; k < stop; ++k) {
+            if (auto moved = advance(k); !moved.has_value()) {
+                return moved;
             }
-        }
-        const std::uint16_t loc = mine ? locate_at(j) : 0;
-        std::optional<std::size_t> place;
-        if (is_add(type)) {
-            if (locate.has_value()) {
-                if (mine) {
-                    place = next_add++;
-                }
-            } else {
-                place = add_index;
-            }
-            ++add_index;
-        }
-        const bool emit = mine && j >= seg.lo;
-        if (need == Need::adds) {
-            if (!emit || !place.has_value()) {
+            const std::uint64_t type = types[k];
+            if (!is_add(type)) {
                 continue;
             }
-            std::uint64_t ts = 0;
-            if (auto got = value(times, j, ts); !got.has_value()) {
-                return got;
+            const std::uint64_t a = add_index++;
+            const std::uint64_t side = add_side[a];
+            const std::uint64_t price_at = side_next[side]++;
+            if (k < first) {
+                continue;
             }
+            const std::uint64_t ts = time;
             if (ts < start || ts >= end) {
                 continue;
             }
             QueryRow row;
-            row.seq = first_record + j;
+            row.seq = first_record + position;
             row.ts_ns = ts;
             row.msg_type = static_cast<std::uint16_t>(type);
-            row.locate = loc;
-            std::uint64_t shares = 0;
-            std::uint64_t price = 0;
-            if (auto got = value(add_shares, places[*place].shares_at, shares); !got.has_value()) {
-                return got;
-            }
-            if (auto got = value(add_price, places[*place].price_at, price); !got.has_value()) {
-                return got;
-            }
-            row.shares = static_cast<std::uint32_t>(shares);
-            row.price = static_cast<std::uint32_t>(price);
-            sink(row);
-            continue;
+            row.locate = run.locate;
+            row.side = static_cast<std::uint8_t>(side);
+            row.shares = static_cast<std::uint32_t>(add_shares[a]);
+            row.price = static_cast<std::uint32_t>(add_price[price_at]);
+            emit(position, row);
         }
+        return {};
+    }
 
-        // Need::rows: the order each record names or creates, kept for every locate the
-        // query reads, and the imports counted over every locate.
+    // Rows: each column's first index for the run, then the ranges the scan reads.
+    ColumnAccess& creation = engine.col(Column::creation_ref);
+    ColumnAccess& distance = engine.col(Column::ref_distance);
+    ColumnAccess& imports = engine.col(Column::import_ref);
+    ColumnAccess& reduce = engine.col(Column::reduce_shares);
+    ColumnAccess& exec_price = engine.col(Column::exec_price);
+    ColumnAccess& replace_shares = engine.col(Column::replace_shares);
+    ColumnAccess& replace_price = engine.col(Column::replace_price);
+    ColumnAccess& trade_ref = engine.col(Column::trade_ref);
+    ColumnAccess& trade_side = engine.col(Column::trade_side);
+    ColumnAccess& trade_shares = engine.col(Column::trade_shares);
+    ColumnAccess& trade_price = engine.col(Column::trade_price);
+    if (before[kSymA] + before[kSymF] != run.add_start) {
+        return std::unexpected(seg.error(ItchStoreErrorKind::bad_value, "locate run add start",
+                                         Column::locate_run_add_start, kNoIndex,
+                                         before[kSymA] + before[kSymF], run.add_start));
+    }
+    TypeCounts next{};
+    for (std::size_t symbol = 0; symbol < kSymbols; ++symbol) {
+        next[symbol] = before[symbol];
+    }
+    const std::uint64_t creation_first = before[kSymA] + before[kSymF] + before[kSymU];
+    const auto range = [&](ColumnAccess& column, std::uint64_t from,
+                           std::uint64_t n) -> std::expected<void, ItchStoreError> {
+        return column.ensure(from, from + n);
+    };
+    std::expected<void, ItchStoreError> ready = range(
+        creation, creation_first, in_run[kSymA] + in_run[kSymF] + in_run[kSymU]);
+    for (const std::size_t symbol : {kSymC, kSymD, kSymE, kSymU, kSymX}) {
+        if (ready.has_value()) {
+            ready = range(distance, seg.ref_group[symbol] + before[symbol], in_run[symbol]);
+        }
+    }
+    for (const std::size_t symbol : {kSymC, kSymE, kSymX}) {
+        if (ready.has_value()) {
+            ready = range(reduce, seg.reduce_group[symbol] + before[symbol], in_run[symbol]);
+        }
+    }
+    if (ready.has_value()) {
+        ready = range(exec_price, before[kSymC], in_run[kSymC]);
+    }
+    for (ColumnAccess* column : {&replace_shares, &replace_price}) {
+        if (ready.has_value()) {
+            ready = range(*column, before[kSymU], in_run[kSymU]);
+        }
+    }
+    for (ColumnAccess* column : {&trade_ref, &trade_side, &trade_shares, &trade_price}) {
+        if (ready.has_value()) {
+            ready = range(*column, before[kSymP], in_run[kSymP]);
+        }
+    }
+    if (!ready.has_value()) {
+        return ready;
+    }
+
+    std::vector<std::uint64_t>& list = engine.list;
+    list.clear();
+    std::uint64_t created = creation_first;
+    std::uint64_t imported = run.import_start;
+    std::uint64_t add_index = run.add_start;
+    std::array<std::uint64_t, 256> side_next = side_base;
+    for (std::uint64_t k = run.start; k < stop; ++k) {
+        if (auto moved = advance(k); !moved.has_value()) {
+            return moved;
+        }
+        const std::uint64_t type = types[k];
+        const std::size_t symbol = kSeekSymbolIndex[type];
+        const std::uint64_t r = next[symbol]++;
         std::uint64_t order_ref = 0;
-        const bool names = symbol == kSymC || symbol == kSymD || symbol == kSymE ||
-                           symbol == kSymU || symbol == kSymX;
-        if (names) {
-            const std::uint64_t at = ref_slot(symbol) + r;
+        if (names(symbol)) {
+            const std::uint64_t at = seg.ref_group[symbol] + r;
             const std::uint64_t d = distance[at];
             if (d == 0) {
-                const std::uint64_t import = imported++;
-                if (mine) {
-                    if (auto got = value(imports, import, order_ref); !got.has_value()) {
-                        return got;
-                    }
-                    engine.append(loc, order_ref);
+                if (imported >= run.import_end) {
+                    return std::unexpected(seg.error(ItchStoreErrorKind::bad_value,
+                                                     "locate run import start",
+                                                     Column::locate_run_import_start, kNoIndex,
+                                                     run.import_end, imported + 1));
                 }
-            } else if (mine) {
-                const std::vector<std::uint64_t>& list = engine.lists[loc];
+                auto got = imports.get(imported++);
+                if (!got.has_value()) {
+                    return std::unexpected(got.error());
+                }
+                order_ref = *got;
+                list.push_back(order_ref);
+            } else {
                 if (d > list.size()) {
                     return std::unexpected(seg.error(ItchStoreErrorKind::bad_value, "ref distance",
                                                      Column::ref_distance, at, list.size(), d));
@@ -1024,84 +1008,286 @@ template <class Sink>
         }
         std::uint64_t created_ref = 0;
         if (is_add(type) || symbol == kSymU) {
-            const std::uint64_t c = created++;
-            if (mine) {
-                created_ref = creation[c];
-                engine.append(loc, created_ref);
-            }
+            created_ref = creation[created++];
+            list.push_back(created_ref);
         }
-        if (!emit) {
+        std::uint64_t add = 0;
+        std::uint64_t price_at = 0;
+        if (is_add(type)) {
+            add = add_index++;
+            price_at = side_next[add_side[add]]++;
+        }
+        if (k < first || k < emit_from) {
             continue;
         }
-        std::uint64_t ts = 0;
-        if (auto got = value(times, j, ts); !got.has_value()) {
-            return got;
-        }
+        const std::uint64_t ts = time;
         if (ts < start || ts >= end) {
             continue;
         }
         QueryRow row;
-        row.seq = first_record + j;
+        row.seq = first_record + position;
         row.ts_ns = ts;
         row.msg_type = static_cast<std::uint16_t>(type);
-        row.locate = loc;
-        std::uint64_t shares = 0;
-        std::uint64_t price = 0;
-        std::uint64_t side = 0;
-        const auto read = [&](Column column, std::uint64_t index,
-                              std::uint64_t& out) { return value(engine.col(column), index, out); };
-        std::expected<void, ItchStoreError> got{};
+        row.locate = run.locate;
         if (is_add(type)) {
             row.order_ref = created_ref;
-            side = places[*place].side;
-            got = read(Column::add_shares, places[*place].shares_at, shares);
-            if (got.has_value()) {
-                got = read(Column::add_price, places[*place].price_at, price);
-            }
+            row.side = static_cast<std::uint8_t>(add_side[add]);
+            row.shares = static_cast<std::uint32_t>(add_shares[add]);
+            row.price = static_cast<std::uint32_t>(add_price[price_at]);
         } else if (symbol == kSymE || symbol == kSymX) {
             row.order_ref = order_ref;
-            got = read(Column::reduce_shares, reduce_start[symbol == kSymE ? 1 : 2] + r, shares);
+            row.shares = static_cast<std::uint32_t>(reduce[seg.reduce_group[symbol] + r]);
         } else if (symbol == kSymC) {
             row.order_ref = order_ref;
-            got = read(Column::reduce_shares, reduce_start[0] + r, shares);
-            if (got.has_value()) {
-                got = read(Column::exec_price, r, price);
-            }
+            row.shares = static_cast<std::uint32_t>(reduce[seg.reduce_group[symbol] + r]);
+            row.price = static_cast<std::uint32_t>(exec_price[r]);
         } else if (symbol == kSymD) {
             row.order_ref = order_ref;
         } else if (symbol == kSymU) {
             row.order_ref = order_ref;
-            got = read(Column::replace_shares, r, shares);
-            if (got.has_value()) {
-                got = read(Column::replace_price, r, price);
-            }
+            row.shares = static_cast<std::uint32_t>(replace_shares[r]);
+            row.price = static_cast<std::uint32_t>(replace_price[r]);
         } else if (symbol == kSymP) {
-            got = read(Column::trade_ref, r, row.order_ref);
-            if (got.has_value()) {
-                got = read(Column::trade_side, r, side);
-            }
-            if (got.has_value()) {
-                got = read(Column::trade_shares, r, shares);
-            }
-            if (got.has_value()) {
-                got = read(Column::trade_price, r, price);
-            }
+            row.order_ref = trade_ref[r];
+            row.side = static_cast<std::uint8_t>(trade_side[r]);
+            row.shares = static_cast<std::uint32_t>(trade_shares[r]);
+            row.price = static_cast<std::uint32_t>(trade_price[r]);
         }
-        if (!got.has_value()) {
-            return got;
-        }
-        row.side = static_cast<std::uint8_t>(side);
-        row.shares = static_cast<std::uint32_t>(shares);
-        row.price = static_cast<std::uint32_t>(price);
         if (is_add(type) || symbol == kSymP) {
-            auto stock = stock_of(seg, stocks, j, loc);
+            auto stock = stock_of(seg, stocks, k, run.locate);
             if (!stock.has_value()) {
                 return std::unexpected(stock.error());
             }
             row.has_stock = true;
             row.stock = *stock;
         }
-        sink(row);
+        emit(position, row);
+    }
+    return {};
+}
+
+// The stored records [first, last) of a run whose seek groups can hold a time in
+// [start, end), or nothing if none can: the first and last such group, clipped to the run.
+[[nodiscard]] std::optional<std::pair<std::uint64_t, std::uint64_t>> zone_range(
+    const SeekIndex& seek, const Run& run, std::uint64_t start, std::uint64_t end) {
+    std::optional<std::uint64_t> first;
+    std::uint64_t last = 0;
+    for (std::uint64_t g = run.start / kSeekGroupRecords;
+         g < seek.groups && g * kSeekGroupRecords < run.end; ++g) {
+        if (seek.max_time[g] >= start && seek.min_time[g] < end) {
+            if (!first.has_value()) {
+                first = g;
+            }
+            last = g;
+        }
+    }
+    if (!first.has_value()) {
+        return std::nullopt;
+    }
+    return std::pair{std::max(run.start, *first * kSeekGroupRecords),
+                     std::min(run.end, (last + 1) * kSeekGroupRecords)};
+}
+
+// The indexed path for one locate in one plain segment: the rows of the locate in
+// [start, end), or its adds for the minute aggregate, in file order.
+template <class Sink>
+[[nodiscard]] std::expected<void, ItchStoreError> locate_segment(
+    const ItchStoreReader& reader, ItchQuery::Engine& engine, std::uint64_t segment,
+    std::uint64_t start, std::uint64_t end, std::uint16_t locate, Need need, QueryStats& stats,
+    Sink&& sink) {
+    ++stats.segments;
+    PlainSegment seg = plain_segment(&reader, &engine, &stats, segment);
+    if (auto parsed = seg.parse(); !parsed.has_value()) {
+        return parsed;
+    }
+    auto runs = seg.open_directory();
+    if (!runs.has_value()) {
+        return std::unexpected(runs.error());
+    }
+    // The summary's bitmap held the locate, so it has a run, whose index is its rank.
+    auto run = seg.run(rank_of(seg.summary->locates, locate), *runs, locate);
+    if (!run.has_value()) {
+        return std::unexpected(run.error());
+    }
+    const auto zone = zone_range(seg.seek, *run, start, end);
+    if (!zone.has_value()) {
+        return {};
+    }
+    if (auto opened = open_scan_columns(seg, need); !opened.has_value()) {
+        return opened;
+    }
+    Stocks stocks;
+    TypeCounts before{};
+    if (need == Need::rows) {
+        auto opened = open_stocks(seg);
+        if (!opened.has_value()) {
+            return std::unexpected(opened.error());
+        }
+        stocks = *opened;
+        auto counted = seg.before(run->start);
+        if (!counted.has_value()) {
+            return std::unexpected(counted.error());
+        }
+        before = *counted;
+    }
+    // A locate's records are in file order within its run, so its rows go out as found.
+    return scan_run(seg, stocks, *run, before, zone->first, zone->second, start, end, need,
+                    [&](std::uint64_t, const QueryRow& row) { sink(row); });
+}
+
+// The file groups whose times can fall in [start, end), as the records [first, last) of
+// the segment in file order, or nothing if none can.
+[[nodiscard]] std::optional<std::pair<std::uint64_t, std::uint64_t>> file_range(
+    const SeekIndex& seek, std::uint64_t start, std::uint64_t end) {
+    std::optional<std::uint64_t> first;
+    std::uint64_t last = 0;
+    for (std::uint64_t g = 0; g < seek.groups; ++g) {
+        if (seek.file_max_time[g] >= start && seek.file_min_time[g] < end) {
+            if (!first.has_value()) {
+                first = g;
+            }
+            last = g;
+        }
+    }
+    if (!first.has_value()) {
+        return std::nullopt;
+    }
+    return std::pair{*first * kSeekGroupRecords,
+                     std::min<std::uint64_t>((last + 1) * kSeekGroupRecords, seek.records)};
+}
+
+// Every stored typed record's index in the segment, from the whole locate column and the
+// run starts.
+[[nodiscard]] std::expected<void, ItchStoreError> all_positions(const PlainSegment& seg,
+                                                                std::uint64_t runs) {
+    ColumnAccess& gaps = seg.engine->col(Column::locate);
+    ColumnAccess& starts = seg.engine->col(Column::locate_run_start);
+    if (auto opened = seg.open_counted(Column::locate, seg.summary->typed_records);
+        !opened.has_value()) {
+        return opened;
+    }
+    for (ColumnAccess* column : {&gaps, &starts}) {
+        if (auto done = column->all(); !done.has_value()) {
+            return done;
+        }
+    }
+    const std::span<const std::uint64_t> start_values = starts.values().first(runs);
+    auto placed = positions_from_runs(gaps.values(), start_values, seg.summary->typed_records,
+                                      seg.summary->records);
+    if (!placed.has_value()) {
+        ItchStoreError e = placed.error();
+        e.segment = seg.segment;
+        return std::unexpected(e);
+    }
+    seg.engine->positions = std::move(*placed);
+    return {};
+}
+
+// The indexed path for every locate in one plain segment: the rows in [start, end), in
+// file order. Each run with a record in the file groups the window can reach is scanned
+// from its first record to its last such record, and the rows are put back in file order
+// by their index in the segment.
+template <class Sink>
+[[nodiscard]] std::expected<void, ItchStoreError> all_segment(
+    const ItchStoreReader& reader, ItchQuery::Engine& engine, std::uint64_t segment,
+    std::uint64_t start, std::uint64_t end, QueryStats& stats, Sink&& sink) {
+    ++stats.segments;
+    PlainSegment seg = plain_segment(&reader, &engine, &stats, segment);
+    if (auto parsed = seg.parse(); !parsed.has_value()) {
+        return parsed;
+    }
+    const auto window = file_range(seg.seek, start, end);
+    if (!window.has_value()) {
+        return {};
+    }
+    auto runs = seg.open_directory();
+    if (!runs.has_value()) {
+        return std::unexpected(runs.error());
+    }
+    for (const Column column : {Column::locate_run, Column::locate_run_start,
+                                Column::locate_run_add_start, Column::locate_run_import_start}) {
+        if (auto done = engine.col(column).all(); !done.has_value()) {
+            return done;
+        }
+    }
+    if (auto checked = check_run_directory(
+            engine.col(Column::locate_run).values(), engine.col(Column::locate_run_start).values(),
+            engine.col(Column::locate_run_add_start).values(),
+            engine.col(Column::locate_run_import_start).values(), seg.summary->typed_records,
+            seg.adds, seg.imports);
+        !checked.has_value()) {
+        ItchStoreError e = checked.error();
+        e.segment = segment;
+        return std::unexpected(e);
+    }
+    if (auto placed = all_positions(seg, *runs); !placed.has_value()) {
+        return placed;
+    }
+    if (auto opened = open_scan_columns(seg, Need::rows); !opened.has_value()) {
+        return opened;
+    }
+    auto opened = open_stocks(seg);
+    if (!opened.has_value()) {
+        return std::unexpected(opened.error());
+    }
+    const Stocks stocks = *opened;
+    const std::vector<std::uint64_t>& positions = engine.positions;
+    const auto [lo, hi] = *window;
+    engine.by_position.resize(hi - lo);
+    engine.filled.assign(hi - lo, 0);
+
+    // Each run's records in the file groups, by a search of its ascending indices; then the
+    // types up to the last such record, counted at each run's first.
+    struct Wanted {
+        Run run;
+        std::uint64_t from = 0;
+        std::uint64_t stop = 0;
+    };
+    std::vector<Wanted> wanted;
+    for (std::uint64_t r = 0; r < *runs; ++r) {
+        auto run = seg.run(r, *runs, static_cast<std::uint16_t>(engine.col(Column::locate_run)[r]));
+        if (!run.has_value()) {
+            return std::unexpected(run.error());
+        }
+        const auto first = positions.begin() + static_cast<std::ptrdiff_t>(run->start);
+        const auto last = positions.begin() + static_cast<std::ptrdiff_t>(run->end);
+        const auto from = std::lower_bound(first, last, lo);
+        const auto stop = std::lower_bound(from, last, hi);
+        if (from == stop) {
+            continue;
+        }
+        wanted.push_back({.run = *run,
+                          .from = static_cast<std::uint64_t>(from - positions.begin()),
+                          .stop = static_cast<std::uint64_t>(stop - positions.begin())});
+    }
+    if (wanted.empty()) {
+        return {};
+    }
+    const std::uint64_t reach = wanted.back().stop;
+    if (auto done = seg.types(0, reach); !done.has_value()) {
+        return done;
+    }
+    TypeCounts counts{};
+    std::uint64_t k = 0;
+    const ColumnAccess& types = engine.col(Column::type);
+    for (const Wanted& w : wanted) {
+        for (; k < w.run.start; ++k) {
+            ++counts[kSeekSymbolIndex[types[k]]];
+        }
+        if (auto done = scan_run(seg, stocks, w.run, counts, w.from, w.stop, start, end,
+                                 Need::rows,
+                                 [&](std::uint64_t position, const QueryRow& row) {
+                                     engine.by_position[position - lo] = row;
+                                     engine.filled[position - lo] = 1;
+                                 });
+            !done.has_value()) {
+            return done;
+        }
+    }
+    for (std::uint64_t i = 0; i < hi - lo; ++i) {
+        if (engine.filled[i] != 0) {
+            sink(engine.by_position[i]);
+        }
     }
     return {};
 }
@@ -1200,9 +1386,11 @@ std::expected<std::vector<QueryRow>, ItchStoreError> ItchQuery::rows(
         }
         const SegmentSummary& summary = reader_->segment(k).summary;
         if (summary.plain && path_ == QueryPath::indexed) {
-            if (auto done = indexed_segment(*reader_, *engine_, k, start_ns, end_ns, locate,
-                                            Need::rows, stats_, keep);
-                !done.has_value()) {
+            auto done = locate.has_value()
+                            ? locate_segment(*reader_, *engine_, k, start_ns, end_ns, *locate,
+                                             Need::rows, stats_, keep)
+                            : all_segment(*reader_, *engine_, k, start_ns, end_ns, stats_, keep);
+            if (!done.has_value()) {
                 return std::unexpected(done.error());
             }
             continue;
@@ -1225,20 +1413,32 @@ std::expected<std::vector<QueryRow>, ItchStoreError> ItchQuery::rows(
 std::expected<std::vector<MinuteBucket>, ItchStoreError> ItchQuery::minute_aggregate(
     std::uint64_t start_ns, std::uint64_t end_ns, std::uint16_t locate) {
     stats_ = {};
-    std::map<std::uint64_t, MinuteBucket> minutes;
+    // The minutes in order. Rows come in file order, whose times rarely fall, so a row's
+    // minute is almost always the last one or a new last one.
+    std::vector<MinuteBucket> minutes;
     if (start_ns >= end_ns) {
-        return std::vector<MinuteBucket>{};
+        return minutes;
     }
     const auto add = [&](const QueryRow& row) {
         if (row.ts_ns < start_ns || row.ts_ns >= end_ns || row.locate != locate ||
             !is_add(row.msg_type)) {
             return;
         }
-        const std::uint64_t minute = row.ts_ns / kNanosPerMinute;
-        auto [slot, fresh] = minutes.try_emplace(minute);
-        MinuteBucket& bucket = slot->second;
-        if (fresh) {
-            bucket.minute_ns = minute * kNanosPerMinute;
+        const std::uint64_t minute_ns = (row.ts_ns / kNanosPerMinute) * kNanosPerMinute;
+        auto slot = minutes.end();
+        if (minutes.empty() || minutes.back().minute_ns < minute_ns) {
+            slot = minutes.insert(minutes.end(), MinuteBucket{});
+        } else if (minutes.back().minute_ns == minute_ns) {
+            slot = minutes.end() - 1;
+        } else {
+            slot = std::ranges::lower_bound(minutes, minute_ns, {}, &MinuteBucket::minute_ns);
+            if (slot->minute_ns != minute_ns) {
+                slot = minutes.insert(slot, MinuteBucket{});
+            }
+        }
+        MinuteBucket& bucket = *slot;
+        if (bucket.count == 0) {
+            bucket.minute_ns = minute_ns;
             bucket.min_price = row.price;
             bucket.max_price = row.price;
         }
@@ -1257,8 +1457,8 @@ std::expected<std::vector<MinuteBucket>, ItchStoreError> ItchQuery::minute_aggre
         }
         const SegmentSummary& summary = reader_->segment(k).summary;
         if (summary.plain && path_ == QueryPath::indexed) {
-            if (auto done = indexed_segment(*reader_, *engine_, k, start_ns, end_ns, locate,
-                                            Need::adds, stats_, add);
+            if (auto done = locate_segment(*reader_, *engine_, k, start_ns, end_ns, locate,
+                                           Need::adds, stats_, add);
                 !done.has_value()) {
                 return std::unexpected(done.error());
             }
@@ -1275,13 +1475,8 @@ std::expected<std::vector<MinuteBucket>, ItchStoreError> ItchQuery::minute_aggre
         }
         engine_->last_ts[k] = *last;
     }
-    std::vector<MinuteBucket> out;
-    out.reserve(minutes.size());
-    for (const auto& [minute, bucket] : minutes) {
-        out.push_back(bucket);
-    }
-    stats_.rows = out.size();
-    return out;
+    stats_.rows = minutes.size();
+    return minutes;
 }
 
 std::expected<ColumnSum, ItchStoreError> ItchQuery::shares_sum() {
@@ -1295,13 +1490,11 @@ std::expected<ColumnSum, ItchStoreError> ItchQuery::shares_sum() {
             // trade_shares; every other row holds 0.
             ++stats_.segments;
             PlainSegment seg = plain_segment(reader_, engine_.get(), &stats_, k);
-            auto any = seg.narrow(0, std::uint64_t{kMax48} + 1);
-            if (!any.has_value()) {
-                return std::unexpected(any.error());
+            if (auto parsed = seg.parse(); !parsed.has_value()) {
+                return std::unexpected(parsed.error());
             }
-            const SeekIndex& seek = seg.seek;
             const auto total = [&](std::size_t symbol) -> std::uint64_t {
-                return seek.symbol_total(symbol);
+                return seg.total[symbol];
             };
             const std::array<std::pair<Column, std::uint64_t>, 4> parts{{
                 {Column::add_shares, total(kSymA) + total(kSymF)},
@@ -1363,32 +1556,66 @@ std::expected<std::vector<std::uint64_t>, ItchStoreError> ItchQuery::locate_coun
         if (summary.plain && path_ == QueryPath::indexed) {
             ++stats_.segments;
             PlainSegment seg = plain_segment(reader_, engine_.get(), &stats_, k);
-            auto any = seg.narrow(start_ns, end_ns);
-            if (!any.has_value()) {
-                return std::unexpected(any.error());
+            if (auto parsed = seg.parse(); !parsed.has_value()) {
+                return std::unexpected(parsed.error());
             }
-            if (!*any) {
+            if (!file_range(seg.seek, start_ns, end_ns).has_value()) {
                 continue;
             }
-            auto locates = all_locates(seg);
-            if (!locates.has_value()) {
-                return std::unexpected(locates.error());
+            // Every record's time, which its run's earlier ones fix, and its locate from the
+            // run it falls in.
+            auto runs = seg.open_directory();
+            if (!runs.has_value()) {
+                return std::unexpected(runs.error());
             }
-            if (auto opened = seg.open(Column::timestamp); !opened.has_value()) {
-                return std::unexpected(opened.error());
+            for (const Column column :
+                 {Column::locate_run, Column::locate_run_start, Column::locate_run_add_start,
+                  Column::locate_run_import_start}) {
+                if (auto done = engine_->col(column).all(); !done.has_value()) {
+                    return std::unexpected(done.error());
+                }
             }
-            ColumnAccess& times = engine_->col(Column::timestamp);
-            if (times.size() != summary.records) {
-                return std::unexpected(seg.error(ItchStoreErrorKind::bad_segment,
-                                                 "column value count", Column::timestamp,
-                                                 kNoIndex, summary.records, times.size()));
+            const ColumnAccess& ids = engine_->col(Column::locate_run);
+            const ColumnAccess& starts = engine_->col(Column::locate_run_start);
+            if (auto checked = check_run_directory(
+                    ids.values(), starts.values(),
+                    engine_->col(Column::locate_run_add_start).values(),
+                    engine_->col(Column::locate_run_import_start).values(),
+                    summary.typed_records, seg.adds, seg.imports);
+                !checked.has_value()) {
+                ItchStoreError e = checked.error();
+                e.segment = k;
+                return std::unexpected(e);
             }
-            if (auto done = times.ensure(seg.lo, seg.hi); !done.has_value()) {
-                return std::unexpected(done.error());
+            if (auto placed = all_positions(seg, *runs); !placed.has_value()) {
+                return std::unexpected(placed.error());
             }
-            for (std::uint64_t j = seg.lo; j < seg.hi; ++j) {
-                if (times[j] >= start_ns && times[j] < end_ns) {
-                    ++counts[(*locates)[j]];
+            const std::uint64_t bases = time_base_count(summary.records, summary.typed_records);
+            for (const auto& [column, want] :
+                 {std::pair{Column::timestamp, std::uint64_t{summary.typed_records}},
+                  std::pair{Column::time_base, bases}}) {
+                if (auto opened = seg.open_counted(column, want); !opened.has_value()) {
+                    return std::unexpected(opened.error());
+                }
+                if (auto done = engine_->col(column).all(); !done.has_value()) {
+                    return std::unexpected(done.error());
+                }
+            }
+            auto times = times_from_residuals(engine_->col(Column::timestamp).values(),
+                                              engine_->positions, starts.values(),
+                                              engine_->col(Column::time_base).values());
+            if (!times.has_value()) {
+                ItchStoreError e = times.error();
+                e.segment = k;
+                return std::unexpected(e);
+            }
+            std::uint64_t r = 0;
+            for (std::uint64_t j = 0; j < times->size(); ++j) {
+                while (r + 1 < *runs && starts[r + 1] <= j) {
+                    ++r;
+                }
+                if ((*times)[j] >= start_ns && (*times)[j] < end_ns) {
+                    ++counts[ids[r]];
                 }
             }
             continue;

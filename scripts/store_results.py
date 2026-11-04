@@ -117,10 +117,12 @@ def layout_sizes(layout):
     return footer, columns, payload
 
 
-# The query index of itch-store-v2: the seek column and the locate run directory. The locate
-# column itself holds each locate's record indices, which is both the symbol filter and the
-# only copy of the records' locates, so it is listed beside the index, not in it.
-QUERY_INDEX_COLUMNS = ("seek", "locate_run", "locate_run_records", "locate_run_adds")
+# The query index of itch-store-v3: the seek column and the locate run directory. The locate
+# column itself holds each typed record's index in its segment, which is both the way back to
+# file order and the only copy of the records' file positions, so it is listed beside the
+# index, not in it.
+QUERY_INDEX_COLUMNS = ("seek", "locate_run", "locate_run_start", "locate_run_add_start",
+                       "locate_run_import_start")
 
 
 def query_index(columns, stored):
@@ -132,8 +134,9 @@ def query_index(columns, stored):
     locate = columns.get("locate", {})
     return {
         "what": "the seek column (per segment the column maxima, then per seek group the time "
-                "zone map, imports and records of each type) and the locate run directory "
-                "(each run's locate, records and adds); the segment summaries in the footer "
+                "zone map, imports and records of each type, then the file groups' time zone "
+                "map) and the locate run directory (each run's locate and where its records, "
+                "adds and imports start); the segment summaries in the footer "
                 "metadata hold each segment's times and locate bitmap",
         "columns": parts,
         "index_bytes": total,
@@ -141,8 +144,8 @@ def query_index(columns, stored):
         "locate_column": {
             "payload_bytes": locate.get("payload_bytes", 0),
             "metadata_bytes": locate.get("metadata_bytes", 0),
-            "note": "each locate's record indices: the symbol filter, and the only copy of the "
-                    "records' locates, so data as much as index",
+            "note": "each typed record's index in its segment, by locate: the way back to "
+                    "file order, so data as much as index",
         },
     }
 

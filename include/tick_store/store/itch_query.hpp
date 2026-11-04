@@ -14,19 +14,23 @@
 // How a segment is answered:
 //
 //   - The footer's summary skips a segment whose times or locates cannot match.
-//   - The seek index (docs/store.md) skips each group of 4,096 records whose time zone map
-//     cannot match, and gives every count a column's value index needs at a group's start.
-//   - A locate's records come from its run in the locate column, so a locate filter reads
-//     that run, not the whole column.
+//   - A segment stores its records by locate (docs/store.md), so a locate filter reads one
+//     run of each column it needs: the run directory gives where the run starts in each, the
+//     seek index (docs/store.md) the counts before the run's group, and its time zone maps
+//     where the run can stop.
+//   - A query over every locate finds the file groups the window can reach from the seek
+//     index, reads each locate's run from its start to its last record there, and puts the
+//     rows back in file order by each record's index in the segment.
 //   - Only the columns a query needs are read, and in them only the codec blocks that hold
-//     values it needs: values are reached by index, a block at a time.
+//     values it needs: values are reached by index, a block at a time, each piece (16,384
+//     values) read, CRC-checked and inflated the first time one of its values is wanted.
 //   - A segment holding a record the column form calls raw, which the seek index's maxima,
 //     the symbols, the stock exceptions and the MPIDs rule out for every real day, is
 //     answered exactly instead: decoded whole, each record re-encoded and mapped by
 //     row_values() (columns.hpp), the function tick_export itself uses.
 //
 // Every block read is CRC-checked unless the reader skips checksums, and every value is
-// checked against its field and against the seek index's maximum for its column. What a
+// checked against its field. What a
 // partial decode cannot check, the whole decode (SegmentReader) does; a file that it
 // accepts gives the same answer by either path.
 //
@@ -82,7 +86,7 @@ struct ColumnSum {
 };
 
 // What a query read. bytes_decoded is stored bytes: each codec block decoded, header
-// included, and for a zstd chunk the whole compressed chunk, which inflates as one; plus
+// included, and for a zstd piece the whole compressed piece, which inflates as one; plus
 // every block of a segment answered exactly. values_decoded counts values those blocks
 // gave.
 struct QueryStats {

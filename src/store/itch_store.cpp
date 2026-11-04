@@ -334,7 +334,7 @@ std::vector<std::byte> encode_column_metadata(const ColumnMetadata& metadata) {
     std::vector<std::byte> out;
     put(out, metadata.segment, 4);
     put(out, static_cast<std::uint16_t>(metadata.column), 2);
-    put(out, 0, 2);
+    put(out, metadata.piece, 2);
     put(out, metadata.values, 4);
     if (metadata.summary.has_value()) {
         const SegmentSummary& s = *metadata.summary;
@@ -343,6 +343,7 @@ std::vector<std::byte> encode_column_metadata(const ColumnMetadata& metadata) {
         put(out, s.last_time, 8);
         put(out, s.min_time, 8);
         put(out, s.max_time, 8);
+        put(out, s.records, 4);
         put(out, s.typed_records, 4);
         put(out, s.plain ? 1U : 0U, 1);
         put(out, s.locates.size(), 2);
@@ -368,14 +369,12 @@ std::expected<ColumnMetadata, ItchStoreError> parse_column_metadata(
         return refuse("column id", kMetaColumnOffset, kColumnCount - 1, column);
     }
     metadata.column = static_cast<Column>(column);
-    if (const std::uint64_t reserved = field(bytes, kMetaReservedOffset, 2); reserved != 0) {
-        return refuse("metadata reserved", kMetaReservedOffset, 0, reserved);
-    }
+    metadata.piece = static_cast<std::uint16_t>(field(bytes, kMetaPieceOffset, 2));
     metadata.values = static_cast<std::uint32_t>(field(bytes, kMetaValueCountOffset, 4));
     if (metadata.values == 0) {
         return refuse("value count", kMetaValueCountOffset, 1, 0);
     }
-    if (metadata.column != Column::type) {
+    if (metadata.column != Column::type || metadata.piece != 0) {
         if (bytes.size() != kColumnMetadataSize) {
             return refuse("metadata size", 0, kColumnMetadataSize, bytes.size());
         }
@@ -385,7 +384,7 @@ std::expected<ColumnMetadata, ItchStoreError> parse_column_metadata(
         return refuse("metadata size", 0, kSegmentMetadataFixedSize, bytes.size());
     }
     SegmentSummary s;
-    s.records = metadata.values;
+    s.records = static_cast<std::uint32_t>(field(bytes, kMetaRecordsOffset, 4));
     s.first_record = field(bytes, kMetaFirstRecordOffset, 8);
     s.first_time = field(bytes, kMetaFirstTimeOffset, 8);
     s.last_time = field(bytes, kMetaLastTimeOffset, 8);
@@ -403,6 +402,9 @@ std::expected<ColumnMetadata, ItchStoreError> parse_column_metadata(
     }
     if (bytes.size() != kSegmentMetadataFixedSize + bitmap) {
         return refuse("metadata size", 0, kSegmentMetadataFixedSize + bitmap, bytes.size());
+    }
+    if (s.records < metadata.values || s.records > kMaxSegmentRecords) {
+        return refuse("segment records", kMetaRecordsOffset, metadata.values, s.records);
     }
     if (s.typed_records > s.records) {
         return refuse("typed records", kMetaTypedOffset, s.records, s.typed_records);
@@ -436,8 +438,18 @@ std::expected<ColumnMetadata, ItchStoreError> parse_column_metadata(
 
 // --- Column values --------------------------------------------------------------------
 
-std::expected<ColumnChunk, ItchStoreError> encode_column(Column column,
-                                                         std::span<const std::uint64_t> values) {
+std::uint64_t pieces_of(Column column, std::uint64_t values) noexcept {
+    if (values == 0) {
+        return 0;
+    }
+    if (column_info(column).codec == ColumnCodec::raw_bytes) {
+        return 1;
+    }
+    return (values + kPieceValues - 1) / kPieceValues;
+}
+
+std::expected<std::vector<ColumnChunk>, ItchStoreError> encode_column(
+    Column column, std::span<const std::uint64_t> values) {
     const ColumnInfo& info = column_info(column);
     const auto refuse = [&](std::string_view name, std::uint64_t expected, std::uint64_t actual) {
         ItchStoreError error = fail(ItchStoreErrorKind::invalid_argument, name, kNoIndex,
@@ -453,26 +465,40 @@ std::expected<ColumnChunk, ItchStoreError> encode_column(Column column,
             return refuse("column value", info.max_value, value);
         }
     }
-    auto coded = code_values(info.codec, values);
-    if (!coded.has_value()) {
-        ItchStoreError error =
-            fail(ItchStoreErrorKind::invalid_argument, "column encoder", kNoIndex, 0, 0);
-        error.column = info.name;
-        error.codec = coded.error();
-        return std::unexpected(error);
-    }
-    ColumnChunk chunk{.codec = primary_codec(column), .bytes = std::move(*coded)};
-    if (info.zstd) {
-        std::vector<std::byte> wrapped;
-        if (codec::encode_zstd_payload(static_cast<std::uint16_t>(chunk.codec), chunk.bytes,
-                                       wrapped)
-                .has_value() &&
-            wrapped.size() < chunk.bytes.size()) {
-            chunk.codec = CodecId::zstd;
-            chunk.bytes = std::move(wrapped);
+    const std::uint64_t pieces = pieces_of(column, values.size());
+    const std::uint64_t per_piece =
+        info.codec == ColumnCodec::raw_bytes ? values.size() : std::uint64_t{kPieceValues};
+    std::vector<ColumnChunk> out;
+    out.reserve(static_cast<std::size_t>(pieces));
+    for (std::uint64_t p = 0; p < pieces; ++p) {
+        const std::uint64_t first = p * per_piece;
+        const std::span<const std::uint64_t> part =
+            values.subspan(static_cast<std::size_t>(first),
+                           static_cast<std::size_t>(std::min(per_piece, values.size() - first)));
+        auto coded = code_values(info.codec, part);
+        if (!coded.has_value()) {
+            ItchStoreError error =
+                fail(ItchStoreErrorKind::invalid_argument, "column encoder", kNoIndex, 0, 0);
+            error.column = info.name;
+            error.codec = coded.error();
+            return std::unexpected(error);
         }
+        // Every piece holds at most a column's values, which the writer holds to 32 bits.
+        ColumnChunk chunk{.codec = primary_codec(column), .bytes = std::move(*coded),
+                          .values = static_cast<std::uint32_t>(part.size())};
+        if (info.zstd) {
+            std::vector<std::byte> wrapped;
+            if (codec::encode_zstd_payload(static_cast<std::uint16_t>(chunk.codec), chunk.bytes,
+                                           wrapped)
+                    .has_value() &&
+                wrapped.size() < chunk.bytes.size()) {
+                chunk.codec = CodecId::zstd;
+                chunk.bytes = std::move(wrapped);
+            }
+        }
+        out.push_back(std::move(chunk));
     }
-    return chunk;
+    return out;
 }
 
 std::expected<ChunkBytes, ItchStoreError> unwrap_column(Column column, codec::CodecId codec_id,
@@ -630,6 +656,7 @@ std::array<std::uint64_t, kColumnCount> counts_from_type_counts(
         add(Column::rare_bytes, per_type[type] * (size.value_or(kItchHeaderBytes) - kItchHeaderBytes));
     }
     add(Column::raw_length, raw);
+    add(Column::time_base, time_base_count(records, typed));
     add(Column::seek, seek_value_count(records));
     return counts;
 }
@@ -644,9 +671,10 @@ std::uint64_t locate_runs_of(const SegmentSummary& summary) noexcept {
     return runs;
 }
 
-std::expected<std::vector<std::uint64_t>, ItchStoreError> locates_from_runs(
-    std::span<const std::uint64_t> gaps, std::span<const std::uint64_t> ids,
-    std::span<const std::uint64_t> records, std::uint64_t typed) {
+std::expected<void, ItchStoreError> check_run_directory(
+    std::span<const std::uint64_t> ids, std::span<const std::uint64_t> starts,
+    std::span<const std::uint64_t> add_starts, std::span<const std::uint64_t> import_starts,
+    std::uint64_t typed, std::uint64_t adds, std::uint64_t imports) {
     const auto refuse = [&](Column column, std::string_view name, std::uint64_t index,
                             std::uint64_t expected, std::uint64_t actual) {
         ItchStoreError error = fail(ItchStoreErrorKind::bad_value, name, kNoIndex, expected, actual);
@@ -654,48 +682,158 @@ std::expected<std::vector<std::uint64_t>, ItchStoreError> locates_from_runs(
         error.index = index;
         return std::unexpected(error);
     };
-    if (ids.size() != records.size()) {
-        return refuse(Column::locate_run_records, "locate run count", kNoIndex, ids.size(),
-                      records.size());
+    const std::size_t runs = ids.size();
+    for (const auto& [column, values] :
+         {std::pair{Column::locate_run_start, starts}, std::pair{Column::locate_run_add_start, add_starts},
+          std::pair{Column::locate_run_import_start, import_starts}}) {
+        if (values.size() != runs) {
+            return refuse(column, "locate run count", kNoIndex, runs, values.size());
+        }
     }
-    if (gaps.size() != typed) {
-        return refuse(Column::locate, "locate run indices", kNoIndex, typed, gaps.size());
-    }
-    // An index not yet named holds this, above every locate.
-    constexpr std::uint64_t kUnplaced = kMax16 + 1;
-    std::vector<std::uint64_t> locates(static_cast<std::size_t>(typed), kUnplaced);
-    std::uint64_t at = 0;
-    for (std::size_t r = 0; r < ids.size(); ++r) {
+    for (std::size_t r = 0; r < runs; ++r) {
         if (ids[r] > kMax16 || (r > 0 && ids[r] <= ids[r - 1])) {
-            return refuse(Column::locate_run, "locate run order", r,
-                          r == 0 ? 0 : ids[r - 1] + 1, ids[r]);
+            return refuse(Column::locate_run, "locate run order", r, r == 0 ? 0 : ids[r - 1] + 1,
+                          ids[r]);
         }
-        // Each run has a record, and the runs together hold no more than `typed`.
-        if (records[r] == 0 || records[r] > typed - at) {
-            return refuse(Column::locate_run_records, "locate run records", r, typed - at,
-                          records[r]);
+        // The first run starts at 0, and each later one after the one before, below `typed`.
+        const std::uint64_t floor = r == 0 ? 0 : starts[r - 1] + 1;
+        if ((r == 0 && starts[r] != 0) || starts[r] < floor || starts[r] >= typed) {
+            return refuse(Column::locate_run_start, "locate run start", r, floor, starts[r]);
         }
-        std::uint64_t index = 0;
-        for (std::uint64_t k = 0; k < records[r]; ++k, ++at) {
-            const std::uint64_t gap = gaps[at];
-            // The first index is the gap itself, each later one the last plus the gap plus
-            // 1, and every one below `typed`, checked before it is formed.
-            const std::uint64_t room = k == 0 ? typed : typed - index - 1;
-            if (gap >= room) {
-                return refuse(Column::locate, "locate run index", at, room - 1, gap);
-            }
-            index = k == 0 ? gap : index + gap + 1;
-            if (locates[index] != kUnplaced) {
-                return refuse(Column::locate, "locate run index repeated", at, kUnplaced,
-                              locates[index]);
-            }
-            locates[index] = ids[r];
+        const std::uint64_t add_floor = r == 0 ? 0 : add_starts[r - 1];
+        if ((r == 0 && add_starts[r] != 0) || add_starts[r] < add_floor || add_starts[r] > adds) {
+            return refuse(Column::locate_run_add_start, "locate run add start", r, add_floor,
+                          add_starts[r]);
+        }
+        const std::uint64_t import_floor = r == 0 ? 0 : import_starts[r - 1];
+        if ((r == 0 && import_starts[r] != 0) || import_starts[r] < import_floor ||
+            import_starts[r] > imports) {
+            return refuse(Column::locate_run_import_start, "locate run import start", r,
+                          import_floor, import_starts[r]);
         }
     }
-    if (at != typed) {
-        return refuse(Column::locate_run_records, "locate run indices", kNoIndex, typed, at);
+    return {};
+}
+
+std::expected<std::vector<std::uint64_t>, ItchStoreError> positions_from_runs(
+    std::span<const std::uint64_t> gaps, std::span<const std::uint64_t> starts,
+    std::uint64_t typed, std::uint64_t records) {
+    const auto refuse = [&](std::string_view name, std::uint64_t index, std::uint64_t expected,
+                            std::uint64_t actual) {
+        ItchStoreError error = fail(ItchStoreErrorKind::bad_value, name, kNoIndex, expected, actual);
+        error.column = column_info(Column::locate).name;
+        error.index = index;
+        return std::unexpected(error);
+    };
+    if (gaps.size() != typed) {
+        return refuse("locate run indices", kNoIndex, typed, gaps.size());
     }
-    return locates;
+    if (typed > 0 && (starts.empty() || starts[0] != 0)) {
+        return refuse("locate run indices", kNoIndex, 1, starts.size());
+    }
+    std::vector<std::uint64_t> positions(static_cast<std::size_t>(typed));
+    std::vector<std::uint8_t> named(static_cast<std::size_t>(records), 0);
+    std::size_t run = 0;
+    std::uint64_t index = 0;
+    for (std::uint64_t at = 0; at < typed; ++at) {
+        const bool first = run < starts.size() && starts[run] == at;
+        if (first) {
+            ++run;
+        }
+        const std::uint64_t gap = gaps[at];
+        // The first index of a run is the gap itself, each later one the last plus the gap
+        // plus 1, and every one below `records`, checked before it is formed.
+        const std::uint64_t room = first ? records : records - index - 1;
+        if (gap >= room) {
+            return refuse("locate run index", at, room - 1, gap);
+        }
+        index = first ? gap : index + gap + 1;
+        if (named[index] != 0) {
+            return refuse("locate run index repeated", at, 0, index);
+        }
+        named[index] = 1;
+        positions[at] = index;
+    }
+    return positions;
+}
+
+// --- The time bases -----------------------------------------------------------------------
+
+std::vector<std::uint64_t> time_bases(std::span<const std::uint64_t> times,
+                                      std::span<const std::uint64_t> positions,
+                                      std::uint64_t records) {
+    constexpr std::uint64_t kNone = kMax64;
+    std::vector<std::uint64_t> bases(static_cast<std::size_t>(time_base_count(records, times.size())),
+                                     kNone);
+    for (std::size_t k = 0; k < times.size(); ++k) {
+        std::uint64_t& base = bases[positions[k] / kTimeBaseRecords];
+        base = std::min(base, times[k]);
+    }
+    std::uint64_t before = 0;
+    for (std::uint64_t& base : bases) {
+        if (base == kNone) {
+            base = before;
+        }
+        before = base;
+    }
+    return bases;
+}
+
+namespace {
+
+// Visits each stored typed record with whether it starts its run and its time base.
+template <class Visit>
+void each_with_base(std::span<const std::uint64_t> positions, std::span<const std::uint64_t> starts,
+                    std::span<const std::uint64_t> bases, Visit&& visit) {
+    std::size_t run = 0;
+    for (std::size_t k = 0; k < positions.size(); ++k) {
+        const bool first = run < starts.size() && starts[run] == k;
+        if (first) {
+            ++run;
+        }
+        visit(k, first, bases[positions[k] / kTimeBaseRecords]);
+    }
+}
+
+}  // namespace
+
+std::vector<std::uint64_t> time_residuals(std::span<const std::uint64_t> times,
+                                          std::span<const std::uint64_t> positions,
+                                          std::span<const std::uint64_t> starts,
+                                          std::span<const std::uint64_t> bases) {
+    std::vector<std::uint64_t> out(times.size());
+    std::uint64_t before = 0;
+    each_with_base(positions, starts, bases, [&](std::size_t k, bool first, std::uint64_t base) {
+        const std::uint64_t from = first ? base : std::max(before, base);
+        // Modulo 2^64: a time below its base wraps, and adds back the same way.
+        out[k] = times[k] - from;
+        before = times[k];
+    });
+    return out;
+}
+
+std::expected<std::vector<std::uint64_t>, ItchStoreError> times_from_residuals(
+    std::span<const std::uint64_t> residuals, std::span<const std::uint64_t> positions,
+    std::span<const std::uint64_t> starts, std::span<const std::uint64_t> bases) {
+    std::vector<std::uint64_t> out(residuals.size());
+    std::uint64_t before = 0;
+    std::optional<std::size_t> refused;
+    each_with_base(positions, starts, bases, [&](std::size_t k, bool first, std::uint64_t base) {
+        const std::uint64_t from = first ? base : std::max(before, base);
+        out[k] = residuals[k] + from;
+        if (out[k] > kMax48 && !refused.has_value()) {
+            refused = k;
+        }
+        before = out[k];
+    });
+    if (refused.has_value()) {
+        ItchStoreError error =
+            fail(ItchStoreErrorKind::bad_value, "timestamp value", kNoIndex, kMax48, out[*refused]);
+        error.column = column_info(Column::timestamp).name;
+        error.index = *refused;
+        return std::unexpected(error);
+    }
+    return out;
 }
 
 // --- The seek index -----------------------------------------------------------------------
@@ -721,7 +859,8 @@ std::array<std::uint64_t, kSeekMaxima> column_maxima(const SegmentColumns& store
 std::vector<std::uint64_t> compute_seek(const std::array<std::uint64_t, kSeekMaxima>& maxima,
                                         std::span<const std::uint64_t> types,
                                         std::span<const std::uint64_t> times,
-                                        std::span<const std::uint64_t> ref_distance) {
+                                        std::span<const std::uint64_t> ref_distance,
+                                        std::span<const std::uint64_t> positions) {
     const std::uint64_t groups = seek_groups(types.size());
     std::vector<std::uint64_t> out(seek_value_count(types.size()), 0);
     std::ranges::copy(maxima, out.begin());
@@ -729,6 +868,8 @@ std::vector<std::uint64_t> compute_seek(const std::array<std::uint64_t, kSeekMax
     const std::size_t max_at = min_at + groups;
     const std::size_t imports_at = max_at + groups;
     const std::size_t counts_at = imports_at + groups;
+    const std::size_t file_min_at = counts_at + (kSeekSymbols.size() * groups);
+    const std::size_t file_max_at = file_min_at + groups;
     std::size_t named = 0;
     for (std::size_t i = 0; i < types.size(); ++i) {
         const std::size_t g = i / kSeekGroupRecords;
@@ -744,24 +885,33 @@ std::vector<std::uint64_t> compute_seek(const std::array<std::uint64_t, kSeekMax
             ++named;
         }
     }
-    // The times: a group's first typed record sets both, and each later one widens them.
+    // The times: a group's first typed record sets both, and each later one widens them;
+    // the same for the file groups, by each record's index in the segment.
+    const auto widen = [&](std::size_t low_at, std::size_t high_at, std::vector<bool>& seen,
+                           std::size_t g, std::uint64_t time) {
+        if (!seen[g]) {
+            seen[g] = true;
+            out[low_at + g] = time;
+            out[high_at + g] = time;
+            return;
+        }
+        out[low_at + g] = std::min(out[low_at + g], time);
+        out[high_at + g] = std::max(out[high_at + g], time);
+    };
     std::size_t typed = 0;
     std::vector<bool> seen(groups, false);
+    std::vector<bool> file_seen(groups, false);
     for (std::size_t i = 0; i < types.size(); ++i) {
         if (types[i] == 0) {
             continue;
         }
-        const std::size_t g = i / kSeekGroupRecords;
         const std::uint64_t time = typed < times.size() ? times[typed] : 0;
-        ++typed;
-        if (!seen[g]) {
-            seen[g] = true;
-            out[min_at + g] = time;
-            out[max_at + g] = time;
-            continue;
+        widen(min_at, max_at, seen, i / kSeekGroupRecords, time);
+        if (typed < positions.size() && positions[typed] < types.size()) {
+            widen(file_min_at, file_max_at, file_seen,
+                  static_cast<std::size_t>(positions[typed] / kSeekGroupRecords), time);
         }
-        out[min_at + g] = std::min(out[min_at + g], time);
-        out[max_at + g] = std::max(out[max_at + g], time);
+        ++typed;
     }
     return out;
 }
@@ -798,6 +948,12 @@ std::expected<SeekIndex, ItchStoreError> parse_seek(std::span<const std::uint64_
     const std::size_t max_at = min_at + groups;
     const std::size_t imports_at = max_at + groups;
     const std::size_t counts_at = imports_at + groups;
+    const std::size_t file_min_at = counts_at + (kSeekSymbols.size() * groups);
+    const std::size_t file_max_at = file_min_at + groups;
+    index.file_min_time.assign(values.begin() + static_cast<std::ptrdiff_t>(file_min_at),
+                               values.begin() + static_cast<std::ptrdiff_t>(file_max_at));
+    index.file_max_time.assign(values.begin() + static_cast<std::ptrdiff_t>(file_max_at),
+                               values.begin() + static_cast<std::ptrdiff_t>(file_max_at + groups));
     index.min_time.assign(values.begin() + static_cast<std::ptrdiff_t>(min_at),
                           values.begin() + static_cast<std::ptrdiff_t>(max_at));
     index.max_time.assign(values.begin() + static_cast<std::ptrdiff_t>(max_at),
@@ -839,6 +995,13 @@ std::expected<SeekIndex, ItchStoreError> parse_seek(std::span<const std::uint64_
         }
         if (index.imports[g] > naming) {
             return refuse("seek imports", imports_at + g, naming, index.imports[g]);
+        }
+        if (index.file_max_time[g] > kMax48) {
+            return refuse("seek file max time", file_max_at + g, kMax48, index.file_max_time[g]);
+        }
+        if (index.file_min_time[g] > index.file_max_time[g]) {
+            return refuse("seek file min time", file_min_at + g, index.file_max_time[g],
+                          index.file_min_time[g]);
         }
         index.imports_before[g + 1] = index.imports_before[g] + index.imports[g];
     }

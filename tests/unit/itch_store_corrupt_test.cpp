@@ -94,9 +94,11 @@ TEST(ItchStoreCorrupt, StoreSectionFields) {
     };
     const std::vector<Case> cases{
         {"store section size", [](Bytes& b) { b.push_back(std::byte{0}); }},
-        {"store version", [](Bytes& b) { put_field(b, kStoreVersionOffset, 4, 3); }},
-        // Version 1, before the locate runs and the seek index, is no longer read.
+        {"store version", [](Bytes& b) { put_field(b, kStoreVersionOffset, 4, 4); }},
+        // Version 1, before the locate runs and the seek index, and version 2, in file
+        // order without pieces or time bases, are no longer read.
         {"store version", [](Bytes& b) { put_field(b, kStoreVersionOffset, 4, 1); }},
+        {"store version", [](Bytes& b) { put_field(b, kStoreVersionOffset, 4, 2); }},
         {"segment records", [](Bytes& b) { put_field(b, kStoreSegmentRecordsOffset, 4, 0); }},
         {"segment records",
          [](Bytes& b) { put_field(b, kStoreSegmentRecordsOffset, 4, kMaxSegmentRecords + 1); }},
@@ -184,7 +186,7 @@ TEST(ItchStoreCorrupt, MetadataFields) {
         {"metadata size", Column::timestamp, [](Bytes& b) { b.resize(11); }},
         {"column id", Column::timestamp,
          [](Bytes& b) { put_field(b, kMetaColumnOffset, 2, kColumnCount); }},
-        {"metadata reserved", Column::timestamp, [](Bytes& b) { put_field(b, kMetaReservedOffset, 2, 1); }},
+        {"piece index", Column::timestamp, [](Bytes& b) { put_field(b, kMetaPieceOffset, 2, 1); }},
         {"value count", Column::timestamp, [](Bytes& b) { put_field(b, kMetaValueCountOffset, 4, 0); }},
         {"metadata size", Column::type, [](Bytes& b) { b.resize(kSegmentMetadataFixedSize - 1); }},
         {"metadata size", Column::type, [](Bytes& b) { b.push_back(std::byte{1}); }},
@@ -260,7 +262,7 @@ TEST(ItchStoreCorrupt, ASummaryThatDisagreesWithItsColumnsIsRefusedWithTheColumn
              put_field(b, kMetaFirstTimeOffset, 8, get_field(b, kMetaMaxTimeOffset, 8));
              put_field(b, kMetaLastTimeOffset, 8, get_field(b, kMetaMaxTimeOffset, 8));
          }},
-        {"locate bitmap", "locate",
+        {"locate bitmap", "locate_run",
          [](Bytes& b) { b[kMetaBitmapOffset] ^= std::byte{0x01}; }},
     };
     for (const Case& c : cases) {
@@ -286,6 +288,67 @@ TEST(ItchStoreCorrupt, ASummaryThatDisagreesWithItsColumnsIsRefusedWithTheColumn
 
 // --- The directory --------------------------------------------------------------------
 
+// One segment of 20,000 adds: the type column, and every add column, in two pieces.
+TEST(ItchStoreCorrupt, PieceFields) {
+    std::vector<itch::Message> messages;
+    for (std::uint64_t i = 0; i < 20'000; ++i) {
+        messages.push_back(test::add(static_cast<std::uint16_t>(1 + (i % 3)), 10 + i, 100 + i));
+    }
+    const Bytes file = test::store_of_messages(messages, 20'000);
+    ASSERT_FALSE(first_error(file).has_value());
+    {
+        auto reader = ItchStoreReader::open_bytes(file);
+        ASSERT_TRUE(reader.has_value());
+        EXPECT_EQ(reader->segment(0).pieces[static_cast<std::size_t>(Column::type)], 2U);
+        EXPECT_EQ(reader->segment(0).values[static_cast<std::size_t>(Column::type)], 20'000U);
+        const auto second = reader->column_view(0, Column::type, 1);
+        ASSERT_TRUE(second.has_value());
+        EXPECT_EQ(second->first_value, kPieceValues);
+        EXPECT_EQ(second->values, 20'000 - kPieceValues);
+        EXPECT_FALSE(reader->column_view(0, Column::type, 2).has_value());
+    }
+    const auto piece = [](StoreParts& parts, Column column, std::size_t p) -> Bytes& {
+        return parts.blocks[parts.block_index(0, column) + p].metadata;
+    };
+    struct Case {
+        std::string_view field;
+        std::function<void(StoreParts&)> edit;
+    };
+    const std::vector<Case> cases{
+        // The second piece numbered as a third, or as a first again.
+        {"piece index",
+         [&](StoreParts& p) { put_field(piece(p, Column::add_shares, 1), kMetaPieceOffset, 2, 2); }},
+        {"piece index",
+         [&](StoreParts& p) { put_field(piece(p, Column::add_shares, 1), kMetaPieceOffset, 2, 0); }},
+        // A first piece short of kPieceValues, and one over it.
+        {"piece value count",
+         [&](StoreParts& p) {
+             put_field(piece(p, Column::add_shares, 0), kMetaValueCountOffset, 4, kPieceValues - 1);
+         }},
+        {"piece value count",
+         [&](StoreParts& p) {
+             put_field(piece(p, Column::add_shares, 1), kMetaValueCountOffset, 4, kPieceValues + 1);
+         }},
+        // The type column's pieces together one record short of the summary's records.
+        {"segment records",
+         [&](StoreParts& p) {
+             put_field(piece(p, Column::type, 1), kMetaValueCountOffset, 4,
+                       20'000 - kPieceValues - 1);
+         }},
+        // The summary's records below its own piece's values.
+        {"segment records",
+         [&](StoreParts& p) {
+             put_field(piece(p, Column::type, 0), kMetaRecordsOffset, 4, kPieceValues - 1);
+         }},
+    };
+    for (const Case& c : cases) {
+        SCOPED_TRACE(std::string{c.field});
+        StoreParts parts = test::parts_of(file);
+        c.edit(parts);
+        expect_refused(parts.build(), c.field, ItchStoreErrorKind::bad_metadata);
+    }
+}
+
 TEST(ItchStoreCorrupt, DirectoryFields) {
     {
         // Segment 1's type block claims segment 2.
@@ -305,11 +368,19 @@ TEST(ItchStoreCorrupt, DirectoryFields) {
         expect_refused(parts.build(), "first record", ItchStoreErrorKind::bad_metadata);
     }
     {
-        // Two blocks of one column in a segment: the second's id does not ascend.
+        // Two blocks of one column in a segment, both piece 0: the second is not the
+        // column's next piece.
         StoreParts parts = test::parts_of(base_file());
         const std::size_t b = parts.block_index(0, Column::timestamp);
         parts.blocks.insert(parts.blocks.begin() + static_cast<std::ptrdiff_t>(b) + 1,
                             parts.blocks[b]);
+        expect_refused(parts.build(), "piece index", ItchStoreErrorKind::bad_metadata);
+    }
+    {
+        // A column's blocks out of column order.
+        StoreParts parts = test::parts_of(base_file());
+        const std::size_t b = parts.block_index(0, Column::timestamp);
+        std::swap(parts.blocks[b], parts.blocks[b + 1]);
         expect_refused(parts.build(), "column id", ItchStoreErrorKind::bad_metadata);
     }
     {
@@ -375,8 +446,10 @@ TEST(ItchStoreCorrupt, ColumnCountsAgainstTheTypeColumn) {
         // the one-byte unknown: no match values.
         StoreParts parts = test::parts_of(base_file());
         const std::size_t at = parts.block_index(3, Column::type);
-        auto chunk = encode_column(Column::match, std::vector<std::uint64_t>{1});
-        ASSERT_TRUE(chunk.has_value());
+        auto chunks = encode_column(Column::match, std::vector<std::uint64_t>{1});
+        ASSERT_TRUE(chunks.has_value());
+        ASSERT_EQ(chunks->size(), 1U);
+        const ColumnChunk* chunk = chunks->data();
         const ColumnMetadata metadata{.segment = 3, .column = Column::match, .values = 1,
                                       .summary = {}};
         parts.blocks.insert(parts.blocks.begin() + static_cast<std::ptrdiff_t>(at) + 1,
@@ -482,8 +555,10 @@ TEST(ItchStoreCorrupt, ValuesThatBreakTheRulesTyingColumnsTogether) {
     {
         std::vector<std::uint64_t> sides = values(Column::add_side);
         sides[0] = 256;
-        auto chunk = encode_column(Column::add_shares, sides);
-        ASSERT_TRUE(chunk.has_value());
+        auto chunks = encode_column(Column::add_shares, sides);
+        ASSERT_TRUE(chunks.has_value());
+        ASSERT_EQ(chunks->size(), 1U);
+        const ColumnChunk* chunk = chunks->data();
         ASSERT_EQ(chunk->codec, primary_codec(Column::add_side));
         StoreParts parts = test::parts_of(file);
         parts.block(0, Column::add_side).bytes = chunk->bytes;
@@ -654,15 +729,16 @@ TEST(ItchStoreCorrupt, EverySingleBitFlipFailsTheOracleWithChecksumsOn) {
 
 // --- The locate runs and the seek index ---------------------------------------------------
 
-// Segment 0 of the reference store: 8 records, 7 typed, locate 1 on typed records 0 to 5
-// (two adds) and locate 2 on typed record 6 (one add). One seek group.
+// Segment 0 of the reference store: 8 records, 7 typed, locate 1 on records 0 to 5 (two
+// adds), the raw record at 6 and locate 2 on record 7 (one add). One seek group.
 TEST(ItchStoreCorrupt, LocateRunFields) {
     const Bytes file = reference_file();
     const auto values = [&](Column column) { return test::column_values(file, 0, column); };
-    ASSERT_EQ(values(Column::locate), (std::vector<std::uint64_t>{0, 0, 0, 0, 0, 0, 6}));
+    ASSERT_EQ(values(Column::locate), (std::vector<std::uint64_t>{0, 0, 0, 0, 0, 0, 7}));
     ASSERT_EQ(values(Column::locate_run), (std::vector<std::uint64_t>{1, 2}));
-    ASSERT_EQ(values(Column::locate_run_records), (std::vector<std::uint64_t>{6, 1}));
-    ASSERT_EQ(values(Column::locate_run_adds), (std::vector<std::uint64_t>{2, 1}));
+    ASSERT_EQ(values(Column::locate_run_start), (std::vector<std::uint64_t>{0, 6}));
+    ASSERT_EQ(values(Column::locate_run_add_start), (std::vector<std::uint64_t>{0, 2}));
+    ASSERT_EQ(values(Column::locate_run_import_start), (std::vector<std::uint64_t>{0, 1}));
     struct Case {
         std::string_view field;
         Column column;
@@ -673,17 +749,31 @@ TEST(ItchStoreCorrupt, LocateRunFields) {
         // Ids out of order, and one the bitmap does not have.
         {"locate run order", Column::locate_run, {2, 1}},
         {"locate bitmap", Column::locate_run, {1, 3}, ItchStoreErrorKind::bad_metadata},
-        // A run with no record, and runs holding more indices than the typed records.
-        {"locate run records", Column::locate_run_records, {0, 7}},
-        {"locate run records", Column::locate_run_records, {6, 2}},
-        // An index past the last typed record, and one named by two runs.
-        {"locate run index", Column::locate, {0, 0, 0, 0, 0, 0, 7}},
-        {"locate run index", Column::locate, {0, 0, 0, 0, 0, 2, 6}},
+        // A first run not at 0, a run with no record, and one starting past the typed
+        // records.
+        {"locate run start", Column::locate_run_start, {1, 6}},
+        {"locate run start", Column::locate_run_start, {0, 0}},
+        {"locate run start", Column::locate_run_start, {0, 7}},
+        // Add and import starts falling, past their totals, or not where the records put
+        // them.
+        {"locate run add start", Column::locate_run_add_start, {1, 2}},
+        {"locate run add start", Column::locate_run_add_start, {0, 4}},
+        {"locate run add start", Column::locate_run_add_start, {0, 1}},
+        {"locate run import start", Column::locate_run_import_start, {1, 1}},
+        {"locate run import start", Column::locate_run_import_start, {0, 2}},
+        {"locate run import start", Column::locate_run_import_start, {0, 0}},
+        // A first index past the last record, a later one, one named by two runs, and
+        // the raw record's index taken by a typed one.
+        {"locate run index", Column::locate, {0, 0, 0, 0, 0, 0, 8}},
+        {"locate run index", Column::locate, {0, 0, 0, 0, 0, 3, 7}},
         {"locate run index repeated", Column::locate, {0, 0, 0, 0, 0, 0, 0}},
-        // An add count the types do not give.
-        {"locate run adds", Column::locate_run_adds, {1, 1}},
+        {"locate run index repeated", Column::locate, {0, 0, 0, 0, 0, 2, 7}},
         // The directory's columns at different lengths.
-        {"column value count", Column::locate_run_records, {7}, ItchStoreErrorKind::bad_segment},
+        {"column value count", Column::locate_run_start, {0}, ItchStoreErrorKind::bad_segment},
+        {"column value count", Column::locate_run_add_start, {0, 2, 3},
+         ItchStoreErrorKind::bad_segment},
+        {"column value count", Column::locate_run_import_start, {0},
+         ItchStoreErrorKind::bad_segment},
     };
     for (const Case& c : cases) {
         SCOPED_TRACE(testing::Message() << c.field << " in " << column_info(c.column).name);
@@ -702,6 +792,63 @@ TEST(ItchStoreCorrupt, LocateRunFields) {
     }
 }
 
+// The time bases of the same segment: one value, its least time, and the times' residuals
+// over the larger of it and the time before in the run.
+TEST(ItchStoreCorrupt, TimeBaseFields) {
+    const Bytes file = reference_file();
+    const auto values = [&](Column column) { return test::column_values(file, 0, column); };
+    const std::vector<std::uint64_t> bases = values(Column::time_base);
+    ASSERT_EQ(bases.size(), 1U);
+    const std::vector<std::uint64_t> residuals = values(Column::timestamp);
+    ASSERT_EQ(residuals.size(), 7U);
+    struct Case {
+        std::string_view field;
+        Column column;
+        std::vector<std::uint64_t> replacement;
+        ItchStoreErrorKind kind = ItchStoreErrorKind::bad_value;
+    };
+    std::vector<std::uint64_t> past = residuals;
+    past[3] = kMax48;
+    std::vector<std::uint64_t> moved = residuals;
+    moved[0] += 1;
+    const std::vector<Case> cases{
+        // A base moved moves every time it is the base of with it, so the times still give
+        // it, and the summary refuses them; one value more than the records need.
+        {"first time", Column::time_base, {bases[0] + 1}, ItchStoreErrorKind::bad_metadata},
+        {"first time", Column::time_base, {bases[0] - 1}, ItchStoreErrorKind::bad_metadata},
+        {"column value count", Column::time_base, {bases[0], bases[0]},
+         ItchStoreErrorKind::bad_segment},
+        // A residual taking a time past 48 bits, and one moving the least time off its base.
+        {"timestamp value", Column::timestamp, past},
+        {"time base", Column::timestamp, moved},
+    };
+    for (const Case& c : cases) {
+        SCOPED_TRACE(testing::Message() << c.field << " in " << column_info(c.column).name);
+        StoreParts parts = test::parts_of(file);
+        test::set_column(parts, 0, c.column, c.replacement);
+        expect_refused(parts.build(), c.field, c.kind);
+        const auto error = first_error(parts.build());
+        ASSERT_TRUE(error.has_value());
+        EXPECT_EQ(error->segment, 0U);
+    }
+}
+
+TEST(ItchStoreCorrupt, ATypedRecordStoredAfterARawOneIsRefused) {
+    // The reference segment stores its seven typed records, then its raw one; swapped, a
+    // typed record follows the raw one.
+    const Bytes file = reference_file();
+    std::vector<std::uint64_t> types = test::column_values(file, 0, Column::type);
+    ASSERT_EQ(types.size(), 8U);
+    ASSERT_EQ(types[7], 0U);
+    std::swap(types[6], types[7]);
+    StoreParts parts = test::parts_of(file);
+    test::set_column(parts, 0, Column::type, types);
+    expect_refused(parts.build(), "typed record after a raw one", ItchStoreErrorKind::bad_value);
+    const auto error = first_error(parts.build());
+    ASSERT_TRUE(error.has_value());
+    EXPECT_EQ(error->index, 7U);
+}
+
 TEST(ItchStoreCorrupt, SeekIndexFields) {
     const Bytes file = reference_file();
     const std::vector<std::uint64_t> seek = test::column_values(file, 0, Column::seek);
@@ -711,7 +858,11 @@ TEST(ItchStoreCorrupt, SeekIndexFields) {
     constexpr std::size_t kMax = kMin + 1;
     constexpr std::size_t kImports = kMax + 1;
     constexpr std::size_t kCounts = kImports + 1;
+    constexpr std::size_t kFileMin = kCounts + kSeekSymbols.size();
+    constexpr std::size_t kFileMax = kFileMin + 1;
     ASSERT_EQ(seek[kMin], 10U);
+    ASSERT_EQ(seek[kFileMin], 10U);
+    ASSERT_EQ(seek[kFileMax], 16U);
     ASSERT_EQ(seek[kMax], 16U);
     ASSERT_EQ(seek[kImports], 1U);
     ASSERT_EQ(seek[kCounts + seek_symbol_index(0)], 1U);
@@ -730,11 +881,15 @@ TEST(ItchStoreCorrupt, SeekIndexFields) {
         {"seek max time", kMax, kMax48 + 1},
         {"seek min time", kMin, 17},
         {"seek imports", kImports, 4},
+        {"seek file max time", kFileMax, kMax48 + 1},
+        {"seek file min time", kFileMin, 17},
         // Values in range that the columns do not give, refused after the last record.
         {"seek value", static_cast<std::size_t>(Column::type), 'Q'},
         {"seek value", kMin, 11},
         {"seek value", kMax, 15},
         {"seek value", kImports, 2},
+        {"seek value", kFileMin, 11},
+        {"seek value", kFileMax, 15},
     };
     for (const Case& c : cases) {
         SCOPED_TRACE(testing::Message() << c.field << " at " << c.index);
@@ -827,7 +982,7 @@ TEST(ItchStoreCorrupt, SeekIndexRulesParsedAlone) {
 // --- The golden file ------------------------------------------------------------------
 
 std::filesystem::path golden_path() {
-    return std::filesystem::path{TICK_STORE_GOLDEN_DIR} / "itch-store-v2.tsc";
+    return std::filesystem::path{TICK_STORE_GOLDEN_DIR} / "itch-store-v3.tsc";
 }
 
 Bytes read_golden() {

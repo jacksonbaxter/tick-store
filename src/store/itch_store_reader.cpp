@@ -113,6 +113,25 @@ std::expected<void, ItchStoreError> ItchStoreReader::read_sections() {
                              StoreError{.kind = StoreErrorKind::not_found, .field = "section"});
 }
 
+std::expected<void, ItchStoreError> ItchStoreReader::close_column(const SegmentEntry& entry,
+                                                                  Column column,
+                                                                  std::uint64_t block) const {
+    // The type column's pieces together hold the segment's records.
+    if (column == Column::type &&
+        entry.values[static_cast<std::size_t>(Column::type)] != entry.summary.records) {
+        ItchStoreError error;
+        error.kind = ItchStoreErrorKind::bad_metadata;
+        error.field = "segment records";
+        error.block = block;
+        error.segment = segments_.size() - 1;
+        error.column = column_info(Column::type).name;
+        error.expected = entry.summary.records;
+        error.actual = entry.values[static_cast<std::size_t>(Column::type)];
+        return std::unexpected(error);
+    }
+    return {};
+}
+
 std::expected<void, ItchStoreError> ItchStoreReader::read_directory() {
     const std::uint64_t n = header_.segment_records;
     // Every segment has a type block, so the blocks bound the segments; the header's count,
@@ -121,6 +140,7 @@ std::expected<void, ItchStoreError> ItchStoreReader::read_directory() {
         std::min<std::uint64_t>(header_.segment_count, parser_.block_count())));
     std::uint64_t records = 0;
     Column previous = Column::type;
+    std::uint64_t previous_values = 0;
     for (std::uint64_t b = 0; b < parser_.block_count(); ++b) {
         auto info = parser_.block_info(b);
         if (!info.has_value()) {
@@ -167,6 +187,14 @@ std::expected<void, ItchStoreError> ItchStoreReader::read_directory() {
                 return refuse("value count", kMetaValueCountOffset, want, summary.records);
             }
             records += summary.records;
+            if (metadata->piece != 0) {
+                return refuse("piece index", kMetaPieceOffset, 0, metadata->piece);
+            }
+            if (!segments_.empty()) {
+                if (auto done = close_column(segments_.back(), previous, b - 1); !done) {
+                    return std::unexpected(done.error());
+                }
+            }
             SegmentEntry entry;
             entry.block.fill(kNoIndex);
             entry.summary = summary;
@@ -180,11 +208,40 @@ std::expected<void, ItchStoreError> ItchStoreReader::read_directory() {
             if (metadata->segment != segment) {
                 return refuse("segment index", kMetaSegmentOffset, segment, metadata->segment);
             }
-            if (metadata->column <= previous) {
+            if (metadata->column == previous) {
+                // The column's next piece: every piece before the last holds kPieceValues,
+                // and a byte column has one piece.
+                const SegmentEntry& entry = segments_.back();
+                const auto c = static_cast<std::size_t>(previous);
+                if (metadata->piece != entry.pieces[c]) {
+                    return refuse("piece index", kMetaPieceOffset, entry.pieces[c],
+                                  metadata->piece);
+                }
+                if (column_info(previous).codec == ColumnCodec::raw_bytes ||
+                    previous_values != kPieceValues) {
+                    return refuse("piece value count", kMetaValueCountOffset,
+                                  column_info(previous).codec == ColumnCodec::raw_bytes
+                                      ? 0
+                                      : kPieceValues,
+                                  previous_values);
+                }
+            } else if (metadata->column < previous) {
                 return refuse("column id", kMetaColumnOffset,
-                              static_cast<std::uint64_t>(previous) + 1,
+                              static_cast<std::uint64_t>(previous),
                               static_cast<std::uint64_t>(metadata->column));
+            } else {
+                if (metadata->piece != 0) {
+                    return refuse("piece index", kMetaPieceOffset, 0, metadata->piece);
+                }
+                if (auto done = close_column(segments_.back(), previous, b - 1); !done) {
+                    return std::unexpected(done.error());
+                }
             }
+        }
+        if (column_info(metadata->column).codec != ColumnCodec::raw_bytes &&
+            metadata->values > kPieceValues) {
+            return refuse("piece value count", kMetaValueCountOffset, kPieceValues,
+                          metadata->values);
         }
         const ColumnInfo& column = column_info(metadata->column);
         const codec::CodecId primary = primary_codec(metadata->column);
@@ -201,9 +258,25 @@ std::expected<void, ItchStoreError> ItchStoreReader::read_directory() {
             return std::unexpected(error);
         }
         SegmentEntry& entry = segments_.back();
-        entry.block[static_cast<std::size_t>(metadata->column)] = b;
-        entry.values[static_cast<std::size_t>(metadata->column)] = metadata->values;
+        const auto c = static_cast<std::size_t>(metadata->column);
+        if (metadata->piece == 0) {
+            entry.block[c] = b;
+        }
+        // A column of a segment holds at most kMax32 values: the sum is checked as it grows.
+        if (metadata->values > kMax32 - entry.values[c]) {
+            return refuse("value count", kMetaValueCountOffset, kMax32 - entry.values[c],
+                          metadata->values);
+        }
+        entry.values[c] += metadata->values;
+        ++entry.pieces[c];
         previous = metadata->column;
+        previous_values = metadata->values;
+    }
+    if (!segments_.empty()) {
+        if (auto done = close_column(segments_.back(), previous, parser_.block_count() - 1);
+            !done) {
+            return std::unexpected(done.error());
+        }
     }
     if (segments_.size() != header_.segment_count) {
         ItchStoreError error;
@@ -251,42 +324,67 @@ std::expected<std::vector<std::uint64_t>, ItchStoreError> ItchStoreReader::read_
         return refuse(count == 0 ? "column not expected" : "column value count", count,
                       entry.values[c]);
     }
-    auto view = parser_.block(block);
-    if (!view.has_value()) {
-        ItchStoreError error = container_failure("block", view.error()).error();
-        error.segment = segment;
-        error.block = block;
-        error.column = column_info(column).name;
-        error.offset = view.error().offset;
-        return std::unexpected(error);
-    }
-    auto values = decode_column(column, view->codec, view->payload, count);
-    if (!values.has_value()) {
-        ItchStoreError error = values.error();
-        error.segment = segment;
-        error.block = block;
-        const std::uint64_t payload = offset_in(file_, view->payload);
-        error.offset = payload;
-        // A codec's offset is in bits from the chunk it read, which is the payload itself
-        // unless zstd stood in between.
-        if (error.codec.has_value() && view->codec != codec::CodecId::zstd) {
-            error.offset = payload + (error.codec->offset / 8U);
+    std::vector<std::uint64_t> out;
+    out.reserve(static_cast<std::size_t>(count));
+    for (std::uint64_t piece = 0; piece < entry.pieces[c]; ++piece) {
+        const std::uint64_t at = block + piece;
+        auto view = parser_.block(at);
+        if (!view.has_value()) {
+            ItchStoreError error = container_failure("block", view.error()).error();
+            error.segment = segment;
+            error.block = at;
+            error.column = column_info(column).name;
+            error.offset = view.error().offset;
+            return std::unexpected(error);
         }
-        return std::unexpected(error);
+        const std::uint64_t first = piece * kPieceValues;
+        const std::uint64_t piece_values =
+            entry.pieces[c] == 1 ? count : std::min<std::uint64_t>(kPieceValues, count - first);
+        auto values = decode_column(column, view->codec, view->payload, piece_values);
+        if (!values.has_value()) {
+            ItchStoreError error = values.error();
+            error.segment = segment;
+            error.block = at;
+            const std::uint64_t payload = offset_in(file_, view->payload);
+            error.offset = payload;
+            // A codec's offset is in bits from the chunk it read, which is the payload itself
+            // unless zstd stood in between.
+            if (error.codec.has_value() && view->codec != codec::CodecId::zstd) {
+                error.offset = payload + (error.codec->offset / 8U);
+            }
+            if (error.index != kNoIndex) {
+                error.index += first;
+            }
+            return std::unexpected(error);
+        }
+        out.insert(out.end(), values->begin(), values->end());
     }
-    return values;
+    return out;
 }
 
 std::expected<ColumnView, ItchStoreError> ItchStoreReader::column_view(std::uint64_t segment,
-                                                                      Column column) const {
+                                                                      Column column,
+                                                                      std::uint64_t piece) const {
     const SegmentEntry& entry = segments_.at(segment);
     const auto c = static_cast<std::size_t>(column);
     ColumnView out;
-    out.block = entry.block[c];
-    if (out.block == kNoIndex) {
+    if (entry.block[c] == kNoIndex) {
         return out;
     }
-    out.values = entry.values[c];
+    if (piece >= entry.pieces[c]) {
+        ItchStoreError error;
+        error.kind = ItchStoreErrorKind::invalid_argument;
+        error.field = "piece index";
+        error.segment = segment;
+        error.column = column_info(column).name;
+        error.expected = entry.pieces[c];
+        error.actual = piece;
+        return std::unexpected(error);
+    }
+    out.block = entry.block[c] + piece;
+    out.first_value = piece * kPieceValues;
+    out.values = piece + 1 == entry.pieces[c] ? entry.values[c] - out.first_value
+                                              : std::uint64_t{kPieceValues};
     auto view = parser_.block(out.block);
     if (!view.has_value()) {
         ItchStoreError error = container_failure("block", view.error()).error();
@@ -368,8 +466,9 @@ std::expected<SegmentColumns, ItchStoreError> ItchStoreReader::read_columns(
                     return std::unexpected(error);
                 }
                 break;
-            case Column::locate_run_records:
-            case Column::locate_run_adds:
+            case Column::locate_run_start:
+            case Column::locate_run_add_start:
+            case Column::locate_run_import_start:
                 count = columns[Column::locate_run].size();
                 break;
             default:
