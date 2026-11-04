@@ -3,6 +3,7 @@
 #include "tick_store/itch/codec.hpp"
 #include "tick_store/itch/frame.hpp"
 #include "tick_store/itch/message.hpp"
+#include "tick_store/store/durability.hpp"
 #include "tick_store/store/little_endian.hpp"
 #include "tick_store/store/store_error.hpp"
 
@@ -17,10 +18,8 @@
 #include <cstdio>
 #include <expected>
 #include <filesystem>
-#include <format>
 #include <optional>
 #include <span>
-#include <string>
 #include <string_view>
 #include <tuple>
 #include <utility>
@@ -63,21 +62,6 @@ static_assert(kLargestFrame < kWriteBufferSize);
             .actual = static_cast<std::uint64_t>(errno)};
 }
 
-[[nodiscard]] std::expected<void, StoreError> write_all(int fd,
-                                                        std::span<const std::byte> bytes) noexcept {
-    while (!bytes.empty()) {
-        const auto written = ::write(fd, bytes.data(), bytes.size());
-        if (written < 0) {
-            if (errno == EINTR) {
-                continue;
-            }
-            return std::unexpected(io_error("write"));
-        }
-        bytes = bytes.subspan(static_cast<std::size_t>(written));
-    }
-    return {};
-}
-
 // The offset is pwrite's off_t, spelled std::int64_t as in flip_bit.cpp, and a narrower off_t
 // would fail -Wconversion at the call.
 [[nodiscard]] std::expected<void, StoreError> write_all_at(int fd,
@@ -97,77 +81,7 @@ static_assert(kLargestFrame < kWriteBufferSize);
     return {};
 }
 
-// Flushes to the device. A plain fsync on macOS stops at the drive's cache, so
-// F_FULLFSYNC comes first, falling back only where the file system does not support
-// it. Any other failure is returned, and the caller gives up (M3, M4).
-[[nodiscard]] std::expected<void, StoreError> sync_to_device(int fd) noexcept {
-#ifdef F_FULLFSYNC
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg): the POSIX interface is variadic.
-    if (::fcntl(fd, F_FULLFSYNC) == 0) {
-        return {};
-    }
-    if (errno != ENOTSUP && errno != EINVAL && errno != ENOTTY) {
-        return std::unexpected(io_error("F_FULLFSYNC"));
-    }
-#endif
-    if (::fsync(fd) != 0) {
-        return std::unexpected(io_error("fsync"));
-    }
-    return {};
-}
-
-[[nodiscard]] std::expected<void, StoreError> sync_directory(
-    const std::filesystem::path& directory) {
-    const std::filesystem::path name = directory.empty() ? "." : directory;
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg): the POSIX interface is variadic.
-    const int fd = ::open(name.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
-    if (fd < 0) {
-        return std::unexpected(io_error("open directory"));
-    }
-    const auto synced = sync_to_device(fd);
-    ::close(fd);
-    return synced;
-}
-
 }  // namespace
-
-std::string to_string(const StoreError& error) {
-    const auto located = [&](std::string_view what) {
-        return std::format("{}: {} at offset {}: expected {}, have {}", what, error.field,
-                           error.offset, error.expected, error.actual);
-    };
-    switch (error.kind) {
-        case StoreErrorKind::file_too_small:
-            return located("file too small");
-        case StoreErrorKind::bad_magic:
-            return located("bad magic");
-        case StoreErrorKind::unsupported_version:
-            return located("unsupported version");
-        case StoreErrorKind::bad_header_size:
-            return located("bad header size");
-        case StoreErrorKind::bad_section_sizes:
-            return located("bad section sizes");
-        case StoreErrorKind::truncated_record:
-            return located("truncated record");
-        case StoreErrorKind::zero_length_record:
-            return located("zero-length record");
-        case StoreErrorKind::record_count_mismatch:
-            return located("record count mismatch");
-        case StoreErrorKind::unencodable_record:
-            return located("unencodable record");
-        case StoreErrorKind::bad_manifest:
-            return located("bad manifest");
-        case StoreErrorKind::bad_column_size:
-            return located("bad column size");
-        case StoreErrorKind::bad_text_offsets:
-            return located("bad text offsets");
-        case StoreErrorKind::bad_row:
-            return located("bad row");
-        case StoreErrorKind::io:
-            return std::format("I/O error: {} failed with errno {}", error.field, error.actual);
-    }
-    return "invalid store error";
-}
 
 std::array<std::byte, kStubHeaderSize> encode_stub_header(const StubHeader& header) noexcept {
     std::array<std::byte, kStubHeaderSize> bytes{};
@@ -194,7 +108,7 @@ std::expected<StubWriter, StoreError> StubWriter::create(const std::filesystem::
     // The header goes in last. Until then this file has an all-zero header, so it
     // could never parse even if it were opened by mistake.
     constexpr std::array<std::byte, kStubHeaderSize> kNoHeader{};
-    if (auto written = write_all(fd, kNoHeader); !written.has_value()) {
+    if (auto written = write_all(posix_file_ops(), fd, kNoHeader); !written.has_value()) {
         return std::unexpected(written.error());
     }
     return writer;
@@ -228,7 +142,7 @@ void StubWriter::abandon() noexcept {
 }
 
 std::expected<void, StoreError> StubWriter::flush() {
-    auto written = write_all(fd_, std::span{buffer_}.first(buffered_));
+    auto written = write_all(posix_file_ops(), fd_, std::span{buffer_}.first(buffered_));
     buffered_ = 0;
     return written;
 }
@@ -269,7 +183,7 @@ std::expected<void, StoreError> StubWriter::commit(std::span<const std::byte> ta
     if (auto flushed = flush(); !flushed.has_value()) {
         return flushed;
     }
-    if (auto written = write_all(fd_, tail); !written.has_value()) {
+    if (auto written = write_all(posix_file_ops(), fd_, tail); !written.has_value()) {
         return written;
     }
     header_.tail_bytes = tail.size();
@@ -281,7 +195,7 @@ std::expected<void, StoreError> StubWriter::commit(std::span<const std::byte> ta
     }
 
     // Step 3: the whole file reaches the device, before anything can name it (M1).
-    if (auto synced = sync_to_device(fd_); !synced.has_value()) {
+    if (auto synced = sync_file(posix_file_ops(), fd_); !synced.has_value()) {
         return synced;
     }
 
@@ -301,7 +215,7 @@ std::expected<void, StoreError> StubWriter::commit(std::span<const std::byte> ta
     }
 
     // Step 6: the rename itself reaches the device.
-    return sync_directory(path_.parent_path());
+    return sync_directory(posix_file_ops(), path_.parent_path());
 }
 
 std::expected<void, StoreError> StubWriter::finish(std::span<const std::byte> tail) {

@@ -34,6 +34,23 @@ enum class StoreErrorKind : std::uint8_t {
     bad_row,
     // A system call failed. `field` names it and `actual` is errno.
     io,
+    // Container: the trailer's footer offset, or the footer's counts, do not fit the
+    // file.
+    bad_footer,
+    // Container: a block, a section or a block's metadata does not sit exactly where
+    // the ones before it end, or runs past the region that holds it.
+    bad_extent,
+    // Container: a stored CRC32C differs from the one computed over the bytes.
+    bad_checksum,
+    // Container: a block names a codec id that is not in the registry, or is reserved.
+    unknown_codec,
+    // Container: a field with a fixed set of values holds another, such as a reserved
+    // field that is not zero or a section name with a character outside its alphabet.
+    bad_field,
+    // Container: no block at that index, or no section of that name. Not corruption.
+    not_found,
+    // A writer was given something the format cannot hold.
+    invalid_argument,
 };
 
 // Offsets are from the start of the file, and `expected` and `actual` are the
@@ -57,6 +74,24 @@ enum class StoreErrorKind : std::uint8_t {
 //   bad_row                `field` is the column; offset = the row; expected = what
 //                          the row's form needs, actual = the value found
 //   io                     actual = errno
+//   bad_footer             `field` is the footer offset or the count refused;
+//                          expected = the largest value that fits (for a footer offset
+//                          below the header, the smallest), actual = the value
+//   bad_extent             `field` names the offset or size refused; offset = where
+//                          that field is in the file; expected = where the extent had
+//                          to start (for a size, the most that fits), actual = the value
+//   bad_checksum           `field` is what the CRC covers; offset = where those bytes
+//                          start; expected = the stored CRC, actual = the computed one
+//   unknown_codec          offset = the field; actual = the codec id
+//   bad_field              offset = the field; expected = the value or bound it must
+//                          meet, actual = the value found. For a section name
+//                          character outside the alphabet, expected = 0; for a
+//                          repeated name, expected and actual are the two entries'
+//                          indexes
+//   not_found              `field` is "block index" (expected = the block count,
+//                          actual = the index) or "section" (the name is not kept)
+//   invalid_argument       `field` is what the writer refused; expected, actual = the
+//                          limit and the value, where there is one
 //
 // `field` points at static storage, so an error outlives the file.
 struct StoreError {

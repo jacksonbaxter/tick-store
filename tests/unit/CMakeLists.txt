@@ -9,9 +9,12 @@ add_executable(tick_store_unit_tests
     codec_real_day_test.cpp
     crc32c_test.cpp
     dictionary_test.cpp
+    durability_test.cpp
     columns_cli_test.cpp
     columns_flip_test.cpp
     columns_test.cpp
+    container_test.cpp
+    container_writer_test.cpp
     frame_cursor_test.cpp
     fuzz_regression_test.cpp
     gorilla_timestamps_test.cpp
@@ -49,6 +52,7 @@ set_source_files_properties(itch_real_day_test.cpp codec_real_day_test.cpp PROPE
 
 target_compile_definitions(tick_store_unit_tests PRIVATE
     TICK_STORE_TEST_SCRATCH_DIR="${CMAKE_BINARY_DIR}/test-scratch"
+    TICK_STORE_GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/golden"
 )
 
 gtest_discover_tests(tick_store_unit_tests DISCOVERY_TIMEOUT 60)

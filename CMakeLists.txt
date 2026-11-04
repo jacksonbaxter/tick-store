@@ -43,8 +43,13 @@ target_sources(tick_store_core PRIVATE
     src/itch/codec.cpp
     src/itch/frame.cpp
     src/store/columns.cpp
+    src/store/container.cpp
+    src/store/container_reader.cpp
+    src/store/container_writer.cpp
     src/store/crc32c.cpp
+    src/store/durability.cpp
     src/store/mapped_file.cpp
+    src/store/store_error.cpp
     src/store/stub_store.cpp
 )
 target_include_directories(tick_store_core PUBLIC include)

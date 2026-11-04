@@ -28,7 +28,8 @@ namespace {
 
 }  // namespace
 
-std::expected<MappedFile, StoreError> MappedFile::open(const std::filesystem::path& path) {
+std::expected<MappedFile, StoreError> MappedFile::open(const std::filesystem::path& path,
+                                                     Access access) {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg): the POSIX interface is variadic.
     const int fd = ::open(path.c_str(), O_RDONLY | O_CLOEXEC);
     if (fd < 0) {
@@ -64,7 +65,7 @@ std::expected<MappedFile, StoreError> MappedFile::open(const std::filesystem::pa
     // A mapping outlives its descriptor. The advice is only a hint, so a failure is
     // not an error: the reads work the same without it.
     ::close(fd);
-    ::madvise(mapping, size, MADV_SEQUENTIAL);
+    ::madvise(mapping, size, access == Access::sequential ? MADV_SEQUENTIAL : MADV_NORMAL);
     return MappedFile{std::span{static_cast<const std::byte*>(mapping), size}};
 }
 
