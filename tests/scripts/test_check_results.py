@@ -256,6 +256,16 @@ class CheckResultsTest(unittest.TestCase):
         self.assert_fails("Linux", lambda d: set_value(d, "unavailable", "header", "turbo"),
                           "header.turbo: Linux must record it")
 
+    def test_linux_without_turbo_but_with_the_reason(self):
+        # What run_bench.py records on a host with no boost switch, such as a CI runner.
+        self.assert_fails("Linux", lambda d: set_value(
+            d, "unavailable: no cpufreq boost switch, as on a virtual machine", "header", "turbo"),
+                          "header.turbo: Linux must record it")
+
+    def test_linux_with_an_unknown_turbo_state(self):
+        self.assert_fails("Linux", lambda d: set_value(d, "partly", "header", "turbo"),
+                          "header.turbo: unknown value partly")
+
     def test_linux_not_pinned(self):
         self.assert_fails("Linux", lambda d: set_value(d, "not-requested", "header", "pinning"),
                           "Linux results must be pinned")

@@ -294,6 +294,11 @@ def check_sibling(header, cases):
     return problems
 
 
+def not_recorded(value):
+    """Empty, or marked unavailable or not available, with or without a reason after a colon."""
+    return value in (None, "") or str(value).partition(":")[0] in (UNAVAILABLE, NOT_AVAILABLE)
+
+
 def check_linux(header, cases):
     problems = check_sibling(header, cases)
     if "core" in header and header["core"] != LINUX_CORE:
@@ -303,11 +308,13 @@ def check_linux(header, cases):
     if "sibling" in header and "not enforced" not in str(header["sibling"]):
         problems.append("header.sibling: the idle sibling must be recorded as stated, "
                         "not claimed")
+    # Linux results come from the pinned host, which measures both. A host that cannot,
+    # such as a hosted CI runner, records why, and its file is refused here.
     for field in ("governor", "turbo"):
-        if field in header and header[field] in (None, "", UNAVAILABLE, NOT_AVAILABLE):
+        if field in header and not_recorded(header[field]):
             problems.append(f"header.{field}: Linux must record it")
-    if "turbo" in header and header["turbo"] not in ("enabled", "disabled", None, "",
-                                                     UNAVAILABLE, NOT_AVAILABLE):
+    if ("turbo" in header and not not_recorded(header["turbo"])
+            and header["turbo"] not in ("enabled", "disabled")):
         problems.append(f"header.turbo: unknown value {header['turbo']}")
     if "frequency" in header:
         frequency = header["frequency"]

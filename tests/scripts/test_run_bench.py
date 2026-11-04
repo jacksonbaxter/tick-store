@@ -219,6 +219,10 @@ class RunBenchTest(unittest.TestCase):
         (self.dir / "stat.step").write_text(STAT_STEP, encoding="ascii")
         self.sysfs = self.dir / "cpu"
         self.write_topology("thread_siblings_list", "4-5")
+        # The boost switch, so no test reads the host's own sysfs: a hosted runner has none.
+        self.boost = self.sysfs / "cpufreq" / "boost"
+        self.boost.parent.mkdir(parents=True)
+        self.boost.write_text("1\n", encoding="ascii")
         write_script(self.bin / "taskset", TASKSET.format(record=self.record))
         write_script(self.bin / "perf", PERF.format(record=self.record, stat=self.stat))
 
@@ -386,16 +390,47 @@ class RunBenchTest(unittest.TestCase):
 
     def test_a_linux_document_meets_the_validators_sibling_rule(self):
         run = self.linux_case(self.make_wrapper())
-        meter = RUN_BENCH.SiblingMeter(self.sysfs, self.stat)
-        with (mock.patch.object(RUN_BENCH, "cpu_model", return_value="cpu"),
-              mock.patch.object(RUN_BENCH, "linux_turbo", return_value="enabled")):
-            document = RUN_BENCH.build_document("Linux", "itch_codec", SLICE, PINS["slices"][SLICE],
-                                                COMMIT, "wrapper", [run], meter)
+        document = self.linux_document(run)
         header = document["header"]
+        self.assertEqual(header["turbo"], "enabled")
         self.assertEqual(header["sibling_busy_percent"]["cases"], {"itch_decode": 0.5})
         self.assertEqual(CHECK_RESULTS.check_sibling(header, ["itch_decode"]), [])
         self.assertEqual(CHECK_RESULTS.check_linux({"sibling": header["sibling"]}, []), [])
         self.assertEqual(CHECK_RESULTS.check_leaks(document), [])
+
+    def linux_document(self, run):
+        meter = RUN_BENCH.SiblingMeter(self.sysfs, self.stat)
+        with mock.patch.object(RUN_BENCH, "cpu_model", return_value="cpu"):
+            return RUN_BENCH.build_document("Linux", "itch_codec", SLICE, PINS["slices"][SLICE],
+                                            COMMIT, "wrapper", [run], meter, self.sysfs)
+
+    def test_turbo_is_read_from_the_given_sysfs_and_the_pinned_core_comes_first(self):
+        self.assertEqual(RUN_BENCH.linux_turbo(self.sysfs), "enabled")
+        self.boost.write_text("0\n", encoding="ascii")
+        self.assertEqual(RUN_BENCH.linux_turbo(self.sysfs), "disabled")
+        core = self.sysfs / "cpu4" / "cpufreq" / "boost"
+        core.parent.mkdir(parents=True)
+        core.write_text("1\n", encoding="ascii")
+        self.assertEqual(RUN_BENCH.linux_turbo(self.sysfs), "enabled")
+
+    def test_with_no_boost_switch_turbo_is_unavailable_with_why_and_the_validator_refuses(self):
+        self.boost.unlink()
+        run = self.linux_case(self.make_wrapper())
+        header = self.linux_document(run)["header"]
+        state, _, reason = header["turbo"].partition(": ")
+        self.assertEqual(state, "unavailable")
+        self.assertIn("no cpufreq boost switch", reason)
+        self.assertIn("header.turbo: Linux must record it",
+                      CHECK_RESULTS.check_linux(header, ["itch_decode"]))
+        self.assertEqual(CHECK_RESULTS.check_leaks(self.linux_document(run)), [])
+
+    @unittest.skipUnless(HOST == "Linux", "the pinned path exists only on Linux")
+    def test_a_linux_run_with_no_boost_switch_publishes_nothing(self):
+        self.boost.unlink()
+        result = self.run_bench(self.make_binary(), self.make_wrapper())
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("header.turbo: Linux must record it", result.stderr)
+        self.assertEqual(list(self.results.iterdir()), [])
 
     def test_a_wait_for_the_lock_is_outside_the_window(self):
         self.stat.with_suffix(".waited").write_text(STAT_AFTER_A_WAIT, encoding="ascii")

@@ -128,15 +128,18 @@ def cpu_model(host):
     raise Failure(EXIT_USAGE, "/proc/cpuinfo has no model name")
 
 
-def linux_turbo():
-    for path in (f"/sys/devices/system/cpu/cpu{LINUX_CORE}/cpufreq/boost",
-                 "/sys/devices/system/cpu/cpufreq/boost"):
+def linux_turbo(sysfs=CPU_SYSFS):
+    """enabled or disabled, from cpufreq's boost switch, or unavailable with the reason. A
+    virtual machine, such as a hosted CI runner, has no switch, and check_results.py refuses
+    a Linux file without a measured state: only the pinned host publishes Linux results."""
+    for path in (sysfs / f"cpu{LINUX_CORE}" / "cpufreq" / "boost", sysfs / "cpufreq" / "boost"):
         try:
-            state = Path(path).read_text(encoding="utf-8").strip()
+            state = path.read_text(encoding="utf-8").strip()
         except OSError:
             continue
-        return {"1": "enabled", "0": "disabled"}.get(state, "unavailable")
-    return "unavailable"
+        return {"1": "enabled", "0": "disabled"}.get(
+            state, f"unavailable: cpufreq boost reads {state!r}, which is neither 0 nor 1")
+    return "unavailable: no cpufreq boost switch, as on a virtual machine"
 
 
 def parse_cpu_list(text):
@@ -403,7 +406,8 @@ def result_row(host, run):
     }
 
 
-def build_document(host, benchmark, slice_name, pin, commit, measure, runs, meter=None):
+def build_document(host, benchmark, slice_name, pin, commit, measure, runs, meter=None,
+                   sysfs=CPU_SYSFS):
     first = runs[0]["report"]
     build = first["build"]
     linux = host == "Linux"
@@ -427,7 +431,7 @@ def build_document(host, benchmark, slice_name, pin, commit, measure, runs, mete
         "second_thread": LINUX_SECOND_THREAD if linux else "not-available",
         "governor": governor_of(host, runs),
         "frequency": frequency_block(host, runs),
-        "turbo": linux_turbo() if linux else "not-available",
+        "turbo": linux_turbo(sysfs) if linux else "not-available",
         "pinning": first["pinning"]["status"],
         "counters": "perf stat, :u events" if linux else "unavailable",
         "timer": first["timer"],
@@ -489,7 +493,7 @@ def parse_arguments(argv):
     parser.add_argument("--work-dir", type=Path, default=DEFAULT_WORK_DIR,
                         help="where raw outputs go, under the build tree")
     parser.add_argument("--sysfs-cpu", type=Path, default=CPU_SYSFS,
-                        help="where the kernel's CPU topology is")
+                        help="where the kernel's CPU topology and boost switch are")
     parser.add_argument("--proc-stat", type=Path, default=PROC_STAT,
                         help="where the kernel's CPU times are")
     return parser.parse_args(argv)
@@ -514,7 +518,8 @@ def run(args):
             for case in cases]
     check_builds_match(runs, commit, measure)
 
-    document = build_document(host, benchmark, args.slice, pin, commit, measure, runs, meter)
+    document = build_document(host, benchmark, args.slice, pin, commit, measure, runs, meter,
+                              args.sysfs_cpu)
     directory = args.results_dir if measure else args.iteration_dir
     output = directory / f"{host}-{benchmark}-{commit[:12]}.json"
     publish(document, output, args.pins, measure)

@@ -83,6 +83,15 @@ def macos_results(folder, root=TREE):
     return found[0]
 
 
+def linux_results(folder, root=TREE):
+    """The one Linux results file in results/<folder>, from the pinned host."""
+    found = sorted((root / "results" / folder).glob("Linux-*.json"))
+    if len(found) != 1:
+        raise SystemExit(f"prove_checks: results/{folder} needs exactly one Linux-*.json, "
+                         f"and has {len(found)}: {[path.name for path in found]}")
+    return found[0]
+
+
 def add_file(path, content):
     target = TREE / path
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -92,6 +101,12 @@ def add_file(path, content):
 
 def drop_load_lines():
     edit_json(macos_results("bench"), lambda d: d["header"].update(load_lines=[]))
+
+
+def unmeasured_turbo_on_linux():
+    """What run_bench.py records on a host with no boost switch, such as a hosted runner."""
+    edit_json(linux_results("bench"), lambda d: d["header"].update(
+        turbo="unavailable: no cpufreq boost switch, as on a virtual machine"))
 
 
 def claim_pinned_on_macos():
@@ -275,6 +290,9 @@ FAULTS = (
           CHECK_FAILED, "no load lines", drop_load_lines),
     Fault("results-macos-pinned", "check-results", "a macOS results file claiming pinned",
           CHECK_FAILED, "macOS cannot be pinned", claim_pinned_on_macos),
+    Fault("results-linux-turbo-unmeasured", "check-results", "the pinned host's Linux results "
+          "file with turbo unavailable, as a hosted runner records it", CHECK_FAILED,
+          "header.turbo: Linux must record it", unmeasured_turbo_on_linux),
     Fault("results-empty-folder", "check-results", "no results files at all, which must not "
           "pass as nothing wrong", CHECK_FAILED, "no results files in", empty_the_results_folder),
     Fault("guard-sub-resolution-data", "check-results", "a percentile below the timer's floor "
