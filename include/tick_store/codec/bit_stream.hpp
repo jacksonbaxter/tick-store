@@ -19,8 +19,10 @@
 #include "tick_store/codec/codec_error.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <expected>
 #include <limits>
 #include <span>
@@ -178,6 +180,47 @@ public:
             return std::unexpected(bit.error());
         }
         return *bit != 0;
+    }
+
+    // A fast peek for a decoder's inner loop: the next `width` bits, for a
+    // width the caller has already proved is at most remaining() and at most
+    // kMaxPeekBits. Outside those it returns 0 and reads nothing, so a caller that skips
+    // the proof gets a wrong value, never a read out of bounds. Inline, and with no
+    // error to build, so a loop over it costs a few instructions a value.
+    static constexpr unsigned kMaxPeekBits = 57;
+    [[nodiscard, gnu::always_inline]] std::uint64_t peek_within(unsigned width) const noexcept {
+        if (width == 0 || width > kMaxPeekBits || width > size_bits_ - pos_) {
+            return 0;
+        }
+        const auto first = static_cast<std::size_t>(pos_ / 8U);
+        const auto skip = static_cast<unsigned>(pos_ % 8U);
+        std::uint64_t word = 0;
+        if (bytes_.size() - first >= 8) {
+            // skip + width <= 7 + 57 = 64, so the eight bytes at `first` hold every bit.
+            // Copied, not loaded as a type, then put in stream order.
+            std::memcpy(&word, bytes_.data() + first, sizeof word);
+            if constexpr (std::endian::native == std::endian::little) {
+                word = std::byteswap(word);
+            }
+        } else {
+            // Near the end, the bytes left, then zeros past them, which the width proved
+            // above never reaches.
+            for (std::size_t i = 0; i < 8; ++i) {
+                const std::size_t at = first + i;
+                word = (word << 8U) |
+                       (at < bytes_.size() ? std::to_integer<std::uint64_t>(bytes_[at]) : 0U);
+            }
+        }
+        // skip < 8 and 64 - width < 64, so both shifts are below the word size.
+        return (word << skip) >> (kWordBits - width);
+    }
+
+    // Consumes `width` bits after peek_within() proved them present: the caller has
+    // checked width <= remaining(). A wider one consumes nothing.
+    void advance_within(unsigned width) noexcept {
+        if (width <= size_bits_ - pos_) {
+            pos_ += width;
+        }
     }
 
     // Bits read so far.

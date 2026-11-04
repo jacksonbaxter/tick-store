@@ -146,6 +146,41 @@ TEST(BitStream, EveryWidthAtEveryOffsetRoundTrips) {
     }
 }
 
+// peek_within is read() without the error or the move, for every width it accepts at
+// every bit position of a buffer of every length up to 17 bytes, so both its whole-word
+// and its near-the-end paths meet every offset; outside its bounds it returns 0 and
+// advance_within moves nothing.
+TEST(BitStream, PeekWithinMatchesReadEverywhereAndRefusesOutsideItsBounds) {
+    test::SplitMix64 random{20261104};
+    for (std::size_t size = 0; size <= 17; ++size) {
+        Bytes raw(size);
+        for (std::byte& b : raw) {
+            b = static_cast<std::byte>(random() & 0xFFU);
+        }
+        const Bytes input = exact_copy(raw);
+        const std::uint64_t bits = std::uint64_t{size} * 8U;
+        for (std::uint64_t at = 0; at <= bits; ++at) {
+            SCOPED_TRACE(testing::Message() << "size " << size << " at " << at);
+            BitReader reader{input};
+            reader.advance_within(static_cast<unsigned>(at));
+            ASSERT_EQ(reader.position(), at);
+            for (unsigned width = 0; width <= 64; ++width) {
+                const std::uint64_t peeked = reader.peek_within(width);
+                if (width == 0 || width > BitReader::kMaxPeekBits || width > bits - at) {
+                    EXPECT_EQ(peeked, 0U) << width;
+                    continue;
+                }
+                BitReader copy = reader;
+                EXPECT_EQ(copy.read(width, "value"), peeked) << width;
+                EXPECT_EQ(reader.position(), at);
+            }
+            BitReader past = reader;
+            past.advance_within(static_cast<unsigned>(bits - at + 1U));
+            EXPECT_EQ(past.position(), at);
+        }
+    }
+}
+
 TEST(BitStream, WidthAboveSixtyFourIsRefused) {
     const Bytes input(16, std::byte{0xFF});
     BitReader reader{input};

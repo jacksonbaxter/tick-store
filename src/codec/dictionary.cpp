@@ -23,6 +23,9 @@ constexpr unsigned kEntryCountBytes = 4;
 constexpr unsigned kLongestBits = 8;
 constexpr unsigned kLastMode = static_cast<unsigned>(DictMode::sorted_move_to_front);
 constexpr std::uint64_t kPayloadStart = kBlockHeaderSize * 8U;
+// Code prefixes the Huffman decoder looks up in one step. Longer codes finish by the
+// canonical rule from there.
+constexpr unsigned kHuffmanTableBits = 10;
 
 constexpr PforOptions kRankedEntries{.transform = IntTransform::none, .adaptive_scale = true,
                                      .patch = true};
@@ -271,7 +274,56 @@ using Encoded = std::expected<void, CodecError>;
     }
     indices.assign(count, 0);
     if (entries > 1) {
-        for (std::size_t i = 0; i < count; ++i) {
+        // The fast path: while a whole longest code is left, peek that many bits and find
+        // the code's length from a table of its first `table_bits`, then by the canonical
+        // rule for a longer one. The code is complete, so every peek holds one whole code,
+        // and nothing here can fail; the last codes, closer to the end than the longest
+        // code, take the bit-by-bit loop below, which reports a truncated stream.
+        const unsigned table_bits = std::min(lengths, kHuffmanTableBits);
+        std::vector<std::uint64_t> first_code(lengths + 1U, 0);
+        std::vector<std::uint64_t> first_index(lengths + 1U, 0);
+        {
+            std::uint64_t first = 0;
+            std::uint64_t index = 0;
+            for (unsigned length = 1; length <= lengths; ++length) {
+                first_code[length] = first;
+                first_index[length] = index;
+                index += per_length[length];
+                first = (first + per_length[length]) << 1U;
+            }
+        }
+        // Each slot: the code's length in the low 8 bits and its entry above them, or 0
+        // where every code with that prefix is longer than table_bits.
+        std::vector<std::uint64_t> table(std::size_t{1} << table_bits, 0);
+        for (unsigned length = 1; length <= table_bits; ++length) {
+            const unsigned spread = table_bits - length;
+            for (std::uint64_t k = 0; k < per_length[length]; ++k) {
+                const std::uint64_t slot = (first_code[length] + k) << spread;
+                const std::uint64_t value = ((first_index[length] + k) << 8U) | length;
+                std::fill_n(table.begin() + static_cast<std::ptrdiff_t>(slot),
+                            std::size_t{1} << spread, value);
+            }
+        }
+        std::size_t done = 0;
+        while (done < count && reader.remaining() >= lengths) {
+            // remaining() >= lengths and lengths <= 32, so the peek holds real bits.
+            const std::uint64_t window = reader.peek_within(lengths);
+            const std::uint64_t slot = table[window >> (lengths - table_bits)];
+            unsigned length = static_cast<unsigned>(slot & 0xFFU);
+            std::uint64_t index = slot >> 8U;
+            if (length == 0) {
+                for (length = table_bits + 1U; length <= lengths; ++length) {
+                    const std::uint64_t code = window >> (lengths - length);
+                    if (code - first_code[length] < per_length[length]) {
+                        index = first_index[length] + (code - first_code[length]);
+                        break;
+                    }
+                }
+            }
+            reader.advance_within(length);
+            indices[done++] = index;
+        }
+        for (std::size_t i = done; i < count; ++i) {
             // The canonical decode: `first` is the first code of each length, `index` the
             // first entry with it. The code is complete, so a code ends by `lengths`.
             std::uint64_t code = 0;
@@ -427,14 +479,17 @@ std::expected<std::size_t, CodecError> decode_dict_block(std::span<const std::by
     }
 
     if (as_mode == DictMode::sorted_move_to_front) {
-        // Ranks to indices. Every rank is below K, and K is at most kDictMtfMaxEntries.
-        std::vector<std::uint64_t> list(entry_count);
+        // Ranks to indices. Every rank is below K, and K is at most kDictMtfMaxEntries,
+        // so an index fits 16 bits and a move shifts a quarter of the bytes 64 would.
+        static_assert(kDictMtfMaxEntries <= (std::uint64_t{1} << 16U));
+        static_assert(kDictMaxCodeBits <= BitReader::kMaxPeekBits);
+        std::vector<std::uint16_t> list(entry_count);
         for (std::size_t i = 0; i < entry_count; ++i) {
-            list[i] = i;
+            list[i] = static_cast<std::uint16_t>(i);
         }
         for (std::uint64_t& value : indices) {
             const auto rank = static_cast<std::ptrdiff_t>(value);
-            const std::uint64_t index = list[static_cast<std::size_t>(rank)];
+            const std::uint16_t index = list[static_cast<std::size_t>(rank)];
             std::move_backward(list.begin(), list.begin() + rank, list.begin() + rank + 1);
             list.front() = index;
             value = index;
