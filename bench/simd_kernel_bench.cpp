@@ -151,6 +151,30 @@ Case unpack_case(const simd::Kernels& set, unsigned width) {
     return c;
 }
 
+// The linear layout, which tails and patch lists take: 1,024 values at `width`, packed
+// end to end, in an exact buffer.
+Case linear_case(const simd::Kernels& set, unsigned width) {
+    const std::uint64_t seed = 0x5EED'0600ULL + width;
+    auto in = std::make_shared<PackedVector>();
+    // NOLINTNEXTLINE(cert-msc32-c,cert-msc51-cpp,bugprone-random-generator-seed): fixed for B1
+    std::mt19937_64 rng{seed};
+    for (std::uint64_t& value : in->values) {
+        value = rng() & mask_of(width);
+    }
+    codec::pack_linear(in->values, width, in->bytes);
+    in->bytes.shrink_to_fit();
+    auto out = std::make_shared<Vector>();
+    Case c = named(std::format("linear_unpack/w={}/{}", width, level_name(set)), seed);
+    c.run = [&set, in, out, width](std::size_t calls) {
+        for (std::size_t i = 0; i < calls; ++i) {
+            set.unpack_linear(in->bytes, width, *out);
+            benchmark::DoNotOptimize(out->data());
+        }
+    };
+    c.verify = [in, out] { return same(*out, in->values); };
+    return c;
+}
+
 // The base is small and positive, as for timestamps and prices, and the same for every
 // form, so the narrow form may run at widths up to kNarrowWidest.
 constexpr std::uint64_t kDeltaBase = 3;
@@ -292,6 +316,9 @@ std::vector<Case> all_cases(bool every_width) {
         }
         for (const unsigned w : widths) {
             cases.push_back(unpack_case(*set, w));
+        }
+        for (const unsigned w : widths) {
+            cases.push_back(linear_case(*set, w));
         }
         for (const unsigned w : widths) {
             cases.push_back(delta_case(*set, w, DeltaForm::two_pass));
