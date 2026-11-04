@@ -3,8 +3,8 @@
   "source": "12302019.NASDAQ_ITCH50",
   "host": "Linux",
   "build_preset": "bench",
-  "commit": "3325f81",
-  "store_format": "itch-store-v2",
+  "commit": "e257f80",
+  "store_format": "itch-store-v3",
   "durability": "page_cache",
   "segment_records": 1048576,
   "placement": "taskset -c 2,6,7 through heavy.sh, so cpu4 and cpu5 stayed free",
@@ -13,7 +13,7 @@
     "verdict": "pass",
     "ingest": {
       "command": "ingest",
-      "store_format": "itch-store-v2",
+      "store_format": "itch-store-v3",
       "durability": "page_cache",
       "segment_records": 1048576,
       "records": 268744780,
@@ -21,14 +21,14 @@
       "tail_bytes": 0,
       "raw_unknown_type": 0,
       "raw_wrong_length": 0,
-      "stored_file_bytes": 1495541951,
-      "ratio": 5.517336,
-      "wall_seconds": 305.788881,
-      "peak_rss_bytes": 4562149376
+      "stored_file_bytes": 1750915467,
+      "ratio": 4.712625,
+      "wall_seconds": 254.359837,
+      "peak_rss_bytes": 6655954944
     },
     "verify": {
       "command": "verify",
-      "store_format": "itch-store-v2",
+      "store_format": "itch-store-v3",
       "checksums": "verify",
       "verdict": "pass",
       "records": 268744780,
@@ -51,42 +51,8 @@
       "stored_matches_expected": true,
       "first_difference": null,
       "store_error": null,
-      "wall_seconds": 175.464568,
-      "peak_rss_bytes": 7005839360
+      "wall_seconds": 145.957089,
+      "peak_rss_bytes": 9861451776
     }
-  },
-  "cross_host": {
-    "written_on": "macOS",
-    "verify": {
-      "command": "verify",
-      "store_format": "itch-store-v2",
-      "checksums": "verify",
-      "verdict": "pass",
-      "records": 268744780,
-      "stored_records": 268744780,
-      "bytes": 8251407909,
-      "stored_bytes": 8251407909,
-      "tail_bytes": 0,
-      "stored_tail_bytes": 0,
-      "tail_matches": true,
-      "mismatched_records": 0,
-      "differing_records": 0,
-      "missing_records": 0,
-      "extra_records": 0,
-      "aliased_records": 0,
-      "source_sha256": "5d81c2e14a0f748b29c674b6a342796932702034b4dd341e39e9a9ec5bac610f",
-      "stored_sha256": "5d81c2e14a0f748b29c674b6a342796932702034b4dd341e39e9a9ec5bac610f",
-      "expected_sha256": "5d81c2e14a0f748b29c674b6a342796932702034b4dd341e39e9a9ec5bac610f",
-      "hashes_match": true,
-      "source_matches_expected": true,
-      "stored_matches_expected": true,
-      "first_difference": null,
-      "store_error": null,
-      "wall_seconds": 103.381403,
-      "peak_rss_bytes": 7141105664
-    },
-    "store_sha256_here": "175f089e9f7c2ae020ac3ba01f9e173f533391fbb8013365fa796dde96f6c598",
-    "store_sha256_there": "175f089e9f7c2ae020ac3ba01f9e173f533391fbb8013365fa796dde96f6c598",
-    "same_store_bytes": true
   }
 }

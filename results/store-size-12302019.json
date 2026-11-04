@@ -3,182 +3,186 @@
   "source": "12302019.NASDAQ_ITCH50",
   "host": "macOS",
   "build_preset": "bench",
-  "commit": "3325f81",
-  "store_format": "itch-store-v2",
+  "commit": "e257f80",
+  "store_format": "itch-store-v3",
   "segment_records": 1048576,
   "segments": 257,
   "records": 268744780,
   "source_bytes": 8251407909,
-  "stored_bytes": 1495541951,
-  "ratio": 5.5173363097455494,
+  "stored_bytes": 1750915467,
+  "ratio": 4.712624946501772,
   "parts": {
     "container_header": 16,
     "container_trailer": 24,
     "footer": {
       "fixed": 24,
-      "block_entries": 224704,
+      "block_entries": 3718016,
       "section_entries": 192,
-      "block_metadata": 382640
+      "block_metadata": 1693660
     },
-    "footer_total": 607560,
+    "footer_total": 5411892,
     "sections": {
       "store": 24,
       "symbols": 89074,
       "tail": 0
     },
-    "column_payloads": 1494845253
+    "column_payloads": 1745414437
   },
   "segment_state": {
     "what": "the import list, the one thing a segment needs from outside its own records to decode on its own; there is no other checkpoint",
-    "import_ref_payload_bytes": 70275493,
-    "import_ref_metadata_bytes": 3072,
+    "import_ref_payload_bytes": 66184548,
+    "import_ref_metadata_bytes": 17028,
     "imports": 21140903
   },
   "query_index": {
-    "what": "the seek column (per segment the column maxima, then per seek group the time zone map, imports and records of each type) and the locate run directory (each run's locate, records and adds); the segment summaries in the footer metadata hold each segment's times and locate bitmap",
+    "what": "the seek column (per segment the column maxima, then per seek group the time zone map, imports and records of each type, then the file groups' time zone map) and the locate run directory (each run's locate and where its records, adds and imports start); the segment summaries in the footer metadata hold each segment's times and locate bitmap",
     "columns": {
       "seek": {
-        "payload_bytes": 1969329,
+        "payload_bytes": 2803976,
         "metadata_bytes": 3084
       },
       "locate_run": {
         "payload_bytes": 377748,
         "metadata_bytes": 3084
       },
-      "locate_run_records": {
-        "payload_bytes": 1982252,
+      "locate_run_start": {
+        "payload_bytes": 1958038,
         "metadata_bytes": 3084
       },
-      "locate_run_adds": {
-        "payload_bytes": 1626057,
+      "locate_run_add_start": {
+        "payload_bytes": 1711925,
+        "metadata_bytes": 3084
+      },
+      "locate_run_import_start": {
+        "payload_bytes": 1208812,
         "metadata_bytes": 3084
       }
     },
-    "index_bytes": 5967722,
-    "fraction_of_file": 0.003990340756412523,
+    "index_bytes": 8075919,
+    "fraction_of_file": 0.0046123980010509555,
     "locate_column": {
-      "payload_bytes": 315999839,
-      "metadata_bytes": 3084,
-      "note": "each locate's record indices: the symbol filter, and the only copy of the records' locates, so data as much as index"
+      "payload_bytes": 317339404,
+      "metadata_bytes": 196836,
+      "note": "each typed record's index in its segment, by locate: the way back to file order, so data as much as index"
     }
   },
   "columns": {
     "type": {
-      "payload_bytes": 60446404,
-      "metadata_bytes": 301460,
-      "blocks": 257,
+      "payload_bytes": 60957850,
+      "metadata_bytes": 496240,
+      "blocks": 16403,
       "zstd_blocks": 0,
       "values": 268744780
     },
     "locate": {
-      "payload_bytes": 315999839,
-      "metadata_bytes": 3084,
-      "blocks": 257,
-      "zstd_blocks": 257,
+      "payload_bytes": 317339404,
+      "metadata_bytes": 196836,
+      "blocks": 16403,
+      "zstd_blocks": 16403,
       "values": 268744780
     },
     "timestamp": {
-      "payload_bytes": 630115795,
-      "metadata_bytes": 3084,
-      "blocks": 257,
+      "payload_bytes": 754936767,
+      "metadata_bytes": 196836,
+      "blocks": 16403,
       "zstd_blocks": 0,
       "values": 268744780
     },
     "tracking": {
-      "payload_bytes": 5537418,
-      "metadata_bytes": 3084,
-      "blocks": 257,
+      "payload_bytes": 5463816,
+      "metadata_bytes": 196836,
+      "blocks": 16403,
       "zstd_blocks": 0,
       "values": 268744780
     },
     "creation_ref": {
-      "payload_bytes": 91776889,
-      "metadata_bytes": 3084,
-      "blocks": 257,
-      "zstd_blocks": 257,
+      "payload_bytes": 201531130,
+      "metadata_bytes": 104328,
+      "blocks": 8694,
+      "zstd_blocks": 8691,
       "values": 140270523
     },
     "ref_distance": {
-      "payload_bytes": 103667337,
-      "metadata_bytes": 3084,
-      "blocks": 257,
+      "payload_bytes": 104186884,
+      "metadata_bytes": 107280,
+      "blocks": 8940,
       "zstd_blocks": 0,
       "values": 144610481
     },
     "import_ref": {
-      "payload_bytes": 70275493,
-      "metadata_bytes": 3072,
-      "blocks": 256,
+      "payload_bytes": 66184548,
+      "metadata_bytes": 17028,
+      "blocks": 1419,
       "zstd_blocks": 0,
       "values": 21140903
     },
     "add_side": {
-      "payload_bytes": 15814100,
-      "metadata_bytes": 3084,
-      "blocks": 257,
+      "payload_bytes": 15794228,
+      "metadata_bytes": 88176,
+      "blocks": 7348,
       "zstd_blocks": 0,
       "values": 118631456
     },
     "add_price": {
-      "payload_bytes": 71671055,
-      "metadata_bytes": 3084,
-      "blocks": 257,
-      "zstd_blocks": 257,
+      "payload_bytes": 72833398,
+      "metadata_bytes": 88176,
+      "blocks": 7348,
+      "zstd_blocks": 7340,
       "values": 118631456
     },
     "add_shares": {
       "payload_bytes": 48742753,
-      "metadata_bytes": 3084,
-      "blocks": 257,
+      "metadata_bytes": 88176,
+      "blocks": 7348,
       "zstd_blocks": 0,
       "values": 118631456
     },
     "mpid": {
-      "payload_bytes": 556413,
-      "metadata_bytes": 3072,
-      "blocks": 256,
+      "payload_bytes": 659493,
+      "metadata_bytes": 3612,
+      "blocks": 301,
       "zstd_blocks": 0,
       "values": 1485888
     },
     "reduce_shares": {
-      "payload_bytes": 6305027,
-      "metadata_bytes": 3084,
-      "blocks": 257,
+      "payload_bytes": 6185970,
+      "metadata_bytes": 7296,
+      "blocks": 608,
       "zstd_blocks": 0,
       "values": 8610417
     },
     "match": {
-      "payload_bytes": 442822,
-      "metadata_bytes": 3084,
-      "blocks": 257,
+      "payload_bytes": 9772618,
+      "metadata_bytes": 6588,
+      "blocks": 549,
       "zstd_blocks": 0,
       "values": 7059179
     },
     "printable": {
-      "payload_bytes": 18088,
+      "payload_bytes": 18033,
       "metadata_bytes": 3012,
       "blocks": 251,
       "zstd_blocks": 0,
       "values": 99917
     },
     "exec_price": {
-      "payload_bytes": 186457,
+      "payload_bytes": 187035,
       "metadata_bytes": 3012,
       "blocks": 251,
       "zstd_blocks": 0,
       "values": 99917
     },
     "replace_shares": {
-      "payload_bytes": 6958491,
-      "metadata_bytes": 3084,
-      "blocks": 257,
+      "payload_bytes": 6234206,
+      "metadata_bytes": 17400,
+      "blocks": 1450,
       "zstd_blocks": 0,
       "values": 21639067
     },
     "replace_price": {
-      "payload_bytes": 42019038,
-      "metadata_bytes": 3084,
-      "blocks": 257,
+      "payload_bytes": 40674682,
+      "metadata_bytes": 17400,
+      "blocks": 1450,
       "zstd_blocks": 0,
       "values": 21639067
     },
@@ -197,28 +201,28 @@
       "values": 1218602
     },
     "trade_shares": {
-      "payload_bytes": 887384,
+      "payload_bytes": 886985,
       "metadata_bytes": 3084,
       "blocks": 257,
       "zstd_blocks": 0,
       "values": 1218602
     },
     "trade_price": {
-      "payload_bytes": 2564002,
+      "payload_bytes": 2555717,
       "metadata_bytes": 3084,
       "blocks": 257,
       "zstd_blocks": 0,
       "values": 1218602
     },
     "cross_shares": {
-      "payload_bytes": 17530,
+      "payload_bytes": 17916,
       "metadata_bytes": 300,
       "blocks": 25,
       "zstd_blocks": 0,
       "values": 17836
     },
     "cross_price": {
-      "payload_bytes": 16023,
+      "payload_bytes": 16295,
       "metadata_bytes": 300,
       "blocks": 25,
       "zstd_blocks": 0,
@@ -232,24 +236,24 @@
       "values": 17836
     },
     "imbalance_shares": {
-      "payload_bytes": 5097829,
-      "metadata_bytes": 1572,
-      "blocks": 131,
+      "payload_bytes": 4928580,
+      "metadata_bytes": 7332,
+      "blocks": 611,
       "zstd_blocks": 0,
       "values": 8048630
     },
     "imbalance_price": {
-      "payload_bytes": 7839329,
-      "metadata_bytes": 1572,
-      "blocks": 131,
+      "payload_bytes": 3543323,
+      "metadata_bytes": 10260,
+      "blocks": 855,
       "zstd_blocks": 0,
       "values": 12072945
     },
     "imbalance_flags": {
-      "payload_bytes": 689310,
-      "metadata_bytes": 1572,
-      "blocks": 131,
-      "zstd_blocks": 19,
+      "payload_bytes": 151635,
+      "metadata_bytes": 4380,
+      "blocks": 365,
+      "zstd_blocks": 250,
       "values": 4024315
     },
     "mwcb_level": {
@@ -260,7 +264,7 @@
       "values": 3
     },
     "rare_bytes": {
-      "payload_bytes": 1218349,
+      "payload_bytes": 721556,
       "metadata_bytes": 1704,
       "blocks": 142,
       "zstd_blocks": 4,
@@ -294,6 +298,13 @@
       "zstd_blocks": 0,
       "values": 0
     },
+    "time_base": {
+      "payload_bytes": 12802424,
+      "metadata_bytes": 3084,
+      "blocks": 257,
+      "zstd_blocks": 0,
+      "values": 4199138
+    },
     "locate_run": {
       "payload_bytes": 377748,
       "metadata_bytes": 3084,
@@ -301,26 +312,33 @@
       "zstd_blocks": 0,
       "values": 1606664
     },
-    "locate_run_records": {
-      "payload_bytes": 1982252,
+    "locate_run_start": {
+      "payload_bytes": 1958038,
       "metadata_bytes": 3084,
       "blocks": 257,
       "zstd_blocks": 0,
       "values": 1606664
     },
-    "locate_run_adds": {
-      "payload_bytes": 1626057,
+    "locate_run_add_start": {
+      "payload_bytes": 1711925,
+      "metadata_bytes": 3084,
+      "blocks": 257,
+      "zstd_blocks": 0,
+      "values": 1606664
+    },
+    "locate_run_import_start": {
+      "payload_bytes": 1208812,
       "metadata_bytes": 3084,
       "blocks": 257,
       "zstd_blocks": 0,
       "values": 1606664
     },
     "seek": {
-      "payload_bytes": 1969329,
+      "payload_bytes": 2803976,
       "metadata_bytes": 3084,
       "blocks": 257,
       "zstd_blocks": 0,
-      "values": 1780776
+      "values": 1912514
     }
   },
   "cr1": {
@@ -338,21 +356,21 @@
         "variant": "zstd1-rg1Mi",
         "stored_bytes": 3191406592,
         "outcome": "finished",
-        "ours_over_theirs": 0.46861529795323553,
+        "ours_over_theirs": 0.5486344082227176,
         "smaller": true
       },
       "arcticdb": {
         "variant": "rows100k-cols127",
         "stored_bytes": 6352666624,
         "outcome": "finished",
-        "ours_over_theirs": 0.23541955520693164,
+        "ours_over_theirs": 0.2756189755629777,
         "smaller": true
       },
       "questdb": {
         "variant": "plain",
         "stored_bytes": 22897786880,
         "outcome": "finished",
-        "ours_over_theirs": 0.06531382088747958,
+        "ours_over_theirs": 0.076466580642749,
         "smaller": true
       }
     },
