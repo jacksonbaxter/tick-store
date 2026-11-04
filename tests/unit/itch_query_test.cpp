@@ -548,6 +548,8 @@ TEST(ItchQueryCorrupt, LocateRunFieldsRefusedByTheQuery) {
         Column column;
         std::vector<std::uint64_t> values;
         std::optional<std::uint16_t> locate;
+        // Ask for the locate's minute aggregate, which reads its adds alone, not its rows.
+        bool minutes = false;
     };
     std::vector<Case> cases;
     {
@@ -567,11 +569,40 @@ TEST(ItchQueryCorrupt, LocateRunFieldsRefusedByTheQuery) {
         cases.push_back({"locate run start", Column::locate_run_start, v, std::nullopt});
     }
     {
-        // A run's adds starting where the records before it do not put them.
+        // A run's adds starting one late: fewer than its records hold, refused before their
+        // sides are read, for its rows and for its minute aggregate.
         auto v = add_starts;
         v[1] += 1;
         cases.push_back({"locate run add start", Column::locate_run_add_start, v,
                          static_cast<std::uint16_t>(ids[1])});
+        cases.push_back({"locate run add start", Column::locate_run_add_start, v,
+                         static_cast<std::uint16_t>(ids[1]), true});
+    }
+    {
+        // A run's adds starting one early: room enough for its records, but not where the
+        // records before the run put them.
+        std::size_t r = 1;
+        while (r + 1 < add_starts.size() && add_starts[r] == add_starts[r - 1]) {
+            ++r;
+        }
+        ASSERT_LT(add_starts[r - 1], add_starts[r]);
+        auto v = add_starts;
+        v[r] -= 1;
+        cases.push_back({"locate run add start", Column::locate_run_add_start, v,
+                         static_cast<std::uint16_t>(ids[r])});
+    }
+    {
+        // A run's imports ending one early, so its last import has no place: the next run's
+        // start still ascends, so only the scan finds it.
+        std::size_t r = 0;
+        while (r + 2 < import_starts.size() && import_starts[r + 1] == import_starts[r]) {
+            ++r;
+        }
+        ASSERT_LT(import_starts[r], import_starts[r + 1]);
+        auto v = import_starts;
+        v[r + 1] -= 1;
+        cases.push_back({"locate run import start", Column::locate_run_import_start, v,
+                         static_cast<std::uint16_t>(ids[r])});
     }
     {
         // Imports past the segment's.
@@ -602,9 +633,18 @@ TEST(ItchQueryCorrupt, LocateRunFieldsRefusedByTheQuery) {
         test::StoreParts parts = test::parts_of(file);
         test::set_column(parts, 0, c.column, c.values);
         const Bytes broken = parts.build();
-        auto refused = query_all(broken, c.locate);
-        ASSERT_FALSE(refused.has_value()) << c.field;
-        EXPECT_EQ(refused.error().field, c.field) << to_string(refused.error());
+        if (c.minutes) {
+            auto reader = ItchStoreReader::open_bytes(broken);
+            ASSERT_TRUE(reader.has_value()) << c.field;
+            ItchQuery query{*reader};
+            auto refused = query.minute_aggregate(0, ~std::uint64_t{0}, *c.locate);
+            ASSERT_FALSE(refused.has_value()) << c.field;
+            EXPECT_EQ(refused.error().field, c.field) << to_string(refused.error());
+        } else {
+            auto refused = query_all(broken, c.locate);
+            ASSERT_FALSE(refused.has_value()) << c.field;
+            EXPECT_EQ(refused.error().field, c.field) << to_string(refused.error());
+        }
         expect_queries_survive(broken);
     }
 }
