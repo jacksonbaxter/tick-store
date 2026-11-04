@@ -296,6 +296,14 @@ using Encoded = std::expected<void, CodecError>;
     return reader.finish("dict codes");
 }
 
+// One block's counts, added to a column's.
+void add_block(DictStats& column, const DictStats& block) noexcept {
+    for (std::size_t mode = 0; mode < kDictModes; ++mode) {
+        column.blocks[mode] += block.blocks[mode];
+    }
+    column.entries += block.entries;
+}
+
 }  // namespace
 
 std::expected<void, CodecError> encode_dict_block(std::span<const std::uint64_t> values,
@@ -481,13 +489,34 @@ std::expected<void, CodecError> encode_dict(std::span<const std::uint64_t> value
         return checked;
     }
     const std::size_t start = out.size();
+    std::span<const std::uint64_t> previous;
+    std::size_t previous_at = start;
+    DictStats block_stats;
     for (std::size_t at = 0; at < values.size(); at += block_values) {
         const std::size_t size = std::min(values.size() - at, block_values);
-        if (auto block = encode_dict_block(values.subspan(at, size), out, stats);
-            !block.has_value()) {
-            out.resize(start);
-            return block;
+        const std::span<const std::uint64_t> block = values.subspan(at, size);
+        const std::size_t block_at = out.size();
+        if (!previous.empty() && std::ranges::equal(block, previous)) {
+            // Copied by position: inserting a vector's own range into it is undefined.
+            const std::size_t bytes = block_at - previous_at;
+            out.resize(block_at + bytes);
+            std::copy_n(out.begin() + static_cast<std::ptrdiff_t>(previous_at), bytes,
+                        out.begin() + static_cast<std::ptrdiff_t>(block_at));
+            if (stats != nullptr) {
+                ++stats->repeated;
+            }
+        } else {
+            block_stats = DictStats{};
+            if (auto encoded = encode_dict_block(block, out, &block_stats); !encoded.has_value()) {
+                out.resize(start);
+                return encoded;
+            }
         }
+        if (stats != nullptr) {
+            add_block(*stats, block_stats);
+        }
+        previous = block;
+        previous_at = block_at;
     }
     return {};
 }

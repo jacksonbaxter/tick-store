@@ -1219,6 +1219,12 @@ void write_low_cardinality_seeds(SeedDir& seeds,
             add_header_corruptions(seeds, block);
             add_byte_corruptions(seeds, block);
         }
+        // The most values one block holds, all equal: a few dozen bytes the oracle decodes to
+        // 2^20 values and re-encodes in blocks of 3. A dictionary block of this, one entry
+        // with codes of no bits, timed out the CI fuzz run before encode_dict copied a block
+        // that repeats the one before.
+        seeds.add(column_of(encoder.encode_column, Words(tick_store::codec::kMaxBlockValues, 42),
+                            tick_store::codec::kMaxBlockValues));
     }
 }
 // A block of `count` values whose payload is the given fixed bytes followed by nested PFOR

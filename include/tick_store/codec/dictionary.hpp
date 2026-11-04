@@ -82,6 +82,9 @@ struct DictStats {
     std::array<std::uint64_t, kDictModes> blocks{};
     // Dictionary entries over all blocks.
     std::uint64_t entries = 0;
+    // Blocks encode_dict wrote as a copy of the block before, whose values they repeat.
+    // They are counted in `blocks` and `entries` too.
+    std::uint64_t repeated = 0;
 };
 
 // Appends one block holding `values`, which must hold 1 to kMaxBlockValues values.
@@ -94,7 +97,11 @@ struct DictStats {
 [[nodiscard]] std::expected<std::size_t, CodecError> decode_dict_block(
     std::span<const std::byte> block, std::vector<std::uint64_t>& out);
 
-// Appends `values` as consecutive blocks of `block_values`, the last one shorter.
+// Appends `values` as consecutive blocks of `block_values`, the last one shorter. A block
+// whose values repeat the block before's is a copy of its bytes, which is what encoding it
+// would give: the encoder is deterministic. A block of 2^20 values can come from 23 bytes,
+// one entry with codes of no bits, and cut into blocks of 3 it would otherwise cost the
+// whole encoder 349,526 times over.
 [[nodiscard]] std::expected<void, CodecError> encode_dict(std::span<const std::uint64_t> values,
                                                           std::size_t block_values,
                                                           std::vector<std::byte>& out,

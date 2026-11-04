@@ -294,6 +294,52 @@ TEST(Dictionary, EncodedSizeIsPinned) {
     EXPECT_EQ(stats.blocks, (std::array<std::uint64_t, kDictModes>{0, 3, 0}));
 }
 
+// encode_dict copies a block that repeats the one before, and the copy must be exactly
+// what encoding it alone gives, the counts included.
+TEST(Dictionary, ABlockRepeatingTheOneBeforeIsTheSameBytes) {
+    const Values five{5, 5, 5};
+    const Values ramp{1, 2, 3};
+    const std::vector<Values> blocks{five, five, five, ramp, ramp, five, Values{5}};
+    Values values;
+    Bytes alone;
+    DictStats alone_stats;
+    for (const Values& block : blocks) {
+        values.insert(values.end(), block.begin(), block.end());
+        ASSERT_TRUE(encode_dict_block(block, alone, &alone_stats).has_value());
+    }
+    DictStats stats;
+    EXPECT_EQ(encoded(values, 3, &stats), alone);
+    EXPECT_EQ(stats.blocks, alone_stats.blocks);
+    EXPECT_EQ(stats.entries, alone_stats.entries);
+    EXPECT_EQ(stats.repeated, 3U);
+    EXPECT_EQ(alone_stats.repeated, 0U);
+    EXPECT_EQ(decoded(alone, values.size()), values);
+}
+
+// The fuzz input that timed out on the CI runner, in
+// crashers/dictionary/timeout-one-entry-codes-of-no-bits: one block of 2^20 equal values in
+// 31 bytes, which the oracle re-encodes in blocks of 3. Each of those blocks but the first
+// is a copy now; before, the encoder ran 349,526 times, which took over ten seconds
+// with the fuzz build's sanitizers on the runner.
+TEST(Dictionary, TwoToTheTwentyEqualValuesInBlocksOfThreeEncodeOneBlock) {
+    const Values values(kMaxBlockValues, 42);
+    DictStats stats;
+    const Bytes column = encoded(values, 3, &stats);
+    // 349,525 blocks of three, all but the first copied, and a last block of one value.
+    constexpr std::uint64_t kFull = kMaxBlockValues / 3;
+    EXPECT_EQ(stats.repeated, kFull - 1);
+    EXPECT_EQ(stats.blocks, (std::array<std::uint64_t, kDictModes>{0, kFull + 1, 0}));
+    EXPECT_EQ(decoded(column, values.size()), values);
+    // The crasher is the encoder's own block for these values.
+    Bytes one;
+    ASSERT_TRUE(encode_dict_block(values, one).has_value());
+    EXPECT_EQ(one, bytes({0x00, 0x00, 0x10, 0x00, 0x17, 0x00, 0x00, 0x00,  // 2^20 values
+                          0x01, 0x01, 0x00, 0x00, 0x00,                    // Huffman, 1 entry
+                          0x01, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00,  // PFOR: 1 value
+                          0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x2A, 0x00, 0x00,
+                          0x00}));                                         // codes of no bits
+}
+
 TEST(Dictionary, EncoderRefusesBadBlockSizes) {
     Bytes out;
     EXPECT_EQ(encode_dict(golden1(), 0, out),
