@@ -117,6 +117,36 @@ def layout_sizes(layout):
     return footer, columns, payload
 
 
+# The query index of itch-store-v2: the seek column and the locate run directory. The locate
+# column itself holds each locate's record indices, which is both the symbol filter and the
+# only copy of the records' locates, so it is listed beside the index, not in it.
+QUERY_INDEX_COLUMNS = ("seek", "locate_run", "locate_run_records", "locate_run_adds")
+
+
+def query_index(columns, stored):
+    """The bytes the queries' index costs, from the layout's columns alone."""
+    parts = {name: {"payload_bytes": columns[name]["payload_bytes"],
+                    "metadata_bytes": columns[name]["metadata_bytes"]}
+             for name in QUERY_INDEX_COLUMNS if name in columns}
+    total = sum(part["payload_bytes"] + part["metadata_bytes"] for part in parts.values())
+    locate = columns.get("locate", {})
+    return {
+        "what": "the seek column (per segment the column maxima, then per seek group the time "
+                "zone map, imports and records of each type) and the locate run directory "
+                "(each run's locate, records and adds); the segment summaries in the footer "
+                "metadata hold each segment's times and locate bitmap",
+        "columns": parts,
+        "index_bytes": total,
+        "fraction_of_file": total / stored,
+        "locate_column": {
+            "payload_bytes": locate.get("payload_bytes", 0),
+            "metadata_bytes": locate.get("metadata_bytes", 0),
+            "note": "each locate's record indices: the symbol filter, and the only copy of the "
+                    "records' locates, so data as much as index",
+        },
+    }
+
+
 def g2_runs(folder, flips, pin):
     data, footer = flips["data"], flips["footer"]
     corrupt = {
@@ -253,6 +283,7 @@ def assemble(folder, day, commit, host, capacity):
             "import_ref_metadata_bytes": import_ref.get("metadata_bytes", 0),
             "imports": import_ref.get("values", 0),
         },
+        "query_index": query_index(columns, stored),
         "columns": columns,
         "cr1": cr1,
         "cr2": cr2,

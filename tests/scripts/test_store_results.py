@@ -93,6 +93,25 @@ class StoreResults(unittest.TestCase):
         return results.assemble(self.dir, day, "abc1234", "macOS",
                                 capacity() if cap is None else cap)
 
+    def test_query_index_bytes_come_from_the_seek_and_run_directory_columns(self):
+        document = layout()
+        document["columns"][0]["payload_bytes"] = 540
+        document["columns"] += [
+            {"column": "locate", "payload_bytes": 20, "metadata_bytes": 0, "blocks": 3,
+             "zstd_blocks": 0, "values": 10},
+            {"column": "seek", "payload_bytes": 30, "metadata_bytes": 0, "blocks": 3,
+             "zstd_blocks": 0, "values": 40},
+            {"column": "locate_run", "payload_bytes": 10, "metadata_bytes": 0, "blocks": 3,
+             "zstd_blocks": 0, "values": 4},
+        ]
+        self.write("layout.json", document)
+        _, size = self.assemble()
+        index = size["query_index"]
+        self.assertEqual(index["index_bytes"], 40)
+        self.assertEqual(sorted(index["columns"]), ["locate_run", "seek"])
+        self.assertAlmostEqual(index["fraction_of_file"], 0.04)
+        self.assertEqual(index["locate_column"]["payload_bytes"], 20)
+
     def test_sizes_ratio_and_verdicts(self):
         roundtrip, size = self.assemble()
         self.assertEqual(size["stored_bytes"], 1000)
