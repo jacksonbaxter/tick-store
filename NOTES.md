@@ -686,6 +686,236 @@ kept with the raw logs.
   resident. Coverage reaches all 126 required functions, now including the PFOR, Stream VByte, lane-packing and patch-list
   decoders and encoders and the new oracles, with lines at 93.9% and functions at 98.1%.
 
+### Every field: references, shares and the rest
+
+CR-6 is met for the references that create orders, and for the references that name an order once each is stored as a
+distance within its stock. CR-7 is met for add and replace shares and missed for execute and cancel shares, by 0.11 and 0.19
+bits at best, above a floor no context-free code can pass. The whole store is estimated at 5.50 and 5.49 times smaller than
+the source with the codecs alone, and 5.98 and 5.96 times with zstd level 1 where it pays: CR-1 and CR-2 are met with room.
+The figures are from `results/codec-eval-*.json`, written by `tools/tick_codec_eval` at `0d55bfe`, and from
+`results/store-estimate.json`, written by `scripts/store_estimate.py`. Every value of every column, codec and zstd frame came
+back exact on both days, and both 2^32 Price(4) proofs had 0 failures. Days are `12302019` then `10302019`, as before.
+
+**What was built.**
+
+- Head delta in PFOR (`c5b0e6a`): each value against one of its seven most recently used heads, a 3-bit token per value and
+  token 7 an escape to a plain value. It falls back to delta where it cannot code.
+- A dictionary codec (`dictionary.hpp`). A block's distinct values once, then each value as an index. Three modes, the smallest
+  kept: a dictionary ranked by use with PFOR indices, so the common values take few bits and PFOR patches the rest as
+  exceptions; the same with canonical Huffman indices; and a sorted dictionary with move-to-front ranks, for up to 2,048
+  entries. The dictionary's order is part of the format and every entry must be used, so each set of values has one dictionary.
+- A run-length codec (`run_length.hpp`): run values as one PFOR block, plain or delta, and run lengths as another. Runs must be
+  maximal.
+- `tick_codec_eval` now covers every field, with 54 columns, Stream VByte on plain values, zstd 1.5.7 at level 1 through a
+  pinned FetchContent tarball and hash, and a pass that keeps the order book by reference, so it can measure distances back to
+  each order's creation and check what a field could be derived from. `--columns` runs a subset; the committed results are each
+  one full run.
+
+**What `A`'s two modes of delta follow: about four interleaved counters, not the stock, side or participant.** The census found
+a previous-value delta that is either small or very large. With seven heads, 46.3% and 45.7% of add references are within
+reach of the most recent head, and 99.9% of a head of the seven:
+
+| Head delta token | 0 | 1 | 2 | 3 | 4 | 5 | 6 | Escape |
+|---|---|---|---|---|---|---|---|---|
+| Add references, `12302019` | 54,870,023 | 26,630,228 | 20,048,508 | 16,746,218 | 63,550 | 66,940 | 95,588 | 110,401 |
+| Add references, `10302019` | 58,732,562 | 29,078,870 | 22,069,675 | 18,446,426 | 58,029 | 62,881 | 89,490 | 100,624 |
+
+- Tokens 0 to 3 take 99.7% of values, and tokens 4 to 6 fewer than 0.2%. So there are about four live sequences at a time.
+  The token's entropy is 1.86 and 1.87 bits, the gap's after it 2.47 and 2.41, and the two together 4.11 and 4.09.
+- Plain deltas step in multiples of 4: +4 for 38.6 and 41.2 million adds, +8 for 9.8 and 10.3 million, +12 for 3.3 and 3.6
+  million, +16 for 1.3 and 1.5 million. Every delta between -16 and +16 that is not a multiple of 4 occurs fewer than 10 times.
+  The other 55% are outside ±16, about equally above and below: that is the jump between counters.
+- The sequences barely follow anything a message carries. When a head is reused, its previous owner had the same locate 36.0%
+  and 34.9% of the time, against 26.7% and 25.6% for consecutive adds. Same side 62.5% and 62.2%, against 60.8% and 60.4%. Same
+  participant, among attributed adds, 66.6% and 66.7%, against 63.3% and 62.9%. Each is within 10 points of the baseline.
+- So references come from a few counters that advance in steps of 4, interleaved in file order by something not in the
+  message. Head delta follows them without knowing what they are.
+
+**CR-6, order references, at most 11.2 bits per value: met for creations, and for the rest as per-stock distances.**
+
+| Column | Best codec | Bits per value | With zstd | CR-6 |
+|---|---|---|---|---|
+| `A` references, file order | `pfor-head-delta` | 8.465, 8.371 | 5.847, 5.804 | met |
+| `A`, `F` and `U` new references together | `pfor-head-delta` | **7.797, 7.641** | 5.420, 5.332 | met |
+| `U` new reference alone | `pfor-head-delta` | 11.207, 11.027 | 8.487, 8.330 | missed by 0.007, then met |
+| `A` references per locate | `svb-delta` | 14.053, 14.078 | 10.813, 10.884 | missed |
+| `A` reference less the running maximum | `dict` | 11.500, 11.519 | 10.171, 10.168 | missed by 0.30 and 0.32 |
+| `U` new less original | `rle` | 17.656, 17.657 | 15.963, 16.054 | missed |
+| References of `E`, `C`, `X`, `D` and `U` original, as values | `svb-delta` | 25.680, 23.994 | 24.090, 22.924 | missed |
+| The same, one stream per type | `svb-delta` | 25.729, 23.959 | 24.084, 22.845 | missed |
+
+- Against the running maximum, the best codec is 3.0 and 3.1 bits worse than head delta. Plain delta, patched, is 23.95 and
+  Stream VByte on delta 21.41 on `12302019`. Patched outliers are in every PFOR figure; unpatched delta is 26.47.
+- `U`'s new reference is a creation, and coded in the creation stream it costs what an add does. On its own it misses by
+  0.007 bits on `12302019` and meets on `10302019` by 0.17. Coding it against the original costs 17.7.
+- A reference that names an order is better stored as how far back its order was created, counting creations (`A`, `F`, `U`
+  new). Counting all creations, that misses. Counting only creations in the order's stock, it meets, for every type on both
+  days:
+
+| Type | Messages | Distance in all creations | Its order-0 entropy | Distance in the stock's creations (`dict`) | Its order-0 entropy |
+|---|---|---|---|---|---|
+| `E` | 5,722,824, 7,316,703 | 20.704, 20.080 | 17.677, 17.344 | **9.217, 8.732** | 7.608, 7.344 |
+| `C` | 99,917, 129,729 | 15.587, 14.954 | 12.066, 11.567 | **6.110, 6.023** | 5.624, 5.507 |
+| `X` | 2,787,676, 3,568,735 | 17.664, 17.335 | 14.580, 14.516 | **7.068, 7.442** | 6.049, 6.370 |
+| `D` | 114,360,997, 123,296,742 | 18.303, 18.355 | 15.870, 15.914 | **7.478, 7.543** | 6.371, 6.425 |
+| `U` original | 21,639,067, 25,513,651 | 17.607, 17.783 | 15.300, 15.517 | **6.755, 6.806** | 5.987, 6.044 |
+
+- The per-stock distance needs the message's locate to find the stream, so it holds only with the locate column stored. The
+  store keeps that column anyway, since every message carries a locate.
+- Every reference resolved: 0 messages named an order not on the book, on either day, and 0 had a locate other than its order's.
+  The book peaked at 1,924,078 and 1,824,830 live orders and was empty at the end of both days, with 0 duplicate creations.
+- A decoder rebuilds the reference from the distance by keeping each stock's creations, not the book: the order it names is
+  the one created that many creations back in the same stock.
+
+**Locality of referencing messages.** The share of each type whose order was created in the same block of creations, or the
+same aligned window of time:
+
+| Type | Same 1,024 creations | Same 4,096 | Same 65,536 | Same 1 ms | Same 1 s | Same 60 s |
+|---|---|---|---|---|---|---|
+| `E` | 15.6%, 16.8% | 19.1%, 20.6% | 37.8%, 41.3% | 7.1%, 8.0% | 21.4%, 23.6% | 61.5%, 67.4% |
+| `C` | 45.0%, 50.3% | 54.7%, 60.1% | 79.5%, 83.1% | 18.6%, 22.9% | 60.4%, 67.0% | 90.0%, 92.5% |
+| `X` | 29.4%, 31.0% | 46.2%, 45.2% | 73.7%, 73.3% | 3.1%, 3.9% | 45.5%, 42.1% | 83.9%, 84.5% |
+| `D` | 24.5%, 24.6% | 33.0%, 32.6% | 63.7%, 62.5% | 8.7%, 9.0% | 36.3%, 36.4% | 82.3%, 82.4% |
+| `U` original | 32.1%, 30.7% | 41.1%, 39.4% | 65.7%, 64.6% | 10.6%, 10.2% | 45.1%, 44.3% | 82.1%, 82.0% |
+
+- Most referencing messages fall outside the block their order was created in, at any block size a store would use. A store
+  cannot keep an order's life in one block, so a reference must be resolvable across blocks, as the per-stock distance is.
+- Executions are the least local: 61.5% and 67.4% within the same minute, against 82% for deletes.
+
+**CR-7, shares, at most 3.8 bits per value: met for adds and replaces, missed for executions and cancels.**
+
+| Column | Best codec | Bits per value | With zstd | Order-0 entropy | CR-7 |
+|---|---|---|---|---|---|
+| `A` and `F` shares, file order | `dict` | **3.687, 3.643** | 3.680, 3.633 | 3.149, 3.095 | met |
+| `A` and `F` shares, per locate | `dict` | **2.614, 2.549** | 2.550, 2.481 | same values | met |
+| `U` shares | `dict` | **2.570, 2.655** | 2.433, 2.533 | 2.140, 2.220 | met |
+| `E` executed shares | `dict` | 6.077, 6.007 | 6.079, 6.008 | 5.362, 5.307 | missed |
+| `C` executed shares | `dict` | 4.842, 4.541 | 4.839, 4.539 | 4.187, 3.982 | missed |
+| `X` cancelled shares | `dict` | 5.275, 5.324 | 5.271, 5.319 | 4.589, 4.616 | missed |
+| `E`, `C` and `X` shares as 0 when all remaining shares, else shares + 1 | `dict` | 3.907, 3.992 | 3.895, 3.989 | 3.886, 3.987 | missed by 0.107 and 0.192 |
+| `P` shares | `dict` | 5.711, 5.383 | 5.712, 5.384 | 5.005, 4.723 | missed |
+| `Q` shares | `pfor-for` | 7.758, 7.717 | 6.633, 6.463 | 4.508, 4.440 | missed |
+| `I` paired shares | `pfor-for` | 5.068, 5.031 | 4.366, 4.292 | 3.298, 3.223 | missed |
+
+- On add shares the dictionary beats run-length (5.56), the scaled frame of reference (5.60) and plain bit-packing by PFOR
+  (10.22) on `12302019`. Every shares column picks the dictionary except `Q` and `I`, where frame of reference is smaller.
+- An execution of all the order's remaining shares is common: 73.6% and 71.9% of `E`, 60.9% and 64.6% of `C`. No `X` cancels
+  all of them, since that is a `D`. Coding that case as 0 brings the three to 3.91 and 3.99 bits. Their order-0 entropy is 3.89
+  and 3.99, so the miss is not the codec: a code that sees each value with no context cannot reach 3.8 on these values.
+  Context the book holds, such as the remaining shares as an upper bound, is the next thing to try. It is in TASKS.md.
+
+**The other fields.** Each field a day needs to be re-serialised exactly, with its best codec, its bits per value, and what
+the result depends on:
+
+| Field | Best column and codec | Bits per value | With zstd | Depends on |
+|---|---|---|---|---|
+| Message type | `dict` | 1.799, 1.824 | 1.776, 1.808 | Order-0 entropy 1.708 and 1.736; order 1 is 1.561 and 1.590, so the previous type would save 0.15 |
+| Stock locate, every message | `dict` | 9.284, 9.306 | 8.343, 8.381 | Order-0 entropy 11.17. Recency rank's entropy is 6.76 and 6.80: a stock just used is likely next |
+| Stock locate, only messages that name no order | `dict` | 11.365, 11.434 | 10.151, 10.196 | Costs more per value and loses: referencing messages then need their locate from the book |
+| Tracking number | per type, `dict` | 0.156, 0.163 | 0.147, 0.154 | One stream per type; in file order it costs 0.402 and 0.450 |
+| `A` and `F` side | `dict` | 1.066, 1.066 | 1.065, 1.065 | One bit of entropy; per locate it is no better, 1.080 and 1.077 |
+| `F` attribution | `dict` | 2.941, 3.122 | 2.850, 3.037 | Below its order-0 entropy of 4.60 and 4.84: a participant repeats within a block |
+| Match number | `pfor-delta` | 0.499, 0.357 | 0.152, 0.132 | Its delta's order-0 entropy is 0.039 on `12302019`: it rises by the same step almost always |
+| `C` printable | `rle` | 0.557, 0.399 | 0.498, 0.369 | Long runs of one value |
+| `P` reference and side | `pfor-delta`, `dict` | 0.061, 0.061 | 0.037, raw zstd | One value each all day: order-0 entropy 0 |
+| `Q` price, shares, cross type | `pfor-for-scaled`, `pfor-for`, `dict` | 7.012, 7.758, 0.091 | 6.363, 6.633, 0.092 | 17,836 and 17,775 crosses: small enough that the choice hardly matters |
+| `I` prices, flags | `pfor-delta-scaled`, `dict` | 5.194, 2.239 | 4.466, 1.219 raw | Three prices per message; zstd on the raw flag bytes halves them |
+| `S`, `R`, `H`, `Y`, `L`, `W`, `K`, `J`, `h`, `N`, `O` payloads | bytes, `dict` | 3.930, 3.928 | 2.729, 2.728 raw | 3.7 million bytes a day; zstd wins on the raw bytes |
+| `V` levels | `gorilla-xor-f64-integer` | 93.3, 90.7 | the same | Three values a day |
+
+- Timestamps and the price columns are as in "Integer codecs on ITCH".
+- Locate: move-to-front over the 8,907 and 8,887 locates in use would cost at least its recency entropy, 6.76 and 6.80 bits,
+  2.5 below the dictionary. No codec for it was built: the dictionary's move-to-front mode stops at 2,048 entries, and a
+  recency rank over 8,900 entries needs a Fenwick tree or similar per value. It is in TASKS.md, with its decode cost unknown.
+- Stock symbols in `A`, `F`, `P`, `Q` and `I` all agree with the stock directory's symbol for their locate, so they are derived
+  and not stored. On `12302019`, 3 `K` messages on locate 0 have no directory entry; `K` is stored whole with the other rare
+  types. Lengths are derived from the type: no message on either day had another length. The estimate charges an exception
+  for any of these that fails; none did.
+
+**zstd: worth it on three columns, not as a layer over everything.** zstd 1.5.7 at level 1 was run on every encoded block
+and on every raw block of every column, and each frame was decompressed and compared with the input. Taken wherever it is
+smaller, in the mixed layout below, it saves 121.6 and 128.4 MB, 8.1% and 7.8% of the store. Most of that is a few columns:
+
+| Column | Saved by zstd on the encoded blocks | Share of the column | zstd decompress time over the codec's decode time |
+|---|---|---|---|
+| Creation references (`pfor-head-delta`) | 41.7, 44.5 MB | 30.5%, 30.2% | 0.16, 0.16 |
+| Stock locate (`dict`) | 31.6, 34.0 MB | 10.1%, 9.9% | 0.05, 0.05 |
+| Add prices per locate and side (`pfor-delta-scaled`) | 15.8, 16.8 MB | 19.5%, 18.6% | 0.54, 0.54 |
+| Timestamps (`pfor-delta`) | 13.8, 13.8 MB | 2.2%, 2.0% | 1.09, 1.05 |
+| Per-stock distances, `D` (on plain Stream VByte, against `dict` alone) | 7.6, 8.1 MB | 7.1%, 7.0% | 0.92, 0.95, over Stream VByte's decode |
+| Add prices, file order (on `pfor-delta-scaled`, against `pfor-for-scaled` alone) | 12.2, 10.0 MB | 5.4%, 4.1% | 1.04, 0.99 |
+
+- The times are relative, from the same run, and are not reported as speeds. A reader decoding a zstd block pays the
+  decompression on top of the codec's decode: 1.05 to 2.09 times the codec's time alone on the rows above.
+- On shares, side and type, zstd saves under 1.5%: 0.2% on add shares in file order, 1.3% and 0.8% on message types.
+- Raw values under zstd lose to the codecs on every large column but one: 33.8 bits on timestamps, 14.4 on creation
+  references, 11.5 on locate. The exception is near-constant columns: per-type tracking numbers, 0.119 against the dictionary's
+  0.156, where zstd's run matching wins. It also wins on the small byte columns, `I` flags and the rare payloads.
+- So the store should apply zstd level 1 to the blocks of three columns: creation references, stock locate and per-locate add
+  prices. They save 89.1 and 95.3 MB a day, at 0.05 to 0.54 times their decode time. Timestamps are left without it: 2% for
+  twice the decode time. With zstd on those three only, the mixed layout comes to about 1,412.5 and 1,549.0 MB, ratios of
+  about 5.84 and 5.83, by subtracting their savings from the codecs-alone estimate.
+
+**The whole store, estimated.** `scripts/store_estimate.py` adds the best exact codec for each field, block headers and
+counts included, an index entry of 24 bytes per block of each column, and the exceptions a derived field would need. It is an
+estimate, not a store: no store file exists, the index size is a stated guess, and a file format will add a header and its
+own framing. Blocks are 4,096 values; the 1,024 granularity was not run.
+
+| Layout | Codecs alone | Ratio to the source | With zstd where it pays | Ratio |
+|---|---|---|---|---|
+| (a) file order, per-type columns, locate stored | 1,662,011,815, 1,812,775,943 | 4.965, 4.984 | 1,544,822,619, 1,692,076,518 | 5.341, 5.340 |
+| (b) per locate, file-order locate stored | 1,830,342,637, 2,009,558,058 | 4.508, 4.496 | 1,688,026,813, 1,857,270,328 | 4.888, 4.865 |
+| mixed: each column in its smaller order | **1,501,612,644, 1,644,285,347** | **5.495, 5.495** | **1,380,003,932, 1,515,912,474** | **5.979, 5.960** |
+
+- **CR-1, at least 2.3415 on `12302019`: met by every layout.** The weakest, per locate with codecs alone, is 4.508, 1.93 times
+  the floor. `10302019`'s gzip ratio is 2.333, and every layout there is at least 4.496.
+- **CR-2, smaller than Parquet, ArcticDB and QuestDB on `12302019`: met by every layout.** The mixed layout with zstd is 0.432
+  of Parquet's 3,191,406,592 bytes, 0.217 of ArcticDB's 6,352,666,624 and 0.060 of QuestDB's 22,897,786,880. The weakest,
+  per locate with codecs alone, is 0.574 of Parquet.
+- Per locate loses to file order by 168 and 197 MB because timestamps per locate cost 25.49 bits against 18.76 in file
+  order, 226 MB a day. It wins on add prices by 145 MB and on add shares by 16 MB, and loses on add references by 102 MB.
+- The mixed layout keeps timestamps and creation references in file order and add prices and shares per locate. Side is
+  smaller in file order with the codecs alone and per locate with zstd, by under 0.4 MB either way. A reader
+  follows the stored locate column to know which stream holds a row's next value, so columns need not share an order.
+- Index entries are 10.6 to 12.5 MB a day, under 1% of any layout. 0 exceptions were charged.
+- **Recommendation: the mixed layout, with zstd on the three columns above.** File order for timestamps, creation references
+  and every column of rare types; add prices and shares per locate; referencing messages' references as distances within
+  their stock; and the file-order locate column stored. If one order for every column is required, file order: with the
+  codecs alone it is 10.7% larger than mixed on `12302019`, and per locate 21.9% larger.
+
+**Exactness and cost of a run.** 0 blocks refused, 0 values changed and 0 zstd frames differing, over 54 columns on both days.
+Each run took 947.3 and 950.2 s, 4.6 and 4.2 times the previous 206.7 and 225.2 s. Peak resident size was 14.1 and 14.9 GB, the source
+mapping included; the peak footprint beyond that was 6.01 and 5.76 GB, against 1.36 and 1.27 GB. The growth comes with the 45 new columns,
+each held whole for the day, and the book pass; which part dominates was not measured. `--columns` runs only
+the columns named, for exploring.
+
+**Checks.**
+
+- `fuzz_dictionary` and `fuzz_run_length` are new, with seeds from the real encoders on short, repeated, low-cardinality and
+  wide inputs, and a hand-built block for each refusal the decoders make. Their oracles decode, re-encode with every mode and
+  check values, and also require a dictionary's entry count to equal the block's distinct values and a run-length block's run
+  count to equal its maximal runs, since a decoder that accepts a repeated entry or a split run would otherwise pass.
+- They are registered in `scripts/check.sh`, CI's scheduled fuzz matrix, whose timeout rose from 300 to 360 minutes for ten
+  targets, and the coverage list, which gains 14 required functions.
+- 240 s each under `heavy.sh`: `fuzz_dictionary` 15,519 runs, `fuzz_pfor` 19,753 and `fuzz_run_length` 57,493, with no crash,
+  1.37 GB peak resident for the three.
+- Three faults are proven caught, one per codec family, by `scripts/prove_checks.py --only` in throwaway clones. Each was
+  caught while libFuzzer was still running the seed corpus, so the real-encoder and hand-built seeds alone find them:
+  - A head-delta inverse that overwrites the front head on an escape instead of pushing the heads down. `check_pfor_column`:
+    "a re-encoded column did not decode to the same values".
+  - A dictionary decoder that accepts a repeated entry. `check_dict_column`: "a dictionary block's entry count is not its count
+    of distinct values".
+  - A run-length decoder that accepts two neighbouring runs of one value. `check_rle_column`: "a run-length block's run count is
+    not its count of maximal runs".
+- The seed generator first rejected a refusal seed that the faulty decoder accepted, which stopped the build before the fuzzer
+  ran. It now checks only the seeds meant to be valid; the unit fixtures already check each refusal (`358d571`).
+- `tick_codec_eval`'s new tests hold the book columns to hand-computed values. Seven injected faults in the tool, and eight in
+  `store_estimate.py`, each failed a test.
+- The whole of `scripts/check.sh` passes on macOS at `e61dbce`, all 27 steps, in 804 s under `heavy.sh`, peaking at 1.24 GB
+  resident. Coverage reaches all 140 required functions, now including the dictionary and run-length decoders, encoders and
+  oracles, with lines at 93.95% and functions at 98.03%. One Python test is skipped by design on macOS: it checks the pinned
+  path, which exists only on Linux.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from

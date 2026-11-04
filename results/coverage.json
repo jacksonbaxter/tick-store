@@ -1,45 +1,45 @@
 {
   "schema": "tick-store-coverage-1",
-  "commit": "203d9dca7e5e",
+  "commit": "e61dbced53fc",
   "platform": "Darwin arm64",
   "run": "tests/unit, with ItchRealDay left out so the report needs no data file.",
   "simd_kernels": "No SIMD kernels exist yet, so none are reported and none are claimed.",
   "python_validators": "llvm-cov measures the C++ only. The Python validators are shown failing rule by rule in tests/scripts/ instead.",
   "totals": {
-    "lines_covered": 6009,
-    "lines_total": 6398,
-    "lines_percent": 93.92,
-    "functions_covered": 580,
-    "functions_total": 591,
-    "functions_percent": 98.14
+    "lines_covered": 7178,
+    "lines_total": 7640,
+    "lines_percent": 93.95,
+    "functions_covered": 648,
+    "functions_total": 661,
+    "functions_percent": 98.03
   },
   "required": {
-    "total": 126,
-    "reached": 126,
+    "total": 140,
+    "reached": 140,
     "functions": [
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<SystemEvent>",
-        "calls": 1698180
+        "calls": 3498192
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<SystemEvent>",
-        "calls": 1521661
+        "calls": 3321661
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<StockDirectory>",
-        "calls": 1011815
+        "calls": 1011910
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<StockDirectory>",
-        "calls": 1004959
+        "calls": 1005073
       },
       {
         "group": "decoder",
@@ -81,7 +81,7 @@
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<MwcbDeclineLevel>",
-        "calls": 397920
+        "calls": 397928
       },
       {
         "group": "encoder",
@@ -141,97 +141,97 @@
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<AddOrder>",
-        "calls": 308887
+        "calls": 309027
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<AddOrder>",
-        "calls": 456719
+        "calls": 456839
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<AddOrderWithMpid>",
-        "calls": 337493
+        "calls": 337570
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<AddOrderWithMpid>",
-        "calls": 494837
+        "calls": 494903
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<OrderExecuted>",
-        "calls": 243794
+        "calls": 243874
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<OrderExecuted>",
-        "calls": 354727
+        "calls": 354823
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<OrderExecutedWithPrice>",
-        "calls": 304540
+        "calls": 304600
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<OrderExecutedWithPrice>",
-        "calls": 439049
+        "calls": 439109
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<OrderCancel>",
-        "calls": 211539
+        "calls": 211574
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<OrderCancel>",
-        "calls": 302233
+        "calls": 302275
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<OrderDelete>",
-        "calls": 180607
+        "calls": 180667
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<OrderDelete>",
-        "calls": 255075
+        "calls": 255147
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<OrderReplace>",
-        "calls": 271908
+        "calls": 271962
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<OrderReplace>",
-        "calls": 379537
+        "calls": 379591
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<Trade>",
-        "calls": 332530
+        "calls": 332596
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<Trade>",
-        "calls": 459273
+        "calls": 459339
       },
       {
         "group": "decoder",
@@ -297,25 +297,25 @@
         "group": "parser",
         "file": "src/itch/codec.cpp",
         "name": "decode",
-        "calls": 984181
+        "calls": 1284253
       },
       {
         "group": "parser",
         "file": "src/itch/codec.cpp",
         "name": "decode_strict",
-        "calls": 1291181
+        "calls": 1591253
       },
       {
         "group": "parser",
         "file": "src/itch/codec.cpp",
         "name": "encode",
-        "calls": 1331584
+        "calls": 1631656
       },
       {
         "group": "parser",
         "file": "src/itch/codec.cpp",
         "name": "encode_frame",
-        "calls": 1321503
+        "calls": 1621575
       },
       {
         "group": "parser",
@@ -333,31 +333,31 @@
         "group": "parser",
         "file": "include/tick_store/itch/frame.hpp",
         "name": "FrameCursor::next",
-        "calls": 2123960
+        "calls": 2424039
       },
       {
         "group": "parser",
         "file": "include/tick_store/itch/big_endian.hpp",
         "name": "BigEndianReader::read_uint",
-        "calls": 7440553
+        "calls": 8641039
       },
       {
         "group": "parser",
         "file": "include/tick_store/itch/big_endian.hpp",
         "name": "BigEndianReader::read_byte",
-        "calls": 2898168
+        "calls": 3498325
       },
       {
         "group": "parser",
         "file": "include/tick_store/itch/big_endian.hpp",
         "name": "BigEndianReader::read_bytes",
-        "calls": 782799
+        "calls": 782843
       },
       {
         "group": "parser",
         "file": "include/tick_store/store/little_endian.hpp",
         "name": "read_le",
-        "calls": 9464707
+        "calls": 20739759
       },
       {
         "group": "parser",
@@ -399,7 +399,7 @@
         "group": "parser",
         "file": "src/store/mapped_file.cpp",
         "name": "MappedFile::open",
-        "calls": 13242
+        "calls": 13244
       },
       {
         "group": "parser",
@@ -423,31 +423,31 @@
         "group": "codec",
         "file": "include/tick_store/codec/bit_stream.hpp",
         "name": "BitReader::read",
-        "calls": 4034615
+        "calls": 5604053
       },
       {
         "group": "codec",
         "file": "include/tick_store/codec/bit_stream.hpp",
         "name": "BitReader::finish",
-        "calls": 154799
+        "calls": 230457
       },
       {
         "group": "codec",
         "file": "src/codec/block.cpp",
         "name": "read_block_header",
-        "calls": 962623
+        "calls": 6600149
       },
       {
         "group": "codec",
         "file": "src/codec/block.cpp",
         "name": "decode_column",
-        "calls": 183026
+        "calls": 337054
       },
       {
         "group": "codec",
         "file": "src/codec/gorilla_timestamps.cpp",
         "name": "decode_timestamp_block",
-        "calls": 63735
+        "calls": 63784
       },
       {
         "group": "codec",
@@ -459,7 +459,7 @@
         "group": "codec",
         "file": "src/codec/gorilla_xor.cpp",
         "name": "decode_xor_block",
-        "calls": 102290
+        "calls": 102416
       },
       {
         "group": "codec",
@@ -477,97 +477,97 @@
         "group": "codec",
         "file": "src/codec/price_double.cpp",
         "name": "double_to_scaled",
-        "calls": 1033822
+        "calls": 1033926
       },
       {
         "group": "codec",
         "file": "include/tick_store/codec/bit_stream.hpp",
         "name": "BitWriter::write",
-        "calls": 1477481
+        "calls": 2493057
       },
       {
         "group": "codec",
         "file": "include/tick_store/codec/bit_stream.hpp",
         "name": "BitWriter::finish",
-        "calls": 110722
+        "calls": 162157
       },
       {
         "group": "codec",
         "file": "src/codec/gorilla_timestamps.cpp",
         "name": "encode_timestamp_block",
-        "calls": 46764
+        "calls": 46813
       },
       {
         "group": "codec",
         "file": "src/codec/gorilla_xor.cpp",
         "name": "encode_xor_block",
-        "calls": 63419
+        "calls": 63545
       },
       {
         "group": "codec",
         "file": "src/codec/lane_pack.cpp",
         "name": "unpack_vector",
-        "calls": 10311
+        "calls": 10738
       },
       {
         "group": "codec",
         "file": "src/codec/lane_pack.cpp",
         "name": "unpack_linear",
-        "calls": 41524855
+        "calls": 82592540
       },
       {
         "group": "codec",
         "file": "src/codec/lane_pack.cpp",
         "name": "pack_vector",
-        "calls": 3979
+        "calls": 5822
       },
       {
         "group": "codec",
         "file": "src/codec/lane_pack.cpp",
         "name": "pack_linear",
-        "calls": 3697270
+        "calls": 16261323
       },
       {
         "group": "codec",
         "file": "src/codec/patch_list.cpp",
         "name": "read_patches",
-        "calls": 275059
+        "calls": 454006
       },
       {
         "group": "codec",
         "file": "src/codec/patch_list.cpp",
         "name": "append_patches",
-        "calls": 426791
+        "calls": 4025870
       },
       {
         "group": "codec",
         "file": "src/codec/pfor.cpp",
         "name": "decode_pfor_block",
-        "calls": 3976106
+        "calls": 27631004
       },
       {
         "group": "codec",
         "file": "src/codec/pfor.cpp",
         "name": "decode_pfor",
-        "calls": 122693
+        "calls": 260564
       },
       {
         "group": "codec",
         "file": "src/codec/pfor.cpp",
         "name": "encode_pfor_block",
-        "calls": 36207
+        "calls": 5223335
       },
       {
         "group": "codec",
         "file": "src/codec/pfor.cpp",
         "name": "encode_pfor",
-        "calls": 110407
+        "calls": 245464
       },
       {
         "group": "codec",
         "file": "src/codec/stream_vbyte.cpp",
         "name": "decode_svb_block",
-        "calls": 2284066
+        "calls": 2890264
       },
       {
         "group": "codec",
@@ -579,13 +579,73 @@
         "group": "codec",
         "file": "src/codec/stream_vbyte.cpp",
         "name": "encode_svb_block",
-        "calls": 121042
+        "calls": 122302
       },
       {
         "group": "codec",
         "file": "src/codec/stream_vbyte.cpp",
         "name": "encode_svb",
         "calls": 10876
+      },
+      {
+        "group": "codec",
+        "file": "src/codec/dictionary.cpp",
+        "name": "decode_dict_block",
+        "calls": 80344
+      },
+      {
+        "group": "codec",
+        "file": "src/codec/dictionary.cpp",
+        "name": "decode_dict",
+        "calls": 6253
+      },
+      {
+        "group": "codec",
+        "file": "src/codec/dictionary.cpp",
+        "name": "encode_dict_block",
+        "calls": 51261
+      },
+      {
+        "group": "codec",
+        "file": "src/codec/dictionary.cpp",
+        "name": "encode_dict",
+        "calls": 4033
+      },
+      {
+        "group": "codec",
+        "file": "src/codec/dictionary.cpp",
+        "name": "read_huffman",
+        "calls": 75692
+      },
+      {
+        "group": "codec",
+        "file": "src/codec/dictionary.cpp",
+        "name": "huffman_lengths",
+        "calls": 173624
+      },
+      {
+        "group": "codec",
+        "file": "src/codec/run_length.cpp",
+        "name": "decode_rle_block",
+        "calls": 1638638
+      },
+      {
+        "group": "codec",
+        "file": "src/codec/run_length.cpp",
+        "name": "decode_rle",
+        "calls": 5546
+      },
+      {
+        "group": "codec",
+        "file": "src/codec/run_length.cpp",
+        "name": "encode_rle_block",
+        "calls": 1633664
+      },
+      {
+        "group": "codec",
+        "file": "src/codec/run_length.cpp",
+        "name": "encode_rle",
+        "calls": 5152
       },
       {
         "group": "validator",
@@ -657,13 +717,13 @@
         "group": "validator",
         "file": "fuzz/codec_oracles.hpp",
         "name": "check_one_block",
-        "calls": 18164
+        "calls": 26865
       },
       {
         "group": "validator",
         "file": "fuzz/codec_oracles.hpp",
         "name": "check_as_values",
-        "calls": 7043
+        "calls": 10871
       },
       {
         "group": "validator",
@@ -675,7 +735,7 @@
         "group": "validator",
         "file": "fuzz/codec_oracles.hpp",
         "name": "check_pfor_column",
-        "calls": 2243
+        "calls": 3792
       },
       {
         "group": "validator",
@@ -693,7 +753,31 @@
         "group": "validator",
         "file": "fuzz/codec_oracles.hpp",
         "name": "pfor_block_encoders",
-        "calls": 4361
+        "calls": 7765
+      },
+      {
+        "group": "validator",
+        "file": "fuzz/codec_oracles.hpp",
+        "name": "check_dict_column",
+        "calls": 1000
+      },
+      {
+        "group": "validator",
+        "file": "fuzz/codec_oracles.hpp",
+        "name": "check_dict_block",
+        "calls": 1260
+      },
+      {
+        "group": "validator",
+        "file": "fuzz/codec_oracles.hpp",
+        "name": "check_rle_column",
+        "calls": 1279
+      },
+      {
+        "group": "validator",
+        "file": "fuzz/codec_oracles.hpp",
+        "name": "check_rle_block",
+        "calls": 1307
       },
       {
         "group": "oracle",
@@ -802,6 +886,14 @@
     },
     {
       "file": "src/harness/codec_eval.cpp",
+      "function": "harness::OrderBook::grow"
+    },
+    {
+      "file": "src/harness/codec_eval.cpp",
+      "function": "harness::kinds"
+    },
+    {
+      "file": "src/harness/codec_eval.cpp",
       "function": "harness::prove_price4"
     },
     {
@@ -905,11 +997,11 @@
     },
     {
       "file": "include/tick_store/codec/int_transform.hpp",
-      "lines_covered": 47,
-      "lines_total": 47,
+      "lines_covered": 92,
+      "lines_total": 92,
       "lines_percent": 100.0,
-      "functions_covered": 6,
-      "functions_total": 6,
+      "functions_covered": 9,
+      "functions_total": 9,
       "functions_percent": 100.0
     },
     {
@@ -959,11 +1051,11 @@
     },
     {
       "file": "include/tick_store/harness/codec_eval.hpp",
-      "lines_covered": 6,
-      "lines_total": 6,
+      "lines_covered": 13,
+      "lines_total": 13,
       "lines_percent": 100.0,
-      "functions_covered": 2,
-      "functions_total": 2,
+      "functions_covered": 4,
+      "functions_total": 4,
       "functions_percent": 100.0
     },
     {
@@ -1174,6 +1266,15 @@
       "functions_percent": 100.0
     },
     {
+      "file": "src/codec/dictionary.cpp",
+      "lines_covered": 386,
+      "lines_total": 408,
+      "lines_percent": 94.61,
+      "functions_covered": 17,
+      "functions_total": 17,
+      "functions_percent": 100.0
+    },
+    {
       "file": "src/codec/gorilla_timestamps.cpp",
       "lines_covered": 134,
       "lines_total": 142,
@@ -1211,9 +1312,9 @@
     },
     {
       "file": "src/codec/pfor.cpp",
-      "lines_covered": 537,
-      "lines_total": 551,
-      "lines_percent": 97.46,
+      "lines_covered": 553,
+      "lines_total": 563,
+      "lines_percent": 98.22,
       "functions_covered": 23,
       "functions_total": 23,
       "functions_percent": 100.0
@@ -1225,6 +1326,15 @@
       "lines_percent": 100.0,
       "functions_covered": 3,
       "functions_total": 3,
+      "functions_percent": 100.0
+    },
+    {
+      "file": "src/codec/run_length.cpp",
+      "lines_covered": 130,
+      "lines_total": 142,
+      "lines_percent": 91.55,
+      "functions_covered": 5,
+      "functions_total": 5,
       "functions_percent": 100.0
     },
     {
@@ -1247,12 +1357,12 @@
     },
     {
       "file": "src/harness/codec_eval.cpp",
-      "lines_covered": 719,
-      "lines_total": 790,
-      "lines_percent": 91.01,
-      "functions_covered": 58,
-      "functions_total": 61,
-      "functions_percent": 95.08
+      "lines_covered": 1304,
+      "lines_total": 1418,
+      "lines_percent": 91.96,
+      "functions_covered": 99,
+      "functions_total": 104,
+      "functions_percent": 95.19
     },
     {
       "file": "src/harness/columns_reader.cpp",
