@@ -118,7 +118,9 @@ install_llvm() {
     tar -tJf "$file" | grep -E "$LLVM_KEEP" >"$members"
     unpacked=$(dirname "$file")/llvm
     mkdir "$unpacked"
-    tar -xJf "$file" -C "$unpacked" --strip-components=1 -T "$members"
+    # Every member is named, directories included, so none is reached through its parent:
+    # GNU tar would then call the member's own name not found.
+    tar -xJf "$file" -C "$unpacked" --strip-components=1 --no-recursion -T "$members"
     for tool in "${LLVM_TOOLS[@]}"; do
         if [[ ! -x $unpacked/bin/$tool ]]; then
             echo "install_tools.sh: the LLVM release has no bin/$tool" >&2
