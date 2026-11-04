@@ -406,8 +406,8 @@ TEST(PriceDouble, Price4RoundTripsExactly) {
 }
 
 TEST(PriceDouble, Price8AndIntegersRoundTripUpTo2To53) {
-    for (const std::uint64_t price : {std::uint64_t{0}, std::uint64_t{1}, 320'000'000'000ULL,
-                                      std::uint64_t{1} << 40U}) {
+    for (const std::uint64_t price : {std::uint64_t{0}, std::uint64_t{1},
+                                      std::uint64_t{320'000'000'000ULL}, std::uint64_t{1} << 40U}) {
         EXPECT_EQ(dollars_to_price8(price8_to_dollars(price)), price) << price;
     }
     constexpr std::uint64_t kExact = std::uint64_t{1} << 53U;
