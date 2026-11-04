@@ -99,9 +99,10 @@ never run.
 
 ## Round-trip check
 
-Gates G-1 and G-2 of `BENCHMARKS.md`. `tick_roundtrip` stores a day, then proves that
-every record comes back bit-exact. Fetch and verify the data with `scripts/fetch_data.py`
-first, and take the pin from `decompressed_sha256` in `scripts/data_pins.json`.
+Gates G-1 and G-2 of `BENCHMARKS.md`. `tick_roundtrip` stores a day in the ITCH store
+(`docs/store.md`), then proves that every record comes back bit-exact. Fetch and verify the data
+with `scripts/fetch_data.py` first, and take the pin from `decompressed_sha256` in
+`scripts/data_pins.json`.
 
 ```sh
 cmake --preset bench && cmake --build --preset bench
@@ -109,29 +110,48 @@ tools=build/bench/tools
 day=data/12302019.NASDAQ_ITCH50
 pin=5d81c2e14a0f748b29c674b6a342796932702034b4dd341e39e9a9ec5bac610f
 
-$tools/tick_roundtrip ingest-stub $day build/12302019.stub
-$tools/tick_roundtrip verify $day build/12302019.stub --expect-sha256 $pin
+$tools/tick_roundtrip ingest $day build/12302019.tsc --durability page_cache
+$tools/tick_roundtrip verify $day build/12302019.tsc --expect-sha256 $pin
 ```
 
-`verify` walks the source's frames and the stored records in lock step, comparing every
-byte, and hashes both whole streams on worker threads. It prints a JSON summary, with
-records, bytes, both hashes, the verdict and the wall time. It exits 0 on a pass, 1 on a
-mismatch and 2 on a usage or I/O error. A mismatch names the first difference: record
-index, source byte offset, bit, expected and actual byte, and message type.
+`ingest` takes the durability class, `page_cache` or `device_flush`, which is never a default,
+and `--segment-records N`, by default 2^20. `verify` decodes the store segment by segment,
+re-serialises every record through the ITCH encoder, and walks those frames and the source's in
+lock step, comparing every byte, and hashes both whole streams on worker threads. Block CRCs are
+checked as each block is read. It prints a JSON summary, with records, bytes, both hashes, the
+verdict and the wall time. It exits 0 on a pass, 1 on a mismatch and 2 on a usage or I/O error. A
+mismatch names the first difference: record index, source byte offset, bit, expected and actual
+byte, and message type; a store error names the segment, column, block, file byte and record it
+refused at.
 
-To see it catch corruption, flip one bit of the store, where bit 0 is the least
-significant. Flipping the same bit again restores the file.
+To see it catch corruption, flip one bit of the store, where bit 0 is the least significant.
+Flipping the same bit again restores the file. `layout --blocks` lists every block with its
+segment, column and file offset, and `layout` shows the footer's offset. A flip inside a data
+block is a CRC failure naming that block and its offset; with `--no-checksums` the decoder or the
+oracle names the column and value, or the record, that came out wrong; a flip in the footer fails
+the footer's CRC:
 
 ```sh
-$tools/tick_roundtrip flip-bit build/12302019.stub 1390407067 1
-$tools/tick_roundtrip verify $day build/12302019.stub --expect-sha256 $pin   # exits 1
-$tools/tick_roundtrip flip-bit build/12302019.stub 1390407067 1
+$tools/tick_roundtrip layout build/12302019.tsc --blocks > build/12302019-layout.json
+$tools/tick_roundtrip flip-bit build/12302019.tsc 721746430 1   # segment 128's timestamp block
+$tools/tick_roundtrip verify $day build/12302019.tsc --expect-sha256 $pin                  # exits 1
+$tools/tick_roundtrip verify $day build/12302019.tsc --expect-sha256 $pin --no-checksums   # exits 1
+$tools/tick_roundtrip flip-bit build/12302019.tsc 721746430 1
+$tools/tick_roundtrip verify $day build/12302019.tsc --expect-sha256 $pin                  # exits 0
 ```
 
-The store here is a stub with no checksum, on purpose, so the oracle is what catches
-the fault. Each step needs about 30 seconds and the store takes as much disk as the
-day. Results for both pinned days are in `results/`, and for one day on Linux in
-`results/roundtrip-12302019-linux.json`.
+Byte 721,746,430 is the middle of segment 128's timestamp block in the store `ingest` writes from
+the pinned day at the default settings; the writer is deterministic, so the offset is the same on
+any host. Each step needs under a minute; the store is 1.45 GB, 5.69 times smaller than the day.
+Results for both pinned days are in `results/roundtrip-12302019.json` and
+`results/roundtrip-10302019.json`, with every byte of each store by column, section and footer in
+`results/store-size-*.json`, and G-1 for one day on Linux in `results/roundtrip-12302019-linux.json`.
+G-1 and G-2 are proved on the real store, not the stub: G-1 re-serialises every record the store
+decodes and matches the whole stream's SHA-256 against the pin, and G-2 flips one bit in a data
+block and one in the footer, each caught with CRCs on and with them off.
+
+`tick_roundtrip ingest-stub` still writes the Phase 2 stub store, the day's frames behind a
+40-byte header with no checksum, which `verify` recognises by its magic.
 
 `tick_census <source> <output.json>` writes the aggregate statistics in `results/`.
 `tick_slice <source> <output> [--from HH:MM:SS] [--to HH:MM:SS]` writes a small valid
