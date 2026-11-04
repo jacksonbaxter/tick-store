@@ -104,9 +104,10 @@ install_ninja() {
 
 # The part of the LLVM release the build and the checks use: the compiler with its headers
 # and runtimes, clang-tidy, lld, the coverage tools, llvm-symbolizer for sanitizer reports,
-# the binutils CMake looks for beside the compiler, and macOS's static libc++. Unpacked
-# whole, the Linux release is 12 GB, and it filled a hosted runner's disk.
-LLVM_KEEP='^[^/]+/(include/|lib/clang/|lib/[^/]+-unknown-linux-gnu/|lib/lib(c\+\+|c\+\+abi|unwind)[.a-z0-9]*$|bin/(clang|clang\+\+|clang-[0-9]+|clang-tidy|clang-scan-deps|lld|ld\.lld|ld64\.lld|llvm-(profdata|cov|cxxfilt|symbolizer|addr2line|ar|ranlib|dlltool|lib|nm|objcopy|strip|install-name-tool|objdump|otool|readobj|readelf))$)'
+# the binutils CMake looks for beside the compiler, macOS's static libc++, and the libLTO
+# clang names to Apple's linker. Unpacked whole, the Linux release is 12 GB, and it filled
+# a hosted runner's disk.
+LLVM_KEEP='^[^/]+/(include/|lib/clang/|lib/[^/]+-unknown-linux-gnu/|lib/lib(c\+\+|c\+\+abi|unwind)[.a-z0-9]*$|lib/libLTO\.dylib$|bin/(clang|clang\+\+|clang-[0-9]+|clang-tidy|clang-scan-deps|lld|ld\.lld|ld64\.lld|llvm-(profdata|cov|cxxfilt|symbolizer|addr2line|ar|ranlib|dlltool|lib|nm|objcopy|strip|install-name-tool|objdump|otool|readobj|readelf))$)'
 LLVM_TOOLS=(clang++ clang-tidy ld.lld ld64.lld llvm-profdata llvm-cov llvm-cxxfilt llvm-symbolizer
             llvm-ar llvm-nm)
 
