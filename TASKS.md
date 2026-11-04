@@ -113,7 +113,7 @@ Checks
 - [x] ASan and UBSan with no recover, TSan on concurrent code
 - [x] clang-tidy, and `-Wall -Wextra -Werror`
 - [x] GitHub Actions config, validated locally with actionlint, and recorded as never executed on GitHub. There is no remote yet, so no job has ever run there, and the Linux jobs have run nowhere
-- [ ] First real run of `.github/workflows/ci.yml` on GitHub, once a remote exists, and any Linux-only failure it finds
+- [x] First real run of `.github/workflows/ci.yml` on GitHub, once a remote exists, and any Linux-only failure it finds. Run 41770320877 at `7ebb81b` failed 10 of 14 jobs; the fixes are in NOTES.md, "The first runs on GitHub Actions", and run 41825067372 at `ad542fd` passed all 14
 - [x] One local script that runs every check (`scripts/check.sh`), in sequence, with a summary table
 - [x] Every check shown failing on an injected fault: `scripts/prove_checks.py`, `faults/`, `results/check-proofs.json`. Each fault must pass its baseline, then fail with the expected exit code and string
 
@@ -124,7 +124,8 @@ Checks carried from Phase 2
 - [ ] A fault patch for `scripts/run_bench.py`'s sibling meter. No patch in `faults/` targets it
 - [x] clang-tidy on the Linux-only sources, `affinity_linux.cpp` and `page_cache_linux.cpp`: `scripts/check.sh` lists its sources without git in an exported tree, so its clang-tidy step on Linux covers every translation unit Linux builds, and fails on an injected violation in either file
 - [ ] `scripts/check.sh` on the Linux host, in an exported tree, at `469e9cd`: 17 of 21 steps pass, but `coverage` and `hygiene` call git, which has no repository there, `actionlint` is not installed there, and `py-compare` skips for want of a `.venv`
-- [ ] CI has never run on GitHub, and the Linux `run_bench` fixture bug means its Linux job would have failed until `a6a82fa`. The first real run is the open item under Phase 2 Checks
+- [x] CI has never run on GitHub, and the Linux `run_bench` fixture bug means its Linux job would have failed until `a6a82fa`. The first real run is the open item under Phase 2 Checks: done, green at run 41825067372
+- [ ] Refresh `results/check-proofs.json` with a full `scripts/prove_checks.py` run: the fault `results-linux-turbo-unmeasured` (`5c78dcf`) was proven alone with `--only`, so it is not in the committed record yet
 
 Storage
 - [x] File format: header, per-block CRC32C, footer, codec registry, little-endian helpers (F1-F7)

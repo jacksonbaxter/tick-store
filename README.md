@@ -91,11 +91,9 @@ step group, on a pinned LLVM. The steps are the same as a local run, and
 `tests/scripts/test_check_sh.py` fails if one of them is missing from the workflow. The data is
 absent on CI, so `ItchRealDay` skips visibly, and with no `.venv`, `py-compare` shows as `SKIP`.
 
-**This workflow has never executed on GitHub: the repository has no remote.** It is validated
-by actionlint with shellcheck. By hand on macOS arm64, a fresh clone ran `install_tools.sh`,
-the environment step and each job's `check.sh` line, with 240 s of fuzzing per target, on the
-pinned LLVM, and all passed. The Linux jobs, `apt-get` and the GitHub actions themselves have
-never run.
+It is validated locally by actionlint with shellcheck. On GitHub, the first run failed 10 of
+its 14 jobs; the causes and fixes are in `NOTES.md`, "The first runs on GitHub Actions". All 14
+jobs passed at `ad542fd`, in [run 41825067372](https://github.com/jacksonbaxter/tick-store/actions/runs/41825067372).
 
 ## Round-trip check
 

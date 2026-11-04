@@ -9,10 +9,9 @@
 # as skipped in the summary table, and is not a pass. There is no .venv either, so py-compare
 # shows as SKIP. No job uses a secret.
 #
-# This workflow has never executed on GitHub, because the repository has no remote yet. It is
-# validated by actionlint, and its commands have been run by hand on macOS arm64. On Linux x86-64
-# the clang-tidy job's command has run too, from an exported tree rather than a checkout, and it
-# covers the Linux-only sources the macOS job cannot see.
+# It is validated locally by actionlint. Its first run on GitHub failed 10 of the 14 jobs; NOTES.md,
+# "The first runs on GitHub Actions", has the causes and fixes. All 14 passed at ad542fd, in run
+# 41825067372. The Linux clang-tidy job covers the Linux-only sources the macOS job cannot see.
 
 name: CI
 

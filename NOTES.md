@@ -1143,6 +1143,81 @@ The first two attempts failed, and the fixes are committed:
 - Day-wide distances with a creation index came to 35 MB less, but they give up decoding one segment on its own.
 - Segments larger than 2^20 save 2.2% at 2^22, for nearly three times the writer's memory and four times the work to decode a random segment.
 
+### The first runs on GitHub Actions
+
+The repository went public at `7ebb81b`, and `.github/workflows/ci.yml` ran on GitHub for the first time. Each run below is the
+whole matrix, 7 checks on 2 hosts. Raw logs and artifacts: `phase3-raw/ci/`.
+
+| Run | Commit | Failed | Which |
+|---|---|---|---|
+| [41770320877](https://github.com/jacksonbaxter/tick-store/actions/runs/41770320877) | `7ebb81b` | 10 of 14 | unit, asan-ubsan, tsan, coverage, clang-tidy, fuzz and repo on Linux; asan-ubsan, clang-tidy and fuzz on macOS |
+| [41816297315](https://github.com/jacksonbaxter/tick-store/actions/runs/41816297315) | `fe19edc` | 6 of 14 | tsan, coverage, clang-tidy, fuzz and repo on Linux; fuzz on macOS |
+| [41825067372](https://github.com/jacksonbaxter/tick-store/actions/runs/41825067372) | `ad542fd` | 0 of 14 | all green |
+
+What failed, and what fixed it:
+
+- **A use after free in a test** failed unit, asan-ubsan, tsan and coverage on Linux and asan-ubsan on macOS. Two of
+  `ReferenceEval.TheCommandLineWritesJsonWithoutPathsAndRefusesBadUsage`'s bad-usage argument lists held `string_view`s into
+  `(dir / "absent").string()` and `(dir / "no" / "dir" / "out.json").string()`, temporaries freed once the list was built. The
+  macOS ASan report is that frame: a 160-byte string copied and freed in the test body, then read by `run_reference_eval_cli` in
+  `string::append`. On Linux the freed bytes still read as the source path, so a refused usage exited 0. `67d2055` names the two
+  paths; run 41816297315 passed all five jobs' tests. Why the macOS ASan preset did not stop it before the push: the test came in
+  with `f8ebc4b`, and `7ebb81b` was pushed at 03:58 UTC, before any sanitizer run on that code. The first local `check.sh`, at
+  `c64ca36` 47 minutes later, stopped at `asan-test` on exactly this test, and the debian gate at `7ebb81b` failed it too. The
+  preset caught it on its first run; it had not been run before the push.
+- **clang-tidy.** At `7ebb81b` both hosts failed on the ITCH store's findings, which `e45d08c` had already fixed: the macOS job
+  passed at `fe19edc`. CI's LLVM is `install_tools.sh`'s pin, 23.1.4, the same as the local one, so the findings were not a version
+  difference. Linux raised four that macOS cannot, because libstdc++ and glibc spell things differently: `ssize_t` and `rusage`
+  come from headers no file includes directly, a `<cstddef>` was unused, and `frames[3].offset` did not count as a use of
+  `itch::Frame`, since libstdc++'s `operator[]` returns its own alias for the element type. `052d9fd` returns `std::ptrdiff_t`
+  from `FileOps::write`, which is `long` as `ssize_t` is on both hosts, gives `rusage` a NOLINT with its reason, names the
+  frames' type and drops the include. Adding `<sys/types.h>` was not tried again: macOS calls it unused (see "clang-tidy had
+  never seen the Linux-only sources"). The eight touched files were clean under clang-tidy on debian at `052d9fd`.
+- **fuzz-dictionary timed out on Linux**, after 11 s on the 31-byte input `AAAQABcAAAABAQAAAAEAAAAJAAAAAAEBAAABKgAAAA==`. It is
+  not a decoder bug. The input is a valid block: 2^20 values, the most a block may hold (D8's named cap), with one dictionary
+  entry and Huffman codes of no bits, which is the block the encoder itself writes for 2^20 equal values. The decoder takes it in
+  29 ms with the fuzz build's sanitizers. The time went to the oracle re-encoding the values as columns: in blocks of 3, 349,526
+  calls of the dictionary encoder took 5.65 s, against 0.43 s in blocks of 64 and 0.20 s in blocks of 4,096 (497, 40 and 22 ms
+  in a release build). The whole input took 7,959 ms on the Mac, under the 10 s timeout, and more than 10 s on the slower runner.
+  `cc012b6` makes `encode_dict` copy a block whose values repeat the block before, which is the encoder's own output for it, the
+  counts in `DictStats` included, and counts the copies as `repeated`. The input now takes 1,475 ms on the Mac, in each of three
+  runs, and the whole dictionary seed corpus passes in 6.6 s. The oracle is unchanged. The input was already a generated seed,
+  a header corruption of a 50-value block with its count set to 2^20; it is now also a named seed (the largest block of equal
+  values, for the dictionary and run-length targets) and a crasher, `tests/unit/crashers/dictionary/timeout-one-entry-codes-of-no-bits`.
+  With the copy disabled, `Dictionary.TwoToTheTwentyEqualValuesInBlocksOfThreeEncodeOneBlock` and
+  `Dictionary.ABlockRepeatingTheOneBeforeIsTheSameBytes` fail, and replaying the crasher takes 14.0 s in the dev build, against
+  2.7 s with it. Raw: `phase3-raw/ci/repro/`.
+- **No fuzz target linked on macOS.** Xcode 16.4's linker on the runner refused every object clang 23 instruments for the fuzzer,
+  `invalid r_symbolnum`, in our library and in zstd. The other presets linked. `758dded` links the fuzz targets on macOS with the
+  LLVM install's own `ld64.lld`, through `-fuse-ld=lld`; the other presets keep Apple's linker. The local fuzz build links and runs
+  with it.
+- **repo on Linux.** `RunBenchTest`'s whole-script tests read the runner's own sysfs, where a virtual machine has no cpufreq boost
+  switch, so turbo read `unavailable` and the validator refused the stand-in Linux run, rightly. `5c78dcf` reads the switch under
+  `run_bench.py`'s `--sysfs-cpu`, as the sibling's topology already was, and the fixture writes one. With no switch, the header now
+  says why: `unavailable: no cpufreq boost switch, as on a virtual machine`. The rule is unchanged, and is the narrowest that does
+  both: `check_linux` already requires Linux results to be pinned, so every Linux file it accepts is from debian, and debian must
+  record `enabled` or `disabled`. The reason form is refused as `unavailable` is. A new fault, `results-linux-turbo-unmeasured`,
+  sets the committed debian bench file's turbo to the reason form, and `prove_checks.py --only` reported it PROVEN: check-results
+  fails with `header.turbo: Linux must record it`. `results/check-proofs.json` was restored from git, so the fault is not in it
+  until the next full run. Raw: `phase3-raw/ci/faults/`.
+- **Coverage on Linux**, which the use after free had hidden in the first run, failed at 203 of 204 required functions:
+  `verify_round_trip` returns a type holding `std::string`, so with libstdc++ it demangles as `verify_round_trip[abi:cxx11](...)`
+  and its pattern matched nothing. `e1afb59` drops ABI tags from the demangled names before matching.
+- **tsan on Linux ran out of disk** in the toolchain step in the second run: `No space left on device`. The cache had no entry
+  for the key, so each of the 14 jobs downloaded the 1.6 GB LLVM release and unpacked it whole, 12 GB on Linux. `24c5cef`,
+  `9c61d31` and `ad542fd` unpack only what the checks use: the compiler with its headers and runtimes, clang-tidy, lld, the
+  coverage tools, `llvm-symbolizer`, the binutils CMake finds beside the compiler, macOS's libc++ and libLTO. That is 1.3 GB on
+  Linux and 1.0 GB on macOS, and the install fails if a tool the checks run is missing. The first version failed on debian
+  before any push: GNU tar matched each member through its listed directory, then called the member's own name not found, which
+  macOS's bsdtar had not minded; members are now extracted with `--no-recursion`. On debian the trimmed install built and ran an
+  ASan program with symbolised frames, a libFuzzer target, a TSan and a coverage build, clang-tidy and llvm-cov.
+
+The third run, [41825067372](https://github.com/jacksonbaxter/tick-store/actions/runs/41825067372) at `ad542fd`, passed all 14
+jobs: coverage 93.78% of lines on Linux and 93.84% on macOS with 204 of 204 required functions, 240 s of fuzzing per target on
+each host, clang-tidy clean on 110 files per host. Before that push, the full local `check.sh` passed 29 of 29 steps on macOS at
+`ad542fd` (988 s, maximum resident set 1.18 GB, through heavy.sh), and on debian the dev build passed ctest, 572 tests with the
+2 `ItchRealDay` tests skipped for want of data.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
