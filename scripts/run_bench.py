@@ -421,6 +421,7 @@ def result_row(host, run):
     return {
         "case": run["case"],
         "host": host,
+        "isa": report["build"]["isa"],
         "timer": report["timer"],
         "timer_end_ticks_per_second": report["timer_end"]["ticks_per_second"],
         "warmup": report["warmup"],
@@ -448,7 +449,8 @@ def build_document(host, benchmark, slice_name, pin, commit, measure, runs, mete
         "compile_flags": build["compile_flags"],
         "build_type": build["build_type"],
         "sanitizers": build["sanitizers"],
-        "isa": build["isa"],
+        # Each row carries the kernel set it ran. A file of several sets lists them all.
+        "isa": "; ".join(dict.fromkeys(run["report"]["build"]["isa"] for run in runs)),
         "commit": commit,
         "core": LINUX_CORE if linux else "not-available",
         "sibling": meter.statement() if linux else "not-available",

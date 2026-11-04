@@ -27,6 +27,7 @@
 #include "tick_store/bench_support/resolution_guard.hpp"
 #include "tick_store/bench_support/stream_check.hpp"
 #include "tick_store/bench_support/timer.hpp"
+#include "tick_store/codec/simd.hpp"
 #include "tick_store/harness/json_writer.hpp"
 #include "tick_store/itch/codec.hpp"
 #include "tick_store/itch/frame.hpp"
@@ -405,7 +406,10 @@ struct ReportInputs {
     json.field("sanitizers", build.sanitizers);
     json.field("commit", build.commit);
     json.field("tree_dirty", build.tree_dirty);
-    json.field("isa", build.isa);
+    // The decode kernel set this process dispatched to, after any TICK_STORE_SIMD cap.
+    json.field("isa", std::format("{}, {} kernels", build.isa,
+                                  tick_store::codec::simd::to_string(
+                                      tick_store::codec::simd::active_kernels().level)));
     json.end_object();
 
     json.key("pinning");

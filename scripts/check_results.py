@@ -228,6 +228,8 @@ def check_host(document, path):
         if result.get("host") != host:
             problems.append(f"mixed hosts: results[{index}].host is "
                             f"{result.get('host')}, and the header says {host}")
+        if not str(result.get("isa", facts["isa"])).startswith(facts["isa"]):
+            problems.append(f"mixed hosts: results[{index}].isa is not from {host}")
         result_timer = result.get("timer", {})
         if result_timer.get("source", facts["timer"]) != facts["timer"]:
             problems.append(f"mixed hosts: results[{index}].timer.source is not from {host}")

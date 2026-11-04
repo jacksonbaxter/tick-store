@@ -128,6 +128,7 @@ def seeded_document(host):
                          "seed": "each case makes its own input from a fixed seed"}
     result = document["results"][0]
     result["case"] = "pfor_unpack/w=13/scalar"
+    result["isa"] = ("x86-64" if host == "Linux" else "arm64") + " baseline, scalar kernels"
     result["verification"] = {"input_seed": 13, "items_per_call": 1024,
                               "calls_per_pass": 8192, "against": "the scalar set",
                               "matched": True}
@@ -619,6 +620,11 @@ class CheckResultsTest(unittest.TestCase):
         self.assert_seeded_fails(
             "macOS", lambda d: remove(d, "results", 0, "latency", "batch_items"),
             "batch_items")
+
+    def test_a_row_whose_kernel_set_is_from_the_other_host_is_mixed(self):
+        self.assert_seeded_fails(
+            "Linux", lambda d: set_value(d, "arm64 baseline, neon kernels", "results", 0, "isa"),
+            "results[0].isa is not from Linux")
 
     def test_a_slice_file_cannot_drop_its_pin_by_omitting_the_kind(self):
         self.assert_fails("Linux", lambda d: remove(d, "input", "slice"), "has no pin")

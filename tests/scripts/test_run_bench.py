@@ -55,8 +55,8 @@ def fake_report(commit, dirty, case):
         "build": {"compiler": "Clang 23.1.4", "compile_flags": "-O3 -DNDEBUG -std=c++23",
                   "build_type": "Release", "sanitizers": "none", "commit": commit,
                   "tree_dirty": dirty,
-                  "isa": ("arm64 baseline, scalar kernels" if HOST == "macOS"
-                          else "x86-64 baseline, scalar kernels")},
+                  "isa": ("arm64 baseline, neon kernels" if HOST == "macOS"
+                          else "x86-64 baseline, avx2 kernels")},
         "pinning": {"status": "not-supported" if HOST == "macOS" else "pinned",
                     "requested_core": -1, "observed_core": None},
         "counters": "not-supported" if HOST == "macOS" else "gated",
@@ -70,11 +70,14 @@ def fake_report(commit, dirty, case):
     }
 
 
-SEEDED_CASES = ("pfor_unpack/w=13/scalar", "svb_decode/scalar")
+SEEDED_CASES = ("pfor_unpack/w=13/scalar", "svb_decode/scalar",
+                "svb_decode/" + ("neon" if HOST == "macOS" else "avx2"))
 
 
 def fake_seeded_report(commit, case):
     report = fake_report(commit, False, case)
+    baseline = "arm64 baseline" if HOST == "macOS" else "x86-64 baseline"
+    report["build"]["isa"] = f"{baseline}, {case.rsplit('/', 1)[1]} kernels"
     report["verification"] = {"input_seed": 13, "items_per_call": 1024, "calls_per_pass": 8192,
                               "against": "the scalar set", "matched": True}
     report["gated"] = {"items": 10000, "wall_ns": 1000000.0}
@@ -531,6 +534,8 @@ class RunBenchTest(unittest.TestCase):
         document = json.loads(self.seeded_path().read_text(encoding="utf-8"))
         self.assertEqual(document["input"]["kind"], "seeded")
         self.assertEqual([row["case"] for row in document["results"]], list(SEEDED_CASES))
+        self.assertEqual(document["results"][0]["isa"].split(", ")[1], "scalar kernels")
+        self.assertEqual(document["header"]["isa"].count("scalar kernels"), 1)
         throughput = document["results"][0]["throughput"]
         self.assertIn("values_per_second", throughput)
         self.assertNotIn("messages_per_second", throughput)

@@ -6,11 +6,13 @@ namespace tick_store::bench_support {
 
 namespace {
 
-// There are no SIMD kernels yet, so the level is the architecture's baseline.
+// The architecture's baseline, which every file is compiled for. The decode kernel set is
+// chosen at run time, so each benchmark appends the set it ran, for example
+// "arm64 baseline, neon kernels".
 #if defined(__x86_64__)
-constexpr const char* kIsa = "x86-64 baseline, scalar kernels";
+constexpr const char* kIsa = "x86-64 baseline";
 #elif defined(__aarch64__)
-constexpr const char* kIsa = "arm64 baseline, scalar kernels";
+constexpr const char* kIsa = "arm64 baseline";
 #else
 #error "tick-store benchmarks support x86-64 and arm64"
 #endif
