@@ -236,7 +236,7 @@ step_oracle() {
 }
 
 # The sources this host does not compile, which clang-tidy therefore cannot see: those of
-# the other operating system, and the CRC32C kernel of the other processor.
+# the other operating system, and the CRC32C and SIMD kernels of the other processor.
 files_of_other_platforms() {
     if [[ $(uname -s) == Linux ]]; then
         printf '%s\n' src/bench_support/affinity_unsupported.cpp src/harness/page_cache_darwin.cpp
@@ -244,9 +244,12 @@ files_of_other_platforms() {
         printf '%s\n' src/bench_support/affinity_linux.cpp src/harness/page_cache_linux.cpp
     fi
     case $(uname -m) in
-        arm64|aarch64) printf '%s\n' src/store/crc32c_sse42.cpp ;;
-        x86_64|amd64) printf '%s\n' src/store/crc32c_armv8.cpp ;;
-        *) printf '%s\n' src/store/crc32c_armv8.cpp src/store/crc32c_sse42.cpp ;;
+        arm64|aarch64) printf '%s\n' src/store/crc32c_sse42.cpp src/codec/simd/kernels_avx2.cpp ;;
+        x86_64|amd64) printf '%s\n' src/store/crc32c_armv8.cpp src/codec/simd/kernels_neon.cpp ;;
+        *)
+            printf '%s\n' src/store/crc32c_armv8.cpp src/store/crc32c_sse42.cpp \
+                src/codec/simd/kernels_neon.cpp src/codec/simd/kernels_avx2.cpp
+            ;;
     esac
 }
 
