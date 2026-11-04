@@ -20,6 +20,13 @@ function(tick_store_enable_sanitizers)
         # libFuzzer's main. Each fuzz target adds -fsanitize=fuzzer at link.
         set(compile_flags -fsanitize=fuzzer-no-link,address,undefined)
         set(link_flags -fsanitize=address,undefined)
+        if(APPLE)
+            # LLVM's own linker, from the same install as the compiler. Apple's ld is tied to
+            # the Xcode on the host, and Xcode 16.4's refuses the coverage sections clang 23
+            # writes ("invalid r_symbolnum"), so the fuzz targets did not link on the macOS
+            # runner. The other presets carry no such sections and keep Apple's ld.
+            list(APPEND link_flags -fuse-ld=lld)
+        endif()
     else()
         message(FATAL_ERROR "Unknown TICK_STORE_SANITIZE value: ${TICK_STORE_SANITIZE}")
     endif()

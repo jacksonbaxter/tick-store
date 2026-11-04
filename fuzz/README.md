@@ -19,7 +19,9 @@ Twelve libFuzzer targets take raw bytes directly, with nothing checking them fir
 
 ## Build
 
-Needs upstream clang: Apple clang has no fuzzer runtime. The build regenerates the
+Needs upstream clang: Apple clang has no fuzzer runtime. On macOS the targets link with
+that clang's own `ld64.lld` (`-fuse-ld=lld`, in `cmake/Sanitizers.cmake`), because the
+runner's Xcode 16.4 linker refuses the coverage sections clang 23 writes. The build regenerates the
 seeds from the real encoder and the real store writer into
 `build/fuzz/fuzz-seeds/{message,frame,store,container,itch_store,columns,gorilla_timestamps,gorilla_xor,pfor,stream_vbyte,dictionary,run_length}`.
 They are never committed. The ITCH store seeds are files from the real `ItchStoreWriter`: the 23
