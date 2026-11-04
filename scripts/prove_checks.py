@@ -259,7 +259,8 @@ FAULTS = (
           arguments=("--test-regex", "ItchStore")),
     Fault("fuzz-itch-store-distance-bound", "fuzz-itch-store", "the ITCH store's segment decoder "
           "stops checking a reference distance against its locate's list", EXIT_LIBFUZZER,
-          "AddressSanitizer", arguments=FUZZ_ARGUMENTS),
+          # ASan or UBSan, by whether the list is empty; either trace names the function.
+          "in tick_store::store::SegmentAssembler::State::named", arguments=FUZZ_ARGUMENTS),
     Fault("g2-weakened-compare", "dev-test", "the oracle's compare ignores bit 0 and stops "
           "requiring the hashes to match", EXIT_CTEST, "Value of: report.passed()",
           arguments=("--test-regex", "OracleExhaustiveFlip")),
