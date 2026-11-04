@@ -104,6 +104,19 @@ class Layouts(unittest.TestCase):
         self.assertNotIn("timestamp", chosen)
         self.assertNotIn("add_shares", chosen)
 
+    def test_mixed_takes_each_field_in_its_smaller_order(self):
+        cols = every_column(100)
+        cols["add_price"]["codecs"] = [codec("pfor-for-scaled", 900)]
+        cols["timestamp_per_locate"]["codecs"] = [codec("svb-delta", 900)]
+        mixed = estimator.estimate_layout(result(cols), "mixed", with_zstd=False)
+        chosen = {part["column"] for f in mixed["fields"] for part in f["chosen"]["columns"]}
+        self.assertIn("timestamp", chosen)
+        self.assertNotIn("add_price", chosen)
+        file_order = estimator.estimate_layout(result(cols), "file_order", with_zstd=False)
+        per_locate = estimator.estimate_layout(result(cols), "per_locate", with_zstd=False)
+        self.assertLess(mixed["total_bytes"],
+                        min(file_order["total_bytes"], per_locate["total_bytes"]))
+
     def test_unresolved_references_and_differing_stocks_cost_exceptions(self):
         clean = estimator.estimate_layout(result(every_column()), "file_order", False)
         costly = estimator.estimate_layout(result(every_column(), unresolved=3, stock_differs=2),
@@ -172,9 +185,9 @@ class Judging(unittest.TestCase):
     def test_a_whole_estimate_is_labelled_and_judged(self):
         document = estimator.estimate([result(every_column())], self.PINS, self.CAPACITY)
         self.assertTrue(document["estimate"])
-        self.assertEqual(len(document["days"][0]["layouts"]), 4)
+        self.assertEqual(len(document["days"][0]["layouts"]), 6)
         lines = estimator.summary_lines(document)
-        self.assertEqual(len(lines), 4)
+        self.assertEqual(len(lines), 6)
         self.assertIn("CR-1 True", lines[0])
 
 

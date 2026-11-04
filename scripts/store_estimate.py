@@ -18,6 +18,9 @@ taken. The two layouts:
               stream per stock locate, the file-order locate column stored to rebuild file
               order, and every other column as in file_order, since only those columns
               were measured per locate.
+  mixed       each of those columns in whichever of the two orders is smaller. Columns are
+              read apart, and the stored locate column tells a reader which per-locate
+              stream holds a row's next value, so one column's order need not be another's.
 
 Each is costed twice: with the codecs alone, and with zstd level 1 taken per block where
 it pays (on the encoded block, or on the raw values), each block paying a byte to say
@@ -47,6 +50,7 @@ TYPE_SLOTS = "SRHYLVWKJhAFECXDUPQBINO?"
 NAMING_TYPES = "ECXDU"
 CR1_FLOOR = {"12302019": 2.3415}
 CR2_SYSTEMS = ("parquet", "arcticdb", "questdb")
+LAYOUTS = ("file_order", "per_locate", "mixed")
 
 
 def best_codec(column, with_zstd):
@@ -91,6 +95,12 @@ def exceptions(analysis):
 def groups(layout):
     """Each field group with its alternatives, each a list of columns plus a tag for the
     exceptions it needs."""
+    if layout == "mixed":
+        merged = []
+        for (field, file_order), (_, per_locate) in zip(groups("file_order"),
+                                                        groups("per_locate")):
+            merged.append((field, file_order + [a for a in per_locate if a not in file_order]))
+        return merged
     distances = [f"ref_distance_{t}" for t in NAMING_TYPES]
     locate_distances = [f"ref_locate_distance_{t}" for t in NAMING_TYPES]
     per_locate = layout == "per_locate"
@@ -223,7 +233,7 @@ def estimate(results, pins, capacity):
         if not result["every_value_exact"]:
             raise SystemExit(f"{result['day']}: not every value came back exact")
         layouts = []
-        for layout in ("file_order", "per_locate"):
+        for layout in LAYOUTS:
             for with_zstd in (False, True):
                 costed = estimate_layout(result, layout, with_zstd)
                 costed["judged"] = judge(result["day"], costed["total_bytes"], pins, capacity)
