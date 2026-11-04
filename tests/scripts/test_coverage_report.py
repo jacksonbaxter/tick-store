@@ -46,6 +46,23 @@ class Gate(unittest.TestCase):
         results = report.evaluate(REQUIRED[:1], [("src/b.cpp", "ns::first(int)", 1)])
         self.assertEqual(len(report.unreached(results)), 1)
 
+    def test_a_libstdcxx_abi_tag_does_not_hide_a_function(self):
+        export = {"data": [{"functions": [
+            {"name": "_Z1av", "filenames": ["/repo/src/a.cpp"], "count": 4},
+            {"name": "_Z1bv", "filenames": ["/repo/src/a.cpp"], "count": 0}]}]}
+        names = ["ns::first[abi:cxx11](std::span<std::byte const>)", "ns::second[abi:cxx11](int)"]
+        original = report.demangle
+        report.demangle = lambda mangled: names
+        try:
+            functions = report.functions_of(export, "/repo")
+        finally:
+            report.demangle = original
+        self.assertEqual(functions, [("src/a.cpp", "ns::first(std::span<std::byte const>)", 4),
+                                     ("src/a.cpp", "ns::second(int)", 0)])
+        failed = report.unreached(report.evaluate(REQUIRED, functions))
+        self.assertEqual([item["name"] for item in failed], ["second"])
+        self.assertIn("0 calls", report.describe(failed[0]))
+
     def test_any_instantiation_reached_counts(self):
         results = report.evaluate(REQUIRED[:1], [("src/a.cpp", "ns::first(int)", 0),
                                                  ("src/a.cpp", "ns::first(long)", 3)])

@@ -302,6 +302,11 @@ def relative_to_repo(path, root):
     return path[len(prefix):] if path.startswith(prefix) else None
 
 
+# libstdc++ tags a function whose type holds std::string with its ABI, as in
+# verify_round_trip[abi:cxx11](...), and libc++ does not, so one pattern fits both only without it.
+ABI_TAG = re.compile(r"\[abi:[^\]]*\]")
+
+
 def functions_of(export, root):
     """Every function under the repo, as (repo-relative file, demangled name, calls)."""
     entries = export["data"][0]["functions"]
@@ -310,7 +315,7 @@ def functions_of(export, root):
     for entry, name in zip(entries, demangled, strict=True):
         file = relative_to_repo(entry["filenames"][0], root)
         if file is not None:
-            found.append((file, name, entry["count"]))
+            found.append((file, ABI_TAG.sub("", name), entry["count"]))
     return found
 
 
