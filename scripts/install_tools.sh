@@ -6,7 +6,8 @@
 # A download is untrusted until its SHA-256 matches the pin below. Each one lands in a new,
 # empty folder, and nothing is unpacked or run before that check passes. The pins come from
 # each project's release page, and the digests GitHub publishes for the release assets.
-# Exit 1 on a mismatch, leaving nothing installed. LLVM is about 1.6 GB to download.
+# Exit 1 on a mismatch, leaving nothing installed. LLVM is about 1.6 GB to download, of which
+# about 1.3 GB is unpacked: the tools the checks use, not the whole release.
 
 set -euo pipefail
 
@@ -101,13 +102,30 @@ install_ninja() {
     "$TOOLS/ninja" --version
 }
 
+# The part of the LLVM release the build and the checks use: the compiler with its headers
+# and runtimes, clang-tidy, lld, the coverage tools, llvm-symbolizer for sanitizer reports,
+# the binutils CMake looks for beside the compiler, and macOS's static libc++. Unpacked
+# whole, the Linux release is 12 GB, and it filled a hosted runner's disk.
+LLVM_KEEP='^[^/]+/(include/|lib/clang/|lib/[^/]+-unknown-linux-gnu/|lib/lib(c\+\+|c\+\+abi|unwind)[.a-z0-9]*$|bin/(clang|clang\+\+|clang-[0-9]+|clang-tidy|clang-scan-deps|lld|ld\.lld|ld64\.lld|llvm-(profdata|cov|cxxfilt|symbolizer|addr2line|ar|ranlib|dlltool|lib|nm|objcopy|strip|install-name-tool|objdump|otool|readobj|readelf))$)'
+LLVM_TOOLS=(clang++ clang-tidy ld.lld ld64.lld llvm-profdata llvm-cov llvm-cxxfilt llvm-symbolizer
+            llvm-ar llvm-nm)
+
 install_llvm() {
-    local file unpacked
+    local file unpacked members tool
     file=$(fetch "https://github.com/llvm/llvm-project/releases/download/llvmorg-$LLVM_VERSION/$LLVM_ASSET" \
                  "$LLVM_SHA256")
+    members=$(dirname "$file")/members
+    tar -tJf "$file" | grep -E "$LLVM_KEEP" >"$members"
     unpacked=$(dirname "$file")/llvm
     mkdir "$unpacked"
-    tar -xJf "$file" -C "$unpacked" --strip-components=1
+    tar -xJf "$file" -C "$unpacked" --strip-components=1 -T "$members"
+    for tool in "${LLVM_TOOLS[@]}"; do
+        if [[ ! -x $unpacked/bin/$tool ]]; then
+            echo "install_tools.sh: the LLVM release has no bin/$tool" >&2
+            rm -rf "$(dirname "$file")"
+            return 1
+        fi
+    done
     rm -rf "$TOOLS/llvm"
     mv "$unpacked" "$TOOLS/llvm"
     rm -rf "$(dirname "$file")"
