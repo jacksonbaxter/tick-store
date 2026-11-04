@@ -1,9 +1,10 @@
-# ITCH store, version 1
+# ITCH store, version 2
 
 The store holds one ITCH 5.0 day as columns inside the container of `docs/format.md`. It gives back
 every frame bit-exact, and the source's tail, the bytes after its last whole frame. The code is
 `include/tick_store/store/itch_store.hpp` (layout and shared parts), `itch_segment.hpp` (one segment
-between records and columns), `itch_store_writer.hpp` and `itch_store_reader.hpp`.
+between records and columns), `itch_store_writer.hpp`, `itch_store_reader.hpp` and, for queries,
+`itch_query.hpp`.
 `tests/unit/golden/itch-store-v2.tsc` is the 26-record test stream and its tail at 8 records a
 segment; the writer must produce it byte for byte and the reader must read it back.
 
@@ -25,11 +26,12 @@ as its import list (below).
 
 | Name | Bytes | Content |
 |---|---|---|
-| `store` | 24 | u32 version (1), u32 N, u64 record count, u64 segment count, which must be the record count over N rounded up |
+| `store` | 24 | u32 version (2), u32 N, u64 record count, u64 segment count, which must be the record count over N rounded up |
 | `symbols` | 4 + 10 n | u32 n, then n entries of u16 locate and the 8-byte stock, locates strictly ascending: the first stock any message carried for each locate |
 | `tail` | any | the source's bytes after its last whole frame |
 
-The file has exactly these three sections.
+The file has exactly these three sections. The reader refuses any version but 2; version 1, which
+kept the locate column in file order and had no seek index or plain flag, is no longer read.
 
 ## Block metadata
 
@@ -45,8 +47,14 @@ what a time index or a symbol filter reads without touching a payload:
 | 36 | 8 | lowest timestamp |
 | 44 | 8 | highest timestamp |
 | 52 | 4 | records with a type (all but raw records) |
-| 56 | 2 | locate bitmap size b, at most 8,192 |
-| 58 | b | bitmap: bit (l mod 8) of byte l / 8 is set if locate l appears; no trailing zero byte |
+| 56 | 1 | plain: 1 if the column form keeps every record of the segment as a hot or rare row, else 0 |
+| 57 | 2 | locate bitmap size b, at most 8,192 |
+| 59 | b | bitmap: bit (l mod 8) of byte l / 8 is set if locate l appears; no trailing zero byte |
+
+A segment is plain when it has no record the decoder returned raw and every hot record's values fit
+the column form's signed columns with a printable stock and MPID (`column_form_plain()` in
+`columns.hpp`, the test `tick_export` applies). A query then takes every row's timestamp from its
+own record. The flag is checked against each record when the segment is decoded whole.
 
 Raw records carry no timestamp or locate, so the times and bitmap cover the typed records, and are
 0 and empty when there are none. The reader checks each summary's own rules from the footer at open
@@ -64,7 +72,7 @@ a tracking number. The rest go by type:
 | Id | Column | Values from | Codec | Order | zstd |
 |---|---|---|---|---|---|
 | 0 | type | every record | dictionary | file | |
-| 1 | locate | typed records | dictionary | file | yes |
+| 1 | locate | typed records | PFOR frame of reference | locate runs | yes |
 | 2 | timestamp | typed records | PFOR delta | file | |
 | 3 | tracking | typed records | dictionary | by type | |
 | 4 | creation_ref | A, F, U's new reference | PFOR head delta | file | yes |
@@ -96,6 +104,10 @@ a tracking number. The rest go by type:
 | 30 | raw_bytes | raw records' whole payloads | raw, a byte a value | file | yes |
 | 31 | stock_exception_record | A, F, P, Q, I whose stock differs from the symbol | PFOR delta | file | |
 | 32 | stock_exception_value | those stocks, 8 bytes each | raw, a byte a value | file | |
+| 33 | locate_run | each locate the segment has | PFOR delta | per run | |
+| 34 | locate_run_records | each locate's typed records | dictionary | per run | |
+| 35 | locate_run_adds | each locate's A and F records | dictionary | per run | |
+| 36 | seek | the seek index (below) | PFOR delta | seek | |
 
 A column's payload is its values coded in blocks of 4,096 back to back. A column marked zstd is
 wrapped in the `zstd` codec where that is smaller (`docs/format.md`); the reader accepts either.
@@ -105,7 +117,43 @@ Grouped columns hold their values sorted, stably, by a key the reader gets from 
 first: `by type` by the type symbol, `by locate and side` by (locate << 8 | side), `by locate` by
 the locate. The reader puts them back in file order. The counts each column must hold follow from
 the type column, except the import list's (the number of distance 0s), the raw bytes' (the sum of
-the raw lengths) and the stock exceptions', which may be any number up to the records.
+the raw lengths) and the stock exceptions', which may be any number up to the records. The run
+directory's columns hold one value per locate in the summary's bitmap, and `seek` holds 36 + 27 G
+values for G groups.
+
+### Locate runs
+
+The `locate` column holds, for each locate the segment has in ascending order, the indices among
+the segment's typed records of that locate's records: a run's first index, then each later one less
+the one before less 1. So a locate's records are one contiguous run of the column, and a symbol
+filter reads that run alone. The run directory holds one value per run, in the same order, in each
+of its three columns: the locate (`locate_run`), its typed records (`locate_run_records`, so a run's
+start is the sum of the runs before it) and its A and F records (`locate_run_adds`, so its first add
+in `add_shares` and its first in `add_price`'s side groups follow the same way). The runs are
+exactly the bitmap's locates. On read the ids must strictly ascend, every run must have a record,
+the runs must hold exactly the typed records, and every index must be below that count and named
+once, so the runs are a partition; the adds are checked against the type column.
+
+### Seek index
+
+Each segment's `seek` column is what a query needs to start at a group of 4,096 records instead of
+the segment's first record, and to skip what cannot match. A group is 4,096 consecutive records of
+the segment (exactly one codec block of `type`), the last one shorter. The values, all u64:
+
+| Values | Content |
+|---|---|
+| 36 | maxima: the largest value of every column but `seek`, in column order, 0 for a column with no values |
+| G | for each of the G groups, the lowest timestamp of its typed records, 0 if none |
+| G | the highest, 0 if none |
+| G | the references its records name at distance 0, which each take an import |
+| 24 G | for each of the 24 symbols 0, A, B, C, D, E, F, H, I, J, K, L, N, O, P, Q, R, S, U, V, W, X, Y, h in turn, its records in each group |
+
+From the counts, a group's start in every column follows by prefix sums: the typed records before
+it, the values of each type-driven column, the imports and the creations. When the index is
+parsed, the counts must sum to each group's records, the times must be within 48 bits and ordered,
+the imports within the group's naming records, and the maxima within each column's range. When the
+segment is decoded whole, every value is checked against the columns. The index is 2 MB on
+12302019, and `NOTES.md` has its bytes and the locate column's on both days.
 
 ### Order references
 
@@ -136,16 +184,46 @@ for the oracle, so `tick_roundtrip verify` reads the store through the whole pat
 Errors name what refused and where: the segment, the block, the column, the file byte, the record
 and the value's index in its column, whichever apply, with the expected and actual values.
 
+### Queries
+
+`ItchQuery` (`itch_query.hpp`) answers Q1 to Q5 of `BENCHMARKS.md` with the comparison harness's
+semantics, so each answer equals what `compare/queries.py` computes from `tick_export`'s columns:
+
+- A row is a record as the column form holds it: its number in the file, its timestamp in
+  nanoseconds from midnight, type byte, locate, order reference (U's original), side, shares, price
+  and stock, each 0 or empty where the form does not use it. A record the form calls raw keeps its
+  type byte and takes the timestamp of the row before it, 0 for the file's first, with locate 0.
+- A window is half-open on that timestamp. The harness finds it by a binary search over the
+  timestamps, which equals a filter only because a day's timestamps never go down; the query
+  filters, and the full-day oracle in `NOTES.md` shows the two agree on 12302019.
+- The minute aggregate counts A and F rows of the locate in the window per minute, with their
+  shares summed and the least and greatest price. The share sum is over every row: add, reduce,
+  replace and trade shares. The busiest locate is the most rows in a window, locate 0 excluded, the
+  lowest on a tie.
+
+How a segment is answered, cheapest first: the footer's summary skips a segment whose times or
+locates cannot match; the seek index skips every group whose time zone map cannot, and gives each
+needed column's value index at the first group that can; a locate filter reads that locate's run of
+the locate column and its directory entry; and only the columns the query needs are read, a codec
+block at a time. A segment that is not plain is answered exactly instead: decoded whole, each record
+re-encoded and mapped by `row_values()`, the function `tick_export` uses. Every block read is
+CRC-checked unless the reader skips checksums, and every value is checked against its field and the
+seek index's maximum for its column; a file the whole decode accepts gives the same answer on either
+path. Each answer reports the segments, blocks, bytes and values it decoded.
+
+`tools/tick_query` serves the queries as JSON lines on stdin and stdout for the harness; its usage
+is in `include/tick_store/harness/query_cli.hpp`.
+
 ### Worst-case work for one segment
 
-Decoding a random segment k reads its blocks only: at most 33, their CRCs, then at most N type
+Decoding a random segment k reads its blocks only: at most 37, their CRCs, then at most N type
 values, N locates, timestamps and tracking numbers, at most N values in each typed column but
 `imbalance_price` and `mwcb_level` (3 per record) and `imbalance_shares` (2 per record), at most
 37 `rare_bytes` per record (the largest rare type, O, is 48 bytes), and the raw records' own bytes,
-at most 65,535 per record. zstd inflates at most 32 bytes a value plus 1,024 per column, and
-exactly the byte count for byte columns. File order comes back by a counting sort for the columns
-grouped by type, O(N), and a sort of the adds by key, O(A log A) for A adds. Each reference is one
-list lookup. Nothing outside segment k is read but the `symbols` section, parsed once at open.
+at most 65,535 per record, then one directory value per locate and 36 + 27 G seek values. zstd
+inflates at most 32 bytes a value plus 1,024 per column, and exactly the byte count for byte
+columns. File order comes back by a counting sort for the columns grouped by type, O(N), and a sort
+of the adds by key, O(A log A) for A adds. Each reference is one list lookup. Nothing outside segment k is read but the `symbols` section, parsed once at open.
 
 ## Writing
 
