@@ -45,6 +45,7 @@
 // Lifetime: ColumnsParser borrows its spans. A frame it returns is valid until the next
 // call to next().
 
+#include "tick_store/itch/message.hpp"
 #include "tick_store/store/store_error.hpp"
 
 #include <array>
@@ -122,6 +123,38 @@ struct ColumnsManifest {
     std::span<const std::byte> bytes);
 
 [[nodiscard]] std::string format_columns_manifest(const ColumnsManifest& manifest);
+
+// How one payload becomes a row, the rest text aside: its form and, for a hot or rare row,
+// the header and the typed values exactly as the files hold them. A raw row repeats the
+// previous row's timestamp, which only the caller knows, so it is 0 here, and every value
+// but the type byte is 0. `stock` and `mpid` point into the payload. ColumnsEncoder writes
+// what this returns, and a query that must answer as the files would uses it too.
+enum class RowForm : std::uint8_t { hot, rare, raw };
+
+struct RowValues {
+    RowForm form = RowForm::raw;
+    std::uint64_t ts_ns = 0;
+    std::uint16_t msg_type = 0;
+    std::uint32_t locate = 0;
+    std::uint32_t tracking = 0;
+    std::uint64_t order_ref = 0;
+    std::uint64_t new_ref = 0;
+    std::uint64_t shares = 0;
+    std::uint64_t price = 0;
+    std::uint64_t match = 0;
+    std::uint8_t side = 0;
+    std::uint8_t printable = 0;
+    std::span<const std::byte> stock;
+    std::span<const std::byte> mpid;
+};
+
+// nullopt only for an empty payload, which no frame can hold.
+[[nodiscard]] std::optional<RowValues> row_values(std::span<const std::byte> payload);
+
+// True if the column form keeps `message` as a hot or a rare row, false if it keeps it raw:
+// a RawMessage, or a hot message with a value outside its signed column or a stock or MPID
+// that is not printable ASCII. row_values() decides the same for a payload.
+[[nodiscard]] bool column_form_plain(const itch::Message& message) noexcept;
 
 // What ColumnsEncoder has seen. The largest value of each range-limited column is
 // here so that the harness can show the types chosen hold the real data.

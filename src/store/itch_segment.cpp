@@ -3,6 +3,7 @@
 #include "tick_store/itch/big_endian.hpp"
 #include "tick_store/itch/codec.hpp"
 #include "tick_store/itch/message.hpp"
+#include "tick_store/store/columns.hpp"
 #include "tick_store/store/itch_store.hpp"
 
 #include <algorithm>
@@ -328,6 +329,7 @@ struct SegmentBuilder::State {
     RefMap refs;
     std::uint32_t records = 0;
     std::uint32_t typed = 0;
+    bool plain = true;
     std::uint64_t first_time = 0;
     std::uint64_t last_time = 0;
     std::uint64_t min_time = 0;
@@ -559,6 +561,7 @@ std::expected<void, ItchStoreError> SegmentBuilder::add(const itch::Message& mes
     }
     state_->symbols = &symbols;
     std::visit(*state_, message);
+    state_->plain = state_->plain && column_form_plain(message);
     ++state_->records;
     return {};
 }
@@ -569,6 +572,7 @@ SegmentColumns SegmentBuilder::finish(std::uint64_t first_record, SegmentSummary
     summary.first_record = first_record;
     summary.records = s.records;
     summary.typed_records = s.typed;
+    summary.plain = s.plain;
     if (s.typed > 0) {
         summary.first_time = s.first_time;
         summary.last_time = s.last_time;
@@ -604,6 +608,7 @@ SegmentColumns SegmentBuilder::finish(std::uint64_t first_record, SegmentSummary
     s.refs.clear();
     s.records = 0;
     s.typed = 0;
+    s.plain = true;
     std::ranges::fill(s.bitmap, std::byte{0});
     return out;
 }
@@ -624,6 +629,8 @@ struct SegmentAssembler::State {
     std::array<std::byte, itch::kMaxPayloadSize> scratch{};
     // The seek index the columns give, against the stored one after the last record.
     std::vector<std::uint64_t> seek_want;
+    // Whether every record read so far is plain, against the summary after the last.
+    bool plain = true;
 
     [[nodiscard]] std::uint64_t take(Column column) {
         return columns[column][at[static_cast<std::size_t>(column)]++];
@@ -889,6 +896,7 @@ std::expected<void, ItchStoreError> SegmentAssembler::load(std::uint64_t segment
     s.next_record = 0;
     s.records = 0;
     s.seek_want.clear();
+    s.plain = true;
     const auto refuse = [&](ItchStoreErrorKind kind, std::string_view name, Column column,
                             std::uint64_t index, std::uint64_t expected, std::uint64_t actual) {
         ItchStoreError error;
@@ -1086,6 +1094,16 @@ std::expected<void, ItchStoreError> SegmentAssembler::load(std::uint64_t segment
 std::expected<std::optional<itch::Message>, ItchStoreError> SegmentAssembler::next() {
     State& s = *state_;
     if (s.next_record == s.records) {
+        if (s.plain != s.summary->plain) {
+            ItchStoreError error;
+            error.kind = ItchStoreErrorKind::bad_metadata;
+            error.field = "plain records";
+            error.segment = s.segment;
+            error.column = column_info(Column::type).name;
+            error.expected = s.plain ? 1U : 0U;
+            error.actual = s.summary->plain ? 1U : 0U;
+            return std::unexpected(error);
+        }
         const std::vector<std::uint64_t>& have = s.columns[Column::seek];
         for (std::size_t i = 0; i < s.seek_want.size(); ++i) {
             if (s.seek_want[i] != have[i]) {
@@ -1115,6 +1133,7 @@ std::expected<std::optional<itch::Message>, ItchStoreError> SegmentAssembler::ne
         return s.refuse("stock exception record", 0, s.next_record,
                         Column::stock_exception_record);
     }
+    s.plain = s.plain && column_form_plain(*message);
     ++s.next_record;
     return std::optional<itch::Message>{*message};
 }

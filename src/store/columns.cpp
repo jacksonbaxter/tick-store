@@ -638,33 +638,60 @@ void ColumnsEncoder::append_text(ColumnFile offsets, ColumnFile bytes,
     put<8>(buffers_[index_of(offsets)], total);
 }
 
-std::expected<void, StoreError> ColumnsEncoder::append(std::span<const std::byte> payload) {
+namespace {
+
+constexpr std::size_t kStockOffset = 24;
+constexpr std::size_t kMpidOffset = 36;
+
+}  // namespace
+
+bool column_form_plain(const itch::Message& message) noexcept {
+    if (std::holds_alternative<itch::RawMessage>(message)) {
+        return false;
+    }
+    const auto hot = hot_fields(message);
+    return !hot.has_value() || fits_columns(hot->second);
+}
+
+std::optional<RowValues> row_values(std::span<const std::byte> payload) {
     const auto message = itch::decode(payload);
     if (!message.has_value()) {
-        return std::unexpected(bad(StoreErrorKind::unencodable_record, "empty payload",
-                                   summary_.records, 1, 0));
+        return std::nullopt;
     }
-
+    RowValues row;
+    row.msg_type = byte_of(payload.front());
     const auto hot = hot_fields(*message);
     const auto* raw = std::get_if<itch::RawMessage>(&*message);
-    const bool keep_raw = raw != nullptr || (hot.has_value() && !fits_columns(hot->second));
-
+    if (raw != nullptr || (hot.has_value() && !fits_columns(hot->second))) {
+        row.form = RowForm::raw;
+        return row;
+    }
     MessageHeader header{};
-    HotFields fields;
-    std::string rest;
-    if (keep_raw) {
-        rest.reserve(kRawRestPrefix.size() + (payload.size() * 2));
-        rest += kRawRestPrefix;
-        append_hex(rest, payload);
-        header.timestamp_ns = previous_ts_ns_;
-        ++summary_.raw_rows;
-    } else if (hot.has_value()) {
+    if (hot.has_value()) {
+        row.form = RowForm::hot;
         header = hot->first;
-        fields = hot->second;
-        ++summary_.hot_rows;
+        const HotFields& fields = hot->second;
+        row.order_ref = fields.order_ref;
+        row.new_ref = fields.new_ref;
+        row.shares = fields.shares;
+        row.price = fields.price;
+        row.match = fields.match;
+        row.side = fields.side;
+        row.printable = fields.printable;
+        // hot_fields' spans point into the decoded message, which ends here, so the row's
+        // point at the same bytes of the payload: the stock of A, F and P at offset 24 and
+        // F's attribution at 36 (src/itch/layout.hpp). decode() gave a hot type, so the
+        // payload has its exact length.
+        if (!fields.stock.empty()) {
+            row.stock = payload.subspan(kStockOffset, fields.stock.size());
+        }
+        if (!fields.mpid.empty()) {
+            row.mpid = payload.subspan(kMpidOffset, fields.mpid.size());
+        }
     } else {
         // A conforming rare type: the header is its first 11 bytes, by the wire layout.
-        const auto rebuilt_header = std::visit(
+        row.form = RowForm::rare;
+        header = std::visit(
             [](const auto& alternative) -> MessageHeader {
                 if constexpr (requires { alternative.header; }) {
                     return alternative.header;
@@ -673,10 +700,49 @@ std::expected<void, StoreError> ColumnsEncoder::append(std::span<const std::byte
                 }
             },
             *message);
-        header = rebuilt_header;
-        rest.reserve((payload.size() - kMessageHeaderSize) * 2);
-        append_hex(rest, payload.subspan(kMessageHeaderSize));
-        ++summary_.rare_rows;
+    }
+    row.ts_ns = header.timestamp_ns;
+    row.locate = header.stock_locate;
+    row.tracking = header.tracking_number;
+    return row;
+}
+
+std::expected<void, StoreError> ColumnsEncoder::append(std::span<const std::byte> payload) {
+    const auto row = row_values(payload);
+    if (!row.has_value()) {
+        return std::unexpected(bad(StoreErrorKind::unencodable_record, "empty payload",
+                                   summary_.records, 1, 0));
+    }
+
+    MessageHeader header{};
+    HotFields fields;
+    std::string rest;
+    if (row->form == RowForm::raw) {
+        rest.reserve(kRawRestPrefix.size() + (payload.size() * 2));
+        rest += kRawRestPrefix;
+        append_hex(rest, payload);
+        header.timestamp_ns = previous_ts_ns_;
+        ++summary_.raw_rows;
+    } else {
+        header.timestamp_ns = row->ts_ns;
+        header.stock_locate = static_cast<std::uint16_t>(row->locate);
+        header.tracking_number = static_cast<std::uint16_t>(row->tracking);
+        if (row->form == RowForm::hot) {
+            fields = HotFields{.order_ref = row->order_ref,
+                               .new_ref = row->new_ref,
+                               .shares = row->shares,
+                               .price = row->price,
+                               .match = row->match,
+                               .side = row->side,
+                               .printable = row->printable,
+                               .stock = row->stock,
+                               .mpid = row->mpid};
+            ++summary_.hot_rows;
+        } else {
+            rest.reserve((payload.size() - kMessageHeaderSize) * 2);
+            append_hex(rest, payload.subspan(kMessageHeaderSize));
+            ++summary_.rare_rows;
+        }
     }
 
     if (header.timestamp_ns < previous_ts_ns_) {

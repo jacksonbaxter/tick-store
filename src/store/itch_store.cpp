@@ -344,6 +344,7 @@ std::vector<std::byte> encode_column_metadata(const ColumnMetadata& metadata) {
         put(out, s.min_time, 8);
         put(out, s.max_time, 8);
         put(out, s.typed_records, 4);
+        put(out, s.plain ? 1U : 0U, 1);
         put(out, s.locates.size(), 2);
         out.insert(out.end(), s.locates.begin(), s.locates.end());
     }
@@ -391,6 +392,11 @@ std::expected<ColumnMetadata, ItchStoreError> parse_column_metadata(
     s.min_time = field(bytes, kMetaMinTimeOffset, 8);
     s.max_time = field(bytes, kMetaMaxTimeOffset, 8);
     s.typed_records = static_cast<std::uint32_t>(field(bytes, kMetaTypedOffset, 4));
+    const std::uint64_t plain = field(bytes, kMetaPlainOffset, 1);
+    if (plain > 1) {
+        return refuse("plain records", kMetaPlainOffset, 1, plain);
+    }
+    s.plain = plain == 1;
     const std::uint64_t bitmap = field(bytes, kMetaBitmapSizeOffset, 2);
     if (bitmap > kMaxLocateBitmapBytes) {
         return refuse("locate bitmap size", kMetaBitmapSizeOffset, kMaxLocateBitmapBytes, bitmap);

@@ -767,6 +767,29 @@ TEST(ItchStoreCorrupt, SeekIndexFields) {
     }
 }
 
+TEST(ItchStoreCorrupt, PlainRecordsFlag) {
+    // Not 0 or 1, refused from the footer at open.
+    {
+        StoreParts parts = test::parts_of(base_file());
+        put_field(parts.block(0, Column::type).metadata, kMetaPlainOffset, 1, 2);
+        expect_refused(parts.build(), "plain records", ItchStoreErrorKind::bad_metadata);
+    }
+    // The base file's segments are plain, the reference file's holds a raw record: each
+    // flag turned over is refused once the segment's last record is read.
+    {
+        StoreParts parts = test::parts_of(base_file());
+        ASSERT_EQ(get_field(parts.block(0, Column::type).metadata, kMetaPlainOffset, 1), 1U);
+        put_field(parts.block(0, Column::type).metadata, kMetaPlainOffset, 1, 0);
+        expect_refused(parts.build(), "plain records", ItchStoreErrorKind::bad_metadata);
+    }
+    {
+        StoreParts parts = test::parts_of(reference_file());
+        ASSERT_EQ(get_field(parts.block(0, Column::type).metadata, kMetaPlainOffset, 1), 0U);
+        put_field(parts.block(0, Column::type).metadata, kMetaPlainOffset, 1, 1);
+        expect_refused(parts.build(), "plain records", ItchStoreErrorKind::bad_metadata);
+    }
+}
+
 TEST(ItchStoreCorrupt, SeekIndexRulesParsedAlone) {
     // One raw record: a group with no typed record must have no times.
     std::vector<std::uint64_t> values(seek_value_count(1), 0);

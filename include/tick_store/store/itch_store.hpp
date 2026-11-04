@@ -97,8 +97,9 @@ inline constexpr std::size_t kMetaLastTimeOffset = 28;
 inline constexpr std::size_t kMetaMinTimeOffset = 36;
 inline constexpr std::size_t kMetaMaxTimeOffset = 44;
 inline constexpr std::size_t kMetaTypedOffset = 52;
-inline constexpr std::size_t kMetaBitmapSizeOffset = 56;
-inline constexpr std::size_t kMetaBitmapOffset = 58;
+inline constexpr std::size_t kMetaPlainOffset = 56;
+inline constexpr std::size_t kMetaBitmapSizeOffset = 57;
+inline constexpr std::size_t kMetaBitmapOffset = 59;
 inline constexpr std::size_t kSegmentMetadataFixedSize = kMetaBitmapOffset;
 // A bitmap over every 16-bit locate.
 inline constexpr std::size_t kMaxLocateBitmapBytes = 8192;
@@ -598,6 +599,11 @@ struct SegmentSummary {
     std::uint64_t last_time = 0;
     std::uint64_t min_time = 0;
     std::uint64_t max_time = 0;
+    // True if the column form (columns.hpp) keeps every record of the segment as a hot or
+    // a rare row: no record the decoder returned raw, and every hot record's values fit
+    // their signed columns with printable stock and MPID (column_form_plain()). A query
+    // can then take each row's timestamp from its own record.
+    bool plain = true;
     // Bit (l % 8) of byte l / 8 is set if locate l appears. No trailing zero byte.
     std::vector<std::byte> locates;
 
