@@ -25,9 +25,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <map>
 #include <optional>
 #include <set>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -39,6 +41,13 @@ namespace {
 using test::Bytes;
 
 constexpr std::uint32_t kBlock = 2;
+
+EvalOptions options_of(std::uint32_t block_values, std::size_t max_examples = 8) {
+    return EvalOptions{.block_values = block_values,
+                       .max_examples = max_examples,
+                       .columns = {},
+                       .observe_block = {}};
+}
 
 void append(Bytes& out, const itch::Message& message) {
     std::array<std::byte, 128> frame{};
@@ -342,7 +351,7 @@ void expect_price_sizes(const ColumnResult& got, ValueKind kind,
 
 TEST(CodecEval, ReportsTheSizesTheColumnEncodersGiveOnEveryColumn) {
     const Day day = small_day(310'000'000'000);
-    const auto result = evaluate_codecs(day.bytes, EvalOptions{.block_values = kBlock});
+    const auto result = evaluate_codecs(day.bytes, options_of(kBlock));
     ASSERT_TRUE(result.has_value()) << result.error();
     EXPECT_TRUE(result->exact());
     EXPECT_EQ(result->messages, day.timestamps.size());
@@ -355,7 +364,8 @@ TEST(CodecEval, ReportsTheSizesTheColumnEncodersGiveOnEveryColumn) {
     const CodecResult& dod = codec(timestamps, "gorilla-dod");
     EXPECT_TRUE(dod.exact());
     const auto timestamp_codecs = static_cast<std::size_t>(std::ranges::count_if(
-        codec_registry(), [](const CodecEntry& entry) { return entry.for_timestamps; }));
+        codec_registry(),
+        [](const CodecEntry& entry) { return applies_to(entry, ValueKind::timestamp_ns); }));
     EXPECT_EQ(timestamps.codecs.size(), timestamp_codecs);
     EXPECT_EQ(timestamp_codecs, 1U + 5U);
     EXPECT_EQ(dod.block_bytes, timestamp_bytes(day.timestamps));
@@ -421,7 +431,7 @@ TEST(CodecEval, ReportsTheSizesTheColumnEncodersGiveOnEveryColumn) {
 
 TEST(CodecEval, ExactEntropiesAreThoseOfTheDeltasEachColumnSees) {
     const Day day = small_day(310'000'000'000);
-    const auto result = evaluate_codecs(day.bytes, EvalOptions{.block_values = kBlock});
+    const auto result = evaluate_codecs(day.bytes, options_of(kBlock));
     ASSERT_TRUE(result.has_value()) << result.error();
 
     const ColumnResult& timestamps = column(*result, "timestamp");
@@ -473,7 +483,7 @@ TEST(CodecEval, ExactEntropiesAreThoseOfTheDeltasEachColumnSees) {
 
 TEST(CodecEval, PermutationEstimateIsTheEntropyOfTheLocateSequence) {
     const Day day = small_day(310'000'000'000);
-    const auto result = evaluate_codecs(day.bytes, EvalOptions{.block_values = kBlock});
+    const auto result = evaluate_codecs(day.bytes, options_of(kBlock));
     ASSERT_TRUE(result.has_value()) << result.error();
     const PermutationEstimate& permutation = result->permutation;
     EXPECT_EQ(permutation.messages, day.locates.size());
@@ -495,7 +505,7 @@ TEST(CodecEval, PermutationEstimateIsTheEntropyOfTheLocateSequence) {
 
 TEST(CodecEval, IdealBitsFollowTheCensusDefinition) {
     const Day day = small_day(310'000'000'000);
-    const auto result = evaluate_codecs(day.bytes, EvalOptions{.block_values = kBlock});
+    const auto result = evaluate_codecs(day.bytes, options_of(kBlock));
     ASSERT_TRUE(result.has_value());
     const ColumnResult& timestamps = column(*result, "timestamp");
     EXPECT_GT(timestamps.ideal_delta_bits, 0.0);
@@ -503,7 +513,7 @@ TEST(CodecEval, IdealBitsFollowTheCensusDefinition) {
     // A column of one value has neither.
     Day one;
     one.event(42);
-    const auto single = evaluate_codecs(one.bytes, EvalOptions{.block_values = kBlock});
+    const auto single = evaluate_codecs(one.bytes, options_of(kBlock));
     ASSERT_TRUE(single.has_value());
     EXPECT_EQ(column(*single, "timestamp").ideal_delta_bits, 0.0);
     EXPECT_EQ(column(*single, "add_price").values, 0U);
@@ -515,7 +525,7 @@ TEST(CodecEval, CountsAndReportsAValueADoubleCannotHold) {
     // or not at all, and the evaluator must say which value, not round it away.
     constexpr std::uint64_t kWide = (std::uint64_t{1} << 60U) + 1;
     const Day day = small_day(kWide);
-    const auto result = evaluate_codecs(day.bytes, EvalOptions{.block_values = kBlock});
+    const auto result = evaluate_codecs(day.bytes, options_of(kBlock));
     ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(result->exact());
     const ColumnResult& levels = column(*result, "mwcb_level");
@@ -539,7 +549,7 @@ TEST(CodecEval, KeepsOnlyTheFirstFewExamples) {
         day.mwcb(100 + i, {(std::uint64_t{1} << 60U) + 1 + (2 * i), 0, 0});
     }
     const auto result =
-        evaluate_codecs(day.bytes, EvalOptions{.block_values = kBlock, .max_examples = 3});
+        evaluate_codecs(day.bytes, options_of(kBlock, 3));
     ASSERT_TRUE(result.has_value());
     const CodecResult& failed = codec(column(*result, "mwcb_level"), "gorilla-xor-f64-integer");
     EXPECT_EQ(failed.representation_failures, 5U);
@@ -548,12 +558,12 @@ TEST(CodecEval, KeepsOnlyTheFirstFewExamples) {
 
 TEST(CodecEval, RefusesABlockSizeTheFormatCannotHold) {
     const Day day = small_day(1);
-    EXPECT_FALSE(evaluate_codecs(day.bytes, EvalOptions{.block_values = 0}).has_value());
+    EXPECT_FALSE(evaluate_codecs(day.bytes, options_of(0)).has_value());
     EXPECT_FALSE(
-        evaluate_codecs(day.bytes, EvalOptions{.block_values = codec::kMaxBlockValues + 1})
+        evaluate_codecs(day.bytes, options_of(codec::kMaxBlockValues + 1))
             .has_value());
     EXPECT_TRUE(
-        evaluate_codecs(day.bytes, EvalOptions{.block_values = codec::kMaxBlockValues})
+        evaluate_codecs(day.bytes, options_of(codec::kMaxBlockValues))
             .has_value());
 }
 
@@ -605,7 +615,8 @@ TEST(CodecEval, EveryCodecHasAUniqueNameAndAColumn) {
     std::set<std::string_view> names;
     for (const CodecEntry& entry : codec_registry()) {
         EXPECT_TRUE(names.insert(entry.name).second) << entry.name;
-        EXPECT_TRUE(entry.for_timestamps || entry.for_prices) << entry.name;
+        EXPECT_NE(entry.kinds, 0U) << entry.name;
+        EXPECT_EQ(entry.kinds >> kValueKinds, 0U) << entry.name;
         EXPECT_NE(entry.encode_block, nullptr);
         EXPECT_NE(entry.decode_block, nullptr);
     }
@@ -613,6 +624,321 @@ TEST(CodecEval, EveryCodecHasAUniqueNameAndAColumn) {
     for (const ColumnSpec& spec : column_specs()) {
         EXPECT_TRUE(columns.insert(spec.name).second) << spec.name;
     }
+}
+
+// A day that exercises the book: adds, executions, a cancel, a replace, deletes, one of
+// them of an order never added and one of an order already executed in full, and the
+// other columns' fields, with every value each new column should see written out by hand.
+itch::Stock stock_of(std::string_view name) {
+    itch::Stock stock{};
+    stock.fill(std::byte{' '});
+    for (std::size_t i = 0; i < name.size(); ++i) {
+        stock[i] = static_cast<std::byte>(name[i]);
+    }
+    return stock;
+}
+
+Bytes book_day() {
+    Bytes bytes;
+    itch::StockDirectory directory;
+    directory.header = header(7, 100);
+    directory.stock = stock_of("AAPL");
+    append(bytes, directory);
+    const auto add = [&](std::uint64_t ref, std::uint16_t locate, char side, std::uint32_t shares,
+                         std::string_view stock) {
+        itch::AddOrder message;
+        message.header = header(locate, 200);
+        message.order_reference_number = ref;
+        message.buy_sell_indicator = static_cast<std::byte>(side);
+        message.shares = shares;
+        message.stock = stock_of(stock);
+        message.price = itch::Price4{1'000};
+        append(bytes, message);
+    };
+    add(100, 7, 'B', 100, "AAPL");
+    itch::AddOrderWithMpid with_mpid;
+    with_mpid.header = header(9, 300);
+    with_mpid.order_reference_number = 104;
+    with_mpid.buy_sell_indicator = std::byte{'S'};
+    with_mpid.shares = 200;
+    with_mpid.stock = stock_of("MSFT");
+    with_mpid.price = itch::Price4{2'000};
+    with_mpid.attribution = {std::byte{'A'}, std::byte{'B'}, std::byte{'C'}, std::byte{'D'}};
+    append(bytes, with_mpid);
+    add(103, 7, 'S', 300, "AAPL");
+    const auto executed = [&](std::uint64_t ref, std::uint16_t locate, std::uint32_t shares,
+                              std::uint64_t match) {
+        itch::OrderExecuted message;
+        message.header = header(locate, 400);
+        message.order_reference_number = ref;
+        message.executed_shares = shares;
+        message.match_number = match;
+        append(bytes, message);
+    };
+    executed(100, 7, 40, 5'000);
+    itch::OrderExecutedWithPrice with_price;
+    with_price.header = header(9, 500);
+    with_price.order_reference_number = 104;
+    with_price.executed_shares = 200;
+    with_price.match_number = 5'001;
+    with_price.printable = std::byte{'Y'};
+    with_price.execution_price = itch::Price4{2'000};
+    append(bytes, with_price);
+    itch::OrderCancel cancel;
+    cancel.header = header(7, 600);
+    cancel.order_reference_number = 100;
+    cancel.cancelled_shares = 60;
+    append(bytes, cancel);
+    itch::OrderReplace replace;
+    replace.header = header(7, 700);
+    replace.original_order_reference_number = 103;
+    replace.new_order_reference_number = 110;
+    replace.shares = 50;
+    replace.price = itch::Price4{1'100};
+    append(bytes, replace);
+    const auto del = [&](std::uint64_t ref) {
+        itch::OrderDelete message;
+        message.header = header(7, 800);
+        message.order_reference_number = ref;
+        append(bytes, message);
+    };
+    del(110);
+    del(999);
+    itch::Trade trade;
+    trade.header = header(9, 900);
+    trade.buy_sell_indicator = std::byte{'B'};
+    trade.shares = 10;
+    trade.stock = stock_of("MSFT");
+    trade.match_number = 5'002;
+    append(bytes, trade);
+    executed(104, 9, 5, 5'003);
+    return bytes;
+}
+
+using Streams = std::map<std::size_t, std::vector<std::uint64_t>>;
+
+// Every block each column cut, rejoined per stream.
+std::map<std::string, Streams, std::less<>> blocks_of(const Bytes& day, EvalOptions options) {
+    std::map<std::string, Streams, std::less<>> seen;
+    options.observe_block = [&](std::string_view name, std::size_t stream,
+                                std::span<const std::uint64_t> block) {
+        auto& values = seen[std::string{name}][stream];
+        values.insert(values.end(), block.begin(), block.end());
+    };
+    const auto result = evaluate_codecs(day, options);
+    EXPECT_TRUE(result.has_value());
+    EXPECT_TRUE(result.has_value() && result->exact());
+    return seen;
+}
+
+std::vector<std::uint64_t> bytes_of(std::string_view text) {
+    std::vector<std::uint64_t> values;
+    for (const char c : text) {
+        values.push_back(static_cast<unsigned char>(c));
+    }
+    return values;
+}
+
+TEST(CodecEval, BookColumnsHoldWhatEachMessageNames) {
+    const auto seen = blocks_of(book_day(), options_of(kBlock));
+    const auto file = [&](std::string_view name) {
+        const auto found = seen.find(name);
+        EXPECT_NE(found, seen.end()) << name;
+        if (found == seen.end()) {
+            return std::vector<std::uint64_t>{};
+        }
+        EXPECT_EQ(found->second.size(), 1U) << name;
+        return found->second.begin()->second;
+    };
+    using V = std::vector<std::uint64_t>;
+    EXPECT_EQ(file("add_ref"), (V{100, 104, 103}));
+    // zigzag(100 - 0), zigzag(104 - 100), zigzag(103 - 104).
+    EXPECT_EQ(file("add_ref_vs_running_max"), (V{200, 8, 1}));
+    EXPECT_EQ(file("creation_ref"), (V{100, 104, 103, 110}));
+    EXPECT_EQ(file("replace_new_ref"), (V{110}));
+    EXPECT_EQ(file("replace_new_minus_original"), (V{14}));
+    EXPECT_EQ(file("referenced_ref"), (V{100, 104, 100, 103, 110, 999, 104}));
+    // Creations so far less the order's: 0 for an order not on the book, as 999 never was
+    // and 104 no longer is once C executed all its shares.
+    EXPECT_EQ(file("ref_distance_E"), (V{3, 0}));
+    EXPECT_EQ(file("ref_locate_distance_E"), (V{2, 0}));
+    EXPECT_EQ(file("ref_distance_C"), (V{2}));
+    EXPECT_EQ(file("ref_locate_distance_C"), (V{1}));
+    EXPECT_EQ(file("ref_distance_X"), (V{3}));
+    EXPECT_EQ(file("ref_locate_distance_X"), (V{2}));
+    EXPECT_EQ(file("ref_distance_D"), (V{1, 0}));
+    EXPECT_EQ(file("ref_locate_distance_D"), (V{1, 0}));
+    EXPECT_EQ(file("ref_distance_U"), (V{1}));
+    EXPECT_EQ(file("ref_locate_distance_U"), (V{1}));
+    EXPECT_EQ(file("add_shares"), (V{100, 200, 300}));
+    EXPECT_EQ(file("executed_shares"), (V{40, 5}));
+    EXPECT_EQ(file("executed_with_price_shares"), (V{200}));
+    EXPECT_EQ(file("cancelled_shares"), (V{60}));
+    EXPECT_EQ(file("replace_shares"), (V{50}));
+    EXPECT_EQ(file("trade_shares"), (V{10}));
+    EXPECT_EQ(file("match_number"), (V{5'000, 5'001, 5'002, 5'003}));
+    EXPECT_EQ(file("message_type"), bytes_of("RAFAECXUDDPE"));
+    EXPECT_EQ(file("stock_locate"), (V{7, 7, 9, 7, 7, 9, 7, 7, 7, 7, 9, 9}));
+    EXPECT_EQ(file("stock_locate_unreferenced"), (V{7, 7, 9, 7, 9}));
+    EXPECT_EQ(file("add_side"), bytes_of("BSS"));
+    EXPECT_EQ(file("mpid"), (V{0x41424344}));
+    EXPECT_EQ(file("printable"), bytes_of("Y"));
+    EXPECT_EQ(file("trade_ref"), (V{0}));
+    EXPECT_EQ(file("trade_side"), bytes_of("B"));
+    // R's bytes after the common header, as the wire holds them.
+    EXPECT_EQ(file("rare_rest_bytes").size(), itch::StockDirectory::wire_size - 11);
+
+    // Reductions as 0 where they take all the order has left, else shares + 1, one stream
+    // per type: E is alternative 12, C 13, X 14.
+    const Streams& reductions = seen.at("reduction_shares_vs_remaining");
+    EXPECT_EQ(reductions.at(12), (V{41, 6}));
+    EXPECT_EQ(reductions.at(13), (V{0}));
+    EXPECT_EQ(reductions.at(14), (V{0}));
+    const Streams& by_type = seen.at("referenced_ref_per_type");
+    EXPECT_EQ(by_type.at(12), (V{100, 104}));
+    EXPECT_EQ(by_type.at(15), (V{110, 999}));
+    EXPECT_EQ(by_type.at(16), (V{103}));
+    const Streams& by_locate = seen.at("add_ref_per_locate");
+    EXPECT_EQ(by_locate.at(7), (V{100, 103}));
+    EXPECT_EQ(by_locate.at(9), (V{104}));
+}
+
+TEST(CodecEval, AnalysisCountsTheBookAndTheDerivableFields) {
+    const auto result = evaluate_codecs(book_day(), options_of(kBlock));
+    ASSERT_TRUE(result.has_value()) << result.error();
+    const Analysis& a = result->analysis;
+    ASSERT_EQ(a.references.size(), 5U);
+    const auto locality = [&](char type) {
+        return *std::ranges::find(a.references, type, &ReferenceLocality::type);
+    };
+    EXPECT_EQ(locality('E').messages, 2U);
+    EXPECT_EQ(locality('E').unresolved, 1U);
+    EXPECT_EQ(locality('E').shares_equal_remaining, 0U);
+    EXPECT_EQ(locality('C').shares_equal_remaining, 1U);
+    EXPECT_EQ(locality('X').shares_equal_remaining, 1U);
+    EXPECT_EQ(locality('D').messages, 2U);
+    EXPECT_EQ(locality('D').unresolved, 1U);
+    EXPECT_EQ(locality('U').unresolved, 0U);
+    for (const ReferenceLocality& r : a.references) {
+        EXPECT_EQ(r.locate_mismatches, 0U) << r.type;
+        // Every resolved order is a few creations back, so in every window but the
+        // aligned blocks, which hold all four creations too at these sizes.
+        EXPECT_EQ(r.within_distance[0], r.messages - r.unresolved) << r.type;
+        EXPECT_EQ(r.same_block[0], r.messages - r.unresolved) << r.type;
+    }
+    EXPECT_EQ(a.peak_live_orders, 3U);
+    EXPECT_EQ(a.live_orders_at_end, 0U);
+    EXPECT_EQ(a.duplicate_creations, 0U);
+
+    // The heads: 100 escapes, 104 and 103 extend it or escape, as the encoder decides.
+    EXPECT_EQ(a.add_heads.values, 3U);
+    std::uint64_t tokens = 0;
+    for (const std::uint64_t count : a.add_heads.tokens) {
+        tokens += count;
+    }
+    EXPECT_EQ(tokens, 3U);
+    EXPECT_EQ(a.add_heads.consecutive, 2U);
+    EXPECT_EQ(a.creation_heads.values, 4U);
+    // Plain deltas 104 - 100 = 4 and 103 - 104 = -1.
+    EXPECT_EQ(a.add_heads.small_deltas[16 + 4], 1U);
+    EXPECT_EQ(a.add_heads.small_deltas[16 - 1], 1U);
+
+    // Recency ranks of the locates 7 7 9 7 7 9 7 7 7 7 9 9: two first uses, then 0 and 1.
+    const std::vector<int> ranks{-1, 0, -1, 1, 0, 1, 1, 0, 0, 0, 1, 0};
+    EXPECT_NEAR(a.locate_recency_entropy_bits, entropy_of(ranks), 1e-12);
+    EXPECT_EQ(a.locate_first_uses, 2U);
+    // The type sequence R A F A E C X U D D P E.
+    const std::vector<char> types{'R', 'A', 'F', 'A', 'E', 'C', 'X', 'U', 'D', 'D', 'P', 'E'};
+    EXPECT_NEAR(a.type_entropy_bits, entropy_of(types), 1e-12);
+
+    // R sets AAPL on locate 7. F and P carry MSFT on locate 9, which has no entry.
+    EXPECT_EQ(a.stock_fields[1], 1U);
+    EXPECT_EQ(a.stock_mismatches[1], 0U);
+    EXPECT_EQ(a.stock_fields[10], 2U);
+    EXPECT_EQ(a.stock_mismatches[10], 0U);
+    EXPECT_EQ(a.stock_mismatches[11], 1U);
+    EXPECT_EQ(a.stock_mismatches[17], 1U);
+}
+
+// More messages than the recency ranks have use times, so they renumber several times,
+// against move-to-front over a plain list.
+TEST(CodecEval, LocateRecencyRanksSurviveRenumbering) {
+    Bytes bytes;
+    std::vector<std::int64_t> ranks;
+    std::vector<std::uint16_t> list;
+    constexpr std::uint64_t kMessages = 300'000;
+    for (std::uint64_t i = 0; i < kMessages; ++i) {
+        const auto locate = static_cast<std::uint16_t>(
+            i % 9'973 == 0 ? 1'000 + (i % 7'000) : 1 + ((i * i) % 37));
+        itch::SystemEvent event;
+        event.header = header(locate, 1'000 + i);
+        append(bytes, event);
+        const auto found = std::ranges::find(list, locate);
+        if (found == list.end()) {
+            ranks.push_back(-1);
+            list.insert(list.begin(), locate);
+        } else {
+            ranks.push_back(found - list.begin());
+            list.erase(found);
+            list.insert(list.begin(), locate);
+        }
+    }
+    EvalOptions options = options_of(codec::kDefaultBlockValues);
+    options.columns = {"message_type"};
+    const auto result = evaluate_codecs(bytes, options);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_NEAR(result->analysis.locate_recency_entropy_bits, entropy_of(ranks), 1e-9);
+    EXPECT_EQ(result->analysis.locate_first_uses,
+              static_cast<std::uint64_t>(std::ranges::count(ranks, -1)));
+}
+
+TEST(CodecEval, ZstdSeesEveryRawAndEncodedBlockAndGivesItBack) {
+    const auto result = evaluate_codecs(book_day(), options_of(kBlock));
+    ASSERT_TRUE(result.has_value());
+    for (const ColumnResult& got : result->columns) {
+        EXPECT_EQ(got.raw_bytes, got.values * got.spec->raw_bytes) << got.spec->name;
+        EXPECT_EQ(got.raw_zstd_mismatches, 0U);
+        EXPECT_EQ(got.raw_zstd_bytes > 0, got.values > 0) << got.spec->name;
+        for (const CodecResult& c : got.codecs) {
+            EXPECT_EQ(c.zstd_mismatches, 0U);
+            EXPECT_EQ(c.zstd_bytes > 0, c.blocks > 0) << got.spec->name << " " << c.entry->name;
+            // Each block costs the smaller of its frame and itself, and a byte to say which.
+            EXPECT_LE(c.zstd_or_plain_bytes, c.block_bytes + c.blocks);
+            EXPECT_LE(c.zstd_or_plain_bytes, c.zstd_bytes + c.blocks);
+        }
+    }
+}
+
+TEST(CodecEval, ASubsetRunsOnlyItsColumnsAndRefusesAnUnknownName) {
+    EvalOptions options = options_of(kBlock);
+    options.columns = {"add_ref", "message_type"};
+    const auto result = evaluate_codecs(book_day(), options);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result->columns.size(), 2U);
+    EXPECT_EQ(result->columns[0].spec->name, "add_ref");
+    EXPECT_EQ(result->columns[1].spec->name, "message_type");
+    EXPECT_EQ(result->analysis.references.size(), 5U);
+    options.columns = {"no_such_column"};
+    EXPECT_FALSE(evaluate_codecs(book_day(), options).has_value());
+}
+
+TEST(CodecEval, EachKindOfColumnGetsItsCodecs) {
+    const auto result = evaluate_codecs(book_day(), options_of(kBlock));
+    ASSERT_TRUE(result.has_value());
+    const auto names = [&](std::string_view column_name) {
+        std::set<std::string_view> out;
+        for (const CodecResult& c : column(*result, column_name).codecs) {
+            out.insert(c.entry->name);
+        }
+        return out;
+    };
+    EXPECT_TRUE(names("add_ref").contains("pfor-head-delta"));
+    EXPECT_FALSE(names("add_ref").contains("dict"));
+    EXPECT_TRUE(names("add_shares").contains("dict"));
+    EXPECT_TRUE(names("add_shares").contains("rle"));
+    EXPECT_TRUE(names("message_type").contains("dict"));
+    EXPECT_FALSE(names("message_type").contains("pfor-head-delta"));
+    EXPECT_FALSE(names("timestamp").contains("dict"));
 }
 
 std::string read_text(const std::filesystem::path& path) {
@@ -653,6 +979,13 @@ TEST(CodecEvalCli, WritesJsonWithNoPathsAndExitsZero) {
     EXPECT_TRUE(text.contains(R"("permutation_estimate")"));
     EXPECT_TRUE(text.contains(R"("entropy_delta_bits")"));
     EXPECT_TRUE(text.contains(R"("entropy_value_bits")"));
+    EXPECT_TRUE(text.contains(R"("target": "CR-6")"));
+    EXPECT_TRUE(text.contains(R"("target": "CR-7")"));
+    EXPECT_TRUE(text.contains(R"("analysis")"));
+    EXPECT_TRUE(text.contains(R"("reference_locality")"));
+    EXPECT_TRUE(text.contains(R"("zstd1_bytes")"));
+    EXPECT_TRUE(text.contains(R"("raw_zstd1_bytes")"));
+    EXPECT_TRUE(text.contains(R"("columns_subset": null)"));
     EXPECT_TRUE(text.contains(R"("price4_exhaustive_proofs": [])"));
     EXPECT_FALSE(text.contains(dir.path().string()));
     EXPECT_TRUE(output.out.contains("timestamp"));
@@ -692,9 +1025,17 @@ TEST(CodecEvalCli, FailsWithExitTwo) {
     EXPECT_EQ(run({source, out, "--day", "D", "--block-values", "2x"}), kExitUsageOrIo);
     EXPECT_EQ(run({source, out, "--day", "D", "--block-values", "1048577"}), kExitUsageOrIo);
     EXPECT_EQ(run({source, out, "--day", "D", "--colour", "red"}), kExitUsageOrIo);
+    EXPECT_EQ(run({source, out, "--day", "D", "--columns", ""}), kExitUsageOrIo);
+    EXPECT_EQ(run({source, out, "--day", "D", "--columns", "add_ref,"}), kExitUsageOrIo);
+    EXPECT_EQ(run({source, out, "--day", "D", "--columns", "no_such_column"}), kExitUsageOrIo);
     EXPECT_EQ(run({absent, out, "--day", "D"}), kExitUsageOrIo);
     EXPECT_EQ(run({source, no_dir, "--day", "D"}), kExitUsageOrIo);
     EXPECT_EQ(run({source, out, "--day", "D"}), kExitPass);
+    EXPECT_EQ(run({source, out, "--day", "D", "--columns", "timestamp,add_ref"}), kExitPass);
+    const std::string text = read_text(out);
+    EXPECT_TRUE(text.contains(R"("columns_subset": [)"));
+    EXPECT_TRUE(text.contains(R"("name": "add_ref")"));
+    EXPECT_FALSE(text.contains(R"("name": "add_price")"));
 }
 
 }  // namespace

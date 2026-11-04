@@ -40,6 +40,26 @@ if(TICK_STORE_BUILD_TESTS OR TICK_STORE_BUILD_BENCH)
     FetchContent_MakeAvailable(hdrhistogram)
 endif()
 
+# zstd at a low level is the generic baseline tick_codec_eval measures the column codecs
+# against, on raw and on encoded blocks. Only the static library is built, single-threaded,
+# without legacy formats or the command-line programs.
+if(TICK_STORE_BUILD_TESTS OR TICK_STORE_BUILD_TOOLS OR TICK_STORE_BUILD_BENCH)
+    tick_store_declare_dependency(zstd
+        # Tag v1.5.7.
+        URL https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz
+        URL_HASH SHA256=eb33e51f49a15e023950cd7825ca74a4a2b43db8354825ac24fc1b7ee09e6fa3
+        SOURCE_SUBDIR build/cmake
+    )
+    set(ZSTD_BUILD_PROGRAMS OFF CACHE BOOL "" FORCE)
+    set(ZSTD_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+    set(ZSTD_BUILD_STATIC ON CACHE BOOL "" FORCE)
+    set(ZSTD_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(ZSTD_BUILD_CONTRIB OFF CACHE BOOL "" FORCE)
+    set(ZSTD_LEGACY_SUPPORT OFF CACHE BOOL "" FORCE)
+    set(ZSTD_MULTITHREAD_SUPPORT OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(zstd)
+endif()
+
 if(TICK_STORE_BUILD_BENCH)
     tick_store_declare_dependency(benchmark
         # Tag v1.9.5.

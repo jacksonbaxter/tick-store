@@ -17,9 +17,18 @@
 // A failure in either is counted and the first few are kept with their values, so a
 // value the representation cannot hold is reported, never rounded away.
 //
+// Each codec's encoded blocks also go through zstd at level 1, and each column's raw
+// values at their wire width, so a generic compressor is measured on both. Every zstd
+// frame is decompressed and compared byte for byte, as the codecs' blocks are.
+//
+// Beside the columns, an analysis section measures what the columns cannot show on their
+// own: what the add references' interleaved sequences follow, how far back the messages
+// that name an order reach for it, which fields can be derived, and the order-1 and
+// recency entropies of the message type and locate. See Analysis below.
+//
 // To measure another codec, add a CodecEntry to the table in codec_eval.cpp: a block
 // encoder, a block decoder of the block.hpp shape, the representation it is given, and
-// which columns it applies to. Nothing else changes.
+// which kinds of column it applies to. Nothing else changes.
 
 #include "tick_store/codec/block.hpp"
 #include "tick_store/codec/codec_error.hpp"
@@ -29,6 +38,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <functional>
 #include <optional>
 #include <span>
 #include <string>
@@ -43,7 +53,15 @@ enum class ValueKind : std::uint8_t {
     price4,
     // Price(8): a uint64 of $0.00000001, only in the MWCB levels.
     price8,
+    // An identifier that mostly rises: order references and match numbers.
+    reference,
+    // A count or a distance: shares, and references recoded as differences.
+    quantity,
+    // A small set of codes: message types, locates, sides, flags and other bytes.
+    symbol,
 };
+
+inline constexpr std::size_t kValueKinds = 6;
 
 enum class StreamOrder : std::uint8_t {
     // One stream, in file order.
@@ -52,6 +70,8 @@ enum class StreamOrder : std::uint8_t {
     per_locate,
     // One stream per stock locate and side, each in file order. Add orders only.
     per_locate_side,
+    // One stream per message type, each in file order.
+    per_type,
 };
 
 enum class Representation : std::uint8_t {
@@ -79,11 +99,19 @@ struct CodecEntry {
     EncodeBlock encode_block;
     codec::BlockDecoder decode_block;
     Representation representation;
-    bool for_timestamps;
-    bool for_prices;
+    // The kinds of column it applies to, one bit per ValueKind.
+    std::uint8_t kinds;
     // Names of the counters in use. An empty name marks one unused.
     std::array<std::string_view, kCodecCounters> counter_names;
 };
+
+[[nodiscard]] constexpr std::uint8_t kind_bit(ValueKind kind) noexcept {
+    return static_cast<std::uint8_t>(1U << static_cast<unsigned>(kind));
+}
+
+[[nodiscard]] constexpr bool applies_to(const CodecEntry& entry, ValueKind kind) noexcept {
+    return (entry.kinds & kind_bit(kind)) != 0;
+}
 
 // Every codec measured, in report order.
 [[nodiscard]] std::span<const CodecEntry> codec_registry() noexcept;
@@ -96,10 +124,14 @@ struct ColumnSpec {
     StreamOrder order;
     // The target it is compared with, if any, by its BENCHMARKS.md id.
     std::string_view target;
-    // Whether to count every distinct delta, and for timestamps every delta-of-delta,
-    // for their exact order-0 entropy. Off where the distinct values would not fit in
-    // memory comfortably.
-    bool exact_entropy;
+    // Whether to count every distinct value, delta and delta-of-delta for their exact
+    // order-0 entropies. Off where the distinct values would not fit in memory
+    // comfortably or say nothing.
+    bool count_values;
+    bool count_deltas;
+    bool count_dods;
+    // Bytes a value takes on the wire, the width raw zstd is given it at.
+    std::uint8_t raw_bytes;
 };
 
 [[nodiscard]] std::span<const ColumnSpec> column_specs() noexcept;
@@ -138,12 +170,23 @@ struct CodecResult {
     std::uint64_t representation_failures = 0;
     std::vector<Example> examples;
     CodecCounters counters{};
+    // Each encoded block through zstd level 1: the frames' bytes, and per block the smaller
+    // of the frame and the block plus a byte to say which. zstd frames that did not
+    // decompress to their block's exact bytes: must be 0.
+    std::uint64_t zstd_bytes = 0;
+    std::uint64_t zstd_or_plain_bytes = 0;
+    std::uint64_t zstd_mismatches = 0;
+    // Time spent in the block decoder and in zstd's decompressor on its frames, for their
+    // ratio only: not a benchmark.
+    std::uint64_t decode_ns = 0;
+    std::uint64_t zstd_decompress_ns = 0;
 
     [[nodiscard]] std::uint64_t stored_bytes() const noexcept {
         return block_bytes + metadata_bytes;
     }
     [[nodiscard]] bool exact() const noexcept {
-        return blocks_refused == 0 && word_mismatches == 0 && representation_failures == 0;
+        return blocks_refused == 0 && word_mismatches == 0 && representation_failures == 0 &&
+               zstd_mismatches == 0;
     }
 };
 
@@ -163,12 +206,22 @@ struct ColumnResult {
     std::optional<double> entropy_delta_of_delta_bits;
     std::uint64_t distinct_deltas = 0;
     std::uint64_t distinct_delta_of_deltas = 0;
-    // For prices, the exact order-0 entropy of the values themselves, in bits per value:
-    // the floor for a code with no context at all, the same in every order. Absent for
-    // timestamps, which are nearly all distinct.
+    // The exact order-0 entropy of the values themselves, in bits per value: the floor for
+    // a code with no context at all, the same in every order. Absent where the column does
+    // not count them, as for timestamps, which are nearly all distinct.
     std::optional<double> entropy_value_bits;
     std::uint64_t distinct_values = 0;
     std::vector<CodecResult> codecs;
+    // The raw values at raw_bytes each, little-endian, block by block through zstd level
+    // 1: their bytes, the frames' bytes, frames that did not come back exact (must be 0),
+    // and the time zstd took to decompress them.
+    std::uint64_t raw_bytes = 0;
+    std::uint64_t raw_zstd_bytes = 0;
+    std::uint64_t raw_zstd_mismatches = 0;
+    std::uint64_t raw_zstd_decompress_ns = 0;
+    std::uint64_t metadata_bytes = 0;
+
+    [[nodiscard]] bool exact() const noexcept;
 };
 
 // What rebuilding file order from per-locate streams would cost if no locate column were
@@ -182,9 +235,97 @@ struct PermutationEstimate {
     std::uint16_t largest_locate = 0;
 };
 
+// The add references' interleaved sequences, through head delta's seven heads: how often
+// each head is taken, the entropies of the token and of the gap, and whether the head a
+// value extends was last extended by a message of the same locate, side or MPID. The
+// baselines are the same shares between consecutive adds, what a sequence that followed
+// nothing would show.
+struct HeadModes {
+    std::uint64_t values = 0;
+    std::array<std::uint64_t, 8> tokens{};
+    double token_entropy_bits = 0;
+    double gap_entropy_bits = 0;
+    double token_and_gap_entropy_bits = 0;
+    std::uint64_t distinct_gaps = 0;
+    // Steps that extend a head, tokens 0 to 6.
+    std::uint64_t head_steps = 0;
+    std::uint64_t same_locate = 0;
+    std::uint64_t same_side = 0;
+    // Among steps where both messages are F, so both carry an MPID.
+    std::uint64_t mpid_steps = 0;
+    std::uint64_t same_mpid = 0;
+    std::uint64_t consecutive = 0;
+    std::uint64_t consecutive_same_locate = 0;
+    std::uint64_t consecutive_same_side = 0;
+    std::uint64_t consecutive_mpid = 0;
+    std::uint64_t consecutive_same_mpid = 0;
+    // The plain delta from the previous add reference: how many fall at each of -16 to
+    // 16, and below and above.
+    std::array<std::uint64_t, 33> small_deltas{};
+    std::uint64_t deltas_below = 0;
+    std::uint64_t deltas_above = 0;
+};
+
+// The messages that name an order (E, C, X, D and U's original), each against the
+// message that created that order (A, F or U's new reference): how many, how many named
+// no order on the book, how many carry a locate other than the order's, and how far back
+// the order was created. Distances count creations, globally and within the locate.
+inline constexpr std::array<std::uint64_t, 3> kLocalityBlocks{1'024, 4'096, 65'536};
+inline constexpr std::array<std::uint64_t, 3> kLocalityWindowsNs{1'000'000, 1'000'000'000,
+                                                                 60'000'000'000};
+
+struct ReferenceLocality {
+    char type = '?';
+    std::uint64_t messages = 0;
+    std::uint64_t unresolved = 0;
+    std::uint64_t locate_mismatches = 0;
+    // The order was created in the block of N creations the store is filling, and at most
+    // N creations back.
+    std::array<std::uint64_t, kLocalityBlocks.size()> same_block{};
+    std::array<std::uint64_t, kLocalityBlocks.size()> within_distance{};
+    // The order was created in the same aligned window of W nanoseconds, and at most W
+    // nanoseconds before.
+    std::array<std::uint64_t, kLocalityWindowsNs.size()> same_window{};
+    std::array<std::uint64_t, kLocalityWindowsNs.size()> within_time{};
+    // Reductions (E, C, X) whose shares are exactly the order's remaining shares.
+    std::uint64_t shares_equal_remaining = 0;
+};
+
+struct Analysis {
+    HeadModes add_heads;
+    HeadModes creation_heads;
+    std::vector<ReferenceLocality> references;
+    std::uint64_t peak_live_orders = 0;
+    std::uint64_t live_orders_at_end = 0;
+    std::uint64_t duplicate_creations = 0;
+    // The message type: order-0 entropy, and order-1 given the previous message's type.
+    double type_entropy_bits = 0;
+    double type_order1_entropy_bits = 0;
+    // The locate as its recency rank, the number of distinct locates seen since its last
+    // use, with a first use as one more symbol: every message, and only messages that
+    // name no order, whose locate the order cannot give.
+    double locate_recency_entropy_bits = 0;
+    double unreferenced_locate_recency_entropy_bits = 0;
+    std::uint64_t locate_first_uses = 0;
+    // Messages with a stock field, and those whose stock differs from the directory's for
+    // their locate, by type; a locate with no directory entry counts as differing.
+    std::array<std::uint64_t, 24> stock_fields{};
+    std::array<std::uint64_t, 24> stock_mismatches{};
+    std::array<std::uint64_t, 24> stock_on_locate_zero{};
+    // Records the decoder returned raw, by reason: unknown type, wrong length.
+    std::uint64_t raw_unknown_type = 0;
+    std::uint64_t raw_wrong_length = 0;
+};
+
 struct EvalOptions {
     std::uint32_t block_values = codec::kDefaultBlockValues;
     std::size_t max_examples = 8;
+    // Only these columns, by name; all when empty. The analysis runs either way.
+    std::vector<std::string> columns;
+    // Called with each block a column cuts, before any codec sees it: the column's name,
+    // the stream's index and the values. For tests; empty in the tool.
+    std::function<void(std::string_view, std::size_t, std::span<const std::uint64_t>)>
+        observe_block;
 };
 
 struct EvalResult {
@@ -195,6 +336,7 @@ struct EvalResult {
     std::string stop;
     std::vector<ColumnResult> columns;
     PermutationEstimate permutation;
+    Analysis analysis;
 
     [[nodiscard]] bool exact() const noexcept;
 };
@@ -223,7 +365,10 @@ struct EvalProvenance {
 };
 
 //   tick_codec_eval <source> <output.json> --day LABEL [--block-values N]
-//                   [--prove-all-price4]
+//                   [--prove-all-price4] [--columns NAME,NAME,...]
+//
+// --columns runs only the named columns, for a quick look; the JSON says so, and
+// results meant to be kept come from a run of every column.
 //
 // Writes the results JSON, which holds no paths, and prints a one-line summary per
 // column. Exit 0 if every value of every column came back exact and, when asked, every

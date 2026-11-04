@@ -75,7 +75,8 @@ if(TICK_STORE_BUILD_TESTS OR TICK_STORE_BUILD_TOOLS OR TICK_STORE_BUILD_BENCH)
     else()
         target_sources(tick_store_harness PRIVATE src/harness/page_cache_darwin.cpp)
     endif()
-    target_link_libraries(tick_store_harness PUBLIC tick_store_core Threads::Threads)
+    target_link_libraries(tick_store_harness PUBLIC tick_store_core Threads::Threads
+        PRIVATE libzstd_static)
     tick_store_apply_warnings(tick_store_harness)
 endif()
 
