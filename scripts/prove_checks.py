@@ -361,7 +361,7 @@ def prepare_tree():
         (TREE / ".venv").symlink_to(venv)
     with (TREE / ".git" / "info" / "exclude").open("a") as exclude:
         exclude.write("/.venv\n")
-    for name in ("googletest", "hdrhistogram", "benchmark"):
+    for name in ("googletest", "hdrhistogram", "benchmark", "zstd"):
         source = REPO_ROOT / "build" / "_deps" / f"{name}-src"
         target = TREE / "build" / "_deps" / f"{name}-src"
         if not source.exists():
