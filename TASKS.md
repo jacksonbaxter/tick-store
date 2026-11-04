@@ -52,7 +52,7 @@ Correctness oracle
 - [x] Injected single-bit corruption test shows the check catches it and reports where
 - [x] Oracle fails correctly on a deliberately broken store, proving it is not vacuous
 - [x] G-1 and G-2 pass on the full `12302019` and `10302019` days on macOS (`results/roundtrip-*.json`), through the stub store
-- [x] Repeat the full-day G-1 on `debian` (`results/roundtrip-12302019-linux.json`)
+- [x] Repeat the full-day G-1 on `debian` (`results/roundtrip-12302019-linux.json`). Repeated on the real store at `4302ce8`, where a store written on the Mac also verifies and is byte-for-byte the store debian writes
 - [x] Phase 3's store plugs into `RecordReader` with the oracle unchanged: `ItchStoreRecordReader` walks the segments and `tick_roundtrip verify` runs as before
 - [x] G-1 and G-2 pass on the full `12302019` and `10302019` days on macOS through the real store, at N = 2^20 (`results/roundtrip-*.json`). G-2 flips one bit in a data block and one in the footer, each caught with CRCs on (a block or footer CRC failure naming the offset) and with them off (the oracle names the record, or the decoder the field). The stub no longer counts for G-1 or G-2
 

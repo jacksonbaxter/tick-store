@@ -1070,7 +1070,7 @@ The per-segment state is the import list: 70,275,493 bytes holding 21,140,903 im
 | ArcticDB | rows100k-cols127 | 6,352,666,624 | 0.228 |
 | QuestDB | plain | 22,897,786,880 | 0.063 |
 
-The ITCH store's bytes depend only on the records. No capacity file exists for 10302019, so CR-2 there is "no comparison". It is not estimated.
+The ITCH store's bytes depend only on the records: debian, at `4302ce8`, wrote byte-for-byte the store the Mac wrote at `f3e9d84` (SHA-256 `2122a277…`). No capacity file exists for 10302019, so CR-2 there is "no comparison". It is not estimated.
 
 **Ratio against the estimate.** Against `results/store-estimate.json` (the mixed layout, with zstd), the gap is 69.5 MB on 12302019 and 73.1 MB on 10302019. Two parts net out to that.
 
@@ -1119,6 +1119,22 @@ On the real days, the largest segment is 8,164,713 bytes in 28 blocks (12302019,
 The first two attempts failed, and the fixes are committed:
 - At `c64ca36`, ASan stopped `ReferenceEval.TheCommandLineWritesJsonWithoutPathsAndRefusesBadUsage` with a heap use after free. Two of its bad-usage argument lists held `string_view`s into temporary path strings. On debian the same test had failed outright, because the freed memory still read as valid arguments.
 - At `67d2055`, clang-tidy refused 109 distinct findings in the store's code and tests: missing includes, static members read through instances, a recursive coder, unchecked optionals, and the column table without designated initialisers. All were fixed at `e45d08c` without changing a stored byte: the golden store file still matches both ways.
+
+**debian.**
+- The Linux build gate passed at `4302ce8`: the dev build, then ctest, 570 of 570 tests.
+- The gate had failed one test at `7ebb81b`: the `ReferenceEval` use after free described above, which exited 0 there.
+- G-1 on 12302019 passed through `~/quant-projects/bin/heavy.sh` with `taskset -c 2,6,7` (`results/roundtrip-12302019-linux.json`, now on the real store):
+
+| Run | Wall time | Peak RSS (VmHWM) |
+|---|---|---|
+| ingest | 300 s | 6.21 GB |
+| verify | 119 s | 6.43 GB |
+
+  debian has no `/usr/bin/time`, so the peaks are the tool's own `ru_maxrss`, which on Linux is VmHWM. It counts the clean, file-backed pages of the mapped source and store.
+- The store written on the Mac, copied over, also verifies on debian (116 s, VmHWM 6.95 GB).
+- Its SHA-256 equals the debian-written store's, so the layout is the same on both hosts.
+- 10302019 is not on debian, and nothing was fetched.
+- Raw output: `phase3-raw/store/debian/`.
 
 **What did not help.**
 - A book checkpoint per segment cost 2,016 MB at 2^20, fifteen times the distances it would allow.
