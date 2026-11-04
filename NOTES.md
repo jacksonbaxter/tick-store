@@ -1220,6 +1220,9 @@ each host, clang-tidy clean on 110 files per host. Before that push, the full lo
 
 ### Queries over the ITCH store
 
+Store version 3 has since replaced the layout this section measures; "Query iteration" below has
+its numbers.
+
 `ItchQuery` and `tools/tick_query` (docs/store.md, "Queries") answer Q1 to Q5 through the index
 version 2 added: per segment a seek column, and a locate column held as runs with a run directory.
 Every number below is **iteration-only and unpinned**. None of them is a reported result, and none
@@ -1386,6 +1389,201 @@ still decode its edge minutes.
     The fuzzer exits 77 on "the indexed path's rows differ from the exact path's".
   - `query-run-order-unchecked`: PROVEN, failing `ItchQueryCorrupt.LocateRunFieldsRefusedByTheQuery`.
   - `query-cli-digest-ts`: PROVEN, failing `QueryCli.ServesEveryKindWithTheHarnessDigests`.
+
+### Query iteration
+
+This work made Q1 to Q5 faster against the harness, one profile at a time. The table below gives
+each step's byte cost and latency change, including the steps that did not help.
+
+Every timing is **iteration-only**. None went through `measure.sh`, and none is a reported result.
+
+- **Mac:** macOS, unpinned, no counters. Each job ran alone through `heavy.sh`.
+- **debian:** under `taskset -c 2,6,7` through `heavy.sh`. Another project kept that host's load
+  average between 6.7 and 10.2 throughout (`uptime-*.txt`), so its figures are noisier still.
+- **Warm:** the median of the rounds after the first, in one worker.
+- **Cold:** the mean over trials. Each trial runs a proven `tick_coldcache evict` of the store,
+  then a fresh worker answers one query.
+- Every whole-day run checked each answer's rows and SHA-256 against compare/queries.py's numpy
+  ground truth for 12302019 (`truth-12302019.json`), so no timing comes from a wrong answer.
+
+Latencies are in ms, Q1 / Q2 / Q3 / Q4 / Q5. Bytes are for 12302019. Raw output is in
+`phase3-raw/query-iter/`.
+
+**Steps that were timed:**
+
+| Step | Change | Bytes per day, ratio | Q1–Q5, iteration-only | Kept? | Why |
+|---|---|---|---|---|---|
+| 0 | Baseline: store version 2 at `6576b0a` | 1,495,541,951, 5.517 | Mac warm 51.8 / 2,256.9 / 1,261.8 / 31.0 / 1,165.7; cold 69.1 / 2,673.9 / 1,600.9 / 43.0 / 1,334.3 (8 rounds, 3 trials, `mac/step0-baseline-6576b0a.json`). debian, same format and decoders at `3325f81` (above): warm 190.7 / 4,525.7 / 2,383.3 / 83.7 / 2,225.2; cold 304.0 / 7,916.1 / 4,409.4 / 187.3 / 3,554.2 | n/a | Reference point |
+| 1 | Faster scalar decoders (`da20832`): Huffman codes read from one loaded word, two short codes per lookup, per-thread scratch, a hashed repeat check, PFOR loads by `memcpy`, head delta by selects | Unchanged | Mac warm 38.3 / 1,523.0 / 823.5 / 21.6 / 529.1; cold 55.2 / 1,919.1 / 1,144.3 / 33.3 / 669.1 (`mac/step1-rerun-v2store.json`; the first run, `mac/step1-decoders.json`, agrees within 6%) | Yes | Dictionary decoding went from 7.05–7.42 to 2.41–3.53 ns a value (`colbench`, below). Q5 is 2.2 times faster, Q2 1.5 times |
+| 2 | v3a: records stored by locate, in pieces, with a run directory; timestamps delta-coded within each locate | 1,969,472,013, 4.190 | Mac warm 38.9 / 42.9 / 20.8 / 25.2 / 496.0 (`warm.py`, 6 rounds, `mac/v3a-warm.txt`) | Replaced by 3 | Q2 35 times faster than step 1, Q3 40 times. But the file is 474 MB larger, and timestamps alone account for 356 MB |
+| 3 | v3b: as step 2, but timestamps stored as residuals over 64-record time bases | 1,750,915,467, 4.713 | Mac warm 37.9 / 42.9 / 21.2 / 23.5 / 488.1 (`mac/v3b-warm.txt`) | Yes, as store version 3 | 219 MB smaller than step 2, at the same speed |
+| 4 | Minute-aggregate buckets in a sorted vector instead of a map | Unchanged | Q3 warm 21.2 to 20.2 (`mac/v3b-minutevec-warm.txt`) | Yes | Fewer allocations. The 1 ms is within the 1 to 2 ms spread between Mac runs |
+| Final | Version 3 as committed at `e257f80`, timed by `timing.py`: 20 rounds, 10 cold trials | 1,750,915,467, 4.713; 10302019: 1,928,632,798, 4.685 | Mac warm 39.3 / 45.0 / 21.7 / 24.7 / 509.7; cold 55.8 / 218.2 / 116.1 / 39.2 / 665.9 (`final/timing/mac-indexed.json`). debian warm 126.1 / 116.2 / 48.2 / 62.3 / 1,202.2; cold 193.6 / 994.0 / 496.9 / 105.2 / 1,971.4 (`debian/linux-indexed.json`) | n/a | Against step 0 on the Mac: Q2 warm is 50 times faster and cold 12 times; Q3 warm 58 times faster; Q5 warm 2.3 times. Q1 and Q4 are slower than step 1 |
+
+**Steps measured on bytes alone.** Bytes decided each of these, so none was timed:
+
+| Step | Change | Bytes per day, ratio | Kept? | Why |
+|---|---|---|---|---|
+| — | Time bases every 16 records instead of 64 | Timestamps 751.4 MB, 16.3 MB less than at 64 | No | Four times the bases to read and check, for 2% of the column |
+| — | Time bases every 4, 256, 1,024 or 4,096 records | 813.5, 802.5, 833.6 and 861.1 MB, against 767.7 at 64 | No | 64 is the smallest |
+| — | Residuals interpolated between two bases | 758.0 MB at 64 (9.8 MB less); 742.4 MB at 16 | No | Every residual would need two bases and a division, for about 3% of the column |
+| — | Locates with fewer than T records kept in one mixed file-order run | Timestamps 959.4 MB at T = 64, with 19.0 M records mixed. At T = 1,024, 746.3 MB, with 171.7 M records (64%) mixed | No | The cost sits in busy locates, not rare ones. Moving enough records to matter puts most of the day back in file order, where Q2 pays for the other symbols again |
+| — | Creation references as residuals over 64-record bases | 254.5 MB before zstd, against 323.2 MB delta-coded; about 3% smaller after zstd | No | Too little to justify a second base column |
+| — | zstd frames over whole columns instead of per piece | 4.07 MB less (`mac/zexp-v3b-12302019.txt`) | No | Q1 and Q4 would inflate whole columns of locate, creation_ref and add_price to read a few thousand values |
+
+The time-base figures are timestamps plus bases. Those rows were measured by `tsexp`, a scratch tool
+over the columns of the 12302019 store (`mac/tsexp-v3a-12302019.txt`).
+
+**Decoder speed** (step 1). `colbench` is a scratch benchmark that decodes the dictionary columns
+of every eighth segment of the version 2 store. It was built against each commit's libraries and
+run on the Mac, unpinned. Raw: `mac/colbench-v0.txt` and `mac/colbench-v2.txt`.
+
+| Column | 6576b0a | da20832 |
+|---|---|---|
+| type | 7.29 ns a value | 2.57 |
+| ref_distance | 7.42 | 3.53 |
+| add_side | 7.05 | 2.41 |
+| add_shares | 7.37 | 3.23 |
+
+**What version 3 changed, and what it cost.** Version 2 kept each segment's records in file order.
+So Q2 ranked every record of a segment up to the locate's last, and decoded every column it
+touched whole. Version 3 (`docs/store.md`) changes that in five ways:
+
+- **Stored order.** Each segment stores its typed records by ascending locate, in file order
+  within a locate, then the raw records.
+- **Locate column.** It holds each record's file position, as gaps within its run.
+- **Run directory.** It gives each run's start, add start and import start, so a single-locate
+  query reads its own run and no other locate's records.
+- **Pieces.** Columns are cut into 16,384-value pieces, with CRC32C and zstd applied per piece.
+- **Time bases and seek index.** Timestamps are residuals over time bases. The seek index also
+  holds each file-order group's least and greatest time, for the all-locate queries.
+
+On 12302019 the file grew by 255,373,516 bytes. On 10302019 it grew by 288,170,320. By part, on
+12302019, payload plus block metadata, from the two `layout.json`:
+
+| Part | Version 2 | Version 3 | Change |
+|---|---|---|---|
+| timestamp | 630,118,879 | 755,133,603 | +125,014,724 |
+| time_base (new) | 0 | 12,805,508 | +12,805,508 |
+| creation_ref | 91,779,973 | 201,635,458 | +109,855,485 |
+| match | 445,906 | 9,779,206 | +9,333,300 |
+| run directory and seek | 5,586,890 | 7,695,087 | +2,108,197 |
+| container block entries, 7,022 to 116,188 blocks | 224,704 | 3,718,016 | +3,493,312 |
+| every other column | | | −7,237,010 |
+
+Most of the cost is order. Values that were monotone, or nearly so, in file order are not in
+stored order:
+
+- **Timestamps.** Delta-coded within a locate, they took 986 MB, against 630 MB in file order.
+  Residuals over bases take 768 MB.
+- **Creation references.** They lose their file-order closeness: 202 MB with zstd, against 92 MB.
+- **Match numbers.** They no longer ascend.
+- **Imports and imbalance prices.** These shrink. Fewer references need an import, and a
+  locate's imbalance prices are close to each other.
+
+Per-piece framing has two costs: 4.07 MB of zstd output, and 4.8 MB of block entries and block
+metadata.
+
+- **CR-1** still passes: 4.713 against 2.3415.
+- **CR-2** still passes: the store is 0.549 of Parquet's stored bytes (`results/store-size-*.json`).
+- **Query index.** The seek column and run directory are 8,075,919 bytes on 12302019 (0.46% of
+  the file) and 8,719,289 on 10302019.
+
+**Final layout, checked.** The final layout passed every check on both days and on both hosts:
+
+- **G-1 and G-2 on the Mac.** Both ran on both days, one run at a time through `heavy.sh` under
+  `/usr/bin/time -l` (`final/<day>/`, `results/roundtrip-*.json`). Every run passed. In each G-2
+  run, both flipped stores exit 1 and the restored store passes.
+
+  | Run | 12302019 | 10302019 |
+  |---|---|---|
+  | ingest | 103.4 s, 395 MB footprint, 8.58 GB max RSS | 115.4 s, 384 MB, 9.37 GB |
+  | verify (G-1) | 33.7 s, 501 MB, 10.41 GB | 37.1 s, 531 MB, 11.36 GB |
+
+- **G-1 on debian, 12302019.** It passed under `taskset -c 2,6,7` through `heavy.sh`. Ingest took
+  254.4 s with a 6.66 GB VmHWM, and verify 146.0 s with 9.86 GB
+  (`results/roundtrip-12302019-linux.json`). The store debian wrote has the same SHA-256 as the
+  Mac's, `86989cd3…`, so the bytes verified there are the Mac's.
+- **Answers on the slice.** On the version 3 store of the slice, every digest in
+  `results/compare/*.json` (both files) matches on both paths: 20 of 20 (`slice/check.log`).
+- **Answers on the whole day.** On 12302019, `tick_query` matched every answer and the busiest
+  locate, 6556, on the indexed and exact paths on the Mac (`final/oracle/`) and on the indexed
+  path on debian (`debian/check-indexed.log`). Bytes decoded on the indexed path:
+
+  | Query | Version 3 | Version 2 |
+  |---|---|---|
+  | Q1 | 9.02 MB | 5.04 |
+  | Q2 | 16.27 MB | 337.9 |
+  | Q3 | 10.27 MB | 258.4 |
+  | Q4 | 9.02 MB | 3.71 |
+  | Q5 | 64.85 MB | 64.86 |
+
+- **Fuzzing.** `fuzz_itch_store` and `fuzz_itch_query` each ran 300 s on corpora from the
+  version 3 encoder's seeds, and both were clean: 873,182 and 49,206 runs, with peak RSS of 456
+  and 667 MB (`fuzz/`).
+
+**Why Q1 and Q4 got slower.** Each reads one segment, but it must decode that segment's whole
+locate column, every run, to put the window's records back in file order. That is 9.0 MB in 1,745
+codec blocks, against 5.0 and 3.7 MB in version 2. On the Mac, Q1 warm is 39.3 ms against step 1's
+38.3, and Q4 24.7 ms against 21.6.
+
+**Why Q5 is slow.** Q5 sums every record's shares over the whole day: 152,012,056 dictionary
+values in 257 segments, 64.85 MB. The scalar decoder Huffman-decodes each one, at 3.35 ns a value
+over the 509.7 ms warm figure. The profile (`prof/v3b-q5.sample`) is almost all
+`decode_dict_block`.
+
+Q5 reads no column it does not need, so no index makes it faster. Three things would:
+
+- SIMD decoding, which is out of scope here.
+- A different code for the share columns, which would change the bytes.
+- A stored per-segment share sum. That is an aggregate index, so it would be a benchmark special
+  in the headline, and it is not built.
+
+**Where Q2's time goes.** From the engine's samples in `prof/v3b-q2.sample`, excluding the digest:
+
+| Part | Share of samples |
+|---|---|
+| Dictionary decoding of the run's types, sides and distances | 32.7% |
+| `scan_run` | 19.2% |
+| PFOR | about 8% |
+| zstd's Huffman | 6.9% |
+| CRC32C | 6.2% |
+| memmove | 5.1% |
+
+**Likely verdicts.** These are iteration-only, not measured under `measure.sh`, and every one
+misses:
+
+- **QL-1** (Q2 warm median at most 16.9 ms) misses at 45.0 ms on the Mac (2.7 times the target)
+  and 116.2 ms on debian (6.9 times). The gap was 134 times at step 0. Q2 now reads only its
+  locate's runs, so what is left is the work per row: 739,944 rows at 61 ns a row. The target
+  needs 23 ns a row with every column decoded. Dictionary decoding alone takes about 20 ns a row
+  (32.7% of the samples), so everything else would have to be nearly free.
+- **QL-2** (Q3 warm median at most 0.41 ms) misses at 21.7 ms on the Mac (53 times) and 48.2 ms on
+  debian (118 times). Q3 must decode every add of the locate in the hour, with its price, shares
+  and side. Only the per-locate minute aggregate costed above (14.6 MB per day by zlib) would
+  reach the target. That is an index built for this query, so it stays costed and unbuilt.
+- **QL-3** (Q4 cold mean at most 10 ms) misses at 39.2 ms on the Mac (3.9 times) and 105.2 ms on
+  debian (10.5 times). Opening the store adds 8.5 ms more, outside `engine_ns`. The rest is
+  dominated by the whole locate column that Q4 decodes to restore file order. A file-order copy of
+  locates would remove that at up to 276 MB, the version 1 column.
+
+**Fault proofs.** Twenty-four faults were proven with `prove_checks.py --only`, and
+`results/check-proofs.json` was restored from git after each run (`faults/prove-run1.log`,
+`faults/prove-run2.log`).
+
+- **Rebased.** Five old faults were rebased onto the new code: the dictionary repeat, the
+  head-delta escape, the run order, the first run skipped and the window boundary.
+- **New.** Nineteen new faults cover each check the pieces, locate runs, time bases and stored
+  order added.
+- **Undetected at first.** Three query-side faults went undetected on the first run: add start,
+  run adds and import start. Each was backed by another check on the only path the test took.
+  New corrupt cases now reach each one (a run's adds one early and one late, for rows and for the
+  minute aggregate, and a run's imports ending one early), and all three are PROVEN.
+- **Not provable.** The query's own piece value count check cannot fail once the reader's
+  directory rules hold, so no fault can show it failing. The reader's check is proven
+  (`store-piece-value-count`).
+
+**Gaps.** debian has no `perf`, so there is no Linux profile of the version 3 queries.
 
 ## Process notes
 
