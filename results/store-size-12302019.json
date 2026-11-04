@@ -3,30 +3,30 @@
   "source": "12302019.NASDAQ_ITCH50",
   "host": "macOS",
   "build_preset": "bench",
-  "commit": "f3e9d84",
-  "store_format": "itch-store-v1",
+  "commit": "3325f81",
+  "store_format": "itch-store-v2",
   "segment_records": 1048576,
   "segments": 257,
   "records": 268744780,
   "source_bytes": 8251407909,
-  "stored_bytes": 1449464212,
-  "ratio": 5.692729658785118,
+  "stored_bytes": 1495541951,
+  "ratio": 5.5173363097455494,
   "parts": {
     "container_header": 16,
     "container_trailer": 24,
     "footer": {
       "fixed": 24,
-      "block_entries": 191808,
+      "block_entries": 224704,
       "section_entries": 192,
-      "block_metadata": 370047
+      "block_metadata": 382640
     },
-    "footer_total": 562071,
+    "footer_total": 607560,
     "sections": {
       "store": 24,
       "symbols": 89074,
       "tail": 0
     },
-    "column_payloads": 1448813003
+    "column_payloads": 1494845253
   },
   "segment_state": {
     "what": "the import list, the one thing a segment needs from outside its own records to decode on its own; there is no other checkpoint",
@@ -34,16 +34,44 @@
     "import_ref_metadata_bytes": 3072,
     "imports": 21140903
   },
+  "query_index": {
+    "what": "the seek column (per segment the column maxima, then per seek group the time zone map, imports and records of each type) and the locate run directory (each run's locate, records and adds); the segment summaries in the footer metadata hold each segment's times and locate bitmap",
+    "columns": {
+      "seek": {
+        "payload_bytes": 1969329,
+        "metadata_bytes": 3084
+      },
+      "locate_run": {
+        "payload_bytes": 377748,
+        "metadata_bytes": 3084
+      },
+      "locate_run_records": {
+        "payload_bytes": 1982252,
+        "metadata_bytes": 3084
+      },
+      "locate_run_adds": {
+        "payload_bytes": 1626057,
+        "metadata_bytes": 3084
+      }
+    },
+    "index_bytes": 5967722,
+    "fraction_of_file": 0.003990340756412523,
+    "locate_column": {
+      "payload_bytes": 315999839,
+      "metadata_bytes": 3084,
+      "note": "each locate's record indices: the symbol filter, and the only copy of the records' locates, so data as much as index"
+    }
+  },
   "columns": {
     "type": {
       "payload_bytes": 60446404,
-      "metadata_bytes": 301203,
+      "metadata_bytes": 301460,
       "blocks": 257,
       "zstd_blocks": 0,
       "values": 268744780
     },
     "locate": {
-      "payload_bytes": 275922975,
+      "payload_bytes": 315999839,
       "metadata_bytes": 3084,
       "blocks": 257,
       "zstd_blocks": 257,
@@ -265,6 +293,34 @@
       "blocks": 0,
       "zstd_blocks": 0,
       "values": 0
+    },
+    "locate_run": {
+      "payload_bytes": 377748,
+      "metadata_bytes": 3084,
+      "blocks": 257,
+      "zstd_blocks": 0,
+      "values": 1606664
+    },
+    "locate_run_records": {
+      "payload_bytes": 1982252,
+      "metadata_bytes": 3084,
+      "blocks": 257,
+      "zstd_blocks": 0,
+      "values": 1606664
+    },
+    "locate_run_adds": {
+      "payload_bytes": 1626057,
+      "metadata_bytes": 3084,
+      "blocks": 257,
+      "zstd_blocks": 0,
+      "values": 1606664
+    },
+    "seek": {
+      "payload_bytes": 1969329,
+      "metadata_bytes": 3084,
+      "blocks": 257,
+      "zstd_blocks": 0,
+      "values": 1780776
     }
   },
   "cr1": {
@@ -282,21 +338,21 @@
         "variant": "zstd1-rg1Mi",
         "stored_bytes": 3191406592,
         "outcome": "finished",
-        "ours_over_theirs": 0.45417723195578336,
+        "ours_over_theirs": 0.46861529795323553,
         "smaller": true
       },
       "arcticdb": {
         "variant": "rows100k-cols127",
         "stored_bytes": 6352666624,
         "outcome": "finished",
-        "ours_over_theirs": 0.22816626430922876,
+        "ours_over_theirs": 0.23541955520693164,
         "smaller": true
       },
       "questdb": {
         "variant": "plain",
         "stored_bytes": 22897786880,
         "outcome": "finished",
-        "ours_over_theirs": 0.06330149807036722,
+        "ours_over_theirs": 0.06531382088747958,
         "smaller": true
       }
     },

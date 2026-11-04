@@ -3,30 +3,30 @@
   "source": "10302019.NASDAQ_ITCH50",
   "host": "macOS",
   "build_preset": "bench",
-  "commit": "f3e9d84",
-  "store_format": "itch-store-v1",
+  "commit": "3325f81",
+  "store_format": "itch-store-v2",
   "segment_records": 1048576,
   "segments": 281,
   "records": 293989079,
   "source_bytes": 9035016843,
-  "stored_bytes": 1588982528,
-  "ratio": 5.686039137492643,
+  "stored_bytes": 1640462478,
+  "ratio": 5.507603474122253,
   "parts": {
     "container_header": 16,
     "container_trailer": 24,
     "footer": {
       "fixed": 24,
-      "block_entries": 195808,
+      "block_entries": 231776,
       "section_entries": 192,
-      "block_metadata": 398542
+      "block_metadata": 412311
     },
-    "footer_total": 594566,
+    "footer_total": 644303,
     "sections": {
       "store": 24,
       "symbols": 88864,
       "tail": 0
     },
-    "column_payloads": 1588299034
+    "column_payloads": 1639729247
   },
   "segment_state": {
     "what": "the import list, the one thing a segment needs from outside its own records to decode on its own; there is no other checkpoint",
@@ -34,19 +34,47 @@
     "import_ref_metadata_bytes": 3360,
     "imports": 23562881
   },
+  "query_index": {
+    "what": "the seek column (per segment the column maxima, then per seek group the time zone map, imports and records of each type) and the locate run directory (each run's locate, records and adds); the segment summaries in the footer metadata hold each segment's times and locate bitmap",
+    "columns": {
+      "seek": {
+        "payload_bytes": 2152686,
+        "metadata_bytes": 3372
+      },
+      "locate_run": {
+        "payload_bytes": 419105,
+        "metadata_bytes": 3372
+      },
+      "locate_run_records": {
+        "payload_bytes": 2125577,
+        "metadata_bytes": 3372
+      },
+      "locate_run_adds": {
+        "payload_bytes": 1745727,
+        "metadata_bytes": 3372
+      }
+    },
+    "index_bytes": 6456583,
+    "fraction_of_file": 0.003935830954129266,
+    "locate_column": {
+      "payload_bytes": 348027417,
+      "metadata_bytes": 3372,
+      "note": "each locate's record indices: the symbol filter, and the only copy of the records' locates, so data as much as index"
+    }
+  },
   "columns": {
     "type": {
       "payload_bytes": 67019323,
-      "metadata_bytes": 328486,
+      "metadata_bytes": 328767,
       "blocks": 281,
       "zstd_blocks": 0,
       "values": 293989079
     },
     "locate": {
-      "payload_bytes": 303040299,
+      "payload_bytes": 348027417,
       "metadata_bytes": 3372,
       "blocks": 281,
-      "zstd_blocks": 280,
+      "zstd_blocks": 281,
       "values": 293989079
     },
     "timestamp": {
@@ -265,6 +293,34 @@
       "blocks": 0,
       "zstd_blocks": 0,
       "values": 0
+    },
+    "locate_run": {
+      "payload_bytes": 419105,
+      "metadata_bytes": 3372,
+      "blocks": 281,
+      "zstd_blocks": 0,
+      "values": 1708554
+    },
+    "locate_run_records": {
+      "payload_bytes": 2125577,
+      "metadata_bytes": 3372,
+      "blocks": 281,
+      "zstd_blocks": 0,
+      "values": 1708554
+    },
+    "locate_run_adds": {
+      "payload_bytes": 1745727,
+      "metadata_bytes": 3372,
+      "blocks": 281,
+      "zstd_blocks": 0,
+      "values": 1708554
+    },
+    "seek": {
+      "payload_bytes": 2152686,
+      "metadata_bytes": 3372,
+      "blocks": 281,
+      "zstd_blocks": 0,
+      "values": 1948041
     }
   },
   "cr1": {
