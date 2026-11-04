@@ -58,9 +58,9 @@ Correctness oracle
 Tests and fuzzing
 - [x] Unit tests for everything built so far, including corrupt fixtures and boundary lists (T1, T3). T2 and T4 wait for the Phase 3 codecs
 - [x] One libFuzzer target per parser and decoder built so far: the ITCH message decoder, the frame cursor and the stub store, following Z1-Z7
-- [ ] Phase 3's parsers and decoders get theirs. The two Gorilla decoders have theirs, `fuzz_gorilla_timestamps` and `fuzz_gorilla_xor`, and so do PFOR and Stream VByte, `fuzz_pfor` and `fuzz_stream_vbyte`, each clean for 240 s under `heavy.sh`
+- [ ] Phase 3's parsers and decoders get theirs. The two Gorilla decoders have theirs, `fuzz_gorilla_timestamps` and `fuzz_gorilla_xor`, and so do PFOR and Stream VByte, `fuzz_pfor` and `fuzz_stream_vbyte`, the dictionary and run-length codecs, `fuzz_dictionary` and `fuzz_run_length`, and the container parser, `fuzz_container`, each clean for 240 s under `heavy.sh`. The time-range index and the store's own readers are still to come
 - [ ] The PFOR fuzz oracle checks values, not bytes, since the encoder makes choices. A field the decoder wrongly accepts without changing a value, such as non-zero tail padding, is caught only by the unit tests' corrupt fixtures
-- [x] Coverage report shows every validator is reached (`scripts/coverage.sh`, `results/coverage.json`). It gates on 126 required functions: `decode_as` and `encode_as` for all 23 types, the parsers, the validators, the codecs' decoders and encoders, PFOR, Stream VByte, lane packing and patch lists among them, the fuzz oracles and the oracle's compare path. No SIMD kernels exist yet, so none are claimed
+- [x] Coverage report shows every validator is reached (`scripts/coverage.sh`, `results/coverage.json`). It gates on 169 required functions: `decode_as` and `encode_as` for all 23 types, the parsers, the validators, the codecs' decoders and encoders, PFOR, Stream VByte, lane packing and patch lists among them, the container's parser, writer and durability calls, the software CRC32C kernel and this processor's hardware one, the fuzz oracles and the oracle's compare path. All 169 reached at `4dcea24`, lines 93.94%, functions 98.14%. No SIMD kernels exist yet, so none are claimed
 - [ ] Phase 3's kernels join the required list in `scripts/coverage_report.py`
 
 Slice for the comparison harness
@@ -126,9 +126,14 @@ Checks carried from Phase 2
 - [ ] CI has never run on GitHub, and the Linux `run_bench` fixture bug means its Linux job would have failed until `a6a82fa`. The first real run is the open item under Phase 2 Checks
 
 Storage
-- [ ] File format: header, per-block CRC32C, footer, codec registry, little-endian helpers (F1-F7)
-- [ ] Writer with named durability modes and a commit ordering that survives torn writes (M1-M8)
-- [ ] Memory-mapped reader with mapped length proved at open and view lifetimes tied to the mapping (A3, M5, M7, M9)
+- [x] File format: header, per-block CRC32C, footer, codec registry, little-endian helpers (F1-F7)
+- [x] Writer with named durability modes and a commit ordering that survives torn writes (M1-M8)
+- [x] Memory-mapped reader with mapped length proved at open and view lifetimes tied to the mapping (A3, M5, M7, M9) (`docs/format.md`)
+- [ ] CRC32C runs one dependent chain of crc32 instructions, about 3 cycles a step. Three interleaved streams joined by a shift table would run near one a cycle; measure verification against decode before adding them
+- [ ] No codec is `read_only` yet, so the path that keeps a retired codec readable but unwritable is tested only through the registry's own table. Test it with a fixture when the first codec retires
+- [ ] zstd has no codec id yet. It takes the next id, 8, when the store writer first emits a zstd frame
+- [ ] SIGBUS from a file cut under a live mapping is not caught, by design (`docs/format.md`). No test shows the process dying; add a death test that truncates a mapped file if the stance is ever revisited
+- [ ] Block CRCs are checked at lookup, not at open, so a scan that reads only zone maps never verifies payloads. The query engine must look blocks up through the reader, never read a payload by offset
 - [ ] Time-range index with block zone maps, and a symbol filter whose cost counts in the ratio
 
 Layout experiments, measured and recorded in NOTES.md whichever way they go

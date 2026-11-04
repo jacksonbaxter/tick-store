@@ -916,6 +916,71 @@ the columns named, for exploring.
   oracles, with lines at 93.95% and functions at 98.03%. One Python test is skipped by design on macOS: it checks the pinned
   path, which exists only on Linux.
 
+### The container format, its writer and its reader
+
+`docs/format.md` has the byte layout. The trade-offs, and what did not work:
+
+- **Block metadata lives in the footer, not beside each payload.** A scan of every block's zone map then reads the footer
+  alone and never touches a payload page. The cost is that a block's metadata and payload are in two places, so the
+  footer grows with the store's metadata. That is about 16 bytes a block for a first-and-last-time zone map.
+- **Blocks and sections tile the data region exactly, in file order.** Open makes one merge walk over the two lists and
+  proves there is no gap, no overlap and no unclaimed byte. That leaves one encoding for any set of parts, which is what
+  lets the fuzzer's oracle rebuild an accepted file through the writer's own encoding and compare it byte for byte.
+- **No padding or alignment.** Payloads start wherever the last part ended, and decoders load with `memcpy`. A kernel
+  that wants aligned loads has to copy first, or wait for a version 2.
+- **A block's CRC32C covers its codec id as well as its payload.** So a block relabelled with another codec fails its
+  CRC, and is not decoded as the wrong format.
+- **CRCs are checked at lookup, not at open.** Opening a file reads its two ends: header, trailer and footer, with the
+  footer's own CRC. `verify_all()` checks every block and section. The price is that a caller reading a payload by
+  offset, instead of through the reader, gets no check (TASKS.md).
+- **The reader's views hold the mapping.** Each one carries a `shared_ptr`, so a lookup costs an atomic increment. In
+  return, a view that outlives its reader stays valid, where a borrowed span would fault after `munmap`.
+- **One dependent chain of crc32 instructions.** Three interleaved streams would run about three times faster on long
+  payloads. Verification has not yet been measured against decode, so this is not done (TASKS.md).
+- **Durability.** `device_flush` uses `F_FULLFSYNC` on macOS, because `fsync` there does not flush the drive's cache. On
+  Linux it calls `fdatasync` on the file and `fsync` on the directory. A failed flush is returned once and never
+  retried, following PostgreSQL's fsyncgate ruling. Flush granularity is one flush per file, at commit.
+
+What did not work:
+
+- **"Every cut of a valid file is refused" is false.** A section can hold a whole container's bytes at just the right
+  offset, and cutting the file there leaves that container, which is valid. The fuzzer's first oracle failed on such an
+  input. It now requires a cut to be refused, or valid in full. The unit tests still cut the golden file at every
+  length and require each cut to be refused, since that file has no nested container.
+- **A footer-offset bound loosened by one is a poor fuzz fault.** The bound is loose by one, but the footer must still be
+  exactly `24 + 32 B + 64 S + M` bytes, so the metadata check refuses every file that gets past it. The bound tightened
+  by one is a fault a unit test catches (`container-footer-offset-bound`), and the fuzz fault starts the metadata area
+  one byte late instead (`fuzz-container-metadata-start`).
+- **gtest's "threadsafe" death tests could not simulate a crash.** They re-run the test in a new process, which makes a
+  new scratch directory, so the crashed child's files were never where the parent looked. The torn-write tests use the
+  default fork style, and end the child with `_Exit(0)` at each system call.
+- **Two existing tools were broken.** `scripts/prove_checks.py` never copied the zstd sources into its clone, so every
+  dev build there had failed since zstd became a dependency; `68a6223` fixes it. And the Linux dev build had failed since
+  `7771c35`: a test's initializer list mixed `std::uint64_t` with `unsigned long long`, which are one type on macOS and
+  two types on Linux. `4dcea24` fixes it.
+
+**Checks.**
+
+- Five faults are proven caught by `scripts/prove_checks.py --only` in throwaway clones:
+  - `container-block-crc-skipped` fails four `ContainerBlock` tests.
+  - `container-footer-offset-bound` fails `ContainerOpen.AcceptsTheSmallestFileAndEmptyParts` and nothing else. The
+    golden file's cuts do not catch it.
+  - `container-directory-sync-dropped` fails four `ContainerCommit` tests.
+  - `crc32c-armv8-last-byte` fails four `Crc32c` tests.
+  - `fuzz-container-metadata-start` is caught by `check_container` after 18 executions, in the seed corpus, with "an
+    accepted file has extents the walk cannot follow".
+- `fuzz_container` ran clean for 240 s under `heavy.sh` at `4dcea24`: 27,722,076 runs, 890 MB peak resident against
+  its 2,048 MB cap, with inputs up to 70,000 bytes. Its 52 seeds come from the real writer.
+- On `debian`, at `4dcea24`, the dev build ran through `heavy.sh` with `taskset -c 2,6,7`. All 141 format, CRC32C,
+  durability and fuzz-regression tests pass, and so do all 516 unit tests other than the real-day ones. That covers the
+  SSE4.2 kernel, picked by CPUID and matched against software at every offset, and the Linux path:
+  `fdatasync` on the file, `fsync` on the directory, and a real flush. With `TICK_STORE_CRC32C=software`, the test
+  requiring the hardware kernel fails, as it should, and the other six CRC32C tests pass.
+- The whole of `scripts/check.sh` passes on macOS at `4dcea24`, all 28 steps, in 916 s under `heavy.sh`, peaking at
+  1.24 GB resident. That includes 519 tests under dev, ASan with UBSan, and TSan. Coverage reaches all 169 required
+  functions, with lines at 93.94% and functions at 98.14%. clang-tidy cannot analyse the SSE4.2 kernel on the Mac.
+  It compiles there for x86-64, and its tests run on `debian`.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from

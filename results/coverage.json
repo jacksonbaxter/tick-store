@@ -1,21 +1,21 @@
 {
   "schema": "tick-store-coverage-1",
-  "commit": "e61dbced53fc",
+  "commit": "4dcea24ef813",
   "platform": "Darwin arm64",
   "run": "tests/unit, with ItchRealDay left out so the report needs no data file.",
   "simd_kernels": "No SIMD kernels exist yet, so none are reported and none are claimed.",
   "python_validators": "llvm-cov measures the C++ only. The Python validators are shown failing rule by rule in tests/scripts/ instead.",
   "totals": {
-    "lines_covered": 7178,
-    "lines_total": 7640,
-    "lines_percent": 93.95,
-    "functions_covered": 648,
-    "functions_total": 661,
-    "functions_percent": 98.03
+    "lines_covered": 7988,
+    "lines_total": 8503,
+    "lines_percent": 93.94,
+    "functions_covered": 737,
+    "functions_total": 751,
+    "functions_percent": 98.14
   },
   "required": {
-    "total": 140,
-    "reached": 140,
+    "total": 169,
+    "reached": 169,
     "functions": [
       {
         "group": "decoder",
@@ -357,7 +357,7 @@
         "group": "parser",
         "file": "include/tick_store/store/little_endian.hpp",
         "name": "read_le",
-        "calls": 20739759
+        "calls": 21099288
       },
       {
         "group": "parser",
@@ -399,7 +399,157 @@
         "group": "parser",
         "file": "src/store/mapped_file.cpp",
         "name": "MappedFile::open",
-        "calls": 13244
+        "calls": 13302
+      },
+      {
+        "group": "parser",
+        "file": "src/store/container.cpp",
+        "name": "ContainerParser::open",
+        "calls": 28730
+      },
+      {
+        "group": "parser",
+        "file": "src/store/container.cpp",
+        "name": "ContainerParser::block_info",
+        "calls": 10997
+      },
+      {
+        "group": "parser",
+        "file": "src/store/container.cpp",
+        "name": "ContainerParser::block_with",
+        "calls": 4652
+      },
+      {
+        "group": "parser",
+        "file": "src/store/container.cpp",
+        "name": "ContainerParser::section_info",
+        "calls": 18350
+      },
+      {
+        "group": "parser",
+        "file": "src/store/container.cpp",
+        "name": "ContainerParser::section_at",
+        "calls": 4065
+      },
+      {
+        "group": "parser",
+        "file": "src/store/container.cpp",
+        "name": "ContainerParser::section",
+        "calls": 7946
+      },
+      {
+        "group": "parser",
+        "file": "src/store/container.cpp",
+        "name": "ContainerParser::verify_all",
+        "calls": 1203
+      },
+      {
+        "group": "parser",
+        "file": "src/store/container_reader.cpp",
+        "name": "ContainerReader::open",
+        "calls": 58
+      },
+      {
+        "group": "parser",
+        "file": "src/store/container_reader.cpp",
+        "name": "ContainerReader::block",
+        "calls": 2
+      },
+      {
+        "group": "parser",
+        "file": "src/store/container_reader.cpp",
+        "name": "ContainerReader::section",
+        "calls": 2
+      },
+      {
+        "group": "writer",
+        "file": "src/store/container.cpp",
+        "name": "ContainerLayout::add_block",
+        "calls": 2693
+      },
+      {
+        "group": "writer",
+        "file": "src/store/container.cpp",
+        "name": "ContainerLayout::add_section",
+        "calls": 2635
+      },
+      {
+        "group": "writer",
+        "file": "src/store/container.cpp",
+        "name": "ContainerLayout::encode_footer_and_trailer",
+        "calls": 1296
+      },
+      {
+        "group": "writer",
+        "file": "src/store/container.cpp",
+        "name": "build_container",
+        "calls": 1282
+      },
+      {
+        "group": "writer",
+        "file": "src/store/container_writer.cpp",
+        "name": "ContainerWriter::create",
+        "calls": 16
+      },
+      {
+        "group": "writer",
+        "file": "src/store/container_writer.cpp",
+        "name": "ContainerWriter::add_block",
+        "calls": 77
+      },
+      {
+        "group": "writer",
+        "file": "src/store/container_writer.cpp",
+        "name": "ContainerWriter::add_section",
+        "calls": 34
+      },
+      {
+        "group": "writer",
+        "file": "src/store/container_writer.cpp",
+        "name": "ContainerWriter::publish",
+        "calls": 14
+      },
+      {
+        "group": "writer",
+        "file": "src/store/durability.cpp",
+        "name": "sync_file",
+        "calls": 68
+      },
+      {
+        "group": "writer",
+        "file": "src/store/durability.cpp",
+        "name": "sync_directory",
+        "calls": 57
+      },
+      {
+        "group": "writer",
+        "file": "src/store/durability.cpp",
+        "name": "full_fsync_or_fallback",
+        "calls": 117
+      },
+      {
+        "group": "writer",
+        "file": "src/store/durability.cpp",
+        "name": "write_all",
+        "calls": 180
+      },
+      {
+        "group": "codec",
+        "file": "src/store/crc32c.cpp",
+        "name": "crc32c",
+        "calls": 48355
+      },
+      {
+        "group": "codec",
+        "file": "src/store/crc32c.cpp",
+        "name": "crc32c_with",
+        "calls": 10092
+      },
+      {
+        "group": "codec",
+        "file": "src/store/crc32c.cpp",
+        "name": "crc32c_software",
+        "calls": 5048
       },
       {
         "group": "parser",
@@ -423,19 +573,19 @@
         "group": "codec",
         "file": "include/tick_store/codec/bit_stream.hpp",
         "name": "BitReader::read",
-        "calls": 5604053
+        "calls": 5605815
       },
       {
         "group": "codec",
         "file": "include/tick_store/codec/bit_stream.hpp",
         "name": "BitReader::finish",
-        "calls": 230457
+        "calls": 230460
       },
       {
         "group": "codec",
         "file": "src/codec/block.cpp",
         "name": "read_block_header",
-        "calls": 6600149
+        "calls": 6600160
       },
       {
         "group": "codec",
@@ -447,7 +597,7 @@
         "group": "codec",
         "file": "src/codec/gorilla_timestamps.cpp",
         "name": "decode_timestamp_block",
-        "calls": 63784
+        "calls": 63786
       },
       {
         "group": "codec",
@@ -459,7 +609,7 @@
         "group": "codec",
         "file": "src/codec/gorilla_xor.cpp",
         "name": "decode_xor_block",
-        "calls": 102416
+        "calls": 102417
       },
       {
         "group": "codec",
@@ -483,25 +633,25 @@
         "group": "codec",
         "file": "include/tick_store/codec/bit_stream.hpp",
         "name": "BitWriter::write",
-        "calls": 2493057
+        "calls": 2494549
       },
       {
         "group": "codec",
         "file": "include/tick_store/codec/bit_stream.hpp",
         "name": "BitWriter::finish",
-        "calls": 162157
+        "calls": 162161
       },
       {
         "group": "codec",
         "file": "src/codec/gorilla_timestamps.cpp",
         "name": "encode_timestamp_block",
-        "calls": 46813
+        "calls": 46815
       },
       {
         "group": "codec",
         "file": "src/codec/gorilla_xor.cpp",
         "name": "encode_xor_block",
-        "calls": 63545
+        "calls": 63546
       },
       {
         "group": "codec",
@@ -513,7 +663,7 @@
         "group": "codec",
         "file": "src/codec/lane_pack.cpp",
         "name": "unpack_linear",
-        "calls": 82592540
+        "calls": 82602185
       },
       {
         "group": "codec",
@@ -525,25 +675,25 @@
         "group": "codec",
         "file": "src/codec/lane_pack.cpp",
         "name": "pack_linear",
-        "calls": 16261323
+        "calls": 16261757
       },
       {
         "group": "codec",
         "file": "src/codec/patch_list.cpp",
         "name": "read_patches",
-        "calls": 454006
+        "calls": 454010
       },
       {
         "group": "codec",
         "file": "src/codec/patch_list.cpp",
         "name": "append_patches",
-        "calls": 4025870
+        "calls": 4025874
       },
       {
         "group": "codec",
         "file": "src/codec/pfor.cpp",
         "name": "decode_pfor_block",
-        "calls": 27631004
+        "calls": 27631037
       },
       {
         "group": "codec",
@@ -555,19 +705,19 @@
         "group": "codec",
         "file": "src/codec/pfor.cpp",
         "name": "encode_pfor_block",
-        "calls": 5223335
+        "calls": 5223343
       },
       {
         "group": "codec",
         "file": "src/codec/pfor.cpp",
         "name": "encode_pfor",
-        "calls": 245464
+        "calls": 245465
       },
       {
         "group": "codec",
         "file": "src/codec/stream_vbyte.cpp",
         "name": "decode_svb_block",
-        "calls": 2890264
+        "calls": 2890865
       },
       {
         "group": "codec",
@@ -579,19 +729,19 @@
         "group": "codec",
         "file": "src/codec/stream_vbyte.cpp",
         "name": "encode_svb_block",
-        "calls": 122302
+        "calls": 122303
       },
       {
         "group": "codec",
         "file": "src/codec/stream_vbyte.cpp",
         "name": "encode_svb",
-        "calls": 10876
+        "calls": 10877
       },
       {
         "group": "codec",
         "file": "src/codec/dictionary.cpp",
         "name": "decode_dict_block",
-        "calls": 80344
+        "calls": 80345
       },
       {
         "group": "codec",
@@ -603,13 +753,13 @@
         "group": "codec",
         "file": "src/codec/dictionary.cpp",
         "name": "encode_dict_block",
-        "calls": 51261
+        "calls": 51262
       },
       {
         "group": "codec",
         "file": "src/codec/dictionary.cpp",
         "name": "encode_dict",
-        "calls": 4033
+        "calls": 4034
       },
       {
         "group": "codec",
@@ -621,13 +771,13 @@
         "group": "codec",
         "file": "src/codec/dictionary.cpp",
         "name": "huffman_lengths",
-        "calls": 173624
+        "calls": 174223
       },
       {
         "group": "codec",
         "file": "src/codec/run_length.cpp",
         "name": "decode_rle_block",
-        "calls": 1638638
+        "calls": 1638639
       },
       {
         "group": "codec",
@@ -639,13 +789,13 @@
         "group": "codec",
         "file": "src/codec/run_length.cpp",
         "name": "encode_rle_block",
-        "calls": 1633664
+        "calls": 1633665
       },
       {
         "group": "codec",
         "file": "src/codec/run_length.cpp",
         "name": "encode_rle",
-        "calls": 5152
+        "calls": 5153
       },
       {
         "group": "validator",
@@ -700,6 +850,24 @@
         "file": "fuzz/columns_oracles.hpp",
         "name": "check_columns",
         "calls": 1428
+      },
+      {
+        "group": "validator",
+        "file": "fuzz/container_oracles.hpp",
+        "name": "check_container",
+        "calls": 2747
+      },
+      {
+        "group": "validator",
+        "file": "fuzz/container_oracles.hpp",
+        "name": "check_parse",
+        "calls": 10119
+      },
+      {
+        "group": "validator",
+        "file": "fuzz/container_oracles.hpp",
+        "name": "fixed_checksums",
+        "calls": 3374
       },
       {
         "group": "validator",
@@ -856,6 +1024,12 @@
         "file": "src/harness/roundtrip.cpp",
         "name": "RefusedStore::next",
         "calls": 516
+      },
+      {
+        "group": "codec",
+        "file": "src/store/crc32c_armv8.cpp",
+        "name": "crc32c_armv8",
+        "calls": 53398
       }
     ]
   },
@@ -907,11 +1081,16 @@
     {
       "file": "src/store/columns.cpp",
       "function": "store::width_of"
+    },
+    {
+      "file": "src/store/durability.cpp",
+      "function": "store::PosixFileOps::fdatasync"
     }
   ],
   "sources_not_built_on_this_platform": [
     "src/bench_support/affinity_linux.cpp",
-    "src/harness/page_cache_linux.cpp"
+    "src/harness/page_cache_linux.cpp",
+    "src/store/crc32c_sse42.cpp"
   ],
   "files": [
     {
@@ -1029,6 +1208,15 @@
       "lines_percent": 100.0,
       "functions_covered": 4,
       "functions_total": 4,
+      "functions_percent": 100.0
+    },
+    {
+      "file": "include/tick_store/codec/registry.hpp",
+      "lines_covered": 11,
+      "lines_total": 11,
+      "lines_percent": 100.0,
+      "functions_covered": 3,
+      "functions_total": 3,
       "functions_percent": 100.0
     },
     {
@@ -1156,6 +1344,42 @@
       "functions_covered": 3,
       "functions_total": 4,
       "functions_percent": 75.0
+    },
+    {
+      "file": "include/tick_store/store/container.hpp",
+      "lines_covered": 6,
+      "lines_total": 6,
+      "lines_percent": 100.0,
+      "functions_covered": 6,
+      "functions_total": 6,
+      "functions_percent": 100.0
+    },
+    {
+      "file": "include/tick_store/store/container_reader.hpp",
+      "lines_covered": 15,
+      "lines_total": 15,
+      "lines_percent": 100.0,
+      "functions_covered": 7,
+      "functions_total": 7,
+      "functions_percent": 100.0
+    },
+    {
+      "file": "include/tick_store/store/container_writer.hpp",
+      "lines_covered": 1,
+      "lines_total": 1,
+      "lines_percent": 100.0,
+      "functions_covered": 1,
+      "functions_total": 1,
+      "functions_percent": 100.0
+    },
+    {
+      "file": "include/tick_store/store/durability.hpp",
+      "lines_covered": 6,
+      "lines_total": 6,
+      "lines_percent": 100.0,
+      "functions_covered": 3,
+      "functions_total": 3,
+      "functions_percent": 100.0
     },
     {
       "file": "include/tick_store/store/little_endian.hpp",
@@ -1500,21 +1724,84 @@
       "functions_percent": 98.21
     },
     {
+      "file": "src/store/container.cpp",
+      "lines_covered": 439,
+      "lines_total": 473,
+      "lines_percent": 92.81,
+      "functions_covered": 27,
+      "functions_total": 27,
+      "functions_percent": 100.0
+    },
+    {
+      "file": "src/store/container_reader.cpp",
+      "lines_covered": 26,
+      "lines_total": 26,
+      "lines_percent": 100.0,
+      "functions_covered": 3,
+      "functions_total": 3,
+      "functions_percent": 100.0
+    },
+    {
+      "file": "src/store/container_writer.cpp",
+      "lines_covered": 120,
+      "lines_total": 134,
+      "lines_percent": 89.55,
+      "functions_covered": 13,
+      "functions_total": 13,
+      "functions_percent": 100.0
+    },
+    {
+      "file": "src/store/crc32c.cpp",
+      "lines_covered": 79,
+      "lines_total": 89,
+      "lines_percent": 88.76,
+      "functions_covered": 12,
+      "functions_total": 12,
+      "functions_percent": 100.0
+    },
+    {
+      "file": "src/store/crc32c_armv8.cpp",
+      "lines_covered": 23,
+      "lines_total": 23,
+      "lines_percent": 100.0,
+      "functions_covered": 2,
+      "functions_total": 2,
+      "functions_percent": 100.0
+    },
+    {
+      "file": "src/store/durability.cpp",
+      "lines_covered": 90,
+      "lines_total": 101,
+      "lines_percent": 89.11,
+      "functions_covered": 15,
+      "functions_total": 16,
+      "functions_percent": 93.75
+    },
+    {
       "file": "src/store/mapped_file.cpp",
-      "lines_covered": 43,
-      "lines_total": 53,
-      "lines_percent": 81.13,
+      "lines_covered": 44,
+      "lines_total": 54,
+      "lines_percent": 81.48,
       "functions_covered": 6,
       "functions_total": 6,
       "functions_percent": 100.0
     },
     {
+      "file": "src/store/store_error.cpp",
+      "lines_covered": 52,
+      "lines_total": 55,
+      "lines_percent": 94.55,
+      "functions_covered": 2,
+      "functions_total": 2,
+      "functions_percent": 100.0
+    },
+    {
       "file": "src/store/stub_store.cpp",
-      "lines_covered": 254,
-      "lines_total": 298,
-      "lines_percent": 85.23,
-      "functions_covered": 22,
-      "functions_total": 22,
+      "lines_covered": 195,
+      "lines_total": 220,
+      "lines_percent": 88.64,
+      "functions_covered": 17,
+      "functions_total": 17,
       "functions_percent": 100.0
     }
   ]
