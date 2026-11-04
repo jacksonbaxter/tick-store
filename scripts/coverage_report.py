@@ -68,6 +68,13 @@ CONTAINER_READER = "src/store/container_reader.cpp"
 DURABILITY = "src/store/durability.cpp"
 CRC32C = "src/store/crc32c.cpp"
 CONTAINER_ORACLES = "fuzz/container_oracles.hpp"
+ITCH_STORE = "src/store/itch_store.cpp"
+ITCH_SEGMENT = "src/store/itch_segment.cpp"
+ITCH_STORE_READER = "src/store/itch_store_reader.cpp"
+ITCH_STORE_WRITER = "src/store/itch_store_writer.cpp"
+ZSTD_FRAME = "src/codec/zstd_frame.cpp"
+ITCH_STORE_RECORD_READER = "src/harness/itch_store_record_reader.cpp"
+ITCH_STORE_ORACLES = "fuzz/itch_store_oracles.hpp"
 
 # Each is (group, file, what to call it, pattern over the demangled name).
 FIXED_REQUIRED = (
@@ -113,6 +120,37 @@ FIXED_REQUIRED = (
     ("writer", DURABILITY, "sync_directory", r"store::sync_directory\("),
     ("writer", DURABILITY, "full_fsync_or_fallback", r"full_fsync_or_fallback\("),
     ("writer", DURABILITY, "write_all", r"store::write_all\("),
+    ("parser", ITCH_STORE, "parse_store_header", r"store::parse_store_header\("),
+    ("parser", ITCH_STORE, "SymbolTable::parse", r"SymbolTable::parse\("),
+    ("parser", ITCH_STORE, "parse_column_metadata", r"store::parse_column_metadata\("),
+    ("parser", ITCH_STORE, "decode_column", r"^tick_store::store::decode_column\("),
+    ("parser", ITCH_STORE_READER, "ItchStoreReader::open", r"ItchStoreReader::open\("),
+    ("parser", ITCH_STORE_READER, "ItchStoreReader::open_bytes", r"ItchStoreReader::open_bytes\("),
+    ("parser", ITCH_STORE_READER, "ItchStoreReader::read_sections",
+     r"ItchStoreReader::read_sections\("),
+    ("parser", ITCH_STORE_READER, "ItchStoreReader::read_directory",
+     r"ItchStoreReader::read_directory\("),
+    ("parser", ITCH_STORE_READER, "ItchStoreReader::read_column", r"ItchStoreReader::read_column\("),
+    ("parser", ITCH_STORE_READER, "ItchStoreReader::read_columns",
+     r"ItchStoreReader::read_columns\("),
+    ("parser", ITCH_STORE_READER, "ItchStoreReader::tail", r"ItchStoreReader::tail\("),
+    ("parser", ITCH_STORE_READER, "SegmentReader::seek", r"SegmentReader::seek\("),
+    ("parser", ITCH_SEGMENT, "SegmentAssembler::load", r"SegmentAssembler::load\("),
+    ("parser", ITCH_SEGMENT, "SegmentAssembler::next", r"SegmentAssembler::next\("),
+    ("parser", ZSTD_FRAME, "decode_zstd_payload", r"codec::decode_zstd_payload\("),
+    ("writer", ITCH_STORE, "encode_store_header", r"store::encode_store_header\("),
+    ("writer", ITCH_STORE, "SymbolTable::encode", r"SymbolTable::encode\("),
+    ("writer", ITCH_STORE, "encode_column_metadata", r"store::encode_column_metadata\("),
+    ("writer", ITCH_STORE, "encode_column", r"^tick_store::store::encode_column\("),
+    ("writer", ITCH_SEGMENT, "SegmentBuilder::add", r"SegmentBuilder::add\("),
+    ("writer", ITCH_SEGMENT, "SegmentBuilder::finish", r"SegmentBuilder::finish\("),
+    ("writer", ITCH_STORE_WRITER, "ItchStoreWriter::create", r"ItchStoreWriter::create\("),
+    ("writer", ITCH_STORE_WRITER, "ItchStoreWriter::in_memory", r"ItchStoreWriter::in_memory\("),
+    ("writer", ITCH_STORE_WRITER, "ItchStoreWriter::append", r"ItchStoreWriter::append\("),
+    ("writer", ITCH_STORE_WRITER, "ItchStoreWriter::write_segment",
+     r"ItchStoreWriter::write_segment\("),
+    ("writer", ITCH_STORE_WRITER, "ItchStoreWriter::finish", r"ItchStoreWriter::finish\("),
+    ("writer", ZSTD_FRAME, "encode_zstd_payload", r"codec::encode_zstd_payload\("),
     ("codec", CRC32C, "crc32c", r"^tick_store::store::crc32c\("),
     ("codec", CRC32C, "crc32c_with", r"crc32c_with\("),
     ("codec", CRC32C, "crc32c_software", r"detail::crc32c_software\("),
@@ -169,6 +207,10 @@ FIXED_REQUIRED = (
     ("validator", CONTAINER_ORACLES, "check_container", r"oracle::check_container\("),
     ("validator", CONTAINER_ORACLES, "check_parse", r"store::oracle::check_parse\("),
     ("validator", CONTAINER_ORACLES, "fixed_checksums", r"oracle::fixed_checksums\("),
+    ("validator", ITCH_STORE_ORACLES, "check_itch_store", r"oracle::check_itch_store\("),
+    ("validator", ITCH_STORE_ORACLES, "read_store", r"oracle::detail::read_store\("),
+    ("validator", ITCH_STORE_ORACLES, "rewrite", r"oracle::detail::rewrite\("),
+    ("validator", ITCH_STORE_ORACLES, "check_random_access", r"oracle::detail::check_random_access\("),
     ("validator", CODEC_ORACLES, "check_timestamp_column", r"oracle::check_timestamp_column\("),
     ("validator", CODEC_ORACLES, "check_xor_column", r"oracle::check_xor_column\("),
     ("validator", CODEC_ORACLES, "check_one_block", r"oracle::check_one_block\("),
@@ -185,6 +227,13 @@ FIXED_REQUIRED = (
     ("oracle", ROUNDTRIP, "verify", r"^tick_store::harness::verify\("),
     ("oracle", ROUNDTRIP, "verify_stub_store", r"^tick_store::harness::verify_stub_store\("),
     ("oracle", COLUMNS_READER, "verify_columns", r"^tick_store::harness::verify_columns\("),
+    ("oracle", ITCH_STORE_RECORD_READER, "verify_itch_store",
+     r"^tick_store::harness::verify_itch_store\("),
+    ("oracle", ITCH_STORE_RECORD_READER, "ItchStoreRecordReader::next",
+     r"ItchStoreRecordReader::next\("),
+    ("oracle", ITCH_STORE_RECORD_READER, "ItchStoreRecordReader::tail",
+     r"ItchStoreRecordReader::tail\("),
+    ("oracle", ITCH_STORE_RECORD_READER, "RefusedItchStore::next", r"RefusedItchStore::next\("),
     ("oracle", ROUNDTRIP, "Walk::run", r"Walk::run\("),
     ("oracle", ROUNDTRIP, "Walk::step", r"Walk::step\("),
     ("oracle", ROUNDTRIP, "Walk::take", r"Walk::take\("),

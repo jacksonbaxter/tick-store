@@ -52,7 +52,7 @@ jobs:
           - { name: asan-ubsan, only: "asan-test" }
           - { name: tsan, only: "tsan-test" }
           - { name: clang-tidy, only: "clang-tidy" }
-          - { name: fuzz, only: "fuzz-columns,fuzz-container,fuzz-dictionary,fuzz-gorilla-timestamps,fuzz-gorilla-xor,fuzz-itch-frame,fuzz-itch-message,fuzz-pfor,fuzz-run-length,fuzz-stream-vbyte,fuzz-stub-store" }
+          - { name: fuzz, only: "fuzz-columns,fuzz-container,fuzz-dictionary,fuzz-gorilla-timestamps,fuzz-gorilla-xor,fuzz-itch-frame,fuzz-itch-message,fuzz-itch-store,fuzz-pfor,fuzz-run-length,fuzz-stream-vbyte,fuzz-stub-store" }
           - { name: coverage, only: "coverage" }
           - { name: repo, only: "py-scripts,py-compare,check-results,check-compare,render-check,actionlint,hygiene" }
     steps:

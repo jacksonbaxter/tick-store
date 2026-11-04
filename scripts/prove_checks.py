@@ -250,8 +250,16 @@ FAULTS = (
     Fault("crc32c-armv8-last-byte", "dev-test", "the ARMv8 CRC32C kernel drops an odd last byte",
           EXIT_CTEST, "Crc32c.HardwareMatchesSoftwareOnRandomLengthsAndOffsets",
           arguments=("--test-regex", "Crc32c")),
-    Fault("g1-store-alters-a-byte", "oracle", "the stub store flips one bit of record 2 as it "
-          "writes", CHECK_FAILED, "first difference: bytes at record 2, source byte"),
+    Fault("g1-store-alters-a-byte", "oracle", "the ITCH store's writer flips the low bit of every "
+          "add order's shares, so record 2 re-serialises one bit off", CHECK_FAILED,
+          "first difference: bytes at record 2, source byte"),
+    Fault("itch-store-import-not-appended", "dev-test", "the ITCH store's writer stops appending "
+          "an import to its locate's list, so the distances after it in the segment are off",
+          EXIT_CTEST, "ItchStoreReferences.AnOrderFromAnEarlierSegmentIsImportedOnceThenADistance",
+          arguments=("--test-regex", "ItchStore")),
+    Fault("fuzz-itch-store-distance-bound", "fuzz-itch-store", "the ITCH store's segment decoder "
+          "stops checking a reference distance against its locate's list", EXIT_LIBFUZZER,
+          "AddressSanitizer", arguments=FUZZ_ARGUMENTS),
     Fault("g2-weakened-compare", "dev-test", "the oracle's compare ignores bit 0 and stops "
           "requiring the hashes to match", EXIT_CTEST, "Value of: report.passed()",
           arguments=("--test-regex", "OracleExhaustiveFlip")),

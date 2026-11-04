@@ -1,0 +1,12 @@
+diff --git a/src/store/itch_segment.cpp b/src/store/itch_segment.cpp
+index 5628e77..a60f7bd 100644
+--- a/src/store/itch_segment.cpp
++++ b/src/store/itch_segment.cpp
+@@ -284,7 +284,6 @@ struct SegmentBuilder::State {
+         push(Column::ref_distance, 0);
+         push(Column::import_ref, reference);
+         refs.assign(reference, locate, known[locate]);
+-        bump(locate);
+     }
+ 
+     void reduce(std::byte type, std::uint32_t shares) {

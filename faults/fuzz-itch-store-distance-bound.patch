@@ -1,0 +1,15 @@
+diff --git a/src/store/itch_segment.cpp b/src/store/itch_segment.cpp
+index 5628e77..40cf8c4 100644
+--- a/src/store/itch_segment.cpp
++++ b/src/store/itch_segment.cpp
+@@ -553,10 +553,6 @@ struct SegmentAssembler::State {
+             return reference;
+         }
+         const std::vector<std::uint64_t>& list = lists[locate];
+-        if (distance > list.size()) {
+-            --at[static_cast<std::size_t>(Column::ref_distance)];
+-            return refuse("ref distance", list.size(), distance, Column::ref_distance);
+-        }
+         return list[list.size() - distance];
+     }
+ 

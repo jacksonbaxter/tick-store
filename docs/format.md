@@ -30,8 +30,13 @@ the order they were written. Each list, blocks and sections, is in file order in
 together they tile the region exactly: no gap, no overlap, no byte that nothing claims. An empty
 section takes no bytes and shares its offset with whatever follows.
 
-A block's payload is opaque to the container. For every codec but `raw` it is one block in the
-codec's own frame (`codec/block.hpp`), which carries the block's value count.
+A block's payload is opaque to the container. For every codec but `raw` and `zstd` it is one or
+more blocks in the codec's own frame (`codec/block.hpp`), back to back, each carrying its value
+count. A `zstd` payload is an 8-byte header, then one zstd frame: a u16 inner codec id (readable,
+neither `none` nor `zstd`), a u16 reserved as 0, a u32 inner size from 1 to the reader's limit, all
+little-endian, then exactly one frame whose content size is the inner size and whose content is a
+payload of the inner codec (`codec/zstd_frame.hpp`). The ITCH store's layout over this container
+is in `docs/store.md`.
 
 ## Footer
 
@@ -126,6 +131,7 @@ codec). A reserved entry stays in the table with its reason.
 | 5 | stream_vbyte | active |
 | 6 | dictionary | active |
 | 7 | run_length | active |
+| 8 | zstd | active: zstd level 1 around a payload of another codec, header above |
 
 A new codec takes the next id and changes no format version. A reader older than the id refuses a
 block that names it as an unknown codec, rather than misread it (D11). A change to an existing codec's

@@ -1,13 +1,13 @@
-diff --git a/src/store/stub_store.cpp b/src/store/stub_store.cpp
---- a/src/store/stub_store.cpp
-+++ b/src/store/stub_store.cpp
-@@ -256,6 +256,9 @@ std::expected<void, StoreError> StubWriter::append(const itch::Message& message)
-         return fail(bad_field(StoreErrorKind::unencodable_record, "empty record",
-                               header_.record_count, 1, 0));
-     }
-+    if (header_.record_count == 2) {
-+        buffer_[buffered_ + 5] ^= std::byte{0x01};
-+    }
-     buffered_ += *written;
-     ++header_.record_count;
-     header_.records_bytes += *written;
+diff --git a/src/store/itch_segment.cpp b/src/store/itch_segment.cpp
+index 5628e77..37c25a0 100644
+--- a/src/store/itch_segment.cpp
++++ b/src/store/itch_segment.cpp
+@@ -310,7 +310,7 @@ struct SegmentBuilder::State {
+         const std::uint8_t side_value = symbol_of(side);
+         push(Column::add_side, side_value);
+         push(Column::add_price, static_cast<std::uint32_t>(price));
+-        push(Column::add_shares, shares);
++        push(Column::add_shares, shares ^ 1U);
+         price_key.push_back((std::uint32_t{h.stock_locate} << 8U) | side_value);
+         shares_key.push_back(h.stock_locate);
+         derived_stock(h.stock_locate, stock);

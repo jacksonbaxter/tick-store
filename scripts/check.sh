@@ -35,7 +35,8 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 cd "$ROOT" || exit 2
 
 FUZZ_TARGETS="fuzz-columns fuzz-container fuzz-dictionary fuzz-gorilla-timestamps fuzz-gorilla-xor
-fuzz-itch-frame fuzz-itch-message fuzz-pfor fuzz-run-length fuzz-stream-vbyte fuzz-stub-store"
+fuzz-itch-frame fuzz-itch-message fuzz-itch-store fuzz-pfor fuzz-run-length fuzz-stream-vbyte
+fuzz-stub-store"
 ALL_STEPS="dev-build dev-test oracle asan-build asan-test tsan-build tsan-test clang-tidy
 fuzz-build $FUZZ_TARGETS coverage py-scripts py-compare check-results check-compare
 render-check actionlint hygiene"
@@ -346,6 +347,7 @@ step_fuzz_gorilla_timestamps() {
 step_fuzz_gorilla_xor() { run_fuzzer "$1" fuzz_gorilla_xor gorilla_xor gorilla_xor 70000; }
 step_fuzz_itch_frame() { run_fuzzer "$1" fuzz_itch_frame itch_frame frame 70000; }
 step_fuzz_itch_message() { run_fuzzer "$1" fuzz_itch_message itch_message message 256; }
+step_fuzz_itch_store() { run_fuzzer "$1" fuzz_itch_store itch_store itch_store 70000; }
 step_fuzz_pfor() { run_fuzzer "$1" fuzz_pfor pfor pfor 16384; }
 step_fuzz_run_length() { run_fuzzer "$1" fuzz_run_length run_length run_length 16384; }
 step_fuzz_stream_vbyte() { run_fuzzer "$1" fuzz_stream_vbyte stream_vbyte stream_vbyte 70000; }

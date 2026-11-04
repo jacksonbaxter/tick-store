@@ -115,7 +115,10 @@ std::expected<void, ItchStoreError> ItchStoreReader::read_sections() {
 
 std::expected<void, ItchStoreError> ItchStoreReader::read_directory() {
     const std::uint64_t n = header_.segment_records;
-    segments_.reserve(static_cast<std::size_t>(header_.segment_count));
+    // Every segment has a type block, so the blocks bound the segments; the header's count,
+    // not yet checked against them, does not size anything.
+    segments_.reserve(static_cast<std::size_t>(
+        std::min<std::uint64_t>(header_.segment_count, parser_.block_count())));
     std::uint64_t records = 0;
     Column previous = Column::type;
     for (std::uint64_t b = 0; b < parser_.block_count(); ++b) {

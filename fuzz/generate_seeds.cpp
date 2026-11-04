@@ -4,6 +4,7 @@
 //   <dir>/frame/    framed streams, for fuzz_itch_frame
 //   <dir>/store/    stub store files, for fuzz_stub_store
 //   <dir>/container/  container files from the real writer, for fuzz_container
+//   <dir>/itch_store/  ITCH store files from the real writer, for fuzz_itch_store
 //   <dir>/columns/  column directories as sections, for fuzz_columns
 //   <dir>/gorilla_timestamps/  timestamp columns, for fuzz_gorilla_timestamps
 //   <dir>/gorilla_xor/         XOR columns, for fuzz_gorilla_xor
@@ -19,6 +20,7 @@
 #include "codec_oracles.hpp"
 #include "columns_oracles.hpp"
 #include "container_oracles.hpp"
+#include "itch_store_oracles.hpp"
 #include "tick_store/codec/block.hpp"
 #include "tick_store/codec/codec_error.hpp"
 #include "tick_store/codec/dictionary.hpp"
@@ -28,6 +30,7 @@
 #include "tick_store/codec/price_double.hpp"
 #include "tick_store/codec/registry.hpp"
 #include "tick_store/codec/run_length.hpp"
+#include "tick_store/codec/zstd_frame.hpp"
 #include "tick_store/itch/codec.hpp"
 #include "tick_store/itch/message.hpp"
 #include "tick_store/store/columns.hpp"
@@ -35,6 +38,8 @@
 #include "tick_store/store/container_writer.hpp"
 #include "tick_store/store/crc32c.hpp"
 #include "tick_store/store/durability.hpp"
+#include "tick_store/store/itch_store.hpp"
+#include "tick_store/store/itch_store_writer.hpp"
 #include "tick_store/store/little_endian.hpp"
 #include "tick_store/store/store_error.hpp"
 #include "tick_store/store/stub_store.hpp"
@@ -49,6 +54,7 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <functional>
 #include <ios>
 #include <iterator>
 #include <limits>
@@ -58,6 +64,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -324,6 +331,222 @@ void write_store_seeds(SeedDir& seeds, const std::filesystem::path& scratch) {
     for (const std::size_t cut : {std::size_t{0}, std::size_t{1}, std::size_t{39}, std::size_t{40},
                                   std::size_t{41}, std::size_t{55}, store.size() - 1}) {
         seeds.add(std::span{store}.first(cut));
+    }
+}
+
+// An ITCH store from the real writer, in memory.
+Bytes written_itch_store(std::span<const Message> messages, std::span<const std::byte> tail,
+                         std::uint32_t segment_records) {
+    auto writer = tick_store::store::ItchStoreWriter::in_memory({.segment_records = segment_records});
+    if (!writer.has_value()) {
+        throw std::runtime_error(to_string(writer.error()));
+    }
+    for (const Message& message : messages) {
+        if (auto added = writer->append(message); !added.has_value()) {
+            throw std::runtime_error(to_string(added.error()));
+        }
+    }
+    if (auto finished = writer->finish(tail); !finished.has_value()) {
+        throw std::runtime_error(to_string(finished.error()));
+    }
+    return writer->take_bytes();
+}
+
+// Orders created, named, replaced and deleted on a few locates, with a stock exception
+// and an order named under the wrong locate, so segments hold creations, distances and
+// imports.
+std::vector<Message> book_messages() {
+    std::vector<Message> out;
+    std::uint64_t state = 7;
+    std::vector<std::uint64_t> live;
+    std::uint64_t next = 5'000;
+    for (std::uint64_t t = 1; t <= 200; ++t) {
+        state = (state * 6364136223846793005ULL) + 1442695040888963407ULL;
+        const auto locate = static_cast<std::uint16_t>(1 + ((state >> 40U) % 3));
+        const MessageHeader h{locate, static_cast<std::uint16_t>(t % 5), 34'200'000'000'000ULL + (t * 997)};
+        const std::uint64_t pick = (state >> 20U) % 8;
+        if (live.empty() || pick < 3) {
+            const Stock stock = t == 50 ? alpha<8>("OTHER   ") : kStock;
+            out.emplace_back(AddOrder{h, next, (state & 1U) != 0 ? ch('B') : ch('S'),
+                                      static_cast<std::uint32_t>(100 * (1 + (state >> 60U))), stock,
+                                      Price4{static_cast<std::uint32_t>(100'000 + ((state >> 48U) % 500))}});
+            live.push_back(next++);
+            continue;
+        }
+        const std::size_t at = (state >> 8U) % live.size();
+        if (pick < 5) {
+            out.emplace_back(OrderExecuted{h, live[at], 10, 90'000 + t});
+        } else if (pick < 6) {
+            out.emplace_back(OrderReplace{h, live[at], next, 100, Price4{100'100}});
+            live[at] = next++;
+        } else if (pick < 7) {
+            out.emplace_back(OrderCancel{h, live[at], 5});
+        } else {
+            out.emplace_back(OrderDelete{h, live[at]});
+            live.erase(live.begin() + static_cast<std::ptrdiff_t>(at));
+        }
+    }
+    return out;
+}
+
+// A store file taken apart, one part changed, and rebuilt through build_container, so its
+// CRCs hold and the store's own check is what refuses it.
+Bytes with_itch_store_part(const Bytes& file,
+                           const std::function<void(std::vector<tick_store::store::ContainerPart>&,
+                                                    std::vector<tick_store::store::ContainerPart>&)>& edit) {
+    auto parser = tick_store::store::ContainerParser::open(file);
+    if (!parser.has_value()) {
+        throw std::runtime_error(to_string(parser.error()));
+    }
+    std::vector<tick_store::store::ContainerPart> blocks;
+    std::vector<tick_store::store::ContainerPart> sections;
+    for (std::uint64_t b = 0; b < parser->block_count(); ++b) {
+        const auto view = parser->block(b);
+        blocks.push_back({.section_name = "", .codec = view->codec,
+                          .metadata = Bytes(view->metadata.begin(), view->metadata.end()),
+                          .bytes = Bytes(view->payload.begin(), view->payload.end())});
+    }
+    for (std::uint64_t i = 0; i < parser->section_count(); ++i) {
+        const auto info = parser->section_info(i);
+        const auto view = parser->section(info->name);
+        sections.push_back({.section_name = std::string{info->name},
+                            .codec = tick_store::codec::CodecId::raw, .metadata = {},
+                            .bytes = Bytes(view->bytes.begin(), view->bytes.end())});
+    }
+    edit(blocks, sections);
+    std::vector<tick_store::store::ContainerPart> parts = blocks;
+    parts.insert(parts.end(), sections.begin(), sections.end());
+    auto rebuilt = tick_store::store::build_container(parts);
+    if (!rebuilt.has_value()) {
+        throw std::runtime_error(to_string(rebuilt.error()));
+    }
+    return std::move(*rebuilt);
+}
+
+void put_le_field(Bytes& bytes, std::size_t at, std::size_t width, std::uint64_t value) {
+    for (std::size_t i = 0; i < width && at + i < bytes.size(); ++i) {
+        bytes[at + i] = static_cast<std::byte>((value >> (8U * i)) & 0xFFU);
+    }
+}
+
+// Stores of every type, raw records and tails at several segment sizes up to the fuzzing
+// cap, a book of orders across segments, then one corrupt copy for each field of the
+// store's own encoding, rebuilt with valid CRCs, and cuts.
+void write_itch_store_seeds(SeedDir& seeds) {
+    namespace st = tick_store::store;
+    const Bytes unknown = filled(std::byte{'z'}, 9, std::byte{0xA5});
+    const Bytes short_add = filled(AddOrder::type_code, 20, std::byte{0});
+    std::vector<Message> messages = ordinary_messages();
+    messages.emplace_back(RawMessage{.bytes = unknown, .reason = RawReason::unknown_type});
+    messages.emplace_back(RawMessage{.bytes = short_add, .reason = RawReason::wrong_length});
+    const std::array tail{std::byte{0x00}, std::byte{0x7F}, std::byte{0xAB}};
+
+    for (const std::uint32_t n : {1U, 2U, 5U, 8U, 25U, st::oracle::kFuzzMaxSegmentRecords}) {
+        seeds.add(written_itch_store(messages, tail, n));
+    }
+    seeds.add(written_itch_store({}, {}, 4));
+    seeds.add(written_itch_store({}, tail, 4));
+    const std::vector<Message> book = book_messages();
+    for (const std::uint32_t n : {7U, 32U, st::oracle::kFuzzMaxSegmentRecords}) {
+        seeds.add(written_itch_store(book, {}, n));
+    }
+    // Over the cap: opened, not decoded.
+    seeds.add(written_itch_store(messages, tail, st::oracle::kFuzzMaxSegmentRecords + 1));
+
+    using Parts = std::vector<st::ContainerPart>;
+    const Bytes base = written_itch_store(messages, tail, 8);
+    const auto section = [](Parts& sections, std::string_view name) -> Bytes& {
+        for (st::ContainerPart& part : sections) {
+            if (part.section_name == name) {
+                return part.bytes;
+            }
+        }
+        throw std::runtime_error("no such section");
+    };
+    // The store section's fields.
+    for (const auto& [at, width, value] :
+         std::vector<std::tuple<std::size_t, std::size_t, std::uint64_t>>{
+             {st::kStoreVersionOffset, 4, 2},
+             {st::kStoreSegmentRecordsOffset, 4, 0},
+             {st::kStoreSegmentRecordsOffset, 4, 7},
+             {st::kStoreRecordCountOffset, 8, 24},
+             {st::kStoreRecordCountOffset, 8, ~std::uint64_t{0}},
+             {st::kStoreSegmentCountOffset, 8, 3}}) {
+        seeds.add(with_itch_store_part(base, [&](Parts&, Parts& sections) {
+            put_le_field(section(sections, st::kStoreSection), at, width, value);
+        }));
+    }
+    // The symbols section: a count off by one, and locates out of order.
+    seeds.add(with_itch_store_part(base, [&](Parts&, Parts& sections) {
+        put_le_field(section(sections, st::kSymbolsSection), 0, 4, 2);
+    }));
+    seeds.add(with_itch_store_part(written_itch_store(book, {}, 32), [&](Parts&, Parts& sections) {
+        put_le_field(section(sections, st::kSymbolsSection), 14, 2, 1);
+    }));
+    // Each metadata field of the first segment's type block, then of a column block.
+    for (const auto& [at, width, value] :
+         std::vector<std::tuple<std::size_t, std::size_t, std::uint64_t>>{
+             {st::kMetaSegmentOffset, 4, 1},
+             {st::kMetaColumnOffset, 2, st::kColumnCount},
+             {st::kMetaReservedOffset, 2, 1},
+             {st::kMetaValueCountOffset, 4, 0},
+             {st::kMetaValueCountOffset, 4, 7},
+             {st::kMetaFirstRecordOffset, 8, 1},
+             {st::kMetaFirstTimeOffset, 8, 1},
+             {st::kMetaLastTimeOffset, 8, 1},
+             {st::kMetaMinTimeOffset, 8, 0},
+             {st::kMetaMaxTimeOffset, 8, ~std::uint64_t{0}},
+             {st::kMetaTypedOffset, 4, 9},
+             {st::kMetaTypedOffset, 4, 7},
+             {st::kMetaBitmapSizeOffset, 2, 1},
+             {st::kMetaBitmapOffset, 1, 1}}) {
+        seeds.add(with_itch_store_part(base, [&](Parts& blocks, Parts&) {
+            put_le_field(blocks[0].metadata, at, width, value);
+        }));
+        if (at < st::kColumnMetadataSize) {
+            seeds.add(with_itch_store_part(base, [&](Parts& blocks, Parts&) {
+                put_le_field(blocks[2].metadata, at, width, value);
+            }));
+        }
+    }
+    // A block under another codec, a block dropped, a block repeated, two swapped.
+    seeds.add(with_itch_store_part(base, [](Parts& blocks, Parts&) {
+        blocks[2].codec = tick_store::codec::CodecId::dictionary;
+    }));
+    seeds.add(with_itch_store_part(base, [](Parts& blocks, Parts&) { blocks.erase(blocks.begin() + 2); }));
+    seeds.add(with_itch_store_part(base, [](Parts& blocks, Parts&) {
+        blocks.insert(blocks.begin() + 2, blocks[2]);
+    }));
+    seeds.add(with_itch_store_part(base, [](Parts& blocks, Parts&) { std::swap(blocks[0], blocks[1]); }));
+    // A column's chunk wrapped in zstd by hand, then each zstd header field changed.
+    const Bytes wrapped = with_itch_store_part(base, [](Parts& blocks, Parts&) {
+        Bytes outer;
+        if (tick_store::codec::encode_zstd_payload(static_cast<std::uint16_t>(blocks[1].codec),
+                                                   blocks[1].bytes, outer)
+                .has_value()) {
+            blocks[1].codec = tick_store::codec::CodecId::zstd;
+            blocks[1].bytes = outer;
+        }
+    });
+    seeds.add(wrapped);
+    for (const auto& [at, width, value] :
+         std::vector<std::tuple<std::size_t, std::size_t, std::uint64_t>>{
+             {0, 2, 0}, {0, 2, 8}, {2, 2, 1}, {4, 4, 0}, {4, 4, 0xFFFF'FFFFU}, {8, 1, 0}}) {
+        seeds.add(with_itch_store_part(wrapped, [&](Parts& blocks, Parts&) {
+            put_le_field(blocks[1].bytes, at, width, value);
+        }));
+    }
+    // Each block's payload with its first byte changed: a codec header field, a value.
+    for (std::size_t b = 0; b < 12; ++b) {
+        seeds.add(with_itch_store_part(base, [&](Parts& blocks, Parts&) {
+            if (b < blocks.size() && !blocks[b].bytes.empty()) {
+                blocks[b].bytes[blocks[b].bytes.size() / 2] ^= std::byte{0x11};
+            }
+        }));
+    }
+    // Cuts at the header, inside the data and inside the footer.
+    for (const std::size_t cut : {std::size_t{0}, std::size_t{16}, base.size() / 2, base.size() - 1}) {
+        seeds.add(std::span{base}.first(cut));
     }
 }
 
@@ -1113,6 +1336,7 @@ int main(int argc, char** argv) {
     SeedDir stream{root / "frame"};
     SeedDir store{root / "store"};
     SeedDir container{root / "container"};
+    SeedDir itch_store{root / "itch_store"};
     SeedDir columns{root / "columns"};
     SeedDir timestamps{root / "gorilla_timestamps"};
     SeedDir xor_words{root / "gorilla_xor"};
@@ -1124,6 +1348,7 @@ int main(int argc, char** argv) {
     write_frame_seeds(stream);
     write_store_seeds(store, root / "store-scratch");
     write_container_seeds(container, root / "container-scratch.tsc");
+    write_itch_store_seeds(itch_store);
     write_columns_seeds(columns);
     write_timestamp_seeds(timestamps);
     write_xor_seeds(xor_words);
@@ -1134,10 +1359,11 @@ int main(int argc, char** argv) {
     add_dict_refusals(dict);
     write_low_cardinality_seeds(rle, tick_store::codec::oracle::detail::kRleEncoders);
     add_rle_refusals(rle);
-    std::println("wrote {} message, {} frame, {} store, {} container, {} columns, "
+    std::println("wrote {} message, {} frame, {} store, {} container, {} itch_store, {} columns, "
                  "{} gorilla_timestamps, {} gorilla_xor, {} pfor, {} stream_vbyte, "
                  "{} dictionary and {} run_length seeds",
-                 message.count(), stream.count(), store.count(), container.count(), columns.count(),
+                 message.count(), stream.count(), store.count(), container.count(),
+                 itch_store.count(), columns.count(),
                  timestamps.count(), xor_words.count(), pfor.count(), svb.count(), dict.count(),
                  rle.count());
     return 0;

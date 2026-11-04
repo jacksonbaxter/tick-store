@@ -9,6 +9,7 @@
 #include "container_oracles.hpp"
 #include "itch_fixtures.hpp"
 #include "itch_oracles.hpp"
+#include "itch_store_oracles.hpp"
 #include "scratch_dir.hpp"
 #include "store_oracles.hpp"
 #include "stub_fixture.hpp"
@@ -92,6 +93,13 @@ TEST(FuzzRegression, ContainerCrashersStayFixed) {
     for (const auto& path : crashers("container")) {
         SCOPED_TRACE(path.filename().string());
         EXPECT_EQ(text(store::oracle::check_container(read_file(path))), "");
+    }
+}
+
+TEST(FuzzRegression, ItchStoreCrashersStayFixed) {
+    for (const auto& path : crashers("itch_store")) {
+        SCOPED_TRACE(path.filename().string());
+        EXPECT_EQ(text(store::oracle::check_itch_store(read_file(path))), "");
     }
 }
 
@@ -216,6 +224,24 @@ TEST(FuzzOracles, PassEveryCutAndFlipOfAContainer) {
     }
     EXPECT_EQ(text(store::oracle::check_container(stale)), "");
     EXPECT_EQ(store::oracle::fixed_checksums(stale), file);
+}
+
+// The golden ITCH store, cut at every length and with one bit of every byte flipped, the
+// bit chosen by the byte's offset; and the same file with segments over the fuzzing cap.
+TEST(FuzzOracles, PassEveryCutAndFlipOfAnItchStore) {
+    const Bytes file =
+        read_file(std::filesystem::path{TICK_STORE_GOLDEN_DIR} / "itch-store-v1.tsc");
+    ASSERT_FALSE(file.empty());
+    EXPECT_EQ(text(store::oracle::check_itch_store(file)), "");
+    for (std::size_t length = 0; length < file.size(); ++length) {
+        const Bytes cut = exact_copy(std::span{file}.first(length));
+        EXPECT_EQ(text(store::oracle::check_itch_store(cut)), "") << "length " << length;
+    }
+    for (std::size_t byte = 0; byte < file.size(); ++byte) {
+        Bytes flipped = exact_copy(file);
+        flipped[byte] ^= static_cast<std::byte>(1U << (byte % 8));
+        EXPECT_EQ(text(store::oracle::check_itch_store(flipped)), "") << "byte " << byte;
+    }
 }
 
 // A real store, cut at every length and with every bit flipped in turn.
