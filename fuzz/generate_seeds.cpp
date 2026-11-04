@@ -862,18 +862,16 @@ Bytes fixed_fields(std::optional<std::uint8_t> first, std::uint32_t value) {
     return out;
 }
 
-// Adds a hand-built block, having checked that its decoder takes it or refuses it as meant,
-// with the field named when refused, so a seed cannot drift from the refusal it is for.
+// Adds a hand-built block. One meant to be valid must decode, so a valid seed cannot drift
+// into a refusal. Refusals are not checked here: the unit tests' corrupt fixtures check each
+// one, and a decoder that stops refusing one must reach the fuzz oracle, not stop the build.
 void add_checked(SeedDir& seeds, tick_store::codec::BlockDecoder decode, const Bytes& block,
                  std::string_view refused_field) {
-    Words ignored;
-    const auto decoded = decode(block, ignored);
-    const bool as_meant = refused_field.empty()
-                              ? decoded.has_value()
-                              : !decoded.has_value() && decoded.error().field == refused_field;
-    if (!as_meant) {
-        throw std::runtime_error(std::format("a hand-built seed meant to be {} was not",
-                                             refused_field.empty() ? "valid" : refused_field));
+    if (refused_field.empty()) {
+        Words ignored;
+        if (!decode(block, ignored).has_value()) {
+            throw std::runtime_error("a hand-built seed meant to be valid was refused");
+        }
     }
     seeds.add(block);
 }
