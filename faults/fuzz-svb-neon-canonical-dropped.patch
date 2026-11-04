@@ -1,0 +1,13 @@
+diff --git a/src/codec/simd/kernels_neon.cpp b/src/codec/simd/kernels_neon.cpp
+index bc1ff09..98c9d22 100644
+--- a/src/codec/simd/kernels_neon.cpp
++++ b/src/codec/simd/kernels_neon.cpp
+@@ -377,7 +377,7 @@ bool svb_decode_neon(std::span<const std::byte> control, std::span<const std::by
+             at += kSvbLengths[c];
+         },
+         [&](std::size_t first) { tail_ok = svb_decode_from(control, data, values, first, at); });
+-    return tail_ok && vminvq_u32(ok) != 0;
++    return tail_ok;
+ }
+ 
+ constexpr Kernels kNeon{

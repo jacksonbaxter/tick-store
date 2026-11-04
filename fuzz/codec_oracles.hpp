@@ -24,6 +24,11 @@
 //
 // Every buffer handed to a decoder is a heap block of exactly its size, so ASan sees a
 // read one byte past it.
+//
+// Every decode the oracle makes runs on the kernel set this process chose, which is the
+// scalar set when TICK_STORE_SIMD=scalar caps it. Each block, and each column part 2
+// decodes, is then decoded again with the scalar set forced on this thread: the two must
+// give the same answer, refusal or values (the kernel-against-scalar oracle).
 
 #include "tick_store/codec/block.hpp"
 #include "tick_store/codec/codec_error.hpp"
@@ -33,6 +38,7 @@
 #include "tick_store/codec/pfor.hpp"
 #include "tick_store/codec/price_double.hpp"
 #include "tick_store/codec/run_length.hpp"
+#include "tick_store/codec/simd.hpp"
 #include "tick_store/codec/stream_vbyte.hpp"
 
 #include <algorithm>
@@ -94,6 +100,23 @@ inline constexpr std::array<std::size_t, 3> kOracleBlockSizes{3, 64, kDefaultBlo
 // and a tail in one block.
 inline constexpr std::size_t kOracleLongBlock = 1'025;
 
+// The kernel-against-scalar oracle for one block: decodes `input` again with the scalar
+// set and compares with what the chosen set gave, `result` into `decoded`.
+[[nodiscard]] inline bool scalar_agrees(const CodecUnderTest& codec, std::span<const std::byte> input,
+                                        const std::expected<std::size_t, CodecError>& result,
+                                        const Words& decoded) {
+    const simd::ScalarKernelsOnThisThread scalar;
+    Words by_scalar{0xDEAD};
+    const auto again = codec.decode_block(input, by_scalar);
+    if (again.has_value() != result.has_value()) {
+        return false;
+    }
+    if (again.has_value() ? *again != *result : again.error() != result.error()) {
+        return false;
+    }
+    return by_scalar == decoded;
+}
+
 // Part 1 for one block at the front of `input`. Sets `taken` to its size if accepted,
 // or to 0 if refused. The block is decoded in place first, to learn its size, and then
 // again from an exact copy of just its bytes, so ASan sees any read past its end.
@@ -103,6 +126,9 @@ inline constexpr std::size_t kOracleLongBlock = 1'025;
     taken = 0;
     Words decoded{0xDEAD};
     const auto first = codec.decode_block(input, decoded);
+    if (!scalar_agrees(codec, input, first, decoded)) {
+        return "the kernel set and the scalar set decoded a block differently";
+    }
     if (!first.has_value()) {
         Words again;
         const auto repeat = codec.decode_block(input, again);
@@ -240,12 +266,21 @@ inline constexpr std::size_t kOracleLongBlock = 1'025;
             return "the encoder refused a column of values";
         }
         Words decoded;
-        const auto done = codec.decode_column(exact_bytes(column), values.size(), decoded);
+        const Bytes exact = exact_bytes(column);
+        const auto done = codec.decode_column(exact, values.size(), decoded);
         if (!done.has_value()) {
             return "a block from the encoder did not decode";
         }
         if (decoded != values) {
             return "a block from the encoder decoded to other values";
+        }
+        Words by_scalar;
+        {
+            const simd::ScalarKernelsOnThisThread scalar;
+            if (!codec.decode_column(exact, values.size(), by_scalar).has_value() ||
+                by_scalar != decoded) {
+                return "the kernel set and the scalar set decoded a column differently";
+            }
         }
     }
     return nullptr;

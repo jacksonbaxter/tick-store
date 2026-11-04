@@ -140,11 +140,28 @@ struct PrefixSumForms {
 // The set for `level`, or nullptr if it is not available.
 [[nodiscard]] const Kernels* kernels_for(KernelLevel level) noexcept;
 
-// The set the codecs use, chosen at the first call.
+// The set the codecs use, chosen at the first call, unless a ScalarKernelsOnThisThread
+// lives on this thread.
 [[nodiscard]] const Kernels& active_kernels() noexcept;
 
 // The best level this build has and this processor runs, ignoring the cap.
 [[nodiscard]] KernelLevel best_kernel_level() noexcept;
+
+// While one lives, the codecs on this thread decode with the scalar set, whatever set
+// was chosen, so a check can decode the same bytes both ways and compare: the fuzz
+// oracles' kernel-against-scalar test. Nests, and restores what was there before.
+class ScalarKernelsOnThisThread {
+public:
+    ScalarKernelsOnThisThread() noexcept;
+    ~ScalarKernelsOnThisThread();
+    ScalarKernelsOnThisThread(const ScalarKernelsOnThisThread&) = delete;
+    ScalarKernelsOnThisThread& operator=(const ScalarKernelsOnThisThread&) = delete;
+    ScalarKernelsOnThisThread(ScalarKernelsOnThisThread&&) = delete;
+    ScalarKernelsOnThisThread& operator=(ScalarKernelsOnThisThread&&) = delete;
+
+private:
+    const Kernels* previous_;
+};
 
 // Calls into each set's kernels on this thread since the last reset, by level.
 [[nodiscard]] std::array<std::uint64_t, kKernelLevels> kernel_runs() noexcept;

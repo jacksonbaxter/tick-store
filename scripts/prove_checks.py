@@ -241,6 +241,11 @@ FAULTS = (
     Fault("fuzz-stream-vbyte-length-check", "fuzz-stream-vbyte", "the Stream VByte decoder "
           "accepts a value stored in more bytes than it needs", EXIT_LIBFUZZER,
           "check_svb_column:", arguments=FUZZ_ARGUMENTS),
+    Fault("fuzz-svb-neon-canonical-dropped", "fuzz-stream-vbyte", "the NEON Stream VByte "
+          "kernel stops refusing a value stored in more bytes than it needs, which only the "
+          "kernel-against-scalar oracle sees", EXIT_LIBFUZZER,
+          "check_svb_column: the kernel set and the scalar set decoded a block differently",
+          arguments=FUZZ_ARGUMENTS),
     Fault("fuzz-pfor-head-delta-escape", "fuzz-pfor", "the head-delta inverse puts an escaped "
           "value over the front head instead of pushing the heads down", EXIT_LIBFUZZER,
           "check_pfor_column:", arguments=FUZZ_ARGUMENTS),

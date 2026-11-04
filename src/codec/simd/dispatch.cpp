@@ -18,6 +18,9 @@ namespace {
 
 thread_local std::array<std::uint64_t, kKernelLevels> tl_runs{};
 
+// The set a ScalarKernelsOnThisThread put in force on this thread, or nullptr.
+thread_local const Kernels* tl_override = nullptr;
+
 }  // namespace
 
 void note_run(KernelLevel level) noexcept { ++tl_runs[static_cast<std::size_t>(level)]; }
@@ -171,8 +174,18 @@ KernelLevel best_kernel_level() noexcept {
 
 const Kernels& active_kernels() noexcept {
     static const Kernels& kActive = choose();
+    if (const Kernels* forced = detail::tl_override; forced != nullptr) {
+        return *forced;
+    }
     return kActive;
 }
+
+ScalarKernelsOnThisThread::ScalarKernelsOnThisThread() noexcept
+    : previous_{detail::tl_override} {
+    detail::tl_override = &detail::scalar_kernels();
+}
+
+ScalarKernelsOnThisThread::~ScalarKernelsOnThisThread() { detail::tl_override = previous_; }
 
 std::array<std::uint64_t, kKernelLevels> kernel_runs() noexcept { return detail::tl_runs; }
 

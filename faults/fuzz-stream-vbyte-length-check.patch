@@ -1,12 +1,13 @@
 diff --git a/src/codec/stream_vbyte.cpp b/src/codec/stream_vbyte.cpp
+index 77b6152..00b4445 100644
 --- a/src/codec/stream_vbyte.cpp
 +++ b/src/codec/stream_vbyte.cpp
-@@ -186,7 +186,7 @@
-         for (unsigned b = length; b > 0; --b) {
-             value = (value << 8U) | std::to_integer<std::uint64_t>((*data)[at + b - 1]);
-         }
--        if (low_length(value) != length) {
-+        if (low_length(value) > length) {
-             return fail(codec_error(CodecErrorKind::non_canonical, "svb length",
-                                     data_at + (at * 8U), low_length(value), length));
-         }
+@@ -187,7 +187,7 @@ std::expected<std::size_t, CodecError> decode_svb_block(std::span<const std::byt
+             for (unsigned b = length; b > 0; --b) {
+                 value = (value << 8U) | std::to_integer<std::uint64_t>((*data)[at + b - 1]);
+             }
+-            if (low_length(value) != length) {
++            if (low_length(value) > length) {
+                 return fail(codec_error(CodecErrorKind::non_canonical, "svb length",
+                                         data_at + (at * 8U), low_length(value), length));
+             }

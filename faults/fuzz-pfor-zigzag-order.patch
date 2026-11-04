@@ -1,12 +1,13 @@
-diff --git a/src/codec/pfor.cpp b/src/codec/pfor.cpp
---- a/src/codec/pfor.cpp
-+++ b/src/codec/pfor.cpp
-@@ -626,7 +626,7 @@
-         const std::uint64_t offset = *base;
-         if (*mode == 1) {
-             for (std::uint64_t& value : vector) {
--                value = zigzag_decode(value + offset);
-+                value = zigzag_decode(value) + offset;
-             }
-         } else {
-             for (std::uint64_t& value : vector) {
+diff --git a/src/codec/simd/driver.hpp b/src/codec/simd/driver.hpp
+index d3c36ee..e7da473 100644
+--- a/src/codec/simd/driver.hpp
++++ b/src/codec/simd/driver.hpp
+@@ -72,7 +72,7 @@ inline void add_base_from(std::span<std::uint64_t> values, std::size_t first, st
+                           bool zigzag) noexcept {
+     if (zigzag) {
+         for (std::size_t i = first; i < values.size(); ++i) {
+-            values[i] = zigzag_decode(values[i] + base);
++            values[i] = zigzag_decode(values[i]) + base;
+         }
+     } else {
+         for (std::size_t i = first; i < values.size(); ++i) {

@@ -15,7 +15,8 @@
 // written again through the real writer at the file's segment size; that file must read
 // back to the same records and tail, and writing those again must give the same bytes,
 // so the writer's output is a fixed point. Every segment is also read on its own, last to
-// first, and must give the records the sequential read gave.
+// first, and must give the records the sequential read gave. The file read with the
+// scalar kernel set forced on this thread must give the same verdict and records.
 //
 // The segment size is capped at kFuzzMaxSegmentRecords: a file declaring more is opened
 // and its directory checked, but its segments are not decoded. A segment's raw bytes can
@@ -23,6 +24,7 @@
 // within libFuzzer's allocation limit.
 
 #include "container_oracles.hpp"
+#include "tick_store/codec/simd.hpp"
 #include "tick_store/itch/codec.hpp"
 #include "tick_store/itch/message.hpp"
 #include "tick_store/store/container.hpp"
@@ -187,6 +189,19 @@ struct ReadResult {
     const detail::ReadResult skipped = detail::read_store(file, Checksums::skip, failure);
     if (failure != nullptr) {
         return failure;
+    }
+    {
+        // The kernel-against-scalar oracle: the same verdict and records with the scalar
+        // set forced.
+        const codec::simd::ScalarKernelsOnThisThread scalar;
+        const detail::ReadResult by_scalar = detail::read_store(file, Checksums::skip, failure);
+        if (failure != nullptr) {
+            return failure;
+        }
+        if (by_scalar.content != skipped.content || by_scalar.error != skipped.error ||
+            by_scalar.over_cap != skipped.over_cap) {
+            return "the kernel set and the scalar set read the file differently";
+        }
     }
     const detail::Bytes fixed = fixed_checksums(file);
     const detail::ReadResult repaired = detail::read_store(fixed, Checksums::verify, failure);

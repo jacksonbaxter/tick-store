@@ -31,6 +31,7 @@
 #include <cstring>
 #include <limits>
 #include <memory>
+#include <numeric>
 #include <random>
 #include <span>
 #include <string>
@@ -192,6 +193,45 @@ TEST(SimdDispatch, TheRequestedSetIsTheOneThatRuns) {
             EXPECT_EQ(ran, 0U) << to_string(level) << " ran in place of " << to_string(expected);
         }
     }
+}
+
+// The fuzz oracles' switch: inside the scope the codecs run only scalar kernels, nested
+// scopes keep it, and leaving the outer one gives back the chosen set.
+TEST(SimdDispatch, AScalarScopeRunsOnlyTheScalarSetAndRestoresTheChoice) {
+    const KernelLevel chosen = active_kernels().level;
+    Values values(3000);
+    std::iota(values.begin(), values.end(), std::uint64_t{7});
+    std::vector<std::byte> column;
+    ASSERT_TRUE(encode_pfor(values, 4096,
+                            {.transform = IntTransform::delta, .adaptive_scale = false, .patch = true},
+                            column)
+                    .has_value());
+    const auto decode_counting = [&] {
+        reset_kernel_runs();
+        Values decoded;
+        EXPECT_TRUE(decode_pfor(column, values.size(), decoded).has_value());
+        EXPECT_EQ(decoded, values);
+        return kernel_runs();
+    };
+    {
+        const ScalarKernelsOnThisThread outer;
+        {
+            const ScalarKernelsOnThisThread inner;
+            EXPECT_EQ(active_kernels().level, KernelLevel::scalar);
+        }
+        EXPECT_EQ(active_kernels().level, KernelLevel::scalar);
+        const auto runs = decode_counting();
+        for (const KernelLevel level : kAllKernelLevels) {
+            const std::uint64_t ran = runs[static_cast<std::size_t>(level)];
+            if (level == KernelLevel::scalar) {
+                EXPECT_GT(ran, 0U);
+            } else {
+                EXPECT_EQ(ran, 0U) << to_string(level) << " ran inside a scalar scope";
+            }
+        }
+    }
+    EXPECT_EQ(active_kernels().level, chosen);
+    EXPECT_GT(decode_counting()[static_cast<std::size_t>(chosen)], 0U);
 }
 
 // --- Unpack ------------------------------------------------------------------------------

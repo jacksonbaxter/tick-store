@@ -15,7 +15,8 @@
 // since it checks only what it reads, but on a file the whole decode accepts it must give
 // exactly what the exact path gives, which maps each record as tick_export does. So when
 // SegmentReader accepts every segment, every rows query, minute aggregate, locate count and
-// the share sum from the indexed path must equal the exact path's.
+// the share sum from the indexed path must equal the exact path's. The indexed answers
+// must also be the same with the scalar kernel set forced on this thread.
 //
 // Requests come from the file: windows over its summaries' times, a one-nanosecond window
 // at a segment's first time, and a window and a locate read from the input's last bytes,
@@ -27,6 +28,7 @@
 // piece while one input stays within libFuzzer's limits.
 
 #include "container_oracles.hpp"
+#include "tick_store/codec/simd.hpp"
 #include "tick_store/store/container.hpp"
 #include "tick_store/store/itch_query.hpp"
 #include "tick_store/store/itch_store.hpp"
@@ -184,6 +186,13 @@ template <class T>
     const query_detail::Answers indexed = query_detail::answer(*reader, QueryPath::indexed, requests);
     if (query_detail::answer(*reader, QueryPath::indexed, requests) != indexed) {
         return "the indexed path answered the same queries differently twice";
+    }
+    {
+        // The kernel-against-scalar oracle: the same answers with the scalar set forced.
+        const codec::simd::ScalarKernelsOnThisThread scalar;
+        if (query_detail::answer(*reader, QueryPath::indexed, requests) != indexed) {
+            return "the kernel set and the scalar set answered the same queries differently";
+        }
     }
     if (!query_detail::whole_decode_accepts(*reader)) {
         return nullptr;
