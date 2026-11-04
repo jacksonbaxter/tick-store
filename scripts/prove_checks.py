@@ -233,6 +233,23 @@ FAULTS = (
     Fault("fuzz-run-length-maximal-runs", "fuzz-run-length", "the run-length decoder stops "
           "refusing two neighbouring runs of one value", EXIT_LIBFUZZER, "check_rle_column:",
           arguments=FUZZ_ARGUMENTS),
+    Fault("fuzz-container-metadata-start", "fuzz-container", "the container parser starts the "
+          "footer's metadata area one byte past the section entries", EXIT_LIBFUZZER,
+          "check_container:", arguments=FUZZ_ARGUMENTS),
+    Fault("container-block-crc-skipped", "dev-test", "a block lookup stops checking the "
+          "block's CRC32C", EXIT_CTEST, "ContainerBlock.RefusesAPayloadWhoseCrcDiffers",
+          arguments=("--test-regex", "ContainerBlock")),
+    Fault("container-footer-offset-bound", "dev-test", "the trailer's footer offset bound is off "
+          "by one, refusing a footer that ends exactly at the trailer", EXIT_CTEST,
+          "ContainerOpen.AcceptsTheSmallestFileAndEmptyParts",
+          arguments=("--test-regex", "ContainerOpen")),
+    Fault("container-directory-sync-dropped", "dev-test", "the writer flushes the directory "
+          "after the rename in page_cache mode instead of device_flush mode", EXIT_CTEST,
+          "ContainerCommit.EachModeMakesItsCallsInOrder",
+          arguments=("--test-regex", "ContainerCommit")),
+    Fault("crc32c-armv8-last-byte", "dev-test", "the ARMv8 CRC32C kernel drops an odd last byte",
+          EXIT_CTEST, "Crc32c.HardwareMatchesSoftwareOnRandomLengthsAndOffsets",
+          arguments=("--test-regex", "Crc32c")),
     Fault("g1-store-alters-a-byte", "oracle", "the stub store flips one bit of record 2 as it "
           "writes", CHECK_FAILED, "first difference: bytes at record 2, source byte"),
     Fault("g2-weakened-compare", "dev-test", "the oracle's compare ignores bit 0 and stops "

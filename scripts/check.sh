@@ -34,7 +34,7 @@ set -u
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 cd "$ROOT" || exit 2
 
-FUZZ_TARGETS="fuzz-columns fuzz-dictionary fuzz-gorilla-timestamps fuzz-gorilla-xor
+FUZZ_TARGETS="fuzz-columns fuzz-container fuzz-dictionary fuzz-gorilla-timestamps fuzz-gorilla-xor
 fuzz-itch-frame fuzz-itch-message fuzz-pfor fuzz-run-length fuzz-stream-vbyte fuzz-stub-store"
 ALL_STEPS="dev-build dev-test oracle asan-build asan-test tsan-build tsan-test clang-tidy
 fuzz-build $FUZZ_TARGETS coverage py-scripts py-compare check-results check-compare
@@ -338,6 +338,7 @@ run_fuzzer() {
 }
 
 step_fuzz_columns() { run_fuzzer "$1" fuzz_columns columns columns 70000; }
+step_fuzz_container() { run_fuzzer "$1" fuzz_container container container 70000; }
 step_fuzz_dictionary() { run_fuzzer "$1" fuzz_dictionary dictionary dictionary 16384; }
 step_fuzz_gorilla_timestamps() {
     run_fuzzer "$1" fuzz_gorilla_timestamps gorilla_timestamps gorilla_timestamps 70000

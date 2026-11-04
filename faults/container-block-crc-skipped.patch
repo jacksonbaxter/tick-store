@@ -1,0 +1,19 @@
+diff --git a/src/store/container.cpp b/src/store/container.cpp
+index 4d27414..1882fc1 100644
+--- a/src/store/container.cpp
++++ b/src/store/container.cpp
+@@ -481,13 +481,7 @@ std::expected<BlockView, StoreError> ContainerParser::block_with(std::uint64_t i
+                                     footer_offset_ + kFooterFixedSize + (index * kBlockEntrySize),
+                                     0, info->payload_offset));
+     }
+-    if (checksums == Checksums::verify) {
+-        const std::uint32_t computed = block_crc(info->codec, *payload);
+-        if (computed != info->crc) {
+-            return std::unexpected(fail(StoreErrorKind::bad_checksum, "block",
+-                                        info->payload_offset, info->crc, computed));
+-        }
+-    }
++    static_cast<void>(checksums);
+     return BlockView{.codec = info->codec, .metadata = info->metadata, .payload = *payload, .owner = {}};
+ }
+ 

@@ -1,0 +1,13 @@
+diff --git a/src/store/container.cpp b/src/store/container.cpp
+index 4d27414..7573e76 100644
+--- a/src/store/container.cpp
++++ b/src/store/container.cpp
+@@ -259,7 +259,7 @@ std::expected<ContainerParser, StoreError> ContainerParser::open(std::span<const
+                                     trailer_start + kTrailerFooterOffset, kContainerHeaderSize,
+                                     footer_offset));
+     }
+-    if (footer_offset > last_footer_offset) {
++    if (footer_offset >= last_footer_offset) {
+         return std::unexpected(fail(StoreErrorKind::bad_footer, "footer offset",
+                                     trailer_start + kTrailerFooterOffset, last_footer_offset,
+                                     footer_offset));

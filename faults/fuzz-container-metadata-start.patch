@@ -1,0 +1,13 @@
+diff --git a/src/store/container.cpp b/src/store/container.cpp
+index 4d27414..219c787 100644
+--- a/src/store/container.cpp
++++ b/src/store/container.cpp
+@@ -309,7 +309,7 @@ std::expected<ContainerParser, StoreError> ContainerParser::open(std::span<const
+     parser.block_entries_ = entries.first(static_cast<std::size_t>(blocks * kBlockEntrySize));
+     parser.section_entries_ = entries.subspan(parser.block_entries_.size(),
+                                               static_cast<std::size_t>(sections * kSectionEntrySize));
+-    parser.metadata_ = entries.subspan(parser.block_entries_.size() + parser.section_entries_.size());
++    parser.metadata_ = entries.subspan(parser.block_entries_.size() + parser.section_entries_.size() + 1);
+ 
+     // Blocks and sections, each list in file order, must tile the data region from the
+     // header to the footer with no gap and no overlap, and blocks' metadata must tile

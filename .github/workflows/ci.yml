@@ -39,7 +39,7 @@ jobs:
   check:
     name: ${{ matrix.check.name }} on ${{ matrix.host.name }}
     runs-on: ${{ matrix.host.runner }}
-    # The scheduled fuzz job runs ten targets for 30 minutes each, one after another.
+    # The scheduled fuzz job runs eleven targets for 30 minutes each, one after another.
     timeout-minutes: 360
     strategy:
       fail-fast: false
@@ -52,7 +52,7 @@ jobs:
           - { name: asan-ubsan, only: "asan-test" }
           - { name: tsan, only: "tsan-test" }
           - { name: clang-tidy, only: "clang-tidy" }
-          - { name: fuzz, only: "fuzz-columns,fuzz-dictionary,fuzz-gorilla-timestamps,fuzz-gorilla-xor,fuzz-itch-frame,fuzz-itch-message,fuzz-pfor,fuzz-run-length,fuzz-stream-vbyte,fuzz-stub-store" }
+          - { name: fuzz, only: "fuzz-columns,fuzz-container,fuzz-dictionary,fuzz-gorilla-timestamps,fuzz-gorilla-xor,fuzz-itch-frame,fuzz-itch-message,fuzz-pfor,fuzz-run-length,fuzz-stream-vbyte,fuzz-stub-store" }
           - { name: coverage, only: "coverage" }
           - { name: repo, only: "py-scripts,py-compare,check-results,check-compare,render-check,actionlint,hygiene" }
     steps:

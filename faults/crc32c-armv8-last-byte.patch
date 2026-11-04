@@ -1,0 +1,13 @@
+diff --git a/src/store/crc32c_armv8.cpp b/src/store/crc32c_armv8.cpp
+index 47049da..d034296 100644
+--- a/src/store/crc32c_armv8.cpp
++++ b/src/store/crc32c_armv8.cpp
+@@ -44,7 +44,7 @@ std::uint32_t crc32c_armv8(std::uint32_t state, std::span<const std::byte> bytes
+         state = __crc32ch(state, load<std::uint16_t>(bytes));
+         bytes = bytes.subspan(2);
+     }
+-    if (!bytes.empty()) {
++    if (bytes.size() > 1) {
+         state = __crc32cb(state, std::to_integer<std::uint8_t>(bytes[0]));
+     }
+     return state;

@@ -1,0 +1,13 @@
+diff --git a/src/store/container_writer.cpp b/src/store/container_writer.cpp
+index dc3ad0c..c0d3334 100644
+--- a/src/store/container_writer.cpp
++++ b/src/store/container_writer.cpp
+@@ -171,7 +171,7 @@ std::expected<void, StoreError> ContainerWriter::publish() {
+ 
+     // Step 5: the rename reaches the device. The file is already at `path`, so a
+     // failure here removes nothing.
+-    if (durability_ == Durability::device_flush) {
++    if (durability_ == Durability::page_cache) {
+         if (auto synced = sync_directory(*ops_, path_.parent_path()); !synced.has_value()) {
+             failed_ = synced.error();
+             return synced;

@@ -6,8 +6,10 @@
 scripts/coverage.sh is the normal way in. The report gives line and function coverage per file
 for src/ and include/. The gate fails if a function below is missing from the binary or was
 never called: every decode_as and encode_as for the 23 message types, each parser and validator
-entry point, the codecs' decoders and encoders, the fuzz oracles, and the oracle's compare path. A name that stops matching fails too, so the list
-cannot go stale in silence.
+entry point, the codecs' decoders and encoders, the container's parser, writer and durability
+calls, CRC32C in software and in this processor's hardware kernel, the fuzz oracles, and the
+oracle's compare path. A name that stops matching fails too, so the list cannot go stale in
+silence.
 
 The list holds no SIMD kernel because none exists yet. The Phase 3 kernels add theirs here.
 llvm-cov sees only C++. scripts/check_results.py and scripts/check_compare.py are shown failing
@@ -60,6 +62,12 @@ PFOR = "src/codec/pfor.cpp"
 STREAM_VBYTE = "src/codec/stream_vbyte.cpp"
 DICTIONARY = "src/codec/dictionary.cpp"
 RUN_LENGTH = "src/codec/run_length.cpp"
+CONTAINER = "src/store/container.cpp"
+CONTAINER_WRITER = "src/store/container_writer.cpp"
+CONTAINER_READER = "src/store/container_reader.cpp"
+DURABILITY = "src/store/durability.cpp"
+CRC32C = "src/store/crc32c.cpp"
+CONTAINER_ORACLES = "fuzz/container_oracles.hpp"
 
 # Each is (group, file, what to call it, pattern over the demangled name).
 FIXED_REQUIRED = (
@@ -81,6 +89,33 @@ FIXED_REQUIRED = (
     ("parser", COLUMNS, "ColumnsParser::next", r"ColumnsParser::next\("),
     ("parser", COLUMNS, "ColumnsParser::rebuild_row", r"ColumnsParser::rebuild_row\("),
     ("parser", MAPPED_FILE, "MappedFile::open", r"MappedFile::open\("),
+    ("parser", CONTAINER, "ContainerParser::open", r"ContainerParser::open\("),
+    ("parser", CONTAINER, "ContainerParser::block_info", r"ContainerParser::block_info\("),
+    ("parser", CONTAINER, "ContainerParser::block_with", r"ContainerParser::block_with\("),
+    ("parser", CONTAINER, "ContainerParser::section_info", r"ContainerParser::section_info\("),
+    ("parser", CONTAINER, "ContainerParser::section_at", r"ContainerParser::section_at\("),
+    ("parser", CONTAINER, "ContainerParser::section", r"ContainerParser::section\("),
+    ("parser", CONTAINER, "ContainerParser::verify_all", r"ContainerParser::verify_all\("),
+    ("parser", CONTAINER_READER, "ContainerReader::open", r"ContainerReader::open\("),
+    ("parser", CONTAINER_READER, "ContainerReader::block", r"ContainerReader::block\("),
+    ("parser", CONTAINER_READER, "ContainerReader::section", r"ContainerReader::section\("),
+    ("writer", CONTAINER, "ContainerLayout::add_block", r"ContainerLayout::add_block\("),
+    ("writer", CONTAINER, "ContainerLayout::add_section", r"ContainerLayout::add_section\("),
+    ("writer", CONTAINER, "ContainerLayout::encode_footer_and_trailer",
+     r"ContainerLayout::encode_footer_and_trailer\("),
+    ("writer", CONTAINER, "build_container", r"store::build_container\("),
+    ("writer", CONTAINER_WRITER, "ContainerWriter::create", r"ContainerWriter::create\("),
+    ("writer", CONTAINER_WRITER, "ContainerWriter::add_block", r"ContainerWriter::add_block\("),
+    ("writer", CONTAINER_WRITER, "ContainerWriter::add_section",
+     r"ContainerWriter::add_section\("),
+    ("writer", CONTAINER_WRITER, "ContainerWriter::publish", r"ContainerWriter::publish\("),
+    ("writer", DURABILITY, "sync_file", r"store::sync_file\("),
+    ("writer", DURABILITY, "sync_directory", r"store::sync_directory\("),
+    ("writer", DURABILITY, "full_fsync_or_fallback", r"full_fsync_or_fallback\("),
+    ("writer", DURABILITY, "write_all", r"store::write_all\("),
+    ("codec", CRC32C, "crc32c", r"^tick_store::store::crc32c\("),
+    ("codec", CRC32C, "crc32c_with", r"crc32c_with\("),
+    ("codec", CRC32C, "crc32c_software", r"detail::crc32c_software\("),
     ("parser", STUB_READER, "StubRecordReader::next", r"StubRecordReader::next\("),
     ("parser", COLUMNS_READER, "ColumnsReader::open", r"ColumnsReader::open\("),
     ("parser", COLUMNS_READER, "ColumnsReader::next", r"ColumnsReader::next\("),
@@ -131,6 +166,9 @@ FIXED_REQUIRED = (
     ("validator", MESSAGE_ORACLES, "check_stream", r"oracle::check_stream\("),
     ("validator", STORE_ORACLES, "check_store", r"oracle::check_store\("),
     ("validator", COLUMNS_ORACLES, "check_columns", r"oracle::check_columns\("),
+    ("validator", CONTAINER_ORACLES, "check_container", r"oracle::check_container\("),
+    ("validator", CONTAINER_ORACLES, "check_parse", r"store::oracle::check_parse\("),
+    ("validator", CONTAINER_ORACLES, "fixed_checksums", r"oracle::fixed_checksums\("),
     ("validator", CODEC_ORACLES, "check_timestamp_column", r"oracle::check_timestamp_column\("),
     ("validator", CODEC_ORACLES, "check_xor_column", r"oracle::check_xor_column\("),
     ("validator", CODEC_ORACLES, "check_one_block", r"oracle::check_one_block\("),
@@ -169,7 +207,18 @@ def message_types(root):
     return names
 
 
-def required_functions(types):
+# The hardware CRC32C kernel this processor builds, which the tests must reach: each
+# processor builds only its own, so the other's is not in the binary to require.
+HARDWARE_CRC32C = {
+    "arm64": ("codec", "src/store/crc32c_armv8.cpp", "crc32c_armv8", r"detail::crc32c_armv8\("),
+    "aarch64": ("codec", "src/store/crc32c_armv8.cpp", "crc32c_armv8",
+                r"detail::crc32c_armv8\("),
+    "x86_64": ("codec", "src/store/crc32c_sse42.cpp", "crc32c_sse42", r"detail::crc32c_sse42\("),
+    "AMD64": ("codec", "src/store/crc32c_sse42.cpp", "crc32c_sse42", r"detail::crc32c_sse42\("),
+}
+
+
+def required_functions(types, machine=None):
     required = []
     for name in types:
         required.append(("decoder", CODEC, f"decode_as<{name}>",
@@ -177,6 +226,9 @@ def required_functions(types):
         required.append(("encoder", CODEC, f"encode_as<{name}>",
                          rf"encode_as<tick_store::itch::{name}>\("))
     required.extend(FIXED_REQUIRED)
+    machine = platform.machine() if machine is None else machine
+    if machine in HARDWARE_CRC32C:
+        required.append(HARDWARE_CRC32C[machine])
     return required
 
 

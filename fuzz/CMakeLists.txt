@@ -8,6 +8,7 @@ function(tick_store_add_fuzzer name)
 endfunction()
 
 tick_store_add_fuzzer(fuzz_columns)
+tick_store_add_fuzzer(fuzz_container)
 tick_store_add_fuzzer(fuzz_dictionary)
 tick_store_add_fuzzer(fuzz_gorilla_timestamps)
 tick_store_add_fuzzer(fuzz_gorilla_xor)

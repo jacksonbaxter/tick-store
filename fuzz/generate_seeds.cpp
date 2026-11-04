@@ -3,6 +3,7 @@
 //   <dir>/message/  payloads, for fuzz_itch_message
 //   <dir>/frame/    framed streams, for fuzz_itch_frame
 //   <dir>/store/    stub store files, for fuzz_stub_store
+//   <dir>/container/  container files from the real writer, for fuzz_container
 //   <dir>/columns/  column directories as sections, for fuzz_columns
 //   <dir>/gorilla_timestamps/  timestamp columns, for fuzz_gorilla_timestamps
 //   <dir>/gorilla_xor/         XOR columns, for fuzz_gorilla_xor
@@ -17,6 +18,7 @@
 
 #include "codec_oracles.hpp"
 #include "columns_oracles.hpp"
+#include "container_oracles.hpp"
 #include "tick_store/codec/block.hpp"
 #include "tick_store/codec/codec_error.hpp"
 #include "tick_store/codec/dictionary.hpp"
@@ -24,10 +26,15 @@
 #include "tick_store/codec/gorilla_xor.hpp"
 #include "tick_store/codec/pfor.hpp"
 #include "tick_store/codec/price_double.hpp"
+#include "tick_store/codec/registry.hpp"
 #include "tick_store/codec/run_length.hpp"
 #include "tick_store/itch/codec.hpp"
 #include "tick_store/itch/message.hpp"
 #include "tick_store/store/columns.hpp"
+#include "tick_store/store/container.hpp"
+#include "tick_store/store/container_writer.hpp"
+#include "tick_store/store/crc32c.hpp"
+#include "tick_store/store/durability.hpp"
 #include "tick_store/store/little_endian.hpp"
 #include "tick_store/store/store_error.hpp"
 #include "tick_store/store/stub_store.hpp"
@@ -317,6 +324,168 @@ void write_store_seeds(SeedDir& seeds, const std::filesystem::path& scratch) {
     for (const std::size_t cut : {std::size_t{0}, std::size_t{1}, std::size_t{39}, std::size_t{40},
                                   std::size_t{41}, std::size_t{55}, store.size() - 1}) {
         seeds.add(std::span{store}.first(cut));
+    }
+}
+
+// A container from the real writer, committed to `scratch` in the page_cache mode and
+// read back.
+Bytes written_container(const std::filesystem::path& scratch,
+                        const std::vector<tick_store::store::ContainerPart>& parts) {
+    using tick_store::store::ContainerWriter;
+    auto writer = ContainerWriter::create(scratch, tick_store::store::Durability::page_cache);
+    if (!writer.has_value()) {
+        throw std::runtime_error(to_string(writer.error()));
+    }
+    for (const auto& part : parts) {
+        if (part.section_name.empty()) {
+            if (const auto added = writer->add_block(part.codec, part.metadata, part.bytes);
+                !added.has_value()) {
+                throw std::runtime_error(to_string(added.error()));
+            }
+        } else if (const auto added = writer->add_section(part.section_name, part.bytes);
+                   !added.has_value()) {
+            throw std::runtime_error(to_string(added.error()));
+        }
+    }
+    if (const auto committed = writer->commit(); !committed.has_value()) {
+        throw std::runtime_error(to_string(committed.error()));
+    }
+    std::ifstream file{scratch, std::ios::binary};
+    Bytes bytes;
+    for (auto it = std::istreambuf_iterator<char>{file}; it != std::istreambuf_iterator<char>{};
+         ++it) {
+        bytes.push_back(static_cast<std::byte>(*it));
+    }
+    std::filesystem::remove(scratch);
+    return bytes;
+}
+
+// `file` with a field overwritten and every CRC recomputed, so the seed reaches the
+// structural check behind them.
+template <std::size_t Width>
+Bytes with_container_field(const Bytes& file, std::size_t offset, std::uint64_t value) {
+    return tick_store::store::oracle::fixed_checksums(with_field<Width>(file, offset, value));
+}
+
+// Valid containers of every shape the format allows, and one corrupt seed for each check
+// in the parser, at the offsets container.hpp gives.
+void write_container_seeds(SeedDir& seeds, const std::filesystem::path& scratch) {
+    namespace store = tick_store::store;
+    using tick_store::codec::CodecId;
+    using Part = store::ContainerPart;
+    const auto block = [](CodecId codec, Bytes metadata, Bytes payload) {
+        return Part{.section_name = "", .codec = codec, .metadata = std::move(metadata),
+                    .bytes = std::move(payload)};
+    };
+    const auto section = [](std::string name, Bytes bytes) {
+        return Part{.section_name = std::move(name), .codec = CodecId::raw, .metadata = {},
+                    .bytes = std::move(bytes)};
+    };
+    // A real codec block, so the seeds carry what a store writes.
+    Bytes timestamps;
+    const std::array<std::uint64_t, 5> times{34'200'000'000'000ULL, 34'200'000'000'100ULL,
+                                             34'200'000'000'100ULL, 34'200'000'009'000ULL,
+                                             34'200'000'009'001ULL};
+    if (!tick_store::codec::encode_timestamp_block(times, timestamps).has_value()) {
+        throw std::runtime_error("encode_timestamp_block failed");
+    }
+
+    const std::vector<Part> typical{
+        block(CodecId::gorilla_timestamps, Bytes(16, std::byte{0x11}), timestamps),
+        section("dict.stock", Bytes(24, std::byte{'Z'})),
+        block(CodecId::raw, {std::byte{1}, std::byte{2}}, {std::byte{0xAB}, std::byte{0xCD}}),
+        section("empty", {}),
+        block(CodecId::pfor, {}, Bytes(40, std::byte{0x5A})),
+        section("index.time", Bytes(48, std::byte{0x07})),
+    };
+    const Bytes file = written_container(scratch, typical);
+    seeds.add(file);
+    seeds.add(written_container(scratch, {}));
+    seeds.add(written_container(scratch, {block(CodecId::raw, {}, {})}));
+    seeds.add(written_container(scratch, {section("only", Bytes(5, std::byte{3}))}));
+    seeds.add(written_container(scratch, {section("a", {}), block(CodecId::raw, {}, {}),
+                                          section("b", {}), block(CodecId::stream_vbyte, {},
+                                                                  Bytes(3, std::byte{9})),
+                                          section("c", {})}));
+    std::vector<Part> many;
+    for (int i = 0; i < 40; ++i) {
+        many.push_back(block(static_cast<CodecId>(1 + (i % 7)), Bytes(static_cast<std::size_t>(i % 5),
+                                                                      std::byte{0x42}),
+                             Bytes(static_cast<std::size_t>(i % 11), static_cast<std::byte>(i))));
+        if (i % 4 == 0) {
+            many.push_back(section("s" + std::to_string((i * 13) % 40), Bytes(3, std::byte{0x21})));
+        }
+    }
+    seeds.add(written_container(scratch, many));
+
+    // Offsets in `file`, which holds three blocks and three sections.
+    const auto parser = store::ContainerParser::open(file);
+    if (!parser.has_value()) {
+        throw std::runtime_error(to_string(parser.error()));
+    }
+    const std::size_t size = file.size();
+    const std::size_t trailer = size - store::kTrailerSize;
+    const auto footer = static_cast<std::size_t>(parser->footer_offset());
+    const std::size_t blocks_at = footer + store::kFooterFixedSize;
+    const std::size_t sections_at = blocks_at + (3 * store::kBlockEntrySize);
+    const std::size_t block1 = blocks_at + store::kBlockEntrySize;
+    const std::size_t section1 = sections_at + store::kSectionEntrySize;
+
+    // The header, the trailer and the footer CRC, which nothing recomputes.
+    seeds.add(with_field<1>(file, 0, 'X'));
+    seeds.add(with_field<4>(file, store::kHeaderVersionOffset, 2));
+    seeds.add(with_field<4>(file, store::kHeaderSizeOffset, 17));
+    seeds.add(with_field<1>(file, size - 1, 'X'));
+    seeds.add(with_field<4>(file, trailer + store::kTrailerReserved, 1));
+    seeds.add(with_field<8>(file, trailer, 15));
+    seeds.add(with_field<8>(file, trailer, trailer));
+    seeds.add(with_field<4>(file, trailer + store::kTrailerFooterCrc, 0));
+    // Each footer field, with every CRC made to match.
+    const std::uint64_t max = std::numeric_limits<std::uint64_t>::max();
+    for (const std::uint64_t value : {std::uint64_t{0}, std::uint64_t{4}, max}) {
+        seeds.add(with_container_field<8>(file, footer + store::kFooterBlockCount, value));
+        seeds.add(with_container_field<8>(file, footer + store::kFooterSectionCount, value));
+        seeds.add(with_container_field<8>(file, footer + store::kFooterMetadataSize, value));
+    }
+    seeds.add(with_container_field<8>(file, block1 + store::kBlockPayloadOffset, 17));
+    seeds.add(with_container_field<8>(file, block1 + store::kBlockMetadataOffset, 1));
+    seeds.add(with_container_field<4>(file, block1 + store::kBlockPayloadSize, 3));
+    seeds.add(with_container_field<4>(file, block1 + store::kBlockPayloadSize, 1));
+    seeds.add(with_container_field<4>(file, block1 + store::kBlockMetadataSize, 3));
+    seeds.add(with_container_field<4>(file, block1 + store::kBlockMetadataSize, 1));
+    seeds.add(with_container_field<2>(file, block1 + store::kBlockCodec, 0));
+    seeds.add(with_container_field<2>(file, block1 + store::kBlockCodec,
+                                      tick_store::codec::kCodecs.size()));
+    seeds.add(with_container_field<2>(file, block1 + store::kBlockReserved, 1));
+    seeds.add(with_container_field<8>(file, section1 + store::kSectionOffset, 1));
+    seeds.add(with_container_field<8>(file, section1 + store::kSectionSize, 1));
+    seeds.add(with_container_field<1>(file, section1 + store::kSectionNameLength, 0));
+    seeds.add(with_container_field<1>(file, section1 + store::kSectionNameLength, 44));
+    seeds.add(with_container_field<1>(file, section1 + store::kSectionName, 'A'));
+    seeds.add(with_container_field<1>(file, section1 + store::kSectionName + 40, 'a'));
+    // A repeated name: the second section renamed to the first's.
+    Bytes repeated = file;
+    std::ranges::copy(std::span{file}.subspan(sections_at + store::kSectionNameLength,
+                                              1 + store::kMaxSectionName),
+                      repeated.begin() + static_cast<std::ptrdiff_t>(section1 +
+                                                                     store::kSectionNameLength));
+    seeds.add(tick_store::store::oracle::fixed_checksums(repeated));
+    // A block's and a section's CRC stale, which only a lookup sees.
+    for (const std::size_t stale : {block1 + store::kBlockCrc, section1 + store::kSectionCrc}) {
+        Bytes stale_crc = with_field<4>(file, stale, 0x5A5A5A5A);
+        const std::uint32_t footer_crc = tick_store::store::crc32c(
+            std::span<const std::byte>{stale_crc}.subspan(footer, trailer - footer));
+        seeds.add(with_field<4>(stale_crc, trailer + store::kTrailerFooterCrc, footer_crc));
+    }
+    Bytes stale_payload = file;
+    stale_payload[store::kContainerHeaderSize] ^= std::byte{0x01};
+    seeds.add(stale_payload);
+
+    // Cut at every boundary and inside the trailer.
+    for (const std::size_t cut : {std::size_t{0}, std::size_t{15}, std::size_t{16},
+                                  std::size_t{63}, footer, blocks_at, sections_at, trailer,
+                                  size - 8, size - 1}) {
+        seeds.add(std::span{file}.first(cut));
     }
 }
 
@@ -943,6 +1112,7 @@ int main(int argc, char** argv) {
     SeedDir message{root / "message"};
     SeedDir stream{root / "frame"};
     SeedDir store{root / "store"};
+    SeedDir container{root / "container"};
     SeedDir columns{root / "columns"};
     SeedDir timestamps{root / "gorilla_timestamps"};
     SeedDir xor_words{root / "gorilla_xor"};
@@ -953,6 +1123,7 @@ int main(int argc, char** argv) {
     write_message_seeds(message);
     write_frame_seeds(stream);
     write_store_seeds(store, root / "store-scratch");
+    write_container_seeds(container, root / "container-scratch.tsc");
     write_columns_seeds(columns);
     write_timestamp_seeds(timestamps);
     write_xor_seeds(xor_words);
@@ -963,10 +1134,10 @@ int main(int argc, char** argv) {
     add_dict_refusals(dict);
     write_low_cardinality_seeds(rle, tick_store::codec::oracle::detail::kRleEncoders);
     add_rle_refusals(rle);
-    std::println("wrote {} message, {} frame, {} store, {} columns, {} gorilla_timestamps, "
-                 "{} gorilla_xor, {} pfor, {} stream_vbyte, {} dictionary and {} run_length "
-                 "seeds",
-                 message.count(), stream.count(), store.count(), columns.count(),
+    std::println("wrote {} message, {} frame, {} store, {} container, {} columns, "
+                 "{} gorilla_timestamps, {} gorilla_xor, {} pfor, {} stream_vbyte, "
+                 "{} dictionary and {} run_length seeds",
+                 message.count(), stream.count(), store.count(), container.count(), columns.count(),
                  timestamps.count(), xor_words.count(), pfor.count(), svb.count(), dict.count(),
                  rle.count());
     return 0;

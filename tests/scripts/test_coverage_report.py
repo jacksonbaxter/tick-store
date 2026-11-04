@@ -59,6 +59,17 @@ class RequiredList(unittest.TestCase):
         encoders = [item for item in required if item[0] == "encoder"]
         self.assertEqual((len(decoders), len(encoders)), (23, 23))
 
+    def test_each_processor_requires_its_own_hardware_crc32c_kernel(self):
+        types = report.message_types(REPO_ROOT)
+        names = {machine: {item[2] for item in report.required_functions(types, machine)}
+                 for machine in ("arm64", "x86_64", "riscv64")}
+        self.assertIn("crc32c_armv8", names["arm64"])
+        self.assertNotIn("crc32c_sse42", names["arm64"])
+        self.assertIn("crc32c_sse42", names["x86_64"])
+        self.assertNotIn("crc32c_armv8", names["x86_64"])
+        self.assertFalse({"crc32c_armv8", "crc32c_sse42"} & names["riscv64"])
+        self.assertIn("crc32c_software", names["riscv64"])
+
     def test_a_header_with_a_missing_type_stops_the_report(self):
         with tempfile.TemporaryDirectory(dir=REPO_ROOT / "build") as root:
             header = Path(root) / report.MESSAGE_HEADER

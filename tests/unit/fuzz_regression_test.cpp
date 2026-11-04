@@ -5,6 +5,8 @@
 #include "codec_oracles.hpp"
 #include "columns_fixture.hpp"
 #include "columns_oracles.hpp"
+#include "container_fixture.hpp"
+#include "container_oracles.hpp"
 #include "itch_fixtures.hpp"
 #include "itch_oracles.hpp"
 #include "scratch_dir.hpp"
@@ -18,6 +20,7 @@
 #include "tick_store/codec/price_double.hpp"
 #include "tick_store/codec/run_length.hpp"
 #include "tick_store/codec/stream_vbyte.hpp"
+#include "tick_store/store/container.hpp"
 
 #include <gtest/gtest.h>
 
@@ -82,6 +85,13 @@ TEST(FuzzRegression, StoreCrashersStayFixed) {
     for (const auto& path : crashers("stub_store")) {
         SCOPED_TRACE(path.filename().string());
         EXPECT_EQ(text(store::oracle::check_store(read_file(path))), "");
+    }
+}
+
+TEST(FuzzRegression, ContainerCrashersStayFixed) {
+    for (const auto& path : crashers("container")) {
+        SCOPED_TRACE(path.filename().string());
+        EXPECT_EQ(text(store::oracle::check_container(read_file(path))), "");
     }
 }
 
@@ -181,6 +191,31 @@ TEST(FuzzOracles, PassEveryCutAndFlipOfAColumnDirectory) {
         EXPECT_EQ(text(store::oracle::check_columns(flipped)), "") << "byte " << byte;
         flipped[byte] ^= static_cast<std::byte>(1U << bit);
     }
+}
+
+// The golden container, cut at every length and with every bit flipped in turn, and a
+// copy with every CRC wrong, which only the CRC checks refuse.
+TEST(FuzzOracles, PassEveryCutAndFlipOfAContainer) {
+    const Bytes file = exact_copy(store::test::read_bytes(store::test::golden_path()));
+    ASSERT_FALSE(file.empty());
+    EXPECT_EQ(text(store::oracle::check_container(file)), "");
+    for (std::size_t length = 0; length < file.size(); ++length) {
+        const Bytes cut = exact_copy(std::span{file}.first(length));
+        EXPECT_EQ(text(store::oracle::check_container(cut)), "") << "length " << length;
+    }
+    for (std::size_t bit = 0; bit < file.size() * 8; ++bit) {
+        Bytes flipped = exact_copy(file);
+        flipped[bit / 8] ^= static_cast<std::byte>(1U << (bit % 8));
+        EXPECT_EQ(text(store::oracle::check_container(flipped)), "") << "bit " << bit;
+    }
+    Bytes stale = exact_copy(file);
+    for (const std::size_t at : {store::test::golden_block_entry(0) + store::kBlockCrc,
+                                 store::test::golden_section_entry(0) + store::kSectionCrc,
+                                 store::test::kGoldenTrailer + store::kTrailerFooterCrc}) {
+        stale[at] ^= std::byte{0xFF};
+    }
+    EXPECT_EQ(text(store::oracle::check_container(stale)), "");
+    EXPECT_EQ(store::oracle::fixed_checksums(stale), file);
 }
 
 // A real store, cut at every length and with every bit flipped in turn.
