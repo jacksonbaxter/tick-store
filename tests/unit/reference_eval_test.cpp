@@ -116,8 +116,11 @@ TEST(ReferenceEval, TheCommandLineWritesJsonWithoutPathsAndRefusesBadUsage) {
         out.write(reinterpret_cast<const char*>(source.data()),
                   static_cast<std::streamsize>(source.size()));
     }
+    // Named, because the argument lists below hold string_views into them.
     const std::string source_path = (dir / "source").string();
     const std::string output_path = (dir / "out.json").string();
+    const std::string absent_path = (dir / "absent").string();
+    const std::string no_dir_path = (dir / "no" / "dir" / "out.json").string();
     const EvalProvenance provenance{.commit = "0123456789abcdef", .tree_dirty = false,
                                     .compiler = "test", .build_type = "Debug", .sanitizers = ""};
     const auto run = [&](std::vector<std::string_view> arguments, CliOutput& output) {
@@ -147,9 +150,8 @@ TEST(ReferenceEval, TheCommandLineWritesJsonWithoutPathsAndRefusesBadUsage) {
         {source_path, output_path, "--day", "T", "--segment-records", "2", "--other", "1"},
         {source_path, output_path, "--day", "T", "--segment-records", "2",
          "--checkpoint-segment-records", "x"},
-        {(dir / "absent").string(), output_path, "--day", "T", "--segment-records", "2"},
-        {source_path, (dir / "no" / "dir" / "out.json").string(), "--day", "T",
-         "--segment-records", "2"},
+        {absent_path, output_path, "--day", "T", "--segment-records", "2"},
+        {source_path, no_dir_path, "--day", "T", "--segment-records", "2"},
     };
     for (const auto& arguments : bad) {
         CliOutput refused;
