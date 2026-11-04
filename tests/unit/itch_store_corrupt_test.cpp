@@ -291,6 +291,7 @@ TEST(ItchStoreCorrupt, ASummaryThatDisagreesWithItsColumnsIsRefusedWithTheColumn
 // One segment of 20,000 adds: the type column, and every add column, in two pieces.
 TEST(ItchStoreCorrupt, PieceFields) {
     std::vector<itch::Message> messages;
+    messages.reserve(20'000);
     for (std::uint64_t i = 0; i < 20'000; ++i) {
         messages.push_back(test::add(static_cast<std::uint16_t>(1 + (i % 3)), 10 + i, 100 + i));
     }

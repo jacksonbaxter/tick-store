@@ -314,6 +314,7 @@ TEST(ItchStoreColumns, ALongColumnIsStoredInPiecesOfFourCodecBlocks) {
     // Integer columns split at kPieceValues, each piece decoding alone; a byte column stays
     // one piece however long.
     std::vector<std::uint64_t> values;
+    values.reserve((2 * kPieceValues) + 5);
     for (std::uint64_t i = 0; i < (2 * kPieceValues) + 5; ++i) {
         values.push_back((i * 2654435761U) % 1000U);
     }
@@ -354,8 +355,9 @@ TEST(ItchStoreColumns, TimesRoundTripThroughResidualsOverTheirBases) {
         }
     }
     std::vector<std::uint64_t> times;
-    for (std::size_t k = 0; k < positions.size(); ++k) {
-        times.push_back(1'000'000 + (positions[k] * 1000));
+    times.reserve(positions.size());
+    for (const std::uint64_t position : positions) {
+        times.push_back(1'000'000 + (position * 1000));
     }
     times[2] = 5;  // below its base and the time before it
     const std::vector<std::uint64_t> starts{0, 4};
