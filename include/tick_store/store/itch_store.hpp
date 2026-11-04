@@ -473,14 +473,19 @@ inline constexpr std::size_t kSeekPerGroup = 3 + kSeekSymbols.size();
     return kSeekMaxima + (seek_groups(records) * kSeekPerGroup);
 }
 
+// Each byte's index in kSeekSymbols, or kSeekSymbols.size() for a byte that is none.
+inline constexpr std::array<std::uint8_t, 256> kSeekSymbolIndex = [] {
+    std::array<std::uint8_t, 256> table{};
+    table.fill(static_cast<std::uint8_t>(kSeekSymbols.size()));
+    for (std::size_t i = 0; i < kSeekSymbols.size(); ++i) {
+        table[kSeekSymbols[i]] = static_cast<std::uint8_t>(i);
+    }
+    return table;
+}();
+
 // The index of `symbol` in kSeekSymbols, or kSeekSymbols.size() for none.
 [[nodiscard]] constexpr std::size_t seek_symbol_index(std::uint64_t symbol) noexcept {
-    for (std::size_t i = 0; i < kSeekSymbols.size(); ++i) {
-        if (kSeekSymbols[i] == symbol) {
-            return i;
-        }
-    }
-    return kSeekSymbols.size();
+    return symbol < kSeekSymbolIndex.size() ? kSeekSymbolIndex[symbol] : kSeekSymbols.size();
 }
 
 // The container codec a column's chunk is stored under when zstd is not used.
@@ -658,6 +663,27 @@ struct ColumnChunk {
 [[nodiscard]] std::expected<ColumnChunk, ItchStoreError> encode_column(
     Column column, std::span<const std::uint64_t> values);
 
+// A column's chunk with any zstd wrapper taken off: the payload as stored, or the coded
+// chunk inside its zstd frame. bytes() is what the column's codec reads.
+struct ChunkBytes {
+    bool zstd = false;
+    std::span<const std::byte> payload;
+    std::vector<std::byte> inflated;
+
+    [[nodiscard]] std::span<const std::byte> bytes() const noexcept {
+        return zstd ? std::span<const std::byte>{inflated} : payload;
+    }
+};
+
+// Checks the codec is one the column takes and inflates a zstd chunk, its inner size held
+// to what `count` values could need. Errors carry the column but no segment or offset.
+[[nodiscard]] std::expected<ChunkBytes, ItchStoreError> unwrap_column(
+    Column column, codec::CodecId codec, std::span<const std::byte> payload, std::uint64_t count);
+
+// The block decoder of a column's codec (codec/block.hpp), or nullptr for the byte columns,
+// whose chunk is the values themselves.
+[[nodiscard]] codec::BlockDecoder column_block_decoder(Column column) noexcept;
+
 // Decodes a chunk that must hold exactly `count` values, checking the codec is one the
 // column takes and every value is within the column's range. Errors carry the column but no
 // segment, block or offset; the caller adds them.
@@ -669,6 +695,10 @@ struct ColumnChunk {
 // stock_exception_record, whose count is free, are left at 0.
 [[nodiscard]] std::array<std::uint64_t, kColumnCount> counts_from_types(
     std::span<const std::uint64_t> types);
+
+// The same from how many records of each type byte there are.
+[[nodiscard]] std::array<std::uint64_t, kColumnCount> counts_from_type_counts(
+    const std::array<std::uint64_t, 256>& per_type);
 
 // --- The locate runs ------------------------------------------------------------------
 

@@ -277,6 +277,31 @@ std::expected<std::vector<std::uint64_t>, ItchStoreError> ItchStoreReader::read_
     return values;
 }
 
+std::expected<ColumnView, ItchStoreError> ItchStoreReader::column_view(std::uint64_t segment,
+                                                                      Column column) const {
+    const SegmentEntry& entry = segments_.at(segment);
+    const auto c = static_cast<std::size_t>(column);
+    ColumnView out;
+    out.block = entry.block[c];
+    if (out.block == kNoIndex) {
+        return out;
+    }
+    out.values = entry.values[c];
+    auto view = parser_.block(out.block);
+    if (!view.has_value()) {
+        ItchStoreError error = container_failure("block", view.error()).error();
+        error.segment = segment;
+        error.block = out.block;
+        error.column = column_info(column).name;
+        error.offset = view.error().offset;
+        return std::unexpected(error);
+    }
+    out.codec = view->codec;
+    out.payload = view->payload;
+    out.file_offset = offset_in(file_, view->payload);
+    return out;
+}
+
 std::expected<SegmentColumns, ItchStoreError> ItchStoreReader::read_columns(
     std::uint64_t segment) const {
     if (segment >= segments_.size()) {

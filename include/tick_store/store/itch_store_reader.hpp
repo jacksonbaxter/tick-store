@@ -61,6 +61,18 @@ struct StoreSizes {
     std::uint64_t tail_section_bytes = 0;
 };
 
+// One column's container block as stored, for a reader that decodes part of it.
+struct ColumnView {
+    codec::CodecId codec = codec::CodecId::none;
+    std::span<const std::byte> payload;
+    // The container block, kNoIndex where the segment has no values in the column.
+    std::uint64_t block = kNoIndex;
+    // The value count its metadata gives, 0 where absent.
+    std::uint64_t values = 0;
+    // Where the payload starts in the file.
+    std::uint64_t file_offset = 0;
+};
+
 class ItchStoreReader {
 public:
     // Maps the file and opens it.
@@ -86,6 +98,11 @@ public:
     // need, every block's CRC checked unless skipped at open.
     [[nodiscard]] std::expected<SegmentColumns, ItchStoreError> read_columns(
         std::uint64_t segment) const;
+
+    // One column of one segment as stored, the block's CRC checked unless skipped at open.
+    // The segment must exist.
+    [[nodiscard]] std::expected<ColumnView, ItchStoreError> column_view(std::uint64_t segment,
+                                                                        Column column) const;
 
     [[nodiscard]] StoreSizes sizes() const;
 

@@ -24,6 +24,7 @@ add_executable(tick_store_unit_tests
     itch_boundary_test.cpp
     itch_fixtures.cpp
     itch_golden_test.cpp
+    itch_query_test.cpp
     itch_raw_path_test.cpp
     itch_real_day_test.cpp
     itch_store_corrupt_test.cpp

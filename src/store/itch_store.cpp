@@ -475,6 +475,48 @@ std::expected<ColumnChunk, ItchStoreError> encode_column(Column column,
     return chunk;
 }
 
+std::expected<ChunkBytes, ItchStoreError> unwrap_column(Column column, codec::CodecId codec_id,
+                                                         std::span<const std::byte> payload,
+                                                         std::uint64_t count) {
+    const ColumnInfo& info = column_info(column);
+    const CodecId primary = primary_codec(column);
+    const auto refuse = [&](std::string_view name, std::uint64_t expected, std::uint64_t actual) {
+        ItchStoreError error = fail(ItchStoreErrorKind::bad_segment, name, kNoIndex, expected, actual);
+        error.column = info.name;
+        return std::unexpected(error);
+    };
+    if (codec_id != primary && (!info.zstd || codec_id != CodecId::zstd)) {
+        return refuse("column codec", static_cast<std::uint64_t>(primary),
+                      static_cast<std::uint64_t>(codec_id));
+    }
+    ChunkBytes out;
+    out.payload = payload;
+    if (codec_id == CodecId::zstd) {
+        auto unwrapped = codec::decode_zstd_payload(payload, max_inner_bytes(column, count));
+        if (!unwrapped.has_value()) {
+            ItchStoreError error =
+                fail(ItchStoreErrorKind::codec, unwrapped.error().field, kNoIndex, 0, 0);
+            error.column = info.name;
+            error.codec = unwrapped.error();
+            return std::unexpected(error);
+        }
+        if (unwrapped->inner_codec != static_cast<std::uint16_t>(primary)) {
+            return refuse("zstd inner codec", static_cast<std::uint64_t>(primary),
+                          unwrapped->inner_codec);
+        }
+        out.zstd = true;
+        out.inflated = std::move(unwrapped->bytes);
+    }
+    return out;
+}
+
+codec::BlockDecoder column_block_decoder(Column column) noexcept {
+    if (column_info(column).codec == ColumnCodec::raw_bytes) {
+        return nullptr;
+    }
+    return block_decoder(primary_codec(column));
+}
+
 std::expected<std::vector<std::uint64_t>, ItchStoreError> decode_column(
     Column column, codec::CodecId codec_id, std::span<const std::byte> payload,
     std::uint64_t count) {
@@ -486,30 +528,11 @@ std::expected<std::vector<std::uint64_t>, ItchStoreError> decode_column(
         error.column = info.name;
         return std::unexpected(error);
     };
-    const auto codec_failure = [&](const codec::CodecError& cause) {
-        ItchStoreError error = fail(ItchStoreErrorKind::codec, cause.field, kNoIndex, 0, 0);
-        error.column = info.name;
-        error.codec = cause;
-        return std::unexpected(error);
-    };
-    if (codec_id != primary && (!info.zstd || codec_id != CodecId::zstd)) {
-        return refuse(ItchStoreErrorKind::bad_segment, "column codec",
-                      static_cast<std::uint64_t>(primary), static_cast<std::uint64_t>(codec_id));
+    auto unwrapped = unwrap_column(column, codec_id, payload, count);
+    if (!unwrapped.has_value()) {
+        return std::unexpected(unwrapped.error());
     }
-    std::vector<std::byte> inflated;
-    std::span<const std::byte> bytes = payload;
-    if (codec_id == CodecId::zstd) {
-        auto unwrapped = codec::decode_zstd_payload(payload, max_inner_bytes(column, count));
-        if (!unwrapped.has_value()) {
-            return codec_failure(unwrapped.error());
-        }
-        if (unwrapped->inner_codec != static_cast<std::uint16_t>(primary)) {
-            return refuse(ItchStoreErrorKind::bad_segment, "zstd inner codec",
-                          static_cast<std::uint64_t>(primary), unwrapped->inner_codec);
-        }
-        inflated = std::move(unwrapped->bytes);
-        bytes = inflated;
-    }
+    const std::span<const std::byte> bytes = unwrapped->bytes();
     std::vector<std::uint64_t> values;
     if (primary == CodecId::raw) {
         if (bytes.size() != count) {
@@ -523,7 +546,10 @@ std::expected<std::vector<std::uint64_t>, ItchStoreError> decode_column(
     }
     if (auto decoded = codec::decode_column(bytes, count, values, block_decoder(primary));
         !decoded.has_value()) {
-        return codec_failure(decoded.error());
+        ItchStoreError error = fail(ItchStoreErrorKind::codec, decoded.error().field, kNoIndex, 0, 0);
+        error.column = info.name;
+        error.codec = decoded.error();
+        return std::unexpected(error);
     }
     for (std::size_t i = 0; i < values.size(); ++i) {
         if (values[i] > info.max_value) {
@@ -555,14 +581,23 @@ std::array<std::uint64_t, kColumnCount> counts_from_types(std::span<const std::u
     for (const std::uint64_t type : types) {
         ++per_type[type & 0xFFU];
     }
+    return counts_from_type_counts(per_type);
+}
+
+std::array<std::uint64_t, kColumnCount> counts_from_type_counts(
+    const std::array<std::uint64_t, 256>& per_type) {
+    std::uint64_t records = 0;
+    for (const std::uint64_t n : per_type) {
+        records += n;
+    }
     std::array<std::uint64_t, kColumnCount> counts{};
     const auto add = [&](Column column, std::uint64_t n) {
         counts[static_cast<std::size_t>(column)] += n;
     };
     const auto of = [&](char type) { return per_type[static_cast<unsigned char>(type)]; };
     const std::uint64_t raw = per_type[0];
-    const std::uint64_t typed = types.size() - raw;
-    add(Column::type, types.size());
+    const std::uint64_t typed = records - raw;
+    add(Column::type, records);
     add(Column::locate, typed);
     add(Column::timestamp, typed);
     add(Column::tracking, typed);
@@ -595,7 +630,7 @@ std::array<std::uint64_t, kColumnCount> counts_from_types(std::span<const std::u
         add(Column::rare_bytes, per_type[type] * (size.value_or(kItchHeaderBytes) - kItchHeaderBytes));
     }
     add(Column::raw_length, raw);
-    add(Column::seek, seek_value_count(types.size()));
+    add(Column::seek, seek_value_count(records));
     return counts;
 }
 

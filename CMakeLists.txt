@@ -49,6 +49,7 @@ target_sources(tick_store_core PRIVATE
     src/store/container_writer.cpp
     src/store/crc32c.cpp
     src/store/durability.cpp
+    src/store/itch_query.cpp
     src/store/itch_segment.cpp
     src/store/itch_store.cpp
     src/store/itch_store_reader.cpp
@@ -96,6 +97,7 @@ if(TICK_STORE_BUILD_TESTS OR TICK_STORE_BUILD_TOOLS OR TICK_STORE_BUILD_BENCH)
         src/harness/flip_bit.cpp
         src/harness/hash_worker.cpp
         src/harness/itch_store_record_reader.cpp
+        src/harness/query_cli.cpp
         src/harness/reference_eval.cpp
         src/harness/roundtrip.cpp
         src/harness/roundtrip_cli.cpp
