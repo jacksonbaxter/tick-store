@@ -75,6 +75,9 @@ ITCH_STORE_WRITER = "src/store/itch_store_writer.cpp"
 ZSTD_FRAME = "src/codec/zstd_frame.cpp"
 ITCH_STORE_RECORD_READER = "src/harness/itch_store_record_reader.cpp"
 ITCH_STORE_ORACLES = "fuzz/itch_store_oracles.hpp"
+ITCH_QUERY = "src/store/itch_query.cpp"
+ITCH_QUERY_ORACLES = "fuzz/itch_query_oracles.hpp"
+QUERY_CLI = "src/harness/query_cli.cpp"
 
 # Each is (group, file, what to call it, pattern over the demangled name).
 FIXED_REQUIRED = (
@@ -138,12 +141,34 @@ FIXED_REQUIRED = (
     ("parser", ITCH_SEGMENT, "SegmentAssembler::load", r"SegmentAssembler::load\("),
     ("parser", ITCH_SEGMENT, "SegmentAssembler::next", r"SegmentAssembler::next\("),
     ("parser", ZSTD_FRAME, "decode_zstd_payload", r"codec::decode_zstd_payload\("),
+    ("parser", ITCH_STORE, "unwrap_column", r"store::unwrap_column\("),
+    ("parser", ITCH_STORE, "parse_seek", r"store::parse_seek\("),
+    ("parser", ITCH_STORE, "locates_from_runs", r"store::locates_from_runs\("),
+    ("parser", ITCH_STORE_READER, "ItchStoreReader::column_view",
+     r"ItchStoreReader::column_view\("),
+    ("parser", ITCH_QUERY, "ColumnAccess::open", r"ColumnAccess::open\("),
+    ("parser", ITCH_QUERY, "ColumnAccess::ensure", r"ColumnAccess::ensure\("),
+    ("parser", ITCH_QUERY, "ColumnAccess::decode_block", r"ColumnAccess::decode_block\("),
+    ("parser", ITCH_QUERY, "PlainSegment::narrow", r"PlainSegment::narrow\("),
+    ("parser", ITCH_QUERY, "PlainSegment::types", r"PlainSegment::types\("),
+    ("parser", ITCH_QUERY, "locate_run", r"::locate_run\("),
+    ("parser", ITCH_QUERY, "all_locates", r"::all_locates\("),
+    ("parser", ITCH_QUERY, "open_stocks", r"::open_stocks\("),
+    ("parser", ITCH_QUERY, "indexed_segment", r"::indexed_segment<"),
+    ("parser", ITCH_QUERY, "exact_segment", r"::exact_segment<"),
+    ("parser", ITCH_QUERY, "seed_before", r"::seed_before\("),
+    ("parser", ITCH_QUERY, "ItchQuery::rows", r"ItchQuery::rows\("),
+    ("parser", ITCH_QUERY, "ItchQuery::minute_aggregate", r"ItchQuery::minute_aggregate\("),
+    ("parser", ITCH_QUERY, "ItchQuery::shares_sum", r"ItchQuery::shares_sum\("),
+    ("parser", ITCH_QUERY, "ItchQuery::locate_counts", r"ItchQuery::locate_counts\("),
+    ("parser", QUERY_CLI, "run_query_cli", r"harness::run_query_cli\("),
     ("writer", ITCH_STORE, "encode_store_header", r"store::encode_store_header\("),
     ("writer", ITCH_STORE, "SymbolTable::encode", r"SymbolTable::encode\("),
     ("writer", ITCH_STORE, "encode_column_metadata", r"store::encode_column_metadata\("),
     ("writer", ITCH_STORE, "encode_column", r"^tick_store::store::encode_column\("),
     ("writer", ITCH_SEGMENT, "SegmentBuilder::add", r"SegmentBuilder::add\("),
     ("writer", ITCH_SEGMENT, "SegmentBuilder::finish", r"SegmentBuilder::finish\("),
+    ("writer", ITCH_STORE, "compute_seek", r"store::compute_seek\("),
     ("writer", ITCH_STORE_WRITER, "ItchStoreWriter::create", r"ItchStoreWriter::create\("),
     ("writer", ITCH_STORE_WRITER, "ItchStoreWriter::in_memory", r"ItchStoreWriter::in_memory\("),
     ("writer", ITCH_STORE_WRITER, "ItchStoreWriter::append", r"ItchStoreWriter::append\("),
@@ -211,6 +236,7 @@ FIXED_REQUIRED = (
     ("validator", ITCH_STORE_ORACLES, "read_store", r"oracle::detail::read_store\("),
     ("validator", ITCH_STORE_ORACLES, "rewrite", r"oracle::detail::rewrite\("),
     ("validator", ITCH_STORE_ORACLES, "check_random_access", r"oracle::detail::check_random_access\("),
+    ("validator", ITCH_QUERY_ORACLES, "check_itch_query", r"oracle::check_itch_query\("),
     ("validator", CODEC_ORACLES, "check_timestamp_column", r"oracle::check_timestamp_column\("),
     ("validator", CODEC_ORACLES, "check_xor_column", r"oracle::check_xor_column\("),
     ("validator", CODEC_ORACLES, "check_one_block", r"oracle::check_one_block\("),

@@ -57,9 +57,11 @@ constexpr std::uint64_t kNanosPerMinute = 60ULL * 1'000'000'000ULL;
 // against the column's range as its block is decoded.
 class ColumnAccess {
 public:
+    // `most` bounds the values the segment's records can give the column, checked before
+    // anything is inflated or allocated.
     [[nodiscard]] std::expected<void, ItchStoreError> open(const ItchStoreReader& reader,
                                                            std::uint64_t segment, Column column,
-                                                           QueryStats& stats) {
+                                                           std::uint64_t most, QueryStats& stats) {
         column_ = column;
         segment_ = segment;
         stats_ = &stats;
@@ -77,16 +79,16 @@ public:
         if (view->block == kNoIndex) {
             return {};
         }
+        if (view->values > most) {
+            return std::unexpected(refuse(ItchStoreErrorKind::bad_segment, "column value count",
+                                          kNoIndex, most, view->values));
+        }
         count_ = view->values;
         auto unwrapped = unwrap_column(column, view->codec, view->payload, count_);
         if (!unwrapped.has_value()) {
             return std::unexpected(located(unwrapped.error(), 0));
         }
         bytes_ = std::move(*unwrapped);
-        if (count_ > values_.size()) {
-            // Kept from segment to segment, so it grows to the largest column once.
-            values_.resize(count_);
-        }
         const std::span<const std::byte> bytes = bytes_.bytes();
         decoder_ = column_block_decoder(column);
         if (bytes_.zstd) {
@@ -99,6 +101,7 @@ public:
                 return std::unexpected(refuse(ItchStoreErrorKind::bad_segment, "column bytes",
                                               kNoIndex, count_, bytes.size()));
             }
+            reserve();
             for (std::uint64_t i = 0; i < count_; ++i) {
                 values_[i] = std::to_integer<std::uint64_t>(bytes[i]);
             }
@@ -149,6 +152,7 @@ public:
         starts_.push_back(total);
         offsets_.push_back(bytes.size());
         decoded_.assign(starts_.size() - 1, 0);
+        reserve();
         return {};
     }
 
@@ -206,6 +210,14 @@ public:
     }
 
 private:
+    // Room for the column's values, kept from segment to segment so it grows to the
+    // largest column once.
+    void reserve() {
+        if (count_ > values_.size()) {
+            values_.resize(count_);
+        }
+    }
+
     [[nodiscard]] std::size_t block_index(std::uint64_t index) const noexcept {
         // Blocks are almost always kColumnBlockValues long, so guess, then search.
         const std::uint64_t guess = index / kColumnBlockValues;
@@ -426,7 +438,16 @@ struct PlainSegment {
     }
 
     [[nodiscard]] std::expected<void, ItchStoreError> open(Column column) const {
-        return engine->col(column).open(*reader, segment, column, *stats);
+        // What any record can give a column the queries read: one value, eight stock bytes
+        // for an exception, and the seek index's own count.
+        const std::uint64_t records = summary->records;
+        std::uint64_t most = records;
+        if (column == Column::stock_exception_value) {
+            most = records * sizeof(itch::Stock);
+        } else if (column == Column::seek) {
+            most = seek_value_count(records);
+        }
+        return engine->col(column).open(*reader, segment, column, most, *stats);
     }
 
     // Parses the seek index and narrows [lo, hi) to the groups whose times can fall in

@@ -5,6 +5,7 @@
 //   <dir>/store/    stub store files, for fuzz_stub_store
 //   <dir>/container/  container files from the real writer, for fuzz_container
 //   <dir>/itch_store/  ITCH store files from the real writer, for fuzz_itch_store
+//   <dir>/itch_query/  ITCH store files over several seek groups, for fuzz_itch_query
 //   <dir>/columns/  column directories as sections, for fuzz_columns
 //   <dir>/gorilla_timestamps/  timestamp columns, for fuzz_gorilla_timestamps
 //   <dir>/gorilla_xor/         XOR columns, for fuzz_gorilla_xor
@@ -20,6 +21,7 @@
 #include "codec_oracles.hpp"
 #include "columns_oracles.hpp"
 #include "container_oracles.hpp"
+#include "itch_query_oracles.hpp"
 #include "itch_store_oracles.hpp"
 #include "tick_store/codec/block.hpp"
 #include "tick_store/codec/codec_error.hpp"
@@ -760,6 +762,105 @@ Bytes text_offset_past_its_file(const std::vector<Bytes>& payloads) {
     return seed;
 }
 
+// A day-like stream for the query engine: adds, executions, cancels, deletes, replaces and
+// trades over a few locates, system events on locate 0, ties in time and orders named
+// across segments, enough records for several seek groups.
+std::vector<Message> query_messages(std::size_t records) {
+    std::vector<Message> out;
+    out.reserve(records);
+    std::uint64_t state = 11;
+    std::vector<std::vector<std::uint64_t>> live(6);
+    std::uint64_t next = 9'000;
+    std::uint64_t time = 34'199'000'000'000ULL;
+    for (std::size_t i = 0; i < records; ++i) {
+        state = (state * 6364136223846793005ULL) + 1442695040888963407ULL;
+        time += (state >> 61U) == 0 ? 0 : (state >> 40U) % 2'000'000;
+        const auto locate = static_cast<std::uint16_t>(1 + ((state >> 33U) % 5));
+        const MessageHeader h{locate, static_cast<std::uint16_t>(i % 3), time};
+        std::vector<std::uint64_t>& orders = live[locate];
+        const std::uint64_t pick = (state >> 20U) % 16;
+        const auto price = Price4{static_cast<std::uint32_t>(100'000 + ((state >> 44U) % 900))};
+        if (pick == 15) {
+            out.emplace_back(SystemEvent{MessageHeader{0, 0, time}, ch('Q')});
+            continue;
+        }
+        if (orders.empty() || pick < 6) {
+            out.emplace_back(AddOrder{h, next, (state & 1U) != 0 ? ch('B') : ch('S'),
+                                      static_cast<std::uint32_t>(100 * (1 + (state >> 58U))),
+                                      i % 1'000 == 999 ? alpha<8>("OTHER   ") : kStock, price});
+            orders.push_back(next++);
+            continue;
+        }
+        const std::size_t at = (state >> 8U) % orders.size();
+        const std::uint64_t named = (state >> 7U) % 23 == 0 ? next + 77 : orders[at];
+        if (pick < 9) {
+            out.emplace_back(OrderExecuted{h, named, 10, 90'000 + i});
+        } else if (pick < 10) {
+            out.emplace_back(OrderExecutedWithPrice{h, named, 5, 90'000 + i, ch('Y'), price});
+        } else if (pick < 11) {
+            out.emplace_back(OrderReplace{h, named, next, 100, price});
+            orders[at] = next++;
+        } else if (pick < 12) {
+            out.emplace_back(OrderCancel{h, named, 5});
+        } else if (pick < 14) {
+            out.emplace_back(OrderDelete{h, named});
+            orders.erase(orders.begin() + static_cast<std::ptrdiff_t>(at));
+        } else {
+            out.emplace_back(Trade{h, named, ch('B'), 100, kStock, price, 70'000 + i});
+        }
+    }
+    return out;
+}
+
+// Stores for the query engine at segment sizes up to its fuzzing cap, one holding records
+// the column form keeps raw, then copies with a byte of each index column changed and
+// rebuilt with valid CRCs, and the ITCH store seeds.
+void write_itch_query_seeds(SeedDir& seeds) {
+    namespace st = tick_store::store;
+    using Parts = std::vector<st::ContainerPart>;
+    const std::vector<Message> day = query_messages(9'000);
+    for (const std::uint32_t n : {4'500U, 9'000U, st::oracle::kQueryFuzzMaxSegmentRecords}) {
+        seeds.add(written_itch_store(day, {}, n));
+    }
+    std::vector<Message> mixed = day;
+    const Bytes unknown = filled(std::byte{'z'}, 9, std::byte{0xA5});
+    mixed[0] = RawMessage{.bytes = unknown, .reason = RawReason::unknown_type};
+    mixed[4'500] = RawMessage{.bytes = unknown, .reason = RawReason::unknown_type};
+    mixed[6'000] = AddOrder{MessageHeader{2, 0, 34'200'500'000'000ULL}, 77, ch('B'), 0x8000'0001U,
+                            kStock, Price4{100}};
+    seeds.add(written_itch_store(mixed, {}, 4'500));
+    const Bytes base = written_itch_store(day, {}, 4'500);
+    const auto block_of = [](const Parts& blocks, st::Column column) -> std::size_t {
+        for (std::size_t b = 0; b < blocks.size(); ++b) {
+            const auto metadata = st::parse_column_metadata(blocks[b].metadata, 0);
+            if (metadata.has_value() && metadata->segment == 0 && metadata->column == column) {
+                return b;
+            }
+        }
+        throw std::runtime_error("no such block");
+    };
+    for (const st::Column column : {st::Column::seek, st::Column::locate_run,
+                                    st::Column::locate_run_records, st::Column::locate_run_adds,
+                                    st::Column::locate, st::Column::type, st::Column::timestamp}) {
+        for (const std::size_t at : {std::size_t{0}, std::size_t{9}, std::size_t{40}, std::size_t{200}}) {
+            seeds.add(with_itch_store_part(base, [&](Parts& blocks, Parts&) {
+                Bytes& payload = blocks[block_of(blocks, column)].bytes;
+                if (at < payload.size()) {
+                    payload[at] ^= std::byte{0x10};
+                }
+            }));
+        }
+    }
+    // The plain flag cleared on a plain segment, and set on one that is not.
+    seeds.add(with_itch_store_part(base, [&](Parts& blocks, Parts&) {
+        put_le_field(blocks[block_of(blocks, st::Column::type)].metadata, st::kMetaPlainOffset, 1, 0);
+    }));
+    seeds.add(with_itch_store_part(written_itch_store(mixed, {}, 4'500), [&](Parts& blocks, Parts&) {
+        put_le_field(blocks[block_of(blocks, st::Column::type)].metadata, st::kMetaPlainOffset, 1, 1);
+    }));
+    write_itch_store_seeds(seeds);
+}
+
 void write_columns_seeds(SeedDir& seeds) {
     std::vector<Bytes> payloads;
     for (const Message& message : ordinary_messages()) {
@@ -1343,6 +1444,7 @@ int main(int argc, char** argv) {
     SeedDir store{root / "store"};
     SeedDir container{root / "container"};
     SeedDir itch_store{root / "itch_store"};
+    SeedDir itch_query{root / "itch_query"};
     SeedDir columns{root / "columns"};
     SeedDir timestamps{root / "gorilla_timestamps"};
     SeedDir xor_words{root / "gorilla_xor"};
@@ -1355,6 +1457,7 @@ int main(int argc, char** argv) {
     write_store_seeds(store, root / "store-scratch");
     write_container_seeds(container, root / "container-scratch.tsc");
     write_itch_store_seeds(itch_store);
+    write_itch_query_seeds(itch_query);
     write_columns_seeds(columns);
     write_timestamp_seeds(timestamps);
     write_xor_seeds(xor_words);
@@ -1365,11 +1468,11 @@ int main(int argc, char** argv) {
     add_dict_refusals(dict);
     write_low_cardinality_seeds(rle, tick_store::codec::oracle::detail::kRleEncoders);
     add_rle_refusals(rle);
-    std::println("wrote {} message, {} frame, {} store, {} container, {} itch_store, {} columns, "
+    std::println("wrote {} message, {} frame, {} store, {} container, {} itch_store, {} itch_query, {} columns, "
                  "{} gorilla_timestamps, {} gorilla_xor, {} pfor, {} stream_vbyte, "
                  "{} dictionary and {} run_length seeds",
                  message.count(), stream.count(), store.count(), container.count(),
-                 itch_store.count(), columns.count(),
+                 itch_store.count(), itch_query.count(), columns.count(),
                  timestamps.count(), xor_words.count(), pfor.count(), svb.count(), dict.count(),
                  rle.count());
     return 0;

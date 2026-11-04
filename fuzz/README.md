@@ -1,6 +1,6 @@
 # Fuzzing
 
-Twelve libFuzzer targets take raw bytes directly, with nothing checking them first:
+Thirteen libFuzzer targets take raw bytes directly, with nothing checking them first:
 
 | Target | Input | Oracle in `itch_oracles.hpp` |
 |---|---|---|
@@ -15,6 +15,7 @@ Twelve libFuzzer targets take raw bytes directly, with nothing checking them fir
 | `fuzz_run_length` | a column of run-length blocks | `check_rle_column`: the same checks with the run-length encoder, whose choices are the nested PFOR blocks', and one more: runs are maximal, so a block's run count must be its count of maximal runs, and the encoder must write the same count |
 | `fuzz_container` | a whole container file | `check_container` in `container_oracles.hpp`: the input goes in three ways, with CRCs verified, with `Checksums::skip`, and with every CRC its structure points at recomputed (`fixed_checksums`), so the bytes reach the structural checks below the CRCs (Z1). Skipping and recomputing must agree on every verdict, and errors repeat. An accepted file is rebuilt from its parsed values alone through `build_container`, the writer's encoding, and must equal the input byte for byte (the format has one encoding per file), or the input with its CRCs recomputed when they were skipped; every block's view must match its directory entry and every section must be found by its name at its own offset. Then a cut of it and a copy with one bit flipped must each be refused or pass the same checks in full. A cut is not required to fail: a file whose section holds a whole container in the right place leaves a valid file when cut there, so the unit suite checks the golden file at every length instead |
 | `fuzz_itch_store` | a whole ITCH store file | `check_itch_store` in `itch_store_oracles.hpp`: the input is read with `Checksums::skip` and, with every CRC its container structure points at recomputed (`fixed_checksums`), with CRCs verified, so the bytes reach the store's own checks below the CRCs: its sections, every block's metadata and segment summary, the directory, the column chunks, the zstd wrapper, the import lists and stock exceptions (Z1). Both reads must give the same verdict, the same error or the same records, and a refusal repeats. The encoding leaves the writer choices, so an accepted file is decoded, re-encoded and compared (Z2): its records and tail go back through the real writer at its segment size, that file must read back to the same records and tail, and writing them again must give the same bytes. Every segment is also read on its own, last to first, and must give what the sequential read gave. A file declaring more than 64 records a segment is opened and its directory checked but not decoded, since a segment's raw bytes reach 65,535 a record held as 64-bit values |
+| `fuzz_itch_query` | a whole ITCH store file | `check_itch_query` in `itch_query_oracles.hpp`: the input is read with every CRC its container structure points at recomputed, so the bytes reach the query engine's index decoders below the CRCs: the seek index, the locate runs and their directory, the plain flag, and each codec block the indexed path decodes on its own. Every rows query, minute aggregate, locate count and share sum must answer or refuse, and give the same result asked twice. The indexed path checks only what it reads, so it may answer a file the whole decode refuses; but when `SegmentReader` accepts every segment, every indexed answer must equal the exact path's, which maps each record as `tick_export` does. Requests come from the file: windows over its summaries' times, a one-nanosecond window at a segment's first time and a window and locate steered by the input's last bytes, for every locate, locate 0 and two named ones. Files declaring more than 12,295 records a segment, three seek groups and a few records, are opened but not queried |
 | `fuzz_stub_store` | a whole store file | `check_store` in `store_oracles.hpp`: errors repeat, an accepted file rebuilds the input exactly from its parsed values and holds the records its header counts, a cut of it is refused, and a copy with one bit flipped is refused or rebuilds to the flipped bytes |
 
 ## Build
@@ -23,7 +24,7 @@ Needs upstream clang: Apple clang has no fuzzer runtime. On macOS the targets li
 that clang's own `ld64.lld` (`-fuse-ld=lld`, in `cmake/Sanitizers.cmake`), because the
 runner's Xcode 16.4 linker refuses the coverage sections clang 23 writes. The build regenerates the
 seeds from the real encoder and the real store writer into
-`build/fuzz/fuzz-seeds/{message,frame,store,container,itch_store,columns,gorilla_timestamps,gorilla_xor,pfor,stream_vbyte,dictionary,run_length}`.
+`build/fuzz/fuzz-seeds/{message,frame,store,container,itch_store,itch_query,columns,gorilla_timestamps,gorilla_xor,pfor,stream_vbyte,dictionary,run_length}`.
 They are never committed. The ITCH store seeds are files from the real `ItchStoreWriter`: the 23
 types with raw records and a tail at 1, 2, 5, 8, 25 and 64 records a segment, empty stores, and a
 book of orders created, named, replaced and deleted across segments at 7, 32 and 64, with a stock
@@ -31,7 +32,11 @@ exception and references under other locates; one over the 64-record cap; then t
 with each store section field, a symbols count and order, each metadata field of a type block and
 of a column block, a block's codec, a dropped, repeated or swapped block, a column wrapped in zstd
 by hand with each zstd header field changed, and a byte of each of the first twelve payloads
-changed, each rebuilt through `build_container` so its CRCs hold; and cuts. The container seeds are files from the real `ContainerWriter`: empty,
+changed, each rebuilt through `build_container` so its CRCs hold; and cuts. The query seeds are
+stores of 9,000 records of adds, executions, cancels, deletes, replaces, trades and system events
+at 4,500, 9,000 and 12,295 records a segment, one with records the column form keeps raw, the
+4,500-record store with a byte of each index column changed at four offsets and the plain flag
+flipped both ways, each rebuilt with valid CRCs, and every ITCH store seed. The container seeds are files from the real `ContainerWriter`: empty,
 one empty block, one section, empty blocks and sections sharing offsets, forty blocks over every
 codec with sections between them, and a typical file with a real timestamp block; then that file
 with each header, trailer and footer field corrupted (footer fields with every CRC recomputed, so
@@ -58,6 +63,7 @@ not maximal, and lengths one short of and one past the count.
 cmake --preset fuzz && cmake --build --preset fuzz
 mkdir -p build/fuzz/corpus/itch_message build/fuzz/corpus/itch_frame \
     build/fuzz/corpus/stub_store build/fuzz/corpus/container build/fuzz/corpus/itch_store \
+    build/fuzz/corpus/itch_query \
     build/fuzz/corpus/columns \
     build/fuzz/corpus/gorilla_timestamps build/fuzz/corpus/gorilla_xor \
     build/fuzz/corpus/pfor build/fuzz/corpus/stream_vbyte \
@@ -94,6 +100,11 @@ build/fuzz/fuzz/fuzz_itch_store -max_total_time=60 -max_len=70000 \
     -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 \
     -artifact_prefix=build/fuzz/artifacts/ \
     build/fuzz/corpus/itch_store build/fuzz/fuzz-seeds/itch_store
+
+build/fuzz/fuzz/fuzz_itch_query -max_total_time=60 -max_len=131072 \
+    -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 \
+    -artifact_prefix=build/fuzz/artifacts/ \
+    build/fuzz/corpus/itch_query build/fuzz/fuzz-seeds/itch_query
 
 build/fuzz/fuzz/fuzz_columns -max_total_time=60 -max_len=70000 \
     -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 \
@@ -153,6 +164,10 @@ build/fuzz/fuzz/fuzz_run_length -max_total_time=60 -max_len=16384 \
   footer and every segment summary. A store's raw bytes are its one input that zstd can
   inflate, up to 65,535 bytes a record held as 64-bit values, which is why segments over 64
   records are not decoded: at 64 that is 33 MB, inside `-malloc_limit_mb`.
+- `fuzz_itch_query` takes `-max_len=131072`: its seeds, 9,000 records over several seek groups,
+  are near 60 KB, and the room above lets mutations grow them. Each input is queried twice by
+  the indexed path and, when the whole decode accepts it, once more by the exact path, about
+  140 runs a second under ASan on the Mac.
 - `fuzz_itch_message` returns -1 for an input over 65,535 bytes, which no frame can
   declare, so it stays out of the corpus.
 - The G-3 gate is 30 minutes per target under the heavy-job lock.
@@ -183,7 +198,7 @@ out-of-range timestamp, which need a hand-built message or a deliberately small 
 
 A crash writes to `build/fuzz/artifacts/`. Move the input to
 `tests/unit/crashers/itch_message/`, `itch_frame/`, `stub_store/`, `container/`, `itch_store/`,
-`columns/`,
+`itch_query/`, `columns/`,
 `gorilla_timestamps/`, `gorilla_xor/`, `pfor/`, `stream_vbyte/`, `dictionary/` or
 `run_length/` and fix the bug in the same commit. `fuzz_regression_test.cpp` replays those files through the same
 oracles in every test build.

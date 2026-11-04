@@ -9,6 +9,8 @@
 #include "container_oracles.hpp"
 #include "itch_fixtures.hpp"
 #include "itch_oracles.hpp"
+#include "itch_query_oracles.hpp"
+#include "itch_store_fixture.hpp"
 #include "itch_store_oracles.hpp"
 #include "scratch_dir.hpp"
 #include "store_oracles.hpp"
@@ -100,6 +102,13 @@ TEST(FuzzRegression, ItchStoreCrashersStayFixed) {
     for (const auto& path : crashers("itch_store")) {
         SCOPED_TRACE(path.filename().string());
         EXPECT_EQ(text(store::oracle::check_itch_store(read_file(path))), "");
+    }
+}
+
+TEST(FuzzRegression, ItchQueryCrashersStayFixed) {
+    for (const auto& path : crashers("itch_query")) {
+        SCOPED_TRACE(path.filename().string());
+        EXPECT_EQ(text(store::oracle::check_itch_query(read_file(path))), "");
     }
 }
 
@@ -241,6 +250,51 @@ TEST(FuzzOracles, PassEveryCutAndFlipOfAnItchStore) {
         Bytes flipped = exact_copy(file);
         flipped[byte] ^= static_cast<std::byte>(1U << (byte % 8));
         EXPECT_EQ(text(store::oracle::check_itch_store(flipped)), "") << "byte " << byte;
+    }
+}
+
+// The query oracle on the golden store cut and flipped throughout, and
+// on a store of several seek groups a segment whose index columns each have a byte changed.
+TEST(FuzzOracles, PassEveryCutAndFlipThroughTheQueryOracle) {
+    const Bytes file =
+        read_file(std::filesystem::path{TICK_STORE_GOLDEN_DIR} / "itch-store-v2.tsc");
+    ASSERT_FALSE(file.empty());
+    EXPECT_EQ(text(store::oracle::check_itch_query(file)), "");
+    // Every 11th length and every 5th byte: the whole decode, which most cuts and flips
+    // still pass under recomputed CRCs, makes each call cost a full set of queries twice.
+    for (std::size_t length = 0; length < file.size(); length += 11) {
+        const Bytes cut = exact_copy(std::span{file}.first(length));
+        EXPECT_EQ(text(store::oracle::check_itch_query(cut)), "") << "length " << length;
+    }
+    for (std::size_t byte = 0; byte < file.size(); byte += 5) {
+        Bytes flipped = exact_copy(file);
+        flipped[byte] ^= static_cast<std::byte>(1U << (byte % 8));
+        EXPECT_EQ(text(store::oracle::check_itch_query(flipped)), "") << "byte " << byte;
+    }
+    std::vector<Message> messages;
+    for (std::uint64_t i = 0; i < 9'000; ++i) {
+        const auto locate = static_cast<std::uint16_t>(1 + (i % 4));
+        const MessageHeader header{locate, 0, 34'200'000'000'000ULL + (i * 1'000)};
+        if (i % 3 == 2) {
+            messages.emplace_back(OrderDelete{header, 1'000 + i - 2});
+        } else {
+            messages.emplace_back(AddOrder{header, 1'000 + i, std::byte{'B'}, 100,
+                                           store::test::stock_of("QRY"), Price4{100'000}});
+        }
+    }
+    const Bytes store_file = store::test::store_of_messages(messages, 4'500);
+    EXPECT_EQ(text(store::oracle::check_itch_query(store_file)), "");
+    for (const store::Column column : {store::Column::seek, store::Column::locate_run,
+                                       store::Column::locate_run_records, store::Column::locate}) {
+        for (const std::size_t at : {std::size_t{0}, std::size_t{12}, std::size_t{60}}) {
+            store::test::StoreParts parts = store::test::parts_of(store_file);
+            Bytes& payload = parts.block(0, column).bytes;
+            if (at < payload.size()) {
+                payload[at] ^= std::byte{0x04};
+            }
+            EXPECT_EQ(text(store::oracle::check_itch_query(parts.build())), "")
+                << store::column_info(column).name << " byte " << at;
+        }
     }
 }
 
