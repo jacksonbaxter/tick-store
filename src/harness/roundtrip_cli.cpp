@@ -222,7 +222,7 @@ int run_verify(std::string_view source_path, std::string_view store_path,
     }
     const bool skip = checksums == store::Checksums::skip;
     return report_verdict(
-        "verify", "itch-store-v1", skip ? "skip" : "verify",
+        "verify", "itch-store-v2", skip ? "skip" : "verify",
         verify_itch_store(source->bytes(), store_file->bytes(), options, {.checksums = checksums}),
         output);
 }
@@ -361,7 +361,7 @@ int run_ingest(std::string_view source_path, std::string_view store_path,
     json.begin_object();
     json.field("tool", std::string_view{"tick_roundtrip"});
     json.field("command", std::string_view{"ingest"});
-    json.field("store_format", std::string_view{"itch-store-v1"});
+    json.field("store_format", std::string_view{"itch-store-v2"});
     json.field("durability", to_string(durability));
     json.field("segment_records", std::uint64_t{options.segment_records});
     write_ingest_fields(json, counts, source->bytes().size(), stored);
@@ -386,7 +386,7 @@ int run_layout(std::string_view store_path, bool blocks, CliOutput& output) {
     json.begin_object();
     json.field("tool", std::string_view{"tick_roundtrip"});
     json.field("command", std::string_view{"layout"});
-    json.field("store_format", std::string_view{"itch-store-v1"});
+    json.field("store_format", std::string_view{"itch-store-v2"});
     json.field("records", reader->header().record_count);
     json.field("segment_records", std::uint64_t{reader->header().segment_records});
     json.field("segments", reader->segment_count());

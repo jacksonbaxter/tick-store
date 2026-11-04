@@ -327,6 +327,26 @@ std::expected<SegmentColumns, ItchStoreError> ItchStoreReader::read_columns(
             case Column::stock_exception_value:
                 count = columns[Column::stock_exception_record].size() * itch::Stock{}.size();
                 break;
+            case Column::locate_run:
+                // Free, but never more than the typed records: one run for each locate,
+                // which the segment's decoder checks against the summary's bitmap.
+                count = entry.values[c];
+                if (count > entry.summary.typed_records) {
+                    ItchStoreError error;
+                    error.kind = ItchStoreErrorKind::bad_segment;
+                    error.field = "column value count";
+                    error.segment = segment;
+                    error.block = entry.block[c];
+                    error.column = column_info(column).name;
+                    error.expected = entry.summary.typed_records;
+                    error.actual = count;
+                    return std::unexpected(error);
+                }
+                break;
+            case Column::locate_run_records:
+            case Column::locate_run_adds:
+                count = columns[Column::locate_run].size();
+                break;
             default:
                 break;
         }

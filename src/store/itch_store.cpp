@@ -12,6 +12,7 @@
 #include "tick_store/store/store_error.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -588,7 +589,219 @@ std::array<std::uint64_t, kColumnCount> counts_from_types(std::span<const std::u
         add(Column::rare_bytes, per_type[type] * (size.value_or(kItchHeaderBytes) - kItchHeaderBytes));
     }
     add(Column::raw_length, raw);
+    add(Column::seek, seek_value_count(types.size()));
     return counts;
+}
+
+// --- The locate runs --------------------------------------------------------------------
+
+std::uint64_t locate_runs_of(const SegmentSummary& summary) noexcept {
+    std::uint64_t runs = 0;
+    for (const std::byte b : summary.locates) {
+        runs += static_cast<std::uint64_t>(std::popcount(std::to_integer<unsigned>(b)));
+    }
+    return runs;
+}
+
+std::expected<std::vector<std::uint64_t>, ItchStoreError> locates_from_runs(
+    std::span<const std::uint64_t> gaps, std::span<const std::uint64_t> ids,
+    std::span<const std::uint64_t> records, std::uint64_t typed) {
+    const auto refuse = [&](Column column, std::string_view name, std::uint64_t index,
+                            std::uint64_t expected, std::uint64_t actual) {
+        ItchStoreError error = fail(ItchStoreErrorKind::bad_value, name, kNoIndex, expected, actual);
+        error.column = column_info(column).name;
+        error.index = index;
+        return std::unexpected(error);
+    };
+    if (ids.size() != records.size()) {
+        return refuse(Column::locate_run_records, "locate run count", kNoIndex, ids.size(),
+                      records.size());
+    }
+    if (gaps.size() != typed) {
+        return refuse(Column::locate, "locate run indices", kNoIndex, typed, gaps.size());
+    }
+    // An index not yet named holds this, above every locate.
+    constexpr std::uint64_t kUnplaced = kMax16 + 1;
+    std::vector<std::uint64_t> locates(static_cast<std::size_t>(typed), kUnplaced);
+    std::uint64_t at = 0;
+    for (std::size_t r = 0; r < ids.size(); ++r) {
+        if (ids[r] > kMax16 || (r > 0 && ids[r] <= ids[r - 1])) {
+            return refuse(Column::locate_run, "locate run order", r,
+                          r == 0 ? 0 : ids[r - 1] + 1, ids[r]);
+        }
+        // Each run has a record, and the runs together hold no more than `typed`.
+        if (records[r] == 0 || records[r] > typed - at) {
+            return refuse(Column::locate_run_records, "locate run records", r, typed - at,
+                          records[r]);
+        }
+        std::uint64_t index = 0;
+        for (std::uint64_t k = 0; k < records[r]; ++k, ++at) {
+            const std::uint64_t gap = gaps[at];
+            // The first index is the gap itself, each later one the last plus the gap plus
+            // 1, and every one below `typed`, checked before it is formed.
+            const std::uint64_t room = k == 0 ? typed : typed - index - 1;
+            if (gap >= room) {
+                return refuse(Column::locate, "locate run index", at, room - 1, gap);
+            }
+            index = k == 0 ? gap : index + gap + 1;
+            if (locates[index] != kUnplaced) {
+                return refuse(Column::locate, "locate run index repeated", at, kUnplaced,
+                              locates[index]);
+            }
+            locates[index] = ids[r];
+        }
+    }
+    if (at != typed) {
+        return refuse(Column::locate_run_records, "locate run indices", kNoIndex, typed, at);
+    }
+    return locates;
+}
+
+// --- The seek index -----------------------------------------------------------------------
+
+namespace {
+
+[[nodiscard]] bool names_an_order(std::uint64_t type) noexcept {
+    return type == 'E' || type == 'C' || type == 'X' || type == 'D' || type == 'U';
+}
+
+}  // namespace
+
+std::array<std::uint64_t, kSeekMaxima> column_maxima(const SegmentColumns& stored) {
+    std::array<std::uint64_t, kSeekMaxima> maxima{};
+    for (std::size_t c = 0; c < kSeekMaxima; ++c) {
+        for (const std::uint64_t value : stored.values[c]) {
+            maxima[c] = std::max(maxima[c], value);
+        }
+    }
+    return maxima;
+}
+
+std::vector<std::uint64_t> compute_seek(const std::array<std::uint64_t, kSeekMaxima>& maxima,
+                                        std::span<const std::uint64_t> types,
+                                        std::span<const std::uint64_t> times,
+                                        std::span<const std::uint64_t> ref_distance) {
+    const std::uint64_t groups = seek_groups(types.size());
+    std::vector<std::uint64_t> out(seek_value_count(types.size()), 0);
+    std::ranges::copy(maxima, out.begin());
+    const std::size_t min_at = kSeekMaxima;
+    const std::size_t max_at = min_at + groups;
+    const std::size_t imports_at = max_at + groups;
+    const std::size_t counts_at = imports_at + groups;
+    std::size_t named = 0;
+    for (std::size_t i = 0; i < types.size(); ++i) {
+        const std::size_t g = i / kSeekGroupRecords;
+        const std::uint64_t type = types[i];
+        const std::size_t symbol = seek_symbol_index(type);
+        if (symbol < kSeekSymbols.size()) {
+            ++out[counts_at + (symbol * groups) + g];
+        }
+        if (names_an_order(type)) {
+            if (named < ref_distance.size() && ref_distance[named] == 0) {
+                ++out[imports_at + g];
+            }
+            ++named;
+        }
+    }
+    // The times: a group's first typed record sets both, and each later one widens them.
+    std::size_t typed = 0;
+    std::vector<bool> seen(groups, false);
+    for (std::size_t i = 0; i < types.size(); ++i) {
+        if (types[i] == 0) {
+            continue;
+        }
+        const std::size_t g = i / kSeekGroupRecords;
+        const std::uint64_t time = typed < times.size() ? times[typed] : 0;
+        ++typed;
+        if (!seen[g]) {
+            seen[g] = true;
+            out[min_at + g] = time;
+            out[max_at + g] = time;
+            continue;
+        }
+        out[min_at + g] = std::min(out[min_at + g], time);
+        out[max_at + g] = std::max(out[max_at + g], time);
+    }
+    return out;
+}
+
+std::uint32_t SeekIndex::group_records(std::uint64_t group) const {
+    const std::uint64_t first = group * kSeekGroupRecords;
+    return static_cast<std::uint32_t>(std::min<std::uint64_t>(kSeekGroupRecords, records - first));
+}
+
+std::expected<SeekIndex, ItchStoreError> parse_seek(std::span<const std::uint64_t> values,
+                                                    std::uint32_t records) {
+    const auto refuse = [&](std::string_view name, std::uint64_t index, std::uint64_t expected,
+                            std::uint64_t actual) {
+        ItchStoreError error = fail(ItchStoreErrorKind::bad_value, name, kNoIndex, expected, actual);
+        error.column = column_info(Column::seek).name;
+        error.index = index;
+        return std::unexpected(error);
+    };
+    const std::uint64_t want = seek_value_count(records);
+    if (records == 0 || values.size() != want) {
+        return refuse("seek value count", kNoIndex, want, values.size());
+    }
+    SeekIndex index;
+    index.records = records;
+    index.groups = seek_groups(records);
+    const std::uint64_t groups = index.groups;
+    for (std::size_t c = 0; c < kSeekMaxima; ++c) {
+        if (values[c] > kColumns[c].max_value) {
+            return refuse("seek column maximum", c, kColumns[c].max_value, values[c]);
+        }
+        index.maxima[c] = values[c];
+    }
+    const std::size_t min_at = kSeekMaxima;
+    const std::size_t max_at = min_at + groups;
+    const std::size_t imports_at = max_at + groups;
+    const std::size_t counts_at = imports_at + groups;
+    index.min_time.assign(values.begin() + static_cast<std::ptrdiff_t>(min_at),
+                          values.begin() + static_cast<std::ptrdiff_t>(max_at));
+    index.max_time.assign(values.begin() + static_cast<std::ptrdiff_t>(max_at),
+                          values.begin() + static_cast<std::ptrdiff_t>(imports_at));
+    index.imports.assign(values.begin() + static_cast<std::ptrdiff_t>(imports_at),
+                         values.begin() + static_cast<std::ptrdiff_t>(counts_at));
+    index.before.assign(kSeekSymbols.size() * (groups + 1), 0);
+    index.imports_before.assign(groups + 1, 0);
+    const std::size_t raw = seek_symbol_index(0);
+    for (std::uint64_t g = 0; g < groups; ++g) {
+        const std::uint32_t size = index.group_records(g);
+        std::uint64_t sum = 0;
+        std::uint64_t naming = 0;
+        for (std::size_t symbol = 0; symbol < kSeekSymbols.size(); ++symbol) {
+            const std::size_t at = counts_at + (symbol * groups) + g;
+            const std::uint64_t count = values[at];
+            if (count > size) {
+                return refuse("seek count", at, size, count);
+            }
+            sum += count;
+            if (names_an_order(kSeekSymbols[symbol])) {
+                naming += count;
+            }
+            const std::size_t slot = (symbol * (groups + 1)) + g;
+            index.before[slot + 1] = index.before[slot] + static_cast<std::uint32_t>(count);
+        }
+        if (sum != size) {
+            return refuse("seek group records", counts_at + g, size, sum);
+        }
+        const std::uint64_t typed = size - index.symbol_in(raw, g);
+        if (index.max_time[g] > kMax48) {
+            return refuse("seek max time", max_at + g, kMax48, index.max_time[g]);
+        }
+        if (index.min_time[g] > index.max_time[g]) {
+            return refuse("seek min time", min_at + g, index.max_time[g], index.min_time[g]);
+        }
+        if (typed == 0 && index.max_time[g] != 0) {
+            return refuse("seek max time", max_at + g, 0, index.max_time[g]);
+        }
+        if (index.imports[g] > naming) {
+            return refuse("seek imports", imports_at + g, naming, index.imports[g]);
+        }
+        index.imports_before[g + 1] = index.imports_before[g] + index.imports[g];
+    }
+    return index;
 }
 
 }  // namespace tick_store::store

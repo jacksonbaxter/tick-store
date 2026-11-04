@@ -57,7 +57,7 @@ namespace tick_store::store {
 
 // --- Layout constants ---------------------------------------------------------------
 
-inline constexpr std::uint32_t kItchStoreVersion = 1;
+inline constexpr std::uint32_t kItchStoreVersion = 2;
 
 // Records per segment: the writer's default, and the largest a file may hold.
 inline constexpr std::uint32_t kDefaultSegmentRecords = std::uint32_t{1} << 20U;
@@ -142,9 +142,13 @@ enum class Column : std::uint16_t {
     raw_bytes,
     stock_exception_record,
     stock_exception_value,
+    locate_run,
+    locate_run_records,
+    locate_run_adds,
+    seek,
 };
 
-inline constexpr std::size_t kColumnCount = 33;
+inline constexpr std::size_t kColumnCount = 37;
 
 // How a column's values are coded. Every PFOR variant is codec id pfor, and a block names
 // its own transform, so the reader accepts any; the writer's choice is what is listed.
@@ -167,6 +171,13 @@ enum class ColumnOrder : std::uint8_t {
     by_type,
     by_locate_side,
     by_locate,
+    // Each locate's typed-record indices, ascending locate: the first index of a run,
+    // then each later one less the one before less 1 (the locate column).
+    locate_runs,
+    // One value for each locate the segment has, ascending locate (the run directory).
+    per_run,
+    // The seek index's own layout (below).
+    seek,
 };
 
 struct ColumnInfo {
@@ -196,10 +207,10 @@ inline constexpr std::array<ColumnInfo, kColumnCount> kColumns{{
      .max_value = kMax8},
     {.id = Column::locate,
      .name = "locate",
-     .codec = ColumnCodec::dictionary,
-     .order = ColumnOrder::file,
+     .codec = ColumnCodec::pfor_for,
+     .order = ColumnOrder::locate_runs,
      .zstd = true,
-     .max_value = kMax16},
+     .max_value = kMaxSegmentRecords - 1},
     {.id = Column::timestamp,
      .name = "timestamp",
      .codec = ColumnCodec::pfor_delta,
@@ -386,6 +397,30 @@ inline constexpr std::array<ColumnInfo, kColumnCount> kColumns{{
      .order = ColumnOrder::file,
      .zstd = false,
      .max_value = kMax8},
+    {.id = Column::locate_run,
+     .name = "locate_run",
+     .codec = ColumnCodec::pfor_delta,
+     .order = ColumnOrder::per_run,
+     .zstd = false,
+     .max_value = kMax16},
+    {.id = Column::locate_run_records,
+     .name = "locate_run_records",
+     .codec = ColumnCodec::dictionary,
+     .order = ColumnOrder::per_run,
+     .zstd = false,
+     .max_value = kMaxSegmentRecords},
+    {.id = Column::locate_run_adds,
+     .name = "locate_run_adds",
+     .codec = ColumnCodec::dictionary,
+     .order = ColumnOrder::per_run,
+     .zstd = false,
+     .max_value = kMaxSegmentRecords},
+    {.id = Column::seek,
+     .name = "seek",
+     .codec = ColumnCodec::pfor_delta,
+     .order = ColumnOrder::seek,
+     .zstd = false,
+     .max_value = kMax64},
 }};
 
 static_assert(
@@ -401,6 +436,50 @@ static_assert(
 
 [[nodiscard]] constexpr const ColumnInfo& column_info(Column column) noexcept {
     return kColumns[static_cast<std::size_t>(column)];
+}
+
+// --- The seek index ---------------------------------------------------------------------
+//
+// Every segment's `seek` column is what a query needs to start decoding at a record group
+// rather than at the segment's first record, and to skip what it cannot need. A group is
+// kSeekGroupRecords consecutive records of the segment, the last one shorter: exactly one
+// codec block of the type column. The values, all u64, in this order:
+//
+//   maxima      kSeekMaxima values: the largest value of every column but seek, in column
+//               order, 0 for a column the segment has no values in
+//   then, for G groups, each of these G values long:
+//   min time    the lowest timestamp of the group's typed records, 0 if it has none
+//   max time    the highest, 0 if it has none
+//   imports     the group's references named at distance 0, which take an import
+//   counts      for each symbol of kSeekSymbols in turn, its records in each group
+//
+// Every value is checked against the columns when the segment is decoded whole, and the
+// structure (counts summing to each group's records, times within 48 bits and ordered,
+// imports within the group's naming records, maxima within each column's range) when the
+// index is parsed.
+inline constexpr std::uint32_t kSeekGroupRecords = kColumnBlockValues;
+inline constexpr std::array<std::uint8_t, 24> kSeekSymbols{
+    0, 'A', 'B', 'C', 'D', 'E', 'F', 'H', 'I', 'J', 'K', 'L',
+    'N', 'O', 'P', 'Q', 'R', 'S', 'U', 'V', 'W', 'X', 'Y', 'h'};
+inline constexpr std::size_t kSeekMaxima = kColumnCount - 1;
+inline constexpr std::size_t kSeekPerGroup = 3 + kSeekSymbols.size();
+
+[[nodiscard]] constexpr std::uint64_t seek_groups(std::uint64_t records) noexcept {
+    return (records + kSeekGroupRecords - 1) / kSeekGroupRecords;
+}
+
+[[nodiscard]] constexpr std::uint64_t seek_value_count(std::uint64_t records) noexcept {
+    return kSeekMaxima + (seek_groups(records) * kSeekPerGroup);
+}
+
+// The index of `symbol` in kSeekSymbols, or kSeekSymbols.size() for none.
+[[nodiscard]] constexpr std::size_t seek_symbol_index(std::uint64_t symbol) noexcept {
+    for (std::size_t i = 0; i < kSeekSymbols.size(); ++i) {
+        if (kSeekSymbols[i] == symbol) {
+            return i;
+        }
+    }
+    return kSeekSymbols.size();
 }
 
 // The container codec a column's chunk is stored under when zstd is not used.
@@ -584,6 +663,64 @@ struct ColumnChunk {
 // stock_exception_record, whose count is free, are left at 0.
 [[nodiscard]] std::array<std::uint64_t, kColumnCount> counts_from_types(
     std::span<const std::uint64_t> types);
+
+// --- The locate runs ------------------------------------------------------------------
+
+// The locates a segment has: the bits set in its summary's bitmap, which is how many runs
+// the locate column holds and how many values each run directory column holds.
+[[nodiscard]] std::uint64_t locate_runs_of(const SegmentSummary& summary) noexcept;
+
+// The file-order locates of a segment's `typed` typed records, from the locate column's
+// runs (ColumnOrder::locate_runs) and the directory's ids and record counts. Checks that
+// the ids strictly ascend, every run has a record, the runs hold exactly `typed` indices,
+// and every index is below `typed` and named once, so the runs are a partition.
+[[nodiscard]] std::expected<std::vector<std::uint64_t>, ItchStoreError> locates_from_runs(
+    std::span<const std::uint64_t> gaps, std::span<const std::uint64_t> ids,
+    std::span<const std::uint64_t> records, std::uint64_t typed);
+
+// --- The seek index, built and parsed ------------------------------------------------
+
+// The largest value of each column but seek, in the order its values are stored (which
+// does not change a maximum), 0 where a column is empty.
+[[nodiscard]] std::array<std::uint64_t, kSeekMaxima> column_maxima(const SegmentColumns& stored);
+
+// A segment's seek values, from its maxima and its file-order type, timestamp and
+// ref_distance values.
+[[nodiscard]] std::vector<std::uint64_t> compute_seek(
+    const std::array<std::uint64_t, kSeekMaxima>& maxima, std::span<const std::uint64_t> types,
+    std::span<const std::uint64_t> times, std::span<const std::uint64_t> ref_distance);
+
+// A segment's seek index, parsed. Groups are numbered from 0 within the segment.
+struct SeekIndex {
+    std::uint32_t records = 0;
+    std::uint64_t groups = 0;
+    std::array<std::uint64_t, kSeekMaxima> maxima{};
+    std::vector<std::uint64_t> min_time;
+    std::vector<std::uint64_t> max_time;
+    std::vector<std::uint64_t> imports;
+    // before[s * (groups + 1) + g]: records of kSeekSymbols[s] before group g, so
+    // g = groups gives the segment's total.
+    std::vector<std::uint32_t> before;
+    // imports_before[g]: imports in the groups before g.
+    std::vector<std::uint64_t> imports_before;
+
+    [[nodiscard]] std::uint32_t symbol_before(std::size_t symbol, std::uint64_t group) const {
+        return before[(symbol * (groups + 1)) + group];
+    }
+    [[nodiscard]] std::uint32_t symbol_in(std::size_t symbol, std::uint64_t group) const {
+        return symbol_before(symbol, group + 1) - symbol_before(symbol, group);
+    }
+    [[nodiscard]] std::uint32_t symbol_total(std::size_t symbol) const {
+        return symbol_before(symbol, groups);
+    }
+    // Records of group g: kSeekGroupRecords, or what the last group holds.
+    [[nodiscard]] std::uint32_t group_records(std::uint64_t group) const;
+};
+
+// Checks the count against `records` and every structural rule of the layout above,
+// naming the value's index in the column for any it refuses.
+[[nodiscard]] std::expected<SeekIndex, ItchStoreError> parse_seek(
+    std::span<const std::uint64_t> values, std::uint32_t records);
 
 // True for the type symbols a record may carry: 0, or one of the 23 ITCH type bytes.
 [[nodiscard]] bool valid_type_symbol(std::uint64_t symbol) noexcept;

@@ -176,18 +176,31 @@ TEST(ItchStoreColumns, EachTypeFillsExactlyItsColumnsWithItsFields) {
 
         Expected expected = expected_columns(*message, fixture.bytes);
         expected[Column::type] = {static_cast<std::uint64_t>(fixture.type)};
-        expected[Column::locate] = {kLocate};
+        // The locate is one run: the record's typed index, 0, under its locate.
+        expected[Column::locate] = {0};
+        expected[Column::locate_run] = {kLocate};
+        expected[Column::locate_run_records] = {1};
+        const bool adds = fixture.type == 'A' || fixture.type == 'F';
+        expected[Column::locate_run_adds] = {adds ? 1U : 0U};
         expected[Column::timestamp] = {kTime};
         expected[Column::tracking] = {kTracking};
+        // The seek index: one group of one record of this type at kTime.
+        auto seek = parse_seek((*columns)[Column::seek], 1);
+        ASSERT_TRUE(seek.has_value()) << to_string(seek.error());
+        EXPECT_EQ(seek->symbol_total(seek_symbol_index(static_cast<std::uint64_t>(fixture.type))),
+                  1U);
+        EXPECT_EQ(seek->min_time, std::vector<std::uint64_t>{kTime});
+        EXPECT_EQ(seek->max_time, std::vector<std::uint64_t>{kTime});
+        expected[Column::seek] = (*columns)[Column::seek];
         if (const auto known = columns_of_type().find(fixture.type);
             known != columns_of_type().end()) {
             for (const Column column : known->second) {
                 EXPECT_TRUE(expected.contains(column)) << column_info(column).name;
             }
-            EXPECT_EQ(expected.size(), known->second.size() + 4);
+            EXPECT_EQ(expected.size(), known->second.size() + 8);
         } else {
             EXPECT_TRUE(is_rare_type(static_cast<std::uint8_t>(fixture.type)));
-            EXPECT_EQ(expected.size(), 5U);
+            EXPECT_EQ(expected.size(), 9U);
         }
         for (std::size_t c = 0; c < kColumnCount; ++c) {
             const auto column = static_cast<Column>(c);
@@ -228,6 +241,13 @@ TEST(ItchStoreColumns, ARawRecordFillsOnlyItsTypeLengthAndBytes) {
             case Column::raw_bytes:
                 EXPECT_EQ((*columns)[column], (std::vector<std::uint64_t>{'z', 0xA1, 0xA2, 0xA3}));
                 break;
+            case Column::seek: {
+                auto seek = parse_seek((*columns)[column], 1);
+                ASSERT_TRUE(seek.has_value()) << to_string(seek.error());
+                EXPECT_EQ(seek->symbol_total(seek_symbol_index(0)), 1U);
+                EXPECT_EQ(seek->max_time, std::vector<std::uint64_t>{0});
+                break;
+            }
             default:
                 EXPECT_TRUE((*columns)[column].empty()) << column_info(column).name;
         }
@@ -248,7 +268,9 @@ TEST(ItchStoreColumns, CountsFromTypesMatchWhatTheBuilderWrites) {
     for (std::size_t c = 0; c < kColumnCount; ++c) {
         const auto column = static_cast<Column>(c);
         if (column == Column::import_ref || column == Column::raw_bytes ||
-            column == Column::stock_exception_record || column == Column::stock_exception_value) {
+            column == Column::stock_exception_record || column == Column::stock_exception_value ||
+            column == Column::locate_run || column == Column::locate_run_records ||
+            column == Column::locate_run_adds) {
             EXPECT_EQ(counts[c], 0U);
             continue;
         }

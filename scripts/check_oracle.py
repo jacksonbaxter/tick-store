@@ -100,7 +100,7 @@ def check(tool, folder):
         return f"G-1 failed: verify exited {done.returncode} on an untouched store"
     report = json.loads(done.stdout)
     if (report.get("records") != len(records) or report.get("verdict") != "pass"
-            or report.get("store_format") != "itch-store-v1"):
+            or report.get("store_format") != "itch-store-v2"):
         return f"G-1 failed: verify reported {report.get('records')} records, " \
                f"{report.get('verdict')}, format {report.get('store_format')}"
 

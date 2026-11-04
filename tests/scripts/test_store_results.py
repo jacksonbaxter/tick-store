@@ -35,7 +35,7 @@ def verify(verdict="pass", store_error=None, first=None, stored=PIN):
 
 
 def layout(file_bytes=1000):
-    return {"store_format": "itch-store-v1", "records": 10, "segment_records": 4, "segments": 3,
+    return {"store_format": "itch-store-v2", "records": 10, "segment_records": 4, "segments": 3,
             "file_bytes": file_bytes,
             "container": {"header_bytes": 64, "trailer_bytes": 24, "footer_fixed_bytes": 24,
                           "block_entry_bytes": 100, "section_entry_bytes": 50,
@@ -154,7 +154,7 @@ class StoreResults(unittest.TestCase):
         (self.dir / "verify.time").write_text(
             "\tElapsed (wall clock) time (h:mm:ss or m:ss): 1:02.50\n"
             "\tMaximum resident set size (kbytes): 2000\n")
-        self.write("verify.json", {**verify(), "store_format": "itch-store-v1"})
+        self.write("verify.json", {**verify(), "store_format": "itch-store-v2"})
         roundtrip = results.assemble_g1(self.dir, "12302019", "abc1234", "Linux")
         self.assertEqual(roundtrip["g1"]["verify"]["real_seconds"], 62.5)
         self.assertEqual(roundtrip["g1"]["verify"]["time_peak_rss_bytes"], 2_048_000)
@@ -168,7 +168,7 @@ class StoreResults(unittest.TestCase):
             results.assemble_g1(self.dir, "12302019", "abc1234", "Linux")
 
     def test_a_store_from_the_other_host_must_verify_here(self):
-        self.write("verify.json", {**verify(), "store_format": "itch-store-v1"})
+        self.write("verify.json", {**verify(), "store_format": "itch-store-v2"})
         self.write("cross-verify.json", verify())
         (self.dir / "cross-verify.time").write_text(TIME)
         (self.dir / "cross-host.txt").write_text("macOS\n")

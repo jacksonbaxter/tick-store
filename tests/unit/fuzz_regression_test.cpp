@@ -230,7 +230,7 @@ TEST(FuzzOracles, PassEveryCutAndFlipOfAContainer) {
 // bit chosen by the byte's offset; and the same file with segments over the fuzzing cap.
 TEST(FuzzOracles, PassEveryCutAndFlipOfAnItchStore) {
     const Bytes file =
-        read_file(std::filesystem::path{TICK_STORE_GOLDEN_DIR} / "itch-store-v1.tsc");
+        read_file(std::filesystem::path{TICK_STORE_GOLDEN_DIR} / "itch-store-v2.tsc");
     ASSERT_FALSE(file.empty());
     EXPECT_EQ(text(store::oracle::check_itch_store(file)), "");
     for (std::size_t length = 0; length < file.size(); ++length) {

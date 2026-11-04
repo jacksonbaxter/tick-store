@@ -255,7 +255,7 @@ TEST_F(RoundTripCliStore, IngestReportsTheStoreItWrote) {
     const CliRun ingest = run({"ingest", source_path.string(), store_path.string(),
                                "--durability", "device_flush"});
     ASSERT_EQ(ingest.code, kExitPass) << ingest.output.err;
-    EXPECT_TRUE(contains(ingest.output.out, R"("store_format": "itch-store-v1")"));
+    EXPECT_TRUE(contains(ingest.output.out, R"("store_format": "itch-store-v2")"));
     EXPECT_TRUE(contains(ingest.output.out, R"("durability": "device_flush")"));
     EXPECT_TRUE(contains(ingest.output.out,
                          std::format(R"("segment_records": {})", store::kDefaultSegmentRecords)));
@@ -272,7 +272,7 @@ TEST_F(RoundTripCliStore, VerifyPassesAgainstThePinWithAndWithoutChecksums) {
     const CliRun verify =
         run({"verify", source_path.string(), store_path.string(), "--expect-sha256", pin});
     EXPECT_EQ(verify.code, kExitPass) << verify.output.err;
-    EXPECT_TRUE(contains(verify.output.out, R"("store_format": "itch-store-v1")"));
+    EXPECT_TRUE(contains(verify.output.out, R"("store_format": "itch-store-v2")"));
     EXPECT_TRUE(contains(verify.output.out, R"("checksums": "verify")"));
     EXPECT_TRUE(contains(verify.output.out, R"("records": 26)"));
     EXPECT_TRUE(contains(verify.output.out, std::format(R"("stored_sha256": "{}")", pin)));

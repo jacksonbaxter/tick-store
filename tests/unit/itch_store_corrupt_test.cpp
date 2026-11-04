@@ -94,7 +94,9 @@ TEST(ItchStoreCorrupt, StoreSectionFields) {
     };
     const std::vector<Case> cases{
         {"store section size", [](Bytes& b) { b.push_back(std::byte{0}); }},
-        {"store version", [](Bytes& b) { put_field(b, kStoreVersionOffset, 4, 2); }},
+        {"store version", [](Bytes& b) { put_field(b, kStoreVersionOffset, 4, 3); }},
+        // Version 1, before the locate runs and the seek index, is no longer read.
+        {"store version", [](Bytes& b) { put_field(b, kStoreVersionOffset, 4, 1); }},
         {"segment records", [](Bytes& b) { put_field(b, kStoreSegmentRecordsOffset, 4, 0); }},
         {"segment records",
          [](Bytes& b) { put_field(b, kStoreSegmentRecordsOffset, 4, kMaxSegmentRecords + 1); }},
@@ -650,10 +652,159 @@ TEST(ItchStoreCorrupt, EverySingleBitFlipFailsTheOracleWithChecksumsOn) {
     }
 }
 
+// --- The locate runs and the seek index ---------------------------------------------------
+
+// Segment 0 of the reference store: 8 records, 7 typed, locate 1 on typed records 0 to 5
+// (two adds) and locate 2 on typed record 6 (one add). One seek group.
+TEST(ItchStoreCorrupt, LocateRunFields) {
+    const Bytes file = reference_file();
+    const auto values = [&](Column column) { return test::column_values(file, 0, column); };
+    ASSERT_EQ(values(Column::locate), (std::vector<std::uint64_t>{0, 0, 0, 0, 0, 0, 6}));
+    ASSERT_EQ(values(Column::locate_run), (std::vector<std::uint64_t>{1, 2}));
+    ASSERT_EQ(values(Column::locate_run_records), (std::vector<std::uint64_t>{6, 1}));
+    ASSERT_EQ(values(Column::locate_run_adds), (std::vector<std::uint64_t>{2, 1}));
+    struct Case {
+        std::string_view field;
+        Column column;
+        std::vector<std::uint64_t> replacement;
+        ItchStoreErrorKind kind = ItchStoreErrorKind::bad_value;
+    };
+    const std::vector<Case> cases{
+        // Ids out of order, and one the bitmap does not have.
+        {"locate run order", Column::locate_run, {2, 1}},
+        {"locate bitmap", Column::locate_run, {1, 3}, ItchStoreErrorKind::bad_metadata},
+        // A run with no record, and runs holding more indices than the typed records.
+        {"locate run records", Column::locate_run_records, {0, 7}},
+        {"locate run records", Column::locate_run_records, {6, 2}},
+        // An index past the last typed record, and one named by two runs.
+        {"locate run index", Column::locate, {0, 0, 0, 0, 0, 0, 7}},
+        {"locate run index", Column::locate, {0, 0, 0, 0, 0, 2, 6}},
+        {"locate run index repeated", Column::locate, {0, 0, 0, 0, 0, 0, 0}},
+        // An add count the types do not give.
+        {"locate run adds", Column::locate_run_adds, {1, 1}},
+        // The directory's columns at different lengths.
+        {"column value count", Column::locate_run_records, {7}, ItchStoreErrorKind::bad_segment},
+    };
+    for (const Case& c : cases) {
+        SCOPED_TRACE(testing::Message() << c.field << " in " << column_info(c.column).name);
+        StoreParts parts = test::parts_of(file);
+        test::set_column(parts, 0, c.column, c.replacement);
+        expect_refused(parts.build(), c.field, c.kind);
+        const auto error = first_error(parts.build());
+        ASSERT_TRUE(error.has_value());
+        EXPECT_EQ(error->segment, 0U);
+    }
+    {
+        // More runs than typed records, refused from the block's count before decoding.
+        StoreParts parts = test::parts_of(file);
+        put_field(parts.block(0, Column::locate_run).metadata, kMetaValueCountOffset, 4, 8);
+        expect_refused(parts.build(), "column value count", ItchStoreErrorKind::bad_segment);
+    }
+}
+
+TEST(ItchStoreCorrupt, SeekIndexFields) {
+    const Bytes file = reference_file();
+    const std::vector<std::uint64_t> seek = test::column_values(file, 0, Column::seek);
+    ASSERT_EQ(seek.size(), seek_value_count(8));
+    // One group: the maxima, then its min time, max time, imports and symbol counts.
+    constexpr std::size_t kMin = kSeekMaxima;
+    constexpr std::size_t kMax = kMin + 1;
+    constexpr std::size_t kImports = kMax + 1;
+    constexpr std::size_t kCounts = kImports + 1;
+    ASSERT_EQ(seek[kMin], 10U);
+    ASSERT_EQ(seek[kMax], 16U);
+    ASSERT_EQ(seek[kImports], 1U);
+    ASSERT_EQ(seek[kCounts + seek_symbol_index(0)], 1U);
+    ASSERT_EQ(seek[kCounts + seek_symbol_index('D')], 2U);
+    ASSERT_EQ(seek[static_cast<std::size_t>(Column::type)], static_cast<std::uint64_t>('R'));
+    struct Case {
+        std::string_view field;
+        std::size_t index;
+        std::uint64_t value;
+    };
+    const std::vector<Case> cases{
+        // Structure, refused as the index is parsed.
+        {"seek column maximum", static_cast<std::size_t>(Column::type), kMax8 + 1},
+        {"seek count", kCounts + seek_symbol_index('D'), 9},
+        {"seek group records", kCounts + seek_symbol_index(0), 2},
+        {"seek max time", kMax, kMax48 + 1},
+        {"seek min time", kMin, 17},
+        {"seek imports", kImports, 4},
+        // Values in range that the columns do not give, refused after the last record.
+        {"seek value", static_cast<std::size_t>(Column::type), 'Q'},
+        {"seek value", kMin, 11},
+        {"seek value", kMax, 15},
+        {"seek value", kImports, 2},
+    };
+    for (const Case& c : cases) {
+        SCOPED_TRACE(testing::Message() << c.field << " at " << c.index);
+        std::vector<std::uint64_t> changed = seek;
+        changed[c.index] = c.value;
+        StoreParts parts = test::parts_of(file);
+        test::set_column(parts, 0, Column::seek, changed);
+        expect_refused(parts.build(), c.field, ItchStoreErrorKind::bad_value);
+        const auto error = first_error(parts.build());
+        ASSERT_TRUE(error.has_value());
+        EXPECT_EQ(error->column, "seek");
+        EXPECT_EQ(error->index, c.index);
+    }
+    {
+        // Swapped counts that still sum to the group: D for E, which the types refuse.
+        std::vector<std::uint64_t> changed = seek;
+        --changed[kCounts + seek_symbol_index('D')];
+        ++changed[kCounts + seek_symbol_index('E')];
+        StoreParts parts = test::parts_of(file);
+        test::set_column(parts, 0, Column::seek, changed);
+        expect_refused(parts.build(), "seek value", ItchStoreErrorKind::bad_value);
+    }
+    {
+        // One value short of the layout, refused as a count before anything is decoded.
+        std::vector<std::uint64_t> changed = seek;
+        changed.pop_back();
+        StoreParts parts = test::parts_of(file);
+        test::set_column(parts, 0, Column::seek, changed);
+        expect_refused(parts.build(), "column value count", ItchStoreErrorKind::bad_segment);
+    }
+}
+
+TEST(ItchStoreCorrupt, SeekIndexRulesParsedAlone) {
+    // One raw record: a group with no typed record must have no times.
+    std::vector<std::uint64_t> values(seek_value_count(1), 0);
+    const std::size_t counts = kSeekMaxima + 3;
+    values[counts + seek_symbol_index(0)] = 1;
+    ASSERT_TRUE(parse_seek(values, 1).has_value());
+    values[kSeekMaxima + 1] = 5;
+    auto refused = parse_seek(values, 1);
+    ASSERT_FALSE(refused.has_value());
+    EXPECT_EQ(refused.error().field, "seek max time");
+    EXPECT_EQ(refused.error().index, kSeekMaxima + 1);
+    values[kSeekMaxima + 1] = 0;
+    // The wrong number of values, and no records at all.
+    values.push_back(0);
+    refused = parse_seek(values, 1);
+    ASSERT_FALSE(refused.has_value());
+    EXPECT_EQ(refused.error().field, "seek value count");
+    EXPECT_FALSE(parse_seek({}, 0).has_value());
+    // Two groups, the second short: each group's counts sum to its own records.
+    std::vector<std::uint64_t> two(seek_value_count(kSeekGroupRecords + 3), 0);
+    const std::size_t two_counts = kSeekMaxima + 6;
+    two[two_counts + (seek_symbol_index(0) * 2)] = kSeekGroupRecords;
+    two[two_counts + (seek_symbol_index(0) * 2) + 1] = 3;
+    auto parsed = parse_seek(two, kSeekGroupRecords + 3);
+    ASSERT_TRUE(parsed.has_value()) << to_string(parsed.error());
+    EXPECT_EQ(parsed->group_records(1), 3U);
+    EXPECT_EQ(parsed->symbol_before(seek_symbol_index(0), 1), kSeekGroupRecords);
+    EXPECT_EQ(parsed->symbol_total(seek_symbol_index(0)), kSeekGroupRecords + 3);
+    two[two_counts + (seek_symbol_index(0) * 2) + 1] = 4;
+    refused = parse_seek(two, kSeekGroupRecords + 3);
+    ASSERT_FALSE(refused.has_value());
+    EXPECT_EQ(refused.error().field, "seek count");
+}
+
 // --- The golden file ------------------------------------------------------------------
 
 std::filesystem::path golden_path() {
-    return std::filesystem::path{TICK_STORE_GOLDEN_DIR} / "itch-store-v1.tsc";
+    return std::filesystem::path{TICK_STORE_GOLDEN_DIR} / "itch-store-v2.tsc";
 }
 
 Bytes read_golden() {

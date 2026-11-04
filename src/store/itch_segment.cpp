@@ -210,6 +210,102 @@ void set_bit(std::vector<std::byte>& bitmap, std::uint16_t locate) {
     return {bitmap.begin(), bitmap.begin() + static_cast<std::ptrdiff_t>(size)};
 }
 
+// The locate column as runs (ColumnOrder::locate_runs) and the run directory, from the
+// file-order locates of the typed records and the segment's types.
+struct LocateRuns {
+    std::vector<std::uint64_t> gaps;
+    std::vector<std::uint64_t> ids;
+    std::vector<std::uint64_t> records;
+    std::vector<std::uint64_t> adds;
+};
+
+[[nodiscard]] LocateRuns to_runs(const std::vector<std::uint64_t>& locates,
+                                 const std::vector<std::uint64_t>& types) {
+    std::vector<std::uint32_t> count(kLocates, 0);
+    std::vector<std::uint32_t> adds(kLocates, 0);
+    std::size_t typed = 0;
+    for (const std::uint64_t type : types) {
+        if (type == 0) {
+            continue;
+        }
+        const std::uint64_t locate = locates[typed++];
+        ++count[locate];
+        if (type == 'A' || type == 'F') {
+            ++adds[locate];
+        }
+    }
+    LocateRuns runs;
+    std::vector<std::uint32_t> start(kLocates, 0);
+    std::uint32_t at = 0;
+    for (std::size_t l = 0; l < kLocates; ++l) {
+        if (count[l] == 0) {
+            continue;
+        }
+        runs.ids.push_back(l);
+        runs.records.push_back(count[l]);
+        runs.adds.push_back(adds[l]);
+        start[l] = at;
+        at += count[l];
+    }
+    std::vector<std::uint32_t> positions(locates.size());
+    std::vector<std::uint32_t> next = start;
+    for (std::size_t i = 0; i < locates.size(); ++i) {
+        positions[next[locates[i]]++] = static_cast<std::uint32_t>(i);
+    }
+    runs.gaps.resize(positions.size());
+    for (std::size_t r = 0, first = 0; r < runs.ids.size(); ++r) {
+        const std::size_t end = first + runs.records[r];
+        runs.gaps[first] = positions[first];
+        for (std::size_t i = first + 1; i < end; ++i) {
+            runs.gaps[i] = positions[i] - positions[i - 1] - 1U;
+        }
+        first = end;
+    }
+    return runs;
+}
+
+// Puts the locate column back in file order from its runs, and checks each run's add count
+// against the types.
+[[nodiscard]] std::expected<void, ItchStoreError> place_locates(
+    std::uint64_t segment, SegmentColumns& columns, const std::vector<std::uint64_t>& types) {
+    auto placed = locates_from_runs(columns[Column::locate], columns[Column::locate_run],
+                                    columns[Column::locate_run_records],
+                                    columns[Column::timestamp].size());
+    if (!placed.has_value()) {
+        ItchStoreError error = placed.error();
+        error.segment = segment;
+        return std::unexpected(error);
+    }
+    std::vector<std::uint32_t> adds(kLocates, 0);
+    std::size_t typed = 0;
+    for (const std::uint64_t type : types) {
+        if (type == 0) {
+            continue;
+        }
+        const std::uint64_t locate = (*placed)[typed++];
+        if (type == 'A' || type == 'F') {
+            ++adds[locate];
+        }
+    }
+    const std::vector<std::uint64_t>& ids = columns[Column::locate_run];
+    const std::vector<std::uint64_t>& stated = columns[Column::locate_run_adds];
+    for (std::size_t r = 0; r < ids.size(); ++r) {
+        if (stated[r] != adds[ids[r]]) {
+            ItchStoreError error;
+            error.kind = ItchStoreErrorKind::bad_value;
+            error.field = "locate run adds";
+            error.segment = segment;
+            error.column = column_info(Column::locate_run_adds).name;
+            error.index = r;
+            error.expected = adds[ids[r]];
+            error.actual = stated[r];
+            return std::unexpected(error);
+        }
+    }
+    columns[Column::locate] = std::move(*placed);
+    return {};
+}
+
 template <class T>
 concept HasStock = requires(const T& message) {
     { message.stock } -> std::convertible_to<itch::Stock>;
@@ -481,11 +577,19 @@ SegmentColumns SegmentBuilder::finish(std::uint64_t first_record, SegmentSummary
         summary.locates = trimmed(s.bitmap);
     }
     SegmentColumns out = std::move(s.columns);
+    LocateRuns runs = to_runs(out[Column::locate], out[Column::type]);
+    out[Column::locate] = std::move(runs.gaps);
+    out[Column::locate_run] = std::move(runs.ids);
+    out[Column::locate_run_records] = std::move(runs.records);
+    out[Column::locate_run_adds] = std::move(runs.adds);
+    const std::vector<std::uint64_t> ref_file_order = out[Column::ref_distance];
     out[Column::tracking] = group_by_byte(out[Column::tracking], s.tracking_key);
     out[Column::ref_distance] = group_by_byte(out[Column::ref_distance], s.ref_key);
     out[Column::reduce_shares] = group_by_byte(out[Column::reduce_shares], s.reduce_key);
     out[Column::add_price] = group_by_key(out[Column::add_price], s.price_key);
     out[Column::add_shares] = group_by_key(out[Column::add_shares], s.shares_key);
+    out[Column::seek] = compute_seek(column_maxima(out), out[Column::type],
+                                     out[Column::timestamp], ref_file_order);
 
     s.columns = SegmentColumns{};
     s.tracking_key.clear();
@@ -518,6 +622,8 @@ struct SegmentAssembler::State {
     std::vector<std::vector<std::uint64_t>> lists = std::vector<std::vector<std::uint64_t>>(kLocates);
     std::vector<std::uint16_t> touched;
     std::array<std::byte, itch::kMaxPayloadSize> scratch{};
+    // The seek index the columns give, against the stored one after the last record.
+    std::vector<std::uint64_t> seek_want;
 
     [[nodiscard]] std::uint64_t take(Column column) {
         return columns[column][at[static_cast<std::size_t>(column)]++];
@@ -782,6 +888,7 @@ std::expected<void, ItchStoreError> SegmentAssembler::load(std::uint64_t segment
     s.symbols = &symbols;
     s.next_record = 0;
     s.records = 0;
+    s.seek_want.clear();
     const auto refuse = [&](ItchStoreErrorKind kind, std::string_view name, Column column,
                             std::uint64_t index, std::uint64_t expected, std::uint64_t actual) {
         ItchStoreError error;
@@ -819,11 +926,33 @@ std::expected<void, ItchStoreError> SegmentAssembler::load(std::uint64_t segment
         columns[Column::stock_exception_record].size();
     expected[static_cast<std::size_t>(Column::stock_exception_value)] =
         columns[Column::stock_exception_record].size() * itch::Stock{}.size();
+    // The runs are as many as the directory's ids, which the locates placed from them are
+    // checked against the summary's bitmap below.
+    const std::uint64_t runs = columns[Column::locate_run].size();
+    for (const Column run_column :
+         {Column::locate_run, Column::locate_run_records, Column::locate_run_adds}) {
+        expected[static_cast<std::size_t>(run_column)] = runs;
+    }
     for (std::size_t c = 0; c < kColumnCount; ++c) {
         if (columns.values[c].size() != expected[c]) {
             return refuse(ItchStoreErrorKind::bad_segment, "column value count",
                           static_cast<Column>(c), kNoIndex, expected[c], columns.values[c].size());
         }
+    }
+
+    // The seek index's structure, and its maxima against the columns as stored, before
+    // anything is put back in file order.
+    auto seek = parse_seek(columns[Column::seek], static_cast<std::uint32_t>(types.size()));
+    if (!seek.has_value()) {
+        ItchStoreError error = seek.error();
+        error.segment = segment;
+        return std::unexpected(error);
+    }
+    const std::array<std::uint64_t, kSeekMaxima> maxima = column_maxima(columns);
+
+    // The locate column back in file order, from its runs.
+    if (auto placed = place_locates(segment, columns, types); !placed.has_value()) {
+        return std::unexpected(placed.error());
     }
 
     // The summary against the values it summarises.
@@ -943,6 +1072,11 @@ std::expected<void, ItchStoreError> SegmentAssembler::load(std::uint64_t segment
     ungroup_by_key(columns[Column::add_price], price_key);
     ungroup_by_key(columns[Column::add_shares], shares_key);
 
+    // What every seek value must be, checked once the last record has been read, so that a
+    // record a rule refuses is named by that rule first.
+    s.seek_want =
+        compute_seek(maxima, types, columns[Column::timestamp], columns[Column::ref_distance]);
+
     const std::uint64_t records = types.size();
     s.columns = std::move(columns);
     s.records = records;
@@ -952,6 +1086,20 @@ std::expected<void, ItchStoreError> SegmentAssembler::load(std::uint64_t segment
 std::expected<std::optional<itch::Message>, ItchStoreError> SegmentAssembler::next() {
     State& s = *state_;
     if (s.next_record == s.records) {
+        const std::vector<std::uint64_t>& have = s.columns[Column::seek];
+        for (std::size_t i = 0; i < s.seek_want.size(); ++i) {
+            if (s.seek_want[i] != have[i]) {
+                ItchStoreError error;
+                error.kind = ItchStoreErrorKind::bad_value;
+                error.field = "seek value";
+                error.segment = s.segment;
+                error.column = column_info(Column::seek).name;
+                error.index = i;
+                error.expected = s.seek_want[i];
+                error.actual = have[i];
+                return std::unexpected(error);
+            }
+        }
         return std::optional<itch::Message>{};
     }
     const auto type = static_cast<std::uint8_t>(s.take(Column::type));

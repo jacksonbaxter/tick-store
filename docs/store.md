@@ -4,7 +4,7 @@ The store holds one ITCH 5.0 day as columns inside the container of `docs/format
 every frame bit-exact, and the source's tail, the bytes after its last whole frame. The code is
 `include/tick_store/store/itch_store.hpp` (layout and shared parts), `itch_segment.hpp` (one segment
 between records and columns), `itch_store_writer.hpp` and `itch_store_reader.hpp`.
-`tests/unit/golden/itch-store-v1.tsc` is the 26-record test stream and its tail at 8 records a
+`tests/unit/golden/itch-store-v2.tsc` is the 26-record test stream and its tail at 8 records a
 segment; the writer must produce it byte for byte and the reader must read it back.
 
 All integers in the store's own fields are little-endian, as in the container.
