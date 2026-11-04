@@ -1,6 +1,7 @@
 #include "tick_store/codec/lane_pack.hpp"
 
 #include "tick_store/codec/bit_stream.hpp"
+#include "tick_store/codec/simd.hpp"
 
 #include <algorithm>
 #include <array>
@@ -147,46 +148,7 @@ bool unpack_linear(std::span<const std::byte> bytes, unsigned width,
     if (bytes.size() != linear_bytes(values.size(), width)) {
         return false;
     }
-    const std::uint64_t mask = low_bits(width);
-    // The up to nine bytes from `at` that hold a value, read as little-endian, with
-    // bytes past the end taken as zero.
-    const auto byte_at = [&bytes](std::size_t at) {
-        return at < bytes.size() ? std::to_integer<std::uint64_t>(bytes[at]) : 0U;
-    };
-    std::size_t i = 0;
-    if constexpr (std::endian::native == std::endian::little) {
-        // While nine bytes from a value's first are in bounds, load them whole.
-        for (; i < values.size(); ++i) {
-            const std::size_t bit = i * width;
-            const std::size_t first = bit / 8U;
-            if (first + 9U > bytes.size()) {
-                break;
-            }
-            const auto skip = static_cast<unsigned>(bit % 8U);
-            std::uint64_t word = 0;
-            std::memcpy(&word, bytes.data() + first, sizeof word);
-            word >>= skip;
-            if (skip + width > kWordBits) {
-                word |= std::to_integer<std::uint64_t>(bytes[first + 8U]) << (kWordBits - skip);
-            }
-            values[i] = word & mask;
-        }
-    }
-    for (; i < values.size(); ++i) {
-        const std::size_t bit = i * width;
-        const std::size_t first = bit / 8U;
-        const auto skip = static_cast<unsigned>(bit % 8U);
-        std::uint64_t word = 0;
-        for (std::size_t b = 8; b > 0; --b) {
-            word = (word << 8U) | byte_at(first + b - 1);
-        }
-        word >>= skip;
-        if (skip + width > kWordBits) {
-            // skip > 0 here, so the shift is below 64.
-            word |= byte_at(first + 8) << (kWordBits - skip);
-        }
-        values[i] = word & mask;
-    }
+    simd::active_kernels().unpack_linear(bytes, width, values);
     const std::size_t used = values.size() * width;
     if (used % 8U != 0) {
         const auto last = std::to_integer<unsigned>(bytes.back());

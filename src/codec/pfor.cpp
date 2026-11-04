@@ -7,6 +7,7 @@
 #include "tick_store/codec/int_transform.hpp"
 #include "tick_store/codec/lane_pack.hpp"
 #include "tick_store/codec/patch_list.hpp"
+#include "tick_store/codec/simd.hpp"
 
 #include <algorithm>
 #include <array>
@@ -537,8 +538,11 @@ std::expected<std::size_t, CodecError> decode_pfor_block(std::span<const std::by
     reserve_for_block(out, header->count);
     out.resize(start + count);
     const std::span<std::uint64_t> y = std::span{out}.subspan(start);
-    // Only the words a vector's width uses are loaded, and only those are read.
-    std::array<std::uint64_t, kVectorValues> words;  // NOLINT(cppcoreguidelines-pro-type-member-init)
+    const simd::Kernels& kernels = simd::active_kernels();
+    // Delta blocks are summed vector by vector as they are decoded, the carry the last sum
+    // of the vector before; the other transforms run over the whole block afterwards.
+    const bool delta = static_cast<IntTransform>(*transform) == IntTransform::delta;
+    std::uint64_t carry = 0;
     thread_local Patches exceptions;
     for (std::size_t at = 0; at < count; at += kVectorValues) {
         const std::span<std::uint64_t> vector = y.subspan(at, std::min(kVectorValues, count - at));
@@ -579,25 +583,27 @@ std::expected<std::size_t, CodecError> decode_pfor_block(std::span<const std::by
                                     bytes_for(*base), *base_bytes));
         }
 
-        if (vector.size() == kVectorValues) {
-            const auto packed = cursor.take(vector_bytes(width), "pfor packed vector");
-            if (!packed.has_value()) {
-                return fail(packed.error());
+        // A full vector's words are unpacked once its exceptions are known, which cannot
+        // fail, so the errors come in the same order either way.
+        const bool full = vector.size() == kVectorValues;
+        std::span<const std::byte> packed;
+        if (full) {
+            const auto taken = cursor.take(vector_bytes(width), "pfor packed vector");
+            if (!taken.has_value()) {
+                return fail(taken.error());
             }
-            const std::span<std::uint64_t> used = std::span{words}.first(vector_words(width));
-            load_words_le(*packed, used);
-            unpack_vector(used, width, vector.first<kVectorValues>());
+            packed = *taken;
         } else {
-            const auto packed = cursor.take(linear_bytes(vector.size(), width), "pfor packed tail");
-            if (!packed.has_value()) {
-                return fail(packed.error());
+            const auto taken = cursor.take(linear_bytes(vector.size(), width), "pfor packed tail");
+            if (!taken.has_value()) {
+                return fail(taken.error());
             }
-            if (!unpack_linear(*packed, width, vector)) {
+            if (!unpack_linear(*taken, width, vector)) {
                 // The last byte holds padding that is not zero.
                 const std::uint64_t used = vector.size() * width;
                 return fail(codec_error(CodecErrorKind::trailing_bits, "pfor tail padding",
                                         cursor.bit_offset() - 8U + (used % 8U), 0,
-                                        std::to_integer<std::uint64_t>(packed->back()) >> (used % 8U)));
+                                        std::to_integer<std::uint64_t>(taken->back()) >> (used % 8U)));
             }
         }
 
@@ -609,6 +615,16 @@ std::expected<std::size_t, CodecError> decode_pfor_block(std::span<const std::by
         if (*listed > vector.size()) {
             return fail(codec_error(CodecErrorKind::bad_count, "pfor exception count",
                                     exceptions_at, vector.size(), *listed));
+        }
+        const bool zigzag = *mode == 1;
+        if (full && delta && *listed == 0 && kernels.fuse_delta) {
+            // Unpack, base, zigzag and sums in one pass.
+            carry = kernels.unpack_delta(packed, width, *base, zigzag, carry,
+                                         vector.first<kVectorValues>());
+            continue;
+        }
+        if (full) {
+            kernels.unpack_vector(packed, width, vector.first<kVectorValues>());
         }
         if (*listed > 0) {
             const std::uint64_t high_at = cursor.bit_offset();
@@ -636,23 +652,16 @@ std::expected<std::size_t, CodecError> decode_pfor_block(std::span<const std::by
                 vector[exceptions.positions[i]] |= exceptions.values[i] << width;
             }
         }
-        const std::uint64_t offset = *base;
-        if (*mode == 1) {
-            for (std::uint64_t& value : vector) {
-                value = zigzag_decode(value + offset);
-            }
+        if (delta) {
+            carry = kernels.delta_pass(vector, *base, zigzag, carry);
         } else {
-            for (std::uint64_t& value : vector) {
-                value += offset;
-            }
+            kernels.add_base(vector, *base, zigzag);
         }
     }
 
     switch (static_cast<IntTransform>(*transform)) {
         case IntTransform::none:
-            break;
         case IntTransform::delta:
-            delta_decode(y);
             break;
         case IntTransform::delta_of_delta:
             delta_of_delta_decode(y);

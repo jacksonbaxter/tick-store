@@ -38,6 +38,7 @@ add_executable(tick_store_unit_tests
     reference_eval_test.cpp
     roundtrip_cli_test.cpp
     run_length_test.cpp
+    simd_kernels_test.cpp
     sha256_test.cpp
     slice_test.cpp
     stream_vbyte_test.cpp
@@ -60,3 +61,11 @@ target_compile_definitions(tick_store_unit_tests PRIVATE
 )
 
 gtest_discover_tests(tick_store_unit_tests DISCOVERY_TIMEOUT 60)
+
+# The same codec, store and query tests again with the kernels capped to the scalar set,
+# so the path every processor can fall back to runs everywhere (S1). SimdDispatch fails
+# here if the cap did not take (S6).
+add_test(NAME simd_capped_to_scalar
+    COMMAND tick_store_unit_tests
+        "--gtest_filter=Simd*:Pfor*:StreamVByte*:Dictionary*:LanePack*:LinearPack*:ItchStore*:ItchQuery*:FuzzOracles*:FuzzRegression*")
+set_tests_properties(simd_capped_to_scalar PROPERTIES ENVIRONMENT "TICK_STORE_SIMD=scalar")

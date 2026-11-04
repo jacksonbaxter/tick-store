@@ -5,6 +5,7 @@
 #include "tick_store/codec/codec_error.hpp"
 #include "tick_store/codec/int_transform.hpp"
 #include "tick_store/codec/patch_list.hpp"
+#include "tick_store/codec/simd.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -165,10 +166,7 @@ std::expected<std::size_t, CodecError> decode_svb_block(std::span<const std::byt
                                     0, spare));
         }
     }
-    std::size_t data_bytes = 0;
-    for (std::size_t i = 0; i < count; ++i) {
-        data_bytes += code_of(i) + 1U;
-    }
+    const std::size_t data_bytes = simd::svb_data_bytes(*controls, count);
     const std::uint64_t data_at = cursor.bit_offset();
     const auto data = cursor.take(data_bytes, "svb data");
     if (!data.has_value()) {
@@ -179,19 +177,22 @@ std::expected<std::size_t, CodecError> decode_svb_block(std::span<const std::byt
     reserve_for_block(out, header->count);
     out.resize(start + count);
     const std::span<std::uint64_t> values = std::span{out}.subspan(start);
-    std::size_t at = 0;
-    for (std::size_t i = 0; i < count; ++i) {
-        const unsigned length = code_of(i) + 1U;
-        std::uint64_t value = 0;
-        for (unsigned b = length; b > 0; --b) {
-            value = (value << 8U) | std::to_integer<std::uint64_t>((*data)[at + b - 1]);
+    const simd::Kernels& kernels = simd::active_kernels();
+    // The kernel says only whether some value is too long; the checked loop finds which.
+    if (!kernels.svb_decode(*controls, *data, values)) {
+        std::size_t at = 0;
+        for (std::size_t i = 0; i < count; ++i) {
+            const unsigned length = code_of(i) + 1U;
+            std::uint64_t value = 0;
+            for (unsigned b = length; b > 0; --b) {
+                value = (value << 8U) | std::to_integer<std::uint64_t>((*data)[at + b - 1]);
+            }
+            if (low_length(value) != length) {
+                return fail(codec_error(CodecErrorKind::non_canonical, "svb length",
+                                        data_at + (at * 8U), low_length(value), length));
+            }
+            at += length;
         }
-        if (low_length(value) != length) {
-            return fail(codec_error(CodecErrorKind::non_canonical, "svb length",
-                                    data_at + (at * 8U), low_length(value), length));
-        }
-        values[i] = value;
-        at += length;
     }
 
     const std::uint64_t highs_at = cursor.bit_offset();
@@ -229,12 +230,10 @@ std::expected<std::size_t, CodecError> decode_svb_block(std::span<const std::byt
         }
     }
     if ((*flags & kFlagZigzag) != 0) {
-        for (std::uint64_t& value : values) {
-            value = zigzag_decode(value);
-        }
+        kernels.add_base(values, 0, true);
     }
     if ((*flags & kFlagDelta) != 0) {
-        delta_decode(values);
+        (void)kernels.prefix_sum(values, 0);
     }
     if (cursor.remaining() != 0) {
         return fail(codec_error(CodecErrorKind::trailing_bits, "svb block", cursor.bit_offset(), 0,

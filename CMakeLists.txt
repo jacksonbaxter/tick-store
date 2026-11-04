@@ -39,6 +39,8 @@ target_sources(tick_store_core PRIVATE
     src/codec/pfor.cpp
     src/codec/price_double.cpp
     src/codec/run_length.cpp
+    src/codec/simd/dispatch.cpp
+    src/codec/simd/kernels_scalar.cpp
     src/codec/stream_vbyte.cpp
     src/codec/zstd_frame.cpp
     src/itch/codec.cpp
@@ -82,6 +84,19 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64|ARM64)$")
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|amd64)$")
     target_sources(tick_store_core PRIVATE src/store/crc32c_sse42.cpp)
     target_compile_definitions(tick_store_core PRIVATE TICK_STORE_CRC32C_SSE42)
+endif()
+
+# The decode kernels for the target processor, each set in its own file (codec/simd.hpp).
+# arm64 has NEON in its baseline, so its set needs no runtime check. x86-64 builds the AVX2
+# set, chosen at run time from CPUID; that file marks its functions target("avx2") rather
+# than being compiled with -mavx2, so nothing it emits can reach code that runs without
+# AVX2. Any other processor gets the scalar set alone. Callers need no #ifdef.
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64|ARM64)$")
+    target_sources(tick_store_core PRIVATE src/codec/simd/kernels_neon.cpp)
+    target_compile_definitions(tick_store_core PRIVATE TICK_STORE_SIMD_NEON)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|amd64)$")
+    target_sources(tick_store_core PRIVATE src/codec/simd/kernels_avx2.cpp)
+    target_compile_definitions(tick_store_core PRIVATE TICK_STORE_SIMD_AVX2)
 endif()
 
 # The correctness harness. It is never linked into the store itself.

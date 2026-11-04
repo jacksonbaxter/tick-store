@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <numeric>
 #include <span>
 #include <vector>
 
@@ -104,10 +105,27 @@ std::expected<void, CodecError> read_patches(ByteCursor& cursor, std::size_t cou
         return std::unexpected(codec_error(CodecErrorKind::non_canonical, fields.gap_width,
                                            gap_width_at, needed, gap_bits));
     }
+    // Positions rise strictly, so only the last can reach `limit`; with that and no value
+    // of 0, nothing can fail, and the positions are formed with no check in the loop. A
+    // gap is below 2^20 and there are at most 2^20, so no sum wraps. Otherwise the checked
+    // loop below finds the first field at fault, in order.
+    const std::uint64_t last =
+        std::accumulate(gaps.begin(), gaps.end(), std::uint64_t{0}) + (count - 1U);
+    const bool zero_value = std::ranges::min(out.values) == 0;
+    if (last < limit && !zero_value) {
+        out.positions.resize(count);
+        std::uint64_t position = gaps[0];
+        out.positions[0] = static_cast<std::uint32_t>(position);
+        for (std::size_t i = 1; i < count; ++i) {
+            position += gaps[i] + 1U;
+            // Below `limit`, which is at most 2^20, so the cast keeps every bit.
+            out.positions[i] = static_cast<std::uint32_t>(position);
+        }
+        return {};
+    }
     out.positions.reserve(count);
     std::uint64_t position = 0;
     for (std::size_t i = 0; i < count; ++i) {
-        // A gap is below 2^20 and so is the position before it, so the sum cannot wrap.
         position = i == 0 ? gaps[0] : position + gaps[i] + 1U;
         if (position >= limit) {
             return std::unexpected(codec_error(CodecErrorKind::bad_field, fields.positions,
@@ -117,7 +135,6 @@ std::expected<void, CodecError> read_patches(ByteCursor& cursor, std::size_t cou
             return std::unexpected(codec_error(CodecErrorKind::non_canonical, fields.values,
                                                values_at + (i * value_bits), 1, 0));
         }
-        // Below `limit`, which is at most 2^20, so the cast keeps every bit.
         out.positions.push_back(static_cast<std::uint32_t>(position));
     }
     return {};
