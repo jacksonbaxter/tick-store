@@ -1111,7 +1111,14 @@ On the real days, the largest segment is 8,164,713 bytes in 28 blocks (12302019,
   - `g1-store-alters-a-byte` was PROVEN: the oracle exits 1 and names the first differing record and byte.
   - `itch-store-import-not-appended` was PROVEN: the dev tests fail on `ItchStoreReferences`.
   - `fuzz-itch-store-distance-bound` first came back WRONG REASON. The fuzzer did exit 77 on the fault, but UBSan reported it, not ASan: an empty list made the read a non-zero offset from a null pointer. The expectation now names the frame of the function whose check the patch removes, `SegmentAssembler::State::named`, which either sanitizer's trace contains. Re-run, it was PROVEN.
-- `results/check-proofs.json` was restored from git afterwards.
+- `coverage-required-removed` no longer applied: the unit test list had gained `bit_stream_test.cpp` and `codec_eval_test.cpp` after the patch was written. With its context refreshed, it was PROVEN: the coverage step fails with `verify_round_trip` not reached. Raw: `phase3-raw/store/faults/coverage/`.
+- `results/check-proofs.json` was restored from git after each proof run.
+
+**The full check.** `scripts/check.sh` ran through `heavy.sh` under `/usr/bin/time -l` at `4302ce8`, with no other sanitizer build running: all 29 steps passed in 993 s, with a 1.24 GB maximum resident set. That covers 570 tests under dev, ASan with UBSan, and TSan; clang-tidy on 110 files; 12 fuzz targets at 20 s each; and coverage reaching all 204 required functions (lines 93.83%, functions 97.39%, published in `results/coverage.json`). Raw logs are in `phase3-raw/store/check/`.
+
+The first two attempts failed, and the fixes are committed:
+- At `c64ca36`, ASan stopped `ReferenceEval.TheCommandLineWritesJsonWithoutPathsAndRefusesBadUsage` with a heap use after free. Two of its bad-usage argument lists held `string_view`s into temporary path strings. On debian the same test had failed outright, because the freed memory still read as valid arguments.
+- At `67d2055`, clang-tidy refused 109 distinct findings in the store's code and tests: missing includes, static members read through instances, a recursive coder, unchecked optionals, and the column table without designated initialisers. All were fixed at `e45d08c` without changing a stored byte: the golden store file still matches both ways.
 
 **What did not help.**
 - A book checkpoint per segment cost 2,016 MB at 2^20, fifteen times the distances it would allow.

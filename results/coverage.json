@@ -1,369 +1,369 @@
 {
   "schema": "tick-store-coverage-1",
-  "commit": "4dcea24ef813",
+  "commit": "4302ce85e473",
   "platform": "Darwin arm64",
   "run": "tests/unit, with ItchRealDay left out so the report needs no data file.",
   "simd_kernels": "No SIMD kernels exist yet, so none are reported and none are claimed.",
   "python_validators": "llvm-cov measures the C++ only. The Python validators are shown failing rule by rule in tests/scripts/ instead.",
   "totals": {
-    "lines_covered": 7988,
-    "lines_total": 8503,
-    "lines_percent": 93.94,
-    "functions_covered": 737,
-    "functions_total": 751,
-    "functions_percent": 98.14
+    "lines_covered": 10545,
+    "lines_total": 11239,
+    "lines_percent": 93.83,
+    "functions_covered": 933,
+    "functions_total": 958,
+    "functions_percent": 97.39
   },
   "required": {
-    "total": 169,
-    "reached": 169,
+    "total": 204,
+    "reached": 204,
     "functions": [
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<SystemEvent>",
-        "calls": 3498192
+        "calls": 3593838
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<SystemEvent>",
-        "calls": 3321661
+        "calls": 3389053
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<StockDirectory>",
-        "calls": 1011910
+        "calls": 1225622
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<StockDirectory>",
-        "calls": 1005073
+        "calls": 1219051
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<StockTradingAction>",
-        "calls": 469675
+        "calls": 570763
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<StockTradingAction>",
-        "calls": 466470
+        "calls": 567558
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<RegShoRestriction>",
-        "calls": 359352
+        "calls": 437976
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<RegShoRestriction>",
-        "calls": 356965
+        "calls": 435589
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<MarketParticipantPosition>",
-        "calls": 505569
+        "calls": 617889
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<MarketParticipantPosition>",
-        "calls": 502138
+        "calls": 614458
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<MwcbDeclineLevel>",
-        "calls": 397928
+        "calls": 407592
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<MwcbDeclineLevel>",
-        "calls": 394789
+        "calls": 474989
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<MwcbStatus>",
-        "calls": 292504
+        "calls": 359896
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<MwcbStatus>",
-        "calls": 290598
+        "calls": 357990
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<IpoQuotingPeriodUpdate>",
-        "calls": 432733
+        "calls": 533821
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<IpoQuotingPeriodUpdate>",
-        "calls": 429457
+        "calls": 530545
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<LuldAuctionCollar>",
-        "calls": 472151
+        "calls": 549711
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<LuldAuctionCollar>",
-        "calls": 468375
+        "calls": 545935
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<OperationalHalt>",
-        "calls": 369940
+        "calls": 431988
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<OperationalHalt>",
-        "calls": 367321
+        "calls": 429369
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<AddOrder>",
-        "calls": 309027
+        "calls": 321197
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<AddOrder>",
-        "calls": 456839
+        "calls": 560229
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<AddOrderWithMpid>",
-        "calls": 337570
+        "calls": 350858
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<AddOrderWithMpid>",
-        "calls": 494903
+        "calls": 566876
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<OrderExecuted>",
-        "calls": 243874
+        "calls": 253586
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<OrderExecuted>",
-        "calls": 354823
+        "calls": 420823
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<OrderExecutedWithPrice>",
-        "calls": 304600
+        "calls": 316680
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<OrderExecutedWithPrice>",
-        "calls": 439109
+        "calls": 504509
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<OrderCancel>",
-        "calls": 211574
+        "calls": 220030
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<OrderCancel>",
-        "calls": 302275
+        "calls": 348069
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<OrderDelete>",
-        "calls": 180667
+        "calls": 187951
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<OrderDelete>",
-        "calls": 255147
+        "calls": 304929
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<OrderReplace>",
-        "calls": 271962
+        "calls": 282861
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<OrderReplace>",
-        "calls": 379591
+        "calls": 419254
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<Trade>",
-        "calls": 332596
+        "calls": 345884
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<Trade>",
-        "calls": 459339
+        "calls": 487246
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<CrossTrade>",
-        "calls": 410915
+        "calls": 423043
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<CrossTrade>",
-        "calls": 407003
+        "calls": 432373
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<BrokenTrade>",
-        "calls": 240403
+        "calls": 247651
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<BrokenTrade>",
-        "calls": 238341
+        "calls": 253563
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<NetOrderImbalance>",
-        "calls": 550076
+        "calls": 566988
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<NetOrderImbalance>",
-        "calls": 544673
+        "calls": 580191
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<RetailInterest>",
-        "calls": 267162
+        "calls": 293370
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<RetailInterest>",
-        "calls": 264810
+        "calls": 291018
       },
       {
         "group": "decoder",
         "file": "src/itch/codec.cpp",
         "name": "decode_as<DirectListingPriceDiscovery>",
-        "calls": 486101
+        "calls": 534773
       },
       {
         "group": "encoder",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<DirectListingPriceDiscovery>",
-        "calls": 481023
+        "calls": 529695
       },
       {
         "group": "parser",
         "file": "src/itch/codec.cpp",
         "name": "decode",
-        "calls": 1284253
+        "calls": 1414811
       },
       {
         "group": "parser",
         "file": "src/itch/codec.cpp",
         "name": "decode_strict",
-        "calls": 1591253
+        "calls": 1731492
       },
       {
         "group": "parser",
         "file": "src/itch/codec.cpp",
         "name": "encode",
-        "calls": 1631656
+        "calls": 1811544
       },
       {
         "group": "parser",
         "file": "src/itch/codec.cpp",
         "name": "encode_frame",
-        "calls": 1621575
+        "calls": 1638099
       },
       {
         "group": "parser",
         "file": "src/itch/codec.cpp",
         "name": "wire_size_of",
-        "calls": 242175
+        "calls": 1162769
       },
       {
         "group": "parser",
         "file": "src/itch/codec.cpp",
         "name": "encode_as<RawMessage>",
-        "calls": 90859
+        "calls": 98002
       },
       {
         "group": "parser",
         "file": "include/tick_store/itch/frame.hpp",
         "name": "FrameCursor::next",
-        "calls": 2424039
+        "calls": 2578970
       },
       {
         "group": "parser",
         "file": "include/tick_store/itch/big_endian.hpp",
         "name": "BigEndianReader::read_uint",
-        "calls": 8641039
+        "calls": 9300600
       },
       {
         "group": "parser",
         "file": "include/tick_store/itch/big_endian.hpp",
         "name": "BigEndianReader::read_byte",
-        "calls": 3498325
+        "calls": 3879833
       },
       {
         "group": "parser",
         "file": "include/tick_store/itch/big_endian.hpp",
         "name": "BigEndianReader::read_bytes",
-        "calls": 782843
+        "calls": 902988
       },
       {
         "group": "parser",
         "file": "include/tick_store/store/little_endian.hpp",
         "name": "read_le",
-        "calls": 21099288
+        "calls": 34799031
       },
       {
         "group": "parser",
         "file": "src/store/stub_store.cpp",
         "name": "StoreParser::open",
-        "calls": 44987
+        "calls": 44985
       },
       {
         "group": "parser",
@@ -399,49 +399,49 @@
         "group": "parser",
         "file": "src/store/mapped_file.cpp",
         "name": "MappedFile::open",
-        "calls": 13302
+        "calls": 13339
       },
       {
         "group": "parser",
         "file": "src/store/container.cpp",
         "name": "ContainerParser::open",
-        "calls": 28730
+        "calls": 226705
       },
       {
         "group": "parser",
         "file": "src/store/container.cpp",
         "name": "ContainerParser::block_info",
-        "calls": 10997
+        "calls": 987320
       },
       {
         "group": "parser",
         "file": "src/store/container.cpp",
         "name": "ContainerParser::block_with",
-        "calls": 4652
+        "calls": 349153
       },
       {
         "group": "parser",
         "file": "src/store/container.cpp",
         "name": "ContainerParser::section_info",
-        "calls": 18350
+        "calls": 185495
       },
       {
         "group": "parser",
         "file": "src/store/container.cpp",
         "name": "ContainerParser::section_at",
-        "calls": 4065
+        "calls": 34983
       },
       {
         "group": "parser",
         "file": "src/store/container.cpp",
         "name": "ContainerParser::section",
-        "calls": 7946
+        "calls": 100778
       },
       {
         "group": "parser",
         "file": "src/store/container.cpp",
         "name": "ContainerParser::verify_all",
-        "calls": 1203
+        "calls": 1204
       },
       {
         "group": "parser",
@@ -465,79 +465,241 @@
         "group": "writer",
         "file": "src/store/container.cpp",
         "name": "ContainerLayout::add_block",
-        "calls": 2693
+        "calls": 63496
       },
       {
         "group": "writer",
         "file": "src/store/container.cpp",
         "name": "ContainerLayout::add_section",
-        "calls": 2635
+        "calls": 6620
       },
       {
         "group": "writer",
         "file": "src/store/container.cpp",
         "name": "ContainerLayout::encode_footer_and_trailer",
-        "calls": 1296
+        "calls": 2624
       },
       {
         "group": "writer",
         "file": "src/store/container.cpp",
         "name": "build_container",
-        "calls": 1282
+        "calls": 1356
       },
       {
         "group": "writer",
         "file": "src/store/container_writer.cpp",
         "name": "ContainerWriter::create",
-        "calls": 16
+        "calls": 27
       },
       {
         "group": "writer",
         "file": "src/store/container_writer.cpp",
         "name": "ContainerWriter::add_block",
-        "calls": 77
+        "calls": 499
       },
       {
         "group": "writer",
         "file": "src/store/container_writer.cpp",
         "name": "ContainerWriter::add_section",
-        "calls": 34
+        "calls": 61
       },
       {
         "group": "writer",
         "file": "src/store/container_writer.cpp",
         "name": "ContainerWriter::publish",
-        "calls": 14
+        "calls": 23
       },
       {
         "group": "writer",
         "file": "src/store/durability.cpp",
         "name": "sync_file",
-        "calls": 68
+        "calls": 71
       },
       {
         "group": "writer",
         "file": "src/store/durability.cpp",
         "name": "sync_directory",
-        "calls": 57
+        "calls": 60
       },
       {
         "group": "writer",
         "file": "src/store/durability.cpp",
         "name": "full_fsync_or_fallback",
-        "calls": 117
+        "calls": 123
       },
       {
         "group": "writer",
         "file": "src/store/durability.cpp",
         "name": "write_all",
-        "calls": 180
+        "calls": 192
+      },
+      {
+        "group": "parser",
+        "file": "src/store/itch_store.cpp",
+        "name": "parse_store_header",
+        "calls": 14532
+      },
+      {
+        "group": "parser",
+        "file": "src/store/itch_store.cpp",
+        "name": "SymbolTable::parse",
+        "calls": 14420
+      },
+      {
+        "group": "parser",
+        "file": "src/store/itch_store.cpp",
+        "name": "parse_column_metadata",
+        "calls": 633275
+      },
+      {
+        "group": "parser",
+        "file": "src/store/itch_store.cpp",
+        "name": "decode_column",
+        "calls": 343894
+      },
+      {
+        "group": "parser",
+        "file": "src/store/itch_store_reader.cpp",
+        "name": "ItchStoreReader::open",
+        "calls": 6
+      },
+      {
+        "group": "parser",
+        "file": "src/store/itch_store_reader.cpp",
+        "name": "ItchStoreReader::open_bytes",
+        "calls": 51539
+      },
+      {
+        "group": "parser",
+        "file": "src/store/itch_store_reader.cpp",
+        "name": "ItchStoreReader::read_sections",
+        "calls": 14570
+      },
+      {
+        "group": "parser",
+        "file": "src/store/itch_store_reader.cpp",
+        "name": "ItchStoreReader::read_directory",
+        "calls": 15180
+      },
+      {
+        "group": "parser",
+        "file": "src/store/itch_store_reader.cpp",
+        "name": "ItchStoreReader::read_column",
+        "calls": 945955
+      },
+      {
+        "group": "parser",
+        "file": "src/store/itch_store_reader.cpp",
+        "name": "ItchStoreReader::read_columns",
+        "calls": 31869
+      },
+      {
+        "group": "parser",
+        "file": "src/store/itch_store_reader.cpp",
+        "name": "ItchStoreReader::tail",
+        "calls": 1735
+      },
+      {
+        "group": "parser",
+        "file": "src/store/itch_store_reader.cpp",
+        "name": "SegmentReader::seek",
+        "calls": 31824
+      },
+      {
+        "group": "parser",
+        "file": "src/store/itch_segment.cpp",
+        "name": "SegmentAssembler::load",
+        "calls": 21745273
+      },
+      {
+        "group": "parser",
+        "file": "src/store/itch_segment.cpp",
+        "name": "SegmentAssembler::next",
+        "calls": 185093
+      },
+      {
+        "group": "parser",
+        "file": "src/codec/zstd_frame.cpp",
+        "name": "decode_zstd_payload",
+        "calls": 11811
+      },
+      {
+        "group": "writer",
+        "file": "src/store/itch_store.cpp",
+        "name": "encode_store_header",
+        "calls": 1255
+      },
+      {
+        "group": "writer",
+        "file": "src/store/itch_store.cpp",
+        "name": "SymbolTable::encode",
+        "calls": 1255
+      },
+      {
+        "group": "writer",
+        "file": "src/store/itch_store.cpp",
+        "name": "encode_column_metadata",
+        "calls": 58002
+      },
+      {
+        "group": "writer",
+        "file": "src/store/itch_store.cpp",
+        "name": "encode_column",
+        "calls": 58103
+      },
+      {
+        "group": "writer",
+        "file": "src/store/itch_segment.cpp",
+        "name": "SegmentBuilder::add",
+        "calls": 34521
+      },
+      {
+        "group": "writer",
+        "file": "src/store/itch_segment.cpp",
+        "name": "SegmentBuilder::finish",
+        "calls": 4942
+      },
+      {
+        "group": "writer",
+        "file": "src/store/itch_store_writer.cpp",
+        "name": "ItchStoreWriter::create",
+        "calls": 11
+      },
+      {
+        "group": "writer",
+        "file": "src/store/itch_store_writer.cpp",
+        "name": "ItchStoreWriter::in_memory",
+        "calls": 1248
+      },
+      {
+        "group": "writer",
+        "file": "src/store/itch_store_writer.cpp",
+        "name": "ItchStoreWriter::append",
+        "calls": 34519
+      },
+      {
+        "group": "writer",
+        "file": "src/store/itch_store_writer.cpp",
+        "name": "ItchStoreWriter::write_segment",
+        "calls": 4942
+      },
+      {
+        "group": "writer",
+        "file": "src/store/itch_store_writer.cpp",
+        "name": "ItchStoreWriter::finish",
+        "calls": 1255
+      },
+      {
+        "group": "writer",
+        "file": "src/codec/zstd_frame.cpp",
+        "name": "encode_zstd_payload",
+        "calls": 14771
       },
       {
         "group": "codec",
         "file": "src/store/crc32c.cpp",
         "name": "crc32c",
-        "calls": 48355
+        "calls": 1123743
       },
       {
         "group": "codec",
@@ -573,25 +735,25 @@
         "group": "codec",
         "file": "include/tick_store/codec/bit_stream.hpp",
         "name": "BitReader::read",
-        "calls": 5605815
+        "calls": 8258298
       },
       {
         "group": "codec",
         "file": "include/tick_store/codec/bit_stream.hpp",
         "name": "BitReader::finish",
-        "calls": 230460
+        "calls": 394320
       },
       {
         "group": "codec",
         "file": "src/codec/block.cpp",
         "name": "read_block_header",
-        "calls": 6600160
+        "calls": 7091813
       },
       {
         "group": "codec",
         "file": "src/codec/block.cpp",
         "name": "decode_column",
-        "calls": 337054
+        "calls": 649847
       },
       {
         "group": "codec",
@@ -633,13 +795,13 @@
         "group": "codec",
         "file": "include/tick_store/codec/bit_stream.hpp",
         "name": "BitWriter::write",
-        "calls": 2494549
+        "calls": 2817567
       },
       {
         "group": "codec",
         "file": "include/tick_store/codec/bit_stream.hpp",
         "name": "BitWriter::finish",
-        "calls": 162161
+        "calls": 188263
       },
       {
         "group": "codec",
@@ -657,43 +819,43 @@
         "group": "codec",
         "file": "src/codec/lane_pack.cpp",
         "name": "unpack_vector",
-        "calls": 10738
+        "calls": 11035
       },
       {
         "group": "codec",
         "file": "src/codec/lane_pack.cpp",
         "name": "unpack_linear",
-        "calls": 82602185
+        "calls": 86648028
       },
       {
         "group": "codec",
         "file": "src/codec/lane_pack.cpp",
         "name": "pack_vector",
-        "calls": 5822
+        "calls": 6428
       },
       {
         "group": "codec",
         "file": "src/codec/lane_pack.cpp",
         "name": "pack_linear",
-        "calls": 16261757
+        "calls": 16587983
       },
       {
         "group": "codec",
         "file": "src/codec/patch_list.cpp",
         "name": "read_patches",
-        "calls": 454010
+        "calls": 518820
       },
       {
         "group": "codec",
         "file": "src/codec/patch_list.cpp",
         "name": "append_patches",
-        "calls": 4025874
+        "calls": 4099872
       },
       {
         "group": "codec",
         "file": "src/codec/pfor.cpp",
         "name": "decode_pfor_block",
-        "calls": 27631037
+        "calls": 29597329
       },
       {
         "group": "codec",
@@ -705,13 +867,13 @@
         "group": "codec",
         "file": "src/codec/pfor.cpp",
         "name": "encode_pfor_block",
-        "calls": 5223343
+        "calls": 5357432
       },
       {
         "group": "codec",
         "file": "src/codec/pfor.cpp",
         "name": "encode_pfor",
-        "calls": 245465
+        "calls": 271514
       },
       {
         "group": "codec",
@@ -729,19 +891,19 @@
         "group": "codec",
         "file": "src/codec/stream_vbyte.cpp",
         "name": "encode_svb_block",
-        "calls": 122303
+        "calls": 122314
       },
       {
         "group": "codec",
         "file": "src/codec/stream_vbyte.cpp",
         "name": "encode_svb",
-        "calls": 10877
+        "calls": 10888
       },
       {
         "group": "codec",
         "file": "src/codec/dictionary.cpp",
         "name": "decode_dict_block",
-        "calls": 80345
+        "calls": 245954
       },
       {
         "group": "codec",
@@ -753,31 +915,31 @@
         "group": "codec",
         "file": "src/codec/dictionary.cpp",
         "name": "encode_dict_block",
-        "calls": 51262
+        "calls": 77364
       },
       {
         "group": "codec",
         "file": "src/codec/dictionary.cpp",
         "name": "encode_dict",
-        "calls": 4034
+        "calls": 30097
       },
       {
         "group": "codec",
         "file": "src/codec/dictionary.cpp",
         "name": "read_huffman",
-        "calls": 75692
+        "calls": 239654
       },
       {
         "group": "codec",
         "file": "src/codec/dictionary.cpp",
         "name": "huffman_lengths",
-        "calls": 174223
+        "calls": 438623
       },
       {
         "group": "codec",
         "file": "src/codec/run_length.cpp",
         "name": "decode_rle_block",
-        "calls": 1638639
+        "calls": 1647134
       },
       {
         "group": "codec",
@@ -789,13 +951,13 @@
         "group": "codec",
         "file": "src/codec/run_length.cpp",
         "name": "encode_rle_block",
-        "calls": 1633665
+        "calls": 1634876
       },
       {
         "group": "codec",
         "file": "src/codec/run_length.cpp",
         "name": "encode_rle",
-        "calls": 5153
+        "calls": 6361
       },
       {
         "group": "validator",
@@ -867,7 +1029,31 @@
         "group": "validator",
         "file": "fuzz/container_oracles.hpp",
         "name": "fixed_checksums",
-        "calls": 3374
+        "calls": 14651
+      },
+      {
+        "group": "validator",
+        "file": "fuzz/itch_store_oracles.hpp",
+        "name": "check_itch_store",
+        "calls": 11277
+      },
+      {
+        "group": "validator",
+        "file": "fuzz/itch_store_oracles.hpp",
+        "name": "read_store",
+        "calls": 33831
+      },
+      {
+        "group": "validator",
+        "file": "fuzz/itch_store_oracles.hpp",
+        "name": "rewrite",
+        "calls": 1136
+      },
+      {
+        "group": "validator",
+        "file": "fuzz/itch_store_oracles.hpp",
+        "name": "check_random_access",
+        "calls": 568
       },
       {
         "group": "validator",
@@ -951,13 +1137,13 @@
         "group": "oracle",
         "file": "src/harness/roundtrip.cpp",
         "name": "verify",
-        "calls": 40812
+        "calls": 46480
       },
       {
         "group": "oracle",
         "file": "src/harness/roundtrip.cpp",
         "name": "verify_stub_store",
-        "calls": 18622
+        "calls": 18620
       },
       {
         "group": "oracle",
@@ -967,69 +1153,93 @@
       },
       {
         "group": "oracle",
+        "file": "src/harness/itch_store_record_reader.cpp",
+        "name": "verify_itch_store",
+        "calls": 5668
+      },
+      {
+        "group": "oracle",
+        "file": "src/harness/itch_store_record_reader.cpp",
+        "name": "ItchStoreRecordReader::next",
+        "calls": 17962
+      },
+      {
+        "group": "oracle",
+        "file": "src/harness/itch_store_record_reader.cpp",
+        "name": "ItchStoreRecordReader::tail",
+        "calls": 31
+      },
+      {
+        "group": "oracle",
+        "file": "src/harness/itch_store_record_reader.cpp",
+        "name": "RefusedItchStore::next",
+        "calls": 4190
+      },
+      {
+        "group": "oracle",
         "file": "src/harness/roundtrip.cpp",
         "name": "Walk::run",
-        "calls": 40812
+        "calls": 46480
       },
       {
         "group": "oracle",
         "file": "src/harness/roundtrip.cpp",
         "name": "Walk::step",
-        "calls": 1061060
+        "calls": 1208376
       },
       {
         "group": "oracle",
         "file": "src/harness/roundtrip.cpp",
         "name": "Walk::take",
-        "calls": 804810
+        "calls": 821292
       },
       {
         "group": "oracle",
         "file": "src/harness/roundtrip.cpp",
         "name": "Walk::stop_reading",
-        "calls": 18625
+        "calls": 24262
       },
       {
         "group": "oracle",
         "file": "src/harness/roundtrip.cpp",
         "name": "Walk::note_missing",
-        "calls": 237627
+        "calls": 362824
       },
       {
         "group": "oracle",
         "file": "src/harness/roundtrip.cpp",
         "name": "Walk::note_difference",
-        "calls": 22612
+        "calls": 22613
       },
       {
         "group": "oracle",
         "file": "src/harness/roundtrip.cpp",
         "name": "Walk::locate",
-        "calls": 22680
+        "calls": 22682
       },
       {
         "group": "oracle",
         "file": "src/harness/roundtrip.cpp",
         "name": "Walk::drain_extra_records",
-        "calls": 22187
+        "calls": 22218
       },
       {
         "group": "oracle",
         "file": "src/harness/roundtrip.cpp",
         "name": "Walk::compare_tail",
-        "calls": 22058
+        "calls": 22089
       },
       {
         "group": "oracle",
         "file": "src/harness/roundtrip.cpp",
         "name": "RefusedStore::next",
-        "calls": 516
+        "calls": 514
       },
       {
         "group": "codec",
         "file": "src/store/crc32c_armv8.cpp",
         "name": "crc32c_armv8",
-        "calls": 53398
+        "calls": 1128786
       }
     ]
   },
@@ -1041,6 +1251,10 @@
     {
       "file": "include/tick_store/store/columns.hpp",
       "function": "store::ColumnsParser::manifest"
+    },
+    {
+      "file": "include/tick_store/store/itch_store.hpp",
+      "function": "store::SegmentColumns::operator[]"
     },
     {
       "file": "src/bench_support/counter_gate.cpp",
@@ -1075,6 +1289,86 @@
       "function": "harness::RefusedColumns::tail"
     },
     {
+      "file": "src/harness/itch_store_record_reader.cpp",
+      "function": "harness::RefusedItchStore::tail"
+    },
+    {
+      "file": "src/harness/reference_eval.cpp",
+      "function": "auto tick_store::harness::Walker::record"
+    },
+    {
+      "file": "src/harness/reference_eval.cpp",
+      "function": "harness::Walker::on"
+    },
+    {
+      "file": "src/harness/reference_eval.cpp",
+      "function": "void tick_store::harness::Walker::on<tick_store::itch::BrokenTrade>"
+    },
+    {
+      "file": "src/harness/reference_eval.cpp",
+      "function": "void tick_store::harness::Walker::on<tick_store::itch::CrossTrade>"
+    },
+    {
+      "file": "src/harness/reference_eval.cpp",
+      "function": "void tick_store::harness::Walker::on<tick_store::itch::DirectListingPriceDiscovery>"
+    },
+    {
+      "file": "src/harness/reference_eval.cpp",
+      "function": "void tick_store::harness::Walker::on<tick_store::itch::IpoQuotingPeriodUpdate>"
+    },
+    {
+      "file": "src/harness/reference_eval.cpp",
+      "function": "void tick_store::harness::Walker::on<tick_store::itch::LuldAuctionCollar>"
+    },
+    {
+      "file": "src/harness/reference_eval.cpp",
+      "function": "void tick_store::harness::Walker::on<tick_store::itch::MarketParticipantPosition>"
+    },
+    {
+      "file": "src/harness/reference_eval.cpp",
+      "function": "void tick_store::harness::Walker::on<tick_store::itch::MwcbDeclineLevel>"
+    },
+    {
+      "file": "src/harness/reference_eval.cpp",
+      "function": "void tick_store::harness::Walker::on<tick_store::itch::MwcbStatus>"
+    },
+    {
+      "file": "src/harness/reference_eval.cpp",
+      "function": "void tick_store::harness::Walker::on<tick_store::itch::NetOrderImbalance>"
+    },
+    {
+      "file": "src/harness/reference_eval.cpp",
+      "function": "void tick_store::harness::Walker::on<tick_store::itch::OperationalHalt>"
+    },
+    {
+      "file": "src/harness/reference_eval.cpp",
+      "function": "void tick_store::harness::Walker::on<tick_store::itch::RawMessage>"
+    },
+    {
+      "file": "src/harness/reference_eval.cpp",
+      "function": "void tick_store::harness::Walker::on<tick_store::itch::RegShoRestriction>"
+    },
+    {
+      "file": "src/harness/reference_eval.cpp",
+      "function": "void tick_store::harness::Walker::on<tick_store::itch::RetailInterest>"
+    },
+    {
+      "file": "src/harness/reference_eval.cpp",
+      "function": "void tick_store::harness::Walker::on<tick_store::itch::StockDirectory>"
+    },
+    {
+      "file": "src/harness/reference_eval.cpp",
+      "function": "void tick_store::harness::Walker::on<tick_store::itch::StockTradingAction>"
+    },
+    {
+      "file": "src/harness/reference_eval.cpp",
+      "function": "void tick_store::harness::Walker::on<tick_store::itch::SystemEvent>"
+    },
+    {
+      "file": "src/harness/reference_eval.cpp",
+      "function": "void tick_store::harness::Walker::on<tick_store::itch::Trade>"
+    },
+    {
       "file": "src/harness/roundtrip.cpp",
       "function": "harness::RefusedStore::tail"
     },
@@ -1085,6 +1379,26 @@
     {
       "file": "src/store/durability.cpp",
       "function": "store::PosixFileOps::fdatasync"
+    },
+    {
+      "file": "src/store/itch_segment.cpp",
+      "function": "store::RefMap::grow"
+    },
+    {
+      "file": "src/store/itch_segment.cpp",
+      "function": "store::SegmentAssembler::SegmentAssembler"
+    },
+    {
+      "file": "src/store/itch_segment.cpp",
+      "function": "store::SegmentAssembler::operator="
+    },
+    {
+      "file": "src/store/itch_segment.cpp",
+      "function": "store::SegmentBuilder::operator="
+    },
+    {
+      "file": "src/store/itch_store.cpp",
+      "function": "store::has_derived_stock"
     }
   ],
   "sources_not_built_on_this_platform": [
@@ -1256,6 +1570,15 @@
       "functions_percent": 100.0
     },
     {
+      "file": "include/tick_store/harness/itch_store_record_reader.hpp",
+      "lines_covered": 1,
+      "lines_total": 1,
+      "lines_percent": 100.0,
+      "functions_covered": 1,
+      "functions_total": 1,
+      "functions_percent": 100.0
+    },
+    {
       "file": "include/tick_store/harness/json_writer.hpp",
       "lines_covered": 88,
       "lines_total": 95,
@@ -1379,6 +1702,33 @@
       "lines_percent": 100.0,
       "functions_covered": 3,
       "functions_total": 3,
+      "functions_percent": 100.0
+    },
+    {
+      "file": "include/tick_store/store/itch_store.hpp",
+      "lines_covered": 11,
+      "lines_total": 14,
+      "lines_percent": 78.57,
+      "functions_covered": 7,
+      "functions_total": 8,
+      "functions_percent": 87.5
+    },
+    {
+      "file": "include/tick_store/store/itch_store_reader.hpp",
+      "lines_covered": 11,
+      "lines_total": 11,
+      "lines_percent": 100.0,
+      "functions_covered": 7,
+      "functions_total": 7,
+      "functions_percent": 100.0
+    },
+    {
+      "file": "include/tick_store/store/itch_store_writer.hpp",
+      "lines_covered": 1,
+      "lines_total": 1,
+      "lines_percent": 100.0,
+      "functions_covered": 1,
+      "functions_total": 1,
       "functions_percent": 100.0
     },
     {
@@ -1536,9 +1886,9 @@
     },
     {
       "file": "src/codec/pfor.cpp",
-      "lines_covered": 553,
+      "lines_covered": 557,
       "lines_total": 563,
-      "lines_percent": 98.22,
+      "lines_percent": 98.93,
       "functions_covered": 23,
       "functions_total": 23,
       "functions_percent": 100.0
@@ -1568,6 +1918,15 @@
       "lines_percent": 96.85,
       "functions_covered": 9,
       "functions_total": 9,
+      "functions_percent": 100.0
+    },
+    {
+      "file": "src/codec/zstd_frame.cpp",
+      "lines_covered": 87,
+      "lines_total": 98,
+      "lines_percent": 88.78,
+      "functions_covered": 6,
+      "functions_total": 6,
       "functions_percent": 100.0
     },
     {
@@ -1634,6 +1993,15 @@
       "functions_percent": 100.0
     },
     {
+      "file": "src/harness/itch_store_record_reader.cpp",
+      "lines_covered": 47,
+      "lines_total": 54,
+      "lines_percent": 87.04,
+      "functions_covered": 6,
+      "functions_total": 7,
+      "functions_percent": 85.71
+    },
+    {
       "file": "src/harness/page_cache_darwin.cpp",
       "lines_covered": 68,
       "lines_total": 80,
@@ -1641,6 +2009,15 @@
       "functions_covered": 12,
       "functions_total": 12,
       "functions_percent": 100.0
+    },
+    {
+      "file": "src/harness/reference_eval.cpp",
+      "lines_covered": 398,
+      "lines_total": 423,
+      "lines_percent": 94.09,
+      "functions_covered": 35,
+      "functions_total": 39,
+      "functions_percent": 89.74
     },
     {
       "file": "src/harness/roundtrip.cpp",
@@ -1653,11 +2030,11 @@
     },
     {
       "file": "src/harness/roundtrip_cli.cpp",
-      "lines_covered": 229,
-      "lines_total": 240,
-      "lines_percent": 95.42,
-      "functions_covered": 13,
-      "functions_total": 13,
+      "lines_covered": 456,
+      "lines_total": 481,
+      "lines_percent": 94.8,
+      "functions_covered": 24,
+      "functions_total": 24,
       "functions_percent": 100.0
     },
     {
@@ -1776,6 +2153,42 @@
       "functions_covered": 15,
       "functions_total": 16,
       "functions_percent": 93.75
+    },
+    {
+      "file": "src/store/itch_segment.cpp",
+      "lines_covered": 789,
+      "lines_total": 831,
+      "lines_percent": 94.95,
+      "functions_covered": 63,
+      "functions_total": 67,
+      "functions_percent": 94.03
+    },
+    {
+      "file": "src/store/itch_store.cpp",
+      "lines_covered": 497,
+      "lines_total": 533,
+      "lines_percent": 93.25,
+      "functions_covered": 32,
+      "functions_total": 33,
+      "functions_percent": 96.97
+    },
+    {
+      "file": "src/store/itch_store_reader.cpp",
+      "lines_covered": 351,
+      "lines_total": 361,
+      "lines_percent": 97.23,
+      "functions_covered": 14,
+      "functions_total": 14,
+      "functions_percent": 100.0
+    },
+    {
+      "file": "src/store/itch_store_writer.cpp",
+      "lines_covered": 133,
+      "lines_total": 168,
+      "lines_percent": 79.17,
+      "functions_covered": 13,
+      "functions_total": 13,
+      "functions_percent": 100.0
     },
     {
       "file": "src/store/mapped_file.cpp",
