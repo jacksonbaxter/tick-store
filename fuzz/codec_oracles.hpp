@@ -12,7 +12,7 @@
 //      values then go through every encoder the codec has:
 //        - canonical codecs (Gorilla), where a sequence has one encoding: the block must
 //          re-encode to exactly its bytes.
-//        - non-canonical codecs (PFOR, Stream VByte), where the encoder makes choices the
+//        - non-canonical codecs (PFOR, Stream VByte, dictionary, run-length), where the encoder makes choices the
 //          format leaves open: the re-encoded block must decode to the same values, the
 //          encoder must give the same bytes twice, and a codec-specific check may hold
 //          the re-encoding to more, such as never being larger.
@@ -27,10 +27,12 @@
 
 #include "tick_store/codec/block.hpp"
 #include "tick_store/codec/codec_error.hpp"
+#include "tick_store/codec/dictionary.hpp"
 #include "tick_store/codec/gorilla_timestamps.hpp"
 #include "tick_store/codec/gorilla_xor.hpp"
 #include "tick_store/codec/pfor.hpp"
 #include "tick_store/codec/price_double.hpp"
+#include "tick_store/codec/run_length.hpp"
 #include "tick_store/codec/stream_vbyte.hpp"
 
 #include <algorithm>
@@ -385,6 +387,93 @@ inline constexpr std::array<Encoder, 2> kSvbEncoders{
     return nullptr;
 }
 
+inline std::expected<void, CodecError> encode_dict_block_plain(
+    std::span<const std::uint64_t> values, std::vector<std::byte>& out) {
+    return encode_dict_block(values, out);
+}
+
+inline std::expected<void, CodecError> encode_dict_plain(std::span<const std::uint64_t> values,
+                                                         std::size_t block_values,
+                                                         std::vector<std::byte>& out) {
+    return encode_dict(values, block_values, out);
+}
+
+inline std::expected<void, CodecError> encode_rle_block_plain(
+    std::span<const std::uint64_t> values, std::vector<std::byte>& out) {
+    return encode_rle_block(values, out);
+}
+
+inline std::expected<void, CodecError> encode_rle_plain(std::span<const std::uint64_t> values,
+                                                        std::size_t block_values,
+                                                        std::vector<std::byte>& out) {
+    return encode_rle(values, block_values, out);
+}
+
+inline constexpr std::array<Encoder, 1> kDictEncoders{
+    Encoder{.encode_block = &encode_dict_block_plain, .encode_column = &encode_dict_plain}};
+inline constexpr std::array<Encoder, 1> kRleEncoders{
+    Encoder{.encode_block = &encode_rle_block_plain, .encode_column = &encode_rle_plain}};
+
+// The u32 little-endian field at `at` bytes into a block's payload.
+[[nodiscard]] inline std::uint64_t payload_u32(std::span<const std::byte> block, std::size_t at) {
+    std::uint64_t value = 0;
+    for (std::size_t i = 4; i > 0; --i) {
+        value = (value << 8U) | std::to_integer<std::uint64_t>(block[kBlockHeaderSize + at + i - 1]);
+    }
+    return value;
+}
+
+// A dictionary block's entries are distinct and every one is used, so its entry count is
+// the number of distinct values it held, whichever mode it took, and the encoder must
+// give the same count. The encoder takes move-to-front only within its entry limit.
+[[nodiscard]] inline const char* check_dict_block(std::span<const std::byte> block,
+                                                  std::span<const std::uint64_t> values) {
+    constexpr std::size_t kModeAt = 0;
+    constexpr std::size_t kEntriesAt = 1;
+    Words distinct(values.begin(), values.end());
+    std::ranges::sort(distinct);
+    const auto unique_end = std::ranges::unique(distinct).begin();
+    const auto count = static_cast<std::uint64_t>(unique_end - distinct.begin());
+    if (payload_u32(block, kEntriesAt) != count) {
+        return "a dictionary block's entry count is not its count of distinct values";
+    }
+    Bytes reencoded;
+    if (!encode_dict_block(values, reencoded).has_value()) {
+        return "the encoder refused values its decoder accepted";
+    }
+    if (payload_u32(reencoded, kEntriesAt) != count) {
+        return "the encoder wrote an entry count other than the distinct values";
+    }
+    const auto mode = std::to_integer<std::uint8_t>(reencoded[kBlockHeaderSize + kModeAt]);
+    if (mode == static_cast<std::uint8_t>(DictMode::sorted_move_to_front) &&
+        count > kDictMtfMaxEntries) {
+        return "the encoder took move-to-front past its entry limit";
+    }
+    return nullptr;
+}
+
+// Runs are maximal, so a run-length block's run count is fixed by its values, and the
+// encoder must write the same count.
+[[nodiscard]] inline const char* check_rle_block(std::span<const std::byte> block,
+                                                 std::span<const std::uint64_t> values) {
+    constexpr std::size_t kRunsAt = 0;
+    std::uint64_t runs = 0;
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        runs += i == 0 || values[i] != values[i - 1] ? 1U : 0U;
+    }
+    if (payload_u32(block, kRunsAt) != runs) {
+        return "a run-length block's run count is not its count of maximal runs";
+    }
+    Bytes reencoded;
+    if (!encode_rle_block(values, reencoded).has_value()) {
+        return "the encoder refused values its decoder accepted";
+    }
+    if (payload_u32(reencoded, kRunsAt) != runs) {
+        return "the encoder wrote a run count other than the maximal runs";
+    }
+    return nullptr;
+}
+
 }  // namespace detail
 
 inline constexpr CodecUnderTest kTimestampCodec{
@@ -422,6 +511,32 @@ inline constexpr CodecUnderTest kSvbCodec{
     .extra_block_check = &detail::check_svb_block,
     .block_encoders = nullptr,
 };
+
+inline constexpr CodecUnderTest kDictCodec{
+    .decode_block = &decode_dict_block,
+    .decode_column = &decode_dict,
+    .encoders = detail::kDictEncoders,
+    .canonical = false,
+    .extra_block_check = &detail::check_dict_block,
+    .block_encoders = nullptr,
+};
+
+inline constexpr CodecUnderTest kRleCodec{
+    .decode_block = &decode_rle_block,
+    .decode_column = &decode_rle,
+    .encoders = detail::kRleEncoders,
+    .canonical = false,
+    .extra_block_check = &detail::check_rle_block,
+    .block_encoders = nullptr,
+};
+
+[[nodiscard]] inline const char* check_dict_column(std::span<const std::byte> input) {
+    return check_codec(kDictCodec, input);
+}
+
+[[nodiscard]] inline const char* check_rle_column(std::span<const std::byte> input) {
+    return check_codec(kRleCodec, input);
+}
 
 [[nodiscard]] inline const char* check_pfor_column(std::span<const std::byte> input) {
     return check_codec(kPforCodec, input);

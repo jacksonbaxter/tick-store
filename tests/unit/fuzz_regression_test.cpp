@@ -11,10 +11,12 @@
 #include "store_oracles.hpp"
 #include "stub_fixture.hpp"
 #include "test_bytes.hpp"
+#include "tick_store/codec/dictionary.hpp"
 #include "tick_store/codec/gorilla_timestamps.hpp"
 #include "tick_store/codec/gorilla_xor.hpp"
 #include "tick_store/codec/pfor.hpp"
 #include "tick_store/codec/price_double.hpp"
+#include "tick_store/codec/run_length.hpp"
 #include "tick_store/codec/stream_vbyte.hpp"
 
 #include <gtest/gtest.h>
@@ -115,6 +117,20 @@ TEST(FuzzRegression, StreamVByteCrashersStayFixed) {
     for (const auto& path : crashers("stream_vbyte")) {
         SCOPED_TRACE(path.filename().string());
         EXPECT_EQ(text(codec::oracle::check_svb_column(read_file(path))), "");
+    }
+}
+
+TEST(FuzzRegression, DictionaryCrashersStayFixed) {
+    for (const auto& path : crashers("dictionary")) {
+        SCOPED_TRACE(path.filename().string());
+        EXPECT_EQ(text(codec::oracle::check_dict_column(read_file(path))), "");
+    }
+}
+
+TEST(FuzzRegression, RunLengthCrashersStayFixed) {
+    for (const auto& path : crashers("run_length")) {
+        SCOPED_TRACE(path.filename().string());
+        EXPECT_EQ(text(codec::oracle::check_rle_column(read_file(path))), "");
     }
 }
 
@@ -246,12 +262,44 @@ TEST(FuzzOracles, PassEveryCutAndFlipOfAnIntegerColumn) {
                     .has_value());
     Bytes svb_column;
     ASSERT_TRUE(codec::encode_svb(values, 16, true, svb_column).has_value());
+    Bytes head_column;
+    ASSERT_TRUE(codec::encode_pfor(values, 16,
+                                   codec::PforOptions{.transform = codec::IntTransform::head_delta,
+                                                      .adaptive_scale = false,
+                                                      .patch = true},
+                                   head_column)
+                    .has_value());
+    // Few distinct values with runs, as shares and flags are: one dictionary column in each
+    // mode the encoder takes at this size, and one run-length column.
+    std::vector<std::uint64_t> shares;
+    shares.reserve(40);
+    for (std::uint64_t i = 0; i < 40; ++i) {
+        std::uint64_t size = 100;
+        if (i % 5 == 0) {
+            size = 200;
+        } else if (i % 13 == 0) {
+            size = 37;
+        }
+        shares.push_back(size);
+    }
+    Bytes dict_column;
+    ASSERT_TRUE(codec::encode_dict(shares, 16, dict_column).has_value());
+    std::vector<std::uint64_t> runs;
+    runs.reserve(40);
+    for (std::uint64_t i = 0; i < 40; ++i) {
+        runs.push_back(i / 7 % 3);
+    }
+    Bytes rle_column;
+    ASSERT_TRUE(codec::encode_rle(runs, 16, rle_column).has_value());
 
     using Check = const char* (*)(std::span<const std::byte>);
     for (const auto& [column, check] :
          {std::pair<const Bytes&, Check>{timestamp_column, &codec::oracle::check_pfor_column},
           std::pair<const Bytes&, Check>{price_column, &codec::oracle::check_pfor_column},
-          std::pair<const Bytes&, Check>{svb_column, &codec::oracle::check_svb_column}}) {
+          std::pair<const Bytes&, Check>{head_column, &codec::oracle::check_pfor_column},
+          std::pair<const Bytes&, Check>{svb_column, &codec::oracle::check_svb_column},
+          std::pair<const Bytes&, Check>{dict_column, &codec::oracle::check_dict_column},
+          std::pair<const Bytes&, Check>{rle_column, &codec::oracle::check_rle_column}}) {
         EXPECT_EQ(text(check(exact_copy(column))), "");
         for (std::size_t length = 0; length < column.size(); ++length) {
             EXPECT_EQ(text(check(exact_copy(std::span{column}.first(length)))), "")

@@ -1,6 +1,6 @@
 # Fuzzing
 
-Eight libFuzzer targets take raw bytes directly, with nothing checking them first:
+Ten libFuzzer targets take raw bytes directly, with nothing checking them first:
 
 | Target | Input | Oracle in `itch_oracles.hpp` |
 |---|---|---|
@@ -11,13 +11,15 @@ Eight libFuzzer targets take raw bytes directly, with nothing checking them firs
 | `fuzz_gorilla_xor` | a column of Gorilla XOR blocks | `check_xor_column`: the same checks on the XOR codec, then the price-to-double mappings on every word: an inverse that accepts a double gives an integer that maps back to it, every Price(4) comes back through dollars, and every integer up to 2^53 through a double |
 | `fuzz_pfor` | a column of patched frame of reference blocks | `check_pfor_column` in `codec_oracles.hpp`: the format leaves the encoder choices (scale, mode, width, base), so instead of bytes the oracle checks that every accepted block decodes the same from an exact copy and is refused once cut, refusals repeat and leave the output alone, the block's values re-encode with each of the four option sets of its transform to a block that decodes to them, and the same bytes twice; a whole valid column decodes at its exact count and not one off; the values re-encode and decode in all sixteen option sets at three block sizes; and the input's bytes, as 64-bit values, go through all sixteen and back at a block size the input picks, up to 97 or just past one 1,024-value vector |
 | `fuzz_stream_vbyte` | a column of Stream VByte blocks | `check_svb_column`: the same checks with the encoder with and without delta, and one more: every field but zigzag has one valid value and the encoder takes zigzag only when strictly smaller, so re-encoding a block's values with its own delta flag gives exactly its bytes when the encoder makes the same zigzag choice, and otherwise a smaller block, or one the same size when the input took zigzag |
+| `fuzz_dictionary` | a column of dictionary blocks | `check_dict_column`: the same checks as `fuzz_pfor` with the dictionary encoder, whose choices are the mode and the nested PFOR blocks', and one more: a block's entries are distinct and all used, so its entry count must be its count of distinct values, the encoder must write the same count, and it takes move-to-front only within its 2,048-entry limit |
+| `fuzz_run_length` | a column of run-length blocks | `check_rle_column`: the same checks with the run-length encoder, whose choices are the nested PFOR blocks', and one more: runs are maximal, so a block's run count must be its count of maximal runs, and the encoder must write the same count |
 | `fuzz_stub_store` | a whole store file | `check_store` in `store_oracles.hpp`: errors repeat, an accepted file rebuilds the input exactly from its parsed values and holds the records its header counts, a cut of it is refused, and a copy with one bit flipped is refused or rebuilds to the flipped bytes |
 
 ## Build
 
 Needs upstream clang: Apple clang has no fuzzer runtime. The build regenerates the
 seeds from the real encoder and the real store writer into
-`build/fuzz/fuzz-seeds/{message,frame,store,columns,gorilla_timestamps,gorilla_xor,pfor,stream_vbyte}`.
+`build/fuzz/fuzz-seeds/{message,frame,store,columns,gorilla_timestamps,gorilla_xor,pfor,stream_vbyte,dictionary,run_length}`.
 They are never committed. The Gorilla seeds are columns from the real encoders at block sizes
 1, 3 and 4,096, cuts of them, each header field corrupted, and a hand-built block for each
 refusal the decoders make. The integer seeds are columns from every PFOR option set and from
@@ -26,14 +28,23 @@ whole-cent prices with stub quotes, a regular clock, multiples of 7 with values 
 near 2^64 and each width edge over a full vector and a tail; cuts of them; each header field
 corrupted; and a small block from each encoder with each of its first 48 payload bytes set to
 0, to 0xFF and to one more. Stream VByte also gets a hand-built block for each refusal its
-decoder makes, and one with zigzag set where plain is no larger.
+decoder makes, and one with zigzag set where plain is no larger. The dictionary and
+run-length seeds are the same integer columns from their encoders, plus columns with few
+distinct values (share-like sizes that take Huffman codes, a locate-like column that takes
+move-to-front, runs of a few values, one value, two alternating), each at the three block
+sizes and cut, and the first 64 values of each as one block with each header field
+corrupted and each of its first 48 payload bytes changed as above. Each also gets a
+hand-built block for each of its decoder's own refusals: a dictionary entry repeated, out of
+frequency order, tied but not ascending, unused, and a sorted dictionary not ascending; runs
+not maximal, and lengths one short of and one past the count.
 
 ```sh
 cmake --preset fuzz && cmake --build --preset fuzz
 mkdir -p build/fuzz/corpus/itch_message build/fuzz/corpus/itch_frame \
     build/fuzz/corpus/stub_store build/fuzz/corpus/columns \
     build/fuzz/corpus/gorilla_timestamps build/fuzz/corpus/gorilla_xor \
-    build/fuzz/corpus/pfor build/fuzz/corpus/stream_vbyte build/fuzz/artifacts
+    build/fuzz/corpus/pfor build/fuzz/corpus/stream_vbyte \
+    build/fuzz/corpus/dictionary build/fuzz/corpus/run_length build/fuzz/artifacts
 ```
 
 ## Run
@@ -81,6 +92,16 @@ build/fuzz/fuzz/fuzz_stream_vbyte -max_total_time=60 -max_len=70000 \
     -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 \
     -artifact_prefix=build/fuzz/artifacts/ \
     build/fuzz/corpus/stream_vbyte build/fuzz/fuzz-seeds/stream_vbyte
+
+build/fuzz/fuzz/fuzz_dictionary -max_total_time=60 -max_len=16384 \
+    -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 \
+    -artifact_prefix=build/fuzz/artifacts/ \
+    build/fuzz/corpus/dictionary build/fuzz/fuzz-seeds/dictionary
+
+build/fuzz/fuzz/fuzz_run_length -max_total_time=60 -max_len=16384 \
+    -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 \
+    -artifact_prefix=build/fuzz/artifacts/ \
+    build/fuzz/corpus/run_length build/fuzz/fuzz-seeds/run_length
 ```
 
 - `-max_len`: no message is longer than 50 bytes, so 256 leaves room for every
@@ -96,6 +117,8 @@ build/fuzz/fuzz/fuzz_stream_vbyte -max_total_time=60 -max_len=70000 \
   the adaptive scale trying several factors, so inputs of 70,000 bytes held it near 50 runs a
   second under ASan; at 16,384 it runs about twice as fast. That still holds a full
   1,024-value vector at width 64 (8,192 bytes) and a tail, and 2,048 values for part 2.
+  `fuzz_dictionary` and `fuzz_run_length` take the same limit: each block nests PFOR blocks
+  and tries several of them, and 16,384 bytes still hold over a vector of values.
 - `fuzz_itch_message` returns -1 for an input over 65,535 bytes, which no frame can
   declare, so it stays out of the corpus.
 - The G-3 gate is 30 minutes per target under the heavy-job lock.
@@ -126,6 +149,6 @@ out-of-range timestamp, which need a hand-built message or a deliberately small 
 
 A crash writes to `build/fuzz/artifacts/`. Move the input to
 `tests/unit/crashers/itch_message/`, `itch_frame/`, `stub_store/`, `columns/`,
-`gorilla_timestamps/`, `gorilla_xor/`, `pfor/` or `stream_vbyte/` and fix the bug
-in the same commit. `fuzz_regression_test.cpp` replays those files through the same
+`gorilla_timestamps/`, `gorilla_xor/`, `pfor/`, `stream_vbyte/`, `dictionary/` or
+`run_length/` and fix the bug in the same commit. `fuzz_regression_test.cpp` replays those files through the same
 oracles in every test build.

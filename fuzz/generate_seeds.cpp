@@ -8,6 +8,8 @@
 //   <dir>/gorilla_xor/         XOR columns, for fuzz_gorilla_xor
 //   <dir>/pfor/                PFOR columns in every option set, for fuzz_pfor
 //   <dir>/stream_vbyte/        Stream VByte columns, for fuzz_stream_vbyte
+//   <dir>/dictionary/          dictionary columns in each mode, for fuzz_dictionary
+//   <dir>/run_length/          run-length columns, for fuzz_run_length
 //
 // Every valid seed comes from the real encoder or the real store writer, so the
 // seeds follow the code (Z4). Corrupt seeds are those same bytes cut, extended or
@@ -17,9 +19,12 @@
 #include "columns_oracles.hpp"
 #include "tick_store/codec/block.hpp"
 #include "tick_store/codec/codec_error.hpp"
+#include "tick_store/codec/dictionary.hpp"
 #include "tick_store/codec/gorilla_timestamps.hpp"
 #include "tick_store/codec/gorilla_xor.hpp"
+#include "tick_store/codec/pfor.hpp"
 #include "tick_store/codec/price_double.hpp"
+#include "tick_store/codec/run_length.hpp"
 #include "tick_store/itch/codec.hpp"
 #include "tick_store/itch/message.hpp"
 #include "tick_store/store/columns.hpp"
@@ -40,6 +45,7 @@
 #include <ios>
 #include <iterator>
 #include <limits>
+#include <optional>
 #include <print>
 #include <span>
 #include <stdexcept>
@@ -764,6 +770,168 @@ void write_integer_seeds(SeedDir& seeds, std::span<const tick_store::codec::orac
     }
     seeds.add(Bytes{});
 }
+
+// Columns with few distinct values, as the dictionary and run-length codecs are for:
+// share-like sizes with a few common values, which take Huffman codes; a locate-like
+// column of 40 values drawn with recency, which takes move-to-front; runs of a few values;
+// one value; and two values alternating.
+std::vector<Words> low_cardinality_sets() {
+    SplitMix64 random{2026};
+    constexpr std::array<std::uint64_t, 9> kShares{100, 200, 300, 500, 1000, 50, 1, 37, 2500};
+    Words shares;
+    for (int i = 0; i < 600; ++i) {
+        // 100 most often, then 200 and 300, then the rest.
+        const std::uint64_t pick = random() % 64;
+        std::uint64_t at = 3 + (pick % 6);
+        if (pick < 40) {
+            at = 0;
+        } else if (pick < 52) {
+            at = 1 + (pick % 2);
+        }
+        shares.push_back(kShares[at]);
+    }
+    Words locates;
+    Words recent{8'000};
+    for (int i = 0; i < 600; ++i) {
+        if (random() % 4 == 0 || recent.size() < 40) {
+            recent.push_back(1 + (random() % 9'000));
+        }
+        locates.push_back(recent[recent.size() - 1 - (random() % std::min<std::size_t>(recent.size(), 6))]);
+    }
+    Words runs;
+    while (runs.size() < 700) {
+        const std::uint64_t value = random() % 6;
+        const std::uint64_t length = 1 + (random() % 30);
+        runs.insert(runs.end(), length, value);
+    }
+    Words alternating;
+    for (std::uint64_t i = 0; i < 64; ++i) {
+        alternating.push_back(i % 2 == 0 ? 7 : 1ULL << 40U);
+    }
+    return {shares, locates, runs, Words(50, 42), alternating};
+}
+
+// The integer seeds, then the low-cardinality columns, and one block of each through
+// every header and byte corruption, so a refusal in each mode is one change away.
+void write_low_cardinality_seeds(SeedDir& seeds,
+                                 std::span<const tick_store::codec::oracle::Encoder> encoders) {
+    write_integer_seeds(seeds, encoders);
+    const std::vector<Words> sets = low_cardinality_sets();
+    for (const auto& encoder : encoders) {
+        add_columns(seeds, encoder.encode_column, sets);
+        for (const Words& values : sets) {
+            const Words first(values.begin(),
+                              values.begin() + static_cast<std::ptrdiff_t>(
+                                                   std::min<std::size_t>(values.size(), 64)));
+            const Bytes block = column_of(encoder.encode_column, first, 4096);
+            add_header_corruptions(seeds, block);
+            add_byte_corruptions(seeds, block);
+        }
+    }
+}
+// A block of `count` values whose payload is the given fixed bytes followed by nested PFOR
+// blocks, each with its options, as the dictionary and run-length payloads are.
+struct Nested {
+    Words values;
+    tick_store::codec::PforOptions options;
+};
+
+Bytes nested_block(std::uint32_t count, const Bytes& fixed, const std::vector<Nested>& nested) {
+    Bytes payload = fixed;
+    for (const Nested& part : nested) {
+        if (!tick_store::codec::encode_pfor_block(part.values, part.options, payload).has_value()) {
+            throw std::runtime_error("a hand-built seed's nested block was refused");
+        }
+    }
+    Bytes block;
+    const std::size_t at = tick_store::codec::begin_block(block, count);
+    tick_store::codec::patch_block_header(block, at, static_cast<std::uint32_t>(payload.size()));
+    block.insert(block.end(), payload.begin(), payload.end());
+    return block;
+}
+
+// An optional leading byte, then a u32 little-endian.
+Bytes fixed_fields(std::optional<std::uint8_t> first, std::uint32_t value) {
+    Bytes out;
+    if (first.has_value()) {
+        out.push_back(static_cast<std::byte>(*first));
+    }
+    for (unsigned i = 0; i < 4; ++i) {
+        out.push_back(static_cast<std::byte>((value >> (8U * i)) & 0xFFU));
+    }
+    return out;
+}
+
+// Adds a hand-built block, having checked that its decoder takes it or refuses it as meant,
+// with the field named when refused, so a seed cannot drift from the refusal it is for.
+void add_checked(SeedDir& seeds, tick_store::codec::BlockDecoder decode, const Bytes& block,
+                 std::string_view refused_field) {
+    Words ignored;
+    const auto decoded = decode(block, ignored);
+    const bool as_meant = refused_field.empty()
+                              ? decoded.has_value()
+                              : !decoded.has_value() && decoded.error().field == refused_field;
+    if (!as_meant) {
+        throw std::runtime_error(std::format("a hand-built seed meant to be {} was not",
+                                             refused_field.empty() ? "valid" : refused_field));
+    }
+    seeds.add(block);
+}
+
+// Each refusal of the dictionary decoder's own order checks, built by hand with the
+// encoder's nested options: a ranked dictionary with an entry repeated, one out of
+// frequency order, one with entries tied in use but not ascending, an unused entry, and a
+// sorted dictionary with an entry repeated and one descending.
+void add_dict_refusals(SeedDir& seeds) {
+    using tick_store::codec::IntTransform;
+    using tick_store::codec::PforOptions;
+    constexpr PforOptions kRanked{.transform = IntTransform::none, .adaptive_scale = true,
+                                  .patch = true};
+    constexpr PforOptions kSorted{.transform = IntTransform::delta, .adaptive_scale = true,
+                                  .patch = true};
+    constexpr PforOptions kIndices{.transform = IntTransform::none, .adaptive_scale = false,
+                                   .patch = true};
+    const auto add = [&](std::uint8_t mode, const PforOptions& options, const Words& dictionary,
+                         const Words& indices, std::string_view refused_field) {
+        add_checked(seeds, &tick_store::codec::decode_dict_block,
+                    nested_block(static_cast<std::uint32_t>(indices.size()),
+                                 fixed_fields(mode, static_cast<std::uint32_t>(dictionary.size())),
+                                 {{dictionary, options}, {indices, kIndices}}),
+                    refused_field);
+    };
+    add(0, kRanked, {100, 200}, {0, 0, 1}, "");
+    add(0, kRanked, {100, 100}, {0, 0, 1}, "dict entry repeated");
+    add(0, kRanked, {100, 200}, {0, 1, 1}, "dict entry order");
+    add(0, kRanked, {200, 100}, {0, 1}, "dict entry order");
+    add(0, kRanked, {100, 200, 300}, {0, 0, 1}, "dict entry unused");
+    add(2, kSorted, {100, 200, 300}, {0, 1, 2, 0}, "");
+    add(2, kSorted, {100, 100, 300}, {0, 1, 2}, "dict entry order");
+    add(2, kSorted, {300, 200, 100}, {0, 1, 2}, "dict entry order");
+}
+
+// Each refusal of the run-length decoder's own checks: runs not maximal, and lengths one
+// short of the count and one past it.
+void add_rle_refusals(SeedDir& seeds) {
+    using tick_store::codec::IntTransform;
+    using tick_store::codec::PforOptions;
+    constexpr PforOptions kPlain{.transform = IntTransform::none, .adaptive_scale = true,
+                                 .patch = true};
+    constexpr PforOptions kLengths{.transform = IntTransform::none, .adaptive_scale = false,
+                                   .patch = true};
+    const auto add = [&](std::uint32_t count, const Words& values, const Words& lengths,
+                         std::string_view refused_field) {
+        add_checked(seeds, &tick_store::codec::decode_rle_block,
+                    nested_block(count,
+                                 fixed_fields(std::nullopt,
+                                              static_cast<std::uint32_t>(values.size())),
+                                 {{values, kPlain}, {lengths, kLengths}}),
+                    refused_field);
+    };
+    add(5, {3, 4}, {1, 2}, "");
+    add(5, {3, 3}, {1, 2}, "rle run value");
+    add(6, {3, 4}, {1, 2}, "rle run lengths");
+    add(4, {3, 4}, {1, 2}, "rle run length");
+}
 }  // namespace
 
 // NOLINTNEXTLINE(bugprone-exception-escape): a failed build step should terminate and say why.
@@ -782,6 +950,8 @@ int main(int argc, char** argv) {
     SeedDir xor_words{root / "gorilla_xor"};
     SeedDir pfor{root / "pfor"};
     SeedDir svb{root / "stream_vbyte"};
+    SeedDir dict{root / "dictionary"};
+    SeedDir rle{root / "run_length"};
     write_message_seeds(message);
     write_frame_seeds(stream);
     write_store_seeds(store, root / "store-scratch");
@@ -791,9 +961,15 @@ int main(int argc, char** argv) {
     write_integer_seeds(pfor, tick_store::codec::oracle::detail::kPforEncoders);
     write_integer_seeds(svb, tick_store::codec::oracle::detail::kSvbEncoders);
     add_svb_refusals(svb);
+    write_low_cardinality_seeds(dict, tick_store::codec::oracle::detail::kDictEncoders);
+    add_dict_refusals(dict);
+    write_low_cardinality_seeds(rle, tick_store::codec::oracle::detail::kRleEncoders);
+    add_rle_refusals(rle);
     std::println("wrote {} message, {} frame, {} store, {} columns, {} gorilla_timestamps, "
-                 "{} gorilla_xor, {} pfor and {} stream_vbyte seeds",
+                 "{} gorilla_xor, {} pfor, {} stream_vbyte, {} dictionary and {} run_length "
+                 "seeds",
                  message.count(), stream.count(), store.count(), columns.count(),
-                 timestamps.count(), xor_words.count(), pfor.count(), svb.count());
+                 timestamps.count(), xor_words.count(), pfor.count(), svb.count(), dict.count(),
+                 rle.count());
     return 0;
 }

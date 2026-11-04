@@ -58,6 +58,8 @@ LANE_PACK = "src/codec/lane_pack.cpp"
 PATCH_LIST = "src/codec/patch_list.cpp"
 PFOR = "src/codec/pfor.cpp"
 STREAM_VBYTE = "src/codec/stream_vbyte.cpp"
+DICTIONARY = "src/codec/dictionary.cpp"
+RUN_LENGTH = "src/codec/run_length.cpp"
 
 # Each is (group, file, what to call it, pattern over the demangled name).
 FIXED_REQUIRED = (
@@ -110,6 +112,16 @@ FIXED_REQUIRED = (
     ("codec", STREAM_VBYTE, "decode_svb", r"codec::decode_svb\("),
     ("codec", STREAM_VBYTE, "encode_svb_block", r"encode_svb_block\("),
     ("codec", STREAM_VBYTE, "encode_svb", r"codec::encode_svb\("),
+    ("codec", DICTIONARY, "decode_dict_block", r"decode_dict_block\("),
+    ("codec", DICTIONARY, "decode_dict", r"codec::decode_dict\("),
+    ("codec", DICTIONARY, "encode_dict_block", r"encode_dict_block\("),
+    ("codec", DICTIONARY, "encode_dict", r"codec::encode_dict\("),
+    ("codec", DICTIONARY, "read_huffman", r"read_huffman\("),
+    ("codec", DICTIONARY, "huffman_lengths", r"huffman_lengths\("),
+    ("codec", RUN_LENGTH, "decode_rle_block", r"decode_rle_block\("),
+    ("codec", RUN_LENGTH, "decode_rle", r"codec::decode_rle\("),
+    ("codec", RUN_LENGTH, "encode_rle_block", r"encode_rle_block\("),
+    ("codec", RUN_LENGTH, "encode_rle", r"codec::encode_rle\("),
     ("validator", COLUMNS, "require_size", r"require_size\("),
     ("validator", COLUMNS, "check_text_ends", r"check_text_ends\("),
     ("validator", COLUMNS, "check_raw_row_empty", r"check_raw_row_empty\("),
@@ -128,6 +140,10 @@ FIXED_REQUIRED = (
     ("validator", CODEC_ORACLES, "check_svb_column", r"oracle::check_svb_column\("),
     ("validator", CODEC_ORACLES, "check_svb_block", r"oracle::detail::check_svb_block\("),
     ("validator", CODEC_ORACLES, "pfor_block_encoders", r"oracle::detail::pfor_block_encoders\("),
+    ("validator", CODEC_ORACLES, "check_dict_column", r"oracle::check_dict_column\("),
+    ("validator", CODEC_ORACLES, "check_dict_block", r"oracle::detail::check_dict_block\("),
+    ("validator", CODEC_ORACLES, "check_rle_column", r"oracle::check_rle_column\("),
+    ("validator", CODEC_ORACLES, "check_rle_block", r"oracle::detail::check_rle_block\("),
     ("oracle", ROUNDTRIP, "verify", r"^tick_store::harness::verify\("),
     ("oracle", ROUNDTRIP, "verify_stub_store", r"^tick_store::harness::verify_stub_store\("),
     ("oracle", COLUMNS_READER, "verify_columns", r"^tick_store::harness::verify_columns\("),

@@ -1,0 +1,12 @@
+diff --git a/src/codec/run_length.cpp b/src/codec/run_length.cpp
+--- a/src/codec/run_length.cpp
++++ b/src/codec/run_length.cpp
+@@ -133,7 +133,7 @@ std::expected<std::size_t, CodecError> decode_rle_block(std::span<const std::byt
+                                            std::uint64_t{payload.size() - at} * 8U));
+     }
+     for (std::size_t i = 1; i < run_count; ++i) {
+-        if (run_values[i] == run_values[i - 1]) {
++        if (false && run_values[i] == run_values[i - 1]) {
+             return std::unexpected(
+                 codec_error(CodecErrorKind::non_canonical, "rle run value", values_at, i, i - 1));
+         }
