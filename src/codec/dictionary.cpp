@@ -309,7 +309,7 @@ using Encoded = std::expected<void, CodecError>;
             // remaining() >= lengths and lengths <= 32, so the peek holds real bits.
             const std::uint64_t window = reader.peek_within(lengths);
             const std::uint64_t slot = table[window >> (lengths - table_bits)];
-            unsigned length = static_cast<unsigned>(slot & 0xFFU);
+            auto length = static_cast<unsigned>(slot & 0xFFU);
             std::uint64_t index = slot >> 8U;
             if (length == 0) {
                 for (length = table_bits + 1U; length <= lengths; ++length) {
