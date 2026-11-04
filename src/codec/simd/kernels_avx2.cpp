@@ -29,6 +29,14 @@
 
 namespace tick_store::codec::simd::detail {
 
+namespace {
+
+// XCR0 by XGETBV, which needs the xsave target. Called only once CPUID has said the
+// processor and the OS have it (OSXSAVE).
+[[gnu::target("xsave")]] std::uint64_t read_xcr0() noexcept { return _xgetbv(0); }
+
+}  // namespace
+
 bool cpu_has_avx2() noexcept {
     unsigned eax = 0;
     unsigned ebx = 0;
@@ -42,10 +50,7 @@ bool cpu_has_avx2() noexcept {
     if ((ecx & bit_OSXSAVE) == 0 || (ecx & bit_AVX) == 0) {
         return false;
     }
-    unsigned xcr0_low = 0;
-    unsigned xcr0_high = 0;
-    __asm__("xgetbv" : "=a"(xcr0_low), "=d"(xcr0_high) : "c"(0));
-    if ((xcr0_low & 0x6U) != 0x6U) {
+    if ((read_xcr0() & 0x6U) != 0x6U) {
         return false;
     }
     if (__get_cpuid_count(7, 0, &eax, &ebx, &ecx, &edx) == 0) {
@@ -386,12 +391,16 @@ std::uint64_t unpack_delta_narrow_rows(std::span<const std::byte> packed, unsign
             // Lanes 8h to 8h + 3 in the even 32-bit places, 8h + 4 to 8h + 7 in the odd, then
             // put in order.
             const __m256i mixed = _mm256_blend_epi32(row[2 * h], _mm256_slli_epi64(row[(2 * h) + 1], 32), 0xAA);
-            __m256i n = _mm256_add_epi32(_mm256_permutevar8x32_epi32(mixed, order), b);
-            if constexpr (Zigzag) {
-                const __m256i sign = _mm256_sub_epi32(_mm256_setzero_si256(),
-                                                      _mm256_and_si256(n, _mm256_set1_epi32(1)));
-                n = _mm256_xor_si256(_mm256_srli_epi32(n, 1), sign);
-            }
+            const __m256i offsets = _mm256_add_epi32(_mm256_permutevar8x32_epi32(mixed, order), b);
+            const __m256i n = [&] {
+                if constexpr (Zigzag) {
+                    const __m256i sign = _mm256_sub_epi32(
+                        _mm256_setzero_si256(), _mm256_and_si256(offsets, _mm256_set1_epi32(1)));
+                    return _mm256_xor_si256(_mm256_srli_epi32(offsets, 1), sign);
+                } else {
+                    return offsets;
+                }
+            }();
             x[h] = sum_lanes32(n);
         }
         x[1] = _mm256_add_epi32(x[1], broadcast_last32(x[0]));
@@ -434,7 +443,7 @@ bool svb_decode_avx2(std::span<const std::byte> control, std::span<const std::by
     drive<4>(
         kLevel, values.size(), [&](std::size_t) { return at + 16U <= data.size(); },
         [&](std::size_t i) {
-            const unsigned c = std::to_integer<unsigned>(control[i / 4U]);
+            const auto c = std::to_integer<unsigned>(control[i / 4U]);
             __m128i bytes;
             std::memcpy(&bytes, data.data() + at, sizeof bytes);
             __m128i shuffle;

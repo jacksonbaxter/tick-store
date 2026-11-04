@@ -1,0 +1,5 @@
+# The kernel sets are written in each instruction set's intrinsics on purpose: one file
+# per set, behind the dispatch table, each tested against the scalar set. std::simd is not
+# used, so the portability check's advice to replace intrinsics does not apply here.
+InheritParentConfig: true
+Checks: -portability-simd-intrinsics

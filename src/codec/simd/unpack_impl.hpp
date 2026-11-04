@@ -56,23 +56,33 @@ template <class Ops, unsigned W, std::size_t R>
     constexpr std::size_t kBit = R * W;
     constexpr std::size_t kWord = kBit / 64U;
     constexpr unsigned kShift = kBit % 64U;
-    typename Ops::V v = cur;
-    if constexpr (kShift != 0) {
-        v = Ops::template shr<kShift>(v);
-    }
-    if constexpr (kShift + W > 64U) {
-        // Straddles into the next word, which the next row starts in.
-        const typename Ops::V next = Ops::load(in + ((kWord + 1U) * kWordStride));
-        v = Ops::or_(v, Ops::template shl<64U - kShift>(next));
-        cur = next;
-    } else if constexpr (kShift + W == 64U && R + 1U < kRows) {
-        // Ends the word, so the next row starts the next one.
-        cur = Ops::load(in + ((kWord + 1U) * kWordStride));
-    }
+    using V = Ops::V;
+    const V shifted = [&] {
+        if constexpr (kShift != 0) {
+            return Ops::template shr<kShift>(cur);
+        } else {
+            return cur;
+        }
+    }();
+    const V joined = [&] {
+        if constexpr (kShift + W > 64U) {
+            // Straddles into the next word, which the next row starts in.
+            const V next = Ops::load(in + ((kWord + 1U) * kWordStride));
+            cur = next;
+            return Ops::or_(shifted, Ops::template shl<64U - kShift>(next));
+        } else {
+            if constexpr (kShift + W == 64U && R + 1U < kRows) {
+                // Ends the word, so the next row starts the next one.
+                cur = Ops::load(in + ((kWord + 1U) * kWordStride));
+            }
+            return shifted;
+        }
+    }();
     if constexpr (W < 64U) {
-        v = Ops::and_(v, mask);
+        Ops::store(out + (R * kLaneCount), Ops::and_(joined, mask));
+    } else {
+        Ops::store(out + (R * kLaneCount), joined);
     }
-    Ops::store(out + (R * kLaneCount), v);
 }
 
 template <class Ops, unsigned W, std::size_t... R>

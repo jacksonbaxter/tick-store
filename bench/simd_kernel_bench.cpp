@@ -138,8 +138,8 @@ std::string level_name(const simd::Kernels& set) { return std::string{simd::to_s
 
 Case unpack_case(const simd::Kernels& set, unsigned width) {
     const std::uint64_t seed = 0x5EED'0100ULL + width;
-    auto in = packed_vector(seed, width);
-    auto out = std::make_shared<Vector>();
+    const auto in = packed_vector(seed, width);
+    const auto out = std::make_shared<Vector>();
     Case c = named(std::format("pfor_unpack/w={}/{}", width, level_name(set)), seed);
     c.run = [&set, in, out, width](std::size_t calls) {
         for (std::size_t i = 0; i < calls; ++i) {
@@ -155,7 +155,7 @@ Case unpack_case(const simd::Kernels& set, unsigned width) {
 // end to end, in an exact buffer.
 Case linear_case(const simd::Kernels& set, unsigned width) {
     const std::uint64_t seed = 0x5EED'0600ULL + width;
-    auto in = std::make_shared<PackedVector>();
+    const auto in = std::make_shared<PackedVector>();
     // NOLINTNEXTLINE(cert-msc32-c,cert-msc51-cpp,bugprone-random-generator-seed): fixed for B1
     std::mt19937_64 rng{seed};
     for (std::uint64_t& value : in->values) {
@@ -163,7 +163,7 @@ Case linear_case(const simd::Kernels& set, unsigned width) {
     }
     codec::pack_linear(in->values, width, in->bytes);
     in->bytes.shrink_to_fit();
-    auto out = std::make_shared<Vector>();
+    const auto out = std::make_shared<Vector>();
     Case c = named(std::format("linear_unpack/w={}/{}", width, level_name(set)), seed);
     c.run = [&set, in, out, width](std::size_t calls) {
         for (std::size_t i = 0; i < calls; ++i) {
@@ -189,9 +189,9 @@ enum class DeltaForm : std::uint8_t { two_pass, fused, narrow };
 
 Case delta_case(const simd::Kernels& set, unsigned width, DeltaForm form) {
     const std::uint64_t seed = 0x5EED'0200ULL + width;
-    auto in = packed_vector(seed, width);
-    auto out = std::make_shared<Vector>();
-    auto reference = std::make_shared<Vector>(delta_reference(*in, 0));
+    const auto in = packed_vector(seed, width);
+    const auto out = std::make_shared<Vector>();
+    const auto reference = std::make_shared<Vector>(delta_reference(*in, 0));
     constexpr std::array<std::string_view, 3> kNames{"pfor_delta_two_pass", "pfor_delta_fused",
                                                      "pfor_delta_narrow"};
     Case c = named(std::format("{}/w={}/{}", kNames[static_cast<std::size_t>(form)], width,
@@ -223,9 +223,9 @@ Case delta_case(const simd::Kernels& set, unsigned width, DeltaForm form) {
 Case prefix_case(const simd::Kernels& set, std::string_view form_name,
                  std::uint64_t (*form)(std::span<std::uint64_t>, std::uint64_t) noexcept) {
     const std::uint64_t seed = 0x5EED'0300ULL;
-    auto in = packed_vector(seed, 20);
-    auto out = std::make_shared<Vector>();
-    auto reference = std::make_shared<Vector>(in->values);
+    const auto in = packed_vector(seed, 20);
+    const auto out = std::make_shared<Vector>();
+    const auto reference = std::make_shared<Vector>(in->values);
     (void)scalar().prefix_sum(*reference, 0);
     Case c = named(std::format("prefix_sum/{}/{}", form_name, level_name(set)), seed);
     c.run = [in, out, form](std::size_t calls) {
@@ -241,9 +241,9 @@ Case prefix_case(const simd::Kernels& set, std::string_view form_name,
 
 Case for_case(const simd::Kernels& set, bool zigzag) {
     const std::uint64_t seed = zigzag ? 0x5EED'0401ULL : 0x5EED'0400ULL;
-    auto in = packed_vector(seed, 20);
-    auto out = std::make_shared<Vector>();
-    auto reference = std::make_shared<Vector>(in->values);
+    const auto in = packed_vector(seed, 20);
+    const auto out = std::make_shared<Vector>();
+    const auto reference = std::make_shared<Vector>(in->values);
     scalar().add_base(*reference, 12345, zigzag);
     Case c = named(std::format("{}/{}", zigzag ? "for_add_zigzag" : "for_add", level_name(set)), seed);
     c.run = [&set, in, out, zigzag](std::size_t calls) {
@@ -264,6 +264,15 @@ struct SvbInput {
     Vector values{};
 };
 
+// The bytes Stream VByte stores a value below 2^32 in.
+unsigned svb_length(std::uint64_t value) {
+    unsigned length = 1;
+    while (length < 4U && (value >> (8U * length)) != 0) {
+        ++length;
+    }
+    return length;
+}
+
 std::shared_ptr<SvbInput> svb_input(std::uint64_t seed) {
     auto in = std::make_shared<SvbInput>();
     // NOLINTNEXTLINE(cert-msc32-c,cert-msc51-cpp,bugprone-random-generator-seed): fixed for B1
@@ -273,7 +282,7 @@ std::shared_ptr<SvbInput> svb_input(std::uint64_t seed) {
         const unsigned bits = 1U + static_cast<unsigned>(rng() % 32U);
         const std::uint64_t value = rng() & mask_of(bits);
         in->values[i] = value;
-        const unsigned length = value < (1U << 8U) ? 1U : value < (1U << 16U) ? 2U : value < (1U << 24U) ? 3U : 4U;
+        const unsigned length = svb_length(value);
         in->control[i / 4U] |= static_cast<std::byte>((length - 1U) << (2U * (i % 4U)));
         for (unsigned b = 0; b < length; ++b) {
             in->data.push_back(static_cast<std::byte>((value >> (8U * b)) & 0xFFU));
@@ -285,9 +294,9 @@ std::shared_ptr<SvbInput> svb_input(std::uint64_t seed) {
 
 Case svb_case(const simd::Kernels& set) {
     const std::uint64_t seed = 0x5EED'0500ULL;
-    auto in = svb_input(seed);
-    auto out = std::make_shared<Vector>();
-    auto ok = std::make_shared<bool>(true);
+    const auto in = svb_input(seed);
+    const auto out = std::make_shared<Vector>();
+    const auto ok = std::make_shared<bool>(true);
     Case c = named(std::format("svb_decode/{}", level_name(set)), seed);
     c.run = [&set, in, out, ok](std::size_t calls) {
         for (std::size_t i = 0; i < calls; ++i) {
@@ -367,7 +376,8 @@ void throughput(benchmark::State& state, Session& session) {
         return;
     }
     const std::uint64_t start = bs::read_ticks();
-    for (const auto _ : state) {
+    for (const auto iteration : state) {
+        static_cast<void>(iteration);
         session.c->run(kPassCalls);
         benchmark::ClobberMemory();
     }
@@ -390,7 +400,8 @@ void throughput(benchmark::State& state, Session& session) {
 
 void batch_latency(benchmark::State& state, Session& session) {
     warm_up(session);
-    for (const auto _ : state) {
+    for (const auto iteration : state) {
+        static_cast<void>(iteration);
         for (std::size_t done = 0; done < kPassCalls; done += kBatchCalls) {
             const std::uint64_t start = bs::read_ticks();
             session.c->run(kBatchCalls);
@@ -607,7 +618,8 @@ int run_by_hand(std::vector<Case>& cases) {
             return fail(checked.error());
         }
         benchmark::RegisterBenchmark(c.name, [&c](benchmark::State& state) {
-            for (const auto _ : state) {
+            for (const auto iteration : state) {
+        static_cast<void>(iteration);
                 c.run(1);
             }
             if (!c.verify()) {

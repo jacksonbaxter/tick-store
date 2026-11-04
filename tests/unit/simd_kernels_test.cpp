@@ -19,7 +19,6 @@
 #include "tick_store/codec/lane_pack.hpp"
 #include "tick_store/codec/pfor.hpp"
 #include "tick_store/codec/simd.hpp"
-#include "tick_store/codec/stream_vbyte.hpp"
 
 #include <gtest/gtest.h>
 
@@ -48,15 +47,28 @@ constexpr std::size_t kOffsets = 16;
 
 #if defined(__aarch64__) || defined(__arm64__)
 constexpr KernelLevel kProcessorLevel = KernelLevel::neon;
-#elif defined(__x86_64__)
+#elifdef __x86_64__
 constexpr KernelLevel kProcessorLevel = KernelLevel::avx2;
 #else
 constexpr KernelLevel kProcessorLevel = KernelLevel::scalar;
 #endif
 
+// Every test's generator starts from a fixed seed of its own, so a failure reproduces.
+std::mt19937_64 seeded(std::uint64_t seed) { return std::mt19937_64{seed}; }
+
+// The bytes Stream VByte stores a 32-bit value in.
+unsigned svb_length(std::uint32_t value) {
+    unsigned length = 1;
+    while (length < 4U && (value >> (8U * length)) != 0U) {
+        ++length;
+    }
+    return length;
+}
+
 // A buffer of exactly `size` bytes on the heap, so ASan sees its end.
 class ExactBytes {
 public:
+    // NOLINTNEXTLINE(modernize-avoid-c-arrays): an exact size, for ASan
     explicit ExactBytes(std::size_t size) : bytes_(std::make_unique<std::byte[]>(size)), size_(size) {}
     [[nodiscard]] std::span<std::byte> span() noexcept { return {bytes_.get(), size_}; }
 
@@ -168,7 +180,7 @@ TEST(SimdDispatch, TheRequestedSetIsTheOneThatRuns) {
     ASSERT_EQ(active_kernels().level, expected)
         << "active " << to_string(active_kernels().level) << ", expected " << to_string(expected);
 
-    std::mt19937_64 rng{0x51D0'0001};
+    std::mt19937_64 rng = seeded(0x51D0'0001);
     Values values(5000);
     std::uint64_t sum = 0;
     for (std::uint64_t& value : values) {
@@ -200,7 +212,7 @@ TEST(SimdDispatch, TheRequestedSetIsTheOneThatRuns) {
 TEST(SimdDispatch, AScalarScopeRunsOnlyTheScalarSetAndRestoresTheChoice) {
     const KernelLevel chosen = active_kernels().level;
     Values values(3000);
-    std::iota(values.begin(), values.end(), std::uint64_t{7});
+    std::ranges::iota(values, std::uint64_t{7});
     std::vector<std::byte> column;
     ASSERT_TRUE(encode_pfor(values, 4096,
                             {.transform = IntTransform::delta, .adaptive_scale = false, .patch = true},
@@ -237,7 +249,7 @@ TEST(SimdDispatch, AScalarScopeRunsOnlyTheScalarSetAndRestoresTheChoice) {
 // --- Unpack ------------------------------------------------------------------------------
 
 TEST(SimdKernels, UnpackEveryWidthAndOffsetMatchesScalar) {
-    std::mt19937_64 rng{0x51D0'0002};
+    std::mt19937_64 rng = seeded(0x51D0'0002);
     for (unsigned width = 0; width <= 64; ++width) {
         const auto values = random_offsets(rng, mask_of(width));
         const std::vector<std::byte> bytes = packed_vector(values, width);
@@ -260,11 +272,11 @@ TEST(SimdKernels, UnpackEveryWidthAndOffsetMatchesScalar) {
 
 // A size that is not the width's leaves every value 0, in every set alike.
 TEST(SimdKernels, UnpackRefusesAWrongSizeTheSameWay) {
-    const std::vector<std::byte> bytes(128U * 3U, std::byte{0xFF});
+    const std::vector<std::byte> bytes(std::size_t{128} * 3U, std::byte{0xFF});
     for (const Kernels* set : sets()) {
         auto out = std::make_unique<std::array<std::uint64_t, kVectorValues>>();
         out->fill(7);
-        set->unpack_vector(std::span{bytes}.first(128U * 2U), 3, *out);
+        set->unpack_vector(std::span{bytes}.first(std::size_t{128} * 2U), 3, *out);
         EXPECT_TRUE(std::ranges::all_of(*out, [](std::uint64_t v) { return v == 0; }))
             << to_string(set->level);
         out->fill(7);
@@ -277,7 +289,7 @@ TEST(SimdKernels, UnpackRefusesAWrongSizeTheSameWay) {
 // The linear layout at every width, every count across the eight-value step and its
 // tail, at every offset, against the scalar set and against the values packed.
 TEST(SimdKernels, LinearUnpackEveryWidthTailAndOffsetMatchesScalar) {
-    std::mt19937_64 rng{0x51D0'000B};
+    std::mt19937_64 rng = seeded(0x51D0'000B);
     std::vector<std::size_t> counts;
     for (std::size_t n = 0; n <= 33; ++n) {
         counts.push_back(n);
@@ -295,7 +307,7 @@ TEST(SimdKernels, LinearUnpackEveryWidthTailAndOffsetMatchesScalar) {
             for (const Kernels* set : sets()) {
                 for (std::size_t offset = 0; offset < kOffsets; offset += (n % 2 == 0 ? 1 : 7)) {
                     const Placed placed = place(bytes, offset);
-                    auto owner = std::make_unique<std::uint64_t[]>(n);  // NOLINT(modernize-avoid-c-arrays): exact, for ASan
+                    const auto owner = std::make_unique<std::uint64_t[]>(n);  // NOLINT(modernize-avoid-c-arrays): exact, for ASan
                     const std::span<std::uint64_t> out{owner.get(), n};
                     set->unpack_linear(placed.bytes, width, out);
                     ASSERT_TRUE(same(out, values))
@@ -341,7 +353,7 @@ void each_placement(const Values& input, std::string_view what, Run run) {
     const std::uint64_t reference_result = run(scalar(), std::span<std::uint64_t>{reference});
     for (const Kernels* set : sets()) {
         for (std::size_t start = 0; start < 8; ++start) {
-            auto owner = std::make_unique<std::uint64_t[]>(start + input.size());  // NOLINT(modernize-avoid-c-arrays): exact, for ASan
+            const auto owner = std::make_unique<std::uint64_t[]>(start + input.size());  // NOLINT(modernize-avoid-c-arrays): exact, for ASan
             const std::span<std::uint64_t> values{owner.get() + start, input.size()};
             std::ranges::copy(input, values.begin());
             const std::uint64_t result = run(*set, values);
@@ -355,7 +367,7 @@ void each_placement(const Values& input, std::string_view what, Run run) {
 }
 
 TEST(SimdKernels, AddBaseMatchesScalarOnEveryTail) {
-    std::mt19937_64 rng{0x51D0'0003};
+    std::mt19937_64 rng = seeded(0x51D0'0003);
     for (const std::size_t n : lengths()) {
         for (const std::uint64_t base : kBases) {
             for (const bool zigzag : {false, true}) {
@@ -370,7 +382,7 @@ TEST(SimdKernels, AddBaseMatchesScalarOnEveryTail) {
 }
 
 TEST(SimdKernels, PrefixSumMatchesScalarOnEveryTail) {
-    std::mt19937_64 rng{0x51D0'0004};
+    std::mt19937_64 rng = seeded(0x51D0'0004);
     for (const std::size_t n : lengths()) {
         for (const std::uint64_t carry : kBases) {
             const Values input = random_values(rng, n, n % 3 == 0 ? 64U : 30U);
@@ -393,7 +405,7 @@ TEST(SimdKernels, PrefixSumMatchesScalarOnEveryTail) {
 }
 
 TEST(SimdKernels, DeltaPassMatchesScalarOnEveryTail) {
-    std::mt19937_64 rng{0x51D0'0005};
+    std::mt19937_64 rng = seeded(0x51D0'0005);
     for (const std::size_t n : lengths()) {
         for (const std::uint64_t base : kBases) {
             for (const bool zigzag : {false, true}) {
@@ -467,7 +479,7 @@ SvbInput svb_input(const Values& values, std::size_t stretch) {
     in.control.assign((values.size() + 3U) / 4U, std::byte{0});
     for (std::size_t i = 0; i < values.size(); ++i) {
         const auto low = static_cast<std::uint32_t>(values[i]);
-        unsigned length = low < (1U << 8U) ? 1U : low < (1U << 16U) ? 2U : low < (1U << 24U) ? 3U : 4U;
+        unsigned length = svb_length(low);
         if (i == stretch && length < 4) {
             ++length;
         }
@@ -489,7 +501,7 @@ Values svb_values(std::mt19937_64& rng, std::size_t n) {
 }
 
 TEST(SimdKernels, StreamVbyteMatchesScalarOnEveryTailAndOffset) {
-    std::mt19937_64 rng{0x51D0'0008};
+    std::mt19937_64 rng = seeded(0x51D0'0008);
     for (const std::size_t n : lengths()) {
         const Values values = svb_values(rng, n);
         const SvbInput in = svb_input(values, n);
@@ -497,7 +509,7 @@ TEST(SimdKernels, StreamVbyteMatchesScalarOnEveryTailAndOffset) {
             for (std::size_t offset = 0; offset < kOffsets; offset += 3) {
                 const Placed control = place(in.control, offset);
                 const Placed data = place(in.data, offset);
-                auto owner = std::make_unique<std::uint64_t[]>(n);  // NOLINT(modernize-avoid-c-arrays): exact, for ASan
+                const auto owner = std::make_unique<std::uint64_t[]>(n);  // NOLINT(modernize-avoid-c-arrays): exact, for ASan
                 const std::span<std::uint64_t> out{owner.get(), n};
                 ASSERT_TRUE(set->svb_decode(control.bytes, data.bytes, out))
                     << to_string(set->level) << " " << n;
@@ -510,7 +522,7 @@ TEST(SimdKernels, StreamVbyteMatchesScalarOnEveryTailAndOffset) {
 // A value one byte longer than it needs is refused wherever it falls: in a whole step
 // or in the tail, by every set.
 TEST(SimdKernels, StreamVbyteRefusesALongValueAnywhere) {
-    std::mt19937_64 rng{0x51D0'0009};
+    std::mt19937_64 rng = seeded(0x51D0'0009);
     for (const std::size_t n : {std::size_t{1}, std::size_t{5}, std::size_t{17}, std::size_t{64}}) {
         Values values = svb_values(rng, n);
         for (std::size_t stretch = 0; stretch < n; ++stretch) {
@@ -528,7 +540,7 @@ TEST(SimdKernels, StreamVbyteRefusesALongValueAnywhere) {
 }
 
 TEST(SimdKernels, StreamVbyteDataBytesFollowTheCodes) {
-    std::mt19937_64 rng{0x51D0'000A};
+    std::mt19937_64 rng = seeded(0x51D0'000A);
     for (const std::size_t n : lengths()) {
         const SvbInput in = svb_input(svb_values(rng, n), n);
         EXPECT_EQ(svb_data_bytes(in.control, n), in.data.size()) << n;

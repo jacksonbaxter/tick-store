@@ -295,14 +295,18 @@ std::uint64_t unpack_delta_narrow_rows(std::span<const std::byte> packed, unsign
         NeonRow row;  // NOLINT(cppcoreguidelines-pro-type-member-init): every register written below
         unpack_row_rt<NeonOps>(packed.data(), width, r, mask, row);
         for (std::size_t h = 0; h < x.size(); ++h) {
-            uint32x4_t n = vaddq_u32(
+            const uint32x4_t offsets = vaddq_u32(
                 vuzp1q_u32(vreinterpretq_u32_u64(row[2 * h]), vreinterpretq_u32_u64(row[(2 * h) + 1])),
                 b);
-            if constexpr (Zigzag) {
-                const uint32x4_t sign =
-                    vreinterpretq_u32_s32(vshrq_n_s32(vreinterpretq_s32_u32(vshlq_n_u32(n, 31)), 31));
-                n = veorq_u32(vshrq_n_u32(n, 1), sign);
-            }
+            const uint32x4_t n = [&] {
+                if constexpr (Zigzag) {
+                    const uint32x4_t sign = vreinterpretq_u32_s32(
+                        vshrq_n_s32(vreinterpretq_s32_u32(vshlq_n_u32(offsets, 31)), 31));
+                    return veorq_u32(vshrq_n_u32(offsets, 1), sign);
+                } else {
+                    return offsets;
+                }
+            }();
             x[h] = n;
         }
         for (std::size_t h = x.size(); h-- > 1;) {
@@ -366,7 +370,7 @@ bool svb_decode_neon(std::span<const std::byte> control, std::span<const std::by
     drive<4>(
         kLevel, values.size(), [&](std::size_t) { return at + 16U <= data.size(); },
         [&](std::size_t i) {
-            const unsigned c = std::to_integer<unsigned>(control[i / 4U]);
+            const auto c = std::to_integer<unsigned>(control[i / 4U]);
             uint8x16_t bytes;
             std::memcpy(&bytes, data.data() + at, sizeof bytes);
             const uint32x4_t v =

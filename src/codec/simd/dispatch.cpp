@@ -1,6 +1,7 @@
 // The dispatch table: which kernel set the codecs use, chosen once.
 
 #include "driver.hpp"
+#include "kernel_sets.hpp"
 
 #include "tick_store/codec/simd.hpp"
 
@@ -29,13 +30,13 @@ void note_run(KernelLevel level) noexcept { ++tl_runs[static_cast<std::size_t>(l
 
 namespace {
 
-#if defined(TICK_STORE_SIMD_NEON)
+#ifdef TICK_STORE_SIMD_NEON
 constexpr bool kNeonBuilt = true;
 #else
 constexpr bool kNeonBuilt = false;
 #endif
 
-#if defined(TICK_STORE_SIMD_AVX2)
+#ifdef TICK_STORE_SIMD_AVX2
 constexpr bool kAvx2Built = true;
 #else
 constexpr bool kAvx2Built = false;

@@ -155,8 +155,8 @@ inline void unpack_linear_from(std::span<const std::byte> bytes, unsigned width,
             }
         }
         word >>= skip;
-        if (skip + width > 64U) {
-            // skip > 0 here, so the shift is below 64.
+        if (skip != 0U && skip + width > 64U) {
+            // A width of at most 64 straddles only from skip > 0, so the shift is below 64.
             word |= byte_at(at + 8U) << (64U - skip);
         }
         values[i] = word & mask;
