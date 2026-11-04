@@ -94,6 +94,11 @@ void append_words_le(std::span<const std::uint64_t> words, std::vector<std::byte
 
 void load_words_le(std::span<const std::byte> bytes, std::span<std::uint64_t> words) noexcept {
     const std::size_t count = std::min(words.size(), bytes.size() / 8U);
+    if (count == 0) {
+        // Width 0 has no words, and an empty span may hold a null pointer, which memcpy
+        // must not get even for 0 bytes.
+        return;
+    }
     if constexpr (std::endian::native == std::endian::little) {
         std::memcpy(words.data(), bytes.data(), count * sizeof(std::uint64_t));
         return;
