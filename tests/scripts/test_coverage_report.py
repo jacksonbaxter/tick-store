@@ -87,6 +87,20 @@ class RequiredList(unittest.TestCase):
         self.assertFalse({"crc32c_armv8", "crc32c_sse42"} & names["riscv64"])
         self.assertIn("crc32c_software", names["riscv64"])
 
+    def test_each_processor_requires_its_own_kernel_set_and_every_one_the_scalar_set(self):
+        types = report.message_types(REPO_ROOT)
+        names = {machine: {item[2] for item in report.required_functions(types, machine)}
+                 for machine in ("arm64", "x86_64", "riscv64")}
+        self.assertIn("svb_decode_neon", names["arm64"])
+        self.assertNotIn("svb_decode_avx2", names["arm64"])
+        self.assertIn("svb_decode_avx2", names["x86_64"])
+        self.assertIn("cpu_has_avx2", names["x86_64"])
+        self.assertNotIn("svb_decode_neon", names["x86_64"])
+        self.assertFalse({"svb_decode_neon", "svb_decode_avx2"} & names["riscv64"])
+        for machine in names:
+            self.assertIn("svb_decode_scalar", names[machine])
+            self.assertIn("ScalarKernelsOnThisThread", names[machine])
+
     def test_a_header_with_a_missing_type_stops_the_report(self):
         with tempfile.TemporaryDirectory(dir=REPO_ROOT / "build") as root:
             header = Path(root) / report.MESSAGE_HEADER

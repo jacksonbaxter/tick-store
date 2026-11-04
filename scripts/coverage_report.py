@@ -78,6 +78,10 @@ ITCH_STORE_ORACLES = "fuzz/itch_store_oracles.hpp"
 ITCH_QUERY = "src/store/itch_query.cpp"
 ITCH_QUERY_ORACLES = "fuzz/itch_query_oracles.hpp"
 QUERY_CLI = "src/harness/query_cli.cpp"
+SIMD_DISPATCH = "src/codec/simd/dispatch.cpp"
+SIMD_SCALAR = "src/codec/simd/kernels_scalar.cpp"
+SIMD_NEON = "src/codec/simd/kernels_neon.cpp"
+SIMD_AVX2 = "src/codec/simd/kernels_avx2.cpp"
 
 # Each is (group, file, what to call it, pattern over the demangled name).
 FIXED_REQUIRED = (
@@ -148,6 +152,21 @@ FIXED_REQUIRED = (
     ("parser", ITCH_STORE, "times_from_residuals", r"store::times_from_residuals\("),
     ("parser", ITCH_STORE_READER, "ItchStoreReader::column_view",
      r"ItchStoreReader::column_view\("),
+    ("kernel", SIMD_DISPATCH, "active_kernels", r"simd::active_kernels\("),
+    ("kernel", SIMD_DISPATCH, "kernels_for", r"simd::kernels_for\("),
+    ("kernel", SIMD_DISPATCH, "kernel_level_available", r"simd::kernel_level_available\("),
+    ("kernel", SIMD_DISPATCH, "parse_kernel_level", r"simd::parse_kernel_level\("),
+    ("kernel", SIMD_DISPATCH, "prefix_sum_forms", r"simd::prefix_sum_forms\("),
+    ("kernel", SIMD_DISPATCH, "svb_data_bytes", r"simd::svb_data_bytes\("),
+    ("kernel", SIMD_DISPATCH, "ScalarKernelsOnThisThread",
+     r"ScalarKernelsOnThisThread::ScalarKernelsOnThisThread\("),
+    ("kernel", SIMD_SCALAR, "unpack_vector_scalar", r"::unpack_vector_scalar\("),
+    ("kernel", SIMD_SCALAR, "unpack_linear_scalar", r"::unpack_linear_scalar\("),
+    ("kernel", SIMD_SCALAR, "add_base_scalar", r"::add_base_scalar\("),
+    ("kernel", SIMD_SCALAR, "prefix_sum_scalar", r"::prefix_sum_scalar\("),
+    ("kernel", SIMD_SCALAR, "delta_pass_scalar", r"::delta_pass_scalar\("),
+    ("kernel", SIMD_SCALAR, "unpack_delta_scalar", r"::unpack_delta_scalar\("),
+    ("kernel", SIMD_SCALAR, "svb_decode_scalar", r"::svb_decode_scalar\("),
     ("parser", ITCH_QUERY, "ColumnAccess::open", r"ColumnAccess::open\("),
     ("parser", ITCH_QUERY, "ColumnAccess::ensure", r"ColumnAccess::ensure\("),
     ("parser", ITCH_QUERY, "ColumnAccess::decode_block", r"ColumnAccess::decode_block\("),
@@ -299,6 +318,20 @@ HARDWARE_CRC32C = {
 }
 
 
+# The SIMD kernel set this processor builds, which the tests must reach, as with CRC32C:
+# NEON on arm64, AVX2 on x86-64 with the CPUID check that selects it.
+NEON_KERNELS = tuple(("kernel", SIMD_NEON, name, rf"::{name}\(") for name in (
+    "unpack_vector_neon", "unpack_linear_neon", "add_base_neon", "prefix_sum_neon_vector",
+    "prefix_sum_neon_tree", "delta_pass_neon", "unpack_delta_neon", "unpack_delta_narrow_neon",
+    "svb_decode_neon"))
+AVX2_KERNELS = tuple(("kernel", SIMD_AVX2, name, rf"::{name}\(") for name in (
+    "cpu_has_avx2", "unpack_vector_avx2", "unpack_linear_avx2", "add_base_avx2",
+    "prefix_sum_avx2_vector", "prefix_sum_avx2_tree", "delta_pass_avx2", "unpack_delta_avx2",
+    "unpack_delta_narrow_avx2", "svb_decode_avx2"))
+SIMD_KERNELS = {"arm64": NEON_KERNELS, "aarch64": NEON_KERNELS, "x86_64": AVX2_KERNELS,
+                "AMD64": AVX2_KERNELS}
+
+
 def required_functions(types, machine=None):
     required = []
     for name in types:
@@ -310,6 +343,7 @@ def required_functions(types, machine=None):
     machine = platform.machine() if machine is None else machine
     if machine in HARDWARE_CRC32C:
         required.append(HARDWARE_CRC32C[machine])
+    required.extend(SIMD_KERNELS.get(machine, ()))
     return required
 
 
