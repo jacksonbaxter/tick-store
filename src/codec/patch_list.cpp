@@ -88,7 +88,8 @@ std::expected<void, CodecError> read_patches(ByteCursor& cursor, std::size_t cou
         return std::unexpected(value_bytes.error());
     }
 
-    std::vector<std::uint64_t> gaps(count);
+    thread_local std::vector<std::uint64_t> gaps;
+    gaps.resize(count);
     if (!unpack_linear(*gap_bytes, gap_bits, gaps)) {
         return std::unexpected(codec_error(CodecErrorKind::trailing_bits, fields.positions,
                                            values_at - 8U, 0, 1));

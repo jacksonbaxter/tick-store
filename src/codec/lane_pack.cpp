@@ -4,8 +4,10 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <span>
 #include <vector>
 
@@ -91,6 +93,10 @@ void append_words_le(std::span<const std::uint64_t> words, std::vector<std::byte
 
 void load_words_le(std::span<const std::byte> bytes, std::span<std::uint64_t> words) noexcept {
     const std::size_t count = std::min(words.size(), bytes.size() / 8U);
+    if constexpr (std::endian::native == std::endian::little) {
+        std::memcpy(words.data(), bytes.data(), count * sizeof(std::uint64_t));
+        return;
+    }
     for (std::size_t w = 0; w < count; ++w) {
         std::uint64_t word = 0;
         for (std::size_t i = 8; i > 0; --i) {
@@ -147,7 +153,26 @@ bool unpack_linear(std::span<const std::byte> bytes, unsigned width,
     const auto byte_at = [&bytes](std::size_t at) {
         return at < bytes.size() ? std::to_integer<std::uint64_t>(bytes[at]) : 0U;
     };
-    for (std::size_t i = 0; i < values.size(); ++i) {
+    std::size_t i = 0;
+    if constexpr (std::endian::native == std::endian::little) {
+        // While nine bytes from a value's first are in bounds, load them whole.
+        for (; i < values.size(); ++i) {
+            const std::size_t bit = i * width;
+            const std::size_t first = bit / 8U;
+            if (first + 9U > bytes.size()) {
+                break;
+            }
+            const auto skip = static_cast<unsigned>(bit % 8U);
+            std::uint64_t word = 0;
+            std::memcpy(&word, bytes.data() + first, sizeof word);
+            word >>= skip;
+            if (skip + width > kWordBits) {
+                word |= std::to_integer<std::uint64_t>(bytes[first + 8U]) << (kWordBits - skip);
+            }
+            values[i] = word & mask;
+        }
+    }
+    for (; i < values.size(); ++i) {
         const std::size_t bit = i * width;
         const std::size_t first = bit / 8U;
         const auto skip = static_cast<unsigned>(bit % 8U);

@@ -7,9 +7,11 @@
 #include "tick_store/codec/pfor.hpp"
 
 #include <algorithm>
+#include <array>
 #include <bit>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <expected>
 #include <span>
 #include <utility>
@@ -26,6 +28,8 @@ constexpr std::uint64_t kPayloadStart = kBlockHeaderSize * 8U;
 // Code prefixes the Huffman decoder looks up in one step. Longer codes finish by the
 // canonical rule from there.
 constexpr unsigned kHuffmanTableBits = 10;
+// The prefix the decoder looks up to take two short codes at once.
+constexpr unsigned kHuffmanPairBits = 11;
 
 constexpr PforOptions kRankedEntries{.transform = IntTransform::none, .adaptive_scale = true,
                                      .patch = true};
@@ -272,16 +276,19 @@ using Encoded = std::expected<void, CodecError>;
                                                counts_at, std::uint64_t{1} << lengths, space));
         }
     }
-    indices.assign(count, 0);
+    indices.resize(count);
     if (entries > 1) {
-        // The fast path: while a whole longest code is left, peek that many bits and find
-        // the code's length from a table of its first `table_bits`, then by the canonical
-        // rule for a longer one. The code is complete, so every peek holds one whole code,
-        // and nothing here can fail; the last codes, closer to the end than the longest
-        // code, take the bit-by-bit loop below, which reports a truncated stream.
+        // The fast path: while eight bytes are left from the byte holding the next bit, a
+        // load of them holds at least 57 real bits, so codes are taken from that word,
+        // one table lookup each, while a whole longest code is left in it. The table maps
+        // the first `table_bits` bits to the code's length in the low 8 bits and its entry
+        // above them, or 0 where every code with that prefix is longer, which then
+        // finishes by the canonical rule. The code is complete, so every code is whole
+        // inside the bits looked at, and nothing here can fail; the last codes take the
+        // checked loops below, the last of which reports a truncated stream.
         const unsigned table_bits = std::min(lengths, kHuffmanTableBits);
-        std::vector<std::uint64_t> first_code(lengths + 1U, 0);
-        std::vector<std::uint64_t> first_index(lengths + 1U, 0);
+        std::array<std::uint64_t, kDictMaxCodeBits + 1U> first_code{};
+        std::array<std::uint64_t, kDictMaxCodeBits + 1U> first_index{};
         {
             std::uint64_t first = 0;
             std::uint64_t index = 0;
@@ -292,33 +299,133 @@ using Encoded = std::expected<void, CodecError>;
                 first = (first + per_length[length]) << 1U;
             }
         }
-        // Each slot: the code's length in the low 8 bits and its entry above them, or 0
-        // where every code with that prefix is longer than table_bits.
-        std::vector<std::uint64_t> table(std::size_t{1} << table_bits, 0);
+        // Entries are below 2^20 (the block's values), so a slot fits 32 bits.
+        thread_local std::vector<std::uint32_t> table;
+        table.assign(std::size_t{1} << table_bits, 0);
         for (unsigned length = 1; length <= table_bits; ++length) {
             const unsigned spread = table_bits - length;
             for (std::uint64_t k = 0; k < per_length[length]; ++k) {
                 const std::uint64_t slot = (first_code[length] + k) << spread;
-                const std::uint64_t value = ((first_index[length] + k) << 8U) | length;
+                const auto value = static_cast<std::uint32_t>(((first_index[length] + k) << 8U) | length);
                 std::fill_n(table.begin() + static_cast<std::ptrdiff_t>(slot),
                             std::size_t{1} << spread, value);
             }
         }
+        const auto long_code = [&](std::uint64_t window, std::uint64_t& index) -> unsigned {
+            // `window` holds the next `lengths` bits; the code is longer than table_bits.
+            for (unsigned length = table_bits + 1U; length <= lengths; ++length) {
+                const std::uint64_t code = window >> (lengths - length);
+                if (code - first_code[length] < per_length[length]) {
+                    index = first_index[length] + (code - first_code[length]);
+                    return length;
+                }
+            }
+            return lengths;  // unreachable for a complete code
+        };
         std::size_t done = 0;
+        constexpr unsigned kWordValidBits = 57;
+        {
+            // Two codes a lookup where both fit in kHuffmanPairBits: each slot holds the bits
+            // its codes take in the low 8 bits, how many codes (0 for a first code longer
+            // than table_bits, 1, or 2) in bits 8 and 9, the first entry from bit 12 and the
+            // second from bit 32. Built from the single table, so it costs a slot a lookup
+            // or two, against a block's thousands of codes.
+            thread_local std::vector<std::uint64_t> pairs;
+            pairs.resize(std::size_t{1} << kHuffmanPairBits);
+            const unsigned down = kHuffmanPairBits - table_bits;
+            const std::uint64_t pair_mask = (std::uint64_t{1} << kHuffmanPairBits) - 1U;
+            for (std::uint64_t slot = 0; slot < pairs.size(); ++slot) {
+                const std::uint32_t one = table[slot >> down];
+                const unsigned first = one & 0xFFU;
+                std::uint64_t entry = 0;
+                if (first != 0) {
+                    entry = first | (std::uint64_t{1} << 8U) | (std::uint64_t{one >> 8U} << 12U);
+                    const std::uint32_t two = table[((slot << first) & pair_mask) >> down];
+                    const unsigned second = two & 0xFFU;
+                    if (second != 0 && first + second <= kHuffmanPairBits) {
+                        entry = (first + second) | (std::uint64_t{2} << 8U) |
+                                (std::uint64_t{one >> 8U} << 12U) |
+                                (std::uint64_t{two >> 8U} << 32U);
+                    }
+                }
+                pairs[slot] = entry;
+            }
+            const std::byte* const data = bytes.data();
+            const std::size_t size = bytes.size();
+            const std::uint64_t start = reader.position();
+            std::uint64_t pos = start;
+            // One spare slot, since a pair writes two entries.
+            indices.resize(count + 1U);
+            std::uint64_t* const indices_out = indices.data();
+            const unsigned widest = std::max(lengths, kHuffmanPairBits);
+            while (done + 2U <= count && (pos >> 3U) + 8U <= size) {
+                std::uint64_t word = 0;
+                std::memcpy(&word, data + (pos >> 3U), sizeof word);
+                if constexpr (std::endian::native == std::endian::little) {
+                    word = std::byteswap(word);
+                }
+                word <<= (pos & 7U);
+                unsigned used = 0;
+                do {
+                    const std::uint64_t bits = word << used;
+                    const std::uint64_t slot = pairs[bits >> (64U - kHuffmanPairBits)];
+                    const auto codes = static_cast<unsigned>((slot >> 8U) & 3U);
+                    if (codes == 0) {
+                        std::uint64_t index = 0;
+                        used += long_code(bits >> (64U - lengths), index);
+                        indices_out[done++] = index;
+                    } else {
+                        indices_out[done] = (slot >> 12U) & 0xFFFFFU;
+                        indices_out[done + 1U] = slot >> 32U;
+                        done += codes;
+                        used += static_cast<unsigned>(slot & 0xFFU);
+                    }
+                } while (done + 2U <= count && used + widest <= kWordValidBits);
+                pos += used;
+            }
+            indices.resize(count);
+            reader.advance_within(static_cast<unsigned>(pos - start));
+        }
+        {
+            const std::byte* const data = bytes.data();
+            const std::size_t size = bytes.size();
+            const std::uint64_t start = reader.position();
+            std::uint64_t pos = start;
+            std::uint64_t* const indices_out = indices.data();
+            const unsigned table_shift = 64U - table_bits;
+            while (done < count && (pos >> 3U) + 8U <= size) {
+                std::uint64_t word = 0;
+                std::memcpy(&word, data + (pos >> 3U), sizeof word);
+                if constexpr (std::endian::native == std::endian::little) {
+                    word = std::byteswap(word);
+                }
+                word <<= (pos & 7U);
+                unsigned used = 0;
+                do {
+                    // used <= kWordValidBits - lengths < 64.
+                    const std::uint64_t bits = word << used;
+                    const std::uint32_t slot = table[bits >> table_shift];
+                    auto length = static_cast<unsigned>(slot & 0xFFU);
+                    std::uint64_t index = slot >> 8U;
+                    if (length == 0) {
+                        length = long_code(bits >> (64U - lengths), index);
+                    }
+                    used += length;
+                    indices_out[done++] = index;
+                } while (done < count && used + lengths <= kWordValidBits);
+                pos += used;
+            }
+            // At most 2^20 codes of at most 32 bits: the advance fits 32 bits.
+            reader.advance_within(static_cast<unsigned>(pos - start));
+        }
         while (done < count && reader.remaining() >= lengths) {
             // remaining() >= lengths and lengths <= 32, so the peek holds real bits.
             const std::uint64_t window = reader.peek_within(lengths);
-            const std::uint64_t slot = table[window >> (lengths - table_bits)];
+            const std::uint32_t slot = table[window >> (lengths - table_bits)];
             auto length = static_cast<unsigned>(slot & 0xFFU);
             std::uint64_t index = slot >> 8U;
             if (length == 0) {
-                for (length = table_bits + 1U; length <= lengths; ++length) {
-                    const std::uint64_t code = window >> (lengths - length);
-                    if (code - first_code[length] < per_length[length]) {
-                        index = first_index[length] + (code - first_code[length]);
-                        break;
-                    }
-                }
+                length = long_code(window, index);
             }
             reader.advance_within(length);
             indices[done++] = index;
@@ -346,6 +453,38 @@ using Encoded = std::expected<void, CodecError>;
         }
     }
     return reader.finish("dict codes");
+}
+
+// Whether any value appears twice in `entries`: an open-addressing set of at least twice
+// as many slots, each stamped with the call that filled it, so no call clears the table.
+[[nodiscard]] bool repeats_an_entry(std::span<const std::uint64_t> entries) {
+    thread_local std::vector<std::uint64_t> keys;
+    thread_local std::vector<std::uint32_t> stamps;
+    thread_local std::uint32_t stamp = 0;
+    const std::size_t slots = std::bit_ceil(std::max<std::size_t>(entries.size() * 2U, 16U));
+    if (slots > keys.size()) {
+        keys.assign(slots, 0);
+        stamps.assign(slots, 0);
+        stamp = 0;
+    }
+    if (++stamp == 0) {
+        std::ranges::fill(stamps, 0U);
+        stamp = 1;
+    }
+    const std::size_t mask = slots - 1U;
+    for (const std::uint64_t value : entries) {
+        // Fibonacci hashing: the top bits of the product spread any pattern of values.
+        std::size_t at = static_cast<std::size_t>((value * 0x9E3779B97F4A7C15ULL) >> 32U) & mask;
+        while (stamps[at] == stamp) {
+            if (keys[at] == value) {
+                return true;
+            }
+            at = (at + 1U) & mask;
+        }
+        stamps[at] = stamp;
+        keys[at] = value;
+    }
+    return false;
 }
 
 // One block's counts, added to a column's.
@@ -436,7 +575,9 @@ std::expected<std::size_t, CodecError> decode_dict_block(std::span<const std::by
 
     // The nested PFOR blocks: positions in `payload`, offsets from the block's first byte.
     std::size_t at = kEntryCountBytes + 1U;
-    std::vector<std::uint64_t> dictionary;
+    // Scratch kept per thread, so a column of blocks allocates once.
+    thread_local std::vector<std::uint64_t> dictionary;
+    dictionary.clear();
     const std::uint64_t dictionary_at = kPayloadStart + (at * 8U);
     {
         const auto taken = decode_pfor_block(payload.subspan(at), dictionary);
@@ -450,7 +591,8 @@ std::expected<std::size_t, CodecError> decode_dict_block(std::span<const std::by
         at += *taken;
     }
 
-    std::vector<std::uint64_t> indices;
+    thread_local std::vector<std::uint64_t> indices;
+    indices.clear();
     const std::uint64_t indices_at = kPayloadStart + (at * 8U);
     if (as_mode == DictMode::ranked_huffman) {
         if (const auto read = read_huffman(payload.subspan(at), indices_at, *entries, count, indices);
@@ -496,9 +638,29 @@ std::expected<std::size_t, CodecError> decode_dict_block(std::span<const std::by
         }
     }
 
-    std::vector<std::uint64_t> used(entry_count, 0);
-    for (const std::uint64_t index : indices) {
-        ++used[index];
+    // Uses per entry, counted four ways at once so a run of one entry does not wait on
+    // its own count, which a block of two or three entries would otherwise do every value.
+    thread_local std::vector<std::uint32_t> used;
+    used.assign(entry_count * 4U, 0);
+    {
+        std::array<std::uint32_t*, 4> way{};
+        for (std::size_t w = 0; w < way.size(); ++w) {
+            way[w] = used.data() + (w * entry_count);
+        }
+        const std::uint64_t* const index = indices.data();
+        std::size_t i = 0;
+        for (; i + 4 <= count; i += 4) {
+            ++way[0][index[i]];
+            ++way[1][index[i + 1]];
+            ++way[2][index[i + 2]];
+            ++way[3][index[i + 3]];
+        }
+        for (; i < count; ++i) {
+            ++way[0][index[i]];
+        }
+        for (std::size_t e = 0; e < entry_count; ++e) {
+            way[0][e] += way[1][e] + way[2][e] + way[3][e];
+        }
     }
     for (std::size_t i = 0; i < entry_count; ++i) {
         if (used[i] == 0) {
@@ -522,17 +684,22 @@ std::expected<std::size_t, CodecError> decode_dict_block(std::span<const std::by
                                                    dictionary_at, i - 1, i));
             }
         }
-        std::vector<std::uint64_t> distinct = dictionary;
-        std::ranges::sort(distinct);
-        if (std::ranges::adjacent_find(distinct) != distinct.end()) {
+        if (repeats_an_entry(dictionary)) {
             return std::unexpected(
                 codec_error(CodecErrorKind::bad_field, "dict entry repeated", dictionary_at, 0, 1));
         }
     }
 
     reserve_for_block(out, header->count);
-    for (const std::uint64_t index : indices) {
-        out.push_back(dictionary[index]);
+    const std::size_t start = out.size();
+    out.resize(start + count);
+    {
+        std::uint64_t* const values = out.data() + start;
+        const std::uint64_t* const entry = dictionary.data();
+        const std::uint64_t* const index = indices.data();
+        for (std::size_t i = 0; i < count; ++i) {
+            values[i] = entry[index[i]];
+        }
     }
     return kBlockHeaderSize + header->payload_bytes;
 }

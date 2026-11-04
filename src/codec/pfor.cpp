@@ -506,7 +506,10 @@ std::expected<std::size_t, CodecError> decode_pfor_block(std::span<const std::by
         return fail(codec_error(CodecErrorKind::non_canonical, "pfor scale", scale_at,
                                 bytes_for(*scale), *scale_bytes));
     }
-    Patches remainders;
+    // Kept per thread, so a column of blocks allocates its lists once.
+    thread_local Patches remainders;
+    remainders.positions.clear();
+    remainders.values.clear();
     if (*scale > 1) {
         const std::uint64_t count_at = cursor.bit_offset();
         const auto listed = cursor.read_le(kRemainderCountBytes, "pfor remainder count");
@@ -534,8 +537,9 @@ std::expected<std::size_t, CodecError> decode_pfor_block(std::span<const std::by
     reserve_for_block(out, header->count);
     out.resize(start + count);
     const std::span<std::uint64_t> y = std::span{out}.subspan(start);
-    std::array<std::uint64_t, kVectorValues> words{};
-    Patches exceptions;
+    // Only the words a vector's width uses are loaded, and only those are read.
+    std::array<std::uint64_t, kVectorValues> words;  // NOLINT(cppcoreguidelines-pro-type-member-init)
+    thread_local Patches exceptions;
     for (std::size_t at = 0; at < count; at += kVectorValues) {
         const std::span<std::uint64_t> vector = y.subspan(at, std::min(kVectorValues, count - at));
         const std::uint64_t mode_at = cursor.bit_offset();

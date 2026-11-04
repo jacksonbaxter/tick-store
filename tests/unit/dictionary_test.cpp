@@ -250,6 +250,39 @@ TEST(Dictionary, LongHuffmanCodesRoundTrip) {
     EXPECT_EQ(decoded(column, values.size()), values);
 }
 
+// The decoder takes codes from a loaded word, two a lookup where both are short, one where
+// the first is long, then finishes the last ones bit by bit. A skewed mix of short and long
+// codes, shuffled, at every count around those hand-overs, must decode to the values both
+// ways a block can end: on a pair and on a single code.
+TEST(Dictionary, HuffmanCodesMixedShortAndLongRoundTripAtEveryCount) {
+    Values pool;
+    std::uint64_t a = 1;
+    std::uint64_t b = 2;
+    for (std::uint64_t entry = 0; entry < 18; ++entry) {
+        pool.insert(pool.end(), a, entry * 1'000);
+        const std::uint64_t next = a + b;
+        a = b;
+        b = next;
+    }
+    test::SplitMix64 random{18};
+    for (std::size_t i = pool.size() - 1; i > 0; --i) {
+        std::swap(pool[i], pool[random() % (i + 1)]);
+    }
+    std::array<std::uint64_t, kDictModes> blocks{};
+    for (std::size_t count = 1; count <= 400; ++count) {
+        SCOPED_TRACE(count);
+        const Values values(pool.begin(), pool.begin() + static_cast<std::ptrdiff_t>(count));
+        DictStats stats;
+        const Bytes column = encoded(values, kMaxBlockValues, &stats);
+        EXPECT_EQ(decoded(column, values.size()), values);
+        for (std::size_t mode = 0; mode < kDictModes; ++mode) {
+            blocks[mode] += stats.blocks[mode];
+        }
+    }
+    // Most counts choose Huffman, so the test reaches its loops.
+    EXPECT_GT(blocks[1], 300U);
+}
+
 TEST(Dictionary, SeededValuesRoundTripAtEveryBlockSize) {
     test::SplitMix64 random{61};
     Values values;

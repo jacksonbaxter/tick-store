@@ -154,20 +154,23 @@ inline void head_to_front(std::array<std::uint64_t, kHeadDeltaHeads>& heads, std
     return true;
 }
 
-// The inverse of head_delta_encode, in place. Defined for every word.
+// The inverse of head_delta_encode, in place. Defined for every word. Every head moves
+// by a select rather than a loop of the token's length, so the loop has no branch on the
+// data.
 inline void head_delta_decode(std::span<std::uint64_t> values) noexcept {
-    std::array<std::uint64_t, kHeadDeltaHeads> heads{};
+    std::array<std::uint64_t, kHeadDeltaHeads + 1U> heads{};
     for (std::uint64_t& value : values) {
         const std::uint64_t token = value & kHeadDeltaTokenMask;
         const std::uint64_t payload = value >> kHeadDeltaTokenBits;
-        if (token == kHeadDeltaEscape) {
-            detail::head_to_front(heads, kHeadDeltaHeads - 1U, payload);
-            value = payload;
-        } else {
-            const std::uint64_t x = heads[token] + payload;
-            detail::head_to_front(heads, static_cast<std::size_t>(token), x);
-            value = x;
+        // The escape's slot, heads[kHeadDeltaHeads], is always 0, so it adds nothing.
+        const std::uint64_t x = heads[static_cast<std::size_t>(token)] + payload;
+        const std::size_t from =
+            token == kHeadDeltaEscape ? kHeadDeltaHeads - 1U : static_cast<std::size_t>(token);
+        for (std::size_t t = kHeadDeltaHeads - 1U; t > 0; --t) {
+            heads[t] = t <= from ? heads[t - 1] : heads[t];
         }
+        heads[0] = x;
+        value = x;
     }
 }
 
