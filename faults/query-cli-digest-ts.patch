@@ -1,0 +1,13 @@
+diff --git a/src/harness/query_cli.cpp b/src/harness/query_cli.cpp
+index b88abd0..e4d5fb0 100644
+--- a/src/harness/query_cli.cpp
++++ b/src/harness/query_cli.cpp
+@@ -262,7 +262,7 @@ private:
+         }
+     };
+     column("seq", [](const QueryRow& r) { return static_cast<std::int64_t>(r.seq); });
+-    column("ts", [&](const QueryRow& r) { return static_cast<std::int64_t>(r.ts_ns) + midnight; });
++    column("ts", [&](const QueryRow& r) { return static_cast<std::int64_t>(r.ts_ns) + midnight + 1; });
+     column("msg_type", [](const QueryRow& r) { return static_cast<std::int64_t>(r.msg_type); });
+     column("locate", [](const QueryRow& r) { return static_cast<std::int64_t>(r.locate); });
+     column("order_ref", [](const QueryRow& r) { return static_cast<std::int64_t>(r.order_ref); });

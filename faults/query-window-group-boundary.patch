@@ -1,0 +1,13 @@
+diff --git a/src/store/itch_query.cpp b/src/store/itch_query.cpp
+index 4de4908..9256377 100644
+--- a/src/store/itch_query.cpp
++++ b/src/store/itch_query.cpp
+@@ -477,7 +477,7 @@ struct PlainSegment {
+         std::optional<std::uint64_t> first;
+         std::uint64_t last = 0;
+         for (std::uint64_t g = 0; g < seek.groups; ++g) {
+-            if (seek.max_time[g] >= start && seek.min_time[g] < end) {
++            if (seek.max_time[g] > start && seek.min_time[g] < end) {
+                 if (!first.has_value()) {
+                     first = g;
+                 }

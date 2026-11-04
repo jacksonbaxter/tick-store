@@ -276,6 +276,20 @@ FAULTS = (
           "stops checking a reference distance against its locate's list", EXIT_LIBFUZZER,
           # ASan or UBSan, by whether the list is empty; either trace names the function.
           "in tick_store::store::SegmentAssembler::State::named", arguments=FUZZ_ARGUMENTS),
+    Fault("query-window-group-boundary", "dev-test", "the query's time zone map treats a seek "
+          "group whose last time equals the window's start as before the window, an off-by-one "
+          "at the time boundary", EXIT_CTEST, "ItchQuery.BothPathsEqualTheColumnFormAtEveryBoundary",
+          arguments=("--test-regex", "ItchQuery\\.")),
+    Fault("query-run-order-unchecked", "dev-test", "the query stops refusing a locate run "
+          "directory whose ids do not ascend", EXIT_CTEST,
+          "ItchQueryCorrupt.LocateRunFieldsRefusedByTheQuery",
+          arguments=("--test-regex", "ItchQueryCorrupt")),
+    Fault("query-cli-digest-ts", "dev-test", "the query worker's row digest puts every ts one "
+          "nanosecond late", EXIT_CTEST, "QueryCli.ServesEveryKindWithTheHarnessDigests",
+          arguments=("--test-regex", "QueryCli")),
+    Fault("fuzz-itch-query-first-run-skipped", "fuzz-itch-query", "the symbol filter skips a "
+          "locate's run when it is the segment's first, so its rows go missing", EXIT_LIBFUZZER,
+          "check_itch_query:", arguments=FUZZ_ARGUMENTS),
     Fault("g2-weakened-compare", "dev-test", "the oracle's compare ignores bit 0 and stops "
           "requiring the hashes to match", EXIT_CTEST, "Value of: report.passed()",
           arguments=("--test-regex", "OracleExhaustiveFlip")),

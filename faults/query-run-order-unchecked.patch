@@ -1,0 +1,13 @@
+diff --git a/src/store/itch_query.cpp b/src/store/itch_query.cpp
+index 4de4908..0d3e8bb 100644
+--- a/src/store/itch_query.cpp
++++ b/src/store/itch_query.cpp
+@@ -580,7 +580,7 @@ struct LocateRun {
+     LocateRun run;
+     std::uint64_t record_offset = 0;
+     for (std::uint64_t r = 0; r < runs; ++r) {
+-        if (r > 0 && ids[r] <= ids[r - 1]) {
++        if (r > 0 && ids[r] == ids[r - 1]) {
+             return std::unexpected(seg.error(ItchStoreErrorKind::bad_value, "locate run order",
+                                              Column::locate_run, r, ids[r - 1] + 1, ids[r]));
+         }
