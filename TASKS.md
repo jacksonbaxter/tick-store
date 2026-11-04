@@ -62,7 +62,7 @@ Tests and fuzzing
 - [ ] Phase 3's parsers and decoders get theirs. The two Gorilla decoders have theirs, `fuzz_gorilla_timestamps` and `fuzz_gorilla_xor`, and so do PFOR and Stream VByte, `fuzz_pfor` and `fuzz_stream_vbyte`, the dictionary and run-length codecs, `fuzz_dictionary` and `fuzz_run_length`, and the container parser, `fuzz_container`, each clean for 240 s under `heavy.sh`. The ITCH store has `fuzz_itch_store`, which reads below the checksum and checks decode, re-encode and compare: 904,149 runs in 240 s, clean. The queries have `fuzz_itch_query`, which feeds whole store files below the CRCs into the indexed and exact paths: 38,445 runs in 270 s, clean. On store version 3, from the new encoder's seeds, `fuzz_itch_store` ran 873,182 runs and `fuzz_itch_query` 49,206 in 300 s each, clean
 - [ ] The PFOR fuzz oracle checks values, not bytes, since the encoder makes choices. A field the decoder wrongly accepts without changing a value, such as non-zero tail padding, is caught only by the unit tests' corrupt fixtures
 - [x] Coverage report shows every validator is reached (`scripts/coverage.sh`, `results/coverage.json`). It gates on 204 required functions: `decode_as` and `encode_as` for all 23 types, the parsers, the validators, the codecs' decoders and encoders, PFOR, Stream VByte, lane packing and patch lists among them, the container's parser, writer and durability calls, the software CRC32C kernel and this processor's hardware one, the fuzz oracles and the oracle's compare path, and the ITCH store's writer, reader, segment coder and metadata parsers. All 204 reached at `4302ce8`, lines 93.83%, functions 97.39%. No SIMD kernels exist yet, so none are claimed
-- [ ] Phase 3's kernels join the required list in `scripts/coverage_report.py`
+- [x] Phase 3's kernels join the required list in `scripts/coverage_report.py`: the dispatch, the scalar set, and this processor's own set, NEON on arm64 or AVX2 and its CPUID check on x86-64 (NOTES.md, SIMD; required 255 of 255 reached on the Mac)
 
 Slice for the comparison harness
 - [x] `tools/tick_slice`: every `S` and `R` of `12302019` plus the window 09:29:30 to 09:34:30, 6,125,294 messages and 206,138,339 bytes, proved clean by the strict decoder and by a round trip, pinned under `slices` in `scripts/data_pins.json`
@@ -144,8 +144,8 @@ Storage
 - [x] Q2 and Q3 decoded every record of each segment up to the locate's last one. Store version 3 stores each locate's records as one run, so they read their own run: Q2 decodes 16.3 MB instead of 337.9 MB, at a cost of 255 MB a day, mostly timestamps and creation references out of file order (NOTES.md)
 - [ ] QL-2: a per-locate minute aggregate of the adds would answer Q3 from about 60 entries. Measured on a prototype serialization, 14.6 MB per day or 27.7 MB per segment (zlib). Build it only with its bytes counted, and time it
 - [ ] Q1 and Q4 decode their segment's whole locate column, every run, to put records back in file order: 9.0 MB, Q4 warm 24.7 ms and cold 39.2 ms on version 3, slower than version 2's 21.6 ms warm. A file-order copy would cost up to the 276 MB the version 1 column took; find something cheaper
-- [ ] Q5 is bound by the scalar dictionary decoder: 152 M share values at 3.35 ns each, 510 ms warm. Only SIMD decoding or a different code for the share columns would move it; a stored share sum would be a benchmark special
-- [ ] debian has no `perf`, so the version 3 queries have no Linux profile. Profile them there if `perf` becomes available
+- [ ] Q5 is bound by the scalar dictionary decoder: 152 M share values at 3.35 ns each, 510 ms warm. SIMD did not move it (502 ms warm after the kernels): Huffman decoding is a chain of dependent lookups with no vector form, and a multi-symbol table cost more to build per block than it saved. Decoding several Huffman streams at once needs a format change; try it, or a different code for the share columns. A stored share sum would be a benchmark special
+- [x] debian has no `perf`, so the version 3 queries have no Linux profile. Profile them there if `perf` becomes available. Done with the project toolchain's `perf` at `43aa7d2`: the dictionary decoder is about 55% of the engine's time there too (NOTES.md, SIMD)
 - [ ] The store offers no zstd on timestamps, add_shares or tracking, which the estimate allowed where smaller. Timestamps are 13.8 MB of the 69.5 MB gap to the estimate. Measure the saving per column against the decode time before adding any
 - [ ] E, C and X shares are stored plain, 2.1 MB a day more than coding them against the remaining shares, because an imported order carries no book state. Try importing an order's remaining shares with its reference, counting both
 - [ ] The writer keeps one locate per reference, so a reference named under alternating locates is imported each time. Count how often that happens on the real days before changing the map
@@ -182,20 +182,26 @@ Competing codecs
 - [ ] Re-run the estimate at 1,024-value blocks when the file format fixes its block size and index
 
 SIMD on both architectures
-- [ ] Scalar kernels always built, written to auto-vectorise, because FastLanes found clang's output matched intrinsics. The interleaved pack and unpack loops now compile to NEON on arm64 at `-O2` and `-O3`, after clang had kept them scalar for fear of aliasing (NOTES.md). Still to check: the x86-64 output, and the decoder's base add and zigzag loops
-- [ ] One dispatch table, one shared prolog, kernel and tail driver, callers free of `#ifdef`. CMake selects kernel files by `CMAKE_SYSTEM_PROCESSOR`, so a Linux build needs no code change
-- [ ] arm64: NEON is baseline, so no runtime dispatch. No SVE or SME, and no bit-deposit instructions exist on the M4
-- [ ] x86-64: runtime dispatch to AVX2 from cached CPUID, with AVX2 kernels in their own translation units to avoid the ODR problem Arrow documents. A CPU check for BMI2 is not enough on Zen 1, so kernels use no PEXT, PDEP or gather
-- [ ] AVX-512: not shipped, because neither host can run it, and an unexecuted kernel is untested code
-- [ ] An environment variable caps the kernel level. A test fails if the requested kernel did not run (S1, S6)
-- [ ] Width, offset and tail matrix and scalar-vs-kernel `memcmp` for every kernel, on both architectures (S3-S5)
-- [ ] x86-64 kernels cannot execute on the Mac: Rosetta is absent, and only compile checks are possible there. They must first run on `debian`, and their tests must pass there before any AVX2 number counts
-- [ ] AVX2 kernels: short ASan and UBSan pass on `debian`, through `~/quant-projects/bin/heavy.sh`, avoiding `cpu4` and `cpu5`, never overlapping a measurement
-- [ ] AVX2 decoders: fuzz runs on `debian`, because the Mac cannot execute them, under the same three conditions
-- [ ] Compare 64-bit lanes with 32-bit lanes relative to a block base, since 64-bit lanes are the weakest case in every source
-- [ ] Fused unpack-plus-prefix kernel against two passes
-- [ ] 64-bit prefix sum: NEON against a scalar dependency tree, since Arm's engineers report scalar wins on Neoverse
-- [ ] Record what the layout gave up, what speedup it bought, and which instruction set each number used
+- [x] Scalar kernels always built, written to auto-vectorise, because FastLanes found clang's output matched intrinsics. The interleaved pack and unpack loops compile to NEON on arm64 at `-O2` and `-O3`, and the x86-64 SSE2 baseline output of the unpack, base add and zigzag loops is vector code too (`psrlq`, `psllq`, `por`, `paddq`). That is why NEON buys only 9% on the interleaved unpack and nothing on the add (NOTES.md, SIMD)
+- [x] One dispatch table, one shared prolog, kernel and tail driver, callers free of `#ifdef`. CMake selects kernel files by `CMAKE_SYSTEM_PROCESSOR`, so a Linux build needs no code change (`include/tick_store/codec/simd.hpp`, `src/codec/simd/`)
+- [x] arm64: NEON is baseline, so no runtime dispatch. No SVE or SME, and no bit-deposit instructions exist on the M4
+- [x] x86-64: runtime dispatch to AVX2 from cached CPUID and XGETBV, with AVX2 kernels in their own translation unit under a `target("avx2")` pragma that starts after every standard header, and shared code in unnamed namespaces, to avoid the ODR problem Arrow documents; checked by disassembly. No PEXT, PDEP or gather
+- [x] AVX-512: not shipped, because neither host can run it, and an unexecuted kernel is untested code
+- [x] An environment variable, `TICK_STORE_SIMD`, caps the kernel level. A test fails if the requested kernel did not run, and ctest runs the codec, store, query and fuzz-regression tests again capped to scalar (S1, S6)
+- [x] Width, offset and tail matrix and scalar-vs-kernel `memcmp` for every kernel, on both architectures (S3-S5): `tests/unit/simd_kernels_test.cpp`, passing on the Mac with NEON and on debian with AVX2 (620 of 620 on both hosts at `f8e7a68`)
+- [x] x86-64 kernels cannot execute on the Mac: Rosetta is absent, and only compile checks are possible there. They ran on `debian`, and their tests passed there before any AVX2 number was taken
+- [x] AVX2 kernels: short ASan and UBSan pass on `debian`, through `~/quant-projects/bin/heavy.sh`, avoiding `cpu4` and `cpu5`, never overlapping a measurement (found the width 0 `memcpy`, fixed in `a961486`; 97 tests clean at `43aa7d2`)
+- [x] AVX2 decoders: fuzz runs on `debian`, because the Mac cannot execute them, under the same three conditions (240 s each at `43aa7d2`, and `fuzz_run_length` again at `f8e7a68` after its timeout fix, NOTES.md, SIMD)
+- [x] Compare 64-bit lanes with 32-bit lanes relative to a block base, since 64-bit lanes are the weakest case in every source. No gain: 3.62 against 3.64 G values/s on the M4, 1.16 against 1.25 on Zen 1, widths 0 to 21. Not used
+- [x] Fused unpack-plus-prefix kernel against two passes. Two passes win on the M4, 3.42 against 3.30 G values/s; fused wins on Zen 1, 1.29 against 1.19. Each set uses its winner
+- [x] 64-bit prefix sum: NEON against a scalar dependency tree, since Arm's engineers report scalar wins on Neoverse. NEON wins on the M4, 4.84 against 3.25 G values/s. On Zen 1 the AVX2 in-register form loses to the tree, 1.57 against 2.04, so AVX2 uses the tree
+- [x] Record what the layout gave up, what speedup it bought, and which instruction set each number used (NOTES.md, SIMD). All iteration-only
+- [ ] Kernel numbers under `measure.sh`: `bench/simd_kernel_bench` cases, such as `pfor_unpack/w=13/neon`, run through `scripts/run_bench.py` as a seeded input kind, which `scripts/check_results.py` validates. Not yet measured
+- [ ] DS-3 and DS-4 miss at iteration: 3.42 G values/s two-pass on the M4 against 3.6, and 2.71 cycles a value fused on Zen 1 against 0.377. The cross-lane prefix sum the value-order layout needs is the main cost; FastLanes' transposed layout avoids it, at the price of a store format change. Measure first, then decide
+- [ ] DS-8 misses at iteration: delta-of-delta decodes at 4.8 GB/s of 32-bit values on the M4 against 8.20, with no kernel of its own. Delta beats delta-of-delta on this data, so build one only if a column moves to it
+- [ ] The queries barely move with SIMD: Q1 to Q4 3 to 6% faster warm on both hosts, Q5 0.4 to 1.1%. The time-base residual add is a max-plus recurrence with wrapping residuals, so it stays scalar (rewritten, 0.94 to 0.69 ns a value); the dictionary decoder is the bound
+- [ ] `results/check-proofs.json` predates five fault patches: `neon-add-base-tail-off-by-one` and `fuzz-svb-neon-canonical-dropped` are new, and `fuzz-pfor-zigzag-order`, `fuzz-stream-vbyte-length-check` and `store-time-past-48-bits` were made again on moved code. Each was proven with `prove_checks.py --only` and the file restored from git. Re-run the full prover to record them
+- [ ] The AVX2 tail fault is shown on debian by hand, on a scratch copy, since the prover needs a git checkout and debian holds an exported tree. A host-aware fault list would let the prover run there
 
 Measure on both hosts
 - [ ] Every target in BENCHMARKS.md measured on its stated hosts, from committed code, with raw outputs on disk

@@ -1583,7 +1583,221 @@ misses:
   directory rules hold, so no fault can show it failing. The reader's check is proven
   (`store-piece-value-count`).
 
-**Gaps.** debian has no `perf`, so there is no Linux profile of the version 3 queries.
+**Gaps.** debian had no `perf`, so there was no Linux profile of the version 3 queries. The project toolchain there has one
+now, and the SIMD section below has the profile.
+
+### SIMD
+
+Decode kernels for NEON on arm64 and AVX2 on x86-64, behind one dispatch table, from `3155b2e` on. Every number here is
+iteration-only. The Mac numbers are macOS on the M4 Max, unpinned, with no counters and a 24 MHz timer (about 42 ns). The debian
+numbers are Linux on the Ryzen Embedded V1605B (Zen 1), run through `heavy.sh` with `taskset -c 2,6,7`, not pinned to one core.
+debian is shared, so each debian figure names the load it ran under. Zen 1 splits each 256-bit operation into two 128-bit
+halves, so AVX2 there does at most the work of 128-bit vectors per cycle. Raw outputs are kept with the logs, not in the repo.
+
+**Dispatch** (`include/tick_store/codec/simd.hpp`, `src/codec/simd/`).
+
+- One table, `simd::Kernels`, of function pointers: interleaved unpack, linear unpack, frame-of-reference add with optional
+  zigzag, prefix sum, the inverse delta, fused unpack and inverse delta in 64-bit and 32-bit lanes, and Stream VByte. The codecs
+  call `active_kernels()` and hold no `#ifdef`. CMake picks `kernels_neon.cpp` or `kernels_avx2.cpp` by
+  `CMAKE_SYSTEM_PROCESSOR`. The scalar set is always built.
+- arm64: NEON is baseline, so the choice is made at compile time. No SVE, SME or bit-deposit instructions.
+- x86-64: AVX2 is chosen at run time from CPUID leaves 1 and 7 and XGETBV, read once and cached. No PEXT, PDEP, gather or
+  AVX-512. The AVX2 file is not compiled with `-mavx2`. Its functions take `target("avx2")` from a pragma that starts after
+  every standard header, and the shared driver and tables sit in unnamed namespaces, so no inline function with external linkage
+  gets an AVX2 body. That is the ODR problem Arrow documents. Checked by cross-compiling for x86-64 and disassembling: no
+  external symbol from the standard library holds VEX code.
+- One driver, `drive<Step>`, runs a set's whole steps while the input fits and hands the rest to the scalar kernel. The scalar
+  set is the driver with no whole steps.
+- `TICK_STORE_SIMD=scalar|neon|avx2` caps the level. An unknown or unavailable level aborts before the first decode. Per-thread
+  run counters show which set ran, and `SimdDispatch.TheRequestedSetIsTheOneThatRuns` fails if another did. ctest runs the codec,
+  store, query and fuzz-regression tests a second time capped to scalar (`simd_capped_to_scalar`).
+- `ScalarKernelsOnThisThread` forces the scalar set on one thread while it lives. The fuzz oracles use it.
+
+**Kernels per instruction set.**
+
+| Kernel | NEON | AVX2 | In the codecs |
+|---|---|---|---|
+| Interleaved unpack, every width 0 to 64 | Width-templated, immediate shifts | Same | PFOR full vectors |
+| Linear unpack, widths up to 56 | `tbl` shuffle, per-lane shift | `pshufb`, `vpsrlvq` | Tails, patch lists, scale remainders |
+| Frame of reference add, zigzag | Yes | Yes | PFOR vectors, Stream VByte zigzag |
+| Prefix sum | In-register (Kogge-Stone) | Scalar tree | Stream VByte delta |
+| Inverse delta, from the block base | In-register | In-register | PFOR delta, two passes |
+| Fused unpack and inverse delta, 64-bit lanes | Yes, not chosen | Yes, chosen | PFOR delta vectors with no exceptions |
+| Fused, 32-bit lanes relative to the block base | Yes, not chosen | Yes, not chosen | None |
+| Stream VByte decode with the length check | `tbl` | `pshufb` on 128 bits | Stream VByte |
+
+Dictionary decoding and the time-base residual add stay scalar, for the reasons below.
+
+**Tests.** `tests/unit/simd_kernels_test.cpp` compares every kernel of every set this processor runs with the scalar set by
+`memcmp`: interleaved unpack at every width 0 to 64 and 16 byte offsets; linear unpack at widths 1 to 64, counts 0 to 33 and
+1,000, and offsets; the add, prefix and delta kernels at lengths 0 to 40, 1,023 to 1,025 and 4,099, from 8 starting offsets,
+with several bases; the fused kernels at every width, base, zigzag and offset; Stream VByte at every tail and offset, with a
+long value refused at every position. Every input is an exact-size heap buffer, so ASan sees a read one byte past it, and packed
+bytes sit at odd offsets, so UBSan's alignment check sees a typed load. At `f8e7a68` the dev suite passes 620 of 620 on the Mac
+with NEON, in the full `check.sh` through `heavy.sh` (30 of 30 steps), and 620 of 620 on debian with AVX2 selected, the capped
+run included; at `43aa7d2` debian passed 618 of 618. The short ASan and UBSan pass over the kernel, codec and fuzz-regression
+tests on debian found `load_words_le` passing a null pointer to `memcpy` at width 0, fixed in `a961486`; at `43aa7d2` its 97
+tests passed in 233 s.
+
+**Fuzzing.** Every codec fuzz target decodes each block, and each column of part 2, a second time with the scalar set forced on
+the thread, and the two must agree: the same refusal, or the same values. `fuzz_itch_store` reads each file a second time that
+way, and `fuzz_itch_query` answers its queries a second time. `fuzz_columns` reads no kernel. The oracle is shown failing on a
+fault only it can see: the NEON Stream VByte kernel stops refusing a value stored in more bytes than it needs
+(`fuzz-svb-neon-canonical-dropped`), caught as "the kernel set and the scalar set decoded a block differently". On the Mac at
+`57ec582` every touched target ran 240 s clean through `heavy.sh`: `fuzz_pfor` 16,563 runs, `fuzz_stream_vbyte` 96,647,
+`fuzz_dictionary` 17,415, `fuzz_run_length` 60,777, `fuzz_gorilla_timestamps` 646,447, `fuzz_gorilla_xor` 309,410,
+`fuzz_itch_store` 535,769 and `fuzz_itch_query` 37,360 (`mac-fuzz/`). On debian at `43aa7d2`, where the AVX2 paths are the
+ones under test, each decoder whose AVX2 path is new ran 240 s through `heavy.sh`: `fuzz_pfor` 4,292 runs,
+`fuzz_stream_vbyte` 17,187, `fuzz_dictionary` 6,818, `fuzz_itch_store` 87,528 and `fuzz_itch_query` 7,914, all clean.
+`fuzz_run_length` stopped at 12 s on a timeout. The input was the seed of 2^20 equal values in one 48-byte block, which the
+oracle re-encodes in blocks of 3: 349,526 encoder runs, 7.5 s on the Mac with sanitizers and over the 10 s limit on Zen 1.
+`encode_dict` had been made to copy a block that repeats the one before after the same seed timed out on CI; `encode_rle`
+now does the same (`f64d4f3`), and the seed takes 1.1 s on the Mac. After the fix `fuzz_run_length` ran 240 s clean on both
+hosts: 68,922 runs on the Mac and 13,044 on debian (`mac-fuzz-rle/`, `debian/verify3/`).
+
+**Faults.** A tail off-by-one in the NEON frame-of-reference kernel, its scalar tail starting one value late
+(`neon-add-base-tail-off-by-one`), is caught by `SimdKernels.AddBaseMatchesScalarOnEveryTail`, proven with
+`prove_checks.py --only` on the Mac. The same fault in the AVX2 kernel was shown on debian, where `prove_checks.py` cannot run (it
+clones with git, and debian holds an exported tree): on a scratch copy of the tree at `a961486`, the kernel tests passed, the
+patched copy failed `SimdKernels.AddBaseMatchesScalarOnEveryTail` (418 failed assertions), and the copy and its build were
+removed. The kernel rewrite had moved the code under two older fault patches,
+`fuzz-pfor-zigzag-order` and `fuzz-stream-vbyte-length-check`, and the time-base rewrite a third, `store-time-past-48-bits`.
+All three were made again on the new code and proven again. `results/check-proofs.json` was restored from git after each proof
+run, so it does not yet list the new faults. The first full Mac check after the kernels failed its clang-tidy step: no compile database
+on the Mac holds `kernels_avx2.cpp`, and `check.sh` did not yet list it with the other processor's files. It does from
+`f8e7a68`, and `kernels_neon.cpp` on x86-64 likewise.
+
+**What the layout gave up.** From the C1 table in "Integer codecs on ITCH", timestamps in file order on `12302019` and
+`10302019`:
+
+- Lost adaptivity: 0.621 and 0.568 bits a value that a width per 128 values would save, 1.474 and 1.451 per locate.
+- The 1,024-value floor: no values in short vectors in file order, 1.8% and 1.6% per locate. Short vectors take the linear
+  layout, which now has a kernel of its own.
+- Padding: none, because tails are linear. Padding them to 1,024 would have cost 0.42 and 0.39 bits a value per locate.
+- Per-lane order: values stay in value order across the 16 lanes, with one base per vector. Decoding a delta therefore needs a
+  prefix sum across each row, in the register. FastLanes transposes the values so that each lane holds its own run of deltas and
+  the inverse delta is a vertical add with no cross-lane step. That transposed layout is what DS-3 and DS-4 measure, and the
+  main reason this layout misses them (below). Moving to it would change the store format.
+
+**Kernel throughput**, G values a second, the median over widths 0 to 64 where a kernel has a width, one vector of 1,024 values
+in L1 decoded over and over (`bench/simd_kernel_bench`, by hand):
+
+| Kernel | Mac scalar | Mac NEON | Speedup | debian scalar | debian AVX2 | Speedup |
+|---|---|---|---|---|---|---|
+| Interleaved unpack | 6.49 | 7.05 | 1.09 | 2.25 | 2.89 | 1.28 |
+| Linear unpack | 2.01 | 7.31 | 3.64 | 0.66 | 1.97 | 3.0 |
+| Unpack and inverse delta, two passes | 1.99 | 3.42 | 1.72 | 0.97 | 1.19 | 1.23 |
+| Unpack and inverse delta, fused | 1.66 | 3.30 | 1.99 | 0.97 | 1.29 | 1.33 |
+| Fused in 32-bit lanes, widths 0 to 21 | 1.76 | 3.62 | 2.06 | 1.06 | 1.16 | 1.09 |
+| Prefix sum, in-register form, with an 8 KB copy | 3.21 | 4.84 | 1.51 | 2.12 | 1.57 | 0.74 |
+| Prefix sum, scalar tree form, with the copy | 3.20 | 3.25 | 1.02 | 2.05 | 2.04 | 1.00 |
+| Frame of reference add | 5.24 | 5.21 | 0.99 | 2.18 | 2.25 | 1.03 |
+| Frame of reference add with zigzag | 3.96 | 3.66 | 0.92 | 1.99 | 2.17 | 1.09 |
+| Stream VByte decode | 0.71 | 6.23 | 8.8 | 0.39 | 2.19 | 5.6 |
+
+- Mac: the tree at `e97c453`, load 1.5 to 3.4 (`mac/kbench-allwidths.json`). debian: `4840312`, load under 2, two runs within
+  3% of each other; `perf stat` gave 3.50 GHz over the run (`debian/simd-kbench-1.json`, `-2.json`). The scalar column is the
+  scalar set in the same binary.
+- "Scalar" is not naive code. Clang auto-vectorises the scalar unpack and the add loops: on arm64 to `ushl.2d` and `add.2d`, on
+  x86-64's SSE2 baseline to `psrlq`, `psllq`, `por` and `paddq`. That is why NEON buys only 9% on the interleaved unpack and
+  nothing on the add. The kernels that win are those the compiler cannot write: shuffles (Stream VByte, the linear layout) and
+  the cross-lane prefix sum.
+- The linear kernel stops at width 56, where one value can span nine bytes; wider values take the scalar path, at 2.00 G/s on
+  the Mac either way.
+- The debian linear row comes from a later run at `57ec582`, the first to have it, which started under a load of 10.7 from
+  another project and ended at 3.2, at 3.15 GHz: every figure in that run is 10 to 15% below the clean one, and the ratios of
+  the other rows match it (`debian/after/simd-after/kbench2.json`). A run at `57ec582` under load 6 to 8 at 2.75 GHz gave
+  numbers about half the clean run's and is not used (`debian/chain/kbench.json`).
+
+**Experiments.**
+
+- 64-bit lanes against 32-bit lanes relative to the block base: no gain. The narrow form must first prove that every value fits
+  in 32 bits from the base, then widens on the store. On the Mac it is 3.62 G/s against 3.64 for two passes over the same
+  widths 0 to 21; on Zen 1, 1.16 against 1.25 for two passes and 1.29 fused over those widths. Not used.
+- Fused unpack and prefix against two passes: two passes win on the M4, 3.42 against 3.30, and the fused form is ahead at only 17
+  of the 65 widths. The fused form unpacks with a shift count in a register, since its rows run in a loop, where the two-pass
+  unpack uses immediate shifts. On Zen 1 fused wins, 1.29 against 1.19, ahead at 64 and 61 of the 65 widths in two runs, so the
+  AVX2 set fuses and the NEON set does not.
+- The 64-bit prefix sum, NEON against a scalar dependency tree: NEON wins on the M4, 4.84 against 3.25, the opposite of what
+  Arm's engineers report on Neoverse. On Zen 1 the in-register AVX2 form loses to the scalar tree, 1.57 against 2.04: each
+  cross-lane `vpermq` is slow there, and a 256-bit add costs two. The AVX2 set uses the tree for the prefix sum.
+
+**Per-column decode on the real day**, ns a value over every fourth segment of the `12302019` store, the second of two runs
+(`mac/colbench-final.txt`):
+
+| Column | Before, `a7c3742` | After, `57ec582`, NEON | After, capped to scalar |
+|---|---|---|---|
+| timestamp (PFOR delta, patched) | 0.90 | 0.60 | 0.79 |
+| time_base | 0.65 | 0.39 | 0.63 |
+| add_price | 1.00 | 0.78 | 0.86 |
+| type (dictionary) | 2.29 | 2.26 | 2.24 |
+| ref_distance (dictionary) | 3.01 | 2.83 | 2.82 |
+| add_shares (dictionary) | 2.75 | 2.61 | 2.63 |
+
+- The timestamp column went from 0.90 to 0.60 ns a value, 1.5 times. Most of its time had been the linear unpack of its patch
+  lists and the checked loop over the patch positions, not the full vectors: the profile before showed `unpack_linear` with 442
+  samples and `read_patches` with 330, against 135 for the block decoder and 58 for each unpack width. Patch positions are now
+  formed without per-value checks when one sum shows they fit, with the checked loop kept for the first error.
+- Capped to scalar, the same build is still faster than before (0.79), from the patch-list change alone.
+
+**Queries Q1 to Q5**, whole day `12302019`, indexed path, `build/scratch/query/timing.py`, every answer checked against the
+ground truth. Mac, warm median ms, before (`a7c3742`) and after (`57ec582`) run alternately twice, 20 warm and 5 cold trials each:
+
+| | Q1 | Q2 | Q3 | Q4 | Q5 |
+|---|---|---|---|---|---|
+| Warm before | 38.97, 39.14 | 44.48, 44.63 | 21.37, 21.54 | 24.46, 24.59 | 503.47, 504.22 |
+| Warm after, NEON | 37.97, 37.75 | 43.06, 43.34 | 20.38, 20.32 | 23.25, 23.19 | 502.63, 501.22 |
+| Change | -3.1% | -3.0% | -5.1% | -5.3% | -0.4% |
+| Cold before | 56.42, 55.60 | 210.31, 210.88 | 111.96, 112.30 | 38.45, 38.16 | 663.73, 665.55 |
+| Cold after | 54.54, 54.79 | 209.95, 209.17 | 111.64, 111.52 | 37.39, 37.52 | 660.71, 661.53 |
+
+- The queries barely move. Q1 to Q4 gain 3 to 5% warm. Q5 is 80% Huffman decoding of the share column, which has no vector
+  form. Cold queries are bound by reading the file. Peak RSS 379 MB, peak footprint 11.6 MB.
+- debian at `43aa7d2`, load about 1, 20 warm and 5 cold trials, every answer checked, AVX2 against the same build capped to
+  scalar (`debian/day/simd-day/timing-{avx2,scalar}.json`). Warm medians: Q1 118.6 against 122.2 ms (-3.0%), Q2 108.7 against
+  111.8 (-2.7%), Q3 43.9 against 45.9 (-4.4%), Q4 57.1 against 60.8 (-6.2%), Q5 1,134.4 against 1,146.8 (-1.1%). Cold medians
+  move from -19% to +5% between the two runs, which is the spread of cold reads on that disk, not the kernels. Peak RSS of
+  each timing run 416 MB and 413 MB, from `getrusage` of its children, since debian has no `/usr/bin/time`. Ingest at the same
+  commit took 224 s with a peak RSS of 7.68 GB.
+
+**Where SIMD lost, or was not tried.**
+
+- Dictionary decoding. The Huffman decode is a chain of dependent lookups, about 8 cycles each with two codes a lookup, and it
+  is 80% of Q5 (`decode_dict_block`, 6,075 of about 7,600 samples). Split by phase on add_shares and ref_distance: counting
+  0.4 to 0.6 ns a value, gathering 0.3 to 0.5, Huffman about 2. A multi-symbol table was tried and rejected: building it for each
+  4,096-value block costs what it saves. Decoding several streams at once would need a format change. TASKS keeps it open.
+- The time-base residual add, `t = r + max(t before, base)`. A max-plus recurrence can be scanned in parallel only if addition
+  is monotone, and residuals wrap modulo 2^64 by design, so no exact vector form exists. The loop was rewritten instead, with
+  only the add and the max on the chain: 0.94 to 0.69 ns a value on 65,536 values and 1.03 to 0.73 on a million
+  (`mac/timebase-scalar-rewrite.txt`).
+- The frame of reference add and zigzag, and on the M4 the interleaved unpack: the compiler's scalar output already matches.
+- The AVX2 in-register prefix sum, which loses to the scalar tree on Zen 1.
+
+**Against the targets** (iteration-only, so no verdict):
+
+- DS-3, 64-bit block delta decode at least 3.6 G values/s on NEON: two passes reach 3.42, the median over widths 0 to 64 on the
+  M4 Max. Short by 5%, against FastLanes on an M1, whose transposed layout needs no cross-lane prefix sum.
+- DS-4, the same kernel at most 0.377 cycles a value on AVX2: 1.29 G/s fused at 3.50 GHz is 2.71 cycles a value, 7.2 times
+  over, on Zen 1 against FastLanes on Zen 3. Zen 1 splits each 256-bit operation in two and is slow on cross-lane permutes, and
+  the layout needs a prefix sum across lanes.
+- DS-6, the SIMD layout at least 14 times faster than the Gorilla stream on the same column: met on the Mac. The open slice's
+  6,125,294 timestamps in file order, one column, 4,096-value blocks: Gorilla delta-of-delta 9.46 to 9.57 ns a value, PFOR
+  delta 0.565 to 0.574 with NEON, 16.6 to 16.7 times; capped to scalar 0.817 to 0.821, 11.6 to 11.7 times
+  (`mac/ds6-ds8-gorilla-pfor.txt`).
+- DS-7, the same on Linux, which has no published figure: 8.0 to 8.5 times with AVX2 on Zen 1, Gorilla 23.6 to 25.9 ns
+  a value against PFOR delta 2.95 to 3.03; capped to scalar 7.8 to 8.4 times, PFOR at 3.10 to 3.22 (`a961486`'s tree, load
+  about 3, `debian/after/simd-after/ds7.txt`).
+- DS-8, delta-of-delta reconstruct at least 8.20 GB/s of 32-bit values: PFOR delta-of-delta on the same column decodes at 0.83 ns
+  a value on the M4, 4.8 GB/s counted as 32-bit values, short by 1.7 times; on Zen 1, 3.19 to 3.25 ns, 1.2 GB/s. The second
+  difference is undone by two scalar passes at the block level, with no kernel of its own; delta beats delta-of-delta on this data
+  anyway (C1), so it was not given one.
+
+**A Linux profile of the queries.** The project toolchain on debian now has `perf`, which the version 3 queries lacked
+(Gaps, above). `perf record -e cycles:u -g` over Q1 to Q5, five times each, with AVX2 at `43aa7d2`, 40,451 samples
+(`debian/day/simd-day/perf-queries-report.txt`): `decode_dict_block` takes 41.8% of all samples, and the SHA-256 and row digest
+of the answers, which `tick_query` computes outside `engine_ns`, take 24.3%. The dictionary decoder is therefore about 55% of
+the engine's own time, the bound it is on the Mac. Of the kernels, the AVX2 linear unpack takes 1.2%, `decode_pfor_block` 1.0%
+and `read_patches` 0.7%; CRC32C takes 1.1%.
 
 ## Process notes
 
