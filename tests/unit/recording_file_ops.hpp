@@ -6,8 +6,6 @@
 
 #include "tick_store/store/durability.hpp"
 
-#include <sys/types.h>
-
 #include <cerrno>
 #include <cstddef>
 #include <functional>
@@ -80,7 +78,7 @@ public:
         return fd;
     }
 
-    ssize_t write(int fd, const std::byte* data, std::size_t size) override {
+    std::ptrdiff_t write(int fd, const std::byte* data, std::size_t size) override {
         if (!begin("write")) {
             return -1;
         }

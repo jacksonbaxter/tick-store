@@ -50,6 +50,7 @@ constexpr std::string_view kUsage =
 // What the process has held at most, in bytes: getrusage's ru_maxrss, which on Linux is the
 // kernel's VmHWM in KiB and on macOS bytes.
 [[nodiscard]] std::uint64_t peak_resident_bytes() noexcept {
+    // NOLINTNEXTLINE(misc-include-cleaner): <sys/resource.h> has it; glibc defines it in bits/
     rusage usage{};
     if (getrusage(RUSAGE_SELF, &usage) != 0) {
         return 0;

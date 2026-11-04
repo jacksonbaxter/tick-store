@@ -35,7 +35,7 @@ public:
         return ::open(path, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
     }
 
-    ssize_t write(int fd, const std::byte* data, std::size_t size) override {
+    std::ptrdiff_t write(int fd, const std::byte* data, std::size_t size) override {
         return ::write(fd, data, size);
     }
 
@@ -144,7 +144,7 @@ std::expected<void, StoreError> sync_directory(FileOps& ops,
 std::expected<void, StoreError> write_all(FileOps& ops, int fd,
                                           std::span<const std::byte> bytes) noexcept {
     while (!bytes.empty()) {
-        const ssize_t written = ops.write(fd, bytes.data(), bytes.size());
+        const std::ptrdiff_t written = ops.write(fd, bytes.data(), bytes.size());
         if (written < 0) {
             if (errno == EINTR) {
                 continue;

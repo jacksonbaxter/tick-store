@@ -9,8 +9,6 @@
 
 #include "tick_store/store/store_error.hpp"
 
-#include <sys/types.h>
-
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -59,7 +57,9 @@ public:
     [[nodiscard]] virtual int create_file(const char* path) = 0;
     // open(path, O_RDONLY | O_DIRECTORY | O_CLOEXEC).
     [[nodiscard]] virtual int open_directory(const char* path) = 0;
-    [[nodiscard]] virtual ssize_t write(int fd, const std::byte* data, std::size_t size) = 0;
+    // write(fd, data, size). ssize_t is long on every host we build for, as std::ptrdiff_t
+    // is, and naming it would need a header glibc and macOS each define it in differently.
+    [[nodiscard]] virtual std::ptrdiff_t write(int fd, const std::byte* data, std::size_t size) = 0;
     // fcntl(fd, F_FULLFSYNC), or -1 with errno ENOTSUP where the OS has no such call.
     [[nodiscard]] virtual int full_fsync(int fd) = 0;
     [[nodiscard]] virtual int fsync(int fd) = 0;

@@ -119,7 +119,9 @@ TEST_F(Slice, KeepsEverySAndRPlusTheWindowInFileOrder) {
     EXPECT_EQ(report->in_window_outside_range, 0U);
     EXPECT_EQ(report->in_range_outside_window, 0U);
 
-    const auto frames = test::frames_of(source_).frames;
+    // Named, not auto: libstdc++'s operator[] returns its own alias for the element type, so
+    // with auto the use of itch::Frame would not show on Linux.
+    const std::vector<itch::Frame> frames = test::frames_of(source_).frames;
     EXPECT_EQ(report->window_first_offset, frames[3].offset);
     EXPECT_EQ(report->window_end_offset, frames[6].offset);
 }
