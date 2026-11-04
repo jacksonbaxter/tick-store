@@ -1340,7 +1340,8 @@ void write_low_cardinality_seeds(SeedDir& seeds,
         // The most values one block holds, all equal: a few dozen bytes the oracle decodes to
         // 2^20 values and re-encodes in blocks of 3. A dictionary block of this, one entry
         // with codes of no bits, timed out the CI fuzz run before encode_dict copied a block
-        // that repeats the one before.
+        // that repeats the one before, and the run-length block, one run, timed out on debian
+        // before encode_rle did the same.
         seeds.add(column_of(encoder.encode_column, Words(tick_store::codec::kMaxBlockValues, 42),
                             tick_store::codec::kMaxBlockValues));
     }

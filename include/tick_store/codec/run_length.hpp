@@ -36,6 +36,9 @@ struct RleStats {
     std::uint64_t runs = 0;
     // Blocks whose run values took delta.
     std::uint64_t delta_blocks = 0;
+    // Blocks encode_rle wrote as a copy of the block before, whose values they repeat.
+    // They are counted in `runs` and `delta_blocks` too.
+    std::uint64_t repeated = 0;
 };
 
 // Appends one block holding `values`, which must hold 1 to kMaxBlockValues values.
@@ -48,7 +51,11 @@ struct RleStats {
 [[nodiscard]] std::expected<std::size_t, CodecError> decode_rle_block(
     std::span<const std::byte> block, std::vector<std::uint64_t>& out);
 
-// Appends `values` as consecutive blocks of `block_values`, the last one shorter.
+// Appends `values` as consecutive blocks of `block_values`, the last one shorter. A block
+// whose values repeat the block before's is a copy of its bytes, which is what encoding it
+// would give: the encoder is deterministic. A block of 2^20 equal values is one run in a
+// few dozen bytes, and cut into blocks of 3 it would otherwise cost the whole encoder
+// 349,526 times over, as encode_dict found first.
 [[nodiscard]] std::expected<void, CodecError> encode_rle(std::span<const std::uint64_t> values,
                                                          std::size_t block_values,
                                                          std::vector<std::byte>& out,

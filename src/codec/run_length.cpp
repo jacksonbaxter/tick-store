@@ -171,13 +171,35 @@ std::expected<void, CodecError> encode_rle(std::span<const std::uint64_t> values
         return checked;
     }
     const std::size_t start = out.size();
+    std::span<const std::uint64_t> previous;
+    std::size_t previous_at = start;
+    RleStats block_stats;
     for (std::size_t at = 0; at < values.size(); at += block_values) {
         const std::size_t size = std::min(values.size() - at, block_values);
-        if (auto block = encode_rle_block(values.subspan(at, size), out, stats);
-            !block.has_value()) {
-            out.resize(start);
-            return block;
+        const std::span<const std::uint64_t> block = values.subspan(at, size);
+        const std::size_t block_at = out.size();
+        if (!previous.empty() && std::ranges::equal(block, previous)) {
+            // Copied by position: inserting a vector's own range into it is undefined.
+            const std::size_t bytes = block_at - previous_at;
+            out.resize(block_at + bytes);
+            std::copy_n(out.begin() + static_cast<std::ptrdiff_t>(previous_at), bytes,
+                        out.begin() + static_cast<std::ptrdiff_t>(block_at));
+            if (stats != nullptr) {
+                ++stats->repeated;
+            }
+        } else {
+            block_stats = RleStats{};
+            if (auto encoded = encode_rle_block(block, out, &block_stats); !encoded.has_value()) {
+                out.resize(start);
+                return encoded;
+            }
         }
+        if (stats != nullptr) {
+            stats->runs += block_stats.runs;
+            stats->delta_blocks += block_stats.delta_blocks;
+        }
+        previous = block;
+        previous_at = block_at;
     }
     return {};
 }
