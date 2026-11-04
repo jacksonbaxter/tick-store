@@ -267,6 +267,10 @@ FAULTS = (
     Fault("crc32c-armv8-last-byte", "dev-test", "the ARMv8 CRC32C kernel drops an odd last byte",
           EXIT_CTEST, "Crc32c.HardwareMatchesSoftwareOnRandomLengthsAndOffsets",
           arguments=("--test-regex", "Crc32c")),
+    Fault("neon-add-base-tail-off-by-one", "dev-test", "the NEON frame-of-reference kernel "
+          "starts its scalar tail one value late, so the first value past the whole steps keeps "
+          "its offset", EXIT_CTEST, "SimdKernels.AddBaseMatchesScalarOnEveryTail",
+          arguments=("--test-regex", "SimdKernels")),
     Fault("g1-store-alters-a-byte", "oracle", "the ITCH store's writer flips the low bit of every "
           "add order's shares, so record 2 re-serialises one bit off", CHECK_FAILED,
           "first difference: bytes at record 2, source byte"),

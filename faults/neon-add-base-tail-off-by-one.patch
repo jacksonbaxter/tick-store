@@ -1,0 +1,13 @@
+diff --git a/src/codec/simd/kernels_neon.cpp b/src/codec/simd/kernels_neon.cpp
+index bc1ff09..124ebc3 100644
+--- a/src/codec/simd/kernels_neon.cpp
++++ b/src/codec/simd/kernels_neon.cpp
+@@ -136,7 +136,7 @@ void add_base_neon(std::span<std::uint64_t> values, std::uint64_t base, bool zz)
+             vst1q_u64(p + i + 4, x2);
+             vst1q_u64(p + i + 6, x3);
+         },
+-        [&](std::size_t first) { add_base_from(values, first, base, zz); });
++        [&](std::size_t first) { add_base_from(values, first + 1, base, zz); });
+ }
+ 
+ // Running sums of eight values in four registers, from the carry in `c`, which then
