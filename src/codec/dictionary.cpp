@@ -405,7 +405,7 @@ using Encoded = std::expected<void, CodecError>;
                     // used <= kWordValidBits - lengths < 64.
                     const std::uint64_t bits = word << used;
                     const std::uint32_t slot = table[bits >> table_shift];
-                    auto length = static_cast<unsigned>(slot & 0xFFU);
+                    unsigned length = slot & 0xFFU;
                     std::uint64_t index = slot >> 8U;
                     if (length == 0) {
                         length = long_code(bits >> (64U - lengths), index);
@@ -422,7 +422,7 @@ using Encoded = std::expected<void, CodecError>;
             // remaining() >= lengths and lengths <= 32, so the peek holds real bits.
             const std::uint64_t window = reader.peek_within(lengths);
             const std::uint32_t slot = table[window >> (lengths - table_bits)];
-            auto length = static_cast<unsigned>(slot & 0xFFU);
+            unsigned length = slot & 0xFFU;
             std::uint64_t index = slot >> 8U;
             if (length == 0) {
                 length = long_code(window, index);

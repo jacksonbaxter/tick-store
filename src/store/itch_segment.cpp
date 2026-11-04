@@ -1317,7 +1317,7 @@ std::expected<std::optional<itch::Message>, ItchStoreError> SegmentAssembler::ne
                                 .error());
             }
             s.plain = s.plain && column_form_plain(*message);
-            s.decoded.push_back(std::move(*message));
+            s.decoded.push_back(*message);
         }
         if (s.plain != s.summary->plain) {
             ItchStoreError error;

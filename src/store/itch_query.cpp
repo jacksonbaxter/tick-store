@@ -801,7 +801,7 @@ template <class Emit>
     std::uint64_t emit_from, std::uint64_t stop, std::uint64_t start, std::uint64_t end,
     Need need, Emit&& emit) {
     ItchQuery::Engine& engine = *seg.engine;
-    ColumnAccess& types = engine.col(Column::type);
+    const ColumnAccess& types = engine.col(Column::type);
     ColumnAccess& times = engine.col(Column::timestamp);
     ColumnAccess& gaps = engine.col(Column::locate);
     ColumnAccess& add_side = engine.col(Column::add_side);

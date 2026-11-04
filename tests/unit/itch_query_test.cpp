@@ -637,7 +637,8 @@ TEST(ItchQueryCorrupt, LocateRunFieldsRefusedByTheQuery) {
             auto reader = ItchStoreReader::open_bytes(broken);
             ASSERT_TRUE(reader.has_value()) << c.field;
             ItchQuery query{*reader};
-            auto refused = query.minute_aggregate(0, ~std::uint64_t{0}, *c.locate);
+            ASSERT_TRUE(c.locate.has_value()) << c.field;
+            auto refused = query.minute_aggregate(0, ~std::uint64_t{0}, c.locate.value());
             ASSERT_FALSE(refused.has_value()) << c.field;
             EXPECT_EQ(refused.error().field, c.field) << to_string(refused.error());
         } else {
