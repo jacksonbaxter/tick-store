@@ -26,12 +26,15 @@ add_executable(tick_store_unit_tests
     itch_golden_test.cpp
     itch_raw_path_test.cpp
     itch_real_day_test.cpp
+    itch_store_corrupt_test.cpp
+    itch_store_test.cpp
     itch_truncation_test.cpp
     oracle_broken_store_test.cpp
     oracle_flip_test.cpp
     oracle_test.cpp
     page_cache_test.cpp
     pfor_test.cpp
+    reference_eval_test.cpp
     roundtrip_cli_test.cpp
     run_length_test.cpp
     sha256_test.cpp

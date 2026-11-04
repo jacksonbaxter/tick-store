@@ -3,13 +3,23 @@
 // The command line of tools/tick_roundtrip, as a function, so tests can run every path
 // and read its exit code and output without starting a process.
 //
-//   tick_roundtrip ingest <source> <store>
-//       Decodes every source record and writes it through the stub store's writer.
-//   tick_roundtrip verify <source> <store> [--expect-sha256 HEX]
-//       Runs the oracle. Prints a JSON summary. On a failure, also describes the first
-//       difference on stderr.
+//   tick_roundtrip ingest <source> <store> --durability page_cache|device_flush
+//                         [--segment-records N]
+//       Decodes every source record and writes the ITCH store (store/itch_store.hpp), in the
+//       durability mode named: it is never a default. Prints a JSON summary.
+//   tick_roundtrip ingest-stub <source> <store>
+//       The same through the Phase 2 stub store, which the stub's own tests still use.
+//   tick_roundtrip verify <source> <store> [--expect-sha256 HEX] [--no-checksums]
+//       Runs the oracle against a store file: the ITCH store, or the stub store by its
+//       magic. Block and section CRCs are checked unless --no-checksums says otherwise, so a
+//       flipped bit is caught by its CRC with the block named, or with checksums skipped,
+//       by the decoder or the oracle with the record named. Prints a JSON summary. On a
+//       failure, also describes the first difference on stderr.
 //   tick_roundtrip verify-columns <source> <columns-dir> [--expect-sha256 HEX]
 //       The same oracle, over a column directory (store/columns.hpp) in place of a store.
+//   tick_roundtrip layout <store> [--blocks]
+//       What an ITCH store's bytes are spent on, from its footer: per column, per section
+//       and the container's own. --blocks lists every block with its offset.
 //   tick_roundtrip flip-bit <file> <byte_offset> <bit>
 //       Flips one bit of a file in place. Bit 0 is the least significant bit.
 //

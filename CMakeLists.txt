@@ -40,6 +40,7 @@ target_sources(tick_store_core PRIVATE
     src/codec/price_double.cpp
     src/codec/run_length.cpp
     src/codec/stream_vbyte.cpp
+    src/codec/zstd_frame.cpp
     src/itch/codec.cpp
     src/itch/frame.cpp
     src/store/columns.cpp
@@ -48,12 +49,18 @@ target_sources(tick_store_core PRIVATE
     src/store/container_writer.cpp
     src/store/crc32c.cpp
     src/store/durability.cpp
+    src/store/itch_segment.cpp
+    src/store/itch_store.cpp
+    src/store/itch_store_reader.cpp
+    src/store/itch_store_writer.cpp
     src/store/mapped_file.cpp
     src/store/store_error.cpp
     src/store/stub_store.cpp
 )
 target_include_directories(tick_store_core PUBLIC include)
 target_compile_features(tick_store_core PUBLIC cxx_std_23)
+# The store wraps a few columns in zstd (codec/zstd_frame.hpp).
+target_link_libraries(tick_store_core PRIVATE libzstd_static)
 tick_store_apply_warnings(tick_store_core)
 
 # The hardware CRC32C kernel for the target processor, each in its own file so its
@@ -88,6 +95,8 @@ if(TICK_STORE_BUILD_TESTS OR TICK_STORE_BUILD_TOOLS OR TICK_STORE_BUILD_BENCH)
         src/harness/data_tools_cli.cpp
         src/harness/flip_bit.cpp
         src/harness/hash_worker.cpp
+        src/harness/itch_store_record_reader.cpp
+        src/harness/reference_eval.cpp
         src/harness/roundtrip.cpp
         src/harness/roundtrip_cli.cpp
         src/harness/sha256.cpp

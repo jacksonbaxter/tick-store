@@ -109,7 +109,7 @@ tools=build/bench/tools
 day=data/12302019.NASDAQ_ITCH50
 pin=5d81c2e14a0f748b29c674b6a342796932702034b4dd341e39e9a9ec5bac610f
 
-$tools/tick_roundtrip ingest $day build/12302019.stub
+$tools/tick_roundtrip ingest-stub $day build/12302019.stub
 $tools/tick_roundtrip verify $day build/12302019.stub --expect-sha256 $pin
 ```
 

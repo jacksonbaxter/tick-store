@@ -3,11 +3,17 @@
 
     python3 -I scripts/check_oracle.py path/to/tick_roundtrip
 
-Writes a few ITCH messages and a cut tail under the gitignored build/ folder, stores them with
-`tick_roundtrip ingest`, and requires `verify` to pass against the pin (G-1). Then it flips one
-stored bit, requires `verify` to exit 1 and name that bit (G-2), and flips it back. No data
-file is needed, so this runs everywhere. Exits 1 if either gate fails, naming the location the
-oracle reported.
+Writes a few ITCH messages and a cut tail under the gitignored build/ folder, stores them in the
+ITCH store with `tick_roundtrip ingest` at two records a segment, and requires `verify` to pass
+against the pin (G-1). Then G-2, each flip undone before the next:
+
+  - a bit in a data block (segment 1's timestamps): with CRCs on, `verify` exits 1 naming a
+    block CRC failure at that block's index and file offset; with --no-checksums, it exits 1
+    naming the record that differs or the segment and column the decoder refused;
+  - a bit in the footer: `verify` exits 1 naming the footer's CRC.
+
+Then `verify` passes again on the restored file. No data file is needed, so this runs
+everywhere. Exits 1 if either gate fails, naming what the tool reported.
 
 Standard library only.
 """
@@ -22,13 +28,13 @@ import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-STORE_HEADER_SIZE = 40
 EXIT_PASS = 0
 EXIT_MISMATCH = 1
+SEGMENT_RECORDS = 2
 FLIP_BIT = 3
-# Bytes into the third record: its prefix, then type, locate, tracking and timestamp.
-FLIP_RECORD = 2
-FLIP_OFFSET_IN_RECORD = 9
+# Segment 1 is the add and the delete.
+FLIP_SEGMENT = 1
+FLIP_COLUMN = "timestamp"
 
 
 def frame(payload):
@@ -67,38 +73,84 @@ def flip(path, offset, bit):
         file.write(bytes([byte ^ (1 << bit)]))
 
 
+def layout(tool, store):
+    done = run(tool, "layout", str(store), "--blocks")
+    if done.returncode != EXIT_PASS:
+        return None
+    return json.loads(done.stdout)
+
+
 def check(tool, folder):
     records, tail = source_stream()
     source_bytes = b"".join(records) + tail
     source = folder / "source.itch"
-    store = folder / "source.stub"
+    store = folder / "source.tsc"
     source.write_bytes(source_bytes)
     pin = hashlib.sha256(source_bytes).hexdigest()
 
-    if run(tool, "ingest", str(source), str(store)).returncode != EXIT_PASS:
+    ingest = ("ingest", str(source), str(store), "--durability", "page_cache",
+              "--segment-records", str(SEGMENT_RECORDS))
+    if run(tool, *ingest).returncode != EXIT_PASS:
         return "ingest failed"
 
     verify = ("verify", str(source), str(store), "--expect-sha256", pin)
+    unchecked = verify + ("--no-checksums",)
     done = run(tool, *verify)
     if done.returncode != EXIT_PASS:
         return f"G-1 failed: verify exited {done.returncode} on an untouched store"
     report = json.loads(done.stdout)
-    if report.get("records") != len(records) or report.get("verdict") != "pass":
+    if (report.get("records") != len(records) or report.get("verdict") != "pass"
+            or report.get("store_format") != "itch-store-v1"):
         return f"G-1 failed: verify reported {report.get('records')} records, " \
-               f"{report.get('verdict')}"
+               f"{report.get('verdict')}, format {report.get('store_format')}"
 
-    source_offset = sum(map(len, records[:FLIP_RECORD])) + FLIP_OFFSET_IN_RECORD
-    flip(store, STORE_HEADER_SIZE + source_offset, FLIP_BIT)
+    shape = layout(tool, store)
+    if shape is None:
+        return "layout failed on an untouched store"
+    blocks = [b for b in shape["block_list"]
+              if b["segment"] == FLIP_SEGMENT and b["column"] == FLIP_COLUMN]
+    if len(blocks) != 1:
+        return f"no {FLIP_COLUMN} block in segment {FLIP_SEGMENT}"
+    block = blocks[0]
+    offset = block["payload_offset"] + block["payload_bytes"] - 1
+
+    flip(store, offset, FLIP_BIT)
+    checked_run = run(tool, *verify)
+    unchecked_run = run(tool, *unchecked)
+    flip(store, offset, FLIP_BIT)
+    if checked_run.returncode != EXIT_MISMATCH:
+        return f"G-2 failed: verify exited {checked_run.returncode} on a flipped data bit"
+    error = json.loads(checked_run.stdout).get("store_error") or ""
+    wanted = [f"block {block['block']}", "bad checksum: block",
+              f"at offset {block['payload_offset']}"]
+    missing = [part for part in wanted if part not in error]
+    if missing:
+        return f"G-2 failed: the CRC failure does not name {missing}: {error!r}"
+    if unchecked_run.returncode != EXIT_MISMATCH:
+        return f"G-2 failed: verify --no-checksums exited {unchecked_run.returncode} " \
+               "on a flipped data bit"
+    report = json.loads(unchecked_run.stdout)
+    first = report.get("first_difference") or {}
+    error = report.get("store_error") or ""
+    names_record = first.get("kind") == "bytes" and first.get("record_index") is not None
+    names_field = f"segment {FLIP_SEGMENT}, column {FLIP_COLUMN}" in error
+    if not (names_record or names_field):
+        return f"G-2 failed: with CRCs off, verify named neither a record nor the column: " \
+               f"{first}, {error!r}"
+
+    footer = shape["container"]["footer_offset"]
+    flip(store, footer, FLIP_BIT)
     done = run(tool, *verify)
-    flip(store, STORE_HEADER_SIZE + source_offset, FLIP_BIT)
+    flip(store, footer, FLIP_BIT)
     if done.returncode != EXIT_MISMATCH:
-        return f"G-2 failed: verify exited {done.returncode} on a flipped bit"
-    first = json.loads(done.stdout).get("first_difference") or {}
-    expected = {"kind": "bytes", "record_index": FLIP_RECORD,
-                "source_byte_offset": source_offset, "bit": FLIP_BIT}
-    wrong = {key: first.get(key) for key, value in expected.items() if first.get(key) != value}
-    if wrong:
-        return f"G-2 failed: verify named the wrong place: {wrong}, expected {expected}"
+        return f"G-2 failed: verify exited {done.returncode} on a flipped footer bit"
+    error = json.loads(done.stdout).get("store_error") or ""
+    if "bad checksum: footer" not in error:
+        return f"G-2 failed: the footer flip was not a footer CRC failure: {error!r}"
+
+    done = run(tool, *verify)
+    if done.returncode != EXIT_PASS:
+        return f"G-2 failed: verify exited {done.returncode} on the restored store"
     return None
 
 

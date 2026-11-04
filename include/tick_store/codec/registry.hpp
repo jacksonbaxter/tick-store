@@ -21,9 +21,9 @@
 //     than misread it (D11). A change to an existing codec's bytes is a new id, never
 //     an edit to an old one.
 //
-// A codec's payload is one block in the codec's own frame (block.hpp), which carries
-// its value count. Composite codecs, such as zstd over another codec's block, are new
-// ids when the store needs them.
+// A codec's payload is one or more blocks in the codec's own frame (block.hpp), back to
+// back, each carrying its value count. Composite codecs are ids of their own: zstd (8)
+// wraps another codec's bytes and names that codec inside its payload (zstd_frame.hpp).
 
 #include "tick_store/codec/block.hpp"
 #include "tick_store/codec/dictionary.hpp"
@@ -50,6 +50,7 @@ enum class CodecId : std::uint16_t {
     stream_vbyte = 5,
     dictionary = 6,
     run_length = 7,
+    zstd = 8,
 };
 
 enum class CodecStatus : std::uint8_t {
@@ -97,6 +98,9 @@ inline constexpr std::array kCodecs{
               .name = "run_length",
               .status = CodecStatus::active,
               .decoder = &decode_rle_block},
+    // zstd over another codec's bytes, which name their codec inside (zstd_frame.hpp). Not
+    // a block decoder: the store decompresses, then decodes with the inner codec.
+    CodecInfo{.id = CodecId::zstd, .name = "zstd", .status = CodecStatus::active},
 };
 
 static_assert(

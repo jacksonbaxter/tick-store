@@ -838,6 +838,7 @@ TEST(CodecRegistry, EachDecoderReadsItsOwnEncodersBlock) {
                 break;
             case CodecId::none:
             case CodecId::raw:
+            case CodecId::zstd:
                 break;
         }
         return out;
