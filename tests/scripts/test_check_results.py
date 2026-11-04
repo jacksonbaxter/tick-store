@@ -120,6 +120,28 @@ def valid_document(host):
             "input": {"slice": SLICE, "sha256": SHA, "messages": MESSAGES},
             "results": [result]}
 
+def seeded_document(host):
+    """A kernel micro-benchmark's file: input made from a seed, so values, not messages."""
+    document = valid_document(host)
+    document["benchmark"] = "simd_kernel"
+    document["input"] = {"kind": "seeded", "items": "values",
+                         "seed": "each case makes its own input from a fixed seed"}
+    result = document["results"][0]
+    result["case"] = "pfor_unpack/w=13/scalar"
+    result["verification"] = {"input_seed": 13, "items_per_call": 1024,
+                              "calls_per_pass": 8192, "against": "the scalar set",
+                              "matched": True}
+    throughput = result["throughput"]
+    throughput["values_per_second"] = throughput.pop("messages_per_second")
+    result["latency"]["batch_items"] = result["latency"].pop("batch_messages")
+    result["ratio"] = {"status": "not-applicable", "reason": "a decode kernel"}
+    if host == "Linux":
+        counters_block = result["counters"]
+        counters_block["per_value"] = counters_block.pop("per_message")
+        document["header"]["sibling_busy_percent"]["cases"] = {result["case"]: 0.5}
+        document["header"]["frequency"]["effective_mhz"] = {result["case"]: 3390.0}
+    return document
+
 
 def remove(document, *keys):
     target = document
@@ -556,6 +578,50 @@ class CheckResultsTest(unittest.TestCase):
             [sys.executable, "-I", str(SCRIPT), "--pins", str(self.pins), str(good), str(bad)],
             capture_output=True, text=True, check=False)
         self.assertEqual(result.returncode, 1)
+
+
+    # A seeded kernel benchmark: no slice to pin, so the seed and the match stand in for it.
+
+    def check_seeded(self, host, mutate=None):
+        document = copy.deepcopy(seeded_document(host))
+        if mutate is not None:
+            mutate(document)
+        return self.run_check(document, f"{host}-simd_kernel-{COMMIT[:12]}.json")
+
+    def assert_seeded_fails(self, host, mutate, expected):
+        result = self.check_seeded(host, mutate)
+        self.assertEqual(result.returncode, 1, msg=result.stdout + result.stderr)
+        self.assertIn(expected, result.stderr)
+
+    def test_a_valid_seeded_file_passes_on_both_hosts(self):
+        for host in ("Linux", "macOS"):
+            with self.subTest(host=host):
+                result = self.check_seeded(host)
+                self.assertEqual(result.returncode, 0, msg=result.stderr)
+
+    def test_a_seeded_file_must_name_its_seed(self):
+        self.assert_seeded_fails(
+            "Linux", lambda d: remove(d, "results", 0, "verification", "input_seed"),
+            "verification.input_seed")
+
+    def test_a_seeded_file_must_show_the_output_matched(self):
+        self.assert_seeded_fails(
+            "Linux", lambda d: set_value(d, False, "results", 0, "verification", "matched"),
+            "verification.matched")
+
+    def test_a_seeded_file_counts_values_not_messages(self):
+        def rename(document):
+            throughput = document["results"][0]["throughput"]
+            throughput["messages_per_second"] = throughput.pop("values_per_second")
+        self.assert_seeded_fails("Linux", rename, "throughput: no median")
+
+    def test_a_seeded_latency_needs_its_batch_size(self):
+        self.assert_seeded_fails(
+            "macOS", lambda d: remove(d, "results", 0, "latency", "batch_items"),
+            "batch_items")
+
+    def test_a_slice_file_cannot_drop_its_pin_by_omitting_the_kind(self):
+        self.assert_fails("Linux", lambda d: remove(d, "input", "slice"), "has no pin")
 
 
 if __name__ == "__main__":

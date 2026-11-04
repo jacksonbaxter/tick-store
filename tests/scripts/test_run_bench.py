@@ -70,6 +70,19 @@ def fake_report(commit, dirty, case):
     }
 
 
+SEEDED_CASES = ("pfor_unpack/w=13/scalar", "svb_decode/scalar")
+
+
+def fake_seeded_report(commit, case):
+    report = fake_report(commit, False, case)
+    report["verification"] = {"input_seed": 13, "items_per_call": 1024, "calls_per_pass": 8192,
+                              "against": "the scalar set", "matched": True}
+    report["gated"] = {"items": 10000, "wall_ns": 1000000.0}
+    latency = report["latency"]
+    latency["batch_items"] = latency.pop("batch_messages")
+    return report
+
+
 def fake_gbench(case):
     rows = [{"name": f"{case}/throughput/real_time", "run_type": "iteration"}]
     for name, rate in (("mean", 6e7), ("median", 6e7), ("stddev", 1e5), ("cv", 0.01)):
@@ -85,7 +98,10 @@ BINARY = """#!{python} -I
 import json, sys
 arguments = dict(a[2:].split("=", 1) for a in sys.argv[1:] if "=" in a)
 if "--list-cases" in sys.argv:
-    print("itch_decode\\nitch_decode_encode")
+    print({cases!r})
+    sys.exit(0)
+if "--input-kind" in sys.argv:
+    print({kind!r})
     sys.exit(0)
 with open({record!r}, "a") as out:
     out.write("binary " + " ".join(sys.argv[1:]) + "\\n")
@@ -237,7 +253,21 @@ class RunBenchTest(unittest.TestCase):
         gbench = {c: json.dumps(fake_gbench(c)) for c in cases}
         path = self.dir / "itch_codec_bench"
         write_script(path, BINARY.format(python=sys.executable, record=str(self.record),
-                                         reports=reports, gbench=gbench, exit_code=exit_code))
+                                         reports=reports, gbench=gbench, exit_code=exit_code,
+                                         cases="\n".join(cases), kind="slice"))
+        return path
+
+    def make_seeded_binary(self, kind="seeded", matched=True):
+        reports = {}
+        for case in SEEDED_CASES:
+            report = fake_seeded_report(self.commit, case)
+            report["verification"]["matched"] = matched
+            reports[case] = json.dumps(report)
+        gbench = {c: json.dumps(fake_gbench(c)) for c in SEEDED_CASES}
+        path = self.dir / "simd_kernel_bench"
+        write_script(path, BINARY.format(python=sys.executable, record=str(self.record),
+                                         reports=reports, gbench=gbench, exit_code=0,
+                                         cases="\n".join(SEEDED_CASES), kind=kind))
         return path
 
     def make_wrapper(self, text=WRAPPER):
@@ -488,6 +518,56 @@ class RunBenchTest(unittest.TestCase):
         meter = RUN_BENCH.SiblingMeter(self.sysfs, self.stat)
         with self.assertRaisesRegex(RUN_BENCH.Failure, "no reading of cpu5"):
             meter.busy_percent(self.dir / "absent")
+
+
+    # A seeded kernel benchmark: no slice, values per second, case names with slashes.
+
+    def seeded_path(self):
+        return self.results / f"{HOST}-simd_kernel-{self.commit[:12]}.json"
+
+    def test_a_seeded_run_writes_a_file_the_validator_passes(self):
+        result = self.run_bench(self.make_seeded_binary(), self.make_wrapper())
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        document = json.loads(self.seeded_path().read_text(encoding="utf-8"))
+        self.assertEqual(document["input"]["kind"], "seeded")
+        self.assertEqual([row["case"] for row in document["results"]], list(SEEDED_CASES))
+        throughput = document["results"][0]["throughput"]
+        self.assertIn("values_per_second", throughput)
+        self.assertNotIn("messages_per_second", throughput)
+        checked = subprocess.run(
+            [sys.executable, "-I", str(CHECK), "--pins", str(self.pins), str(self.seeded_path())],
+            capture_output=True, text=True, check=False)
+        self.assertEqual(checked.returncode, 0, msg=checked.stderr)
+
+    def test_a_seeded_case_gets_no_slice_and_its_files_no_slashes(self):
+        self.run_bench(self.make_seeded_binary(), self.make_wrapper())
+        runs = [line for line in self.record.read_text(encoding="utf-8").splitlines()
+                if line.startswith("binary ")]
+        self.assertEqual(len(runs), len(SEEDED_CASES))
+        for line in runs:
+            self.assertNotIn("--slice=", line)
+            self.assertNotIn("--expect-", line)
+        self.assertIn("pfor_unpack_w=13_scalar.report", "".join(runs))
+
+    def test_a_seeded_case_that_did_not_match_the_scalar_set_is_never_published(self):
+        result = self.run_bench(self.make_seeded_binary(matched=False), self.make_wrapper())
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("verification.matched", result.stderr)
+        self.assertEqual(list(self.results.iterdir()), [])
+
+    def test_an_unknown_input_kind_is_refused_before_any_case_runs(self):
+        result = self.run_bench(self.make_seeded_binary(kind="guessed"), self.make_wrapper())
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("'guessed'", result.stderr)
+        self.assertFalse(self.record.exists())
+
+    @unittest.skipUnless(HOST == "Linux", "the pinned path exists only on Linux")
+    def test_linux_counts_a_seeded_case_per_value(self):
+        self.run_bench(self.make_seeded_binary(), self.make_wrapper())
+        document = json.loads(self.seeded_path().read_text(encoding="utf-8"))
+        counters = document["results"][0]["counters"]
+        self.assertEqual(counters["per_value"]["cycles"], 0.4)
+        self.assertEqual(counters["gated_values"], 10000)
 
 
 if __name__ == "__main__":

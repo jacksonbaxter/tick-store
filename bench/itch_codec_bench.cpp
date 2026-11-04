@@ -300,6 +300,7 @@ struct Options {
     std::optional<std::filesystem::path> perf_control;
     std::optional<std::filesystem::path> perf_acknowledge;
     bool list_cases = false;
+    bool input_kind = false;
 };
 
 template <class Number>
@@ -321,6 +322,8 @@ template <class Number>
         };
         if (argument == "--list-cases") {
             options.list_cases = true;
+        } else if (argument == "--input-kind") {
+            options.input_kind = true;
         } else if (const auto slice = value_of("--slice=")) {
             options.slice = *slice;
         } else if (const auto sha = value_of("--expect-sha256=")) {
@@ -347,7 +350,7 @@ template <class Number>
             return std::unexpected(std::format("unknown argument: {}", argument));
         }
     }
-    if (options.list_cases) {
+    if (options.list_cases || options.input_kind) {
         return options;
     }
     if (options.slice.empty() || options.expected_sha256.empty() ||
@@ -356,7 +359,7 @@ template <class Number>
         return std::unexpected(std::string{
             "usage: itch_codec_bench --slice=PATH --expect-sha256=HEX --expect-messages=N "
             "--case=NAME --report=PATH [--core=N] [--perf-control=FIFO --perf-ack=FIFO] "
-            "[benchmark flags]\n       itch_codec_bench --list-cases"});
+            "[benchmark flags]\n       itch_codec_bench --list-cases | --input-kind"});
     }
     return options;
 }
@@ -537,6 +540,11 @@ int run(int argc, char** argv) {
     }
     if (options->list_cases) {
         std::println("{}\n{}", DecodeOnly::kName, DecodeEncode::kName);
+        return kExitOk;
+    }
+    // run_bench.py asks what the binary reads: a pinned slice of real messages.
+    if (options->input_kind) {
+        std::println("slice");
         return kExitOk;
     }
 

@@ -4,6 +4,10 @@
     TICK_STORE_MEASURE=/path/to/measure.sh \\
         python3 -I scripts/run_bench.py build/bench/bench/itch_codec_bench
 
+A binary says what it reads with --input-kind: "slice", a pinned file of real messages,
+whose cases are messages per second, or "seeded", input it makes from a fixed seed per
+case, as simd_kernel_bench does, whose cases are values per second.
+
 Each case in the binary runs as its own process directly under the measurement wrapper,
 because the wrapper signals only its direct child, and so that `perf stat` around that
 process counts one workload. The wrapper is never named here: it comes from
@@ -246,7 +250,20 @@ def macos_counters():
     return {field: {"status": "unavailable", "reason": reason} for field in fields}
 
 
-def throughput_of(google_benchmark, case):
+# What a case counts, by the binary's input kind.
+ITEMS = {"slice": "messages", "seeded": "values"}
+
+
+def input_kind_of(binary):
+    """What the binary reads, by its own answer to --input-kind."""
+    kind = run_text([str(binary), "--input-kind"])
+    if kind not in ITEMS:
+        raise Failure(EXIT_USAGE, f"{binary.name} says its input is {kind!r}, not one of "
+                                  f"{sorted(ITEMS)}")
+    return kind
+
+
+def throughput_of(google_benchmark, case, items="messages"):
     """Median, mean and spread across repetitions, from Google Benchmark's own aggregates."""
     aggregates = {}
     repetitions = 0
@@ -268,7 +285,7 @@ def throughput_of(google_benchmark, case):
     return {
         "repetitions": repetitions,
         "pass_ms_median": aggregates["median"]["real_time"],
-        "messages_per_second": {
+        f"{items}_per_second": {
             "median": aggregates["median"]["items_per_second"],
             "mean": aggregates["mean"]["items_per_second"],
             "stddev": aggregates["stddev"]["items_per_second"],
@@ -278,25 +295,27 @@ def throughput_of(google_benchmark, case):
     }
 
 
-def counters_of(host, case_files, report):
+def counters_of(host, case_files, report, items="messages"):
     if host == "macOS":
         return macos_counters()
     counters = parse_perf(case_files["perf"])
     if counters["cycles"].get("value") == 0:
         raise Failure(1, "perf counted nothing, so the gate never opened")
-    messages = report["gated"]["messages"]
-    per_message = {}
+    gated = report["gated"][items if items == "messages" else "items"]
+    per_item = {}
     for name in PERF_EVENTS.values():
         if "value" in counters[name]:
-            per_message[name] = counters[name]["value"] / messages
+            per_item[name] = counters[name]["value"] / gated
     counters["cache_misses"] = dict(CACHE_MISSES_UNAVAILABLE)
     counters["scope"] = COUNTER_SCOPE
-    counters["gated_messages"] = messages
-    counters["per_message"] = per_message
+    counters[f"gated_{items}"] = gated
+    counters["per_message" if items == "messages" else "per_value"] = per_item
     return counters
 
 
-def ratio_of(case, report):
+def ratio_of(case, report, kind="slice"):
+    if kind == "seeded":
+        return {"status": "not-applicable", "reason": "a decode kernel, so nothing is stored"}
     if case.endswith("_encode"):
         bytes_out = report["verification"]["bytes"]
         return {"value": 1.0, "source_bytes": bytes_out, "output_bytes": bytes_out,
@@ -317,16 +336,21 @@ def wrapped_command(host, measure, case_files, binary_args, meter=None):
     return command + binary_args
 
 
-def run_case(host, measure, binary, case, slice_path, pin, work_dir, meter=None):
-    files = {name: work_dir / f"{case}.{name}" for name in
+def run_case(host, measure, binary, case, slice_path, pin, work_dir, meter=None, kind="slice"):
+    # A case name may hold slashes, as pfor_unpack/w=13/neon does.
+    stem = case.replace("/", "_")
+    files = {name: work_dir / f"{stem}.{name}" for name in
              ("stdout", "stderr", "report", "gbench", "perf", "control", "ack", "stat")}
     for path in files.values():
         path.unlink(missing_ok=True)
 
-    arguments = [str(binary), f"--slice={slice_path}", f"--expect-sha256={pin['sha256']}",
-                 f"--expect-messages={pin['message_count']}", f"--case={case}",
-                 f"--report={files['report']}", f"--benchmark_out={files['gbench']}",
-                 "--benchmark_out_format=json", "--benchmark_color=false"]
+    arguments = [str(binary)]
+    if kind == "slice":
+        arguments += [f"--slice={slice_path}", f"--expect-sha256={pin['sha256']}",
+                      f"--expect-messages={pin['message_count']}"]
+    arguments += [f"--case={case}", f"--report={files['report']}",
+                  f"--benchmark_out={files['gbench']}", "--benchmark_out_format=json",
+                  "--benchmark_color=false"]
     if host == "Linux":
         os.mkfifo(files["control"], 0o600)
         os.mkfifo(files["ack"], 0o600)
@@ -348,12 +372,14 @@ def run_case(host, measure, binary, case, slice_path, pin, work_dir, meter=None)
     sibling_busy = meter.busy_percent(files["stat"]) if meter else None
     report = json.loads(files["report"].read_text(encoding="utf-8"))
     google_benchmark = json.loads(files["gbench"].read_text(encoding="utf-8"))
+    items = ITEMS[kind]
     return {
         "case": case,
+        "kind": kind,
         "sibling_busy_percent": sibling_busy,
         "report": report,
-        "throughput": throughput_of(google_benchmark, case),
-        "counters": counters_of(host, files, report),
+        "throughput": throughput_of(google_benchmark, case, items),
+        "counters": counters_of(host, files, report, items),
         "load_lines": clean_load_lines(stderr_text) if measure else [],
     }
 
@@ -401,7 +427,7 @@ def result_row(host, run):
         "verification": report["verification"],
         "throughput": run["throughput"],
         "counters": run["counters"],
-        "ratio": ratio_of(run["case"], report),
+        "ratio": ratio_of(run["case"], report, run.get("kind", "slice")),
         "latency": report["latency"],
     }
 
@@ -438,16 +464,25 @@ def build_document(host, benchmark, slice_name, pin, commit, measure, runs, mete
         "load_lines": [line for run in runs for line in run["load_lines"]],
         "peak_rss_bytes": peak_rss_bytes(),
     }
-    return {
-        "header": header,
-        "benchmark": benchmark,
-        "input": {
+    if runs[0].get("kind", "slice") == "seeded":
+        input_block = {
+            "kind": "seeded",
+            "items": "values",
+            "seed": "each case makes its own input from a fixed seed, in its verification block",
+        }
+    else:
+        input_block = {
+            "kind": "slice",
             "slice": slice_name,
             "sha256": pin["sha256"],
             "messages": pin["message_count"],
             "bytes": pin["size"],
             "seed": "the input is a pinned file. Only batch boundaries are seeded, per case",
-        },
+        }
+    return {
+        "header": header,
+        "benchmark": benchmark,
+        "input": input_block,
         "results": [result_row(host, run) for run in runs],
     }
 
@@ -502,19 +537,20 @@ def parse_arguments(argv):
 def run(args):
     measure = os.environ.get(MEASURE_ENV)
     host = host_label()
+    binary = args.binary.resolve()
+    kind = input_kind_of(binary)
     pins = json.loads(args.pins.read_text(encoding="utf-8"))
     pin = pins["slices"].get(args.slice)
-    if pin is None:
+    if pin is None and kind == "slice":
         raise Failure(EXIT_USAGE, f"no pin for slice {args.slice}")
-    slice_path = args.slice_path or REPO_ROOT / pin["path"]
-    binary = args.binary.resolve()
+    slice_path = (args.slice_path or REPO_ROOT / pin["path"]) if kind == "slice" else None
     benchmark = binary.name.removesuffix("_bench")
     commit = current_commit()
     args.work_dir.mkdir(parents=True, exist_ok=True)
     meter = SiblingMeter(args.sysfs_cpu, args.proc_stat) if host == "Linux" else None
 
     cases = run_text([str(binary), "--list-cases"]).split()
-    runs = [run_case(host, measure, binary, case, slice_path, pin, args.work_dir, meter)
+    runs = [run_case(host, measure, binary, case, slice_path, pin, args.work_dir, meter, kind)
             for case in cases]
     check_builds_match(runs, commit, measure)
 

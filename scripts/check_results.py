@@ -335,14 +335,14 @@ def check_timer(where, timer):
     return problems
 
 
-def check_latency(where, latency, timer):
+def check_latency(where, latency, timer, batch="batch_messages"):
     """Every published latency must clear what the timer can resolve."""
     problems = []
-    for field in ("unit", "batch_messages", "timer_resolution_ns", "percentiles"):
+    for field in ("unit", batch, "timer_resolution_ns", "percentiles"):
         if field not in latency:
             problems.append(f"{where}: '{field}' must sit next to the percentiles")
-    if not is_number(latency.get("batch_messages")) or latency.get("batch_messages", 0) < 1:
-        problems.append(f"{where}.batch_messages: needs a batch size")
+    if not is_number(latency.get(batch)) or latency.get(batch, 0) < 1:
+        problems.append(f"{where}.{batch}: needs a batch size")
     floor = max((value for value in (timer.get("min_publishable_ns"),
                                      timer.get("resolution_ns"),
                                      latency.get("timer_resolution_ns")) if is_number(value)),
@@ -381,9 +381,11 @@ def check_results_rows(document, pins):
     if not isinstance(results, list) or not results:
         return ["results: no results"]
     input_block = document.get("input", {})
+    seeded = input_block.get("kind") == "seeded"
+    items = "values" if seeded else "messages"
     slices = pins.get("slices", {})
-    pin = slices.get(input_block.get("slice"))
-    if pin is None:
+    pin = None if seeded else slices.get(input_block.get("slice"))
+    if pin is None and not seeded:
         problems.append(f"input.slice: '{input_block.get('slice')}' has no pin")
     for index, result in enumerate(results):
         where = f"results[{index}]"
@@ -396,7 +398,8 @@ def check_results_rows(document, pins):
         if not isinstance(latency, dict):
             problems.append(f"{where}.latency: missing")
         else:
-            problems += check_latency(f"{where}.latency", latency, timer)
+            problems += check_latency(f"{where}.latency", latency, timer,
+                                      "batch_items" if seeded else "batch_messages")
         counters = result.get("counters")
         if not isinstance(counters, dict):
             problems.append(f"{where}.counters: missing")
@@ -414,10 +417,18 @@ def check_results_rows(document, pins):
                     problems.append(f"{where}.verification.{field}: not the slice's pin")
             if verification.get("messages") != pin["message_count"]:
                 problems.append(f"{where}.verification.messages: not the slice's count")
+        if seeded:
+            # B1 and B2 for seeded input: the seed is recorded, and the kernel's output
+            # matched the scalar set's before and after timing.
+            if not is_number(verification.get("input_seed")):
+                problems.append(f"{where}.verification.input_seed: a seeded input names its seed")
+            if verification.get("matched") is not True:
+                problems.append(f"{where}.verification.matched: the output was not shown to "
+                                "match the scalar set")
         throughput = result.get("throughput", {})
-        if not is_number(throughput.get("messages_per_second", {}).get("median")):
+        if not is_number(throughput.get(f"{items}_per_second", {}).get("median")):
             problems.append(f"{where}.throughput: no median")
-        if not is_number(throughput.get("messages_per_second", {}).get("cv")):
+        if not is_number(throughput.get(f"{items}_per_second", {}).get("cv")):
             problems.append(f"{where}.throughput: no variability across repetitions")
     return problems
 
