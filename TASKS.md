@@ -53,12 +53,13 @@ Correctness oracle
 - [x] Oracle fails correctly on a deliberately broken store, proving it is not vacuous
 - [x] G-1 and G-2 pass on the full `12302019` and `10302019` days on macOS (`results/roundtrip-*.json`), through the stub store
 - [x] Repeat the full-day G-1 on `debian` (`results/roundtrip-12302019-linux.json`)
-- [ ] Phase 3's store plugs into `RecordReader` with the oracle unchanged
+- [x] Phase 3's store plugs into `RecordReader` with the oracle unchanged: `ItchStoreRecordReader` walks the segments and `tick_roundtrip verify` runs as before
+- [x] G-1 and G-2 pass on the full `12302019` and `10302019` days on macOS through the real store, at N = 2^20 (`results/roundtrip-*.json`). G-2 flips one bit in a data block and one in the footer, each caught with CRCs on (a block or footer CRC failure naming the offset) and with them off (the oracle names the record, or the decoder the field). The stub no longer counts for G-1 or G-2
 
 Tests and fuzzing
 - [x] Unit tests for everything built so far, including corrupt fixtures and boundary lists (T1, T3). T2 and T4 wait for the Phase 3 codecs
 - [x] One libFuzzer target per parser and decoder built so far: the ITCH message decoder, the frame cursor and the stub store, following Z1-Z7
-- [ ] Phase 3's parsers and decoders get theirs. The two Gorilla decoders have theirs, `fuzz_gorilla_timestamps` and `fuzz_gorilla_xor`, and so do PFOR and Stream VByte, `fuzz_pfor` and `fuzz_stream_vbyte`, the dictionary and run-length codecs, `fuzz_dictionary` and `fuzz_run_length`, and the container parser, `fuzz_container`, each clean for 240 s under `heavy.sh`. The time-range index and the store's own readers are still to come
+- [ ] Phase 3's parsers and decoders get theirs. The two Gorilla decoders have theirs, `fuzz_gorilla_timestamps` and `fuzz_gorilla_xor`, and so do PFOR and Stream VByte, `fuzz_pfor` and `fuzz_stream_vbyte`, the dictionary and run-length codecs, `fuzz_dictionary` and `fuzz_run_length`, and the container parser, `fuzz_container`, each clean for 240 s under `heavy.sh`. The ITCH store has `fuzz_itch_store`, which reads below the checksum and checks decode, re-encode and compare: 904,149 runs in 240 s, clean. The time-range index is still to come
 - [ ] The PFOR fuzz oracle checks values, not bytes, since the encoder makes choices. A field the decoder wrongly accepts without changing a value, such as non-zero tail padding, is caught only by the unit tests' corrupt fixtures
 - [x] Coverage report shows every validator is reached (`scripts/coverage.sh`, `results/coverage.json`). It gates on 169 required functions: `decode_as` and `encode_as` for all 23 types, the parsers, the validators, the codecs' decoders and encoders, PFOR, Stream VByte, lane packing and patch lists among them, the container's parser, writer and durability calls, the software CRC32C kernel and this processor's hardware one, the fuzz oracles and the oracle's compare path. All 169 reached at `4dcea24`, lines 93.94%, functions 98.14%. No SIMD kernels exist yet, so none are claimed
 - [ ] Phase 3's kernels join the required list in `scripts/coverage_report.py`
@@ -131,10 +132,14 @@ Storage
 - [x] Memory-mapped reader with mapped length proved at open and view lifetimes tied to the mapping (A3, M5, M7, M9) (`docs/format.md`)
 - [ ] CRC32C runs one dependent chain of crc32 instructions, about 3 cycles a step. Three interleaved streams joined by a shift table would run near one a cycle; measure verification against decode before adding them
 - [ ] No codec is `read_only` yet, so the path that keeps a retired codec readable but unwritable is tested only through the registry's own table. Test it with a fixture when the first codec retires
-- [ ] zstd has no codec id yet. It takes the next id, 8, when the store writer first emits a zstd frame
+- [x] zstd takes codec id 8, which the store writer emits on the locate, creation_ref, add_price, imbalance_flags, rare_bytes and raw_bytes columns where it is smaller (`docs/format.md`)
 - [ ] SIGBUS from a file cut under a live mapping is not caught, by design (`docs/format.md`). No test shows the process dying; add a death test that truncates a mapped file if the stance is ever revisited
 - [ ] Block CRCs are checked at lookup, not at open, so a scan that reads only zone maps never verifies payloads. The query engine must look blocks up through the reader, never read a payload by offset
-- [ ] Time-range index with block zone maps, and a symbol filter whose cost counts in the ratio
+- [ ] Time-range index with block zone maps, and a symbol filter whose cost counts in the ratio. Each segment's summary in the footer already holds its first, last, lowest and highest timestamps and a locate bitmap, and counts in the stored bytes
+- [ ] The store offers no zstd on timestamps, add_shares or tracking, which the estimate allowed where smaller. Timestamps are 13.8 MB of the 69.5 MB gap to the estimate. Measure the saving per column against the decode time before adding any
+- [ ] E, C and X shares are stored plain, 2.1 MB a day more than coding them against the remaining shares, because an imported order carries no book state. Try importing an order's remaining shares with its reference, counting both
+- [ ] The writer keeps one locate per reference, so a reference named under alternating locates is imported each time. Count how often that happens on the real days before changing the map
+- [ ] CR-2 on `10302019` is "no comparison": the capacity check stored only `12302019` in the other systems. Run them on the second day if CR-2 is ever wanted there
 
 Layout experiments, measured and recorded in NOTES.md whichever way they go
 - [ ] File-order blocks with per-type columns, against per-symbol columns plus a stored permutation
@@ -161,7 +166,7 @@ Competing codecs
 - [ ] CR-7 on `E`, `C` and `X` shares: 3.91 and 3.99 bits coded against the remaining shares, above order-0 floors of 3.89 and 3.99. Try the book's context: the remaining shares as a bound, or the order's add shares as a predictor
 - [ ] `U`'s new reference alone misses CR-6 by 0.007 on `12302019`. It meets inside the creation stream; keep it there unless a reader needs it apart
 - [ ] Locate by recency rank: its entropy is 6.76 and 6.80 bits against the dictionary's 9.28 and 9.31. Build a rank codec over about 8,900 entries and measure its decode cost before choosing it
-- [ ] Per-stock reference distances need each stock's creation list while decoding. Measure the reader's memory and time for that against storing references whole
+- [x] Per-stock reference distances need each stock's creation list while decoding. Built per segment with an import list, measured by `tick_reference_eval` on the real codecs: 173.9 MB a day at N = 2^20, against 464 to 494 MB for references stored whole, and a book checkpoint for day-wide distances cost 2,016 MB (NOTES.md, "The ITCH store"). The reader holds one list per locate for one segment only. Its time per reference has not been measured on its own; that belongs with the speed benchmarks
 - [ ] Measure the head-delta, dictionary and run-length encoders' and decoders' speed before the writer and reader choose them
 - [ ] A whole-day `tick_codec_eval` run now takes 950 s with a 6.0 GB footprint, from 207 s and 1.36 GB. Find what holds the memory, and keep `--columns` for exploring
 - [ ] Re-run the estimate at 1,024-value blocks when the file format fixes its block size and index

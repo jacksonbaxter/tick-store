@@ -981,6 +981,145 @@ What did not work:
   functions, with lines at 93.94% and functions at 98.14%. clang-tidy cannot analyse the SSE4.2 kernel on the Mac.
   It compiles there for x86-64, and its tests run on `debian`.
 
+### The ITCH store
+
+`docs/store.md` has the layout as built. In short: a segment is N consecutive records, N = 2^20 by
+default; each segment is one container block per column, 33 columns, the `type` block's footer
+metadata carrying the segment's summary (first record, first, last, lowest and highest timestamp,
+typed records, a locate bitmap); three sections hold the store header, the symbol table and the
+tail. Each segment decodes from its own blocks and the symbol table alone.
+
+**What a segment needs to decode on its own.** Everything but the orders its messages name that
+were created before it. Those it carries as its import list: a reference that names an order is a
+distance back in that locate's list of the segment's creations and imports, and distance 0 takes the
+next value from the import list. So the only per-segment state is the import list, and every byte
+of it is in the file (the `import_ref` column). There is no book checkpoint.
+
+**The reference encoding, chosen on the numbers.** `tick_reference_eval` measured every candidate on
+12302019 with the real codecs, block by block, counting each one's state as well as its column
+(144,610,481 references; raw output `phase3-raw/store/iteration/reference-eval-12302019.json`,
+from the uncommitted tree on `cc93641`, whose writer and evaluator are the committed ones). Bytes
+per day, column + state:
+
+| N | within stock, imports (built) | all creations, imports | values, PFOR delta | values, head delta | values, Stream VByte | day distance + book checkpoint | day distance + creation index |
+|---|---|---|---|---|---|---|---|
+| 2^16 | 69.9 + 206.7 = 276.7 MB | 414.6 MB | 470.8 MB | 494.4 MB | 464.2 MB | not run | 134.7 + 67.3 = 202.0 MB |
+| 2^18 | 88.2 + 130.7 = 218.9 MB | 416.6 MB | 470.8 MB | 494.3 MB | 464.2 MB | not run | 134.4 + 16.8 = 151.3 MB |
+| 2^20 | 103.7 + 70.3 = 173.9 MB | 423.1 MB | 470.8 MB | 494.3 MB | 464.2 MB | 134.3 + 2,015.7 = 2,150.0 MB | 134.3 + 4.2 = 138.5 MB |
+| 2^22 | 115.0 + 35.3 = 150.2 MB | 428.9 MB | 470.8 MB | 494.3 MB | 464.2 MB | 134.3 + 504.0 = 638.3 MB | 134.3 + 1.1 = 135.4 MB |
+| 2^24 | 122.6 + 17.2 = 139.9 MB | 432.6 MB | 470.8 MB | 494.3 MB | 464.2 MB | 134.3 + 122.8 = 257.1 MB | 134.3 + 0.3 = 134.6 MB |
+
+- Within-stock distance with a per-segment import list saves 296.9 MB a day against the cheapest
+  stateless encoding at 2^20 (173.9 against 470.8 MB for PFOR on deltas), so it is the one built.
+  The import list is 70.3 MB of that 173.9, 21.1 million imports, and the store's own
+  `ref_distance` and `import_ref` columns come to exactly the evaluator's bytes.
+- **A book checkpoint eats the saving.** Distances over the whole day are 134.3 MB, but a segment
+  that decodes on its own then needs every order live at its start, 1.9 million at the peak: 2,016 MB
+  of checkpoints at 2^20, fifteen times the column, and still 123 MB at 2^24. This is the finding the
+  brief asked for: a checkpoint of the book costs more than the distance saves, at every segment
+  size measured.
+- Day-wide distances with only a per-locate creation count per segment cost 138.5 MB, 35.4 MB (2.4%
+  of the file) less than what is built, but a segment is then no longer decodable on its own: an
+  order created in segment j and named in segment k needs segment j decoded, and in the worst case
+  every segment back to the first. That fails the random-access requirement, so it is not built.
+- One list over all creations, rather than one per locate, costs 423 MB: the locate is what makes
+  the distances short.
+
+**The segment size, chosen on the numbers.** The real store at four sizes, 12302019, same writer
+(raw `phase3-raw/store/iteration/ingest-12302019-n*.json`, `layout-12302019-n*.json` and the
+`.time` files, `/usr/bin/time -l`):
+
+| N | Segments | Stored bytes | Ratio | References + imports | add_price | Footer | Writer footprint |
+|---|---|---|---|---|---|---|---|
+| 2^16 | 4,101 | 1,594,523,642 | 5.175 | 276.7 MB | 96.7 MB | 8.78 MB | 40 MB |
+| 2^18 | 1,026 | 1,508,225,974 | 5.471 | 218.9 MB | 80.6 MB | 2.21 MB | 136 MB |
+| 2^20 | 257 | 1,449,464,212 | 5.693 | 173.9 MB | 71.7 MB | 0.56 MB | 283 MB |
+| 2^22 | 65 | 1,417,650,455 | 5.821 | 150.2 MB | 67.4 MB | 0.15 MB | 819 MB |
+
+2^20 is the default. Going to 2^22 would save 31.8 MB (2.2%) at nearly three times the writer's
+memory and four times the work to decode one random segment; 2^18 would cost 58.8 MB (4.1%) more.
+Most of the difference is the import list and the per-locate price runs, which both restart at each
+segment.
+
+**Full days on the store as built.** Each day was ingested at N = 2^20 with `page_cache`
+durability, then G-1 and G-2 were run, one after another, through `heavy.sh` under
+`/usr/bin/time -l`, using the bench build at `f3e9d84`. The results are in
+`results/roundtrip-*.json` and `results/store-size-*.json`, assembled by `scripts/store_results.py`.
+Raw output is in `phase3-raw/store/<day>/`. The wall times are from runs during iteration.
+
+| Day | Records | Stored bytes | Ratio | CR-1 (≥ 2.3415) | Estimate | Gap |
+|---|---|---|---|---|---|---|
+| 12302019 | 268,744,780 | 1,449,464,212 | 5.693 | pass | 1,380,003,932 (5.979) | +69.5 MB, 5.0% |
+| 10302019 | 293,989,079 | 1,588,982,528 | 5.686 | not a CR-1 day | 1,515,912,474 (5.960) | +73.1 MB, 4.8% |
+
+The parts of 12302019, which add up to the file:
+- column payloads: 1,448,813,003 bytes;
+- footer: 562,071 bytes, made of 191,808 bytes of block entries, 370,047 of block metadata (the segment summaries included), 192 of section entries and 24 fixed;
+- symbols section: 89,074 bytes;
+- store section: 24 bytes;
+- header and trailer: 40 bytes.
+
+The per-segment state is the import list: 70,275,493 bytes holding 21,140,903 imports, 4.8% of the file. On 10302019 it is 75,876,740 bytes for 23,562,881 imports. No other checkpoint exists.
+
+**CR-2: pass on 12302019.** It is judged against the debian full-day stores in
+`results/fullday-capacity-12302019.json`:
+
+| System | Variant | Its stored bytes | Ours as a fraction of it |
+|---|---|---|---|
+| Parquet | zstd1-rg1Mi | 3,191,406,592 | 0.454 |
+| ArcticDB | rows100k-cols127 | 6,352,666,624 | 0.228 |
+| QuestDB | plain | 22,897,786,880 | 0.063 |
+
+The ITCH store's bytes depend only on the records. No capacity file exists for 10302019, so CR-2 there is "no comparison". It is not estimated.
+
+**Ratio against the estimate.** Against `results/store-estimate.json` (the mixed layout, with zstd), the gap is 69.5 MB on 12302019 and 73.1 MB on 10302019. Two parts net out to that.
+
+The column payloads are 80.0 MB and 84.6 MB larger than the estimate's. The store saves 10.6 MB and 11.6 MB on its index, because the estimate charged 24 bytes for every block of 4,096 values, while the store's whole footer and sections come to 0.65 MB and 0.68 MB.
+
+By field, on 12302019 (10302019 in brackets):
+- **Locate and references, +44.5 MB (+47.7).** The estimate costed references as distances over the whole day, 125.1 MB. Those distances are not self-contained (above). The store's within-segment distances plus imports cost 173.9 MB, +48.8 MB. The locate column is 4.4 MB smaller than the estimate's.
+- **Timestamp, +13.8 MB (+13.8).** The estimate let zstd wrap a timestamp block wherever it came out smaller. The store does not offer zstd on timestamps. Apart from that, the coding differs only at the 257 segment boundaries.
+- **Add shares, +10.9 MB (+11.7); add price, +6.0 MB (+6.8).** These columns are grouped by locate (and, for prices, by side) within each segment, not over the whole day, so every run restarts at each segment. The estimate let zstd wrap add_shares where smaller; the store has no zstd on add_shares. At N = 2^22, add_price falls to 67.4 MB (the sweep above).
+- **E, C and X shares, +2.1 MB (+2.5).** The estimate coded each against the order's remaining shares. Those are book state, which an imported order does not carry, so the store keeps the shares plain.
+- **Tracking, +1.7 MB (+1.8).** The estimate used Stream VByte with zstd per type. The store uses a dictionary per type.
+- **The rest, within ±1.5 MB each.** Creation references come out 3.3 MB (3.7) smaller, and imbalance flags 1.2 MB (1.1) smaller.
+
+**Peak memory per whole-day run.** Measured on macOS by `/usr/bin/time -l` (raw `.time` files):
+
+| Run | 12302019 footprint | 12302019 max RSS | 10302019 footprint | 10302019 max RSS |
+|---|---|---|---|---|
+| ingest | 279 MB | 8.46 GB | 275 MB | 9.24 GB |
+| verify (G-1) | 363 MB | 10.00 GB | 363 MB | 10.93 GB |
+| G-2, worst run | 372 MB | 10.01 GB | 369 MB | 10.93 GB |
+
+Max RSS counts the clean, file-backed pages of the read-only source mapping, and on verify the store's mapping too. The kernel can drop those pages. The footprint is the process's own memory.
+
+The writer's footprint, 279 MB, is within the bound in `docs/store.md`. At 2^20 records, the worst case of 19 values of 8 bytes per record is 159 MB, and the reference table is at most 32 MB plus 8 bytes per reference. The fixed locate tables are about 0.6 MB. The rest of the footprint is not broken down here.
+
+**Worst-case work for one random segment.** The bound is in `docs/store.md`, under "Worst-case work for one segment". In short:
+- at most 33 blocks and their CRCs;
+- at most N values per column, with at most 3 per record in the multi-value columns, plus the rare and raw bytes;
+- a counting sort for the columns grouped by type, and a sort of the adds by key;
+- one list lookup per reference;
+- nothing outside the segment except the symbols section, which is parsed once at open.
+
+On the real days, the largest segment is 8,164,713 bytes in 28 blocks (12302019, segment 5), and the largest on 10302019 is 7,913,048 bytes. The average is 5.6 MB.
+
+**Fuzzing and fault proofs.**
+- `fuzz_itch_store` ran 240 s through `heavy.sh` under `/usr/bin/time -l`: 904,149 runs, clean, with libFuzzer's peak RSS at 444 MB and the process maximum at 466 MB. Raw: `phase3-raw/store/fuzz/fuzz-itch-store-240s.log`.
+- The three new faults were proven with `prove_checks.py --only`. Raw: `phase3-raw/store/faults/`, with the first run in `run1/`.
+  - `g1-store-alters-a-byte` was PROVEN: the oracle exits 1 and names the first differing record and byte.
+  - `itch-store-import-not-appended` was PROVEN: the dev tests fail on `ItchStoreReferences`.
+  - `fuzz-itch-store-distance-bound` first came back WRONG REASON. The fuzzer did exit 77 on the fault, but UBSan reported it, not ASan: an empty list made the read a non-zero offset from a null pointer. The expectation now names the frame of the function whose check the patch removes, `SegmentAssembler::State::named`, which either sanitizer's trace contains. Re-run, it was PROVEN.
+- `results/check-proofs.json` was restored from git afterwards.
+
+**What did not help.**
+- A book checkpoint per segment cost 2,016 MB at 2^20, fifteen times the distances it would allow.
+- One creation list over all locates cost 423 MB against 174 MB.
+- Every stateless value coding of references cost 464 to 494 MB.
+- Day-wide distances with a creation index came to 35 MB less, but they give up decoding one segment on its own.
+- Segments larger than 2^20 save 2.2% at 2^22, for nearly three times the writer's memory and four times the work to decode a random segment.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
