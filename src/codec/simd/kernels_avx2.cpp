@@ -453,12 +453,15 @@ bool svb_decode_avx2(std::span<const std::byte> control, std::span<const std::by
 
 constexpr Kernels kAvx2{
     .level = kLevel,
-    // to be measured on Zen 1.
-    .fuse_delta = false,
+    // Fused measured faster than two passes on Zen 1, 1.29 against 1.19 G values/s, the
+    // median over every width; the in-register prefix sum lost to the scalar tree, 1.57
+    // against 2.04, since a cross-lane permute costs more than the adds it saves when
+    // each 256-bit operation is split in two (NOTES.md, "SIMD").
+    .fuse_delta = true,
     .unpack_vector = &unpack_vector_avx2,
     .unpack_linear = &unpack_linear_avx2,
     .add_base = &add_base_avx2,
-    .prefix_sum = &prefix_sum_avx2_vector,
+    .prefix_sum = &prefix_sum_avx2_tree,
     .delta_pass = &delta_pass_avx2,
     .unpack_delta = &unpack_delta_avx2,
     .unpack_delta_narrow = &unpack_delta_narrow_avx2,
