@@ -167,6 +167,30 @@ class StoreResults(unittest.TestCase):
         with self.assertRaises(results.Refused):
             results.assemble_g1(self.dir, "12302019", "abc1234", "Linux")
 
+    def test_a_store_from_the_other_host_must_verify_here(self):
+        self.write("verify.json", {**verify(), "store_format": "itch-store-v1"})
+        self.write("cross-verify.json", verify())
+        (self.dir / "cross-verify.time").write_text(TIME)
+        (self.dir / "cross-host.txt").write_text("macOS\n")
+        (self.dir / "store.sha256").write_text("ee\n")
+        (self.dir / "cross-store.sha256").write_text("ee\n")
+        roundtrip = results.assemble_g1(self.dir, "12302019", "abc1234", "Linux", "pinned")
+        self.assertEqual(roundtrip["placement"], "pinned")
+        self.assertEqual(roundtrip["cross_host"]["written_on"], "macOS")
+        self.assertTrue(roundtrip["cross_host"]["same_store_bytes"])
+        self.assertEqual(roundtrip["cross_host"]["verify"]["real_seconds"], 12.5)
+        (self.dir / "cross-store.sha256").write_text("ff\n")
+        crossed = results.assemble_g1(self.dir, "12302019", "abc1234", "Linux")
+        self.assertFalse(crossed["cross_host"]["same_store_bytes"])
+        self.assertNotIn("placement", crossed)
+        self.write("cross-verify.json", verify("mismatch", stored="cd"))
+        with self.assertRaises(results.Refused):
+            results.assemble_g1(self.dir, "12302019", "abc1234", "Linux")
+        self.write("cross-verify.json", verify())
+        (self.dir / "cross-host.txt").unlink()
+        with self.assertRaises(results.Refused):
+            results.assemble_g1(self.dir, "12302019", "abc1234", "Linux")
+
     def test_a_missing_file_is_refused(self):
         (self.dir / "g2-restored.time").unlink()
         with self.assertRaises(results.Refused):

@@ -17,6 +17,10 @@
     g2-footer-nocrc.json .err .time  the same with --no-checksums
     g2-restored.json .time           verify after both flips are undone
 
+With --g1-only it needs ingest and verify alone (time files optional), and takes, if present,
+cross-verify.json, a store written on another host verified here, with cross-host.txt naming
+that host and store.sha256 and cross-store.sha256 holding the two stores' SHA-256.
+
 Every value comes from those files; nothing is estimated. It refuses, exit 1, a G-1 that did not
 pass, a G-2 run that did not exit 1 where the store was corrupt or did not pass once restored, a
 CRC failure that does not name the flipped block and its offset, and a layout whose parts do not
@@ -155,14 +159,36 @@ def g1(folder, timed=True):
     return ingest, verify, pin
 
 
-def assemble_g1(folder, day, commit, host):
+def cross_host(folder, pin):
+    """A store written on another host and verified here: cross-verify.json, with the other
+    host's name in cross-host.txt and both stores' SHA-256 in store.sha256 and
+    cross-store.sha256. Absent if cross-verify.json is."""
+    if not (Path(folder) / "cross-verify.json").is_file():
+        return None
+    verify = run(folder, "cross-verify", timed=(Path(folder) / "cross-verify.time").is_file())
+    if verify["verdict"] != "pass" or verify.get("stored_sha256") != pin:
+        raise Refused("the store written on the other host did not pass here")
+    here = read_text(folder, "store.sha256").strip()
+    there = read_text(folder, "cross-store.sha256").strip()
+    return {"written_on": read_text(folder, "cross-host.txt").strip(), "verify": verify,
+            "store_sha256_here": here, "store_sha256_there": there,
+            "same_store_bytes": here == there}
+
+
+def assemble_g1(folder, day, commit, host, placement=None):
     """G-1 alone, for a host that runs only that gate. Without time files, the peaks are the
     tool's own, getrusage's ru_maxrss, which on Linux is VmHWM."""
-    ingest, verify, _ = g1(folder, timed=(Path(folder) / "verify.time").is_file())
-    return {"day": day, "source": ingest_source(day), "host": host, "build_preset": "bench",
-            "commit": commit, "store_format": verify["store_format"],
-            "durability": ingest["durability"], "segment_records": ingest["segment_records"],
-            "g1": {"gate": "G-1", "verdict": "pass", "ingest": ingest, "verify": verify}}
+    ingest, verify, pin = g1(folder, timed=(Path(folder) / "verify.time").is_file())
+    out = {"day": day, "source": ingest_source(day), "host": host, "build_preset": "bench",
+           "commit": commit, "store_format": verify["store_format"],
+           "durability": ingest["durability"], "segment_records": ingest["segment_records"]}
+    if placement:
+        out["placement"] = placement
+    out["g1"] = {"gate": "G-1", "verdict": "pass", "ingest": ingest, "verify": verify}
+    crossed = cross_host(folder, pin)
+    if crossed is not None:
+        out["cross_host"] = crossed
+    return out
 
 
 def assemble(folder, day, commit, host, capacity):
@@ -259,11 +285,12 @@ def main(argv=None):
     parser.add_argument("--size")
     parser.add_argument("--g1-only", action="store_true",
                         help="G-1 alone, into --roundtrip; no G-2 and no sizes")
+    parser.add_argument("--placement", help="with --g1-only: how the runs were placed")
     args = parser.parse_args(argv)
     capacity = json.loads(Path(args.capacity).read_text()) if args.capacity else None
     if args.g1_only:
         try:
-            roundtrip = assemble_g1(args.raw, args.day, args.commit, args.host)
+            roundtrip = assemble_g1(args.raw, args.day, args.commit, args.host, args.placement)
         except Refused as refused:
             print(f"refused: {refused}", file=sys.stderr)
             return 1
