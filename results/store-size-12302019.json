@@ -1,0 +1,305 @@
+{
+  "day": "12302019",
+  "source": "12302019.NASDAQ_ITCH50",
+  "host": "macOS",
+  "build_preset": "bench",
+  "commit": "f3e9d84",
+  "store_format": "itch-store-v1",
+  "segment_records": 1048576,
+  "segments": 257,
+  "records": 268744780,
+  "source_bytes": 8251407909,
+  "stored_bytes": 1449464212,
+  "ratio": 5.692729658785118,
+  "parts": {
+    "container_header": 16,
+    "container_trailer": 24,
+    "footer": {
+      "fixed": 24,
+      "block_entries": 191808,
+      "section_entries": 192,
+      "block_metadata": 370047
+    },
+    "footer_total": 562071,
+    "sections": {
+      "store": 24,
+      "symbols": 89074,
+      "tail": 0
+    },
+    "column_payloads": 1448813003
+  },
+  "segment_state": {
+    "what": "the import list, the one thing a segment needs from outside its own records to decode on its own; there is no other checkpoint",
+    "import_ref_payload_bytes": 70275493,
+    "import_ref_metadata_bytes": 3072,
+    "imports": 21140903
+  },
+  "columns": {
+    "type": {
+      "payload_bytes": 60446404,
+      "metadata_bytes": 301203,
+      "blocks": 257,
+      "zstd_blocks": 0,
+      "values": 268744780
+    },
+    "locate": {
+      "payload_bytes": 275922975,
+      "metadata_bytes": 3084,
+      "blocks": 257,
+      "zstd_blocks": 257,
+      "values": 268744780
+    },
+    "timestamp": {
+      "payload_bytes": 630115795,
+      "metadata_bytes": 3084,
+      "blocks": 257,
+      "zstd_blocks": 0,
+      "values": 268744780
+    },
+    "tracking": {
+      "payload_bytes": 5537418,
+      "metadata_bytes": 3084,
+      "blocks": 257,
+      "zstd_blocks": 0,
+      "values": 268744780
+    },
+    "creation_ref": {
+      "payload_bytes": 91776889,
+      "metadata_bytes": 3084,
+      "blocks": 257,
+      "zstd_blocks": 257,
+      "values": 140270523
+    },
+    "ref_distance": {
+      "payload_bytes": 103667337,
+      "metadata_bytes": 3084,
+      "blocks": 257,
+      "zstd_blocks": 0,
+      "values": 144610481
+    },
+    "import_ref": {
+      "payload_bytes": 70275493,
+      "metadata_bytes": 3072,
+      "blocks": 256,
+      "zstd_blocks": 0,
+      "values": 21140903
+    },
+    "add_side": {
+      "payload_bytes": 15814100,
+      "metadata_bytes": 3084,
+      "blocks": 257,
+      "zstd_blocks": 0,
+      "values": 118631456
+    },
+    "add_price": {
+      "payload_bytes": 71671055,
+      "metadata_bytes": 3084,
+      "blocks": 257,
+      "zstd_blocks": 257,
+      "values": 118631456
+    },
+    "add_shares": {
+      "payload_bytes": 48742753,
+      "metadata_bytes": 3084,
+      "blocks": 257,
+      "zstd_blocks": 0,
+      "values": 118631456
+    },
+    "mpid": {
+      "payload_bytes": 556413,
+      "metadata_bytes": 3072,
+      "blocks": 256,
+      "zstd_blocks": 0,
+      "values": 1485888
+    },
+    "reduce_shares": {
+      "payload_bytes": 6305027,
+      "metadata_bytes": 3084,
+      "blocks": 257,
+      "zstd_blocks": 0,
+      "values": 8610417
+    },
+    "match": {
+      "payload_bytes": 442822,
+      "metadata_bytes": 3084,
+      "blocks": 257,
+      "zstd_blocks": 0,
+      "values": 7059179
+    },
+    "printable": {
+      "payload_bytes": 18088,
+      "metadata_bytes": 3012,
+      "blocks": 251,
+      "zstd_blocks": 0,
+      "values": 99917
+    },
+    "exec_price": {
+      "payload_bytes": 186457,
+      "metadata_bytes": 3012,
+      "blocks": 251,
+      "zstd_blocks": 0,
+      "values": 99917
+    },
+    "replace_shares": {
+      "payload_bytes": 6958491,
+      "metadata_bytes": 3084,
+      "blocks": 257,
+      "zstd_blocks": 0,
+      "values": 21639067
+    },
+    "replace_price": {
+      "payload_bytes": 42019038,
+      "metadata_bytes": 3084,
+      "blocks": 257,
+      "zstd_blocks": 0,
+      "values": 21639067
+    },
+    "trade_ref": {
+      "payload_bytes": 11622,
+      "metadata_bytes": 3084,
+      "blocks": 257,
+      "zstd_blocks": 0,
+      "values": 1218602
+    },
+    "trade_side": {
+      "payload_bytes": 14167,
+      "metadata_bytes": 3084,
+      "blocks": 257,
+      "zstd_blocks": 0,
+      "values": 1218602
+    },
+    "trade_shares": {
+      "payload_bytes": 887384,
+      "metadata_bytes": 3084,
+      "blocks": 257,
+      "zstd_blocks": 0,
+      "values": 1218602
+    },
+    "trade_price": {
+      "payload_bytes": 2564002,
+      "metadata_bytes": 3084,
+      "blocks": 257,
+      "zstd_blocks": 0,
+      "values": 1218602
+    },
+    "cross_shares": {
+      "payload_bytes": 17530,
+      "metadata_bytes": 300,
+      "blocks": 25,
+      "zstd_blocks": 0,
+      "values": 17836
+    },
+    "cross_price": {
+      "payload_bytes": 16023,
+      "metadata_bytes": 300,
+      "blocks": 25,
+      "zstd_blocks": 0,
+      "values": 17836
+    },
+    "cross_type": {
+      "payload_bytes": 868,
+      "metadata_bytes": 300,
+      "blocks": 25,
+      "zstd_blocks": 0,
+      "values": 17836
+    },
+    "imbalance_shares": {
+      "payload_bytes": 5097829,
+      "metadata_bytes": 1572,
+      "blocks": 131,
+      "zstd_blocks": 0,
+      "values": 8048630
+    },
+    "imbalance_price": {
+      "payload_bytes": 7839329,
+      "metadata_bytes": 1572,
+      "blocks": 131,
+      "zstd_blocks": 0,
+      "values": 12072945
+    },
+    "imbalance_flags": {
+      "payload_bytes": 689310,
+      "metadata_bytes": 1572,
+      "blocks": 131,
+      "zstd_blocks": 19,
+      "values": 4024315
+    },
+    "mwcb_level": {
+      "payload_bytes": 35,
+      "metadata_bytes": 12,
+      "blocks": 1,
+      "zstd_blocks": 0,
+      "values": 3
+    },
+    "rare_bytes": {
+      "payload_bytes": 1218349,
+      "metadata_bytes": 1704,
+      "blocks": 142,
+      "zstd_blocks": 4,
+      "values": 3684297
+    },
+    "raw_length": {
+      "payload_bytes": 0,
+      "metadata_bytes": 0,
+      "blocks": 0,
+      "zstd_blocks": 0,
+      "values": 0
+    },
+    "raw_bytes": {
+      "payload_bytes": 0,
+      "metadata_bytes": 0,
+      "blocks": 0,
+      "zstd_blocks": 0,
+      "values": 0
+    },
+    "stock_exception_record": {
+      "payload_bytes": 0,
+      "metadata_bytes": 0,
+      "blocks": 0,
+      "zstd_blocks": 0,
+      "values": 0
+    },
+    "stock_exception_value": {
+      "payload_bytes": 0,
+      "metadata_bytes": 0,
+      "blocks": 0,
+      "zstd_blocks": 0,
+      "values": 0
+    }
+  },
+  "cr1": {
+    "target": "CR-1",
+    "floor": 2.3415,
+    "gz_ratio": 2.34148051540548,
+    "verdict": "pass"
+  },
+  "cr2": {
+    "target": "CR-2",
+    "source": "results/fullday-capacity-12302019.json",
+    "note": "the comparison systems' stored bytes are their full-day stores on the debian host, from the capacity check; the ITCH store's bytes depend on the records alone, the same on either host",
+    "systems": {
+      "parquet": {
+        "variant": "zstd1-rg1Mi",
+        "stored_bytes": 3191406592,
+        "outcome": "finished",
+        "ours_over_theirs": 0.45417723195578336,
+        "smaller": true
+      },
+      "arcticdb": {
+        "variant": "rows100k-cols127",
+        "stored_bytes": 6352666624,
+        "outcome": "finished",
+        "ours_over_theirs": 0.22816626430922876,
+        "smaller": true
+      },
+      "questdb": {
+        "variant": "plain",
+        "stored_bytes": 22897786880,
+        "outcome": "finished",
+        "ours_over_theirs": 0.06330149807036722,
+        "smaller": true
+      }
+    },
+    "verdict": "pass"
+  }
+}

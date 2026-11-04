@@ -1,0 +1,282 @@
+{
+  "day": "10302019",
+  "source": "10302019.NASDAQ_ITCH50",
+  "host": "macOS",
+  "build_preset": "bench",
+  "commit": "f3e9d84",
+  "store_format": "itch-store-v1",
+  "segment_records": 1048576,
+  "segments": 281,
+  "records": 293989079,
+  "source_bytes": 9035016843,
+  "stored_bytes": 1588982528,
+  "ratio": 5.686039137492643,
+  "parts": {
+    "container_header": 16,
+    "container_trailer": 24,
+    "footer": {
+      "fixed": 24,
+      "block_entries": 195808,
+      "section_entries": 192,
+      "block_metadata": 398542
+    },
+    "footer_total": 594566,
+    "sections": {
+      "store": 24,
+      "symbols": 88864,
+      "tail": 0
+    },
+    "column_payloads": 1588299034
+  },
+  "segment_state": {
+    "what": "the import list, the one thing a segment needs from outside its own records to decode on its own; there is no other checkpoint",
+    "import_ref_payload_bytes": 75876740,
+    "import_ref_metadata_bytes": 3360,
+    "imports": 23562881
+  },
+  "columns": {
+    "type": {
+      "payload_bytes": 67019323,
+      "metadata_bytes": 328486,
+      "blocks": 281,
+      "zstd_blocks": 0,
+      "values": 293989079
+    },
+    "locate": {
+      "payload_bytes": 303040299,
+      "metadata_bytes": 3372,
+      "blocks": 281,
+      "zstd_blocks": 280,
+      "values": 293989079
+    },
+    "timestamp": {
+      "payload_bytes": 686855587,
+      "metadata_bytes": 3372,
+      "blocks": 281,
+      "zstd_blocks": 0,
+      "values": 293989079
+    },
+    "tracking": {
+      "payload_bytes": 6308740,
+      "metadata_bytes": 3372,
+      "blocks": 281,
+      "zstd_blocks": 0,
+      "values": 293989079
+    },
+    "creation_ref": {
+      "payload_bytes": 99015508,
+      "metadata_bytes": 3372,
+      "blocks": 281,
+      "zstd_blocks": 281,
+      "values": 154152208
+    },
+    "ref_distance": {
+      "payload_bytes": 116161818,
+      "metadata_bytes": 3372,
+      "blocks": 281,
+      "zstd_blocks": 0,
+      "values": 159825560
+    },
+    "import_ref": {
+      "payload_bytes": 75876740,
+      "metadata_bytes": 3360,
+      "blocks": 280,
+      "zstd_blocks": 0,
+      "values": 23562881
+    },
+    "add_side": {
+      "payload_bytes": 17148457,
+      "metadata_bytes": 3372,
+      "blocks": 281,
+      "zstd_blocks": 0,
+      "values": 128638557
+    },
+    "add_price": {
+      "payload_bytes": 80594716,
+      "metadata_bytes": 3372,
+      "blocks": 281,
+      "zstd_blocks": 281,
+      "values": 128638557
+    },
+    "add_shares": {
+      "payload_bytes": 51594697,
+      "metadata_bytes": 3372,
+      "blocks": 281,
+      "zstd_blocks": 0,
+      "values": 128638557
+    },
+    "mpid": {
+      "payload_bytes": 570005,
+      "metadata_bytes": 3348,
+      "blocks": 279,
+      "zstd_blocks": 0,
+      "values": 1423908
+    },
+    "reduce_shares": {
+      "payload_bytes": 8000749,
+      "metadata_bytes": 3372,
+      "blocks": 281,
+      "zstd_blocks": 0,
+      "values": 11015167
+    },
+    "match": {
+      "payload_bytes": 402569,
+      "metadata_bytes": 3372,
+      "blocks": 281,
+      "zstd_blocks": 0,
+      "values": 8989571
+    },
+    "printable": {
+      "payload_bytes": 18582,
+      "metadata_bytes": 3312,
+      "blocks": 276,
+      "zstd_blocks": 0,
+      "values": 129729
+    },
+    "exec_price": {
+      "payload_bytes": 239723,
+      "metadata_bytes": 3312,
+      "blocks": 276,
+      "zstd_blocks": 0,
+      "values": 129729
+    },
+    "replace_shares": {
+      "payload_bytes": 8477180,
+      "metadata_bytes": 3372,
+      "blocks": 281,
+      "zstd_blocks": 0,
+      "values": 25513651
+    },
+    "replace_price": {
+      "payload_bytes": 48795138,
+      "metadata_bytes": 3372,
+      "blocks": 281,
+      "zstd_blocks": 0,
+      "values": 25513651
+    },
+    "trade_ref": {
+      "payload_bytes": 14223,
+      "metadata_bytes": 3372,
+      "blocks": 281,
+      "zstd_blocks": 0,
+      "values": 1525363
+    },
+    "trade_side": {
+      "payload_bytes": 17143,
+      "metadata_bytes": 3372,
+      "blocks": 281,
+      "zstd_blocks": 0,
+      "values": 1525363
+    },
+    "trade_shares": {
+      "payload_bytes": 1048641,
+      "metadata_bytes": 3372,
+      "blocks": 281,
+      "zstd_blocks": 0,
+      "values": 1525363
+    },
+    "trade_price": {
+      "payload_bytes": 3132602,
+      "metadata_bytes": 3372,
+      "blocks": 281,
+      "zstd_blocks": 0,
+      "values": 1525363
+    },
+    "cross_shares": {
+      "payload_bytes": 17091,
+      "metadata_bytes": 72,
+      "blocks": 6,
+      "zstd_blocks": 0,
+      "values": 17775
+    },
+    "cross_price": {
+      "payload_bytes": 15669,
+      "metadata_bytes": 72,
+      "blocks": 6,
+      "zstd_blocks": 0,
+      "values": 17775
+    },
+    "cross_type": {
+      "payload_bytes": 279,
+      "metadata_bytes": 72,
+      "blocks": 6,
+      "zstd_blocks": 0,
+      "values": 17775
+    },
+    "imbalance_shares": {
+      "payload_bytes": 4701690,
+      "metadata_bytes": 372,
+      "blocks": 31,
+      "zstd_blocks": 0,
+      "values": 7480280
+    },
+    "imbalance_price": {
+      "payload_bytes": 7372859,
+      "metadata_bytes": 372,
+      "blocks": 31,
+      "zstd_blocks": 0,
+      "values": 11220420
+    },
+    "imbalance_flags": {
+      "payload_bytes": 642588,
+      "metadata_bytes": 372,
+      "blocks": 31,
+      "zstd_blocks": 15,
+      "values": 3740140
+    },
+    "mwcb_level": {
+      "payload_bytes": 35,
+      "metadata_bytes": 12,
+      "blocks": 1,
+      "zstd_blocks": 0,
+      "values": 3
+    },
+    "rare_bytes": {
+      "payload_bytes": 1216383,
+      "metadata_bytes": 1428,
+      "blocks": 119,
+      "zstd_blocks": 8,
+      "values": 3677648
+    },
+    "raw_length": {
+      "payload_bytes": 0,
+      "metadata_bytes": 0,
+      "blocks": 0,
+      "zstd_blocks": 0,
+      "values": 0
+    },
+    "raw_bytes": {
+      "payload_bytes": 0,
+      "metadata_bytes": 0,
+      "blocks": 0,
+      "zstd_blocks": 0,
+      "values": 0
+    },
+    "stock_exception_record": {
+      "payload_bytes": 0,
+      "metadata_bytes": 0,
+      "blocks": 0,
+      "zstd_blocks": 0,
+      "values": 0
+    },
+    "stock_exception_value": {
+      "payload_bytes": 0,
+      "metadata_bytes": 0,
+      "blocks": 0,
+      "zstd_blocks": 0,
+      "values": 0
+    }
+  },
+  "cr1": {
+    "target": "CR-1",
+    "floor": null,
+    "gz_ratio": 2.3328627022911657,
+    "verdict": "not a CR-1 day",
+    "note": "CR-1 is set on 12302019; this day's own .gz ratio is given as context"
+  },
+  "cr2": {
+    "target": "CR-2",
+    "verdict": "no comparison",
+    "note": "the comparison systems were stored for 12302019 only"
+  }
+}
