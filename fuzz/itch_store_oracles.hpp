@@ -204,6 +204,9 @@ struct ReadResult {
     if (skipped.over_cap) {
         return nullptr;
     }
+    if (!skipped.content.has_value() || !repaired.content.has_value()) {
+        return "a file neither refused nor over the cap gave no records";
+    }
     const detail::StoreContent& content = *skipped.content;
     if (*repaired.content != content) {
         return "the file read differently with CRCs skipped and recomputed";

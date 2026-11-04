@@ -6,15 +6,17 @@
 #include "itch_store_fixture.hpp"
 #include "scratch_dir.hpp"
 #include "stub_fixture.hpp"
+#include "test_bytes.hpp"
+#include "tick_store/codec/registry.hpp"
 #include "tick_store/harness/itch_store_record_reader.hpp"
 #include "tick_store/harness/roundtrip.hpp"
 #include "tick_store/harness/sha256.hpp"
 #include "tick_store/itch/codec.hpp"
+#include "tick_store/itch/frame.hpp"
 #include "tick_store/itch/message.hpp"
 #include "tick_store/store/container.hpp"
 #include "tick_store/store/durability.hpp"
 #include "tick_store/store/mapped_file.hpp"
-#include "tick_store/store/itch_segment.hpp"
 #include "tick_store/store/itch_store.hpp"
 #include "tick_store/store/itch_store_reader.hpp"
 #include "tick_store/store/itch_store_writer.hpp"
@@ -28,6 +30,8 @@
 #include <set>
 #include <span>
 #include <string>
+#include <type_traits>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -256,7 +260,8 @@ TEST(ItchStoreColumns, EveryColumnRoundTripsThroughItsCodecAtItsLimits) {
     for (const ColumnInfo& info : kColumns) {
         SCOPED_TRACE(std::string{info.name});
         std::vector<std::uint64_t> values;
-        for (std::uint64_t i = 0; i < 3 * kColumnBlockValues + 17; ++i) {
+        values.reserve((3 * kColumnBlockValues) + 17);
+        for (std::uint64_t i = 0; i < (3 * kColumnBlockValues) + 17; ++i) {
             values.push_back(i % 5 == 0 ? info.max_value : (i * 2654435761U) & info.max_value);
         }
         auto chunk = encode_column(info.id, values);
@@ -288,7 +293,7 @@ TEST(ItchStoreColumns, ZstdIsKeptOnlyWhereItIsSmaller) {
     std::vector<std::uint64_t> noise;
     std::uint64_t state = 1;
     for (int i = 0; i < 64; ++i) {
-        state = state * 6364136223846793005ULL + 1442695040888963407ULL;
+        state = (state * 6364136223846793005ULL) + 1442695040888963407ULL;
         noise.push_back(state >> 56U);
     }
     auto plain = encode_column(Column::rare_bytes, noise);
@@ -353,7 +358,7 @@ TEST(ItchStoreRoundTrip, AStoreThatDropsOrChangesARecordFailsTheOracle) {
 
 TEST(ItchStoreRoundTrip, AFileOnDiskReadsBackUnderEitherDurability) {
     const Bytes source = tick_store::test::source_with_tail();
-    tick_store::test::ScratchDir dir;
+    const tick_store::test::ScratchDir dir;
     for (const Durability durability : {Durability::page_cache, Durability::device_flush}) {
         const auto path = dir / "store.tsc";
         auto writer = ItchStoreWriter::create(path, durability, {.segment_records = 5});
@@ -372,7 +377,7 @@ TEST(ItchStoreRoundTrip, AFileOnDiskReadsBackUnderEitherDurability) {
         EXPECT_TRUE(std::ranges::equal(mapped->bytes(), test::store_of_source(source, 5)));
         auto reader = ItchStoreReader::open(path);
         ASSERT_TRUE(reader.has_value()) << to_string(reader.error());
-        ItchStoreReader moved = std::move(*reader);
+        const ItchStoreReader moved = std::move(*reader);
         harness::ItchStoreRecordReader records{moved};
         EXPECT_TRUE(harness::verify(source, records).passed());
     }
@@ -533,7 +538,7 @@ TEST(ItchStoreSegments, TheSummaryHoldsTimesRecordsAndLocates) {
 }
 
 TEST(ItchStoreSegments, MetadataEncodesAndParsesBack) {
-    ColumnMetadata plain{.segment = 7, .column = Column::match, .values = 9, .summary = {}};
+    const ColumnMetadata plain{.segment = 7, .column = Column::match, .values = 9, .summary = {}};
     auto parsed = parse_column_metadata(encode_column_metadata(plain), 0);
     ASSERT_TRUE(parsed.has_value());
     EXPECT_EQ(*parsed, plain);
@@ -546,7 +551,7 @@ TEST(ItchStoreSegments, MetadataEncodesAndParsesBack) {
                            .min_time = 1,
                            .max_time = 9,
                            .locates = {std::byte{0}, std::byte{4}}};
-    ColumnMetadata typed{.segment = 7, .column = Column::type, .values = 9, .summary = summary};
+    const ColumnMetadata typed{.segment = 7, .column = Column::type, .values = 9, .summary = summary};
     const auto encoded = encode_column_metadata(typed);
     EXPECT_EQ(encoded.size(), kSegmentMetadataFixedSize + 2);
     parsed = parse_column_metadata(encoded, 0);
@@ -566,7 +571,7 @@ TEST(ItchStoreSegments, RandomAccessToAnySegmentGivesWhatTheSequentialReadGives)
     std::uint64_t next = 1000;
     std::uint64_t state = 42;
     for (std::uint64_t t = 1; t <= 3000; ++t) {
-        state = state * 6364136223846793005ULL + 1442695040888963407ULL;
+        state = (state * 6364136223846793005ULL) + 1442695040888963407ULL;
         const auto locate = static_cast<std::uint16_t>(1 + ((state >> 40U) % 5));
         const std::uint64_t pick = (state >> 20U) % 10;
         if (live.empty() || pick < 4) {
@@ -671,7 +676,7 @@ TEST(ItchStoreWriter, RefusesWhatNoFileHolds) {
 }
 
 TEST(ItchStoreWriter, TheCreateErrorNamesTheContainersFailure) {
-    tick_store::test::ScratchDir dir;
+    const tick_store::test::ScratchDir dir;
     const auto refused =
         ItchStoreWriter::create(dir / "no" / "such" / "dir", Durability::page_cache, {});
     ASSERT_FALSE(refused.has_value());

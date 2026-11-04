@@ -5,6 +5,7 @@
 // what refuses it, and each refusal is checked for the field it names. Then every cut of a
 // file, and the golden file both ways.
 
+#include "itch_fixtures.hpp"
 #include "itch_store_fixture.hpp"
 #include "stub_fixture.hpp"
 #include "test_bytes.hpp"
@@ -26,10 +27,13 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <ios>
 #include <iterator>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace tick_store::store {
@@ -341,7 +345,7 @@ TEST(ItchStoreCorrupt, DirectoryFields) {
                                                block.bytes, wrapped)
                         .has_value());
         block.codec = codec::CodecId::zstd;
-        block.bytes = wrapped;
+        block.bytes = std::move(wrapped);
         expect_refused(parts.build(), "column codec", ItchStoreErrorKind::bad_segment);
     }
 }
@@ -428,6 +432,7 @@ TEST(ItchStoreCorrupt, ValuesThatBreakTheRulesTyingColumnsTogether) {
         const Bytes broken = with(Column::ref_distance, distances);
         expect_refused(broken, "ref distance", ItchStoreErrorKind::bad_value);
         const auto error = first_error(broken);
+        ASSERT_TRUE(error.has_value());
         EXPECT_EQ(error->record, 3U);
         EXPECT_EQ(error->column, "ref_distance");
     }
@@ -483,6 +488,7 @@ TEST(ItchStoreCorrupt, ValuesThatBreakTheRulesTyingColumnsTogether) {
         const Bytes broken = parts.build();
         expect_refused(broken, "column value", ItchStoreErrorKind::bad_value);
         const auto error = first_error(broken);
+        ASSERT_TRUE(error.has_value());
         EXPECT_EQ(error->column, "add_side");
         EXPECT_EQ(error->index, 0U);
     }
@@ -538,12 +544,10 @@ TEST(ItchStoreCorrupt, ZstdWrapperFields) {
             if (!info.zstd) {
                 continue;
             }
-            try {
-                if (clean.block(s, info.id).codec == codec::CodecId::zstd) {
-                    wrapped = std::pair{s, info.id};
-                    break;
-                }
-            } catch (const std::runtime_error&) {
+            const auto b = clean.find_block(s, info.id);
+            if (b.has_value() && clean.blocks[*b].codec == codec::CodecId::zstd) {
+                wrapped = std::pair{s, info.id};
+                break;
             }
         }
     }

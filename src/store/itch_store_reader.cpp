@@ -146,8 +146,8 @@ std::expected<void, ItchStoreError> ItchStoreReader::read_directory() {
             error.actual = actual;
             return std::unexpected(error);
         };
-        if (metadata->column == Column::type) {
-            // A type block opens the next segment.
+        if (metadata->summary.has_value()) {
+            // A type block, the only one with a summary, opens the next segment.
             const std::uint64_t segment = segments_.size();
             if (metadata->segment != segment) {
                 return refuse("segment index", kMetaSegmentOffset, segment, metadata->segment);
@@ -188,7 +188,7 @@ std::expected<void, ItchStoreError> ItchStoreReader::read_directory() {
         }
         const ColumnInfo& column = column_info(metadata->column);
         const codec::CodecId primary = primary_codec(metadata->column);
-        if (info->codec != primary && !(column.zstd && info->codec == codec::CodecId::zstd)) {
+        if (info->codec != primary && (!column.zstd || info->codec != codec::CodecId::zstd)) {
             ItchStoreError error;
             error.kind = ItchStoreErrorKind::bad_segment;
             error.field = "column codec";

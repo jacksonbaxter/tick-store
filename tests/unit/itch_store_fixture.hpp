@@ -146,8 +146,9 @@ struct StoreParts {
         throw std::runtime_error("no such section");
     }
 
-    // The block of `column` in `segment`, found from its metadata.
-    [[nodiscard]] std::size_t block_index(std::uint32_t segment, Column column) const {
+    // The block of `column` in `segment`, found from its metadata, if the segment has one.
+    [[nodiscard]] std::optional<std::size_t> find_block(std::uint32_t segment,
+                                                        Column column) const {
         for (std::size_t b = 0; b < blocks.size(); ++b) {
             const auto metadata = parse_column_metadata(blocks[b].metadata, 0);
             if (metadata.has_value() && metadata->segment == segment &&
@@ -155,7 +156,15 @@ struct StoreParts {
                 return b;
             }
         }
-        throw std::runtime_error("no such block");
+        return std::nullopt;
+    }
+
+    [[nodiscard]] std::size_t block_index(std::uint32_t segment, Column column) const {
+        const auto found = find_block(segment, column);
+        if (!found.has_value()) {
+            throw std::runtime_error("no such block");
+        }
+        return *found;
     }
 
     [[nodiscard]] ContainerPart& block(std::uint32_t segment, Column column) {

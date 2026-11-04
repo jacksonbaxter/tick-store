@@ -525,7 +525,7 @@ void write_itch_store_seeds(SeedDir& seeds) {
                                                    blocks[1].bytes, outer)
                 .has_value()) {
             blocks[1].codec = tick_store::codec::CodecId::zstd;
-            blocks[1].bytes = outer;
+            blocks[1].bytes = std::move(outer);
         }
     });
     seeds.add(wrapped);

@@ -1,5 +1,6 @@
 #include "tick_store/harness/roundtrip_cli.hpp"
 
+#include "tick_store/codec/registry.hpp"
 #include "tick_store/harness/columns_reader.hpp"
 #include "tick_store/harness/flip_bit.hpp"
 #include "tick_store/harness/itch_store_record_reader.hpp"
@@ -24,6 +25,7 @@
 #include <algorithm>
 #include <charconv>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <format>

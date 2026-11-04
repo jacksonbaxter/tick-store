@@ -81,10 +81,14 @@ std::expected<ZstdPayload, CodecError> decode_zstd_payload(std::span<const std::
     const auto inner = cursor.read_le(2, "zstd header");
     const auto reserved = cursor.read_le(2, "zstd header");
     const auto size = cursor.read_le(4, "zstd header");
+    if (!inner.has_value()) {
+        return std::unexpected(inner.error());
+    }
+    if (!reserved.has_value()) {
+        return std::unexpected(reserved.error());
+    }
     if (!size.has_value()) {
-        return std::unexpected(!inner.has_value()      ? inner.error()
-                               : !reserved.has_value() ? reserved.error()
-                                                       : size.error());
+        return std::unexpected(size.error());
     }
     if (!valid_inner(*inner)) {
         return std::unexpected(codec_error(CodecErrorKind::bad_field, "zstd inner codec",

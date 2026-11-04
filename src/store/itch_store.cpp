@@ -9,7 +9,6 @@
 #include "tick_store/codec/zstd_frame.hpp"
 #include "tick_store/itch/codec.hpp"
 #include "tick_store/itch/message.hpp"
-#include "tick_store/store/little_endian.hpp"
 #include "tick_store/store/store_error.hpp"
 
 #include <algorithm>
@@ -105,6 +104,16 @@ void put(std::vector<std::byte>& out, std::uint64_t value, std::size_t width) {
     }
 }
 
+[[nodiscard]] std::expected<std::vector<std::byte>, codec::CodecError> code_pfor(
+    ColumnCodec kind, std::span<const std::uint64_t> values) {
+    std::vector<std::byte> out;
+    if (auto done = codec::encode_pfor(values, kColumnBlockValues, pfor_options(kind), out);
+        !done) {
+        return std::unexpected(done.error());
+    }
+    return out;
+}
+
 [[nodiscard]] std::expected<std::vector<std::byte>, codec::CodecError> code_values(
     ColumnCodec kind, std::span<const std::uint64_t> values) {
     std::vector<std::byte> out;
@@ -129,20 +138,15 @@ void put(std::vector<std::byte>& out, std::uint64_t value, std::size_t width) {
             return out;
         }
         case ColumnCodec::pfor_reference: {
-            auto head = code_values(ColumnCodec::pfor_head_delta, values);
-            auto delta = code_values(ColumnCodec::pfor_delta, values);
+            auto head = code_pfor(ColumnCodec::pfor_head_delta, values);
+            auto delta = code_pfor(ColumnCodec::pfor_delta, values);
             if (!head.has_value() || !delta.has_value()) {
                 return !head.has_value() ? head : delta;
             }
             return head->size() < delta->size() ? std::move(head) : std::move(delta);
         }
-        default: {
-            if (auto done = codec::encode_pfor(values, kColumnBlockValues, pfor_options(kind), out);
-                !done) {
-                return std::unexpected(done.error());
-            }
-            return out;
-        }
+        default:
+            return code_pfor(kind, values);
     }
 }
 
@@ -481,7 +485,7 @@ std::expected<std::vector<std::uint64_t>, ItchStoreError> decode_column(
         error.codec = cause;
         return std::unexpected(error);
     };
-    if (codec_id != primary && !(info.zstd && codec_id == CodecId::zstd)) {
+    if (codec_id != primary && (!info.zstd || codec_id != CodecId::zstd)) {
         return refuse(ItchStoreErrorKind::bad_segment, "column codec",
                       static_cast<std::uint64_t>(primary), static_cast<std::uint64_t>(codec_id));
     }

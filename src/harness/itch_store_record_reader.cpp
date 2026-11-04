@@ -8,7 +8,6 @@
 #include "tick_store/store/itch_store_reader.hpp"
 
 #include <cstddef>
-#include <cstdint>
 #include <expected>
 #include <optional>
 #include <span>

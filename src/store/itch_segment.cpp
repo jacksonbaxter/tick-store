@@ -7,7 +7,7 @@
 
 #include <algorithm>
 #include <array>
-#include <bit>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -317,46 +317,48 @@ struct SegmentBuilder::State {
     }
 
     void operator()(const itch::AddOrder& m) {
-        add_order(m.type_code, m.header, m.order_reference_number, m.buy_sell_indicator, m.shares,
-                  m.price, m.stock);
+        add_order(itch::AddOrder::type_code, m.header, m.order_reference_number,
+                  m.buy_sell_indicator, m.shares, m.price, m.stock);
     }
     void operator()(const itch::AddOrderWithMpid& m) {
-        add_order(m.type_code, m.header, m.order_reference_number, m.buy_sell_indicator, m.shares,
-                  m.price, m.stock);
+        add_order(itch::AddOrderWithMpid::type_code, m.header, m.order_reference_number,
+                  m.buy_sell_indicator, m.shares, m.price, m.stock);
         push(Column::mpid, mpid_value(m.attribution));
     }
     void operator()(const itch::OrderExecuted& m) {
-        header(m.type_code, m.header);
-        name(m.type_code, m.header.stock_locate, m.order_reference_number);
-        reduce(m.type_code, m.executed_shares);
+        header(itch::OrderExecuted::type_code, m.header);
+        name(itch::OrderExecuted::type_code, m.header.stock_locate, m.order_reference_number);
+        reduce(itch::OrderExecuted::type_code, m.executed_shares);
         push(Column::match, m.match_number);
     }
     void operator()(const itch::OrderExecutedWithPrice& m) {
-        header(m.type_code, m.header);
-        name(m.type_code, m.header.stock_locate, m.order_reference_number);
-        reduce(m.type_code, m.executed_shares);
+        header(itch::OrderExecutedWithPrice::type_code, m.header);
+        name(itch::OrderExecutedWithPrice::type_code, m.header.stock_locate,
+             m.order_reference_number);
+        reduce(itch::OrderExecutedWithPrice::type_code, m.executed_shares);
         push(Column::match, m.match_number);
         push(Column::printable, symbol_of(m.printable));
         push(Column::exec_price, static_cast<std::uint32_t>(m.execution_price));
     }
     void operator()(const itch::OrderCancel& m) {
-        header(m.type_code, m.header);
-        name(m.type_code, m.header.stock_locate, m.order_reference_number);
-        reduce(m.type_code, m.cancelled_shares);
+        header(itch::OrderCancel::type_code, m.header);
+        name(itch::OrderCancel::type_code, m.header.stock_locate, m.order_reference_number);
+        reduce(itch::OrderCancel::type_code, m.cancelled_shares);
     }
     void operator()(const itch::OrderDelete& m) {
-        header(m.type_code, m.header);
-        name(m.type_code, m.header.stock_locate, m.order_reference_number);
+        header(itch::OrderDelete::type_code, m.header);
+        name(itch::OrderDelete::type_code, m.header.stock_locate, m.order_reference_number);
     }
     void operator()(const itch::OrderReplace& m) {
-        header(m.type_code, m.header);
-        name(m.type_code, m.header.stock_locate, m.original_order_reference_number);
+        header(itch::OrderReplace::type_code, m.header);
+        name(itch::OrderReplace::type_code, m.header.stock_locate,
+             m.original_order_reference_number);
         create(m.header.stock_locate, m.new_order_reference_number);
         push(Column::replace_shares, m.shares);
         push(Column::replace_price, static_cast<std::uint32_t>(m.price));
     }
     void operator()(const itch::Trade& m) {
-        header(m.type_code, m.header);
+        header(itch::Trade::type_code, m.header);
         push(Column::trade_ref, m.order_reference_number);
         push(Column::trade_side, symbol_of(m.buy_sell_indicator));
         push(Column::trade_shares, m.shares);
@@ -365,7 +367,7 @@ struct SegmentBuilder::State {
         derived_stock(m.header.stock_locate, m.stock);
     }
     void operator()(const itch::CrossTrade& m) {
-        header(m.type_code, m.header);
+        header(itch::CrossTrade::type_code, m.header);
         push(Column::cross_shares, m.shares);
         push(Column::cross_price, static_cast<std::uint32_t>(m.cross_price));
         push(Column::match, m.match_number);
@@ -373,11 +375,11 @@ struct SegmentBuilder::State {
         derived_stock(m.header.stock_locate, m.stock);
     }
     void operator()(const itch::BrokenTrade& m) {
-        header(m.type_code, m.header);
+        header(itch::BrokenTrade::type_code, m.header);
         push(Column::match, m.match_number);
     }
     void operator()(const itch::NetOrderImbalance& m) {
-        header(m.type_code, m.header);
+        header(itch::NetOrderImbalance::type_code, m.header);
         push(Column::imbalance_shares, m.paired_shares);
         push(Column::imbalance_shares, m.imbalance_shares);
         push(Column::imbalance_price, static_cast<std::uint32_t>(m.far_price));
@@ -390,7 +392,7 @@ struct SegmentBuilder::State {
         derived_stock(m.header.stock_locate, m.stock);
     }
     void operator()(const itch::MwcbDeclineLevel& m) {
-        header(m.type_code, m.header);
+        header(itch::MwcbDeclineLevel::type_code, m.header);
         push(Column::mwcb_level, static_cast<std::uint64_t>(m.level_1));
         push(Column::mwcb_level, static_cast<std::uint64_t>(m.level_2));
         push(Column::mwcb_level, static_cast<std::uint64_t>(m.level_3));
@@ -966,7 +968,7 @@ std::expected<std::optional<itch::Message>, ItchStoreError> SegmentAssembler::ne
                         Column::stock_exception_record);
     }
     ++s.next_record;
-    return std::optional<itch::Message>{std::move(*message)};
+    return std::optional<itch::Message>{*message};
 }
 
 }  // namespace tick_store::store

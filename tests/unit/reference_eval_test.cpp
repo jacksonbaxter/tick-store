@@ -3,7 +3,7 @@
 
 #include "itch_store_fixture.hpp"
 #include "scratch_dir.hpp"
-#include "test_bytes.hpp"
+#include "stub_fixture.hpp"
 #include "tick_store/harness/codec_eval.hpp"
 #include "tick_store/harness/reference_eval.hpp"
 #include "tick_store/harness/roundtrip_cli.hpp"
@@ -15,9 +15,9 @@
 
 #include <array>
 #include <cstddef>
-#include <cstdint>
 #include <fstream>
 #include <iterator>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -109,13 +109,9 @@ TEST(ReferenceEval, AnEmptyStreamCostsNothing) {
 }
 
 TEST(ReferenceEval, TheCommandLineWritesJsonWithoutPathsAndRefusesBadUsage) {
-    tick_store::test::ScratchDir dir;
+    const tick_store::test::ScratchDir dir;
     const Bytes source = stream();
-    {
-        std::ofstream out{dir / "source", std::ios::binary};
-        out.write(reinterpret_cast<const char*>(source.data()),
-                  static_cast<std::streamsize>(source.size()));
-    }
+    tick_store::test::write_file(dir / "source", source);
     // Named, because the argument lists below hold string_views into them.
     const std::string source_path = (dir / "source").string();
     const std::string output_path = (dir / "out.json").string();

@@ -1,6 +1,5 @@
 #include "tick_store/harness/reference_eval.hpp"
 
-#include "tick_store/codec/block.hpp"
 #include "tick_store/codec/dictionary.hpp"
 #include "tick_store/codec/pfor.hpp"
 #include "tick_store/codec/stream_vbyte.hpp"
@@ -12,6 +11,7 @@
 #include "tick_store/itch/message.hpp"
 #include "tick_store/store/itch_store.hpp"
 #include "tick_store/store/mapped_file.hpp"
+#include "tick_store/store/store_error.hpp"
 
 #include <sys/utsname.h>
 
@@ -25,11 +25,13 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <ios>
 #include <optional>
 #include <span>
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <variant>
