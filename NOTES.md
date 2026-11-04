@@ -1218,6 +1218,175 @@ each host, clang-tidy clean on 110 files per host. Before that push, the full lo
 `ad542fd` (988 s, maximum resident set 1.18 GB, through heavy.sh), and on debian the dev build passed ctest, 572 tests with the
 2 `ItchRealDay` tests skipped for want of data.
 
+### Queries over the ITCH store
+
+`ItchQuery` and `tools/tick_query` (docs/store.md, "Queries") answer Q1 to Q5 through the index
+version 2 added: per segment a seek column, and a locate column held as runs with a run directory.
+Every number below is **iteration-only and unpinned**. None of them is a reported result, and none
+went through `measure.sh`.
+
+**What the index costs.** Store version 2 was ingested on both days and assembled by
+`scripts/store_results.py` into `results/store-size-*.json`, which now list the query index. The
+tools were the bench build at `3325f81`. Raw output is in `phase3-raw/query/store/<day>/`.
+
+| Day | Version 1 bytes | Version 2 bytes | Ratio | Seek column | Run directory | Locate column, v1 to v2 |
+|---|---|---|---|---|---|---|
+| 12302019 | 1,449,464,212 | 1,495,541,951 | 5.693 to 5.517 | 1,972,413 | 3,995,309 | 275,922,975 to 315,999,839 |
+| 10302019 | 1,588,982,528 | 1,640,462,478 | 5.686 to 5.508 | 2,156,058 | 4,300,525 | 303,040,299 to 348,027,417 |
+
+- The index itself, the seek column plus the three run directory columns with their metadata, is
+  5,967,722 bytes on 12302019 (0.399% of the file) and 6,456,583 on 10302019 (0.394%).
+- Most of the growth is the locate column. Held as each locate's record indices, with gaps coded
+  by PFOR and zstd, it costs 40.1 MB more than the file-order dictionary did on 12302019, and 45.0 MB
+  more on 10302019. It is the symbol filter and also the only copy of the records' locates.
+- On 12302019 the file grew by 46,077,739 bytes. That is the locate column's 40,076,864, plus
+  5,955,386 of new payloads, plus 45,489 of footer for the new blocks and the plain flag.
+- CR-1 still passes on 12302019 (5.517 against 2.3415).
+- CR-2 still passes. The store is 0.469 of Parquet's stored bytes, 0.235 of ArcticDB's and 0.065
+  of QuestDB's.
+
+**G-1 and G-2 on version 2.** They ran on both days on the Mac, one run at a time through
+`heavy.sh` under `/usr/bin/time -l`, and every run passed. `results/roundtrip-*.json` hold each
+run.
+
+| Run | 12302019 | 10302019 |
+|---|---|---|
+| ingest | 106.4 s, 280 MB footprint, 8.49 GB max RSS | 113.4 s, 269 MB, 9.26 GB |
+| verify (G-1) | 36.8 s, 375 MB, 10.05 GB | 43.1 s, 380 MB, 10.99 GB |
+
+In each G-2 run, both flipped stores exit 1 and the restored store passes.
+
+On debian, G-1 on 12302019 passed under `taskset -c 2,6,7` through `heavy.sh`: ingest took 305.8 s
+with a 4.56 GB peak RSS, and verify 175.5 s with 7.01 GB. The store debian wrote has the same
+SHA-256 as the Mac's (`175f089e…`), and the Mac's store, copied over, also passed verify there.
+`results/roundtrip-12302019-linux.json` holds these. Raw output is in `phase3-raw/query/debian/g1/`.
+
+**Answers equal the harness's, on the slice and on the whole day.**
+
+- **Slice.** On the version 2 store of the slice, every digest in `results/compare/*.json` matches
+  on both paths, indexed and exact:
+
+  | Query | Rows | Digest |
+  |---|---|---|
+  | Q1 | 527,644 | `230d7f3f…` |
+  | Q2 | 66,741 | `2d9259f7…` |
+  | Q3 | 5 | `f57ae03d…` |
+  | Q4 | 338 | `2ea6acc5…` |
+  | Q5 | 1 | `d68a6d60…` |
+
+  The busiest locate is 6556.
+- **Whole day.** For 12302019, `tick_export` wrote the day's columns, and its oracle passed
+  (`timestamps_sorted: true`, so the harness's binary search and the query's filter pick the same
+  rows). Then compare/queries.py's own numpy `build_queries` and `ground_truth` ran without
+  clipping, with the window ending at 10:30:00, through `heavy.sh` under `/usr/bin/time -l`. That
+  took 1.93 s, with a 750 MB peak footprint and a 4.76 GB maximum resident set, most of it the
+  mapped columns. The busiest locate in [09:30, 10:30) is 6556 again. `tick_query` matched every
+  answer, on both paths:
+
+  | Query | Rows | Digest | Indexed: bytes decoded, segments |
+  |---|---|---|---|
+  | Q1 | 527,644 | `8a576f4b…` | 5,041,159, 1 |
+  | Q2 | 739,944 | `5905cebd…` | 337,889,598, 62 |
+  | Q3 | 60 | `7c2fb741…` | 258,441,700, 62 |
+  | Q4 | 338 | `f65405f7…` | 3,708,239, 1 |
+  | Q5 | 1 | `b56f72ae…` | 64,862,984, 257 |
+
+  The exact path decodes whole segments: 359.7 MB for Q2 and Q3, and all 1,494.8 MB of the
+  payloads for Q5, in 31.4 s.
+- The same check passed on debian.
+- Raw output is in `phase3-raw/query/oracle/` (`truth-12302019.json`, `check-*.log`, the `.time`
+  files) and `phase3-raw/query/debian/timing/linux-check-indexed.log`.
+
+**Latency, iteration-only and unpinned.** These are `engine_ns` from `tick_query` on the
+whole-day 12302019 store, indexed path. Warm figures are the median of rounds 2 to 20 in one
+worker. Cold figures come from 10 trials per query, each a proven `tick_coldcache evict` of the
+store, then a fresh worker answering one query.
+
+The Mac ran through `heavy.sh` while another project's test used two cores. debian ran under
+`taskset -c 2,6,7` through `heavy.sh`, with its load average rising from 0.0 to 7.5 during the
+run as another project started. Neither run is a measurement.
+
+Raw output: `phase3-raw/query/timing/mac-indexed.json` and
+`phase3-raw/query/debian/timing/linux-indexed.json`.
+
+| Query | Rows | Bytes decoded | Mac warm median | Mac cold mean | debian warm median | debian cold mean |
+|---|---|---|---|---|---|---|
+| Q1 | 527,644 | 5.04 MB | 63.7 ms | 75.6 ms | 190.7 ms | 304.0 ms |
+| Q2 | 739,944 | 337.9 MB | 2,605.7 ms | 2,887.1 ms | 4,525.7 ms | 7,916.1 ms |
+| Q3 | 60 | 258.4 MB | 1,409.6 ms | 1,694.1 ms | 2,383.3 ms | 4,409.4 ms |
+| Q4 | 338 | 3.71 MB | 36.7 ms | 53.7 ms | 83.7 ms | 187.3 ms |
+| Q5 | 1 | 64.9 MB | 1,315.0 ms | 1,460.8 ms | 2,225.2 ms | 3,554.2 ms |
+
+Opening the store took 1.6 to 2.7 ms on the Mac and 6.7 to 11.6 ms on debian, outside
+`engine_ns`.
+
+**Likely verdicts, iteration-only.** Not one is met:
+
+- **QL-1** (Q2 warm median at most 16.9 ms) misses by about 150 times on the Mac and 270 times on
+  debian.
+- **QL-2** (Q3 warm median at most 0.41 ms) misses by more than three orders of magnitude.
+- **QL-3** (Q4 cold mean at most 10 ms) misses at 53.7 ms on the Mac and 187.3 ms on debian.
+
+On the slice, clipped to four and a half minutes, Q2 took 240 ms. A whole hour of one symbol
+crosses 62 segments.
+
+**Where the time goes.** In a `sample` profile of Q2 on the whole day (raw
+`phase3-raw/query/prof/q2-full.txt`):
+
+- 37% is dictionary decoding. That is the whole type column of every segment Q2 reaches, plus the
+  reference distances and the add columns.
+- 32% is the single pass over each segment's records up to the locate's last one. The pass ranks
+  every record's type to find each column's value index, and keeps every locate's order list,
+  because a reference names an order by its distance back in its locate's list, and that list
+  includes the segment's imports.
+- CRC32C, zstd's Huffman and the PFOR unpack make up most of the rest. The answer's SHA-256, about
+  5% of the samples, is outside `engine_ns`, since the profile covers the whole worker.
+
+So Q2's cost is set by records of other symbols as much as by its own.
+
+**The index that would close QL-2, costed but not built.** Q3 over whole minutes could come from a
+per-locate minute aggregate of the adds, with each entry holding locate, minute, adds, share sum,
+and least and greatest price, 24 bytes raw. On 12302019 it was measured on a prototype
+serialization by numpy from the export:
+
+| Granularity | Entries | Raw | zlib -9 | lzma -6 | Share of the file, zlib |
+|---|---|---|---|---|---|
+| Per segment | 3,208,555 | 77.0 MB | 27.7 MB | 18.5 MB | 1.85% |
+| Per day | 2,343,750 | 56.3 MB | 14.6 MB | 10.3 MB | 0.98% |
+
+The codecs are the standard library's, so they bound what a store codec might do, and are not the
+store's coding. Raw output: `phase3-raw/query/oracle/minute-index-12302019.json`. With that index,
+Q3 would read 60 entries for each of 62 segments, or 60 entries in all, instead of 258 MB. Whether
+that reaches 0.41 ms is not measured. A window that does not start and end on whole minutes would
+still decode its edge minutes.
+
+**Considered and not built, so not measured:**
+
+- **A walk-back for references.** It would resolve each of the locate's references by decoding
+  backwards from its position, instead of keeping every locate's list. Imports make the list
+  depend on every earlier record of the locate in the segment, and a C, E, X, D or U of another
+  locate between them still has to be ranked, so most of the pass stays.
+- **A file-order copy of the locate column for Q4.** Q4 reads one segment's first groups, and the
+  run form makes it decode every run to put locates back in file order (about 4.5 ms of Q4's 36
+  ms). A copy would cost up to the v1 column, 276 MB.
+- **A Huffman decode of several symbols per table lookup.** Today it decodes one per lookup.
+- **A counting sort when ungrouping.** It would replace the sort of add places, which profiles
+  under 1%.
+
+**Fuzzing and faults.**
+
+- `fuzz_itch_query` ran 270 s through `check.sh --only fuzz-itch-query --fresh-corpus` under
+  `heavy.sh` and `/usr/bin/time -l`, and was clean: 38,445 runs, 141 a second, with libFuzzer's
+  peak RSS at 618 MB. Raw: `phase3-raw/query/fuzz/`.
+- Four faults were proven with `prove_checks.py --only`, and `results/check-proofs.json` was
+  restored from git after each run. Raw: `phase3-raw/query/faults/`.
+  - `query-window-group-boundary`, the time-window off-by-one: PROVEN, failing
+    `ItchQuery.BothPathsEqualTheColumnFormAtEveryBoundary`.
+  - `fuzz-itch-query-first-run-skipped`, the symbol filter skipping a segment's first run: PROVEN.
+    The fuzzer exits 77 on "the indexed path's rows differ from the exact path's".
+  - `query-run-order-unchecked`: PROVEN, failing `ItchQueryCorrupt.LocateRunFieldsRefusedByTheQuery`.
+  - `query-cli-digest-ts`: PROVEN, failing `QueryCli.ServesEveryKindWithTheHarnessDigests`.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
