@@ -32,6 +32,7 @@
 #include "tick_store/store/itch_store.hpp"
 #include "tick_store/store/itch_store_reader.hpp"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -165,12 +166,7 @@ struct Answers {
 
 template <class T>
 [[nodiscard]] bool all_answered(const std::vector<std::expected<T, ItchStoreError>>& answers) {
-    for (const auto& one : answers) {
-        if (!one.has_value()) {
-            return false;
-        }
-    }
-    return true;
+    return std::ranges::all_of(answers, [](const auto& one) { return one.has_value(); });
 }
 
 }  // namespace query_detail

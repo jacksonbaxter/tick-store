@@ -23,7 +23,9 @@
 #include "tick_store/codec/price_double.hpp"
 #include "tick_store/codec/run_length.hpp"
 #include "tick_store/codec/stream_vbyte.hpp"
+#include "tick_store/itch/message.hpp"
 #include "tick_store/store/container.hpp"
+#include "tick_store/store/itch_store.hpp"
 
 #include <gtest/gtest.h>
 
