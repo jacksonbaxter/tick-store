@@ -815,22 +815,38 @@ std::vector<std::uint64_t> time_residuals(std::span<const std::uint64_t> times,
 std::expected<std::vector<std::uint64_t>, ItchStoreError> times_from_residuals(
     std::span<const std::uint64_t> residuals, std::span<const std::uint64_t> positions,
     std::span<const std::uint64_t> starts, std::span<const std::uint64_t> bases) {
+    // A max-plus recurrence, t = r + max(t before, base), so each value waits on the one
+    // before: no vector form, since the residuals wrap modulo 2^64 and a wrapped sum breaks
+    // the associativity a parallel scan needs (NOTES.md, "SIMD"). The loop keeps only the
+    // add and the max on that chain: the run start is a compare with the next start, and
+    // the 48-bit check is an OR over all values, with the first offender found after.
     std::vector<std::uint64_t> out(residuals.size());
     std::uint64_t before = 0;
-    std::optional<std::size_t> refused;
-    each_with_base(positions, starts, bases, [&](std::size_t k, bool first, std::uint64_t base) {
-        const std::uint64_t from = first ? base : std::max(before, base);
-        out[k] = residuals[k] + from;
-        if (out[k] > kMax48 && !refused.has_value()) {
-            refused = k;
+    std::uint64_t seen = 0;
+    std::size_t run = 0;
+    std::size_t next_start = starts.empty() ? positions.size() : starts[0];
+    for (std::size_t k = 0; k < positions.size(); ++k) {
+        const std::uint64_t base = bases[positions[k] / kTimeBaseRecords];
+        std::uint64_t from_before = before;
+        if (k == next_start) {
+            // A run's first record takes its base alone.
+            from_before = 0;
+            ++run;
+            next_start = run < starts.size() ? starts[run] : positions.size();
         }
-        before = out[k];
-    });
-    if (refused.has_value()) {
+        const std::uint64_t time = residuals[k] + std::max(from_before, base);
+        out[k] = time;
+        seen |= time;
+        before = time;
+    }
+    if (seen > kMax48) {
+        const auto refused = static_cast<std::size_t>(
+            std::ranges::find_if(out, [](std::uint64_t time) { return time > kMax48; }) -
+            out.begin());
         ItchStoreError error =
-            fail(ItchStoreErrorKind::bad_value, "timestamp value", kNoIndex, kMax48, out[*refused]);
+            fail(ItchStoreErrorKind::bad_value, "timestamp value", kNoIndex, kMax48, out[refused]);
         error.column = column_info(Column::timestamp).name;
-        error.index = *refused;
+        error.index = refused;
         return std::unexpected(error);
     }
     return out;

@@ -1,12 +1,13 @@
 diff --git a/src/store/itch_store.cpp b/src/store/itch_store.cpp
+index 8aa706b..047f49e 100644
 --- a/src/store/itch_store.cpp
 +++ b/src/store/itch_store.cpp
-@@ -821,7 +821,7 @@
-     each_with_base(positions, starts, bases, [&](std::size_t k, bool first, std::uint64_t base) {
-         const std::uint64_t from = first ? base : std::max(before, base);
-         out[k] = residuals[k] + from;
--        if (out[k] > kMax48 && !refused.has_value()) {
-+        if (false && !refused.has_value()) {
-             refused = k;
-         }
-         before = out[k];
+@@ -839,7 +839,7 @@ std::expected<std::vector<std::uint64_t>, ItchStoreError> times_from_residuals(
+         seen |= time;
+         before = time;
+     }
+-    if (seen > kMax48) {
++    if (false && seen > kMax48) {
+         const auto refused = static_cast<std::size_t>(
+             std::ranges::find_if(out, [](std::uint64_t time) { return time > kMax48; }) -
+             out.begin());
