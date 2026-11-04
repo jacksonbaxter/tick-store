@@ -234,13 +234,19 @@ step_oracle() {
     python3 -I scripts/check_oracle.py build/dev/tools/tick_roundtrip
 }
 
-# The sources this host does not compile, which clang-tidy therefore cannot see.
+# The sources this host does not compile, which clang-tidy therefore cannot see: those of
+# the other operating system, and the CRC32C kernel of the other processor.
 files_of_other_platforms() {
     if [[ $(uname -s) == Linux ]]; then
         printf '%s\n' src/bench_support/affinity_unsupported.cpp src/harness/page_cache_darwin.cpp
     else
         printf '%s\n' src/bench_support/affinity_linux.cpp src/harness/page_cache_linux.cpp
     fi
+    case $(uname -m) in
+        arm64|aarch64) printf '%s\n' src/store/crc32c_sse42.cpp ;;
+        x86_64|amd64) printf '%s\n' src/store/crc32c_armv8.cpp ;;
+        *) printf '%s\n' src/store/crc32c_armv8.cpp src/store/crc32c_sse42.cpp ;;
+    esac
 }
 
 # The tracked C++ sources. A tree exported with git archive, as a sync to the Linux host

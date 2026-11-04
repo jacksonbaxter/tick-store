@@ -43,12 +43,33 @@ target_sources(tick_store_core PRIVATE
     src/itch/codec.cpp
     src/itch/frame.cpp
     src/store/columns.cpp
+    src/store/crc32c.cpp
     src/store/mapped_file.cpp
     src/store/stub_store.cpp
 )
 target_include_directories(tick_store_core PUBLIC include)
 target_compile_features(tick_store_core PUBLIC cxx_std_23)
 tick_store_apply_warnings(tick_store_core)
+
+# The hardware CRC32C kernel for the target processor, each in its own file so its
+# instructions cannot reach code that runs without them. arm64 uses the CRC
+# instructions only when the baseline target has them, and x86-64 checks CPUID at run
+# time. Any other processor gets the software kernel alone.
+include(CheckCXXSourceCompiles)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64|ARM64)$")
+    check_cxx_source_compiles("
+        #ifndef __ARM_FEATURE_CRC32
+        #error no CRC32 instructions in the baseline target
+        #endif
+        int main() { return 0; }" TICK_STORE_HAVE_ARM_CRC32)
+    if(TICK_STORE_HAVE_ARM_CRC32)
+        target_sources(tick_store_core PRIVATE src/store/crc32c_armv8.cpp)
+        target_compile_definitions(tick_store_core PRIVATE TICK_STORE_CRC32C_ARMV8)
+    endif()
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|amd64)$")
+    target_sources(tick_store_core PRIVATE src/store/crc32c_sse42.cpp)
+    target_compile_definitions(tick_store_core PRIVATE TICK_STORE_CRC32C_SSE42)
+endif()
 
 # The correctness harness. It is never linked into the store itself.
 if(TICK_STORE_BUILD_TESTS OR TICK_STORE_BUILD_TOOLS OR TICK_STORE_BUILD_BENCH)

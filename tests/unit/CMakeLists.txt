@@ -7,6 +7,7 @@ add_executable(tick_store_unit_tests
     census_test.cpp
     codec_eval_test.cpp
     codec_real_day_test.cpp
+    crc32c_test.cpp
     dictionary_test.cpp
     columns_cli_test.cpp
     columns_flip_test.cpp
