@@ -1,0 +1,12 @@
+diff --git a/src/store/itch_store_reader.cpp b/src/store/itch_store_reader.cpp
+--- a/src/store/itch_store_reader.cpp
++++ b/src/store/itch_store_reader.cpp
+@@ -118,7 +118,7 @@
+                                                                   std::uint64_t block) const {
+     // The type column's pieces together hold the segment's records.
+     if (column == Column::type &&
+-        entry.values[static_cast<std::size_t>(Column::type)] != entry.summary.records) {
++        false && entry.values[static_cast<std::size_t>(Column::type)] != entry.summary.records) {
+         ItchStoreError error;
+         error.kind = ItchStoreErrorKind::bad_metadata;
+         error.field = "segment records";

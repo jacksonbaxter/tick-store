@@ -1,0 +1,12 @@
+diff --git a/src/store/itch_store.cpp b/src/store/itch_store.cpp
+--- a/src/store/itch_store.cpp
++++ b/src/store/itch_store.cpp
+@@ -403,7 +403,7 @@
+     if (bytes.size() != kSegmentMetadataFixedSize + bitmap) {
+         return refuse("metadata size", 0, kSegmentMetadataFixedSize + bitmap, bytes.size());
+     }
+-    if (s.records < metadata.values || s.records > kMaxSegmentRecords) {
++    if (s.records > kMaxSegmentRecords) {
+         return refuse("segment records", kMetaRecordsOffset, metadata.values, s.records);
+     }
+     if (s.typed_records > s.records) {

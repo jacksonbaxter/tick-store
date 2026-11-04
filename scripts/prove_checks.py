@@ -56,6 +56,8 @@ EXIT_BUILD = 1
 EXIT_LIBFUZZER = 77
 
 TIDY_ONE_FILE = ("--tidy-files", "src/itch/frame.cpp")
+STORE_CORRUPT = ("--test-regex", "ItchStoreCorrupt")
+QUERY_CORRUPT = ("--test-regex", "ItchQueryCorrupt")
 
 
 def edit_json(path, change):
@@ -280,10 +282,105 @@ FAULTS = (
           "group whose last time equals the window's start as before the window, an off-by-one "
           "at the time boundary", EXIT_CTEST, "ItchQuery.BothPathsEqualTheColumnFormAtEveryBoundary",
           arguments=("--test-regex", "ItchQuery\\.")),
-    Fault("query-run-order-unchecked", "dev-test", "the query stops refusing a locate run "
-          "directory whose ids do not ascend", EXIT_CTEST,
-          "ItchQueryCorrupt.LocateRunFieldsRefusedByTheQuery",
-          arguments=("--test-regex", "ItchQueryCorrupt")),
+    Fault("query-run-order-unchecked", "dev-test",
+          "the run directory check stops refusing "
+          "locate run ids that fall, refusing only a repeated one", EXIT_CTEST,
+          "ItchQueryCorrupt.LocateRunFieldsRefusedByTheQuery", arguments=QUERY_CORRUPT),
+    Fault("store-piece-index-next", "dev-test",
+          "the reader stops checking that a column's next piece "
+          "carries the next piece index",
+          EXIT_CTEST, "ItchStoreCorrupt.PieceFields",
+          arguments=STORE_CORRUPT),
+    Fault("store-piece-value-count", "dev-test",
+          "the reader accepts a piece before a column's last that "
+          "holds fewer than 16,384 values",
+          EXIT_CTEST, "ItchStoreCorrupt.PieceFields",
+          arguments=STORE_CORRUPT),
+    Fault("store-segment-records-sum", "dev-test",
+          "the reader stops comparing the type column's pieces "
+          "together with the summary's records",
+          EXIT_CTEST, "ItchStoreCorrupt.PieceFields",
+          arguments=STORE_CORRUPT),
+    Fault("store-metadata-records", "dev-test",
+          "the summary parser accepts segment records below its "
+          "own piece's values",
+          EXIT_CTEST, "ItchStoreCorrupt.PieceFields",
+          arguments=STORE_CORRUPT),
+    Fault("store-run-start-floor", "dev-test",
+          "the run directory check accepts a run starting where the "
+          "run before it starts",
+          EXIT_CTEST, "ItchStoreCorrupt.LocateRunFields",
+          arguments=STORE_CORRUPT),
+    Fault("store-run-add-start-records", "dev-test",
+          "the segment decoder stops comparing a run's add start "
+          "with the adds stored before it",
+          EXIT_CTEST, "ItchStoreCorrupt.LocateRunFields",
+          arguments=STORE_CORRUPT),
+    Fault("store-run-index-repeated", "dev-test",
+          "the locate column's decoder accepts a file position "
+          "named by two records",
+          EXIT_CTEST, "ItchStoreCorrupt.LocateRunFields",
+          arguments=STORE_CORRUPT),
+    Fault("store-time-base-unchecked", "dev-test",
+          "the segment decoder stops comparing the stored time "
+          "bases with the ones the restored times give",
+          EXIT_CTEST, "ItchStoreCorrupt.TimeBaseFields",
+          arguments=STORE_CORRUPT),
+    Fault("store-time-past-48-bits", "dev-test",
+          "times restored from residuals are no longer checked "
+          "against 48 bits",
+          EXIT_CTEST, "ItchStoreCorrupt.TimeBaseFields",
+          arguments=STORE_CORRUPT),
+    Fault("store-typed-after-raw", "dev-test",
+          "the segment decoder accepts a typed record stored "
+          "after a raw one",
+          EXIT_CTEST, "ItchStoreCorrupt.ATypedRecordStoredAfterARawOneIsRefused",
+          arguments=STORE_CORRUPT),
+    Fault("store-seek-file-max-time", "dev-test",
+          "the seek index check accepts a file group's greatest "
+          "time past 48 bits",
+          EXIT_CTEST, "ItchStoreCorrupt.SeekIndexFields",
+          arguments=STORE_CORRUPT),
+    Fault("store-seek-file-min-time", "dev-test",
+          "the seek index check accepts a file group's least "
+          "time above its greatest",
+          EXIT_CTEST, "ItchStoreCorrupt.SeekIndexFields",
+          arguments=STORE_CORRUPT),
+    Fault("query-run-id-unchecked", "dev-test",
+          "the query takes the run at a locate's rank without "
+          "checking that the run is the locate's",
+          EXIT_CTEST, "ItchQueryCorrupt.LocateRunFieldsRefusedByTheQuery",
+          arguments=QUERY_CORRUPT),
+    Fault("query-run-start-unchecked", "dev-test",
+          "the query stops checking a run's start and end "
+          "against each other and the typed records",
+          EXIT_CTEST, "ItchQueryCorrupt.LocateRunFieldsRefusedByTheQuery",
+          arguments=QUERY_CORRUPT),
+    Fault("query-add-start-unchecked", "dev-test",
+          "the query stops comparing a run's add start with the "
+          "adds of the records before the run",
+          EXIT_CTEST, "ItchQueryCorrupt.LocateRunFieldsRefusedByTheQuery",
+          arguments=QUERY_CORRUPT),
+    Fault("query-run-adds-unchecked", "dev-test",
+          "the query stops checking a run's adds against its add "
+          "starts before reading their sides",
+          EXIT_CTEST, "ItchQueryCorrupt.LocateRunFieldsRefusedByTheQuery",
+          arguments=QUERY_CORRUPT),
+    Fault("query-import-start-unchecked", "dev-test",
+          "the query reads a run's imports past the run's "
+          "import end",
+          EXIT_CTEST, "ItchQueryCorrupt.LocateRunFieldsRefusedByTheQuery",
+          arguments=QUERY_CORRUPT),
+    Fault("query-run-index-unchecked", "dev-test",
+          "the query forms a file position from a gap without "
+          "checking it against the records",
+          EXIT_CTEST, "ItchQueryCorrupt.LocateRunFieldsRefusedByTheQuery",
+          arguments=QUERY_CORRUPT),
+    Fault("query-time-past-48-bits", "dev-test",
+          "the query stops checking a restored time against 48 "
+          "bits",
+          EXIT_CTEST, "ItchQueryCorrupt.LocateRunFieldsRefusedByTheQuery",
+          arguments=QUERY_CORRUPT),
     Fault("query-cli-digest-ts", "dev-test", "the query worker's row digest puts every ts one "
           "nanosecond late", EXIT_CTEST, "QueryCli.ServesEveryKindWithTheHarnessDigests",
           arguments=("--test-regex", "QueryCli")),

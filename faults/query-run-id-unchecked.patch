@@ -1,0 +1,12 @@
+diff --git a/src/store/itch_query.cpp b/src/store/itch_query.cpp
+--- a/src/store/itch_query.cpp
++++ b/src/store/itch_query.cpp
+@@ -640,7 +640,7 @@
+                 return std::unexpected(done.error());
+             }
+         }
+-        if (ids[r] != locate) {
++        if (false && ids[r] != locate) {
+             return std::unexpected(error(ItchStoreErrorKind::bad_value, "locate run id",
+                                          Column::locate_run, r, locate, ids[r]));
+         }

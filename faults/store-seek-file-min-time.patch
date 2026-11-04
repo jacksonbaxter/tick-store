@@ -1,0 +1,12 @@
+diff --git a/src/store/itch_store.cpp b/src/store/itch_store.cpp
+--- a/src/store/itch_store.cpp
++++ b/src/store/itch_store.cpp
+@@ -999,7 +999,7 @@
+         if (index.file_max_time[g] > kMax48) {
+             return refuse("seek file max time", file_max_at + g, kMax48, index.file_max_time[g]);
+         }
+-        if (index.file_min_time[g] > index.file_max_time[g]) {
++        if (false && index.file_min_time[g] > index.file_max_time[g]) {
+             return refuse("seek file min time", file_min_at + g, index.file_max_time[g],
+                           index.file_min_time[g]);
+         }

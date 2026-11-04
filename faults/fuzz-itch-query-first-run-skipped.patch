@@ -1,13 +1,16 @@
 diff --git a/src/store/itch_query.cpp b/src/store/itch_query.cpp
-index 4de4908..7b3f10b 100644
 --- a/src/store/itch_query.cpp
 +++ b/src/store/itch_query.cpp
-@@ -584,7 +584,7 @@ struct LocateRun {
-             return std::unexpected(seg.error(ItchStoreErrorKind::bad_value, "locate run order",
-                                              Column::locate_run, r, ids[r - 1] + 1, ids[r]));
-         }
--        if (ids[r] == locate) {
-+        if (r > 0 && ids[r] == locate) {
-             run.found = true;
-             const std::uint64_t n = records[r];
-             if (n == 0 || n > gaps.size() - record_offset) {
+@@ -1105,7 +1105,11 @@
+         return std::unexpected(runs.error());
+     }
+     // The summary's bitmap held the locate, so it has a run, whose index is its rank.
+-    auto run = seg.run(rank_of(seg.summary->locates, locate), *runs, locate);
++    const std::uint64_t rank = rank_of(seg.summary->locates, locate);
++    if (rank == 0) {
++        return {};
++    }
++    auto run = seg.run(rank, *runs, locate);
+     if (!run.has_value()) {
+         return std::unexpected(run.error());
+     }

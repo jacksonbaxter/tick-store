@@ -1,0 +1,12 @@
+diff --git a/src/store/itch_query.cpp b/src/store/itch_query.cpp
+--- a/src/store/itch_query.cpp
++++ b/src/store/itch_query.cpp
+@@ -925,7 +925,7 @@
+     ColumnAccess& trade_side = engine.col(Column::trade_side);
+     ColumnAccess& trade_shares = engine.col(Column::trade_shares);
+     ColumnAccess& trade_price = engine.col(Column::trade_price);
+-    if (before[kSymA] + before[kSymF] != run.add_start) {
++    if (false && before[kSymA] + before[kSymF] != run.add_start) {
+         return std::unexpected(seg.error(ItchStoreErrorKind::bad_value, "locate run add start",
+                                          Column::locate_run_add_start, kNoIndex,
+                                          before[kSymA] + before[kSymF], run.add_start));

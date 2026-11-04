@@ -1,0 +1,12 @@
+diff --git a/src/store/itch_store.cpp b/src/store/itch_store.cpp
+--- a/src/store/itch_store.cpp
++++ b/src/store/itch_store.cpp
+@@ -697,7 +697,7 @@
+         }
+         // The first run starts at 0, and each later one after the one before, below `typed`.
+         const std::uint64_t floor = r == 0 ? 0 : starts[r - 1] + 1;
+-        if ((r == 0 && starts[r] != 0) || starts[r] < floor || starts[r] >= typed) {
++        if ((r == 0 && starts[r] != 0) || starts[r] >= typed) {
+             return refuse(Column::locate_run_start, "locate run start", r, floor, starts[r]);
+         }
+         const std::uint64_t add_floor = r == 0 ? 0 : add_starts[r - 1];

@@ -1,0 +1,12 @@
+diff --git a/src/store/itch_segment.cpp b/src/store/itch_segment.cpp
+--- a/src/store/itch_segment.cpp
++++ b/src/store/itch_segment.cpp
+@@ -1132,7 +1132,7 @@
+     }
+     const std::vector<std::uint64_t> bases = time_bases(*restored, *positions, types.size());
+     for (std::size_t c = 0; c < bases.size(); ++c) {
+-        if (bases[c] != columns[Column::time_base][c]) {
++        if (false && bases[c] != columns[Column::time_base][c]) {
+             return refuse(ItchStoreErrorKind::bad_value, "time base", Column::time_base, c,
+                           bases[c], columns[Column::time_base][c]);
+         }

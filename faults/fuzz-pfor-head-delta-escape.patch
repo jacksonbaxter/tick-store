@@ -1,12 +1,12 @@
 diff --git a/include/tick_store/codec/int_transform.hpp b/include/tick_store/codec/int_transform.hpp
 --- a/include/tick_store/codec/int_transform.hpp
 +++ b/include/tick_store/codec/int_transform.hpp
-@@ -161,7 +161,7 @@ inline void head_delta_decode(std::span<std::uint64_t> values) noexcept {
-         const std::uint64_t token = value & kHeadDeltaTokenMask;
-         const std::uint64_t payload = value >> kHeadDeltaTokenBits;
-         if (token == kHeadDeltaEscape) {
--            detail::head_to_front(heads, kHeadDeltaHeads - 1U, payload);
-+            detail::head_to_front(heads, 0, payload);
-             value = payload;
-         } else {
-             const std::uint64_t x = heads[token] + payload;
+@@ -165,7 +165,7 @@
+         // The escape's slot, heads[kHeadDeltaHeads], is always 0, so it adds nothing.
+         const std::uint64_t x = heads[static_cast<std::size_t>(token)] + payload;
+         const std::size_t from =
+-            token == kHeadDeltaEscape ? kHeadDeltaHeads - 1U : static_cast<std::size_t>(token);
++            token == kHeadDeltaEscape ? 0 : static_cast<std::size_t>(token);
+         for (std::size_t t = kHeadDeltaHeads - 1U; t > 0; --t) {
+             heads[t] = t <= from ? heads[t - 1] : heads[t];
+         }

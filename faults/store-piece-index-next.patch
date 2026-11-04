@@ -1,0 +1,12 @@
+diff --git a/src/store/itch_store_reader.cpp b/src/store/itch_store_reader.cpp
+--- a/src/store/itch_store_reader.cpp
++++ b/src/store/itch_store_reader.cpp
+@@ -213,7 +213,7 @@
+                 // and a byte column has one piece.
+                 const SegmentEntry& entry = segments_.back();
+                 const auto c = static_cast<std::size_t>(previous);
+-                if (metadata->piece != entry.pieces[c]) {
++                if (false && metadata->piece != entry.pieces[c]) {
+                     return refuse("piece index", kMetaPieceOffset, entry.pieces[c],
+                                   metadata->piece);
+                 }

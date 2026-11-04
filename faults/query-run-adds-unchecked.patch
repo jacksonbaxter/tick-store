@@ -1,0 +1,12 @@
+diff --git a/src/store/itch_query.cpp b/src/store/itch_query.cpp
+--- a/src/store/itch_query.cpp
++++ b/src/store/itch_query.cpp
+@@ -819,7 +819,7 @@
+         ++in_run[kSeekSymbolIndex[types[k]]];
+     }
+     const std::uint64_t run_adds = run.add_end - run.add_start;
+-    if (in_run[kSymA] + in_run[kSymF] > run_adds) {
++    if (false && in_run[kSymA] + in_run[kSymF] > run_adds) {
+         return std::unexpected(seg.error(ItchStoreErrorKind::bad_value, "locate run add start",
+                                          Column::locate_run_add_start, kNoIndex, run_adds,
+                                          in_run[kSymA] + in_run[kSymF]));

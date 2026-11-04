@@ -1,12 +1,12 @@
 diff --git a/src/codec/dictionary.cpp b/src/codec/dictionary.cpp
 --- a/src/codec/dictionary.cpp
 +++ b/src/codec/dictionary.cpp
-@@ -461,7 +461,7 @@ std::expected<std::size_t, CodecError> decode_dict_block(std::span<const std::by
+@@ -684,7 +684,7 @@
+                                                    dictionary_at, i - 1, i));
+             }
          }
-         std::vector<std::uint64_t> distinct = dictionary;
-         std::ranges::sort(distinct);
--        if (std::ranges::adjacent_find(distinct) != distinct.end()) {
-+        if (false && std::ranges::adjacent_find(distinct) != distinct.end()) {
+-        if (repeats_an_entry(dictionary)) {
++        if (false && repeats_an_entry(dictionary)) {
              return std::unexpected(
                  codec_error(CodecErrorKind::bad_field, "dict entry repeated", dictionary_at, 0, 1));
          }

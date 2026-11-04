@@ -1,0 +1,12 @@
+diff --git a/src/store/itch_store.cpp b/src/store/itch_store.cpp
+--- a/src/store/itch_store.cpp
++++ b/src/store/itch_store.cpp
+@@ -748,7 +748,7 @@
+             return refuse("locate run index", at, room - 1, gap);
+         }
+         index = first ? gap : index + gap + 1;
+-        if (named[index] != 0) {
++        if (false && named[index] != 0) {
+             return refuse("locate run index repeated", at, 0, index);
+         }
+         named[index] = 1;

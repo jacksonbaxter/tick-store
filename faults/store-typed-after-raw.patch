@@ -1,0 +1,12 @@
+diff --git a/src/store/itch_segment.cpp b/src/store/itch_segment.cpp
+--- a/src/store/itch_segment.cpp
++++ b/src/store/itch_segment.cpp
+@@ -1059,7 +1059,7 @@
+         }
+         // Stored order keeps every typed record before every raw one.
+         if (types[i] != 0) {
+-            if (typed != i) {
++            if (false && typed != i) {
+                 return refuse(ItchStoreErrorKind::bad_value, "typed record after a raw one",
+                               Column::type, i, 0, types[i]);
+             }

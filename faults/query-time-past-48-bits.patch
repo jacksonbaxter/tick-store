@@ -1,0 +1,12 @@
+diff --git a/src/store/itch_query.cpp b/src/store/itch_query.cpp
+--- a/src/store/itch_query.cpp
++++ b/src/store/itch_query.cpp
+@@ -870,7 +870,7 @@
+         position = first_of_run ? gap : position + gap + 1;
+         const std::uint64_t base = bases[position / kTimeBaseRecords];
+         time = times[k] + (first_of_run ? base : std::max(time, base));
+-        if (time > kMax48) {
++        if (false && time > kMax48) {
+             return std::unexpected(seg.error(ItchStoreErrorKind::bad_value, "timestamp value",
+                                              Column::timestamp, k, kMax48, time));
+         }

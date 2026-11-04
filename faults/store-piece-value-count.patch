@@ -1,0 +1,12 @@
+diff --git a/src/store/itch_store_reader.cpp b/src/store/itch_store_reader.cpp
+--- a/src/store/itch_store_reader.cpp
++++ b/src/store/itch_store_reader.cpp
+@@ -218,7 +218,7 @@
+                                   metadata->piece);
+                 }
+                 if (column_info(previous).codec == ColumnCodec::raw_bytes ||
+-                    previous_values != kPieceValues) {
++                    previous_values > kPieceValues) {
+                     return refuse("piece value count", kMetaValueCountOffset,
+                                   column_info(previous).codec == ColumnCodec::raw_bytes
+                                       ? 0

@@ -1,0 +1,12 @@
+diff --git a/src/store/itch_segment.cpp b/src/store/itch_segment.cpp
+--- a/src/store/itch_segment.cpp
++++ b/src/store/itch_segment.cpp
+@@ -289,7 +289,7 @@
+     std::size_t run = 0;
+     for (std::uint64_t k = 0; k < typed; ++k) {
+         if (run < starts.size() && starts[run] == k) {
+-            if (add_starts[run] != adds) {
++            if (false && add_starts[run] != adds) {
+                 return refuse(Column::locate_run_add_start, "locate run add start", run, adds,
+                               add_starts[run]);
+             }

@@ -1,0 +1,12 @@
+diff --git a/src/store/itch_query.cpp b/src/store/itch_query.cpp
+--- a/src/store/itch_query.cpp
++++ b/src/store/itch_query.cpp
+@@ -986,7 +986,7 @@
+             const std::uint64_t at = seg.ref_group[symbol] + r;
+             const std::uint64_t d = distance[at];
+             if (d == 0) {
+-                if (imported >= run.import_end) {
++                if (false && imported >= run.import_end) {
+                     return std::unexpected(seg.error(ItchStoreErrorKind::bad_value,
+                                                      "locate run import start",
+                                                      Column::locate_run_import_start, kNoIndex,

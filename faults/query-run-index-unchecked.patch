@@ -1,0 +1,12 @@
+diff --git a/src/store/itch_query.cpp b/src/store/itch_query.cpp
+--- a/src/store/itch_query.cpp
++++ b/src/store/itch_query.cpp
+@@ -863,7 +863,7 @@
+         const std::uint64_t records = seg.summary->records;
+         const bool first_of_run = k == run.start;
+         const std::uint64_t room = first_of_run ? records : records - position - 1;
+-        if (gap >= room) {
++        if (false && gap >= room) {
+             return std::unexpected(seg.error(ItchStoreErrorKind::bad_value, "locate run index",
+                                              Column::locate, k, room - 1, gap));
+         }

@@ -1,0 +1,12 @@
+diff --git a/src/store/itch_query.cpp b/src/store/itch_query.cpp
+--- a/src/store/itch_query.cpp
++++ b/src/store/itch_query.cpp
+@@ -653,7 +653,7 @@
+         out.end = final_run ? summary->typed_records : starts[r + 1];
+         out.add_end = final_run ? adds : add_starts[r + 1];
+         out.import_end = final_run ? imports : import_starts[r + 1];
+-        if (out.start >= out.end || out.end > summary->typed_records) {
++        if (false && (out.start >= out.end || out.end > summary->typed_records)) {
+             return std::unexpected(error(ItchStoreErrorKind::bad_value, "locate run start",
+                                          Column::locate_run_start, r, out.end, out.start));
+         }
