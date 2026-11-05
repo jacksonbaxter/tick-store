@@ -1799,6 +1799,84 @@ of the answers, which `tick_query` computes outside `engine_ns`, take 24.3%. The
 the engine's own time, the bound it is on the Mac. Of the kernels, the AVX2 linear unpack takes 1.2%, `decode_pfor_block` 1.0%
 and `read_patches` 0.7%; CRC32C takes 1.1%.
 
+### tick-store in the comparison (slice)
+
+Slice only: the five-minute open of `12302019`, 6,125,294 messages, 206,138,339 source bytes. These
+numbers prove the harness and do not claim anything about a full day; no target changes. Both
+files are at `67621b0` under `measure.sh`, one system at a time, and pass `scripts/check_compare.py`:
+`results/compare/Linux-12302019-open-67621b061000.json` (pinned to cpu4 and cpu6, cpu5 busy 0.26% to
+0.98% per system, load at start 1.38 to 1.49) and `results/compare/macOS-12302019-open-67621b061000.json`
+(unpinned, no counters, 24 MHz timer, load at start 1.67 to 3.62). Each system's headline variant;
+queries on its class B store; median / p99 in ms, warm over 30 runs, cold over 7.
+
+Linux, Ryzen V1605B (Zen 1):
+
+| Query | Parquet | ArcticDB | QuestDB | tick-store |
+|---|---|---|---|---|
+| Q1 warm | 56.10 / 89.80 | 31.28 / 58.46 | 57.28 / 206.00 | 118.77 / 148.22 |
+| Q1 cold | 88.66 / 97.46 | 75.63 / 77.92 | 503.73 / 574.14 | 160.71 / 163.42 |
+| Q2 warm | 243.25 / 266.50 | 139.65 / 151.73 | 28.79 / 147.24 | 10.61 / 26.06 |
+| Q2 cold | 351.54 / 367.96 | 458.47 / 461.53 | 1147.54 / 1228.06 | 108.86 / 110.62 |
+| Q3 warm | 148.71 / 184.69 | 97.91 / 117.88 | 16.11 / 118.66 | 4.74 / 5.19 |
+| Q3 cold | 225.83 / 232.30 | 373.58 / 378.53 | 620.16 / 665.26 | 58.36 / 59.59 |
+| Q4 warm | 47.29 / 54.87 | 6.07 / 6.83 | 1.51 / 5.97 | 53.43 / 55.32 |
+| Q4 cold | 79.53 / 83.31 | 21.15 / 21.40 | 74.13 / 89.58 | 88.51 / 98.09 |
+| Q5 warm | 24.76 / 37.68 | 46.49 / 73.05 | 3.56 / 15.18 | 33.35 / 34.71 |
+| Q5 cold | 39.40 / 44.80 | 262.18 / 264.73 | 126.00 / 148.32 | 54.58 / 65.28 |
+
+macOS, M4 Max:
+
+| Query | Parquet | ArcticDB | QuestDB | tick-store |
+|---|---|---|---|---|
+| Q1 warm | 16.31 / 20.52 | 7.47 / 9.26 | 14.65 / 56.18 | 38.09 / 44.64 |
+| Q1 cold | 20.98 / 21.42 | 17.42 / 17.64 | 93.01 / 94.03 | 55.26 / 58.77 |
+| Q2 warm | 77.93 / 79.35 | 40.51 / 44.91 | 7.88 / 23.34 | 4.12 / 5.45 |
+| Q2 cold | 86.27 / 87.93 | 113.78 / 115.02 | 316.04 / 317.46 | 22.28 / 22.62 |
+| Q3 warm | 53.15 / 56.91 | 25.90 / 31.91 | 2.06 / 25.33 | 1.84 / 2.07 |
+| Q3 cold | 58.37 / 59.74 | 86.12 / 87.74 | 119.27 / 120.11 | 13.47 / 13.57 |
+| Q4 warm | 15.63 / 16.72 | 1.76 / 1.95 | 0.30 / 1.04 | 22.82 / 23.84 |
+| Q4 cold | 20.43 / 21.58 | 6.21 / 6.31 | 9.79 / 11.08 | 35.63 / 37.59 |
+| Q5 warm | 6.97 / 8.45 | 12.00 / 13.65 | 0.98 / 5.14 | 14.58 / 15.33 |
+| Q5 cold | 9.99 / 10.69 | 59.66 / 59.96 | 22.54 / 23.57 | 20.48 / 21.82 |
+
+**Lowest per query.** tick-store has the lowest median and p99, warm and cold, on Q2 and Q3 on
+both hosts: the one-security queries, which read one locate's run. It is the slowest of the four on
+Q1 warm on both hosts and on Q4 warm and cold on both, and not lowest on Q5. Q1 and Q4 decode the
+segment's whole locate column to put records back in file order (TASKS); ArcticDB has the lowest Q1,
+QuestDB the lowest Q4 and Q5 warm, ArcticDB the lowest Q4 cold and Parquet the lowest Q5 cold. The
+engine's own time sits 0.15 to 0.23 ms under each round trip on Linux and 0.02 to 0.07 ms on
+macOS, so the Python worker is not what makes it slow. On macOS QuestDB runs its scalar `Vanilla` kernels.
+
+**Ingest, median of three writes.** tick-store's write holds ITCH parsing, which the others'
+writes do not; nothing is subtracted.
+
+| Host, class | Parquet | ArcticDB | QuestDB | tick-store |
+|---|---|---|---|---|
+| Linux A | 1.849 s | 1.046 s | 4.066 s | 5.546 s |
+| Linux B | 2.009 s | 1.257 s | 9.144 s | 5.662 s |
+| macOS A | 0.989 s | 0.488 s | 0.822 s | 2.393 s |
+| macOS B | 0.999 s | 0.523 s | 0.876 s | 2.396 s |
+
+tick-store is the slowest writer in class A on both hosts and in class B on macOS, and second
+slowest in class B on Linux, ahead of QuestDB. Its class B adds one flush of the file and one of its
+directory, `fdatasync` and `fsync` on Linux and `F_FULLFSYNC` twice on macOS, which cost 0.1 s and
+0.003 s over class A. QuestDB's class B is not like-for-like on either host.
+
+**Stored bytes**, allocated at rest, ratio source over stored: tick-store is the smallest on both
+hosts, 42,127,360 bytes on Linux (4.893) and 42,741,760 on macOS (4.823), from 42,126,581 apparent.
+Parquet `zstd1-rg1Mi` takes 70.5 MB (2.925), ArcticDB `rows100k-cols127` 141.2 MB on Linux (1.460)
+and 141.9 MB on macOS (1.453), QuestDB `plain` 537.6 MB on Linux and 537.8 MB on macOS (0.383).
+
+**Tuning variants.** Parquet with no codec, `none-rg1Mi`, stores 155,033,600 bytes and is
+faster than the headline on every warm query, by 8% to 27% on Linux and 18% to 44% on macOS (Q2
+warm 204.5 ms against 243.3, and 57.9 against 77.9), and on every cold query on macOS; cold on Linux
+it is slower on Q1, Q4 and Q5, by 7% to 34%, with 2.2 times the bytes to read; the cause is not measured. `ts` on its
+default dictionary encoding stores 74,022,380 bytes apparent against 70,478,425 with
+`DELTA_BINARY_PACKED`, and is slower on every query but Q5 cold, which is within 2%. ArcticDB with one symbol
+per security writes in 15.0 s (A) and 133.2 s (B) on Linux, 5.9 s and 218.7 s on macOS, stores 208.5
+and 235.2 MB, and answers Q2 warm in 8.5 and 1.8 ms but Q1 warm in 5.77 and 1.06 s. The headlines
+stay as they were. Raw logs: `phase3-raw/compare-slice/`.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from

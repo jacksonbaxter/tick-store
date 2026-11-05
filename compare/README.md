@@ -363,9 +363,12 @@ one-security query (Q2, Q3) reads that symbol alone, with no filter. A query ove
 (Q1, Q4, Q5) is one `read_batch` over every symbol, the list of which the worker takes from
 `list_symbols` when it opens, before any clock, as an application keeps its universe. The cost is at
 ingest under class B: LMDB commits each storage key in its own transaction, so every symbol costs
-flushes of its own. On the Mac an iteration write took 3.5 s in class A and 212 s in class B, against
-about 0.5 s for one symbol, and the store was 224 MB against 142 MB. The results hold the measured
-figures.
+flushes of its own. In the slice results at `67621b0`, the median write took 5.9 s in class A and
+218.7 s in class B on the Mac, against 0.49 s and 0.52 s for one symbol, and 15.0 s and 133.2 s on
+Linux, against 1.05 s and 1.26 s. The store took 235,167,744 bytes against 141,860,864 on the Mac,
+and 208,506,880 against 141,168,640 on Linux. A one-security query gains: Q2 warm 1.8 ms against
+40.5 ms on the Mac, 8.5 ms against 139.6 ms on Linux. A query over every security loses: Q1 warm
+1.06 s against 7.5 ms on the Mac, 5.77 s against 31.3 ms on Linux.
 
 ## Full-day capacity
 
