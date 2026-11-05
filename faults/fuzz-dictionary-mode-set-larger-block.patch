@@ -1,0 +1,13 @@
+diff --git a/src/codec/dictionary.cpp b/src/codec/dictionary.cpp
+index 357dbb4..78fd1f6 100644
+--- a/src/codec/dictionary.cpp
++++ b/src/codec/dictionary.cpp
+@@ -518,7 +518,7 @@ std::expected<void, CodecError> encode_dict_block(std::span<const std::uint64_t>
+         if (auto done = encode_ranked_huffman(prepared, trial); !done.has_value()) {
+             return done;
+         }
+-        if (trial.size() < best.size()) {
++        if (trial.size() <= best.size() + 64) {
+             std::swap(best, trial);
+             chosen = DictMode::ranked_huffman;
+         }

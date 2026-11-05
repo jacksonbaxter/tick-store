@@ -255,6 +255,12 @@ FAULTS = (
     Fault("fuzz-dictionary-mode-set-ignored", "fuzz-dictionary", "the dictionary encoder tries "
           "Huffman whatever its mode set allows, so a column held to ranked PFOR can take "
           "Huffman", EXIT_LIBFUZZER, "check_dict_column:", arguments=FUZZ_ARGUMENTS),
+    Fault("fuzz-dictionary-mode-set-larger-block", "fuzz-dictionary", "the dictionary encoder "
+          "takes Huffman even when it is up to 64 bytes larger than ranked PFOR", EXIT_LIBFUZZER,
+          "check_dict_column:", arguments=FUZZ_ARGUMENTS),
+    Fault("fuzz-dictionary-pfor-only-refuses", "fuzz-dictionary", "the dictionary encoder held "
+          "to ranked PFOR refuses a block of more than two distinct values", EXIT_LIBFUZZER,
+          "check_dict_column:", arguments=FUZZ_ARGUMENTS),
     Fault("fuzz-run-length-maximal-runs", "fuzz-run-length", "the run-length decoder stops "
           "refusing two neighbouring runs of one value", EXIT_LIBFUZZER, "check_rle_column:",
           arguments=FUZZ_ARGUMENTS),
