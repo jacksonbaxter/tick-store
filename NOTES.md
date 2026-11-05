@@ -1885,6 +1885,40 @@ and 216.9 s on macOS, stores 208,986,112 and 235,167,744 bytes, and answers Q2 w
 but Q1 warm in 5.77 and 1.05 s. The headlines stay as they were. Raw logs:
 `phase3-raw/compare-slice/`.
 
+### Layout experiments
+
+This section measures layouts against each other on the full day, then picks the store's final
+layout by the rule below. The rule was written and committed before any experiment was measured,
+and it was not changed after. Every timing here is **iteration-only**: none went through
+`measure.sh`.
+
+**The decision rule.**
+
+1. *Eligible.* A layout is eligible if its store of 12302019 keeps CR-1 (ratio at least 2.3415)
+   and takes at most three quarters of Parquet's full-day stored bytes, 0.75 times 3,191,406,592,
+   which is 2,393,554,944 bytes (a ratio of at least 3.447). That keeps it smaller than every other
+   system with room to spare, so CR-2 holds too.
+2. *Figures.* Each candidate is timed on the Mac on the whole day 12302019, indexed path, with every
+   answer checked against the oracle: Q1 to Q5, warm median and cold mean, ten figures. Warm is the
+   median of rounds 2 to 20 in one worker; cold is the mean of 10 trials, each a proven eviction of
+   the store and then a fresh worker.
+3. *Score.* On each figure, a candidate scores a point if its time is within 5% of the lowest
+   eligible time on that figure. Mac runs differ by 1% to 6% from run to run, so a smaller gap is
+   not a difference.
+4. *Order of the experiments.* The experiments change one thing at a time from the current
+   layout, version 3 at N = 2^20. Within each experiment the rule picks that dimension's value,
+   holding the others at their current choice. The combination of the winners is then timed and
+   must itself win the rule against each experiment's winner and the version 3 baseline;
+   otherwise the best of those wins.
+5. *Finalists.* The candidates within one point of the top Mac score are finalists. They are timed
+   on debian too, through `heavy.sh` with `taskset -c 2,6,7`, and scored the same way on its ten
+   figures. The finalist with the most points over both hosts wins.
+6. *Ties.* A tie on points goes to the smaller store.
+
+The other systems' slice figures and the debian timings are compared in the table, but they do not
+enter the score: the slice is a different store, and the other systems were not run on the whole
+day.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
