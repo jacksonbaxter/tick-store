@@ -594,7 +594,7 @@ int run_roundtrip_cli(std::span<const std::string_view> arguments, CliOutput& ou
                 if (!value.has_value() || *value == 0) {
                     return usage(output);
                 }
-                first_records = *value;
+                first_records = value;
             } else {
                 return usage(output);
             }
