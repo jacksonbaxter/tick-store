@@ -1919,6 +1919,21 @@ The other systems' slice figures and the debian timings are compared in the tabl
 enter the score: the slice is a different store, and the other systems were not run on the whole
 day.
 
+**How each candidate was timed.** `build/layout/cand.sh` (scratch, not tracked) ingests 12302019
+with `page_cache` durability through `heavy.sh` under `/usr/bin/time -l`, writes the layout, then
+runs the query timing script (the one "Query iteration" used: 20 warm rounds, 10 cold trials per
+query, each answer's rows and SHA-256 checked against `truth-12302019.json`) through `heavy.sh`
+under `/usr/bin/time -l`. Writer memory is the ingest's peak memory footprint. Raw output is in
+`phase3-raw/layout/<candidate>/`. Latencies are in ms, Q1 / Q2 / Q3 / Q4 / Q5.
+
+| Experiment | Option | Bytes and ratio | Writer memory | Q1–Q5 warm and cold, Mac and debian, iteration-only | Chosen? |
+|---|---|---|---|---|---|
+| 1, segment size | N = 2^14, version 3 tools at `8ac4aab` | 2,024,871,931, 4.075 | 93 MB | Mac warm 38.04 / 622.65 / 344.59 / 1.02 / 693.20; cold 51.77 / 1,190.15 / 858.70 / 1.92 / 1,998.14 | No: 2 points (Q4) |
+| 1 | N = 2^16 | 1,903,523,711, 4.335 | 52 MB | Mac warm 32.34 / 226.69 / 103.01 / 2.18 / 559.07; cold 42.80 / 698.50 / 522.63 / 3.33 / 1,681.87 | No: 2 points (Q1) |
+| 1 | N = 2^18 | 1,819,101,831, 4.536 | 173 MB | Mac warm 32.30 / 88.62 / 38.17 / 6.07 / 517.94; cold 43.79 / 422.44 / 275.56 / 9.28 / 922.05 | No: 3 points (Q1, Q5 warm) |
+| 1 | N = 2^20, version 3 as it was (baseline) | 1,750,915,467, 4.713 | 401 MB | Mac warm 37.10 / 42.34 / 19.94 / 22.75 / 494.52; cold 55.83 / 215.12 / 114.78 / 38.63 / 665.33 | No: 2 points (Q5) |
+| 1 | N = 2^22 | 1,707,376,132, 4.833 | 1,236 MB | Mac warm 129.00 / 30.82 / 17.29 / 100.78 / 528.86; cold 188.91 / 109.74 / 56.07 / 156.99 / 644.71 | Won experiment 1: 5 points (Q2, Q3, Q5 cold) |
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
