@@ -52,7 +52,23 @@ def setting(name, value):
     return {"name": name, "requested": value, "in_force": value, "read_from": "somewhere"}
 
 
+TICKSTORE_COLUMNS = 39
+
+
+def tickstore_settings(durability):
+    flushes = [] if durability == "A" else ["F_FULLFSYNC on the file, returned 0",
+                                            "F_FULLFSYNC on the directory, returned 0"]
+    return [setting("store version", 3), setting("segment records", 1048576),
+            setting("records", MESSAGES),
+            setting("durability mode", {"A": "page_cache", "B": "device_flush"}[durability]),
+            setting("flushes made", flushes), setting("query path", "indexed"),
+            setting("kernel level", "neon"), setting("kernel sets that ran", ["neon"])] + [
+        setting(f"codec ids, column{index}", True) for index in range(TICKSTORE_COLUMNS)]
+
+
 def settings_of(system, durability):
+    if system == "tickstore":
+        return tickstore_settings(durability)
     if system != "questdb":
         return [setting("threads", 2)]
     mode = {"A": "nosync", "B": "sync"}[durability]
@@ -61,25 +77,37 @@ def settings_of(system, durability):
         setting("java initial heap", "-Xms1g"), setting("java heap", "-Xmx1g")]
 
 
-def flush(dirty, parquet_calls=None):
+def flush(dirty, parquet_calls=None, engine_flushes=None):
     block = {"rows": 10, "seconds": 0.1, "data_dirty_pages": dirty, "data_dirty_files": {},
              "residual_dirty_files": {}}
     if parquet_calls is not None:
         block["harness_flushes"] = parquet_calls
+    if engine_flushes is not None:
+        block["engine_flushes"] = copy.deepcopy(engine_flushes)
     return block
+
+
+def engine_flushes_of(system, name):
+    if system != "tickstore":
+        return None
+    if name == "A":
+        return []
+    return [{"call": "F_FULLFSYNC", "of": "file", "result": 0},
+            {"call": "F_FULLFSYNC", "of": "directory", "result": 0}]
 
 
 def durability_block(system, name, host):
     dirty = 5 if name == "A" else 0
     calls = None if system != "parquet" else (0 if name == "A" else 2)
+    engine = engine_flushes_of(system, name)
     return {"class": name, "sync_primitive": "fsync", "flush_granularity": "per file",
             "like_for_like": not (host == "macOS" and system == "questdb"), "note": "n",
             "status": PROVEN, "reason": "shown",
-            "flush": {"probe": flush(dirty, calls), "full_ingest": flush(dirty, calls)}}
+            "flush": {"probe": flush(dirty, calls, engine), "full_ingest": flush(dirty, calls, engine)}}
 
 
 def class_entry(system, name, host):
-    return {
+    entry = {
         "durability": durability_block(system, name, host),
         "settings": settings_of(system, name),
         "write": {"seconds_median": 2.0, "records_per_second_median": MESSAGES / 2.0,
@@ -92,16 +120,26 @@ def class_entry(system, name, host):
                                  "source_sha256": SHA, "stored_sha256": SHA},
                       "stored_settings": {"checks_passed": 3}},
     }
+    if system == "tickstore":
+        entry["write"]["detail"] = {"input": "its write time holds ITCH parsing"}
+        entry["read_back"]["stored_settings"]["g1"] = {
+            "verdict": "pass", "records": MESSAGES, "mismatched_records": 0,
+            "hashes_match": True, "exit_code": 0}
+    return entry
 
 
-def query_entry(name):
+def query_entry(name, system=None):
     cold_proof = {"resident_after_eviction": 0, "evicted_pages": 10, "method": "m",
                   "resident_bytes_after_run": 4096, "device_bytes_read": 8192, "device_slack": 0}
-    return {"digest": digest(name), "matches_ground_truth": True,
-            "scan": {"rows_decoded": 5},
-            "warm": {"n": 3, "median_us": 10.0,
-                     "proof": {"pages": 8, "resident_before": 8, "resident_after": 8}},
-            "cold": {"n": 2, "median_us": 100.0, "proofs": [cold_proof, dict(cold_proof)]}}
+    entry = {"digest": digest(name), "matches_ground_truth": True,
+             "scan": {"rows_decoded": 5},
+             "warm": {"n": 3, "median_us": 10.0,
+                      "proof": {"pages": 8, "resident_before": 8, "resident_after": 8}},
+             "cold": {"n": 2, "median_us": 100.0, "proofs": [cold_proof, dict(cold_proof)]}}
+    if system == "tickstore":
+        entry["warm"]["engine"] = {"n": 3, "median_us": 9.0}
+        entry["cold"]["engine"] = {"n": 2, "median_us": 90.0}
+    return entry
 
 
 def system_block(system, host):
@@ -114,7 +152,7 @@ def system_block(system, host):
         "variants": {"v": {
             "tuning": {"k": 1},
             "classes": {name: class_entry(system, name, host) for name in ("A", "B")},
-            "queries": {name: query_entry(name) for name in QUERY_NAMES},
+            "queries": {name: query_entry(name, system) for name in QUERY_NAMES},
         }},
     }
 
@@ -139,7 +177,7 @@ def runtime_block(host):
 
 def sibling_block():
     return {"core": 4, "sibling": 5, "topology": "thread_siblings_list", "method": "jiffies",
-            "cases": {"parquet": 0.5, "arcticdb": 0.1, "questdb": 1.0}}
+            "cases": {"parquet": 0.5, "arcticdb": 0.1, "questdb": 1.0, "tickstore": 0.2}}
 
 
 def valid_document(host):
@@ -159,16 +197,17 @@ def valid_document(host):
             "pinning": "pinned" if linux else "not-supported",
             "questdb_runtime": runtime_block(host),
             "counters": "unavailable",
-            "load_lines": (LOAD_LINUX if linux else LOAD_MAC) * 3,
+            "load_lines": (LOAD_LINUX if linux else LOAD_MAC) * 4,
         },
         "label": "Slice numbers. They are not claims about a full day, and no target changes.",
         "heap": heap_block(host),
         "input": {"slice": SLICE, "sha256": SHA, "messages": MESSAGES, "bytes": BYTES,
-                  "ratio_baseline": "source bytes", "clipping": "Q2 is clipped to the slice"},
+                  "ratio_baseline": "source bytes", "clipping": "Q2 is clipped to the slice",
+                  "ingest_input": "tick-store's ingest holds ITCH parsing, the others' not"},
         "method": {"warm": "how", "cold": "how"},
         "queries": {"parameters": [], "truth": {name: digest(name) for name in QUERY_NAMES}},
         "systems": {name: system_block(name, host)
-                    for name in ("parquet", "arcticdb", "questdb")},
+                    for name in ("parquet", "arcticdb", "questdb", "tickstore")},
     }
 
 
@@ -246,6 +285,125 @@ class Faults(Harness):
             settings = b_of(document)["settings"]
             b_of(document)["settings"] = [item for item in settings if "parsed" not in item["name"]]
         self.assert_fault(fault, "commit mode from 'cairo.commit.mode (parsed)'")
+
+    # tick-store's settings, each read back from the store or its tools.
+
+    def test_a_tickstore_setting_that_differs(self):
+        def fault(document):
+            for item in b_of(document, "tickstore")["settings"]:
+                if item["name"] == "segment records":
+                    item["in_force"] = 65536
+        self.assert_fault(fault, "segment records requested 1048576, in force 65536")
+
+    def test_a_tickstore_setting_not_read_back(self):
+        def fault(document):
+            entry = b_of(document, "tickstore")
+            entry["settings"] = [item for item in entry["settings"]
+                                 if item["name"] != "kernel level"]
+        self.assert_fault(fault, "tick-store's 'kernel level' was not read back")
+
+    def test_a_tickstore_class_b_store_in_page_cache_mode(self):
+        def fault(document):
+            for item in b_of(document, "tickstore")["settings"]:
+                if item["name"] == "durability mode":
+                    item["requested"] = item["in_force"] = "page_cache"
+        self.assert_fault(fault, "durability mode 'page_cache' in class B")
+
+    def test_tickstore_class_b_with_one_flush_in_the_settings(self):
+        def fault(document):
+            for item in b_of(document, "tickstore")["settings"]:
+                if item["name"] == "flushes made":
+                    item["requested"] = item["in_force"] = item["in_force"][:1]
+        self.assert_fault(fault, "flushes made")
+
+    def test_tickstore_class_a_with_a_flush_in_the_settings(self):
+        def fault(document):
+            entry = document["systems"]["tickstore"]["variants"]["v"]["classes"]["A"]
+            for item in entry["settings"]:
+                if item["name"] == "flushes made":
+                    item["requested"] = item["in_force"] = ["fsync on the file, returned 0"]
+        self.assert_fault(fault, "flushes made ['fsync on the file, returned 0'] in class A")
+
+    def test_tickstore_another_kernel_set_ran(self):
+        def fault(document):
+            for item in b_of(document, "tickstore")["settings"]:
+                if item["name"] == "kernel sets that ran":
+                    item["requested"] = item["in_force"] = ["neon", "scalar"]
+        self.assert_fault(fault, "kernel sets that ran ['neon', 'scalar'], not 'neon'")
+
+    def test_tickstore_a_column_on_another_codec(self):
+        def fault(document):
+            item = b_of(document, "tickstore")["settings"][-1]
+            item["requested"] = item["in_force"] = False
+        self.assert_fault(fault, "is not the codec docs/store.md lists")
+
+    def test_tickstore_codecs_missing_for_a_column(self):
+        def fault(document):
+            b_of(document, "tickstore")["settings"].pop()
+        self.assert_fault(fault, "codec ids read back for 38 columns")
+
+    def test_tickstore_store_version_2(self):
+        def fault(document):
+            for item in b_of(document, "tickstore")["settings"]:
+                if item["name"] == "store version":
+                    item["requested"] = item["in_force"] = 2
+        self.assert_fault(fault, "store version 2, not 3")
+
+    def test_tickstore_class_b_claimed_without_the_writers_flush(self):
+        def fault(document):
+            block = b_of(document, "tickstore")["durability"]["flush"]["full_ingest"]
+            block["engine_flushes"] = block["engine_flushes"][:1]
+        self.assert_fault(fault, "without the writer's flush of the file and then its directory")
+
+    def test_tickstore_class_b_claimed_with_a_failed_flush(self):
+        def fault(document):
+            block = b_of(document, "tickstore")["durability"]["flush"]["probe"]
+            block["engine_flushes"][1]["result"] = -1
+        self.assert_fault(fault, "without the writer's flush")
+
+    def test_tickstore_class_a_claimed_with_a_flush(self):
+        def fault(document):
+            entry = document["systems"]["tickstore"]["variants"]["v"]["classes"]["A"]
+            entry["durability"]["flush"]["probe"]["engine_flushes"] = [
+                {"call": "fsync", "of": "file", "result": 0}]
+        self.assert_fault(fault, "class A claimed with the writer's flushes in probe")
+
+    def test_tickstore_needs_no_dirty_page_control(self):
+        document = valid_document("macOS")
+        entry = document["systems"]["tickstore"]["variants"]["v"]["classes"]["A"]
+        entry["durability"]["flush"]["probe"]["data_dirty_pages"] = 0
+        self.assertEqual(self.run_on(document).returncode, 0)
+
+    def test_tickstore_g1_failing(self):
+        def fault(document):
+            b_of(document, "tickstore")["read_back"]["stored_settings"]["g1"]["verdict"] = "mismatch"
+        self.assert_fault(fault, "G-1 on the store did not pass")
+
+    def test_tickstore_write_not_saying_it_parses_itch(self):
+        def fault(document):
+            b_of(document, "tickstore")["write"]["detail"]["input"] = "the slice"
+        self.assert_fault(fault, "does not say that tick-store's time holds ITCH parsing")
+
+    def test_the_input_not_saying_tickstore_parses_itch(self):
+        def fault(document):
+            del document["input"]["ingest_input"]
+        self.assert_fault(fault, "input: does not say that tick-store's ingest holds ITCH parsing")
+
+    def test_tickstore_with_no_engine_time(self):
+        def fault(document):
+            del document["systems"]["tickstore"]["variants"]["v"]["queries"]["Q2"]["cold"]["engine"]
+        self.assert_fault(fault, "Q2.cold: no engine time beside the round trip")
+
+    def test_tickstore_engine_longer_than_its_round_trip(self):
+        def fault(document):
+            query = document["systems"]["tickstore"]["variants"]["v"]["queries"]["Q3"]
+            query["warm"]["engine"]["median_us"] = 11.0
+        self.assert_fault(fault, "the engine took longer than its round trip")
+
+    def test_a_class_labelled_as_the_other(self):
+        def fault(document):
+            b_of(document, "arcticdb")["durability"]["class"] = "A"
+        self.assert_fault(fault, "durability: labelled class 'A'")
 
     # Read back.
 

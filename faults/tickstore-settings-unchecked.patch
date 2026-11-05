@@ -1,0 +1,13 @@
+diff --git a/compare/systems/tickstore.py b/compare/systems/tickstore.py
+index 0e98072..6c55825 100644
+--- a/compare/systems/tickstore.py
++++ b/compare/systems/tickstore.py
+@@ -312,7 +312,7 @@ class TickStoreSystem(System):
+             self.close()
+         settings, codecs = codec_settings(self.layout_blocks())
+         self.codecs_found = codecs
+-        return require_all_match([
++        return (lambda settings: [item.as_json() for item in settings])([
+             Setting("store version", STORE_VERSION, ready["store_version"],
+                     "the store section's bytes, read by tools/tick_query"),
+             Setting("segment records", SEGMENT_RECORDS, ready["segment_records"],

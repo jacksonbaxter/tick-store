@@ -3,7 +3,7 @@
 
     python3 -I scripts/check_compare.py results/compare/*.json
 
-A comparison result claims that three systems held the same records under stated settings
+A comparison result claims that four systems held the same records under stated settings
 and gave the same answers. This checks that the file can back each claim: a requested setting
 must equal the one in force, every store must have rebuilt the source through the oracle,
 every answer must equal the ground truth, every warm and cold number must carry its proof, a
@@ -31,7 +31,15 @@ DEFAULT_CAPACITY = REPO_ROOT / "results" / "fullday-capacity-12302019.json"
 CAPACITY_CITATION = f"results/{DEFAULT_CAPACITY.name}"
 LINUX_ONLY = "Linux only"
 HEAP_SETTINGS = ("java initial heap", "java heap")
-SYSTEMS = ("parquet", "arcticdb", "questdb")
+SYSTEMS = ("parquet", "arcticdb", "questdb", "tickstore")
+# Systems whose class proof is the flushes made, counted call by call, and not a dirty-page
+# control: the harness's own flush for Parquet, the writer's recorded system calls for tick-store.
+COUNTED_FLUSHES = ("parquet", "tickstore")
+TICKSTORE_MODE = {"A": "page_cache", "B": "device_flush"}
+TICKSTORE_COLUMNS = 39
+TICKSTORE_SETTINGS = ("store version", "segment records", "records", "durability mode",
+                      "flushes made", "query path", "kernel level", "kernel sets that ran")
+ITCH_PARSING = "ITCH parsing"
 CLASSES = ("A", "B")
 PROVEN = "proven"
 NOT_PROVEN = "NOT PROVEN"
@@ -64,6 +72,33 @@ def check_settings(where, settings, name, durability):
             if found.get(source) != COMMIT_MODE[durability]:
                 problems.append(f"{where}.settings: commit mode from {source!r} is "
                                 f"{found.get(source)!r}, not {COMMIT_MODE[durability]}")
+    if name == "tickstore":
+        problems += check_tickstore_settings(where, settings or [], durability)
+    return problems
+
+
+def check_tickstore_settings(where, settings, durability):
+    """tick-store's settings, read back from the store and its tools, each one present."""
+    found = {item.get("name"): item.get("in_force") for item in settings}
+    problems = [f"{where}.settings: tick-store's {name!r} was not read back"
+                for name in TICKSTORE_SETTINGS if name not in found]
+    if "store version" in found and found["store version"] != 3:
+        problems.append(f"{where}.settings: store version {found['store version']!r}, not 3")
+    if "durability mode" in found and found["durability mode"] != TICKSTORE_MODE[durability]:
+        problems.append(f"{where}.settings: durability mode {found['durability mode']!r} in "
+                        f"class {durability}")
+    flushes = found.get("flushes made")
+    if "flushes made" in found and (flushes != [] if durability == "A" else len(flushes or []) != 2):
+        problems.append(f"{where}.settings: flushes made {flushes!r} in class {durability}")
+    if "kernel level" in found and found.get("kernel sets that ran") != [found["kernel level"]]:
+        problems.append(f"{where}.settings: kernel sets that ran "
+                        f"{found.get('kernel sets that ran')!r}, not {found['kernel level']!r}")
+    codecs = [item for item in settings if str(item.get("name")).startswith("codec ids, ")]
+    if len(codecs) != TICKSTORE_COLUMNS:
+        problems.append(f"{where}.settings: codec ids read back for {len(codecs)} columns, "
+                        f"not {TICKSTORE_COLUMNS}")
+    problems += [f"{where}.settings: {item.get('name')} is not the codec docs/store.md lists"
+                 for item in codecs if item.get("in_force") is not True]
     return problems
 
 
@@ -84,6 +119,15 @@ def check_read_back(where, read_back, pin):
     if not (read_back.get("stored_settings") or {}).get("checks_passed"):
         problems.append(f"{where}.read_back: no stored settings were checked")
     return problems
+
+
+def check_tickstore_read_back(where, read_back):
+    """G-1 runs on tick-store's store beside the column oracle, and must pass."""
+    g1 = ((read_back or {}).get("stored_settings") or {}).get("g1") or {}
+    if g1.get("verdict") != "pass" or g1.get("hashes_match") is not True or \
+            g1.get("mismatched_records") != 0:
+        return [f"{where}.read_back: G-1 on the store did not pass: {g1.get('verdict')!r}"]
+    return []
 
 
 def check_stored(where, stored, pin):
@@ -115,6 +159,13 @@ def check_write(where, write, pin):
     return problems
 
 
+def check_tickstore_write(where, write):
+    """tick-store's write parses ITCH and the others' do not, and the file must say so."""
+    if ITCH_PARSING not in str(((write or {}).get("detail") or {}).get("input", "")):
+        return [f"{where}.write: does not say that tick-store's time holds {ITCH_PARSING}"]
+    return []
+
+
 def check_durability(where, durability, name, class_name, control, host):
     """A class is claimed only with its proof. NOT PROVEN is a valid thing to say."""
     block = durability or {}
@@ -123,16 +174,23 @@ def check_durability(where, durability, name, class_name, control, host):
         problems.append(f"{where}.durability: no sync primitive or flush granularity")
     if "like_for_like" not in block:
         problems.append(f"{where}.durability: no like_for_like")
+    if block.get("class") != class_name:
+        problems.append(f"{where}.durability: labelled class {block.get('class')!r}")
     status = block.get("status")
     if status not in (PROVEN, NOT_PROVEN):
         return [*problems, f"{where}.durability: unknown status {status!r}"]
     if not block.get("reason"):
         problems.append(f"{where}.durability: no reason")
+    flush = block.get("flush") or {}
     if class_name != "B":
+        if name == "tickstore" and status == PROVEN:
+            for scope in ("probe", "full_ingest"):
+                if (flush.get(scope) or {}).get("engine_flushes") != []:
+                    problems.append(f"{where}.durability: class A claimed with the writer's "
+                                    f"flushes in {scope}")
         return problems
     if host == "macOS" and name == "questdb" and block.get("like_for_like") is not False:
         problems.append(f"{where}.durability: macOS QuestDB class B must not be like-for-like")
-    flush = block.get("flush") or {}
     if status == PROVEN:
         for scope in ("probe", "full_ingest"):
             detail = flush.get(scope) or {}
@@ -142,7 +200,14 @@ def check_durability(where, durability, name, class_name, control, host):
             if name == "parquet" and detail.get("harness_flushes") != 2:
                 problems.append(f"{where}.durability: class B claimed without the harness flush "
                                 f"in {scope}")
-        if name != "parquet" and not control:
+            calls = detail.get("engine_flushes") or []
+            if name == "tickstore" and (len(calls) != 2 or
+                                        any(call.get("result") != 0 for call in calls) or
+                                        [call.get("of") for call in calls] !=
+                                        ["file", "directory"]):
+                problems.append(f"{where}.durability: class B claimed without the writer's "
+                                f"flush of the file and then its directory in {scope}")
+        if name not in COUNTED_FLUSHES and not control:
             problems.append(f"{where}.durability: class B claimed, and class A's control "
                             "saw no dirty page")
         table_pages = {key: value for key, value in
@@ -181,7 +246,21 @@ def check_cold(where, cold):
     return problems
 
 
-def check_queries(where, queries, truth):
+def check_engine_time(where, query):
+    """tick-store's worker reports its engine's time beside each round trip, warm and cold."""
+    problems = []
+    for kind in ("warm", "cold"):
+        block = query.get(kind) or {}
+        engine = block.get("engine") or {}
+        if engine.get("n") != block.get("n") or not check_results.is_number(
+                engine.get("median_us")):
+            problems.append(f"{where}.{kind}: no engine time beside the round trip")
+        elif engine["median_us"] > block.get("median_us", 0):
+            problems.append(f"{where}.{kind}: the engine took longer than its round trip")
+    return problems
+
+
+def check_queries(where, queries, truth, system_name=None):
     problems = []
     for name in QUERY_NAMES:
         query = (queries or {}).get(name)
@@ -195,6 +274,8 @@ def check_queries(where, queries, truth):
         problems += check_cold(here, query.get("cold"))
         if not query.get("scan"):
             problems.append(f"{here}: no rows or bytes decoded, or a statement of why not")
+        if system_name == "tickstore":
+            problems += check_engine_time(here, query)
     return problems
 
 
@@ -232,9 +313,12 @@ def check_system(name, system, document, pin):
             problems += check_read_back(here, entry.get("read_back"), pin)
             problems += check_stored(here, entry.get("stored"), pin)
             problems += check_write(here, entry.get("write"), pin)
+            if name == "tickstore":
+                problems += check_tickstore_read_back(here, entry.get("read_back"))
+                problems += check_tickstore_write(here, entry.get("write"))
             problems += check_durability(here, entry.get("durability"), name, class_name, control,
                                          host)
-        problems += check_queries(where, variant.get("queries"), truth)
+        problems += check_queries(where, variant.get("queries"), truth, name)
     return problems
 
 
@@ -331,6 +415,9 @@ def check_document(document, top_keys, path, pins, capacity):
         problems.append("input: does not match the pin")
     if "clip" not in str(input_block.get("clipping", "")) or not input_block.get("ratio_baseline"):
         problems.append("input: the clipping or the ratio baseline is not stated")
+    if "tickstore" in systems and ITCH_PARSING not in str(input_block.get("ingest_input", "")):
+        problems.append(f"input: does not say that tick-store's ingest holds {ITCH_PARSING} and "
+                        "the others' does not")
     method = document.get("method") or {}
     if not method.get("warm") or not method.get("cold"):
         problems.append("method: how warm and cold were achieved is not stated")

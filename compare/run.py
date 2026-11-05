@@ -39,6 +39,7 @@ from compare.queries import CLIPPING_STATEMENT  # noqa: E402
 from compare.schema import read_manifest  # noqa: E402
 from compare.systems import SYSTEM_NAMES  # noqa: E402
 from compare.systems.questdb_system import heap_flags  # noqa: E402
+from compare.systems.tickstore import INPUT_STATEMENT  # noqa: E402
 
 CHECK_COMPARE = REPO_ROOT / "scripts" / "check_compare.py"
 RUN_SYSTEM = REPO_ROOT / "compare" / "run_system.py"
@@ -80,6 +81,13 @@ COLD_INCLUDES = ("Each cold number is the query alone, in a fresh process. The s
                  "pyarrow.acero among them, and pages they touched count as resident and as "
                  "device reads. The clock does hold what an engine sets up on its first call in "
                  "a process: for Parquet on macOS, about 1 ms over a second call on warm pages.")
+TICKSTORE_QUERIES = ("tick-store's queries go to one tools/tick_query worker per store, started "
+                     "before the clock. Each is timed from Python as a round trip that stops on "
+                     "the worker's acknowledgement that the answer is in its memory. The worker "
+                     "then digests the answer by compare/queries.py's rule, outside the clock, "
+                     "as the other systems' digests are made in Python, and returns no rows to "
+                     "Python. Its engine time is recorded beside each round trip and is not the "
+                     "number compared. The writer and the worker each run on one thread.")
 BASELINE = ("The slice's source bytes: every ITCH frame with its two-byte length prefix, which "
             "is what BENCHMARKS.md's stored bytes must be able to rebuild.")
 
@@ -204,9 +212,9 @@ def build_document(host, args, layout, pin, commit, measure, parts, load_lines, 
         "heap": LINUX_HEAP if linux else MACOS_HEAP,
         "input": {"slice": args.slice, "sha256": pin["sha256"], "messages": pin["message_count"],
                   "bytes": pin["size"], "ratio_baseline": BASELINE, "clipping": CLIPPING_STATEMENT,
-                  "export": manifest},
+                  "ingest_input": INPUT_STATEMENT, "export": manifest},
         "method": {"warm": WARM_METHOD, "cold": COLD_METHOD[host], "cold_includes": COLD_INCLUDES,
-                   "one_system_at_a_time": True,
+                   "one_system_at_a_time": True, "tickstore_queries": TICKSTORE_QUERIES,
                    "input_cache": "the export's column files are warm before every write",
                    "p99": "nearest rank, so a small n gives a value that really occurred"},
         "queries": {"parameters": query_sets[0], "truth": truths[0],

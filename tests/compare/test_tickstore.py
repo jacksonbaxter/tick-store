@@ -203,6 +203,84 @@ class Answers(unittest.TestCase):
         self.assertEqual(answer_key("rows", 5, 6, 7), ("rows", 5, 6, 7))
 
 
+class SettingsAfterIngest(unittest.TestCase):
+    """The run's read-back with the tools replaced by what they would say: every setting must be
+    the one requested, or the run stops."""
+
+    def system(self, durability=CLASS_B, ready=None, report=None, runs=None, blocks=None):
+        owner = system(durability)
+        level = owner.kernel_level
+        owner.expected_records = 100
+        owner.ingest_report = {"durability": owner.mode,
+                               "flushes": expected_flushes(durability), **(report or {})}
+        ready_line = {"ready": True, "store_version": 3, "segment_records": 1 << 20,
+                      "records": 100, "path": "indexed", "kernel_level": level, **(ready or {})}
+        kernel_runs = runs if runs is not None else {level: 5}
+
+        def start_worker(check=True):
+            owner.ready = ready_line
+
+        def ask(request):
+            return SimpleNamespace(finish=lambda: {"kernel_runs": kernel_runs})
+
+        owner._start_worker = start_worker
+        owner._ask = ask
+        owner.close = lambda: None
+        owner.layout_blocks = lambda: blocks if blocks is not None else [
+            {"column": column, "codec": codec} for column, (codec, _) in COLUMN_CODECS.items()]
+        return owner
+
+    def test_everything_as_requested_passes(self):
+        names = [item["name"] for item in self.system().settings_after_ingest()]
+        for name in ("store version", "segment records", "records", "durability mode",
+                     "flushes made", "query path", "kernel level", "kernel sets that ran"):
+            self.assertIn(name, names)
+        self.assertEqual(sum(name.startswith("codec ids, ") for name in names), 39)
+
+    def test_a_segment_size_mismatch_stops_the_run(self):
+        with self.assertRaisesRegex(SettingsMismatch,
+                                    "segment records: requested 1048576, in force 65536"):
+            self.system(ready={"segment_records": 65536}).settings_after_ingest()
+
+    def test_a_store_version_mismatch_stops_the_run(self):
+        with self.assertRaisesRegex(SettingsMismatch, "store version: requested 3, in force 2"):
+            self.system(ready={"store_version": 2}).settings_after_ingest()
+
+    def test_page_cache_in_class_b_stops_the_run(self):
+        with self.assertRaisesRegex(SettingsMismatch, "durability mode: requested "
+                                                      "'device_flush', in force 'page_cache'"):
+            self.system(report={"durability": "page_cache", "flushes": []}).settings_after_ingest()
+
+    def test_a_missing_flush_stops_the_run(self):
+        with self.assertRaisesRegex(SettingsMismatch, "flushes made"):
+            self.system(report={"flushes": expected_flushes(CLASS_B)[:1]}).settings_after_ingest()
+
+    def test_a_flush_in_class_a_stops_the_run(self):
+        with self.assertRaisesRegex(SettingsMismatch, "flushes made"):
+            self.system(CLASS_A, report={"flushes": expected_flushes(CLASS_B)}
+                        ).settings_after_ingest()
+
+    def test_another_kernel_level_stops_the_run(self):
+        with self.assertRaisesRegex(SettingsMismatch, "kernel level: requested"):
+            self.system(ready={"kernel_level": "not_a_level"}).settings_after_ingest()
+
+    def test_another_kernel_set_running_stops_the_run(self):
+        level = expected_kernel_level()
+        other = "scalar" if level != "scalar" else "neon"
+        with self.assertRaisesRegex(SettingsMismatch, "kernel sets that ran"):
+            self.system(runs={level: 5, other: 1}).settings_after_ingest()
+
+    def test_a_column_on_another_codec_stops_the_run(self):
+        blocks = [{"column": column, "codec": codec} for column, (codec, _) in
+                  COLUMN_CODECS.items()] + [{"column": "type", "codec": "pfor"}]
+        with self.assertRaisesRegex(SettingsMismatch, "codec ids, type"):
+            self.system(blocks=blocks).settings_after_ingest()
+
+    def test_fewer_records_than_written_stops_the_run(self):
+        with self.assertRaisesRegex(SettingsMismatch, "records: requested 100, in force 99"):
+            self.system(ready={"records": 99}).settings_after_ingest()
+
+
 class Ingest(unittest.TestCase):
     def test_the_command_names_the_mode_and_the_segment_size(self):
         owner = system()

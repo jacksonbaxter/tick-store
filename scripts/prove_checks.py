@@ -406,6 +406,9 @@ FAULTS = (
           "FAIL: test_a_linux_case_records_its_siblings_busy_share (__main__.RunBenchTest"),
     Fault("compare-tests-settings", "py-compare", "the QuestDB commit mode check stops checking",
           CHECK_FAILED, "FAIL: test_the_parser_outranks_a_matching_echo"),
+    Fault("tickstore-settings-unchecked", "py-compare", "tick-store's read-back stops comparing "
+          "each setting with the one requested, so a store of another segment size passes "
+          "silently", CHECK_FAILED, "FAIL: test_a_segment_size_mismatch_stops_the_run"),
     Fault("results-no-load-lines", "check-results", "a macOS results file with no load lines",
           CHECK_FAILED, "no load lines", drop_load_lines),
     Fault("results-macos-pinned", "check-results", "a macOS results file claiming pinned",
