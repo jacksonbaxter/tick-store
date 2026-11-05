@@ -106,6 +106,7 @@ def step_read_back(system, request, layout):
         return {"read_seconds": answer["read_seconds"],
                 "write_columns_seconds": written - started - answer["read_seconds"],
                 "rows": answer["rows"], "windows": answer["windows"],
+                "method": answer["method"],
                 "stored_settings": system.stored_settings()}
     started = time.perf_counter()
     table = system.read_all()

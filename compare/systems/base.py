@@ -163,7 +163,9 @@ class System(ABC):
                 reading += time.perf_counter() - started
                 writer.append(table)
             rows = writer.records
-        return {"rows": rows, "read_seconds": reading, "windows": len(windows)}
+        return {"rows": rows, "read_seconds": reading, "windows": len(windows),
+                "method": "the store read back one time window at a time, each ordered by seq, "
+                          "into one column directory"}
 
     @abstractmethod
     def probe_flush(self, table):

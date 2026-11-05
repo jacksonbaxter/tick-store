@@ -457,7 +457,9 @@ class TickStoreSystem(System):
         self._export(destination)
         seconds = time.perf_counter() - started
         return {"rows": read_manifest(destination)["records"], "read_seconds": seconds,
-                "windows": "none: tick_export --store reads the whole store in order"}
+                "windows": "none: tick_export --store reads the whole store in order",
+                "method": "tick_export --store, every record through the store's read path "
+                          "and the ITCH encoder, straight into one column directory"}
 
     def _export(self, directory):
         shutil.rmtree(directory, ignore_errors=True)

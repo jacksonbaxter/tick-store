@@ -191,8 +191,7 @@ class Runner:
         if self.full_day:
             result["streamed"] = {"windows": answer["windows"], "rows": answer["rows"],
                                   "write_columns_seconds": answer["write_columns_seconds"],
-                                  "method": "the store read back one time window at a time, "
-                                            "each ordered by seq, into one column directory"}
+                                  "method": answer["method"]}
         return result
 
     def run_class(self, variant, durability, control_saw_dirty):
