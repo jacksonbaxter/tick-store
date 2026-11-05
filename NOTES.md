@@ -1933,6 +1933,53 @@ under `/usr/bin/time -l`. Writer memory is the ingest's peak memory footprint. R
 | 1 | N = 2^18 | 1,819,101,831, 4.536 | 173 MB | Mac warm 32.30 / 88.62 / 38.17 / 6.07 / 517.94; cold 43.79 / 422.44 / 275.56 / 9.28 / 922.05 | No: 3 points (Q1, Q5 warm) |
 | 1 | N = 2^20, version 3 as it was (baseline) | 1,750,915,467, 4.713 | 401 MB | Mac warm 37.10 / 42.34 / 19.94 / 22.75 / 494.52; cold 55.83 / 215.12 / 114.78 / 38.63 / 665.33 | No: 2 points (Q5) |
 | 1 | N = 2^22 | 1,707,376,132, 4.833 | 1,236 MB | Mac warm 129.00 / 30.82 / 17.29 / 100.78 / 528.86; cold 188.91 / 109.74 / 56.07 / 156.99 / 644.71 | Won experiment 1: 5 points (Q2, Q3, Q5 cold) |
+| 2, locate access for time windows | N = 2^20, version 3 (baseline), rounds 3 and 4 | 1,750,915,467, 4.713 | 401 MB | Mac warm 40.19 / 45.61 / 21.40 / 24.78 / 535.51; cold 60.16 / 220.13 / 117.88 / 40.67 / 699.63 | Won experiment 2: 8 points (Q1, Q2 warm, Q3, Q5) |
+| 2 | A file-order locate column, `file_locate`, in 4,096-value blocks, ranked PFOR or Huffman; the window narrowed to 64-record chunks by the time bases where a segment's times ascend; each run scanned from its start, its records before the window read for the chain and the list alone | 2,128,851,992, 3.876 | 402 MB | Mac warm 41.49 / 45.37 / 22.57 / 11.82 / 536.35; cold 65.96 / 228.91 / 129.53 / 29.40 / 748.45 | No: 6 points (Q1 warm, Q2, Q4, Q5 warm) |
+| 2 | The same, with move-to-front allowed in `file_locate` | 2,063,523,061, 3.999 | 393 MB | Mac warm 43.91 / 45.39 / 22.50 / 11.82 / 534.75; cold 66.62 / 230.14 / 128.55 / 29.98 / 749.93 | No: 5 points (Q2, Q4, Q5 warm) |
+| 2 | The `file_locate` store with every column in 1,024-value codec blocks | 2,168,712,948, 3.805 | 394 MB | Mac, one run, load 10: warm 46.59 / 41.33 / 24.31 / 9.14 / 760.76; cold 71.07 / 232.32 / 185.39 (one trial 651 ms, median 133.48) / 26.89 / 977.56 | No: dropped before the side-by-side rounds, Q5 42% slower for Q4's 3 ms |
+| 2 | A per-group offset directory: each locate's first record in each 4,096-record file group | not built: 50,911,193 (group, locate) pairs on 12302019, 776 a group, 0.19 a record | | not timed | No: a query still reads each run from its start (below) |
+| 3, hot-column codecs | Baseline, as in experiment 2 | 1,750,915,467, 4.713 | 401 MB | as above | No: 2 points (Q2, Q3 cold) |
+| 3 | The eight hot dictionary columns (`type`, `ref_distance`, `add_side`, `add_shares`, `reduce_shares`, `replace_shares`, `trade_side`, `trade_shares`) held to ranked PFOR: ranks bit-packed at one width a PFOR block, no Huffman or move-to-front | 1,808,255,218, 4.563 | 395 MB | Mac warm 36.24 / 35.98 / 18.30 / 20.84 / 289.99; cold 56.52 / 216.88 / 115.57 / 35.80 / 472.04 | Won experiment 3: 10 points |
+| 3 | An interleaved multi-stream Huffman decode | not built | | not timed | No (below) |
+
+**Experiments 2 and 3, timed side by side.** Machine load from other work moved single runs by up
+to 10%, so experiments 2 and 3 were timed again in interleaved rounds: `build/layout/batch.sh`
+(scratch) runs every candidate's timing once per round, in turn, through `heavy.sh` under
+`/usr/bin/time -l`, the same script, warm rounds and cold trials as above, raw output in
+`phase3-raw/layout/batch/<candidate>-<round>.txt` with the load before each in `uptime.txt`. Each
+figure in a row timed this way is the mean of its two rounds; load averages were 2.3 to 3.0 over
+rounds 3 and 4. Rounds 1 and 2 ran the `file_locate` stores under a first query engine whose scan of
+the records before the window took three passes; it was 5% to 6% slower on Q1 and Q2 than version
+3's single pass on the same store. One pass for the chain and the list, and reference values held
+directly from the first row that can be emitted on, brought Q2 back level, and rounds 3 and 4 used
+that engine. Version 3's own engine was kept for the version 3 stores: the same change on them made
+Q1 2% to 6% and Q3 5% slower and Q4 no faster, because there the whole `locate` column is decoded
+anyway.
+
+*Experiment 2.* The file-order column halves Q4, 24.8 to 11.8 ms warm and 40.7 to 29.4 ms cold, and
+costs 378 MB. It loses on everything else: Q3 warm 5.5% slower, Q1, Q2, Q3 and Q5 cold 4% to 10%
+slower. Q5 reads no locate column at all, and its warm time is level (535.5 against 536.4 ms), so the
+cold loss is the file: 22% more bytes put the share columns' pieces further apart on the disk. Under
+the rule the baseline takes 8 points to 6, so version 3's locate access stays. Move-to-front saves
+65 MB of the 378 and costs Q1 5.8% (the list shift on every value). The 1,024-value blocks cut what
+Q4 decodes from each run's start, 9.1 ms warm, but make four times the blocks, each with its header
+and its own setup, in every column: Q5 is 42% slower. The per-group directory was not built: the store's references and
+its time and index chains restart only at a run's start, so a query over every locate must still
+read each run from its first record, whichever group it starts in. The directory could only replace
+the search of the `locate` column, which the `file_locate` candidate already removes, at 0.19
+entries a record. The models in `build/layout/q4model.py` (scratch) over the export agree: at
+N = 2^20, Q4's window reaches all 256 `type` blocks of its segment from the 4,096-record file groups,
+and 111 of 256 from the 64-record chunks. The full diff of the `file_locate` store, version 4 with
+its own checks and tests, is kept with the raw logs (`phase3-raw/layout/v4-file-locate-tree.diff`).
+
+*Experiment 3.* Holding the hot dictionary columns to ranked PFOR costs 57 MB (3.3%) and is faster on
+all ten figures: Q5 warm 535.5 to 290.0 ms, Q2 45.6 to 36.0, Q3 21.4 to 18.3. A Huffman block
+decodes one code at a time, each code's length depending on the last; ranked PFOR unpacks a block at
+one width with the SIMD kernels and maps ranks through a table. An interleaved multi-stream Huffman
+decode was not built: it would still be a variable-length decode, so it could at best approach
+ranked PFOR's speed, and the rule scores time, with size only for eligibility and ties, where the
+57 MB cannot matter (both are far inside 2,393,554,944 bytes). The fixed-width dictionary code that
+TASKS named is ranked PFOR itself: ranks at one width per block, with patches for outliers.
 
 ## Process notes
 
