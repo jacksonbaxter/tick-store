@@ -1,8 +1,8 @@
 # Comparison harness
 
-Stores one pinned ITCH slice in Parquet (through pyarrow), ArcticDB on LMDB and QuestDB, and
-proves what each run claims. For every variant of every system, and for durability classes A
-and B, it:
+Stores one pinned ITCH slice in Parquet (through pyarrow), ArcticDB on LMDB, QuestDB and
+tick-store itself, and proves what each run claims. For every variant of every system, and for
+durability classes A and B, it:
 
 1. proves the settings in force match the settings requested, and stops if they do not,
 2. makes a small commit in a store of its own and reads the dirty pages it left,
@@ -14,7 +14,9 @@ Then, on the class B store, it runs Q1 to Q5 from `BENCHMARKS.md`, warm and cold
 answer must equal a ground truth computed with numpy from the exported columns, sharing no code
 with any system (`compare/queries.py`). A failed proof or a wrong answer stops the run. Python
 never parses ITCH: `tools/tick_export` writes the column files, and `tick_roundtrip
-verify-columns` judges what comes back.
+verify-columns` judges what comes back. tick-store alone ingests the ITCH slice itself, its
+natural input, so its write time holds the ITCH parsing the others never do: see "tick-store"
+below.
 
 One system runs at a time, each as one process. `compare/run.py` writes
 `results/compare/<host>-<slice>-<commit>.json` only when every system has finished and
@@ -33,7 +35,7 @@ One system runs at a time, each as one process. `compare/run.py` writes
 | `compare/coldcache.py` | Warm and cold proofs, and the size at rest |
 | `compare/fullday.py` | One system through a whole day, as an iteration-only capacity check |
 | `compare/guard.py` | Runs a command in its own session, and stops it before it can hurt the host |
-| `compare/systems/` | One file per system, behind `compare/systems/base.py` |
+| `compare/systems/` | One file per system, behind `compare/systems/base.py`. tick-store's is `tickstore.py` |
 | `compare/java/CommitModeProbe.java` | Runs QuestDB's own configuration parser on a conf |
 
 ## Setup
@@ -195,6 +197,7 @@ Class A returns once data is in the OS page cache. Class B returns after a flush
 | Parquet | Nothing: pyarrow never syncs | The harness flushes the closed file and then its directory, and that flush is timed in the write | One flush per file, after it closes |
 | ArcticDB | `ARCTICDB_LMDBStorage_ExtraFlags_int` set to MDB_NOSYNC and MDB_NOMETASYNC, which ArcticDB's docs mark as for throwaway data | The same variable at 0, LMDB's default | One LMDB transaction per storage key: each data segment, index and version key commits alone |
 | QuestDB | `cairo.commit.mode=nosync` | `cairo.commit.mode=sync`. `async` never counts, since it is a no-op flush on Linux | Per commit: the client commits about every 100 batches, and each WAL commit is then applied to the table |
+| tick-store | `--durability page_cache`: every byte handed to the kernel and the file renamed into place, no flush | `--durability device_flush` | One flush per file, at its commit: the file's data before the rename that publishes it, then its directory |
 
 The primitive beside every class B number:
 
@@ -203,9 +206,10 @@ The primitive beside every class B number:
 | Parquet, by the harness | `fsync` | `F_FULLFSYNC` |
 | ArcticDB, by LMDB | `fdatasync` | `F_FULLFSYNC` |
 | QuestDB | `msync(MS_SYNC)` and plain `fsync` | `msync(MS_SYNC)` and plain `fsync` |
+| tick-store | `fdatasync` on the file, `fsync` on its directory | `F_FULLFSYNC` on the file and on its directory |
 
-The harness's own primitive is what it calls. LMDB's and QuestDB's are stated from what is known of
-them, and are not traced in a run.
+The harness's own primitive is what it calls. tick-store's is what its writer called, recorded call
+by call. LMDB's and QuestDB's are stated from what is known of them, and are not traced in a run.
 
 **How a class is proven.** Each run makes a small commit of 65,536 rows in a store of its own, and
 reads each file's dirty pages straight after the commit returns. The last full write is read the
@@ -220,6 +224,11 @@ same way. `compare/settings.py` gives the verdict:
   out when it closes, so a closed Parquet file reads 0 dirty with or without a flush, and dirty pages
   are no proof there. The verdict is the count of flushes made: 2 that succeeded and 0 dirty pages
   under B, and none under A.
+- tick-store is proven the same way, for the same reason: its store is one file written and
+  closed. `tick_roundtrip ingest` passes its writer a `FileOps` that makes the real system calls
+  and records each flush, what it was called on and what it returned, and prints the list. Class B
+  is proven only by the file's flush and then its directory's, both returning 0, by the host's
+  primitive, and 0 dirty pages; class A only by no flush at all.
 
 `NOT PROVEN` is a valid thing to record, and the validator accepts it as long as the file does not
 claim the proof.
@@ -253,6 +262,19 @@ ingest, the stored index gives the largest segment, the map size comes from the 
 `data.mdb`, and the first stored segment's bytes are decoded by a plain LZ4 reader and must equal
 the engine's first timestamps. The LZ4 acceleration cannot be read: the segment header has no
 Python binding in 6.28.2.
+
+**tick-store**'s settings are read from the store just written and from its tools, after the
+write's clock stops. `tools/tick_query`, opened on the store, reads the version and the segment
+size from the bytes of the store section, and the records from its header; it names the kernel set
+it chose, with `TICK_STORE_SIMD` set to the level the processor's own flags give (`neon` on arm64,
+`avx2` on an x86-64 with AVX2), and one share sum counts its kernel calls by set, which must be that
+set alone. The durability mode and the flushes made come from `tick_roundtrip ingest`'s report.
+`tick_roundtrip layout --blocks` gives every block's codec from the footer, and each column's must
+be the one `docs/store.md` lists, or zstd where it allows it. Each query worker checks the
+version, segment size, path and kernel set again as it opens. The same `not_a_mode` failure is
+shown on the real tools in `tests/compare/test_real_systems.py`: a store of another segment size,
+a class B store written in `page_cache`, and a kernel cap below the one asked for are refused, and
+`--durability not_a_mode` and `TICK_STORE_SIMD=not_a_level` stop the tools.
 
 **Parquet**'s thread counts come from `pa.cpu_count()` and `pa.io_thread_count()`. After ingest, the
 footer gives each column chunk's compression, dictionary, statistics, page index and delta
@@ -294,6 +316,57 @@ call, so `ParquetSystem.open` imports both first, and `tests/compare/test_system
 if any module loads inside the timed call. The clock does hold what an engine sets up on its first
 call in a process: for Parquet on macOS, about 1 ms over a second call on warm pages.
 
+## tick-store
+
+tick-store runs through its own tools and nothing else, one variant: store version 3 at its
+default segment of 2^20 records, the indexed query path, CRCs checked on every read.
+
+- **Ingest.** `tick_roundtrip ingest <slice> <store> --durability page_cache|device_flush
+  --segment-records 1048576`, run and timed from Python as every other write is, with the slice
+  read through first, as the others' column files are. The clock holds the ITCH parsing, which
+  the other systems never do, since they load the columns `tick_export` already parsed. Nothing is
+  subtracted, and every results file says so in `input.ingest_input` and in each write's
+  `detail.input`. `python_seconds` is the tool's start and exit, outside its own clock.
+- **Read-back.** `tick_export --store` writes the store's records as the column files, each record
+  through the store's whole read path and the ITCH encoder, and the harness then writes and judges
+  them exactly as it does every other system's. G-1, `tick_roundtrip verify` of the store against
+  the source byte for byte, is stronger, and runs as well: it is in `stored_settings.g1`.
+- **Queries.** One `tools/tick_query` per store, started in the worker before any clock, as every
+  other client is opened. Each query is one request line with `"ack": true`, timed from Python as a
+  round trip that stops on the worker's line saying the answer is in its memory. The worker then
+  digests the answer by `compare/queries.py`'s rule, outside the clock, as the other systems'
+  digests are made in Python: on the slice that digest of Q1's 527,644 rows takes longer than the
+  engine. It returns no rows to Python, so a rows digest is the worker's own, and it must still
+  equal the numpy ground truth; an aggregate's answer comes back whole and is digested in Python
+  too. The worker's engine time is recorded beside every warm and cold round trip, as `engine`,
+  and is not the number compared. Cold runs through `tick_coldcache` as for the others.
+- **Threads.** The writer and the query worker each run on one thread; the others have two.
+
+## Tuning variants and their sources
+
+Each system runs every variant below, and the headline variant of each is fixed in its module, as
+it was before these were added. The settings come from section 7 of
+`research/evidence/column-systems.md`, which quotes each system's documentation.
+
+| System | Variant | What it tests | Source |
+|---|---|---|---|
+| Parquet | `none-rg1Mi` | No compression codec, against snappy and zstd | Section 7 sweeps "none, snappy (pyarrow default), zstd level 1 (Arrow default), one higher level". pyarrow's `compression` lists `'NONE'` among its valid values (`python/pyarrow/parquet/core.py` lines 778 to 780, Arrow 26.0.0), and the footer reads `UNCOMPRESSED` |
+| Parquet | `zstd1-rg1Mi-ts-default` | `ts` on the writer's default encoding, against `DELTA_BINARY_PACKED` | Section 7: "Time column: `column_encoding={'ts': 'DELTA_BINARY_PACKED'}`, one run vs default". The default is `use_dictionary`, "default True", and "if the dictionary size is too large, the column will fallback to ``PLAIN`` encoding" (`core.py` lines 772 to 776), past the 1 MB dictionary page limit |
+| ArcticDB | `rows100k-cols127-per-security` | One symbol per security, against one symbol for the whole table | ArcticDB's [data organisation](https://docs.arcticdb.io/latest/tutorials/data_organisation/) lists "Separate Symbol for Each Security": "Every security has its own symbol with the same data shape", "Ideal for single security analysis", and "Analysis involving many securities requires reading many symbols". Section 7: "Run one symbol for all, and one symbol per security". `Library.write_batch` and `Library.read_batch` are its documented calls for many symbols (docstrings in `arcticdb/version_store/library.py`, 6.28.2) |
+
+**ArcticDB per security** needs a query path of its own, and it is ArcticDB's documented one. The
+write sorts the table by locate, stably, and gives `write_batch` one frame per locate, its rows in
+file order, under the symbol `locate-NNNNN`: 8,907 symbols on the slice. It then calls
+`list_symbols` once, inside the clock, because ArcticDB warns after many writes that the call
+compacts its symbol list and needs write access, and a query must not be the first to pay that. A
+one-security query (Q2, Q3) reads that symbol alone, with no filter. A query over every security
+(Q1, Q4, Q5) is one `read_batch` over every symbol, the list of which the worker takes from
+`list_symbols` when it opens, before any clock, as an application keeps its universe. The cost is at
+ingest under class B: LMDB commits each storage key in its own transaction, so every symbol costs
+flushes of its own. On the Mac an iteration write took 3.5 s in class A and 212 s in class B, against
+about 0.5 s for one symbol, and the store was 224 MB against 142 MB. The results hold the measured
+figures.
+
 ## Full-day capacity
 
 A run on a whole day answers one question: does the system fit on the host and survive? It is not a
@@ -312,6 +385,8 @@ benchmark. `compare/fullday.py` needs the day's export at `<data>/export/<day>-f
   day. Every chunk is a whole number of row groups or segments, so `stored_settings` applies as is.
 - One full-column scan and one window run, each against the ground truth, then `stored_settings`.
   There is no whole-store read-back, since that needs a day on the heap, and no warm or cold proof.
+- tick-store and ArcticDB's per-security layout have no streamed ingest here, and are not part of
+  this check.
 - QuestDB starts through `bin/questdb.sh` with `JVM_PREPEND`, not from `java` directly, and writes a
   GC log per server start. It is otherwise the same server: the prepended options are the ones
   `QuestDBServer.command` passes.
@@ -333,6 +408,6 @@ Linux only.
 ## What the numbers are
 
 Slice numbers prove that the harness works. They are not claims about a full day, and no target
-changes because of them. The slice is five minutes long, so Q2 and Q3 are clipped from an hour to
+changes because of them. Every latency carries its median, nearest-rank p99 and mean. The slice is five minutes long, so Q2 and Q3 are clipped from an hour to
 `[09:30:00, 09:34:30)`, and Q5 scans 6,125,294 rows and not a day's 268,744,780. Every results file
 says so. What the runs found is in "Comparison harness" in `NOTES.md`.

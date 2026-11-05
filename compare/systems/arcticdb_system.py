@@ -1,4 +1,5 @@
-"""ArcticDB on LMDB. One library per store, one symbol for the whole table.
+"""ArcticDB on LMDB. One library per store, and either one symbol for the whole table or one
+symbol per security, the two layouts ArcticDB's docs describe.
 
 ArcticDB's settings come from the environment before it loads, so worker_environment sets
 them and settings_in_force reads them back through the engine's own config. LMDB syncs each
@@ -11,6 +12,7 @@ import re
 import struct
 import time
 
+import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pyarrow.compute as pc
@@ -35,17 +37,30 @@ AGGREGATION = {"n": ("shares", "count"), "s": ("shares", "sum"), "lo": ("price",
                "hi": ("price", "max")}
 
 
-def _variant(rows, columns):
-    return {"rows_per_segment": rows, "columns_per_segment": columns}
+ONE_SYMBOL = "one symbol for the whole table"
+PER_SECURITY = "one symbol per security"
+SECURITY_PREFIX = "locate-"
+PROBE_PREFIX = "flush-probe-"
+
+
+def _variant(rows, columns, layout=ONE_SYMBOL):
+    return {"rows_per_segment": rows, "columns_per_segment": columns, "symbol_layout": layout}
+
+
+def security_symbol(locate, prefix=SECURITY_PREFIX):
+    return f"{prefix}{int(locate):05d}"
 
 
 class ArcticDBSystem(System):
     name = "arcticdb"
     headline_variant = "rows100k-cols127"
+    # Per security: ArcticDB's docs, "Separate Symbol for Each Security", in
+    # https://docs.arcticdb.io/latest/tutorials/data_organisation/. See compare/README.md.
     variants = {
         "rows100k-cols127": _variant(100_000, 127),
         "rows10M-cols127": _variant(10_000_000, 127),
         "rows100k-cols1": _variant(100_000, 1),
+        "rows100k-cols127-per-security": _variant(100_000, 127, PER_SECURITY),
     }
 
     # LMDB's reader table, a mapped scratch file that LMDB rebuilds. It holds no data.
@@ -56,6 +71,12 @@ class ArcticDBSystem(System):
         self.library = None
         self.map_size_bytes = FULL_DAY_MAP_SIZE_BYTES if context.full_day else MAP_SIZE_BYTES
         self.map_size_text = FULL_DAY_MAP_SIZE_TEXT if context.full_day else MAP_SIZE_TEXT
+        self.symbols = []
+        self.rows_read = None
+
+    @property
+    def per_security(self):
+        return self.tuning["symbol_layout"] == PER_SECURITY
 
     def worker_environment(self):
         flags = 0 if self.class_b else LMDB_NO_SYNC_FLAGS
@@ -65,8 +86,13 @@ class ArcticDBSystem(System):
 
     def requested(self):
         return {"uri": f"lmdb, on a local disk, map_size={self.map_size_text}",
-                "symbol_layout": "one symbol for the whole table",
-                "write": "one lib.write of a pandas frame",
+                "symbol_layout": self.tuning["symbol_layout"],
+                "write": ("one lib.write_batch of a pandas frame per security, then one "
+                          "lib.list_symbols, as ArcticDB asks after many writes"
+                          if self.per_security else "one lib.write of a pandas frame"),
+                "security_symbols": (f"{SECURITY_PREFIX} and the locate, each holding that "
+                                     "locate's rows in file order" if self.per_security
+                                     else "not used"),
                 "rows_per_segment": self.tuning["rows_per_segment"],
                 "columns_per_segment": self.tuning["columns_per_segment"],
                 "dynamic_schema": False, "dedup": False, "encoding_version": "default, V1",
@@ -91,6 +117,11 @@ class ArcticDBSystem(System):
                 rows_per_segment=self.tuning["rows_per_segment"],
                 columns_per_segment=self.tuning["columns_per_segment"]))
         self.arctic = arctic
+        if self.per_security:
+            # The securities a query over all of them must read. Listed before any clock, as an
+            # application keeps its universe.
+            self.symbols = sorted(symbol for symbol in self.library.list_symbols()
+                                  if symbol.startswith(SECURITY_PREFIX))
 
     def close(self):
         self.library = None
@@ -127,7 +158,39 @@ class ArcticDBSystem(System):
                     config("VersionStore.NumIOThreads"), "ArcticDB's config"),
         ])
 
+    def _write_securities(self, table, prefix):
+        """One symbol per locate, each that locate's rows in file order, in one write_batch."""
+        from arcticdb import WritePayload
+
+        started = time.perf_counter()
+        ordered = table.take(pc.sort_indices(table, sort_keys=[("locate", "ascending")]))
+        locates = ordered.column("locate").to_numpy()
+        breaks = np.flatnonzero(np.diff(locates)) + 1
+        starts = np.concatenate([[0], breaks])
+        ends = np.concatenate([breaks, [len(locates)]])
+        frame = _frame(ordered)
+        payloads = [WritePayload(security_symbol(locates[first], prefix), frame.iloc[first:end])
+                    for first, end in zip(starts, ends, strict=True)]
+        built = time.perf_counter()
+        results = self.library.write_batch(payloads)
+        failed = [result for result in results if not hasattr(result, "version")]
+        if failed:
+            raise SettingsMismatch(f"write_batch refused {len(failed)} symbols: {failed[0]}")
+        written = time.perf_counter()
+        listed = len(self.library.list_symbols())
+        finished = time.perf_counter()
+        return {"seconds": finished - started, "engine_seconds": finished - built,
+                "python_seconds": built - started, "symbols": len(payloads),
+                "write_batch_seconds": written - built, "list_symbols_seconds": finished - written,
+                "symbols_listed": listed,
+                "python_note": "lib.write_batch takes pandas, so the table is sorted by locate "
+                               "and made one frame, and each security's rows are a slice of it. "
+                               "The list_symbols after the write is ArcticDB's own compaction of "
+                               "its symbol list, which it asks for after many writes"}
+
     def ingest(self, columns, table):
+        if self.per_security:
+            return self._write_securities(table, SECURITY_PREFIX)
         started = time.perf_counter()
         frame = _frame(table)
         built = time.perf_counter()
@@ -144,6 +207,8 @@ class ArcticDBSystem(System):
     def ingest_stream(self, chunks):
         """The first chunk is a write, and each one after it an append, so one frame at a time
         exists. Each append makes a version, and none is pruned."""
+        if self.per_security:
+            raise NotImplementedError("the full-day check runs one symbol for the whole table")
         started = time.perf_counter()
         python_seconds = 0.0
         appends = 0
@@ -161,6 +226,9 @@ class ArcticDBSystem(System):
                 "engine_seconds": finished - started - python_seconds, "appends": appends}
 
     def probe_flush(self, table):
+        if self.per_security:
+            self._write_securities(table, PROBE_PREFIX)
+            return
         self.library.write("flush-probe", _frame(table))
 
     def _lmdb_directory(self):
@@ -169,14 +237,32 @@ class ArcticDBSystem(System):
     def dirty_paths(self):
         return [self._lmdb_directory() / "data.mdb"]
 
-    def _read(self, **arguments):
+    def _read(self, symbol=SYMBOL, **arguments):
         from arcticdb.options import OutputFormat
 
-        return self.library.read(SYMBOL, output_format=OutputFormat.PYARROW, **arguments).data
+        return self.library.read(symbol, output_format=OutputFormat.PYARROW, **arguments).data
+
+    def _read_every_security(self, **arguments):
+        """Every security's symbol in one read_batch, as one table in no particular order."""
+        from arcticdb import ReadRequest
+        from arcticdb.options import OutputFormat
+
+        results = self.library.read_batch(
+            [ReadRequest(symbol, **arguments) for symbol in self.symbols],
+            output_format=OutputFormat.PYARROW)
+        failed = [result for result in results if not hasattr(result, "data")]
+        if failed:
+            raise SettingsMismatch(f"read_batch failed on {len(failed)} symbols: {failed[0]}")
+        return pa.concat_tables([result.data for result in results])
 
     def read_all(self):
-        table = self._read(columns=[c for c in TABLE_COLUMNS if c != INDEX_COLUMN])
-        return table.sort_by("seq")
+        wanted = [c for c in TABLE_COLUMNS if c != INDEX_COLUMN]
+        if self.per_security:
+            table = self._read_every_security(columns=wanted).sort_by("seq")
+        else:
+            table = self._read(columns=wanted).sort_by("seq")
+        self.rows_read = table.num_rows
+        return table
 
     def _range(self, start_ns, end_ns):
         """ArcticDB's date_range includes its end, and the queries' windows do not."""
@@ -187,11 +273,16 @@ class ArcticDBSystem(System):
     def query_rows(self, start_ns, end_ns, locate, columns):
         from arcticdb import QueryBuilder
 
+        wanted = [c for c in columns if c != INDEX_COLUMN]
+        if self.per_security:
+            window = self._range(start_ns, end_ns)
+            if locate >= 0:
+                return self._read(security_symbol(locate), date_range=window, columns=wanted)
+            return self._read_every_security(date_range=window, columns=wanted)
         builder = None
         if locate >= 0:
             builder = QueryBuilder()
             builder = builder[builder["locate"] == locate]
-        wanted = [c for c in columns if c != INDEX_COLUMN]
         return self._read(date_range=self._range(start_ns, end_ns), columns=wanted,
                           query_builder=builder)
 
@@ -199,29 +290,47 @@ class ArcticDBSystem(System):
         from arcticdb import QueryBuilder
 
         builder = QueryBuilder()
-        builder = builder[(builder["locate"] == locate) & builder["msg_type"].isin(list(msg_types))]
+        if self.per_security:
+            builder = builder[builder["msg_type"].isin(list(msg_types))]
+        else:
+            builder = builder[(builder["locate"] == locate) &
+                              builder["msg_type"].isin(list(msg_types))]
         builder = builder.date_range(self._range(start_ns, end_ns))
         builder = builder.resample("1min").agg(AGGREGATION)
-        table = self._read(query_builder=builder)
+        symbol = security_symbol(locate) if self.per_security else SYMBOL
+        table = self._read(symbol, query_builder=builder)
         rows = zip(table.column(INDEX_COLUMN).cast(pa.int64()).to_pylist(),
                    table.column("n").to_pylist(), table.column("s").to_pylist(),
                    table.column("lo").to_pylist(), table.column("hi").to_pylist(), strict=True)
         return [[int(value) for value in row] for row in rows if row[1]]
 
     def query_column_sum(self, column):
-        values = self._read(columns=[column]).column(column)
+        if self.per_security:
+            values = self._read_every_security(columns=[column]).column(column)
+        else:
+            values = self._read(columns=[column]).column(column)
         return [[len(values), pc.sum(values, min_count=0).as_py() or 0]]
+
+    def _query_symbols(self, query):
+        if not self.per_security:
+            return [SYMBOL]
+        if query.kind != "column_sum" and query.locate >= 0:
+            return [security_symbol(query.locate)]
+        return self.symbols
 
     def scan_facts(self, query):
         """Segments that overlap the window, from the stored index. Bytes are not available."""
-        index = self.library._nvs.read_index(SYMBOL)
         midnight = self.context.day.midnight_ns
-        if query.kind != "column_sum":
-            first = pd.Timestamp(query.start_ns + midnight, unit="ns")
-            last = pd.Timestamp(query.end_ns + midnight, unit="ns")
-            index = index[(index["end_index"] > first) & (index.index < last)]
-        starts = index.drop_duplicates(subset=["start_row", "end_row"])
-        return {"rows_decoded": int((starts["end_row"] - starts["start_row"]).sum()),
+        rows = 0
+        for symbol in self._query_symbols(query):
+            index = self.library._nvs.read_index(symbol)
+            if query.kind != "column_sum":
+                first = pd.Timestamp(query.start_ns + midnight, unit="ns")
+                last = pd.Timestamp(query.end_ns + midnight, unit="ns")
+                index = index[(index["end_index"] > first) & (index.index < last)]
+            starts = index.drop_duplicates(subset=["start_row", "end_row"])
+            rows += int((starts["end_row"] - starts["start_row"]).sum())
+        return {"rows_decoded": rows, "symbols_read": len(self._query_symbols(query)),
                 "bytes_decoded": {"status": "unavailable",
                                   "reason": "ArcticDB reports neither decoded nor read bytes"},
                 "method": "the stored index: rows of the segments whose time range overlaps "
@@ -236,14 +345,15 @@ class ArcticDBSystem(System):
             return f"bad meta magic {magic:#x}"
         return map_size
 
-    def _segment_codec(self, tool, keys, index):
+    def _segment_codec(self, tool, keys, index, symbol=SYMBOL):
         """The first stored segment, decoded here with a plain LZ4 reader. Its first column
         must equal the first timestamps the engine returns, or the codec is not LZ4. The
         segment header has no Python binding in 6.28.2, so this reads the bytes after it."""
         rows = int(index["end_row"].iloc[0] - index["start_row"].iloc[0])
+        keys = [key for key in keys if key.id == symbol]
         first = min(keys, key=lambda key: key.start_index)
         stored = tool.read_to_segment(first).bytes
-        expected = self._read(row_range=(0, rows), columns=["seq"]).column(INDEX_COLUMN)
+        expected = self._read(symbol, row_range=(0, rows), columns=["seq"]).column(INDEX_COLUMN)
         expected = expected.cast(pa.int64()).to_numpy().astype("<i8").tobytes()
         try:
             decoded = lz4_block_prefix(stored, len(expected))
@@ -257,9 +367,51 @@ class ArcticDBSystem(System):
                           "reader, equal the first timestamps as the engine returns them",
                 "acceleration": "not read: the header has no Python binding in 6.28.2"}
 
+    def _stored_securities(self):
+        """Per security: every symbol's index, the rows across them, and the busiest one's first
+        segment through the plain LZ4 reader."""
+        import arcticdb_ext
+
+        descriptions = self.library.get_description_batch(self.symbols)
+        rows = sum(int(item.row_count) for item in descriptions)
+        indices = {symbol: self.library._nvs.read_index(symbol) for symbol in self.symbols}
+        rows_per = max(int((index["end_row"] - index["start_row"]).max())
+                       for index in indices.values())
+        columns_per = max(int((index["end_col"] - index["start_col"]).max())
+                          for index in indices.values())
+        busiest = max(self.symbols, key=lambda symbol: int(indices[symbol]["end_row"].max()))
+        tool = self.library._nvs.library_tool()
+        keys = tool.find_keys(arcticdb_ext.storage.KeyType.TABLE_DATA)
+        index = indices[busiest].reset_index().sort_values(["start_row", "start_col"])
+        codec = self._segment_codec(tool, keys, index, busiest)
+        checked = require_all_match([
+            Setting("largest segment rows <= rows_per_segment", True,
+                    bool(rows_per <= self.tuning["rows_per_segment"]), "every symbol's index"),
+            Setting("largest segment columns <= columns_per_segment", True,
+                    bool(columns_per <= self.tuning["columns_per_segment"]),
+                    "every symbol's index"),
+            Setting("LMDB map size", self.map_size_bytes, self._lmdb_map_size(),
+                    "meta page of data.mdb"),
+            Setting("rows across the symbols", self.rows_read, rows,
+                    "lib.get_description_batch against the rows read back"),
+            Setting("one symbol per security", True,
+                    all(symbol.startswith(SECURITY_PREFIX) for symbol in self.symbols),
+                    "lib.list_symbols"),
+        ])
+        sizes = {key.name: {"compressed_bytes": size.bytes_compressed, "keys": size.count}
+                 for key, size in self.library.admin_tools().get_sizes().items()}
+        return {"checks_passed": len(checked), "symbols": len(self.symbols),
+                "segments": int(sum(len(index) for index in indices.values())),
+                "data_keys": len(keys), "largest_segment_rows": rows_per,
+                "largest_segment_columns": columns_per,
+                "lmdb_map_size": self._lmdb_map_size(), "segment_codec": codec,
+                "segment_codec_symbol": busiest, "admin_tools_sizes": sizes}
+
     def stored_settings(self):
         import arcticdb_ext
 
+        if self.per_security:
+            return self._stored_securities()
         description = self.library.get_description(SYMBOL)
         index = self.library._nvs.read_index(SYMBOL).reset_index().sort_values(
             ["start_row", "start_col"])

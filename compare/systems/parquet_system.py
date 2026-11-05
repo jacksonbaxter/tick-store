@@ -32,9 +32,16 @@ PAGE_HEADER_TYPE_FIELD = 0x15
 PAGE_TYPE_TOKENS = {0x00: "1.0", 0x06: "2.0"}
 
 
-def _variant(codec, level, row_group, price_delta=False):
+# The footer's name for each codec the writer is asked for.
+FOOTER_CODEC = {"zstd": "ZSTD", "snappy": "SNAPPY", "none": "UNCOMPRESSED"}
+
+
+def _variant(codec, level, row_group, price_delta=False, ts_default=False):
     return {"compression": codec, "compression_level": level, "row_group_rows": row_group,
-            "price_shares_delta": price_delta}
+            "price_shares_delta": price_delta,
+            "ts_encoding": ("the writer's default: dictionary, falling back to PLAIN past the "
+                            "1 MB dictionary page limit" if ts_default
+                            else "DELTA_BINARY_PACKED")}
 
 
 class ParquetSystem(System):
@@ -47,21 +54,37 @@ class ParquetSystem(System):
         "snappy-rg1Mi": _variant("snappy", None, ROW_GROUP_1MI),
         "zstd9-rg1Mi": _variant("zstd", 9, ROW_GROUP_1MI),
         "zstd1-rg1Mi-delta-price": _variant("zstd", 1, ROW_GROUP_1MI, price_delta=True),
+        # Section 7 of research/evidence/column-systems.md sweeps "none" among the codecs, and
+        # runs `ts` once on the writer's default against DELTA_BINARY_PACKED. See
+        # compare/README.md for the documentation behind both.
+        "none-rg1Mi": _variant("none", None, ROW_GROUP_1MI),
+        "zstd1-rg1Mi-ts-default": _variant("zstd", 1, ROW_GROUP_1MI, ts_default=True),
     }
 
     @property
     def path(self):
         return self.root / FILE_NAME
 
+    @property
+    def ts_default(self):
+        return self.tuning["ts_encoding"] != "DELTA_BINARY_PACKED"
+
     def _dictionary_columns(self):
+        columns = DICTIONARY_COLUMNS
         if self.tuning["price_shares_delta"]:
-            return tuple(c for c in DICTIONARY_COLUMNS if c not in ("shares", "price"))
-        return DICTIONARY_COLUMNS
+            columns = tuple(c for c in columns if c not in ("shares", "price"))
+        if self.ts_default:
+            # pyarrow's use_dictionary defaults to True for every column.
+            columns = ("ts", *columns)
+        return columns
 
     def _delta_columns(self):
+        columns = DELTA_COLUMNS
         if self.tuning["price_shares_delta"]:
-            return (*DELTA_COLUMNS, "shares", "price")
-        return DELTA_COLUMNS
+            columns = (*columns, "shares", "price")
+        if self.ts_default:
+            columns = tuple(c for c in columns if c != "ts")
+        return columns
 
     def _writer(self, path, schema):
         return pq.ParquetWriter(
@@ -222,7 +245,7 @@ class ParquetSystem(System):
         parquet = pq.ParquetFile(self.path)
         metadata = parquet.metadata
         expected_groups = self.tuning["row_group_rows"] or metadata.num_rows
-        codec = self.tuning["compression"].upper()
+        codec = FOOTER_CODEC[self.tuning["compression"]]
         checks = [Setting("format version", PARQUET_VERSION, metadata.format_version, "footer")]
         rows = [metadata.row_group(i).num_rows for i in range(metadata.num_row_groups)]
         checks.append(Setting("row-group rows", True,
