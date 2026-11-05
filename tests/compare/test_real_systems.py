@@ -220,7 +220,7 @@ class TickStoreReal(unittest.TestCase):
 
         system = self.write(self.system(CLASS_A), segment_records=1 << 16)
         with self.assertRaisesRegex(SettingsMismatch,
-                                    "segment records: requested 1048576, in force 65536"):
+                                    "segment records: requested 4194304, in force 65536"):
             system.settings_after_ingest()
         # A worker on that store refuses it too, before any query.
         with self.assertRaisesRegex(SettingsMismatch, "segment records"):
