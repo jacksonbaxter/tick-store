@@ -861,6 +861,48 @@ TEST(QueryCli, ServesEveryKindWithTheHarnessDigests) {
     }
 }
 
+// With "ack", the line that stops the harness's clock comes before the digest, and agrees with
+// the full answer after it.
+TEST(QueryCli, AckComesFirstAndAgreesWithTheAnswer) {
+    const ::tick_store::test::ScratchDir dir;
+    const Day day = make_day(day_options(6'000, 5));
+    const Bytes file = test::store_of_messages(day.messages, 2'000);
+    const auto path = dir / "day.tsc";
+    ::tick_store::test::write_file(path, file);
+    std::istringstream in{
+        "{\"name\":\"r\",\"kind\":\"rows\",\"start_ns\":0,\"end_ns\":9000000000000000,\"ack\":true}\n"
+        "{\"name\":\"m\",\"kind\":\"minute_aggregate\",\"start_ns\":0,\"end_ns\":9000000000000000,"
+        "\"locate\":3,\"ack\":true}\n"
+        "{\"name\":\"s\",\"kind\":\"column_sum\",\"ack\":true}\n"
+        "{\"name\":\"n\",\"kind\":\"column_sum\",\"ack\":false}\n"
+        "{\"name\":\"e\",\"kind\":\"minute_aggregate\",\"ack\":true}\n"};
+    std::ostringstream out;
+    harness::CliOutput output;
+    const std::string store_path = path.string();
+    const std::vector<std::string_view> arguments{store_path, "--day", "12302019"};
+    ASSERT_EQ(harness::run_query_cli(arguments, in, out, output), harness::kExitPass) << output.err;
+    std::vector<std::string> lines;
+    std::istringstream answers{out.str()};
+    for (std::string line; std::getline(answers, line);) {
+        lines.push_back(line);
+    }
+    // ready, then two lines for each acknowledged request, one for the rest.
+    ASSERT_EQ(lines.size(), 1U + 2U + 2U + 2U + 1U + 1U) << out.str();
+    for (const std::size_t first : {1U, 3U, 5U}) {
+        EXPECT_EQ(json_field(lines[first], "answered"), "true") << lines[first];
+        EXPECT_EQ(json_field(lines[first], "sha256"), "") << lines[first];
+        EXPECT_EQ(json_field(lines[first], "name"), json_field(lines[first + 1], "name"));
+        EXPECT_EQ(json_field(lines[first], "rows"), json_field(lines[first + 1], "rows"));
+        EXPECT_EQ(json_field(lines[first], "engine_ns"), json_field(lines[first + 1], "engine_ns"));
+        EXPECT_NE(json_field(lines[first + 1], "sha256"), "") << lines[first + 1];
+    }
+    EXPECT_EQ(std::to_string(column_form(day).size()), json_field(lines[1], "rows"));
+    EXPECT_EQ(json_field(lines[7], "name"), "n");
+    EXPECT_NE(json_field(lines[7], "sha256"), "");
+    EXPECT_EQ(json_field(lines[8], "answered"), "");
+    EXPECT_NE(json_field(lines[8], "error"), "");
+}
+
 TEST(QueryCli, BusiestLocateTakesTheLowestOnATie) {
     const ::tick_store::test::ScratchDir dir;
     // Locates 7 and 5 tie with two rows each, 9 has one, and locate 0 has three, which

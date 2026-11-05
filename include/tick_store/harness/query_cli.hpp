@@ -16,6 +16,12 @@
 //       parameter compare/queries.py's busiest_locate() picks.
 //   {"kind": "quit"}
 //
+// A rows, minute_aggregate or column_sum request may add "ack": true. The worker then writes
+// {"name", "kind", "answered": true, "rows", "engine_ns"} as soon as the engine has the answer
+// in memory, and the full answer line after it, once the digest is made. The comparison harness
+// stops its clock on the first line, so the digest falls outside it, as the other systems'
+// digests do. An error has no first line.
+//
 // The ready line holds the store's records and segments as the reader parsed them, and what the
 // harness reads back as settings in force: `store_version` and `segment_records` from the bytes
 // of the store section, `kernel_level`, the kernel set this process chose (codec/simd.hpp, so a

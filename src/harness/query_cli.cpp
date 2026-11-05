@@ -333,7 +333,7 @@ private:
 
 // One request line to one answer line.
 [[nodiscard]] std::string answer(ItchQuery& query, std::string_view line, std::int64_t midnight,
-                                 bool& quit) {
+                                 bool& quit, std::ostream& out) {
     JsonReader reader{line};
     const auto request = reader.object();
     if (!request.has_value()) {
@@ -351,6 +351,20 @@ private:
         quit = true;
         return head + "}";
     }
+    // With "ack": true, a line goes out as soon as the engine has the answer in memory, before
+    // the digest is made, so a caller can stop its clock where the other systems' clocks stop:
+    // with the answer in hand, and its digest still to make.
+    const auto ack_at = request->find("ack");
+    const bool ack = ack_at != request->end() && std::holds_alternative<bool>(ack_at->second) &&
+                     std::get<bool>(ack_at->second);
+    const auto acknowledge = [&](std::size_t rows, std::int64_t engine) {
+        if (ack) {
+            out << std::format(R"({},"answered":true,"rows":{},"engine_ns":{}}})", head, rows,
+                               engine)
+                << '\n'
+                << std::flush;
+        }
+    };
     const auto start = integer(*request, "start_ns").value_or(0);
     const auto end = integer(*request, "end_ns").value_or(0);
     const auto locate = integer(*request, "locate").value_or(-1);
@@ -372,6 +386,7 @@ private:
         if (!rows.has_value()) {
             return fail(store::to_string(rows.error()));
         }
+        acknowledge(rows->size(), engine);
         const auto digest_clock = std::chrono::steady_clock::now();
         const std::string digest = rows_digest(*rows, midnight);
         return std::format(R"({},"rows":{},"sha256":"{}","engine_ns":{},"digest_ns":{},{}}})",
@@ -395,6 +410,7 @@ private:
         if (!minutes.has_value()) {
             return fail(store::to_string(minutes.error()));
         }
+        acknowledge(minutes->size(), engine);
         const auto digest_clock = std::chrono::steady_clock::now();
         std::string json = "[";
         for (std::size_t i = 0; i < minutes->size(); ++i) {
@@ -413,6 +429,7 @@ private:
         if (!sum.has_value()) {
             return fail(store::to_string(sum.error()));
         }
+        acknowledge(1, engine);
         const auto digest_clock = std::chrono::steady_clock::now();
         const std::string json = std::format("[[{},{}]]", sum->records, sum->sum);
         return aggregate(engine, json, 1, since(digest_clock));
@@ -528,7 +545,7 @@ int run_query_cli(std::span<const std::string_view> arguments, std::istream& in,
         if (line.find_first_not_of(" \t\r") == std::string::npos) {
             continue;
         }
-        out << answer(query, line, *midnight, quit) << '\n' << std::flush;
+        out << answer(query, line, *midnight, quit, out) << '\n' << std::flush;
     }
     return kExitPass;
 }
