@@ -2007,8 +2007,12 @@ references and add prices are zstd-wrapped, and the whole `locate` column of the
 decoding, 10% in the run scans and 11% in the window's search of each run. The file-order column
 of experiment 2 removes the first two, which is its halving of Q4; the rest is reading each of
 about 9,000 runs from its start, for its reference list and its time and index chains
-(`prof-q1-combo22.txt` shows the same for Q1 on the `file_locate` store). Neither suggested a change
-that fits this round; both are TASKS items.
+(`prof-q1-combo22.txt` shows the same for Q1 on the `file_locate` store). On debian, `perf record -e
+cycles:u` of the same store at `1669ae0` (flat, `phase3-raw/layout/debian/perf/`): Q4's top symbol is
+`positions_from_runs`, 14.9%, then column access 8.8%, dictionary decoding 8.3% and the run scans
+7.1%; Q5 is 30.0% dictionary decoding, 11.5% column access and 18% PFOR unpacking and patches, with
+about 15% at addresses perf could not resolve to a symbol. Neither host suggested a change that fits this
+round; both are TASKS items.
 
 **The final layout, chosen by the rule.** Store version 3, unchanged: no byte means anything new, so
 every version 3 file still reads and the version is not raised. The writer's defaults change:
@@ -2034,6 +2038,17 @@ asks, with nothing to score against there.
   Both attempts' files are in `phase3-raw/layout/store/10302019/`.
 - The slice store gives every digest of `results/compare/*.json`, both files, both paths, 5 of 5.
   The full-day store gives the oracle's answer to Q1 to Q5 and the busiest locate on both paths.
+- Fuzzing at `1669ae0`, seeds from the real encoders, 300 s each through `check.sh`: `fuzz_dictionary`
+  18,405 runs (its oracle now re-encodes every block under the ranked-PFOR mode set too),
+  `fuzz_itch_query` 52,926 and `fuzz_itch_store` 663,308, no failure. The compare module's
+  real-system tests pass on both hosts, 11 of 11.
+- Faults for the new checks, each shown failing by `prove_checks.py --only`: the encoder trying
+  Huffman whatever its mode set (`fuzz-dictionary-mode-set-ignored`) and taking Huffman when it is
+  larger than ranked PFOR (`fuzz-dictionary-mode-set-larger-block`) are caught by the dictionary
+  oracle in `fuzz_dictionary`, exit 77; the encoder held to ranked PFOR refusing a block
+  (`dict-pfor-only-refuses`) stops the writer and the seed generator before any fuzzing, so it is
+  proved by the dictionary unit tests, exit 8. All three passed their baselines. Every earlier fault
+  patch still applies.
 
 **Likely verdicts, iteration-only.**
 
