@@ -10,6 +10,7 @@ memory is that step's alone.
     open()               the client, in the worker
     settings_in_force()  everything requested against what the engine says. Raises
     ingest(columns, table)  everything, durable under the class. Returns timings
+    settings_after_ingest()  what only the stored form can show. Raises
     probe_flush(table)   a small commit. dirty_paths() are read straight after it returns
     read_all()           the whole table as Arrow, ordered by seq
     query_*()            the three query shapes in compare/queries.py
@@ -40,6 +41,8 @@ class RunContext:
     full_day: bool = False
     heap: str = "1g"
     gc_log: Path | None = None
+    # The ITCH source itself, for a system whose natural input it is: tick-store's.
+    source: Path | None = None
 
 
 class System(ABC):
@@ -105,6 +108,11 @@ class System(ABC):
     @abstractmethod
     def settings_in_force(self):
         """Requested against in force, as Setting.as_json dicts. Raises SettingsMismatch."""
+
+    def settings_after_ingest(self):
+        """Settings only the stored form can show, read once the write has returned and outside
+        its clock. Raises SettingsMismatch."""
+        return []
 
     @abstractmethod
     def stored_settings(self):

@@ -82,7 +82,8 @@ class Runner:
         self.step_number = 0
 
     def context(self, root, variant, durability):
-        return RunContext(self.layout, root, variant, durability, self.day, THREADS)
+        return RunContext(self.layout, root, variant, durability, self.day, THREADS,
+                          source=self.source)
 
     def note(self, text):
         print(f"[{time.strftime('%H:%M:%S')}] {self.args.system}: {text}", flush=True)
@@ -99,7 +100,7 @@ class Runner:
         answer_path = request_path.with_suffix(".answer")
         request = {"step": step, "system": system.name, "variant": system.context.variant,
                    "class": system.context.durability, "root": str(system.root),
-                   "day": self.pin["day"],
+                   "day": self.pin["day"], "source": str(self.source),
                    "layout": {key: str(getattr(self.layout, key))
                               for key in ("data", "vendor", "work", "tools")}, **fields}
         request_path.write_text(json.dumps(request), encoding="utf-8")
@@ -234,6 +235,7 @@ class Runner:
             system.stop_service()
 
         cold = {query.name: [] for query in queries}
+        cold_engine = {query.name: [] for query in queries}
         proofs = {query.name: [] for query in queries}
         for query in queries:
             self.note(f"{variant}: cold {query.name}")
@@ -250,6 +252,7 @@ class Runner:
                     system.stop_service()
                 proofs[query.name].append(coldcache.proof_of_cold(evicted, after, device.delta()))
                 cold[query.name].append(answer["seconds"])
+                cold_engine[query.name].append(answer.get("engine_seconds"))
 
         results = {}
         for query in queries:
@@ -260,6 +263,12 @@ class Runner:
                 "warm": {**latency(warm_query["seconds"]), "proof": warm["proof"]},
                 "cold": {**latency(cold[query.name]), "proofs": proofs[query.name]},
             }
+            # A system that reports its engine's own time gets it beside the round trip, which
+            # stays the number that is compared.
+            if "engine_seconds" in warm_query:
+                results[query.name]["warm"]["engine"] = latency(warm_query["engine_seconds"])
+            if None not in cold_engine[query.name]:
+                results[query.name]["cold"]["engine"] = latency(cold_engine[query.name])
         floor = latency(warm["floor_seconds"])
         return results, floor, warm["peak_rss_bytes"], self.after_queries(system)
 
@@ -344,7 +353,8 @@ def latency(seconds):
     ordered = sorted(seconds)
     rank = max(0, -(-99 * len(ordered) // 100) - 1)
     return {"n": len(ordered), "median_us": statistics.median(ordered) * 1e6,
-            "p99_us": ordered[rank] * 1e6, "min_us": ordered[0] * 1e6, "max_us": ordered[-1] * 1e6}
+            "p99_us": ordered[rank] * 1e6, "mean_us": statistics.fmean(ordered) * 1e6,
+            "min_us": ordered[0] * 1e6, "max_us": ordered[-1] * 1e6}
 
 
 def summarise_writes(repetitions, pin):

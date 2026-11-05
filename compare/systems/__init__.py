@@ -1,4 +1,4 @@
-"""The comparison systems, behind one interface. Phase 3 adds tick-store's own."""
+"""The comparison systems, behind one interface, tick-store's own among them."""
 
 
 def system_class(name):
@@ -12,7 +12,10 @@ def system_class(name):
     if name == "questdb":
         from compare.systems.questdb_system import QuestDBSystem
         return QuestDBSystem
+    if name == "tickstore":
+        from compare.systems.tickstore import TickStoreSystem
+        return TickStoreSystem
     raise ValueError(f"unknown system {name}")
 
 
-SYSTEM_NAMES = ("parquet", "arcticdb", "questdb")
+SYSTEM_NAMES = ("parquet", "arcticdb", "questdb", "tickstore")

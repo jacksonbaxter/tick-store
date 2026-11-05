@@ -45,6 +45,7 @@ def step_ingest(system, request, layout):
     table = arrow_table(columns, system.context.day)
     settings = system.settings_in_force()
     timings = system.ingest(columns, table)
+    settings = settings + system.settings_after_ingest()
     answer = {"timings": timings, "settings": settings, "rows": table.num_rows}
     if request.get("flush_report"):
         saved = system.dirty_paths
@@ -125,12 +126,16 @@ def step_warm_queries(system, request, layout):
     answers = {}
     for query in queries:
         seconds = []
+        engine = []
         for _ in range(repetitions):
             elapsed, result = timed_query(system, query)
             seconds.append(elapsed)
             digest = digest_result(query, result)
             require_truth(query, digest, truth[query.name], system.name)
+            engine.append(engine_seconds(result))
         answers[query.name] = {"seconds": seconds, "digest": digest}
+        if None not in engine:
+            answers[query.name]["engine_seconds"] = engine
     after = coldcache.residency(layout, paths)
     proof = coldcache.proof_of_warm(before, after)
     floor = python_floor(system)
@@ -138,12 +143,17 @@ def step_warm_queries(system, request, layout):
     return {"queries": answers, "proof": proof, "floor_seconds": floor, "scan_facts": facts}
 
 
+def engine_seconds(result):
+    """The engine's own time for an answer, where the system reports one beside the round trip."""
+    return getattr(result, "engine_seconds", None)
+
+
 def step_cold_query(system, request, layout):
     query = query_from_json(request["query"])
     elapsed, result = timed_query(system, query)
     digest = digest_result(query, result)
     require_truth(query, digest, request["truth"], system.name)
-    return {"seconds": elapsed, "digest": digest}
+    return {"seconds": elapsed, "digest": digest, "engine_seconds": engine_seconds(result)}
 
 
 STEPS = {"ingest": step_ingest, "flush_probe": step_flush_probe, "read_back": step_read_back,
@@ -156,8 +166,10 @@ def main(argv):
     request = json.loads(Path(argv[0]).read_text(encoding="utf-8"))
     layout = Layout(**{key: Path(value) for key, value in request["layout"].items()})
     day = TradingDay.from_pin(request["day"])
+    source = request.get("source")
     context = RunContext(layout, Path(request["root"]), request["variant"], request["class"], day,
-                         full_day=request.get("full_day", False))
+                         full_day=request.get("full_day", False),
+                         source=Path(source) if source else None)
     system = system_class(request["system"])(context)
     system.open()
     try:

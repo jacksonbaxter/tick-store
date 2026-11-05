@@ -197,7 +197,12 @@ def run_query(system, query):
 
 def digest_result(query, result):
     """The common form of a system's answer. Each system returns rows as an Arrow table, and
-    aggregates as a list of lists of ints."""
+    aggregates as a list of lists of ints, except one that digests its own answer: tick-store's
+    worker returns no rows to Python, only their digest, made by the same rule as rows_digest,
+    and an object whose harness_digest gives it."""
+    own = getattr(result, "harness_digest", None)
+    if own is not None:
+        return own(query)
     return rows_digest(result) if query.kind == "rows" else aggregate_digest(result)
 
 
