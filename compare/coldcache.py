@@ -99,6 +99,16 @@ def proof_of_cold(evicted, after, device_delta):
             "metadata": "stays warm: neither method reaches file system metadata"}
 
 
+def meminfo_bytes(field):
+    """A /proc/meminfo field in bytes, or None where there is no such file (macOS)."""
+    if platform.system() != "Linux":
+        return None
+    for line in Path("/proc/meminfo").read_text(encoding="ascii").splitlines():
+        if line.startswith(f"{field}:"):
+            return int(line.split()[1]) * 1024
+    return None
+
+
 def _iostat_megabytes():
     text = subprocess.run(["iostat", "-Id", IOSTAT_DEVICE], check=True, capture_output=True,
                           text=True).stdout

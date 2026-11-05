@@ -190,14 +190,17 @@ def warm_full_day(system, request, layout):
         for _ in range(WARM_ATTEMPTS):
             warm_up = timed_repetitions(system, query, truth, WARM_UP_RUNS)[0]
             before = coldcache.residency(layout, paths)
+            free_before = coldcache.meminfo_bytes("MemFree")
             device = coldcache.DeviceCounter(paths[0])
             seconds, engine, digest = timed_repetitions(system, query, truth, repetitions)
             moved = device.delta()
+            free_after = coldcache.meminfo_bytes("MemFree")
             after = coldcache.residency(layout, paths)
             attempt = {"device_bytes_read": moved["bytes"], "device_counter": moved["counter"],
                        "warm_up_runs": len(warm_up), "warm_up_seconds": warm_up,
                        "pages": after["pages"], "resident_before": before["resident_pages"],
                        "resident_after": after["resident_pages"],
+                       "mem_free_bytes_before": free_before, "mem_free_bytes_after": free_after,
                        "median_us": statistics.median(seconds) * 1e6}
             attempts.append(attempt)
             if moved["bytes"] == 0:

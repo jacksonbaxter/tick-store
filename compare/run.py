@@ -79,7 +79,10 @@ FULL_DAY_WARM = ("Query by query, since QuestDB's store is larger than this host
                  "untimed run first, answer checked, then the block device under the store must "
                  "read 0 bytes across all repetitions. An attempt where it read any is kept in "
                  "the result and run again, up to three times. Residency of every store file "
-                 "is recorded before and after.")
+                 "is recorded before and after. Before the warm queries the day's ITCH file, "
+                 "its export and every store file are evicted from the page cache, each proven "
+                 "at 0 resident, so that reclaim does not take the queries' own pages; MemFree "
+                 "is recorded either side.")
 FULL_DAY_WRITES = ("One write per class and variant, each a sustained run of minutes over the "
                    "whole day, so a write's median is that one write. Three of each would not "
                    "fit the run: see compare/README.md.")

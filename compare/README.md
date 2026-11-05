@@ -464,7 +464,13 @@ TICK_STORE_MEASURE=<wrapper> <venv>/bin/python -I compare/run.py --day 12302019 
   all 30 repetitions, by its own sectors-read counter. An attempt where it read anything is kept
   in the result, with what it read, and the query runs again, up to three attempts; a third
   failure stops the run. The counter is machine-wide, so another process's read can only fail an
-  attempt, never pass one. Residency of every store file is recorded before and after.
+  attempt, never pass one. Residency of every store file is recorded before and after. Before
+  the warm queries the day's ITCH file, its export and every store file are evicted from the
+  page cache, the store flushed first, each proven at 0 resident, and MemFree is recorded either
+  side: the first full-day run at `193177b` left them filling the page cache with almost no
+  memory free, and Parquet's Q2 failed all three attempts with 782,336, 274,432 and 73,728
+  bytes read while the store's resident pages held steady, which is reclaim taking pages back
+  between repetitions. Each query's untimed run then reads what it needs.
 - **Cold is as on the slice:** every store file evicted and proven at 0 resident, a fresh process,
   and the device's count must reach what became resident.
 - **The guard.** Each system runs under `compare/guard.py`, inside the measurement wrapper and

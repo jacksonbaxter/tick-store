@@ -68,12 +68,7 @@ def on_terminate(signal_number, frame):
 
 
 def memory_available_bytes():
-    if platform.system() != "Linux":
-        return None
-    for line in Path("/proc/meminfo").read_text(encoding="ascii").splitlines():
-        if line.startswith("MemAvailable:"):
-            return int(line.split()[1]) * 1024
-    return None
+    return coldcache.meminfo_bytes("MemAvailable")
 
 
 class Runner:
@@ -92,6 +87,7 @@ class Runner:
             self.columns_dir = self.layout.export_dir(args.slice)
         self.day = TradingDay.from_pin(self.pin["day"])
         self.windows = None
+        self.cleared = None
         self.stores = self.layout.work / "stores" / args.system
         self.requests = self.layout.work / "requests" / args.system
         self.system_class = system_class(args.system)
@@ -256,6 +252,8 @@ class Runner:
         root = self.stores / variant / durability
         system = self.system_class(self.context(root, variant, durability))
         paths = system.data_paths()
+        if self.full_day:
+            self.cleared = self.clear_page_cache(root, paths)
         self.note(f"{variant}: warm queries")
         try:
             system.start_service()
@@ -306,6 +304,28 @@ class Runner:
                 results[query.name]["cold"]["engine"] = latency(cold_engine[query.name])
         floor = latency(warm["floor_seconds"])
         return results, floor, warm["peak_rss_bytes"], self.after_queries(system)
+
+    def clear_page_cache(self, root, paths):
+        """On a day, the page cache emptied of the inputs and the store before warm queries.
+
+        The writes, the read-back, the oracle and the ground truth leave a day's source, its
+        export and the store filling this host's 15 GB of page cache, with almost no memory
+        free. Then the memory a query allocates is taken by reclaim, which can drop the pages
+        the query just read, or the worker's own code, between repetitions, and the warm proof's
+        device counter rightly fails. So the source, the export and every store file are
+        evicted, each proven at 0 resident, with the service stopped and the store flushed, and
+        MemFree is recorded either side. Each query's untimed run then reads what it needs; the
+        warm proof itself is unchanged."""
+        free_before = coldcache.meminfo_bytes("MemFree")
+        sync_tree(root)
+        inputs = coldcache.evict(self.layout, [self.source, self.columns_dir])
+        store = coldcache.evict(self.layout, paths)
+        return {"what": "the day's ITCH file and its export, then every store file",
+                "input_pages": inputs["pages"], "store_pages": store["pages"],
+                "resident_after": inputs["resident_pages"] + store["resident_pages"],
+                "passes": [inputs["passes"], store["passes"]], "method": store["method"],
+                "mem_free_bytes_before": free_before,
+                "mem_free_bytes_after": coldcache.meminfo_bytes("MemFree")}
 
     def after_queries(self, system):
         try:
@@ -364,6 +384,8 @@ class Runner:
                 entry["classes"][durability] = result
             query_results, floor, peak, extra = self.run_queries(variant, CLASSES[-1], queries,
                                                                  truth)
+            if self.full_day:
+                entry["page_cache_before_warm"] = self.cleared
             entry["queries"] = query_results
             entry["query_store_class"] = CLASSES[-1]
             entry["python_floor"] = {**floor, "what": "the same Python call over an empty "

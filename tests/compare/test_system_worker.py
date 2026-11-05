@@ -164,6 +164,54 @@ class FullDayWarm(unittest.TestCase):
         with self.assertRaisesRegex(ProofFailed, "each of 3 attempts"):
             self.run_warm([4096, 1, 8192])
 
+    def test_each_attempt_records_memfree_either_side(self):
+        accepted = self.run_warm([0])["proofs"]["Q5"]["accepted"]
+        self.assertIn("mem_free_bytes_before", accepted)
+        self.assertIn("mem_free_bytes_after", accepted)
+
+
+class PageCacheBeforeWarm(unittest.TestCase):
+    """Before a day's warm queries the source, the export and the store leave the page cache,
+    each proven at 0 resident, the store flushed first."""
+
+    def runner(self):
+        from compare import run_system
+
+        runner = run_system.Runner.__new__(run_system.Runner)
+        runner.layout = None
+        runner.source = Path("day.itch")
+        runner.columns_dir = Path("export/day-full")
+        return runner
+
+    def test_inputs_then_store_are_evicted_and_the_proof_kept(self):
+        from compare import coldcache, run_system
+
+        reports = [{"pages": 100, "resident_pages": 0, "passes": 1, "proven": True,
+                    "method": "fadvise"},
+                   {"pages": 7, "resident_pages": 0, "passes": 2, "proven": True,
+                    "method": "fadvise"}]
+        with (mock.patch.object(coldcache, "evict", side_effect=reports) as evict,
+              mock.patch.object(run_system, "sync_tree") as sync,
+              mock.patch.object(coldcache, "meminfo_bytes", side_effect=[1 << 30, 9 << 30])):
+            found = self.runner().clear_page_cache(Path("store"), [Path("store/a")])
+        sync.assert_called_once_with(Path("store"))
+        self.assertEqual(evict.call_args_list,
+                         [mock.call(None, [Path("day.itch"), Path("export/day-full")]),
+                          mock.call(None, [Path("store/a")])])
+        self.assertEqual((found["input_pages"], found["store_pages"], found["resident_after"]),
+                         (100, 7, 0))
+        self.assertEqual((found["mem_free_bytes_before"], found["mem_free_bytes_after"]),
+                         (1 << 30, 9 << 30))
+
+    def test_an_eviction_not_proven_stops_the_run(self):
+        from compare import coldcache, run_system
+
+        with (mock.patch.object(coldcache, "evict",
+                                side_effect=coldcache.ProofFailed("eviction not proven")),
+              mock.patch.object(run_system, "sync_tree"),
+              self.assertRaises(coldcache.ProofFailed)):
+            self.runner().clear_page_cache(Path("store"), [Path("store/a")])
+
 
 class RuntimeReading(unittest.TestCase):
     """The reading on both hosts' output, whichever host runs this."""
