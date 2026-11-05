@@ -133,9 +133,10 @@ def query_entry(name, system=None):
                   "resident_bytes_after_run": 4096, "device_bytes_read": 8192, "device_slack": 0}
     entry = {"digest": digest(name), "matches_ground_truth": True,
              "scan": {"rows_decoded": 5},
-             "warm": {"n": 3, "median_us": 10.0,
+             "warm": {"n": 3, "median_us": 10.0, "p99_us": 12.0,
                       "proof": {"pages": 8, "resident_before": 8, "resident_after": 8}},
-             "cold": {"n": 2, "median_us": 100.0, "proofs": [cold_proof, dict(cold_proof)]}}
+             "cold": {"n": 2, "median_us": 100.0, "p99_us": 110.0,
+                      "proofs": [cold_proof, dict(cold_proof)]}}
     if system == "tickstore":
         entry["warm"]["engine"] = {"n": 3, "median_us": 9.0}
         entry["cold"]["engine"] = {"n": 2, "median_us": 90.0}
@@ -445,6 +446,16 @@ class Faults(Harness):
         self.assert_fault(fault, "Q4 missing")
 
     # Warm and cold.
+
+    def test_a_query_with_no_p99(self):
+        def fault(document):
+            del q1_of(document, "tickstore")["cold"]["p99_us"]
+        self.assert_fault(fault, "tickstore.v.queries.Q1.cold: no median and p99")
+
+    def test_a_p99_below_the_median(self):
+        def fault(document):
+            q1_of(document)["warm"]["p99_us"] = 9.0
+        self.assert_fault(fault, "parquet.v.queries.Q1.warm: the p99 is below the median")
 
     def test_a_warm_number_with_no_proof(self):
         def fault(document):

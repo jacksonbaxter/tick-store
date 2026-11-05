@@ -260,6 +260,19 @@ def check_engine_time(where, query):
     return problems
 
 
+def check_latency(where, query):
+    """The median and p99 the README prints, each a number, the p99 no lower than the median."""
+    problems = []
+    for kind in ("warm", "cold"):
+        block = query.get(kind) or {}
+        median, p99 = block.get("median_us"), block.get("p99_us")
+        if not (check_results.is_number(median) and check_results.is_number(p99)):
+            problems.append(f"{where}.{kind}: no median and p99")
+        elif p99 < median:
+            problems.append(f"{where}.{kind}: the p99 is below the median")
+    return problems
+
+
 def check_queries(where, queries, truth, system_name=None):
     problems = []
     for name in QUERY_NAMES:
@@ -272,6 +285,7 @@ def check_queries(where, queries, truth, system_name=None):
             problems.append(f"{here}: differs from the ground truth")
         problems += check_warm(here, query.get("warm"))
         problems += check_cold(here, query.get("cold"))
+        problems += check_latency(here, query)
         if not query.get("scan"):
             problems.append(f"{here}: no rows or bytes decoded, or a statement of why not")
         if system_name == "tickstore":
