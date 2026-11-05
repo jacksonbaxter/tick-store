@@ -15,6 +15,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstddef>
 #include <filesystem>
 #include <format>
@@ -95,6 +96,47 @@ TEST_F(ColumnsCli, ExportStatesItsUsageAndAMissingSource) {
     const CliRun missing = run(run_export_cli, {(scratch / "absent").string(), directory.string()});
     EXPECT_EQ(missing.code, kExitUsageOrIo);
     EXPECT_TRUE(missing.output.err.contains("cannot read the source"));
+}
+
+// The comparison harness reads tick-store back this way: the store's records as the column
+// form, which must be the very files tick_export writes from the source, and pass the oracle.
+TEST_F(ColumnsCli, ExportFromAStoreWritesWhatTheSourceExportWrites) {
+    ASSERT_EQ(export_all().code, kExitPass);
+    const std::filesystem::path store_path = scratch / "store.tsc";
+    const std::vector<std::string> ingest{"ingest", source_path.string(), store_path.string(),
+                                          "--durability", "page_cache", "--segment-records", "8"};
+    const std::vector<std::string_view> views{ingest.begin(), ingest.end()};
+    CliOutput ingested;
+    ASSERT_EQ(run_roundtrip_cli(views, ingested), kExitPass) << ingested.err;
+
+    const std::filesystem::path from_store = scratch / "from-store";
+    const CliRun exported =
+        run(run_export_cli, {"--store", store_path.string(), from_store.string()});
+    ASSERT_EQ(exported.code, kExitPass) << exported.output.err;
+    EXPECT_TRUE(exported.output.out.contains("\"command\": \"store\""));
+    EXPECT_TRUE(exported.output.out.contains("\"records\": 26"));
+    EXPECT_TRUE(exported.output.out.contains("\"tail_bytes\": 4"));
+    EXPECT_FALSE(exported.output.out.contains(scratch.path().string()));
+    std::vector<std::string> names{store::kColumnFileNames.begin(), store::kColumnFileNames.end()};
+    names.emplace_back(store::kColumnsManifestName);
+    for (const std::string& name : names) {
+        const auto expected = store::MappedFile::open((directory / name).string());
+        const auto actual = store::MappedFile::open((from_store / name).string());
+        ASSERT_EQ(expected.has_value(), actual.has_value()) << name;
+        if (expected.has_value()) {
+            EXPECT_TRUE(std::ranges::equal(expected->bytes(), actual->bytes())) << name;
+        }
+    }
+    const std::vector<std::string> verify{"verify-columns", source_path.string(),
+                                          from_store.string()};
+    const std::vector<std::string_view> verify_views{verify.begin(), verify.end()};
+    CliOutput verified;
+    EXPECT_EQ(run_roundtrip_cli(verify_views, verified), kExitPass) << verified.err;
+
+    const CliRun refused = run(run_export_cli, {"--store", source_path.string(),
+                                                (scratch / "not-a-store").string()});
+    EXPECT_EQ(refused.code, kExitMismatch);
+    EXPECT_TRUE(refused.output.err.contains("the store does not open"));
 }
 
 TEST_F(ColumnsCli, VerifyColumnsPassesAndChecksThePin) {

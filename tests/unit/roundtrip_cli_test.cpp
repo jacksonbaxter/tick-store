@@ -268,6 +268,69 @@ TEST_F(RoundTripCliStore, IngestReportsTheStoreItWrote) {
     EXPECT_FALSE(contains(ingest.output.out, dir.path().string()));
 }
 
+// The harness reads the durability in force from this list, so it must hold the flushes the
+// writer really made: none in page_cache, and in device_flush the file before its directory.
+TEST_F(RoundTripCliStore, IngestListsTheFlushesItMade) {
+    const CliRun cached = run({"ingest", source_path.string(), store_path.string(),
+                               "--durability", "page_cache"});
+    ASSERT_EQ(cached.code, kExitPass) << cached.output.err;
+    EXPECT_TRUE(contains(cached.output.out, R"("flushes": [])"));
+
+    const CliRun flushed = run({"ingest", source_path.string(), store_path.string(),
+                                "--durability", "device_flush"});
+    ASSERT_EQ(flushed.code, kExitPass) << flushed.output.err;
+#ifdef __APPLE__
+    const std::string_view file_call = "F_FULLFSYNC";
+    const std::string_view directory_call = "F_FULLFSYNC";
+#else
+    const std::string_view file_call = "fdatasync";
+    const std::string_view directory_call = "fsync";
+#endif
+    const std::string file = std::format(
+        "{{\n      \"call\": \"{}\",\n      \"of\": \"file\",\n      \"result\": 0\n    }}",
+        file_call);
+    const std::string directory = std::format(
+        "{{\n      \"call\": \"{}\",\n      \"of\": \"directory\",\n      \"result\": 0\n    }}",
+        directory_call);
+    const auto file_at = flushed.output.out.find(file);
+    const auto directory_at = flushed.output.out.find(directory);
+    ASSERT_NE(file_at, std::string::npos) << flushed.output.out;
+    ASSERT_NE(directory_at, std::string::npos) << flushed.output.out;
+    EXPECT_LT(file_at, directory_at);
+    EXPECT_EQ(flushed.output.out.find(R"("of": )", directory_at + directory.size()),
+              std::string::npos)
+        << "a third flush: " << flushed.output.out;
+}
+
+TEST_F(RoundTripCliStore, FirstRecordsStoresThatManyAndNoTail) {
+    const CliRun ingest = run({"ingest", source_path.string(), store_path.string(),
+                               "--durability", "page_cache", "--first-records", "10"});
+    ASSERT_EQ(ingest.code, kExitPass) << ingest.output.err;
+    EXPECT_TRUE(contains(ingest.output.out, R"("records": 10)"));
+    EXPECT_TRUE(contains(ingest.output.out, R"("tail_bytes": 0)"));
+    const auto reader = store::ItchStoreReader::open(store_path);
+    ASSERT_TRUE(reader.has_value());
+    EXPECT_EQ(reader->header().record_count, 10U);
+
+    // More than the source has is the whole source, its tail included.
+    const CliRun all = run({"ingest", source_path.string(), store_path.string(), "--durability",
+                            "page_cache", "--first-records", "1000"});
+    ASSERT_EQ(all.code, kExitPass) << all.output.err;
+    EXPECT_TRUE(contains(all.output.out, R"("records": 26)"));
+    EXPECT_TRUE(contains(all.output.out, R"("tail_bytes": 4)"));
+    for (const std::string_view bad : {"0", "x", "-1"}) {
+        EXPECT_EQ(run({"ingest", source_path.string(), store_path.string(), "--durability",
+                       "page_cache", "--first-records", std::string{bad}})
+                      .code,
+                  kExitUsageOrIo)
+            << bad;
+    }
+    EXPECT_EQ(run({"ingest", source_path.string(), store_path.string(), "--durability",
+                   "page_cache", "--first-records", "1", "--first-records", "2"})
+                  .code,
+              kExitUsageOrIo);
+}
+
 TEST_F(RoundTripCliStore, VerifyPassesAgainstThePinWithAndWithoutChecksums) {
     const CliRun verify =
         run({"verify", source_path.string(), store_path.string(), "--expect-sha256", pin});

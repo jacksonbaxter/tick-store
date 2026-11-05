@@ -6,6 +6,7 @@
 #include "itch_store_fixture.hpp"
 #include "scratch_dir.hpp"
 #include "stub_fixture.hpp"
+#include "tick_store/codec/simd.hpp"
 #include "tick_store/harness/query_cli.hpp"
 #include "tick_store/harness/roundtrip_cli.hpp"
 #include "tick_store/harness/sha256.hpp"
@@ -793,6 +794,34 @@ TEST(QueryCli, ServesEveryKindWithTheHarnessDigests) {
     ASSERT_EQ(lines.size(), 8U) << out.str();
     EXPECT_EQ(json_field(lines[0], "ready"), "true");
     EXPECT_EQ(lines[0].find('/'), std::string::npos);
+    // What the harness reads back as settings in force.
+    EXPECT_EQ(json_field(lines[0], "store_version"), "3");
+    EXPECT_EQ(json_field(lines[0], "segment_records"), "5000");
+    EXPECT_EQ(json_field(lines[0], "records"), std::to_string(day.messages.size()));
+    const codec::simd::KernelLevel level = codec::simd::active_kernels().level;
+    EXPECT_EQ(json_field(lines[0], "kernel_level"), codec::simd::to_string(level));
+    EXPECT_EQ(json_field(lines[0], "kernel_best"),
+              codec::simd::to_string(codec::simd::best_kernel_level()));
+    // Each answer counts the kernel calls of its own request: only the chosen set's.
+    const auto kernel_runs = [](std::string_view line) {
+        const auto at = line.find("\"kernel_runs\":{");
+        return at == std::string_view::npos
+                   ? std::string{}
+                   : std::string{line.substr(at, line.find('}', at) + 1 - at)};
+    };
+    for (const std::size_t answer : {1U, 2U, 3U, 4U}) {
+        const std::string runs = kernel_runs(lines[answer]);
+        ASSERT_FALSE(runs.empty()) << lines[answer];
+        for (const codec::simd::KernelLevel other : codec::simd::kAllKernelLevels) {
+            if (other != level) {
+                EXPECT_TRUE(runs.contains(std::format("\"{}\":0", codec::simd::to_string(other))))
+                    << lines[answer];
+            }
+        }
+    }
+    EXPECT_FALSE(kernel_runs(lines[1])
+                     .contains(std::format("\"{}\":0", codec::simd::to_string(level))))
+        << "Q1 decodes PFOR timestamps, so the chosen set ran: " << lines[1];
 
     const auto q1 = window_of(all, t, t + 200'000'000, std::nullopt);
     EXPECT_EQ(json_field(lines[1], "rows"), std::to_string(q1.size()));

@@ -4,9 +4,11 @@
 
 #include "tick_store/harness/roundtrip_cli.hpp"
 #include "tick_store/harness/sha256.hpp"
+#include "tick_store/codec/simd.hpp"
 #include "tick_store/store/itch_query.hpp"
 #include "tick_store/store/itch_store.hpp"
 #include "tick_store/store/itch_store_reader.hpp"
+#include "tick_store/store/little_endian.hpp"
 
 #include <array>
 #include <chrono>
@@ -288,12 +290,39 @@ private:
     return to_hex(sha256(std::as_bytes(std::span{json.data(), json.size()})));
 }
 
+// Calls into each kernel set on this thread since the last reset, so the harness can check
+// that the set it asked for is the one that ran (codec/simd.hpp).
+[[nodiscard]] std::string kernel_runs_json() {
+    const auto runs = codec::simd::kernel_runs();
+    std::string out = "{";
+    for (std::size_t level = 0; level < codec::simd::kKernelLevels; ++level) {
+        out += std::format(R"({}"{}":{})", level == 0 ? "" : ",",
+                           codec::simd::to_string(codec::simd::kAllKernelLevels[level]),
+                           runs[level]);
+    }
+    out += '}';
+    return out;
+}
+
 [[nodiscard]] std::string stats_json(const QueryStats& stats) {
     return std::format(
         R"("segments":{},"exact_segments":{},"blocks":{},"bytes_decoded":{},)"
-        R"("values_decoded":{})",
+        R"("values_decoded":{},"kernel_runs":{})",
         stats.segments, stats.exact_segments, stats.blocks, stats.bytes_decoded,
-        stats.values_decoded);
+        stats.values_decoded, kernel_runs_json());
+}
+
+// The store section's version and segment size, read from the file's own bytes rather than
+// from what the reader made of them, or 0 where the section is short.
+[[nodiscard]] std::pair<std::uint64_t, std::uint64_t> stored_version_and_segment(
+    const store::ItchStoreReader& reader) {
+    const auto section = reader.container().section(store::kStoreSection);
+    if (!section.has_value()) {
+        return {0, 0};
+    }
+    const auto version = store::read_le<4>(section->bytes, store::kStoreVersionOffset);
+    const auto segment = store::read_le<4>(section->bytes, store::kStoreSegmentRecordsOffset);
+    return {version.value_or(0), segment.value_or(0)};
 }
 
 [[nodiscard]] std::int64_t since(std::chrono::steady_clock::time_point start) {
@@ -312,6 +341,7 @@ private:
     }
     const std::string kind = text(*request, "kind");
     const std::string name = text(*request, "name");
+    codec::simd::reset_kernel_runs();
     const std::string head =
         std::format(R"({{"name":{},"kind":{})", json_string(name), json_string(kind));
     const auto fail = [&](std::string_view why) {
@@ -478,10 +508,18 @@ int run_query_cli(std::span<const std::string_view> arguments, std::istream& in,
         return kExitMismatch;
     }
     ItchQuery query{*reader, query_path};
+    // Choosing the kernel set here, before the ready line, means a TICK_STORE_SIMD cap that
+    // names no level, or one this processor lacks, stops the worker before any answer.
+    const codec::simd::KernelLevel level = codec::simd::active_kernels().level;
+    const auto [version, segment] = stored_version_and_segment(*reader);
     out << std::format(
-               R"({{"ready":true,"open_ns":{},"segments":{},"records":{},"path":"{}"}})",
+               R"({{"ready":true,"open_ns":{},"segments":{},"records":{},"path":"{}",)"
+               R"("store_version":{},"segment_records":{},"kernel_level":"{}",)"
+               R"("kernel_best":"{}"}})",
                since(clock), reader->segment_count(), reader->header().record_count,
-               query_path == store::QueryPath::indexed ? "indexed" : "exact")
+               query_path == store::QueryPath::indexed ? "indexed" : "exact", version, segment,
+               codec::simd::to_string(level),
+               codec::simd::to_string(codec::simd::best_kernel_level()))
         << '\n'
         << std::flush;
     std::string line;

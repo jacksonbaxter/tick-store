@@ -34,13 +34,14 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <vector>
 
 namespace tick_store::harness {
 namespace {
 
 constexpr std::string_view kUsage =
     "usage: tick_roundtrip ingest <source> <store> --durability page_cache|device_flush\n"
-    "                             [--segment-records N]\n"
+    "                             [--segment-records N] [--first-records N]\n"
     "       tick_roundtrip ingest-stub <source> <store>\n"
     "       tick_roundtrip verify <source> <store> [--expect-sha256 HEX] [--no-checksums]\n"
     "       tick_roundtrip verify-columns <source> <columns-dir> [--expect-sha256 HEX]\n"
@@ -324,8 +325,75 @@ int store_failure(CliOutput& output, std::string_view what, const store::ItchSto
     return kExitUsageOrIo;
 }
 
+// The real system calls, each flush recorded with what it was called on and what it
+// returned, so the report says which flushes the writer made rather than which it was asked
+// for. The comparison harness reads this back as the durability in force.
+class RecordingFileOps final : public store::FileOps {
+public:
+    struct Flush {
+        std::string_view call;
+        std::string_view of;
+        int result = 0;
+    };
+
+    int create_file(const char* path) override {
+        const int fd = real_.create_file(path);
+        if (fd >= 0) {
+            std::erase(directories_, fd);
+        }
+        return fd;
+    }
+    int open_directory(const char* path) override {
+        const int fd = real_.open_directory(path);
+        if (fd >= 0) {
+            directories_.push_back(fd);
+        }
+        return fd;
+    }
+    std::ptrdiff_t write(int fd, const std::byte* data, std::size_t size) override {
+        return real_.write(fd, data, size);
+    }
+    int full_fsync(int fd) override { return record("F_FULLFSYNC", fd, real_.full_fsync(fd)); }
+    int fsync(int fd) override { return record("fsync", fd, real_.fsync(fd)); }
+    int fdatasync(int fd) override { return record("fdatasync", fd, real_.fdatasync(fd)); }
+    int close(int fd) override {
+        std::erase(directories_, fd);
+        return real_.close(fd);
+    }
+    int rename(const char* from, const char* to) override { return real_.rename(from, to); }
+    int unlink(const char* path) override { return real_.unlink(path); }
+
+    [[nodiscard]] const std::vector<Flush>& flushes() const noexcept { return flushes_; }
+
+private:
+    int record(std::string_view call, int fd, int result) {
+        const bool directory = std::ranges::find(directories_, fd) != directories_.end();
+        flushes_.push_back(Flush{.call = call, .of = directory ? "directory" : "file",
+                                 .result = result});
+        return result;
+    }
+
+    store::FileOps& real_ = store::posix_file_ops();
+    std::vector<int> directories_;
+    std::vector<Flush> flushes_;
+};
+
+// The bytes of the first `records` whole frames, so a small commit can be made from the start
+// of a source. A source with fewer frames is taken whole, tail included.
+[[nodiscard]] std::span<const std::byte> first_frames(std::span<const std::byte> source,
+                                                      std::uint64_t records) {
+    itch::FrameCursor cursor{source};
+    for (std::uint64_t i = 0; i < records; ++i) {
+        if (!cursor.next().has_value()) {
+            return source;
+        }
+    }
+    return source.first(source.size() - cursor.remaining().size());
+}
+
 int run_ingest(std::string_view source_path, std::string_view store_path,
-               store::Durability durability, store::ItchStoreOptions options, CliOutput& output) {
+               store::Durability durability, store::ItchStoreOptions options,
+               std::optional<std::uint64_t> first_records, CliOutput& output) {
     using Clock = std::chrono::steady_clock;
     const Clock::time_point start = Clock::now();
 
@@ -333,13 +401,16 @@ int run_ingest(std::string_view source_path, std::string_view store_path,
     if (!source.has_value()) {
         return io_failure(output, "cannot read the source", source.error());
     }
-    auto writer = store::ItchStoreWriter::create(store_path, durability, options);
+    const std::span<const std::byte> input =
+        first_records.has_value() ? first_frames(source->bytes(), *first_records) : source->bytes();
+    RecordingFileOps ops;
+    auto writer = store::ItchStoreWriter::create(store_path, durability, options, ops);
     if (!writer.has_value()) {
         return store_failure(output, "cannot create the store", writer.error());
     }
     IngestCounts counts;
     const auto failed = walk_source(
-        source->bytes(), counts,
+        input, counts,
         [&](const itch::Message& message) -> std::optional<int> {
             if (const auto appended = writer->append(message); !appended.has_value()) {
                 return store_failure(output, "cannot write the store", appended.error());
@@ -364,10 +435,20 @@ int run_ingest(std::string_view source_path, std::string_view store_path,
     json.field("store_format", std::string_view{"itch-store-v3"});
     json.field("durability", to_string(durability));
     json.field("segment_records", std::uint64_t{options.segment_records});
-    write_ingest_fields(json, counts, source->bytes().size(), stored);
+    write_ingest_fields(json, counts, input.size(), stored);
     json.field("ratio", stored == 0 ? 0.0
-                                    : static_cast<double>(source->bytes().size()) /
+                                    : static_cast<double>(input.size()) /
                                           static_cast<double>(stored));
+    json.key("flushes");
+    json.begin_array();
+    for (const RecordingFileOps::Flush& flush : ops.flushes()) {
+        json.begin_object();
+        json.field("call", flush.call);
+        json.field("of", flush.of);
+        json.field("result", static_cast<std::int64_t>(flush.result));
+        json.end_object();
+    }
+    json.end_array();
     json.field("wall_seconds", std::chrono::duration<double>{Clock::now() - start}.count());
     json.field("peak_rss_bytes", peak_resident_bytes());
     json.end_object();
@@ -492,6 +573,7 @@ int run_roundtrip_cli(std::span<const std::string_view> arguments, CliOutput& ou
 
     if (command == "ingest" && rest.size() >= 2) {
         std::optional<store::Durability> durability;
+        std::optional<std::uint64_t> first_records;
         store::ItchStoreOptions options;
         for (std::size_t i = 2; i < rest.size(); i += 2) {
             if (i + 1 >= rest.size()) {
@@ -507,6 +589,12 @@ int run_roundtrip_cli(std::span<const std::string_view> arguments, CliOutput& ou
                     return usage(output);
                 }
                 options.segment_records = *value;
+            } else if (rest[i] == "--first-records" && !first_records.has_value()) {
+                const auto value = parse_number<std::uint64_t>(rest[i + 1]);
+                if (!value.has_value() || *value == 0) {
+                    return usage(output);
+                }
+                first_records = *value;
             } else {
                 return usage(output);
             }
@@ -515,7 +603,7 @@ int run_roundtrip_cli(std::span<const std::string_view> arguments, CliOutput& ou
         if (!durability.has_value()) {
             return usage(output);
         }
-        return run_ingest(rest[0], rest[1], *durability, options, output);
+        return run_ingest(rest[0], rest[1], *durability, options, first_records, output);
     }
     if (command == "ingest-stub" && rest.size() == 2) {
         return run_ingest_stub(rest[0], rest[1], output);

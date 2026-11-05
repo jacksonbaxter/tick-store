@@ -4,9 +4,12 @@
 // and read its exit code and output without starting a process.
 //
 //   tick_roundtrip ingest <source> <store> --durability page_cache|device_flush
-//                         [--segment-records N]
+//                         [--segment-records N] [--first-records N]
 //       Decodes every source record and writes the ITCH store (store/itch_store.hpp), in the
-//       durability mode named: it is never a default. Prints a JSON summary.
+//       durability mode named: it is never a default. Prints a JSON summary, which lists in
+//       `flushes` every flush the writer made, through the real system calls, with what it was
+//       called on, the file or its directory, and its result. --first-records stores only the
+//       source's first N records, with no tail: the comparison harness's small commit.
 //   tick_roundtrip ingest-stub <source> <store>
 //       The same through the Phase 2 stub store, which the stub's own tests still use.
 //   tick_roundtrip verify <source> <store> [--expect-sha256 HEX] [--no-checksums]

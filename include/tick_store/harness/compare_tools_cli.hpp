@@ -7,6 +7,11 @@
 //       Writes an ITCH file as the column form of store/columns.hpp, then reads the
 //       directory back through the oracle before saying it passed. Prints a JSON summary
 //       holding no paths. Refuses a directory that already has a manifest.
+//   tick_export --store <store.tsc> <directory>
+//       Writes an ITCH store's records as the same column form: each record comes through
+//       the store's whole read path and the ITCH encoder, as the oracle reads it. It is
+//       given no source, so the comparison harness proves the directory against the source
+//       with tick_roundtrip verify-columns. Exits 1 if the store refuses to give a record.
 //
 //   tick_coldcache evict <paths...>
 //       Evicts every regular file under the paths and proves it, on a fresh mapping,

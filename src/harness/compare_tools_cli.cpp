@@ -1,6 +1,7 @@
 #include "tick_store/harness/compare_tools_cli.hpp"
 
 #include "tick_store/harness/columns_reader.hpp"
+#include "tick_store/harness/itch_store_record_reader.hpp"
 #include "tick_store/harness/json_writer.hpp"
 #include "tick_store/harness/page_cache.hpp"
 #include "tick_store/harness/roundtrip.hpp"
@@ -8,6 +9,8 @@
 #include "tick_store/harness/sha256.hpp"
 #include "tick_store/itch/frame.hpp"
 #include "tick_store/store/columns.hpp"
+#include "tick_store/store/itch_store.hpp"
+#include "tick_store/store/itch_store_reader.hpp"
 #include "tick_store/store/mapped_file.hpp"
 #include "tick_store/store/store_error.hpp"
 
@@ -33,7 +36,9 @@
 namespace tick_store::harness {
 namespace {
 
-constexpr std::string_view kExportUsage = "usage: tick_export <source> <directory>\n";
+constexpr std::string_view kExportUsage =
+    "usage: tick_export <source> <directory>\n"
+    "       tick_export --store <store.tsc> <directory>\n";
 constexpr std::string_view kColdcacheUsage =
     "usage: tick_coldcache evict <paths...>\n"
     "       tick_coldcache residency <paths...>\n"
@@ -244,9 +249,68 @@ int run_residency(std::string_view command, const std::vector<std::filesystem::p
     return kExitPass;
 }
 
+// The store's records, each through its whole read path and the ITCH encoder
+// (ItchStoreRecordReader), written as the column form. Nothing here sees the source, so the
+// harness proves the directory against it with tick_roundtrip verify-columns.
+int run_export_from_store(std::string_view store_path, std::string_view directory_text,
+                          CliOutput& output) {
+    using Clock = std::chrono::steady_clock;
+    const Clock::time_point start = Clock::now();
+    auto reader = store::ItchStoreReader::open(std::string{store_path});
+    if (!reader.has_value()) {
+        output.err += std::format("the store does not open: {}\n", to_string(reader.error()));
+        return kExitMismatch;
+    }
+    auto writer = store::ColumnsWriter::create(std::filesystem::path{directory_text});
+    if (!writer.has_value()) {
+        return fail_store(output, "cannot create the columns", writer.error());
+    }
+    ItchStoreRecordReader records{*reader};
+    while (true) {
+        auto record = records.next();
+        if (!record.has_value()) {
+            output.err += std::format("the store cannot give its next record: {}\n",
+                                      record.error().message);
+            return kExitMismatch;
+        }
+        if (!record->has_value()) {
+            break;
+        }
+        if (const auto added = writer->append(record->value().subspan(itch::kFramePrefixSize));
+            !added.has_value()) {
+            return fail_store(output, "cannot write the columns", added.error());
+        }
+    }
+    const auto tail = records.tail();
+    if (!tail.has_value()) {
+        output.err += std::format("the store cannot give its tail: {}\n", tail.error().message);
+        return kExitMismatch;
+    }
+    const auto summary = writer->finish(*tail);
+    if (!summary.has_value()) {
+        return fail_store(output, "cannot finish the columns", summary.error());
+    }
+    JsonWriter json;
+    json.begin_object();
+    json.field("tool", std::string_view{"tick_export"});
+    json.field("command", std::string_view{"store"});
+    json.field("records", summary->records);
+    json.field("tail_bytes", summary->tail_bytes);
+    json.field("hot_rows", summary->hot_rows);
+    json.field("rare_rows", summary->rare_rows);
+    json.field("raw_rows", summary->raw_rows);
+    json.field("wall_seconds", std::chrono::duration<double>{Clock::now() - start}.count());
+    json.end_object();
+    output.out += json.finish();
+    return kExitPass;
+}
+
 }  // namespace
 
 int run_export_cli(std::span<const std::string_view> arguments, CliOutput& output) {
+    if (arguments.size() == 3 && arguments[0] == "--store") {
+        return run_export_from_store(arguments[1], arguments[2], output);
+    }
     if (arguments.size() != 2) {
         return fail(output, kExportUsage.substr(0, kExportUsage.size() - 1));
     }

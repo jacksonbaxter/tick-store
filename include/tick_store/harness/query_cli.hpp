@@ -16,6 +16,12 @@
 //       parameter compare/queries.py's busiest_locate() picks.
 //   {"kind": "quit"}
 //
+// The ready line holds the store's records and segments as the reader parsed them, and what the
+// harness reads back as settings in force: `store_version` and `segment_records` from the bytes
+// of the store section, `kernel_level`, the kernel set this process chose (codec/simd.hpp, so a
+// TICK_STORE_SIMD cap is applied before the line is printed), and `kernel_best`, the best set
+// this build and processor have.
+//
 // Every answer carries `name` and `kind` back, then:
 //
 //   rows, sha256      for rows, the row count and the digest compare/queries.py's
@@ -29,6 +35,7 @@
 //   digest_ns         the digest, after the engine
 //   segments, exact_segments, blocks, bytes_decoded, values_decoded
 //                     what the engine read (store/itch_query.hpp's QueryStats)
+//   kernel_runs       calls into each kernel set during this request, by level name
 //
 // An error answers {"error": "..."} and the worker goes on. Exit codes are those of
 // roundtrip_cli.hpp: 0 after a quit or the end of stdin, 1 if the store does not open, 2 for
