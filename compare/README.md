@@ -460,17 +460,24 @@ TICK_STORE_MEASURE=<wrapper> <venv>/bin/python -I compare/run.py --day 12302019 
   of QuestDB's 23 GB beside a 24 GB read-back would crowd the disk the guard watches.
 - **Warm is proven query by query.** QuestDB's store, 22.9 GB in the capacity check, is larger
   than this host's 15 GB of memory, so no store is held resident whole. Each query runs once
-  untimed, its answer checked, and then the block device under the store must read 0 bytes across
-  all 30 repetitions, by its own sectors-read counter. An attempt where it read anything is kept
-  in the result, with what it read, and the query runs again, up to three attempts; a third
-  failure stops the run. The counter is machine-wide, so another process's read can only fail an
-  attempt, never pass one. Residency of every store file is recorded before and after. Before
-  the warm queries the day's ITCH file, its export and every store file are evicted from the
-  page cache, the store flushed first, each proven at 0 resident, and MemFree is recorded either
-  side: the first full-day run at `193177b` left them filling the page cache with almost no
-  memory free, and Parquet's Q2 failed all three attempts with 782,336, 274,432 and 73,728
-  bytes read while the store's resident pages held steady, which is reclaim taking pages back
-  between repetitions. Each query's untimed run then reads what it needs.
+  untimed, its answer checked, and then the processes that answer it must cause 0 bytes of
+  storage reads across all 30 repetitions: the worker, tick-store's `tick_query` or QuestDB's
+  server, each by `read_bytes` in its own `/proc/<pid>/io`, which counts page faults on a
+  mapping and readahead in the process that caused them, and any child the worker waited for.
+  The block device's machine-wide sectors-read count is kept beside it in every attempt. An
+  attempt where they read anything is kept in the result, with what was read, and the query
+  runs again, up to three attempts; a third failure stops the run. Residency of every store file
+  is recorded before and after. Before the warm queries the day's ITCH file, its export and
+  every store file are evicted from the page cache, the store flushed first, each proven at 0
+  resident, and MemFree is recorded either side, so that each query's untimed run reads what it
+  needs into free memory.
+
+  Both are what the first two full-day runs found. At `193177b` the proof was the machine-wide
+  count alone, with nothing evicted: Parquet's Q2 failed all three attempts with 782,336, 274,432
+  and 73,728 bytes read, its store's resident pages steady, with almost no memory free. At
+  `953f3d4`, with the page cache emptied and 11.7 GB free, it failed again with 4,096, 4,096 and
+  987,136 bytes, the store's resident pages again steady: reads on a shared host that the
+  query did not make. A machine-wide count cannot tell them apart; the processes' own can.
 - **Cold is as on the slice:** every store file evicted and proven at 0 resident, a fresh process,
   and the device's count must reach what became resident.
 - **The guard.** Each system runs under `compare/guard.py`, inside the measurement wrapper and

@@ -120,36 +120,54 @@ class FullDayWarm(unittest.TestCase):
     """Warm on a whole day: the device's own counter across the repetitions, query by query,
     with every attempt kept."""
 
-    def run_warm(self, device_reads):
+    def run_warm(self, process_reads, machine_wide=None):
         from compare import coldcache, worker
 
-        reads = iter(device_reads)
+        reads = iter(process_reads)
+        wide = iter(machine_wide or [4096] * len(process_reads))
+        self.processes_seen = []
 
         class Counter:
             def __init__(self, path):
                 pass
 
             def delta(self):
-                return {"bytes": next(reads), "counter": "block device stat", "slack": 0}
+                return {"bytes": next(wide), "counter": "block device stat", "slack": 0}
+
+        test = self
+
+        class Reads:
+            def __init__(self, processes):
+                test.processes_seen.append(processes)
+
+            def delta(self):
+                count = next(reads)
+                return {"bytes": count, "by_process": {"worker": count, "waited children": 0},
+                        "counter": "read_bytes per process"}
 
         system = SimpleNamespace(name="fake", query_rows=lambda *args: [[1, 2]],
                                  query_column_sum=lambda column: [[1, 2]],
-                                 scan_facts=lambda query: {"status": "unavailable"})
+                                 scan_facts=lambda query: {"status": "unavailable"},
+                                 query_processes=lambda: {"tick_query": 7})
         query = Query("Q5", "column_sum", 0, 0)
         request = {"queries": [query_to_json(query)], "repetitions": 4, "paths": ["store"],
-                   "truth": {"Q5": {"rows": 1, "sha256": "x"}}}
+                   "truth": {"Q5": {"rows": 1, "sha256": "x"}},
+                   "service_processes": {"questdb": 9}}
         residency = {"pages": 8, "resident_pages": 8, "page_size": 4096}
         with (mock.patch.object(coldcache, "DeviceCounter", Counter),
+              mock.patch.object(coldcache, "ProcessReads", Reads),
               mock.patch.object(coldcache, "residency", return_value=residency),
               mock.patch.object(worker, "digest_result", return_value={"rows": 1, "sha256": "x"}),
               mock.patch.object(worker, "python_floor", return_value=[0.0])):
             return worker.warm_full_day(system, request, None)
 
-    def test_a_quiet_device_proves_the_first_attempt(self):
+    def test_processes_that_read_nothing_prove_the_first_attempt(self):
         answer = self.run_warm([0])
         proof = answer["proofs"]["Q5"]
         self.assertEqual((proof["attempts"], proof["discarded"]), (1, []))
         self.assertEqual(proof["accepted"]["device_bytes_read"], 0)
+        self.assertEqual(proof["accepted"]["machine_wide_device_bytes_read"], 4096)
+        self.assertEqual(self.processes_seen, [{"questdb": 9, "tick_query": 7}])
         self.assertEqual(proof["accepted"]["warm_up_runs"], 1)
         self.assertEqual(len(answer["queries"]["Q5"]["seconds"]), 4)
 
@@ -163,6 +181,12 @@ class FullDayWarm(unittest.TestCase):
 
         with self.assertRaisesRegex(ProofFailed, "each of 3 attempts"):
             self.run_warm([4096, 1, 8192])
+
+    def test_a_quiet_device_does_not_pass_a_process_that_read(self):
+        from compare.coldcache import ProofFailed
+
+        with self.assertRaisesRegex(ProofFailed, "each of 3 attempts"):
+            self.run_warm([4096, 4096, 4096], machine_wide=[0, 0, 0])
 
     def test_each_attempt_records_memfree_either_side(self):
         accepted = self.run_warm([0])["proofs"]["Q5"]["accepted"]

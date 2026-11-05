@@ -6,6 +6,8 @@ library only.
 """
 
 import os
+import platform
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -14,7 +16,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
-from compare.coldcache import ProofFailed, allocated_bytes, proof_of_cold, proof_of_warm
+from compare import coldcache  # noqa: E402
+from compare.coldcache import ProofFailed, allocated_bytes, proof_of_cold, proof_of_warm  # noqa: E402
 
 PAGE = 4096
 EVICTED = {"pages": 10, "resident_pages": 0, "passes": 1, "method": "m"}
@@ -75,6 +78,67 @@ class Allocated(unittest.TestCase):
             report = allocated_bytes([root])
         self.assertEqual(report["files"], 1)
         self.assertEqual(report["apparent_bytes"], 10000)
+
+
+
+@unittest.skipUnless(platform.system() == "Linux", "reads /proc/<pid>/io")
+class ProcessReadsOnLinux(unittest.TestCase):
+    """The warm proof's counter, on real reads of a file taken out of the page cache."""
+
+    def evicted_file(self, directory):
+        path = Path(directory) / "data"
+        with open(path, "wb") as handle:
+            handle.write(os.urandom(1 << 20))
+            handle.flush()
+            os.fsync(handle.fileno())
+        descriptor = os.open(path, os.O_RDONLY)
+        os.posix_fadvise(descriptor, 0, 0, os.POSIX_FADV_DONTNEED)
+        os.close(descriptor)
+        return path
+
+    def test_own_reads_count_and_cached_reads_do_not(self):
+        (REPO_ROOT / "build").mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "build") as directory:
+            path = self.evicted_file(directory)
+            reads = coldcache.ProcessReads({})
+            path.read_bytes()
+            first = reads.delta()
+            reads = coldcache.ProcessReads({})
+            path.read_bytes()
+            second = reads.delta()
+        self.assertGreaterEqual(first["by_process"]["worker"], 1 << 20)
+        self.assertEqual(second["bytes"], 0)
+
+    def test_a_named_process_and_a_waited_child_count(self):
+        (REPO_ROOT / "build").mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "build") as directory:
+            path = self.evicted_file(directory)
+            child = subprocess.Popen([sys.executable, "-I", "-c",
+                                      "import sys; sys.stdin.readline(); "
+                                      f"open({str(path)!r}, 'rb').read(); print(flush=True); "
+                                      "sys.stdin.readline()"],
+                                     stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+            reads = coldcache.ProcessReads({"server": child.pid})
+            child.stdin.write("\n")
+            child.stdin.flush()
+            child.stdout.readline()
+            named = reads.delta()
+            child.stdin.write("\n")
+            child.stdin.close()
+            child.wait()
+            path = self.evicted_file(directory)
+            reads = coldcache.ProcessReads({})
+            subprocess.run([sys.executable, "-I", "-c", f"open({str(path)!r}, 'rb').read()"],
+                           check=True)
+            waited = reads.delta()
+        self.assertGreaterEqual(named["by_process"]["server"], 1 << 20)
+        self.assertGreaterEqual(waited["by_process"]["waited children"], 1 << 20)
+
+    def test_a_process_gone_is_refused(self):
+        child = subprocess.Popen([sys.executable, "-I", "-c", "pass"])
+        child.wait()
+        with self.assertRaisesRegex(ProofFailed, "no I/O account"):
+            coldcache.ProcessReads({"server": child.pid})
 
 
 if __name__ == "__main__":

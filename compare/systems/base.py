@@ -89,6 +89,14 @@ class System(ABC):
         """Settings the runner can read with no client: QuestDB's commit mode, say."""
         return []
 
+    def service_processes(self):
+        """{role: pid} of the server that answers queries, read by the runner once it is up."""
+        return {}
+
+    def query_processes(self):
+        """{role: pid} of a process of the worker's own that answers queries, once open."""
+        return {}
+
     def settle(self):
         """After ingest, with the service up: finish anything left in the background."""
         return {}

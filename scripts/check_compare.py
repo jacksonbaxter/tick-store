@@ -247,8 +247,9 @@ def check_durability(where, durability, name, class_name, control, host):
 
 
 def check_warm_full_day(where, warm):
-    """On a whole day: untimed runs first, then not one byte from the device across every
-    timed repetition, by the block device's own counter."""
+    """On a whole day: untimed runs first, then not one byte read from storage across every
+    timed repetition by the processes that answer the query, each counted, with the block
+    device's machine-wide count kept beside them."""
     proof = (warm or {}).get("proof") or {}
     accepted = proof.get("accepted") or {}
     problems = []
@@ -259,6 +260,14 @@ def check_warm_full_day(where, warm):
         problems.append(f"{where}.warm: no untimed run before the repetitions")
     if not accepted.get("device_counter") or not proof.get("method"):
         problems.append(f"{where}.warm: the counter or the method is not named")
+    by_process = accepted.get("by_process")
+    if (not isinstance(by_process, dict) or "worker" not in by_process
+            or any(value != 0 for value in by_process.values())
+            or sum(by_process.values()) != accepted.get("device_bytes_read")):
+        problems.append(f"{where}.warm: no storage reads per process, from the worker on, that "
+                        f"add up to 0: {by_process!r}")
+    if not check_results.is_number(accepted.get("machine_wide_device_bytes_read")):
+        problems.append(f"{where}.warm: the block device's machine-wide count is not kept")
     attempts = proof.get("attempts")
     if attempts != len(proof.get("discarded") or []) + 1 or attempts > MAX_WARM_ATTEMPTS:
         problems.append(f"{where}.warm: {attempts!r} attempts, and every one must be kept")

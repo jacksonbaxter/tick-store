@@ -277,6 +277,9 @@ class TickStoreSystem(System):
         if self.store_path.exists():
             self._start_worker()
 
+    def query_processes(self):
+        return {"tick_query": self.worker.pid} if self.worker is not None else {}
+
     def settings_in_force(self):
         return []
 

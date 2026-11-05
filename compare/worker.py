@@ -175,9 +175,11 @@ def timed_repetitions(system, query, truth, repetitions):
 def warm_full_day(system, request, layout):
     """Warm on a whole day, query by query. QuestDB's store is larger than this host's memory,
     so no store can be held resident whole, and the proof is instead that the timed repetitions
-    read nothing from the device: each query runs untimed first, answer checked, and the block
-    device under the store must then move no byte across its repetitions. A failed attempt is
-    kept in the result, with what the device read, and the query runs again, up to
+    read nothing from storage: each query runs untimed first, answer checked, and then the
+    processes that answer it, this worker, its query tool and the system's server, must cause
+    no storage read across its repetitions (coldcache.ProcessReads). The block device's
+    machine-wide count is kept beside it, since another process on the host can move it. A
+    failed attempt is kept in the result, with what was read, and the query runs again, up to
     WARM_ATTEMPTS times. Residency of every store file is recorded before and after."""
     queries = [query_from_json(item) for item in request["queries"]]
     truth = request["truth"]
@@ -192,28 +194,36 @@ def warm_full_day(system, request, layout):
             before = coldcache.residency(layout, paths)
             free_before = coldcache.meminfo_bytes("MemFree")
             device = coldcache.DeviceCounter(paths[0])
+            reads = coldcache.ProcessReads({**request.get("service_processes", {}),
+                                            **system.query_processes()})
             seconds, engine, digest = timed_repetitions(system, query, truth, repetitions)
+            caused = reads.delta()
             moved = device.delta()
             free_after = coldcache.meminfo_bytes("MemFree")
             after = coldcache.residency(layout, paths)
-            attempt = {"device_bytes_read": moved["bytes"], "device_counter": moved["counter"],
+            attempt = {"device_bytes_read": caused["bytes"], "device_counter": caused["counter"],
+                       "by_process": caused["by_process"],
+                       "machine_wide_device_bytes_read": moved["bytes"],
+                       "machine_wide_counter": moved["counter"],
                        "warm_up_runs": len(warm_up), "warm_up_seconds": warm_up,
                        "pages": after["pages"], "resident_before": before["resident_pages"],
                        "resident_after": after["resident_pages"],
                        "mem_free_bytes_before": free_before, "mem_free_bytes_after": free_after,
                        "median_us": statistics.median(seconds) * 1e6}
             attempts.append(attempt)
-            if moved["bytes"] == 0:
+            if caused["bytes"] == 0:
                 break
         else:
-            raise coldcache.ProofFailed(f"warm {query.name}: the device read bytes in each of "
-                                        f"{WARM_ATTEMPTS} attempts: {attempts}")
+            raise coldcache.ProofFailed(f"warm {query.name}: the query's processes read from "
+                                        f"storage in each of {WARM_ATTEMPTS} attempts: "
+                                        f"{attempts}")
         answers[query.name] = {"seconds": seconds, "digest": digest}
         if None not in engine:
             answers[query.name]["engine_seconds"] = engine
         proofs[query.name] = {
-            "method": "per query: untimed runs first, then the block device under the store "
-                      "read 0 bytes across every timed repetition",
+            "method": "per query: untimed runs first, then the query's own processes read 0 "
+                      "bytes from storage across every timed repetition; the block device's "
+                      "machine-wide count is kept beside it",
             "device_slack_bytes": 0, "attempts": len(attempts), "accepted": attempts[-1],
             "discarded": attempts[:-1]}
     floor = python_floor(system)

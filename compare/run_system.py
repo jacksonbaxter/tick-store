@@ -259,7 +259,8 @@ class Runner:
             system.start_service()
             warm = self.worker(system, "warm_queries", paths=[str(path) for path in paths],
                                queries=[query_to_json(query) for query in queries], truth=truth,
-                               repetitions=self.args.warm_repetitions)
+                               repetitions=self.args.warm_repetitions,
+                               service_processes=system.service_processes())
             if self.full_day:
                 self.sample_memory()
         finally:

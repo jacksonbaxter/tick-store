@@ -821,7 +821,10 @@ def full_day_parameters():
 
 
 def full_day_warm(entry):
-    accepted = {"device_bytes_read": 0, "device_counter": "block device stat",
+    accepted = {"device_bytes_read": 0, "device_counter": "read_bytes per process",
+                "by_process": {"worker": 0, "waited children": 0},
+                "machine_wide_device_bytes_read": 4096,
+                "machine_wide_counter": "block device stat",
                 "warm_up_runs": 1, "pages": 8, "resident_before": 8, "resident_after": 8}
     entry["warm"]["proof"] = {"method": "per query", "device_slack_bytes": 0, "attempts": 1,
                               "accepted": accepted, "discarded": []}
@@ -939,6 +942,21 @@ class FullDay(Harness):
         def fault(document, source):
             q1_of(document)["warm"]["proof"]["accepted"]["device_bytes_read"] = 4096
         self.assert_full_fault(fault, "the device read 4096 bytes")
+
+    def test_a_warm_number_whose_server_read_from_storage(self):
+        def fault(document, source):
+            q1_of(document)["warm"]["proof"]["accepted"]["by_process"]["questdb"] = 8192
+        self.assert_full_fault(fault, "no storage reads per process")
+
+    def test_a_warm_number_counted_without_the_worker(self):
+        def fault(document, source):
+            del q1_of(document)["warm"]["proof"]["accepted"]["by_process"]["worker"]
+        self.assert_full_fault(fault, "no storage reads per process")
+
+    def test_a_warm_number_with_no_machine_wide_count(self):
+        def fault(document, source):
+            del q1_of(document)["warm"]["proof"]["accepted"]["machine_wide_device_bytes_read"]
+        self.assert_full_fault(fault, "machine-wide count is not kept")
 
     def test_a_discarded_warm_attempt_left_out(self):
         def fault(document, source):

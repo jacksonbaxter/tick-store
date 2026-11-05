@@ -9,6 +9,7 @@ reaches the results file.
 import json
 import os
 import platform
+import resource
 import subprocess
 from pathlib import Path
 
@@ -143,6 +144,48 @@ class DeviceCounter:
                 "counter": (f"iostat's total for {IOSTAT_DEVICE}, MiB read and written, machine-wide"
                             if self.macos else "block device stat, sectors read, machine-wide"),
                 "slack": IOSTAT_SLACK_BYTES if self.macos else 0}
+
+
+def _process_read_bytes(pid):
+    """read_bytes from /proc/<pid>/io: what the process caused to be fetched from storage,
+    every thread of it, page faults on a mapping and readahead included."""
+    try:
+        text = Path(f"/proc/{pid}/io").read_text(encoding="ascii")
+    except OSError as error:
+        raise ProofFailed(f"no I/O account for {pid}: {error}") from error
+    for line in text.splitlines():
+        if line.startswith("read_bytes:"):
+            return int(line.split()[1])
+    raise ProofFailed(f"/proc/{pid}/io has no read_bytes")
+
+
+class ProcessReads:
+    """Bytes that the processes answering a query caused to be read from storage since this
+    was made: this process, each process named in `processes` ({role: pid}, a query tool or a
+    server), and every child this process has waited for. Linux only.
+
+    The block device's counter is machine-wide, so on a shared host another process's read
+    fails an attempt that read nothing. This counts only the query's own processes, and the
+    warm proof records the machine-wide count beside it."""
+
+    COUNTER = ("read_bytes in /proc/<pid>/io of the worker and of each process that answers its "
+               "queries, and ru_inblock of the children it waited for: storage reads those "
+               "processes caused, page faults and readahead included")
+
+    def __init__(self, processes):
+        self.processes = {"worker": "self", **processes}
+        self.start = self._read()
+
+    def _read(self):
+        found = {role: _process_read_bytes(pid) for role, pid in self.processes.items()}
+        found["waited children"] = resource.getrusage(resource.RUSAGE_CHILDREN).ru_inblock * 512
+        return found
+
+    def delta(self):
+        now = self._read()
+        by_process = {role: now[role] - self.start[role] for role in now}
+        return {"bytes": sum(by_process.values()), "by_process": by_process,
+                "counter": self.COUNTER}
 
 
 def allocated_bytes(paths):

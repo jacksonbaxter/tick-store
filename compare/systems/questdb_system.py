@@ -521,6 +521,9 @@ class QuestDBSystem(System):
         return {"peak_rss_bytes": self.server.peak_rss_bytes,
                 "heap": " ".join(self.server.heap_options) or "the JVM's default"}
 
+    def service_processes(self):
+        return {"questdb": self.server.pid}
+
     def service_settings(self):
         """Run with the server up. This is what makes a class proven, or stops the run."""
         settings = prove_commit_mode(self.server, self.mode)
