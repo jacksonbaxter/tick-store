@@ -143,6 +143,7 @@ class Guard:
         self.fired_at = None
         self.asked_to_stop = None
         self.samples_taken = 0
+        self.session_rss_peak = 0
 
     def on_signal(self, number, frame):
         self.asked_to_stop = signal.Signals(number).name
@@ -174,6 +175,7 @@ class Guard:
                                     sample.available_bytes)
         self.lowest_disk = min(self.lowest_disk or sample.free_disk_bytes, sample.free_disk_bytes)
         rss = self.note_processes(session)
+        self.session_rss_peak = max(self.session_rss_peak, rss)
         samples.write(f"{elapsed:.1f},{sample.available_bytes},{sample.swap_free_bytes},"
                       f"{rate:.0f},{sample.free_disk_bytes},{rss}\n")
         samples.flush()
@@ -190,6 +192,7 @@ class Guard:
                                          if self.first else None),
             "free_disk_start_bytes": self.first and self.first.free_disk_bytes,
             "free_disk_lowest_bytes": self.lowest_disk,
+            "session_rss_bytes_peak": self.session_rss_peak,
         })
         pending = self.args.report.with_name(self.args.report.name + ".pending")
         pending.write_text(json.dumps(self.report, indent=1) + "\n", encoding="utf-8")

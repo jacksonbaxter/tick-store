@@ -15,6 +15,19 @@ across the system's run, read against /proc/stat when the wrapper exits. Output 
 nothing depends on a terminal or an SSH connection. The results file appears only when every
 system has finished and check_compare.py has passed it, so a file that exists is complete.
 
+A full-day run, Linux only, is
+
+    TICK_STORE_MEASURE=... python3 -I compare/run.py --day 12302019 --variant-source <slice file>
+
+with the slice results file of the same host and commit, from which compare/variant_rule.py
+picks each system's variants. Each system then runs as
+
+    <wrapper> taskset -c 4 sh -c <copy /proc/stat, then exec> python3 -I compare/guard.py
+        --report <file> --samples <file> --watch <work> -- python3 -I compare/run_system.py --day
+
+so the guard watches the host as in the capacity check, and its report gives each system's peak
+memory. The results file is <host>-<day>-full-<commit>.json.
+
 Exit codes: 0 done, 75 the wrapper says retry later (finished systems are kept, and run it
 again to go on), 2 usage or setup, anything else what failed.
 """
@@ -34,20 +47,46 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import run_bench  # noqa: E402
 
+from compare import variant_rule  # noqa: E402
 from compare.layout import PINS_PATH, SLICE_NAME, Layout  # noqa: E402
-from compare.queries import CLIPPING_STATEMENT  # noqa: E402
+from compare.queries import CLIPPING_STATEMENT, FULL_DAY_STATEMENT  # noqa: E402
 from compare.schema import read_manifest  # noqa: E402
 from compare.systems import SYSTEM_NAMES  # noqa: E402
 from compare.systems.questdb_system import heap_flags  # noqa: E402
-from compare.systems.tickstore import INPUT_STATEMENT  # noqa: E402
+from compare.systems.tickstore import FULL_DAY_INPUT_STATEMENT, INPUT_STATEMENT  # noqa: E402
 
 CHECK_COMPARE = REPO_ROOT / "scripts" / "check_compare.py"
 RUN_SYSTEM = REPO_ROOT / "compare" / "run_system.py"
+GUARD = REPO_ROOT / "compare" / "guard.py"
 DEFAULT_RESULTS_DIR = REPO_ROOT / "results" / "compare"
 DEFAULT_ITERATION_DIR = REPO_ROOT / "build" / "compare-iteration"
 LINUX_CORE = run_bench.LINUX_CORE
 LABEL = ("These numbers come from a five-minute slice and prove that the harness works. They "
          "are not claims about a full day, and no target changes because of them.")
+FULL_DAY_LABEL = ("A full day: every record of the pinned day in every system, every query as "
+                  "BENCHMARKS.md defines it with nothing clipped. These are the numbers the "
+                  "targets are judged on.")
+FULL_DAY_SUFFIX = "full"
+FULL_DAY_BASELINE = ("The day's source bytes: every ITCH frame with its two-byte length prefix, "
+                     "the decompressed file, which is what BENCHMARKS.md's stored bytes must be "
+                     "able to rebuild.")
+FULL_DAY_INPUT_CACHE = (
+    "The others' writes read the day's export, 24 GB of column files, chunk by chunk inside "
+    "the clock, and this host's page cache cannot hold it, so part of each read comes from the "
+    "device. tick-store's write reads the day's ITCH file, 8.25 GB, which is read through "
+    "first and must be resident, as on the slice.")
+FULL_DAY_WARM = ("Query by query, since QuestDB's store is larger than this host's memory: one "
+                 "untimed run first, answer checked, then the block device under the store must "
+                 "read 0 bytes across all repetitions. An attempt where it read any is kept in "
+                 "the result and run again, up to three times. Residency of every store file "
+                 "is recorded before and after.")
+FULL_DAY_WRITES = ("One write per class and variant, each a sustained run of minutes over the "
+                   "whole day, so a write's median is that one write. Three of each would not "
+                   "fit the run: see compare/README.md.")
+GUARD_STATEMENT = ("Each system ran under compare/guard.py, as the capacity check did: it samples "
+                   "MemAvailable, swap and free disk every 2 s and stops the run under 3 GiB, "
+                   "under 50 GiB free or on sustained swapping. Peak memory is the largest "
+                   "VmHWM of each process it saw, and the largest sum of their RSS at a sample.")
 MACOS_STATEMENT = ("Unpinned. No hardware counters. macOS has no thread pinning, and no "
                    "unprivileged hardware counters. Each system gets the same thread budget.")
 LINUX_STATEMENT = (f"Each system ran under taskset -c {LINUX_CORE}, and the run then widened its "
@@ -123,7 +162,27 @@ def wrapped_command(measure, meter, snapshot, command):
     return prefix + command
 
 
-def run_one(system, args, layout, measure, parts, meter):
+def system_command(system, args, layout, part, variants, guard):
+    """run_system.py's command for one system, under the guard on a full-day run."""
+    command = [sys.executable, "-I", str(RUN_SYSTEM), "--system", system, "--part", str(part),
+               "--slice", args.slice, *layout.as_arguments()]
+    if args.day:
+        command += ["--day", args.day]
+    if args.full_day_smoke:
+        command.append("--full-day-smoke")
+    for option in ("write_repetitions", "warm_repetitions", "cold_repetitions"):
+        value = getattr(args, option)
+        if value is not None:
+            command += [f"--{option.replace('_', '-')}", str(value)]
+    if variants is not None:
+        command += ["--variants", ",".join(variants)]
+    if guard is None:
+        return command
+    return [sys.executable, "-I", str(GUARD), "--report", str(guard["report"]),
+            "--samples", str(guard["samples"]), "--watch", str(layout.work), "--", *command]
+
+
+def run_one(system, args, layout, measure, parts, meter, variants=None):
     """Runs a system unless its part is already there. Returns its load lines."""
     part = parts / f"{system}.json"
     lines_path = parts / f"{system}.load"
@@ -131,13 +190,12 @@ def run_one(system, args, layout, measure, parts, meter):
     if part.exists() and lines_path.exists() and (meter is None or sibling_path.exists()):
         return json.loads(lines_path.read_text(encoding="utf-8"))
     snapshot = parts / f"{system}.stat"
-    command = wrapped_command(measure, meter, snapshot, [
-        sys.executable, "-I", str(RUN_SYSTEM), "--system", system, "--part", str(part),
-        "--slice", args.slice, *layout.as_arguments()])
-    for option in ("write_repetitions", "warm_repetitions", "cold_repetitions", "variants"):
-        value = getattr(args, option)
-        if value is not None:
-            command += [f"--{option.replace('_', '-')}", str(value)]
+    guard = None
+    if is_full_day(args) and run_bench.host_label() == "Linux":
+        guard = {"report": parts / f"{system}.guard.json",
+                 "samples": parts / f"{system}.guard.csv"}
+    command = wrapped_command(measure, meter, snapshot,
+                              system_command(system, args, layout, part, variants, guard))
     logs = layout.work / "logs"
     logs.mkdir(parents=True, exist_ok=True)
     stdout_path = logs / f"{system}.stdout"
@@ -146,6 +204,11 @@ def run_one(system, args, layout, measure, parts, meter):
         code = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=stdout, stderr=stderr,
                               check=False).returncode
     text = stderr_path.read_text(encoding="utf-8", errors="replace")
+    if guard is not None and guard["report"].exists():
+        report = json.loads(guard["report"].read_text(encoding="utf-8"))
+        if report.get("guard_fired"):
+            raise run_bench.Failure(1, f"{system}: the guard stopped it: "
+                                       f"{report.get('guard_reason')}")
     if code == run_bench.EXIT_RETRY_LATER and measure:
         raise run_bench.Failure(run_bench.EXIT_RETRY_LATER,
                                 "retry later: the measurement wrapper did not get the machine")
@@ -177,15 +240,46 @@ def sibling_block(meter, parts, systems):
         encoding="utf-8")) for system in systems})
 
 
-def build_document(host, args, layout, pin, commit, measure, parts, load_lines, meter=None):
+def is_full_day(args):
+    return bool(args.day or args.full_day_smoke)
+
+
+def peak_memory(report):
+    """Each system's peak memory, from its guard report: VmHWM per process name, the largest
+    over the processes that share a name, and MemAvailable at its lowest."""
+    by_name = {}
+    for key, fields in report["processes"].items():
+        name = key.split(" ", 1)[1]
+        by_name[name] = max(by_name.get(name, 0), fields.get("VmHWM", 0))
+    return {"vmhwm_bytes_by_process": dict(sorted(by_name.items())),
+            "vmhwm_bytes_largest": max(by_name.values(), default=0),
+            "session_rss_bytes_peak": report.get("session_rss_bytes_peak"),
+            "mem_available_lowest_bytes": report["mem_available_lowest_bytes"],
+            "mem_available_start_bytes": report["mem_available_start_bytes"],
+            "swapped_pages_during_run": report["swapped_pages_during_run"],
+            "free_disk_lowest_bytes": report["free_disk_lowest_bytes"],
+            "guard_fired": report["guard_fired"], "exit": report["exit"],
+            "source": "compare/guard.py, sampling every 2 s"}
+
+
+def build_document(host, args, layout, pin, commit, measure, parts, load_lines, meter=None,
+                   selection=None):
     linux = host == "Linux"
+    full_day = is_full_day(args)
     systems = {system: json.loads((parts / f"{system}.json").read_text(encoding="utf-8"))
                for system in args.systems}
     truths = [part.pop("truth") for part in systems.values()]
     query_sets = [part.pop("queries") for part in systems.values()]
+    day_facts = [part.pop("full_day", None) for part in systems.values()]
     if any(item != truths[0] for item in truths) or any(item != query_sets[0]
                                                         for item in query_sets):
         raise run_bench.Failure(1, "the systems did not run the same queries")
+    if any(item != day_facts[0] for item in day_facts):
+        raise run_bench.Failure(1, "the systems did not run the same full-day parameters")
+    if full_day and linux:
+        for system, part in systems.items():
+            part["peak_memory"] = peak_memory(json.loads(
+                (parts / f"{system}.guard.json").read_text(encoding="utf-8")))
     runs = [{"load_lines": lines} for lines in load_lines]
     header = {
         "schema": 1,
@@ -205,23 +299,44 @@ def build_document(host, args, layout, pin, commit, measure, parts, load_lines, 
         "questdb_runtime": questdb_runtime(systems),
         "load_lines": [line for lines in load_lines for line in lines],
     }
-    manifest = read_manifest(layout.export_dir(args.slice))
-    return {
+    if args.day:
+        manifest = read_manifest(layout.export_dir(f"{args.day}-full"))
+        input_block = {"day": args.day, "full_day": True, "sha256": pin["sha256"],
+                       "messages": pin["message_count"], "bytes": pin["size"],
+                       "ratio_baseline": FULL_DAY_BASELINE, "clipping": FULL_DAY_STATEMENT,
+                       "ingest_input": FULL_DAY_INPUT_STATEMENT,
+                       "export": manifest}
+    else:
+        manifest = read_manifest(layout.export_dir(args.slice))
+        input_block = {"slice": args.slice, "sha256": pin["sha256"],
+                       "messages": pin["message_count"], "bytes": pin["size"],
+                       "ratio_baseline": BASELINE, "clipping": CLIPPING_STATEMENT,
+                       "ingest_input": INPUT_STATEMENT, "export": manifest}
+    method = {"warm": WARM_METHOD, "cold": COLD_METHOD[host], "cold_includes": COLD_INCLUDES,
+              "one_system_at_a_time": True, "tickstore_queries": TICKSTORE_QUERIES,
+              "input_cache": "the export's column files are warm before every write",
+              "p99": "nearest rank, so a small n gives a value that really occurred"}
+    queries = {"parameters": query_sets[0], "truth": truths[0],
+               "truth_method": "numpy over the exported columns, sharing no code with any system"}
+    if full_day:
+        method.update({"warm": FULL_DAY_WARM, "input_cache": FULL_DAY_INPUT_CACHE,
+                       "writes": FULL_DAY_WRITES, "guard": GUARD_STATEMENT,
+                       "read_back": "each store read back one time window at a time, each "
+                                    "window ordered by seq, into one column directory that "
+                                    "tick_roundtrip verify-columns judges against the day"})
+        queries["full_day"] = day_facts[0]
+    document = {
         "header": header,
-        "label": LABEL,
+        "label": FULL_DAY_LABEL if full_day else LABEL,
         "heap": LINUX_HEAP if linux else MACOS_HEAP,
-        "input": {"slice": args.slice, "sha256": pin["sha256"], "messages": pin["message_count"],
-                  "bytes": pin["size"], "ratio_baseline": BASELINE, "clipping": CLIPPING_STATEMENT,
-                  "ingest_input": INPUT_STATEMENT, "export": manifest},
-        "method": {"warm": WARM_METHOD, "cold": COLD_METHOD[host], "cold_includes": COLD_INCLUDES,
-                   "one_system_at_a_time": True, "tickstore_queries": TICKSTORE_QUERIES,
-                   "input_cache": "the export's column files are warm before every write",
-                   "p99": "nearest rank, so a small n gives a value that really occurred"},
-        "queries": {"parameters": query_sets[0], "truth": truths[0],
-                    "truth_method": "numpy over the exported columns, sharing no code with "
-                                    "any system"},
-        "systems": systems,
+        "input": input_block,
+        "method": method,
+        "queries": queries,
     }
+    if selection is not None:
+        document["variant_selection"] = selection
+    document["systems"] = systems
+    return document
 
 
 def publish(document, output, measure):
@@ -239,9 +354,32 @@ def publish(document, output, measure):
     os.replace(pending, output)
 
 
+def variant_selection(args, commit, host):
+    """The rule's variants for each system, from the slice file of this host and commit."""
+    source = json.loads(args.variant_source.read_text(encoding="utf-8"))
+    header = source["header"]
+    if header["host"] != host or header["commit"] != commit or "slice" not in source["input"]:
+        raise run_bench.Failure(run_bench.EXIT_USAGE, "the variant source must be this host's "
+                                                      "slice results at this commit")
+    if not args.full_day_smoke and header.get("measurement") != "reported":
+        raise run_bench.Failure(run_bench.EXIT_USAGE, "the variant source is not reported")
+    chosen = variant_rule.select(source)
+    missing = [system for system in args.systems if system not in chosen]
+    if missing:
+        raise run_bench.Failure(run_bench.EXIT_USAGE, f"the variant source lacks {missing}")
+    return {"rule": variant_rule.RULE, "source": args.variant_source.name,
+            "source_commit": commit, "estimate": "compare/README.md, \"Full-day comparison\"",
+            "systems": {system: chosen[system] for system in args.systems}}
+
+
 def parse_arguments(argv):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--slice", default=SLICE_NAME)
+    parser.add_argument("--day", help="a full-day run on this pinned day, Linux only")
+    parser.add_argument("--full-day-smoke", action="store_true",
+                        help="the full-day path on the slice, iteration only")
+    parser.add_argument("--variant-source", type=Path,
+                        help="for a full-day run: the slice results of this host and commit")
     parser.add_argument("--systems", nargs="+", default=list(SYSTEM_NAMES),
                         choices=SYSTEM_NAMES)
     parser.add_argument("--results-dir", type=Path, default=DEFAULT_RESULTS_DIR)
@@ -258,19 +396,45 @@ def run(args):
     measure = os.environ.get(run_bench.MEASURE_ENV)
     host = run_bench.host_label()
     pins = json.loads(PINS_PATH.read_text(encoding="utf-8"))
-    pin = pins["slices"].get(args.slice)
-    if pin is None:
-        raise run_bench.Failure(run_bench.EXIT_USAGE, f"no pin for slice {args.slice}")
+    full_day = is_full_day(args)
+    if full_day and host != "Linux":
+        raise run_bench.Failure(run_bench.EXIT_USAGE, "a full-day run is Linux only")
+    if args.full_day_smoke and measure:
+        raise run_bench.Failure(run_bench.EXIT_USAGE, "the smoke run is iteration only")
+    if full_day and args.variant_source is None and args.variants is None:
+        raise run_bench.Failure(run_bench.EXIT_USAGE, "a full-day run needs --variant-source")
+    if args.day:
+        if args.day not in pins["days"]:
+            raise run_bench.Failure(run_bench.EXIT_USAGE, f"no pin for day {args.day}")
+        day = pins["days"][args.day]
+        pin = {"sha256": day["decompressed_sha256"], "size": day["decompressed_size"],
+               "message_count": day["message_count"]}
+    else:
+        pin = pins["slices"].get(args.slice)
+        if pin is None:
+            raise run_bench.Failure(run_bench.EXIT_USAGE, f"no pin for slice {args.slice}")
     require_clean_tree(measure)
     commit = run_bench.current_commit()
     layout = Layout.from_arguments(args)
-    parts = layout.work / "parts" / commit[:12]
+    tag = commit[:12] + (f"-{args.day}-full" if args.day else "-smoke" if full_day else "")
+    parts = layout.work / "parts" / tag
     parts.mkdir(parents=True, exist_ok=True)
     meter = run_bench.SiblingMeter() if host == "Linux" else None
-    load_lines = [run_one(system, args, layout, measure, parts, meter) for system in args.systems]
-    document = build_document(host, args, layout, pin, commit, measure, parts, load_lines, meter)
+    selection = None
+    chosen = {}
+    if full_day and args.variant_source is not None:
+        selection = variant_selection(args, commit, host)
+        chosen = {system: entry["selected"] for system, entry in selection["systems"].items()}
+    elif args.variants is not None:
+        chosen = {system: args.variants.split(",") for system in args.systems}
+    load_lines = [run_one(system, args, layout, measure, parts, meter, chosen.get(system))
+                  for system in args.systems]
+    document = build_document(host, args, layout, pin, commit, measure, parts, load_lines, meter,
+                              selection)
     directory = args.results_dir if measure else args.iteration_dir
-    output = directory / f"{host}-{args.slice}-{commit[:12]}.json"
+    name = f"{args.day}-{FULL_DAY_SUFFIX}" if args.day else (
+        f"{args.slice}-smoke" if full_day else args.slice)
+    output = directory / f"{host}-{name}-{commit[:12]}.json"
     publish(document, output, measure)
     print(output if measure else f"{run_bench.MEASURE_ENV} is not set, iteration-only: {output}")
 

@@ -5,7 +5,6 @@ fsyncs, so class B here is the harness flushing the closed file and its director
 is recorded in every result.
 """
 
-import itertools
 import time
 
 import pyarrow as pa
@@ -154,17 +153,31 @@ class ParquetSystem(System):
         return self.tuning["row_group_rows"] * CHUNK_ROW_GROUPS
 
     def ingest_stream(self, chunks):
+        """The clock holds reading each chunk from the column files, which a day cannot keep
+        warm, as well as the writer: `python_seconds` is that reading."""
+        if self.tuning["row_group_rows"] is None:
+            raise NotImplementedError("one row group of a whole day cannot be streamed")
         chunks = iter(chunks)
-        first = next(chunks)
         started = time.perf_counter()
+        reading = 0.0
+        before = time.perf_counter()
+        first = next(chunks)
+        reading += time.perf_counter() - before
         with self._writer(self.path, first.schema) as writer:
-            for table in itertools.chain([first], chunks):
+            table = first
+            while table is not None:
                 writer.write_table(table, row_group_size=self.tuning["row_group_rows"])
+                before = time.perf_counter()
+                table = next(chunks, None)
+                reading += time.perf_counter() - before
         written = time.perf_counter()
         self._flush(self.path)
         finished = time.perf_counter()
-        return {"seconds": finished - started, "engine_seconds": written - started,
-                "flush_seconds": finished - written}
+        return {"seconds": finished - started, "engine_seconds": written - started - reading,
+                "flush_seconds": finished - written, "python_seconds": reading,
+                "python_note": "python_seconds reads each chunk of the column files into an "
+                               "Arrow table, inside the clock, since a day's 24 GB of columns "
+                               "cannot stay warm. engine_seconds is the writer"}
 
     def probe_flush(self, table):
         path = self.root / "probe.parquet"
@@ -181,6 +194,9 @@ class ParquetSystem(System):
 
     def read_all(self):
         return self._read(list(TABLE_COLUMNS))
+
+    def read_window(self, start_ns, end_ns):
+        return self._read(list(TABLE_COLUMNS), self._filter(start_ns, end_ns, -1)).sort_by("seq")
 
     def _filter(self, start_ns, end_ns, locate):
         ts_type = pa.timestamp("ns")

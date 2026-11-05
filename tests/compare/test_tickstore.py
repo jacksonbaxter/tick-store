@@ -38,10 +38,11 @@ from compare.systems.tickstore import (COLUMN_CODECS, EngineAnswer, TickStoreSys
 DAY = TradingDay(2019, 12, 30)
 
 
-def system(durability=CLASS_B):
+def system(durability=CLASS_B, variant="v3-seg4Mi", full_day=False):
     layout = SimpleNamespace(tool=lambda name: Path("/nonexistent") / name)
-    return TickStoreSystem(RunContext(layout, Path("/nonexistent/root"), "v3-seg4Mi", durability,
-                                      DAY, source=Path("/nonexistent/slice.itch")))
+    return TickStoreSystem(RunContext(layout, Path("/nonexistent/root"), variant, durability,
+                                      DAY, full_day=full_day,
+                                      source=Path("/nonexistent/slice.itch")))
 
 
 class FakeWorker:
@@ -64,6 +65,27 @@ class Registered(unittest.TestCase):
         self.assertIn("tickstore", SYSTEM_NAMES)
         self.assertIs(system_class("tickstore"), TickStoreSystem)
         self.assertIn(TickStoreSystem.headline_variant, TickStoreSystem.variants)
+
+
+class Variants(unittest.TestCase):
+    def test_the_headline_is_the_writers_default_and_2_20_is_a_variant(self):
+        self.assertEqual(TickStoreSystem.headline_variant, "v3-seg4Mi")
+        self.assertEqual(TickStoreSystem.variants["v3-seg4Mi"]["segment_records"], 1 << 22)
+        self.assertEqual(tickstore.SEGMENT_RECORDS, 1 << 22)
+        self.assertEqual(TickStoreSystem.variants["v3-seg1Mi"]["segment_records"], 1 << 20)
+
+    def test_the_variant_reaches_the_command_and_every_check(self):
+        owner = system(variant="v3-seg1Mi")
+        command = owner.ingest_command("in.itch", "out.tsc", "page_cache")
+        self.assertEqual(command[command.index("--segment-records") + 1], str(1 << 20))
+        self.assertEqual(owner.requested()["segment_records"], 1 << 20)
+        self.assertIn("ranked PFOR", owner.requested()["hot_columns"])
+
+    def test_a_full_day_says_the_day_and_not_the_slice(self):
+        self.assertIn("ITCH parsing", tickstore.FULL_DAY_INPUT_STATEMENT)
+        self.assertNotIn("slice", tickstore.FULL_DAY_INPUT_STATEMENT)
+        self.assertEqual(system(full_day=True).requested()["input"],
+                         tickstore.FULL_DAY_INPUT_STATEMENT)
 
 
 class Codecs(unittest.TestCase):

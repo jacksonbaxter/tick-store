@@ -9,6 +9,7 @@ runner, which alone reads the host's caches and devices for cold runs.
 """
 
 import json
+import statistics
 import sys
 import time
 from pathlib import Path
@@ -26,6 +27,8 @@ from compare.systems import system_class  # noqa: E402
 from compare.systems.base import RunContext  # noqa: E402
 
 FLUSH_PROBE_ROWS = 1 << 16
+WARM_UP_RUNS = 1
+WARM_ATTEMPTS = 3
 FLOOR_REPETITIONS = 100
 FLOOR_WINDOW = (0, 1)
 
@@ -42,11 +45,17 @@ def flush_report(system, layout):
 
 def step_ingest(system, request, layout):
     columns = ColumnSet(request["columns"])
-    table = arrow_table(columns, system.context.day)
     settings = system.settings_in_force()
-    timings = system.ingest(columns, table)
+    if request.get("full_day"):
+        # A whole day streams: no day-sized table is ever built.
+        timings = system.ingest_day(columns)
+        rows = columns.records
+    else:
+        table = arrow_table(columns, system.context.day)
+        timings = system.ingest(columns, table)
+        rows = table.num_rows
     settings = settings + system.settings_after_ingest()
-    answer = {"timings": timings, "settings": settings, "rows": table.num_rows}
+    answer = {"timings": timings, "settings": settings, "rows": rows}
     if request.get("flush_report"):
         saved = system.dirty_paths
         system.dirty_paths = system.data_paths
@@ -79,7 +88,7 @@ def step_stored_settings(system, request, layout):
 
 def step_flush_probe(system, request, layout):
     columns = ColumnSet(request["columns"])
-    table = arrow_table(columns, system.context.day).slice(0, FLUSH_PROBE_ROWS)
+    table = next(table_chunks(columns, system.context.day, FLUSH_PROBE_ROWS))
     started = time.perf_counter()
     system.probe_flush(table)
     seconds = time.perf_counter() - started
@@ -88,6 +97,16 @@ def step_flush_probe(system, request, layout):
 
 
 def step_read_back(system, request, layout):
+    if request.get("full_day"):
+        # A whole day does not fit in memory as one table, so it goes back one window at a time.
+        started = time.perf_counter()
+        answer = system.read_back_to(request["destination"],
+                                     [tuple(window) for window in request["windows"]])
+        written = time.perf_counter()
+        return {"read_seconds": answer["read_seconds"],
+                "write_columns_seconds": written - started - answer["read_seconds"],
+                "rows": answer["rows"], "windows": answer["windows"],
+                "stored_settings": system.stored_settings()}
     started = time.perf_counter()
     table = system.read_all()
     read = time.perf_counter()
@@ -116,7 +135,10 @@ def python_floor(system):
 
 
 def step_warm_queries(system, request, layout):
-    """Every query, `repetitions` times, between two residency proofs."""
+    """Every query, `repetitions` times, between two residency proofs. A whole day's store can
+    be larger than memory, so there the proof is the query's own: see `warm_full_day`."""
+    if request.get("full_day"):
+        return warm_full_day(system, request, layout)
     queries = [query_from_json(item) for item in request["queries"]]
     truth = request["truth"]
     repetitions = request["repetitions"]
@@ -125,14 +147,7 @@ def step_warm_queries(system, request, layout):
     before = coldcache.residency(layout, paths)
     answers = {}
     for query in queries:
-        seconds = []
-        engine = []
-        for _ in range(repetitions):
-            elapsed, result = timed_query(system, query)
-            seconds.append(elapsed)
-            digest = digest_result(query, result)
-            require_truth(query, digest, truth[query.name], system.name)
-            engine.append(engine_seconds(result))
+        seconds, engine, digest = timed_repetitions(system, query, truth, repetitions)
         answers[query.name] = {"seconds": seconds, "digest": digest}
         if None not in engine:
             answers[query.name]["engine_seconds"] = engine
@@ -141,6 +156,65 @@ def step_warm_queries(system, request, layout):
     floor = python_floor(system)
     facts = {query.name: system.scan_facts(query) for query in queries}
     return {"queries": answers, "proof": proof, "floor_seconds": floor, "scan_facts": facts}
+
+
+def timed_repetitions(system, query, truth, repetitions):
+    seconds = []
+    engine = []
+    digest = None
+    for _ in range(repetitions):
+        elapsed, result = timed_query(system, query)
+        seconds.append(elapsed)
+        digest = digest_result(query, result)
+        require_truth(query, digest, truth[query.name], system.name)
+        engine.append(engine_seconds(result))
+    return seconds, engine, digest
+
+
+def warm_full_day(system, request, layout):
+    """Warm on a whole day, query by query. QuestDB's store is larger than this host's memory,
+    so no store can be held resident whole, and the proof is instead that the timed repetitions
+    read nothing from the device: each query runs untimed first, answer checked, and the block
+    device under the store must then move no byte across its repetitions. A failed attempt is
+    kept in the result, with what the device read, and the query runs again, up to
+    WARM_ATTEMPTS times. Residency of every store file is recorded before and after."""
+    queries = [query_from_json(item) for item in request["queries"]]
+    truth = request["truth"]
+    repetitions = request["repetitions"]
+    paths = [Path(path) for path in request["paths"]]
+    answers = {}
+    proofs = {}
+    for query in queries:
+        attempts = []
+        for _ in range(WARM_ATTEMPTS):
+            warm_up = timed_repetitions(system, query, truth, WARM_UP_RUNS)[0]
+            before = coldcache.residency(layout, paths)
+            device = coldcache.DeviceCounter(paths[0])
+            seconds, engine, digest = timed_repetitions(system, query, truth, repetitions)
+            moved = device.delta()
+            after = coldcache.residency(layout, paths)
+            attempt = {"device_bytes_read": moved["bytes"], "device_counter": moved["counter"],
+                       "warm_up_runs": len(warm_up), "warm_up_seconds": warm_up,
+                       "pages": after["pages"], "resident_before": before["resident_pages"],
+                       "resident_after": after["resident_pages"],
+                       "median_us": statistics.median(seconds) * 1e6}
+            attempts.append(attempt)
+            if moved["bytes"] == 0:
+                break
+        else:
+            raise coldcache.ProofFailed(f"warm {query.name}: the device read bytes in each of "
+                                        f"{WARM_ATTEMPTS} attempts: {attempts}")
+        answers[query.name] = {"seconds": seconds, "digest": digest}
+        if None not in engine:
+            answers[query.name]["engine_seconds"] = engine
+        proofs[query.name] = {
+            "method": "per query: untimed runs first, then the block device under the store "
+                      "read 0 bytes across every timed repetition",
+            "device_slack_bytes": 0, "attempts": len(attempts), "accepted": attempts[-1],
+            "discarded": attempts[:-1]}
+    floor = python_floor(system)
+    facts = {query.name: system.scan_facts(query) for query in queries}
+    return {"queries": answers, "proofs": proofs, "floor_seconds": floor, "scan_facts": facts}
 
 
 def engine_seconds(result):

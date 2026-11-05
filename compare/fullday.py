@@ -114,7 +114,7 @@ class FullDay:
 
     def context(self):
         return RunContext(self.layout, self.root, self.variant, self.args.durability, self.day,
-                          THREADS, full_day=True, heap=self.args.heap,
+                          THREADS, full_day=True, launcher=True, heap=self.args.heap,
                           gc_log=self.run_dir / "gc-%p.log")
 
     def timed(self, name, action):

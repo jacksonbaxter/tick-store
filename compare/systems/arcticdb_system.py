@@ -158,11 +158,11 @@ class ArcticDBSystem(System):
                     config("VersionStore.NumIOThreads"), "ArcticDB's config"),
         ])
 
-    def _write_securities(self, table, prefix):
-        """One symbol per locate, each that locate's rows in file order, in one write_batch."""
+    def _security_payloads(self, table, prefix):
+        """One WritePayload per locate of `table`, its rows in the table's order, from a stable
+        sort by locate."""
         from arcticdb import WritePayload
 
-        started = time.perf_counter()
         ordered = table.take(pc.sort_indices(table, sort_keys=[("locate", "ascending")]))
         locates = ordered.column("locate").to_numpy()
         breaks = np.flatnonzero(np.diff(locates)) + 1
@@ -171,6 +171,12 @@ class ArcticDBSystem(System):
         frame = _frame(ordered)
         payloads = [WritePayload(security_symbol(locates[first], prefix), frame.iloc[first:end])
                     for first, end in zip(starts, ends, strict=True)]
+        return payloads, len(payloads)
+
+    def _write_securities(self, table, prefix):
+        """One symbol per locate, each that locate's rows in file order, in one write_batch."""
+        started = time.perf_counter()
+        payloads, _ = self._security_payloads(table, prefix)
         built = time.perf_counter()
         results = self.library.write_batch(payloads)
         failed = [result for result in results if not hasattr(result, "version")]
@@ -206,14 +212,20 @@ class ArcticDBSystem(System):
 
     def ingest_stream(self, chunks):
         """The first chunk is a write, and each one after it an append, so one frame at a time
-        exists. Each append makes a version, and none is pruned."""
+        exists. Each append makes a version, and none is pruned. The clock holds reading each
+        chunk of the column files, which a day cannot keep warm."""
         if self.per_security:
-            raise NotImplementedError("the full-day check runs one symbol for the whole table")
+            raise NotImplementedError("one symbol per security streams through ingest_day")
+        chunks = iter(chunks)
         started = time.perf_counter()
         python_seconds = 0.0
         appends = 0
-        for table in chunks:
+        while True:
             before = time.perf_counter()
+            table = next(chunks, None)
+            if table is None:
+                python_seconds += time.perf_counter() - before
+                break
             frame = _frame(table)
             python_seconds += time.perf_counter() - before
             if appends == 0 and not self.library.has_symbol(SYMBOL):
@@ -223,7 +235,94 @@ class ArcticDBSystem(System):
                 appends += 1
         finished = time.perf_counter()
         return {"seconds": finished - started, "python_seconds": python_seconds,
-                "engine_seconds": finished - started - python_seconds, "appends": appends}
+                "engine_seconds": finished - started - python_seconds, "appends": appends,
+                "python_note": "python_seconds reads each chunk of the column files and builds "
+                               "the pandas frame lib.write and lib.append take, with a Python "
+                               "str per text value. The first chunk is a write, the rest "
+                               "appends"}
+
+    def ingest_day(self, columns):
+        if not self.per_security:
+            return super().ingest_day(columns)
+        return self._write_securities_day(columns)
+
+    def _write_securities_day(self, columns):
+        """One symbol per locate over a whole day, each written once, whole, in file order, as
+        `_write_securities` does on the slice. A day sorted by locate does not fit in memory, so
+        the rows are first spread by locate into bucket files of about one chunk each, in file
+        order, and each bucket is then sorted by locate, stably, and given to one write_batch.
+        Everything is inside the clock, as the slice's sort is."""
+        import shutil
+
+        import pyarrow.ipc as ipc
+
+        from compare.schema import table_chunks
+
+        started = time.perf_counter()
+        chunk_rows = self.stream_chunk_rows()
+        counts = np.bincount(np.asarray(columns.fixed["locate"]))
+        bucket_of = _locate_buckets(counts, chunk_rows)
+        scratch = self.context.layout.work / "partition" / self.root.name
+        shutil.rmtree(scratch, ignore_errors=True)
+        scratch.mkdir(parents=True)
+        writers = {}
+        writers_open = []
+        try:
+            for table in table_chunks(columns, self.context.day, chunk_rows):
+                buckets = bucket_of[table.column("locate").to_numpy()]
+                order = np.argsort(buckets, kind="stable")
+                ordered = table.take(pa.array(order))
+                sorted_buckets = buckets[order]
+                breaks = np.flatnonzero(np.diff(sorted_buckets)) + 1
+                for first, end in zip(np.concatenate([[0], breaks]),
+                                      np.concatenate([breaks, [len(order)]]), strict=True):
+                    bucket = int(sorted_buckets[first])
+                    if bucket not in writers:
+                        writers[bucket] = ipc.new_file(scratch / f"{bucket:05d}.arrow",
+                                                       table.schema)
+                        writers_open.append(writers[bucket])
+                    writers[bucket].write_table(ordered.slice(first, end - first))
+            while writers_open:
+                writers_open.pop().close()
+            partitioned = time.perf_counter()
+            python_seconds = partitioned - started
+            batch_seconds = 0.0
+            symbols = 0
+            for bucket in sorted(writers):
+                before = time.perf_counter()
+                path = scratch / f"{bucket:05d}.arrow"
+                with pa.memory_map(str(path)) as source:
+                    table = ipc.open_file(source).read_all()
+                payloads, built = self._security_payloads(table, SECURITY_PREFIX)
+                del table
+                path.unlink()
+                python_seconds += time.perf_counter() - before
+                before = time.perf_counter()
+                results = self.library.write_batch(payloads)
+                failed = [result for result in results if not hasattr(result, "version")]
+                if failed:
+                    raise SettingsMismatch(f"write_batch refused {len(failed)} symbols: "
+                                           f"{failed[0]}")
+                batch_seconds += time.perf_counter() - before
+                symbols += built
+            written = time.perf_counter()
+            listed = len(self.library.list_symbols())
+            finished = time.perf_counter()
+        finally:
+            while writers_open:
+                writers_open.pop().close()
+            shutil.rmtree(scratch, ignore_errors=True)
+        return {"seconds": finished - started, "python_seconds": python_seconds,
+                "engine_seconds": finished - started - python_seconds,
+                "partition_seconds": partitioned - started, "symbols": symbols,
+                "buckets": len(writers), "write_batch_seconds": batch_seconds,
+                "list_symbols_seconds": finished - written, "symbols_listed": listed,
+                "python_note": "python_seconds spreads the day's rows by locate into bucket "
+                               "files of about one chunk, reading the column files as it goes, "
+                               "then sorts each bucket by locate and makes its frame. "
+                               "engine_seconds is one write_batch per bucket, each security "
+                               "whole in one of them, and the list_symbols after, ArcticDB's "
+                               "own compaction of its symbol list"}
 
     def probe_flush(self, table):
         if self.per_security:
@@ -263,6 +362,21 @@ class ArcticDBSystem(System):
             table = self._read(columns=wanted).sort_by("seq")
         self.rows_read = table.num_rows
         return table
+
+    def read_window(self, start_ns, end_ns):
+        wanted = [c for c in TABLE_COLUMNS if c != INDEX_COLUMN]
+        window = self._range(start_ns, end_ns)
+        if self.per_security:
+            table = self._read_every_security(date_range=window, columns=wanted)
+        else:
+            table = self._read(date_range=window, columns=wanted)
+        return table.sort_by("seq")
+
+    def read_back_to(self, destination, windows):
+        """As every system, and the rows read become the count the stored checks compare."""
+        answer = super().read_back_to(destination, windows)
+        self.rows_read = answer["rows"]
+        return answer
 
     def _range(self, start_ns, end_ns):
         """ArcticDB's date_range includes its end, and the queries' windows do not."""
@@ -503,6 +617,21 @@ def lz4_block_prefix(data, wanted):
         for _ in range(length):
             out.append(out[-offset])
     return bytes(out[:wanted])
+
+
+def _locate_buckets(counts, rows_per_bucket):
+    """A bucket number for every locate: runs of consecutive locates holding about
+    `rows_per_bucket` rows between them. A locate busier than that has a bucket to itself."""
+    buckets = np.zeros(len(counts), dtype=np.int64)
+    bucket = 0
+    held = 0
+    for locate, count in enumerate(counts):
+        if held and held + count > rows_per_bucket:
+            bucket += 1
+            held = 0
+        buckets[locate] = bucket
+        held += int(count)
+    return buckets
 
 
 def _frame(table):

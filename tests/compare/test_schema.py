@@ -19,11 +19,11 @@ except ImportError:
     raise unittest.SkipTest("needs the .venv: compare/setup.py makes it") from None
 
 from compare.queries import (NANOS_PER_MINUTE, OPEN_NS, Query, QueryMismatch, aggregate_digest,
-                             busiest_locate, build_queries, digest_result, ground_truth,
-                             require_truth, rows_digest)
-from compare.schema import (FIXED_COLUMNS, TEXT_COLUMNS, ColumnsError, ColumnSet, TradingDay,
-                            arrow_table, format_manifest, read_manifest, table_chunks,
-                            write_columns)
+                             busiest_locate, build_queries, digest_result, full_day_facts,
+                             ground_truth, require_truth, rows_digest)
+from compare.schema import (FIXED_COLUMNS, TEXT_COLUMNS, ColumnsError, ColumnSet, ColumnWriter,
+                            TradingDay, arrow_table, format_manifest, read_manifest,
+                            table_chunks, write_columns)
 
 DAY = TradingDay(2019, 12, 30)
 RECORDS = 6
@@ -146,6 +146,35 @@ class Queries(Fixture):
         queries = {query.name: query for query in build_queries(self.columns, OPEN_NS + 100)}
         self.assertEqual(queries["Q2"].end_ns, OPEN_NS + 100)
         self.assertEqual(queries["Q3"].end_ns, OPEN_NS + 100)
+
+    def test_a_full_day_clips_nothing(self):
+        queries = {query.name: query for query in build_queries(self.columns)}
+        hour = 3600 * 1_000_000_000
+        for name in ("Q2", "Q3"):
+            self.assertEqual((queries[name].start_ns, queries[name].end_ns),
+                             (OPEN_NS, OPEN_NS + hour))
+            self.assertNotIn("clipped", queries[name].text)
+        self.assertEqual(queries["Q2"].locate, busiest_locate(self.columns, OPEN_NS,
+                                                              OPEN_NS + hour))
+        self.assertIn(f"all {RECORDS:,} records", queries["Q5"].text)
+        facts = full_day_facts(self.columns, tuple(queries.values()))
+        self.assertEqual(facts["q5_rows_scanned"], RECORDS)
+        self.assertFalse(facts["clipped"])
+
+    def test_a_table_written_in_pieces_is_the_table_written_whole(self):
+        table = arrow_table(self.columns, DAY)
+        out = Path(self.scratch.name) / "pieces"
+        with ColumnWriter(out, DAY) as writer:
+            for first, count in ((0, 1), (1, 0), (1, 3), (4, 2)):
+                writer.append(table.slice(first, count))
+        for path in sorted(self.directory.iterdir()):
+            self.assertEqual(path.read_bytes(), (out / path.name).read_bytes(), path.name)
+
+    def test_a_writer_that_fails_leaves_no_manifest(self):
+        out = Path(self.scratch.name) / "failed"
+        with self.assertRaises(ColumnsError), ColumnWriter(out, DAY) as writer:
+            writer.append(arrow_table(self.columns, DAY).drop_columns(["rest"]))
+        self.assertFalse((out / "manifest.txt").exists())
 
     def test_a_system_answer_in_another_row_order_still_matches(self):
         table = arrow_table(self.columns, DAY)

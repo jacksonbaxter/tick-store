@@ -415,6 +415,10 @@ FAULTS = (
     Fault("taskset-removed", "py-scripts", "run_bench.py drops the taskset -c 4 pin from a "
           "Linux case's command", CHECK_FAILED,
           "FAIL: test_a_linux_case_records_its_siblings_busy_share (__main__.RunBenchTest"),
+    Fault("compare-full-day-clipped-window", "py-scripts", "check_compare.py stops comparing a "
+          "full-day file's query windows with BENCHMARKS.md's, so an hour clipped to the slice "
+          "passes as a full day", CHECK_FAILED,
+          "FAIL: test_a_clipped_hour_passing_as_a_full_day (__main__.FullDay"),
     Fault("compare-tests-settings", "py-compare", "the QuestDB commit mode check stops checking",
           CHECK_FAILED, "FAIL: test_the_parser_outranks_a_matching_echo"),
     Fault("tickstore-settings-unchecked", "py-compare", "tick-store's read-back stops comparing "

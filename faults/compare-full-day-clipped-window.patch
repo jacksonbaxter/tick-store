@@ -1,0 +1,12 @@
+diff --git a/scripts/check_compare.py b/scripts/check_compare.py
+--- a/scripts/check_compare.py
++++ b/scripts/check_compare.py
+@@ -418,7 +418,7 @@
+         item = found.get(name) or {}
+         locate = item.get("locate")
+         wanted_locate = facts.get("busiest_locate") if one_locate else -1
+-        if (item.get("kind"), item.get("start_ns"), item.get("end_ns")) != (kind, start, end) \
++        if item.get("kind") != kind \
+                 or locate != wanted_locate or (one_locate and not isinstance(locate, int)):
+             problems.append(f"queries.parameters: {name} is not the full-day query: {item}")
+         if "clipped" in str(item.get("text", "")):

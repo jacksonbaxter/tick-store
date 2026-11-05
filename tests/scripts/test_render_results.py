@@ -223,6 +223,31 @@ class RenderCompareTest(Scratch):
         self.assertIn("comparison results file failed validation", result.stderr)
         self.assertEqual(self.readme.read_text(encoding="utf-8"), BOTH)
 
+    def test_a_full_day_heads_the_block_and_never_shares_a_table_with_a_slice(self):
+        document, source = COMPARE.full_day_document()
+        document["systems"]["questdb"]["peak_memory"]["vmhwm_bytes_by_process"] = {"java": 10}
+        for system in document["systems"].values():
+            system["peak_memory"].setdefault("vmhwm_bytes_by_process", {"python3": 10})
+        self.add_compare("Linux", source)
+        self.add_compare("macOS")
+        day = self.compare / f"Linux-{COMPARE.DAY}-full-{COMPARE.COMMIT[:12]}.json"
+        day.write_text(json.dumps(document), encoding="utf-8")
+        result = self.render()
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        block = self.block()
+        full = block.index(f"**Linux, full day {COMPARE.DAY}.**")
+        linux = block.index("**Linux, slice only.**")
+        macos = block.index("**macOS, slice only.**")
+        self.assertLess(full, linux)
+        self.assertLess(linux, macos)
+        section = block[full:linux]
+        self.assertEqual(section.count("| Query |"), 1)
+        self.assertIn("the day's source bytes over them", section)
+        self.assertNotIn("the slice's source bytes", section)
+        self.assertIn("`v` (headline)", section)
+        self.assertIn("| QuestDB | 0.00 GiB (`java`)", section)
+        self.assertNotIn("Peak memory", block[linux:])
+
     def test_comparison_files_need_their_markers(self):
         self.readme.write_text(README, encoding="utf-8")
         self.add_compare("Linux")

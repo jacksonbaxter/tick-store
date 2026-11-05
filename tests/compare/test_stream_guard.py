@@ -29,7 +29,7 @@ from compare.fullday import LABEL, MEASUREMENT, refuse_results_folder  # noqa: E
 from compare.guard import (GIB, SWAP_STRIKES, HostSample, Limits, breach, parse_meminfo,  # noqa: E402
                            parse_status, parse_swap_pages, session_of, wait_status_fields)
 from compare.layout import Layout  # noqa: E402
-from compare.schema import ColumnSet, arrow_table, table_chunks  # noqa: E402
+from compare.schema import ColumnSet, arrow_table, read_windows, table_chunks  # noqa: E402
 from compare.systems import system_class  # noqa: E402
 from compare.systems.base import RunContext  # noqa: E402
 
@@ -116,11 +116,11 @@ class StreamedIngest(unittest.TestCase):
         self.columns = ColumnSet(base / "in")
         self.base = base
 
-    def system(self, name):
+    def system(self, name, variant=None):
         kind = system_class(name)
         layout = Layout(self.base, self.base, self.base, self.base)
-        context = RunContext(layout, self.base / name, kind.headline_variant, CLASS_B, DAY,
-                             full_day=True)
+        context = RunContext(layout, self.base / name, variant or kind.headline_variant, CLASS_B,
+                             DAY, full_day=True)
         system = kind(context)
         system.prepare()
         system.open()
@@ -142,6 +142,49 @@ class StreamedIngest(unittest.TestCase):
 
     def test_arcticdb(self):
         self.check("arcticdb")
+
+    def read_back_matches(self, system, rows_per_window):
+        """A whole store back through windows is the input's column files, byte for byte."""
+        out = self.base / f"{system.name}-{rows_per_window}-back"
+        answer = system.read_back_to(out, read_windows(self.columns, rows_per_window))
+        self.assertEqual(answer["rows"], RECORDS)
+        for path in sorted((self.base / "in").iterdir()):
+            self.assertEqual(path.read_bytes(), (out / path.name).read_bytes(), path.name)
+
+    def test_parquet_reads_a_day_back_window_by_window(self):
+        system = self.system("parquet")
+        system.ingest_day(self.columns)
+        for rows in (1, 2, RECORDS):
+            self.read_back_matches(system, rows)
+
+    def test_arcticdb_reads_a_day_back_window_by_window(self):
+        system = self.system("arcticdb")
+        system.ingest_day(self.columns)
+        for rows in (1, 2, RECORDS):
+            self.read_back_matches(system, rows)
+        self.assertEqual(system.rows_read, RECORDS)
+
+    def test_arcticdb_per_security_writes_each_security_once_from_bucket_files(self):
+        system = self.system("arcticdb", "rows100k-cols127-per-security")
+        system.stream_chunk_rows = lambda: 2  # Three buckets: locates 0, 7 and 9.
+        timings = system.ingest_day(self.columns)
+        self.assertEqual(timings["buckets"], 3)
+        self.assertEqual(timings["symbols"], 3)
+        self.assertFalse((self.base / "partition").exists() and
+                         any((self.base / "partition").rglob("*.arrow")))
+        system.close()
+        system.open()
+        self.assertEqual(system.symbols, ["locate-00000", "locate-00007", "locate-00009"])
+        self.read_back_matches(system, 2)
+        self.assertEqual(system.stored_settings()["symbols"], 3)
+
+    def test_the_windows_cover_the_day_and_never_split_a_nanosecond(self):
+        for rows in (1, 2, 4, RECORDS, RECORDS + 1):
+            windows = read_windows(self.columns, rows)
+            self.assertEqual(windows[0][0], 0)
+            self.assertGreater(windows[-1][1], int(self.columns.fixed["ts_ns"][-1]))
+            for (_, end), (start, _) in zip(windows, windows[1:]):
+                self.assertEqual(end, start)
 
     def test_a_day_maps_more_than_a_slice_and_the_chunk_fits_the_stored_unit(self):
         system = self.system("arcticdb")

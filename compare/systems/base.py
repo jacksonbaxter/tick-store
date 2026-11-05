@@ -15,7 +15,9 @@ memory is that step's alone.
     read_all()           the whole table as Arrow, ordered by seq
     query_*()            the three query shapes in compare/queries.py
     stored_settings()    settings read from the stored form
-    ingest_stream(chunks)  a whole day, chunk by chunk, for compare/fullday.py alone
+    ingest_stream(chunks)  a whole day, chunk by chunk
+    ingest_day(columns)  a whole day, durable under the class, for a full-day run. Streams
+    read_back_to(destination, windows)  a whole day back as column files, one window at a time
     close()
     stop_service()       server down, port free, peak memory returned
     data_paths()         every file of the store, for size and residency
@@ -37,8 +39,11 @@ class RunContext:
     durability: str
     day: object
     threads: int = 2
-    # A whole day, for compare/fullday.py: an iteration run, never a results file.
+    # A whole day, for compare/fullday.py's capacity check or a full-day comparison run.
     full_day: bool = False
+    # QuestDB through bin/questdb.sh, for compare/fullday.py alone: a reported run starts the
+    # server from java directly, on either input, so that its runtime is read the same way.
+    launcher: bool = False
     heap: str = "1g"
     gc_log: Path | None = None
     # The ITCH source itself, for a system whose natural input it is: tick-store's.
@@ -130,6 +135,35 @@ class System(ABC):
     def ingest_stream(self, chunks):
         """As ingest, from an iterator of Arrow tables, holding one chunk at a time."""
         raise NotImplementedError
+
+    def ingest_day(self, columns):
+        """A whole day, as `ingest`, streamed in chunks of the stored unit so that no day-sized
+        table is ever built. A system whose natural input is not the columns overrides it."""
+        from compare.schema import table_chunks
+
+        return self.ingest_stream(table_chunks(columns, self.context.day,
+                                               self.stream_chunk_rows()))
+
+    def read_window(self, start_ns, end_ns):
+        """Every row in [start, end), with the table's columns, ordered by seq."""
+        raise NotImplementedError
+
+    def read_back_to(self, destination, windows):
+        """The whole table as column files, one window at a time, each window ordered by seq.
+        Returns the rows written and the seconds spent reading from the engine."""
+        import time
+
+        from compare.schema import ColumnWriter
+
+        reading = 0.0
+        with ColumnWriter(destination, self.context.day) as writer:
+            for start_ns, end_ns in windows:
+                started = time.perf_counter()
+                table = self.read_window(start_ns, end_ns)
+                reading += time.perf_counter() - started
+                writer.append(table)
+            rows = writer.records
+        return {"rows": rows, "read_seconds": reading, "windows": len(windows)}
 
     @abstractmethod
     def probe_flush(self, table):

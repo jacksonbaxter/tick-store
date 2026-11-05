@@ -116,6 +116,55 @@ class ColdWorker(unittest.TestCase):
                 self.assertEqual(self.cold(query)["imported_inside_the_clock"], [])
 
 
+class FullDayWarm(unittest.TestCase):
+    """Warm on a whole day: the device's own counter across the repetitions, query by query,
+    with every attempt kept."""
+
+    def run_warm(self, device_reads):
+        from compare import coldcache, worker
+
+        reads = iter(device_reads)
+
+        class Counter:
+            def __init__(self, path):
+                pass
+
+            def delta(self):
+                return {"bytes": next(reads), "counter": "block device stat", "slack": 0}
+
+        system = SimpleNamespace(name="fake", query_rows=lambda *args: [[1, 2]],
+                                 query_column_sum=lambda column: [[1, 2]],
+                                 scan_facts=lambda query: {"status": "unavailable"})
+        query = Query("Q5", "column_sum", 0, 0)
+        request = {"queries": [query_to_json(query)], "repetitions": 4, "paths": ["store"],
+                   "truth": {"Q5": {"rows": 1, "sha256": "x"}}}
+        residency = {"pages": 8, "resident_pages": 8, "page_size": 4096}
+        with (mock.patch.object(coldcache, "DeviceCounter", Counter),
+              mock.patch.object(coldcache, "residency", return_value=residency),
+              mock.patch.object(worker, "digest_result", return_value={"rows": 1, "sha256": "x"}),
+              mock.patch.object(worker, "python_floor", return_value=[0.0])):
+            return worker.warm_full_day(system, request, None)
+
+    def test_a_quiet_device_proves_the_first_attempt(self):
+        answer = self.run_warm([0])
+        proof = answer["proofs"]["Q5"]
+        self.assertEqual((proof["attempts"], proof["discarded"]), (1, []))
+        self.assertEqual(proof["accepted"]["device_bytes_read"], 0)
+        self.assertEqual(proof["accepted"]["warm_up_runs"], 1)
+        self.assertEqual(len(answer["queries"]["Q5"]["seconds"]), 4)
+
+    def test_an_attempt_that_read_the_device_is_kept_and_run_again(self):
+        proof = self.run_warm([4096, 0])["proofs"]["Q5"]
+        self.assertEqual(proof["attempts"], 2)
+        self.assertEqual(proof["discarded"][0]["device_bytes_read"], 4096)
+
+    def test_three_attempts_that_read_the_device_fail_the_run(self):
+        from compare.coldcache import ProofFailed
+
+        with self.assertRaisesRegex(ProofFailed, "each of 3 attempts"):
+            self.run_warm([4096, 1, 8192])
+
+
 class RuntimeReading(unittest.TestCase):
     """The reading on both hosts' output, whichever host runs this."""
 
@@ -211,14 +260,25 @@ class Document(unittest.TestCase):
     RUNTIME = {"jvm_vendor": "v", "jvm_version": "25", "jvm_read_from": "the JVM",
                "jemalloc_preloaded": True, "jemalloc_read_from": "the process"}
 
-    def build(self, host, meter, parts):
+    GUARD = {"processes": {"11 python3": {"VmHWM": 5}, "12 java": {"VmHWM": 9},
+                           "13 python3": {"VmHWM": 7}},
+             "session_rss_bytes_peak": 20, "mem_available_lowest_bytes": 3,
+             "mem_available_start_bytes": 8, "swapped_pages_during_run": 0,
+             "free_disk_lowest_bytes": 100, "guard_fired": False,
+             "exit": {"code": 0, "signal": None}}
+
+    def build(self, host, meter, parts, day=None):
         systems = ("parquet", "questdb")
         for name in systems:
             classes = {"A": {"facts": {"runtime": self.RUNTIME}}} if name == "questdb" else {}
             part = {"truth": {}, "queries": [], "variants": {"v": {"classes": classes}}}
+            if day:
+                part["full_day"] = {"clipped": False}
+                (parts / f"{name}.guard.json").write_text(json.dumps(self.GUARD),
+                                                          encoding="utf-8")
             (parts / f"{name}.json").write_text(json.dumps(part), encoding="utf-8")
             (parts / f"{name}.sibling").write_text("0.5", encoding="utf-8")
-        args = SimpleNamespace(systems=systems, slice="s")
+        args = SimpleNamespace(systems=systems, slice="s", day=day, full_day_smoke=False)
         pin = {"sha256": "ab", "message_count": 1, "size": 1}
         layout = SimpleNamespace(export_dir=lambda name: name)
         run_bench = compare_run.run_bench
@@ -249,6 +309,22 @@ class Document(unittest.TestCase):
         self.assertEqual(check_compare.check_results.check_sibling(
             linux["header"], ["parquet", "questdb"]), [])
         self.assertEqual(macos["header"]["sibling_busy_percent"], "not-available")
+
+    def test_a_full_day_states_its_day_and_each_system_its_peak_memory(self):
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "build") as scratch:
+            parts = Path(scratch)
+            topology = parts / "cpu" / "cpu4" / "topology"
+            topology.mkdir(parents=True)
+            (topology / "thread_siblings_list").write_text("4-5\n", encoding="ascii")
+            meter = compare_run.run_bench.SiblingMeter(parts / "cpu", parts / "stat")
+            document = self.build("Linux", meter, parts, day="12302019")
+        self.assertEqual(document["label"], compare_run.FULL_DAY_LABEL)
+        self.assertEqual(document["input"]["day"], "12302019")
+        self.assertNotIn("slice", document["input"])
+        self.assertEqual(document["queries"]["full_day"], {"clipped": False})
+        memory = document["systems"]["questdb"]["peak_memory"]
+        self.assertEqual(memory["vmhwm_bytes_by_process"], {"java": 9, "python3": 7})
+        self.assertEqual(memory["mem_available_lowest_bytes"], 3)
 
 
 class HeapStatements(unittest.TestCase):

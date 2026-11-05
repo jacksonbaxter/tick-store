@@ -20,7 +20,9 @@ below.
 
 One system runs at a time, each as one process. `compare/run.py` writes
 `results/compare/<host>-<slice>-<commit>.json` only when every system has finished and
-`scripts/check_compare.py` has passed the file, so a file that exists is complete.
+`scripts/check_compare.py` has passed the file, so a file that exists is complete. A full-day
+run, Linux only, does the same on a whole pinned day and writes
+`results/compare/<host>-<day>-full-<commit>.json`: see "Full-day comparison" below.
 
 | Path | Job |
 |---|---|
@@ -33,6 +35,7 @@ One system runs at a time, each as one process. `compare/run.py` writes
 | `compare/durability.py` | The classes, and the host's strongest sync |
 | `compare/settings.py` | Requested against in force, and the verdict on a class |
 | `compare/coldcache.py` | Warm and cold proofs, and the size at rest |
+| `compare/variant_rule.py` | Which variants a full-day run takes, from the slice file of the same host and commit |
 | `compare/fullday.py` | One system through a whole day, as an iteration-only capacity check |
 | `compare/guard.py` | Runs a command in its own session, and stops it before it can hurt the host |
 | `compare/systems/` | One file per system, behind `compare/systems/base.py`. tick-store's is `tickstore.py` |
@@ -318,13 +321,20 @@ call in a process: for Parquet on macOS, about 1 ms over a second call on warm p
 
 ## tick-store
 
-tick-store runs through its own tools and nothing else, one variant: store version 3 at its
-default segment of 2^22 records, the indexed query path, CRCs checked on every read. The results
-in `results/compare/` from `25a462b` ran the earlier default, 2^20 records (variant `v3-seg1Mi`),
-before the layout experiments in `NOTES.md` chose 2^22.
+tick-store runs through its own tools and nothing else: store version 3, the indexed query path,
+CRCs checked on every read. Its headline, `v3-seg4Mi`, is the writer's default segment of 2^22
+records with the eight hot dictionary columns held to ranked PFOR, the layout the rule in "Layout
+experiments" in `NOTES.md` chose before it was measured, and it stays fixed in
+`compare/systems/tickstore.py`. Its tuning variant, `v3-seg1Mi`, is the same writer at 2^20
+records, the segment size it replaced, which the layout experiments found faster on Q1 and Q4 and
+slower on Q2, Q3 and Q5, so the comparison itself shows that trade. Both write the hot columns
+the same way, which no result reads back: the footer names each block's codec id, not its
+dictionary mode. The slice results from `25a462b` ran 2^20 as their only variant, under the
+same name, before the layout experiments.
 
 - **Ingest.** `tick_roundtrip ingest <slice> <store> --durability page_cache|device_flush
-  --segment-records 4194304`, run and timed from Python as every other write is, with the slice
+  --segment-records 4194304` (1048576 for `v3-seg1Mi`), run and timed from Python as every other
+  write is, with the slice
   read through first, as the others' column files are. The clock holds the ITCH parsing, which
   the other systems never do, since they load the columns `tick_export` already parsed. Nothing is
   subtracted, and every results file says so in `input.ingest_input` and in each write's
@@ -354,6 +364,7 @@ it was before these were added. The settings come from section 7 of
 |---|---|---|---|
 | Parquet | `none-rg1Mi` | No compression codec, against snappy and zstd | Section 7 sweeps "none, snappy (pyarrow default), zstd level 1 (Arrow default), one higher level". pyarrow's `compression` lists `'NONE'` among its valid values (`python/pyarrow/parquet/core.py` lines 778 to 780, Arrow 26.0.0), and the footer reads `UNCOMPRESSED` |
 | Parquet | `zstd1-rg1Mi-ts-default` | `ts` on the writer's default encoding, against `DELTA_BINARY_PACKED` | Section 7: "Time column: `column_encoding={'ts': 'DELTA_BINARY_PACKED'}`, one run vs default". The default is `use_dictionary`, "default True", and "if the dictionary size is too large, the column will fallback to ``PLAIN`` encoding" (`core.py` lines 772 to 776), past the 1 MB dictionary page limit |
+| tick-store | `v3-seg1Mi` | Segments of 2^20 records, against the headline's 2^22, both with the hot columns held to ranked PFOR: faster on Q1 and Q4, slower on Q2, Q3 and Q5 in the layout experiments | "Layout experiments" in `NOTES.md`, experiment 1 and the final round, scored by a rule committed before any of them was measured. tick-store's own measurements, not a documentation source, since it is ours |
 | ArcticDB | `rows100k-cols127-per-security` | One symbol per security, against one symbol for the whole table | ArcticDB's [data organisation](https://docs.arcticdb.io/latest/tutorials/data_organisation/) lists "Separate Symbol for Each Security": "Every security has its own symbol with the same data shape", "Ideal for single security analysis", and "Analysis involving many securities requires reading many symbols". Section 7: "Run one symbol for all, and one symbol per security". `Library.write_batch` and `Library.read_batch` are its documented calls for many symbols (docstrings in `arcticdb/version_store/library.py`, 6.28.2) |
 
 **ArcticDB per security** needs a query path of its own, and it is ArcticDB's documented one. The
@@ -410,9 +421,90 @@ file, and `scripts/check_compare.py` refuses a heap other than the one the file 
 or one the running command did not hold. A macOS file states its own heap, and that this check is
 Linux only.
 
+## Full-day comparison
+
+The headline comparison: every system on the whole of `12302019`, 268,744,780 records, on
+debian, Linux only. It is the slice run on a day, with these differences, each forced by the day's
+size or by the host:
+
+```sh
+TICK_STORE_MEASURE=<wrapper> <venv>/bin/python -I compare/run.py --day 12302019 \
+    --variant-source <results>/Linux-12302019-open-<commit>.json \
+    --data <dir> --vendor <dir> --work <dir> --tools <dir> --results-dir <results>
+```
+
+- **Input.** The day's ITCH file, checked against its pin, and its whole export at
+  `<data>/export/12302019-full`, which `tools/tick_export` makes and the oracle proves rebuilds
+  the day before anything is loaded. Every ratio is over the day's 8,251,407,909 source bytes.
+- **Queries as defined, nothing clipped.** Q2 and Q3 run over the hour `[09:30:00, 10:30:00)`, the
+  busiest locate is the busiest over that hour of the day, and Q5 sums shares over every record.
+  The ground truth is the same numpy code over the full export. The parameters, the hour, the
+  window the locate was chosen over and Q5's row count are in the file, and
+  `scripts/check_compare.py` refuses a full-day file with any window clipped.
+- **Writes stream.** No day-sized table is built: Parquet, ArcticDB and QuestDB take the export in
+  chunks of their stored unit, as in the capacity check, and their clock holds reading each chunk
+  from the column files, since 24 GB of columns cannot stay in this host's page cache.
+  tick-store's write is the same command on the day's ITCH file, read through first and resident,
+  as on the slice. ArcticDB's per-security layout spreads the day by locate into bucket files of
+  about one chunk each, then writes each bucket's securities whole in one `write_batch`, so each
+  security is still written once, in file order; that partitioning is inside its clock, as the
+  slice's sort is.
+- **One write per class.** Each is a sustained run of minutes over the whole day, and three of
+  each for every variant would not fit the run (below). A write's median is that one write.
+- **Read-back streams.** Each store is read back one time window of about 8 Mi rows at a time,
+  each window ordered by seq, into one column directory, which `tick_roundtrip verify-columns`
+  judges against the day as on the slice; tick-store's goes through `tick_export --store` straight
+  into the directory, and G-1 runs on its store too. A window is a range of times, so rows of one
+  nanosecond never straddle two, and the export's times never decrease in file order.
+- **Class A's store goes after its read-back,** since queries run on class B alone and two stores
+  of QuestDB's 23 GB beside a 24 GB read-back would crowd the disk the guard watches.
+- **Warm is proven query by query.** QuestDB's store, 22.9 GB in the capacity check, is larger
+  than this host's 15 GB of memory, so no store is held resident whole. Each query runs once
+  untimed, its answer checked, and then the block device under the store must read 0 bytes across
+  all 30 repetitions, by its own sectors-read counter. An attempt where it read anything is kept
+  in the result, with what it read, and the query runs again, up to three attempts; a third
+  failure stops the run. The counter is machine-wide, so another process's read can only fail an
+  attempt, never pass one. Residency of every store file is recorded before and after.
+- **Cold is as on the slice:** every store file evicted and proven at 0 resident, a fresh process,
+  and the device's count must reach what became resident.
+- **The guard.** Each system runs under `compare/guard.py`, inside the measurement wrapper and
+  under the same pin, with the capacity check's limits. Its report gives each system's peak
+  memory: the largest VmHWM of each process it saw, the largest sum of their RSS at one sample,
+  and MemAvailable at its lowest.
+- Settings read-back, the heap rule, the durability proofs, the sibling meter and the load lines
+  apply exactly as on the slice.
+
+**The variant rule, written before any full-day run.** The slice runs every variant of every
+system. On the day that does not fit: estimated from `results/fullday-capacity-12302019.json` and
+the Linux slice timings at `25a462b`, counting both classes, one write each, both classes' read-
+backs and the oracle, and the queries, every variant would take about 13.5 hours of measurement
+on debian, and about 20 with three writes per class, against a guide of about 10.
+
+| System | Variants and minutes, each with both classes |
+|---|---|
+| Parquet | 7 streamable variants at 34 to 41 each (write 3.1 min a class, read-back and oracle 10, queries 7), about 250. `zstd1-rgall`, one row group for the whole input, cannot stream a day |
+| ArcticDB | headline 43, `rows10M-cols127` 52, `rows100k-cols1` 72 (class B writes 5.3 times the headline's on the slice), per security 98 (partition and writes 33, read-back over 8,907 symbols 28, Q1, Q4 and Q5 over every symbol 37), about 265 |
+| QuestDB | `plain` 87 (writes 10.5 and 16 min from the capacity check, settle, read-back 38, cold restarts 8), `locate-index` 95, about 182 |
+| tick-store | 43 each (write about 4 min a class, `tick_export --store`, the oracle and G-1 15 min a class), 86 |
+| Every system | the source's SHA-256 and the export's oracle before it starts, 6 each, 24 |
+
+So a full-day run takes, for every system alike, **its headline variant and every other variant
+of that system that won a query on the Linux slice at the same commit**: among that system's
+variants, both the lowest median and the lowest p99 of one query, warm or cold, the test the
+"Lowest" column and QL-4 use. `compare/variant_rule.py` applies it to the slice file named by
+`--variant-source`, which must be this host's slice results at this commit; the file records the
+rule, the slice file and each system's winners, and `scripts/check_compare.py` applies the rule
+again to that slice file and refuses a file whose variants differ. On the slice at `25a462b` the
+rule gives Parquet `zstd1-rg128k` and `none-rg1Mi`, ArcticDB `rows10M-cols127` and per security,
+QuestDB `locate-index`, and tick-store `v3-seg1Mi` (its only variant then), about 9.8 hours by the
+table above; the run takes whatever the slice at its own commit gives.
+
 ## What the numbers are
 
-Slice numbers prove that the harness works. They are not claims about a full day, and no target
-changes because of them. Every latency carries its median, nearest-rank p99 and mean. The slice is five minutes long, so Q2 and Q3 are clipped from an hour to
-`[09:30:00, 09:34:30)`, and Q5 scans 6,125,294 rows and not a day's 268,744,780. Every results file
-says so. What the runs found is in "Comparison harness" in `NOTES.md`.
+The full-day file is the one the targets are judged on. Slice numbers prove that the harness
+works; they are not claims about a full day, and no target changes because of them. Every latency
+carries its median, nearest-rank p99 and mean. The slice is five minutes long, so Q2 and Q3 are
+clipped from an hour to `[09:30:00, 09:34:30)`, and Q5 scans 6,125,294 rows and not a day's
+268,744,780. Every results file says which it is, and `scripts/render_results.py` never puts a
+full-day number and a slice number in one table. What the runs found is in "Comparison harness",
+"tick-store in the comparison (slice)" and "Full-day comparison" in `NOTES.md`.

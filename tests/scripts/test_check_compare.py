@@ -20,6 +20,9 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "check_compare.py"
+sys.path.insert(0, str(REPO_ROOT))
+
+from compare import variant_rule  # noqa: E402
 SCRATCH_ROOT = REPO_ROOT / "build" / "test_check_compare"
 
 COMMIT = "0123456789abcdef0123456789abcdef01234567"
@@ -29,7 +32,13 @@ BYTES = 20000
 SLICE = "test-slice"
 QUERY_NAMES = ("Q1", "Q2", "Q3", "Q4", "Q5")
 PROVEN = "proven"
-PINS = {"slices": {SLICE: {"sha256": SHA, "message_count": MESSAGES, "size": BYTES}}}
+DAY = "12302019"
+DAY_SHA = "cd" * 32
+DAY_MESSAGES = 4000
+DAY_BYTES = 80000
+PINS = {"slices": {SLICE: {"sha256": SHA, "message_count": MESSAGES, "size": BYTES}},
+        "days": {DAY: {"decompressed_sha256": DAY_SHA, "message_count": DAY_MESSAGES,
+                       "decompressed_size": DAY_BYTES}}}
 HEAP = "-Xms1g -Xmx1g"
 CAPACITY_FILE = "results/fullday-capacity-12302019.json"
 CAPACITY = {"questdb_heap_verdict": {"verdict": "adequate", "chosen_heap": HEAP,
@@ -114,7 +123,8 @@ def class_entry(system, name, host):
                   "python_seconds": 0.1, "engine_seconds": 1.9, "python_note": "n",
                   "peak_rss_bytes_client": 1000},
         "stored": {"allocated_bytes": 10000, "ratio_stored_over_source": 10000 / BYTES,
-                   "method": "st_blocks", "denominator": "source", "measured": "at rest"},
+                   "method": "st_blocks", "denominator": "the slice's source bytes",
+                   "measured": "at rest"},
         "read_back": {"oracle": {"verdict": "pass", "exit_code": 0, "records": MESSAGES,
                                  "mismatched_records": 0, "hashes_match": True,
                                  "source_sha256": SHA, "stored_sha256": SHA},
@@ -790,6 +800,230 @@ class Faults(Harness):
         result = self.run_on(shuffled)
         self.assertEqual(result.returncode, 1)
         self.assertIn("does not start with its header", result.stderr)
+
+
+OPEN_NS = 34_200 * 1_000_000_000
+HOUR_NS = 3_600 * 1_000_000_000
+BUSIEST = 13
+
+
+def full_day_parameters():
+    return [{"name": "Q1", "kind": "rows", "start_ns": OPEN_NS, "end_ns": OPEN_NS + 10**9,
+             "locate": -1, "text": "One second."},
+            {"name": "Q2", "kind": "rows", "start_ns": OPEN_NS, "end_ns": OPEN_NS + HOUR_NS,
+             "locate": BUSIEST, "text": "One hour of one symbol."},
+            {"name": "Q3", "kind": "minute_aggregate", "start_ns": OPEN_NS,
+             "end_ns": OPEN_NS + HOUR_NS, "locate": BUSIEST, "text": "Per minute, one hour."},
+            {"name": "Q4", "kind": "rows", "start_ns": OPEN_NS, "end_ns": OPEN_NS + 10**6,
+             "locate": -1, "text": "One millisecond."},
+            {"name": "Q5", "kind": "column_sum", "start_ns": 0, "end_ns": 0, "locate": -1,
+             "text": "The whole day."}]
+
+
+def full_day_warm(entry):
+    accepted = {"device_bytes_read": 0, "device_counter": "block device stat",
+                "warm_up_runs": 1, "pages": 8, "resident_before": 8, "resident_after": 8}
+    entry["warm"]["proof"] = {"method": "per query", "device_slack_bytes": 0, "attempts": 1,
+                              "accepted": accepted, "discarded": []}
+
+
+def full_day_document():
+    """The Linux file as a full day, and the slice file its variants come from."""
+    document = valid_document("Linux")
+    document["label"] = "A full day, every query with nothing clipped."
+    document["input"] = {"day": DAY, "full_day": True, "sha256": DAY_SHA,
+                         "messages": DAY_MESSAGES, "bytes": DAY_BYTES,
+                         "ratio_baseline": "the day's source bytes",
+                         "clipping": "A whole day. Nothing is clipped.",
+                         "ingest_input": "tick-store's ingest holds ITCH parsing"}
+    document["queries"]["parameters"] = full_day_parameters()
+    document["queries"]["full_day"] = {"hour_window_ns": [OPEN_NS, OPEN_NS + HOUR_NS],
+                                       "busiest_locate_window_ns": [OPEN_NS, OPEN_NS + HOUR_NS],
+                                       "busiest_locate": BUSIEST,
+                                       "q5_rows_scanned": DAY_MESSAGES, "clipped": False}
+    for system in document["systems"].values():
+        system["peak_memory"] = {"vmhwm_bytes_largest": 10, "mem_available_lowest_bytes": 5,
+                                 "session_rss_bytes_peak": 12, "guard_fired": False,
+                                 "exit": {"code": 0, "signal": None}}
+        for variant in system["variants"].values():
+            for entry in variant["classes"].values():
+                entry["write"]["records_per_second_median"] = DAY_MESSAGES / 2.0
+                entry["stored"]["ratio_stored_over_source"] = 10000 / DAY_BYTES
+                entry["stored"]["denominator"] = "the day's source bytes"
+                for field in ("records",):
+                    entry["read_back"]["oracle"][field] = DAY_MESSAGES
+                for field in ("source_sha256", "stored_sha256"):
+                    entry["read_back"]["oracle"][field] = DAY_SHA
+                entry["read_back"]["streamed"] = {"rows": DAY_MESSAGES, "windows": 3}
+            for entry in variant["queries"].values():
+                full_day_warm(entry)
+    source = valid_document("Linux")
+    document["variant_selection"] = {
+        "rule": variant_rule.RULE, "source": f"Linux-{SLICE}-{COMMIT[:12]}.json",
+        "source_commit": COMMIT, "systems": variant_rule.select(source)}
+    return document, source
+
+
+class FullDay(Harness):
+    def run_full(self, document, source, name=None):
+        (self.directory / f"Linux-{SLICE}-{COMMIT[:12]}.json").write_text(
+            json.dumps(source), encoding="utf-8")
+        path = self.directory / (name or f"Linux-{DAY}-full-{COMMIT[:12]}.json")
+        path.write_text(json.dumps(document), encoding="utf-8")
+        return subprocess.run([sys.executable, "-I", str(SCRIPT), "--pins", str(self.pins),
+                               "--capacity", str(self.capacity), str(path)],
+                              check=False, capture_output=True, text=True)
+
+    def assert_full_fault(self, mutate, expected, name=None):
+        document, source = full_day_document()
+        mutate(document, source)
+        result = self.run_full(document, source, name)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn(expected, result.stderr)
+
+    def test_the_valid_full_day_file_passes(self):
+        result = self.run_full(*full_day_document())
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_a_clipped_hour_passing_as_a_full_day(self):
+        def fault(document, source):
+            for item in document["queries"]["parameters"]:
+                if item["name"] in ("Q2", "Q3"):
+                    item["end_ns"] = OPEN_NS + 270 * 10**9
+        self.assert_full_fault(fault, "Q2 is not the full-day query")
+
+    def test_a_busiest_locate_chosen_over_a_clipped_window(self):
+        def fault(document, source):
+            document["queries"]["full_day"]["busiest_locate_window_ns"][1] = OPEN_NS + 10**9
+        self.assert_full_fault(fault, "the busiest locate's window is clipped")
+
+    def test_q5_over_less_than_the_day(self):
+        def fault(document, source):
+            document["queries"]["full_day"]["q5_rows_scanned"] = MESSAGES
+        self.assert_full_fault(fault, "Q5 scans 1000 rows")
+
+    def test_a_query_that_says_it_is_clipped(self):
+        def fault(document, source):
+            document["queries"]["parameters"][1]["text"] = "One hour, clipped to the slice."
+        self.assert_full_fault(fault, "Q2 says it is clipped")
+
+    def test_a_slice_file_named_as_a_full_day(self):
+        document = valid_document("Linux")
+        result = self.run_full(document, valid_document("Linux"),
+                               f"Linux-{SLICE}-full-{COMMIT[:12]}.json")
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("a full-day file must name its day", result.stderr)
+
+    def test_a_full_day_file_with_a_slice_name(self):
+        document, source = full_day_document()
+        result = self.run_full(document, source, f"Linux-{SLICE}-{COMMIT[:12]}-day.json")
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("a full-day file must name its day", result.stderr)
+
+    def test_a_full_day_against_the_slice_pin(self):
+        def fault(document, source):
+            document["input"]["messages"] = MESSAGES
+        self.assert_full_fault(fault, "input: does not match the pin")
+
+    def test_a_ratio_over_the_slice(self):
+        def fault(document, source):
+            b_of(document, "parquet")["stored"]["ratio_stored_over_source"] = 10000 / BYTES
+        self.assert_full_fault(fault, "the ratio is not over")
+
+    def test_a_store_not_read_back_whole(self):
+        def fault(document, source):
+            b_of(document, "arcticdb")["read_back"]["streamed"]["rows"] = DAY_MESSAGES - 1
+        self.assert_full_fault(fault, "the whole day was not read back")
+
+    def test_a_warm_number_that_read_from_the_device(self):
+        def fault(document, source):
+            q1_of(document)["warm"]["proof"]["accepted"]["device_bytes_read"] = 4096
+        self.assert_full_fault(fault, "the device read 4096 bytes")
+
+    def test_a_discarded_warm_attempt_left_out(self):
+        def fault(document, source):
+            q1_of(document)["warm"]["proof"]["attempts"] = 2
+        self.assert_full_fault(fault, "2 attempts")
+
+    def test_a_slice_warm_proof_on_a_full_day(self):
+        def fault(document, source):
+            q1_of(document)["warm"]["proof"] = {"pages": 8, "resident_before": 8,
+                                                "resident_after": 8}
+        self.assert_full_fault(fault, "bytes across the timed repetitions")
+
+    def test_no_peak_memory(self):
+        def fault(document, source):
+            del document["systems"]["questdb"]["peak_memory"]
+        self.assert_full_fault(fault, "questdb.peak_memory: no vmhwm_bytes_largest")
+
+    def test_the_guard_fired(self):
+        def fault(document, source):
+            document["systems"]["parquet"]["peak_memory"]["guard_fired"] = True
+        self.assert_full_fault(fault, "the guard stopped the run")
+
+    def test_variants_the_rule_does_not_give(self):
+        def fault(document, source):
+            variants = document["systems"]["parquet"]["variants"]
+            variants["extra"] = copy.deepcopy(variants["v"])
+        self.assert_full_fault(fault, "parquet ran ['v', 'extra']")
+
+    def test_a_rule_applied_to_another_slice_file(self):
+        def fault(document, source):
+            winner = copy.deepcopy(source["systems"]["parquet"]["variants"]["v"])
+            for query in winner["queries"].values():
+                query["warm"]["median_us"] = query["warm"]["p99_us"] = 1.0
+            source["systems"]["parquet"]["variants"]["w"] = winner
+        self.assert_full_fault(fault, "variant_selection: parquet states")
+
+    def test_no_slice_file_beside_it(self):
+        def fault(document, source):
+            document["variant_selection"]["source"] = "Linux-other-0123456789ab.json"
+        self.assert_full_fault(fault, "is not beside this one")
+
+    def test_a_slice_file_from_another_commit(self):
+        def fault(document, source):
+            source["header"]["commit"] = "f" * 40
+        self.assert_full_fault(fault, "not this host's at this commit")
+
+    def test_no_variant_selection(self):
+        def fault(document, source):
+            del document["variant_selection"]
+        self.assert_full_fault(fault, "must state how its variants were chosen")
+
+
+class VariantRule(unittest.TestCase):
+    """compare/variant_rule.py: a win needs the lowest median and the lowest p99 together."""
+
+    @staticmethod
+    def system(numbers):
+        """{variant: (median, p99)} on every query and kind alike, except Q1 warm."""
+        variants = {}
+        for name, (median, p99) in numbers.items():
+            queries = {query: {kind: {"median_us": 50.0, "p99_us": 60.0}
+                               for kind in ("warm", "cold")} for query in QUERY_NAMES}
+            queries["Q1"]["warm"] = {"median_us": median, "p99_us": p99}
+            variants[name] = {"queries": queries}
+        return {"headline_variant": "h", "variants": variants}
+
+    def test_the_lowest_median_and_p99_together_win(self):
+        won = variant_rule.wins(self.system({"h": (10.0, 20.0), "a": (5.0, 15.0)}))
+        self.assertIn("Q1 warm", won["a"])
+        self.assertNotIn("Q1 warm", won.get("h", []))
+
+    def test_a_lower_median_with_a_higher_p99_does_not_win(self):
+        won = variant_rule.wins(self.system({"h": (10.0, 20.0), "a": (5.0, 25.0)}))
+        self.assertNotIn("Q1 warm", won.get("a", []))
+        self.assertNotIn("Q1 warm", won.get("h", []))
+
+    def test_the_headline_comes_first_and_losers_stay_out(self):
+        document = {"systems": {"x": self.system({"b": (1.0, 1.0), "h": (2.0, 2.0),
+                                                  "c": (3.0, 3.0)})}}
+        chosen = variant_rule.select(document)["x"]
+        self.assertEqual(chosen["selected"][0], "h")
+        self.assertIn("b", chosen["selected"])
+        # Every variant ties on the other nine measures, so each of them wins those.
+        self.assertEqual(sorted(chosen["selected"]), ["b", "c", "h"])
+        self.assertEqual(chosen["won"]["b"][0], "Q1 warm")
 
 
 if __name__ == "__main__":

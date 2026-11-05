@@ -9,9 +9,12 @@ hosts are never mixed, and every file must pass check_results.py to appear. --ch
 regenerates the block and compares, so a hand edit inside the markers shows as stale.
 
 The comparison block, between its own markers, comes from results/compare/ and every file
-there must pass check_compare.py. Each host has its own tables, and so does each durability
-class: ingest in class A and ingest in class B never share a table, and queries are on each
-system's class B store, as the harness runs them. Each system shows its headline variant.
+there must pass check_compare.py. Each file has its own tables, a full day's first, then each
+slice's, labelled slice only, so a full-day number and a slice number never share a table. Each
+host has its own tables, and so does each durability class: ingest in class A and ingest in
+class B never share a table, and queries are on each system's class B store, as the harness runs
+them. Each system shows its headline variant; a full day also lists every variant it ran, and
+each system's peak memory.
 """
 
 import argparse
@@ -41,6 +44,10 @@ QUERY_COLUMNS = ("Query", "System", "Variant", "Rows", "Warm median ms", "Warm p
                  "Cold median ms", "Cold p99 ms", "Lowest")
 INGEST_COLUMNS = ("System", "Variant", "Write s, median", "M records/s", "Stored bytes",
                   "Ratio", "Proof", "Like-for-like")
+VARIANT_COLUMNS = ("System", "Variant", "Stored bytes, B", "Ratio", "Write s, A / B",
+                   *(f"{name} ms, warm / cold" for name in QUERY_NAMES))
+MEMORY_COLUMNS = ("System", "Largest VmHWM", "Peak RSS of its processes together",
+                  "MemAvailable, lowest")
 
 EXIT_STALE = 1
 EXIT_USAGE = 2
@@ -165,10 +172,53 @@ def ingest_table(document, class_name):
     return lines
 
 
+def full_day_of(document):
+    return document["input"].get("day")
+
+
+def gib(value):
+    return f"{value / (1 << 30):,.2f} GiB"
+
+
+def variant_table(document):
+    """Every variant each system ran, so a tuning variant's trade-off shows beside its
+    headline. Queries are medians on the class B store."""
+    lines = ["| " + " | ".join(VARIANT_COLUMNS) + " |", "|" + "---|" * len(VARIANT_COLUMNS)]
+    source_bytes = document["input"]["bytes"]
+    for name in ordered_systems(document):
+        system = document["systems"][name]
+        for variant, entry in system["variants"].items():
+            classes = entry["classes"]
+            stored = classes["B"]["stored"]["allocated_bytes"]
+            mark = " (headline)" if variant == system["headline_variant"] else ""
+            cells = [SYSTEM_LABEL[name], f"`{variant}`{mark}", f"{stored:,}",
+                     f"{source_bytes / stored:.3f}",
+                     f"{classes['A']['write']['seconds_median']:.1f} / "
+                     f"{classes['B']['write']['seconds_median']:.1f}"]
+            cells += [f"{milliseconds(entry['queries'][query]['warm']['median_us'])} / "
+                      f"{milliseconds(entry['queries'][query]['cold']['median_us'])}"
+                      for query in QUERY_NAMES]
+            lines.append("| " + " | ".join(cells) + " |")
+    return lines
+
+
+def memory_table(document):
+    lines = ["| " + " | ".join(MEMORY_COLUMNS) + " |", "|" + "---|" * len(MEMORY_COLUMNS)]
+    for name in ordered_systems(document):
+        memory = document["systems"][name]["peak_memory"]
+        largest = max(memory["vmhwm_bytes_by_process"].items(), key=lambda item: item[1])
+        cells = (SYSTEM_LABEL[name], f"{gib(largest[1])} (`{largest[0]}`)",
+                 gib(memory["session_rss_bytes_peak"]), gib(memory["mem_available_lowest_bytes"]))
+        lines.append("| " + " | ".join(cells) + " |")
+    return lines
+
+
 def compare_for(document):
     header = document["header"]
     host = header["host"]
-    lines = [f"**{host}, slice only.** {header['cpu_model']}, commit `{header['commit'][:12]}`. "
+    day = full_day_of(document)
+    scope = f"full day {day}" if day else "slice only"
+    lines = [f"**{host}, {scope}.** {header['cpu_model']}, commit `{header['commit'][:12]}`. "
              f"{header['statement']} {document['label']}", "",
              "Queries, on each system's class B store, in milliseconds. \"Lowest\" names the "
              "measures, warm or cold, on which a system had both the lowest median and the "
@@ -176,11 +226,20 @@ def compare_for(document):
     lines += query_table(document)
     for class_name, meaning in (("A", "returns once data is in the OS page cache"),
                                 ("B", "returns after a flush to the device")):
+        unit = "day" if day else "slice"
         lines += ["", f"Ingest and size, class {class_name}: {meaning}. Stored bytes are "
-                      "allocated at rest, and the ratio is the slice's source bytes over them.",
+                      f"allocated at rest, and the ratio is the {unit}'s source bytes over them.",
                   ""]
         lines += ingest_table(document, class_name)
     lines += ["", document["input"]["ingest_input"]]
+    if day:
+        lines += ["", "Every variant run on the full day, by the rule in compare/README.md. "
+                      "Queries are medians on the class B store.", ""]
+        lines += variant_table(document)
+        if host == "Linux":
+            lines += ["", "Peak memory per system, from compare/guard.py across the system's "
+                          "whole run.", ""]
+            lines += memory_table(document)
     return lines
 
 
@@ -190,10 +249,11 @@ def render_compare(compare_dir):
     if not documents:
         return ["No reported comparison yet."]
     lines = []
-    for host in HOSTS:
-        for document in documents:
-            if document["header"]["host"] == host:
-                lines += compare_for(document) + [""]
+    for full_day in (True, False):
+        for host in HOSTS:
+            for document in documents:
+                if document["header"]["host"] == host and bool(full_day_of(document)) == full_day:
+                    lines += compare_for(document) + [""]
     return lines[:-1]
 
 

@@ -28,7 +28,7 @@ from pathlib import Path
 
 from compare import coldcache
 from compare.queries import ROW_COLUMNS, aggregate_digest
-from compare.schema import ColumnSet, arrow_table
+from compare.schema import ColumnSet, arrow_table, read_manifest
 from compare.settings import NOT_PROVEN, PROVEN, Setting, SettingsMismatch, require_all_match
 from compare.systems.base import System
 
@@ -36,7 +36,11 @@ STORE_NAME = "store.tsc"
 PROBE_NAME = "probe.tsc"
 STORE_FORMAT = "itch-store-v3"
 STORE_VERSION = 3
-SEGMENT_RECORDS = 1 << 22
+SEGMENT_RECORDS = 1 << 22  # The writer's default, and the headline: see compare/README.md.
+SEGMENT_RECORDS_1MI = 1 << 20
+HOT_COLUMNS = ("the writer's default column specs: the eight hot dictionary columns held to "
+               "ranked PFOR. Not read back: the footer names each block's codec id, not its "
+               "dictionary mode")
 QUERY_PATH = "indexed"
 MODE_FOR_CLASS = {"A": "page_cache", "B": "device_flush"}
 WORKER_START_SECONDS = 60
@@ -48,6 +52,10 @@ INPUT_STATEMENT = ("tick-store ingests the ITCH slice itself, so its write time 
                    "parsing. The other systems ingest the columns tools/tick_export wrote from "
                    "the same slice, already parsed, and their times do not. Nothing is "
                    "subtracted.")
+FULL_DAY_INPUT_STATEMENT = ("tick-store ingests the day's ITCH file itself, so its write time "
+                            "holds ITCH parsing. The other systems ingest the columns "
+                            "tools/tick_export wrote from the same day, already parsed, and "
+                            "their times do not. Nothing is subtracted.")
 G1_NOTE = ("tick_roundtrip verify, the G-1 check: every record re-serialised from the store and "
            "compared with the source byte for byte, and both streams hashed. Stronger than the "
            "column oracle every system passes.")
@@ -185,11 +193,20 @@ class EngineAnswer:
         return mine
 
 
+def _variant(segment_records):
+    return {"store_version": STORE_VERSION, "segment_records": segment_records,
+            "hot_columns": HOT_COLUMNS, "query_path": QUERY_PATH,
+            "checksums": "verified on every read"}
+
+
 class TickStoreSystem(System):
     name = "tickstore"
+    # The headline is the writer's default, 2^22 records, chosen by the rule in "Layout
+    # experiments" in NOTES.md before it was measured. 2^20 is the layout it replaced, faster
+    # on Q1 and Q4 and slower on Q2, Q3 and Q5: see compare/README.md.
     headline_variant = "v3-seg4Mi"
-    variants = {"v3-seg4Mi": {"store_version": STORE_VERSION, "segment_records": SEGMENT_RECORDS,
-                              "query_path": QUERY_PATH, "checksums": "verified on every read"}}
+    variants = {"v3-seg4Mi": _variant(SEGMENT_RECORDS),
+                "v3-seg1Mi": _variant(SEGMENT_RECORDS_1MI)}
 
     def __init__(self, context):
         super().__init__(context)
@@ -205,6 +222,7 @@ class TickStoreSystem(System):
         self.export_dir = None
         self.layout_report = None
         self.codecs_found = None
+        self.segment_records = self.tuning["segment_records"]
 
     @property
     def store_path(self):
@@ -219,10 +237,12 @@ class TickStoreSystem(System):
         return {"TICK_STORE_SIMD": self.kernel_level}
 
     def requested(self):
-        return {"input": INPUT_STATEMENT, "store_format": STORE_FORMAT,
+        return {"input": FULL_DAY_INPUT_STATEMENT if self.context.full_day else INPUT_STATEMENT,
+                "store_format": STORE_FORMAT,
                 "ingest": f"tools/tick_roundtrip ingest --durability {self.mode} "
-                          f"--segment-records {SEGMENT_RECORDS}",
-                "durability": self.mode, "segment_records": SEGMENT_RECORDS,
+                          f"--segment-records {self.segment_records}",
+                "durability": self.mode, "segment_records": self.segment_records,
+                "hot_columns": HOT_COLUMNS,
                 "codecs": "each column's codec as docs/store.md lists it, zstd where the "
                           "writer finds it smaller",
                 "query_worker": f"tools/tick_query, one process per store, opened before the "
@@ -235,7 +255,7 @@ class TickStoreSystem(System):
     def ingest_command(self, source, store, mode, first_records=None, segment_records=None):
         command = [self.tool("tick_roundtrip"), "ingest", str(source), str(store),
                    "--durability", mode,
-                   "--segment-records", str(segment_records or SEGMENT_RECORDS)]
+                   "--segment-records", str(segment_records or self.segment_records)]
         if first_records is not None:
             command += ["--first-records", str(first_records)]
         return command
@@ -260,6 +280,11 @@ class TickStoreSystem(System):
     def settings_in_force(self):
         return []
 
+    def ingest_day(self, columns):
+        """A whole day is the same command on the day's file: it is tick-store's natural input,
+        and no table is built."""
+        return self.ingest(columns, None)
+
     def ingest(self, columns, table):
         source = self._source()
         warmed = coldcache.warm(self.context.layout, [source])
@@ -279,7 +304,7 @@ class TickStoreSystem(System):
                                "clock. engine_seconds is tick_roundtrip's own wall time: mapping "
                                "the source, parsing ITCH, coding and writing the store, and its "
                                "commit",
-                "input": INPUT_STATEMENT,
+                "input": FULL_DAY_INPUT_STATEMENT if self.context.full_day else INPUT_STATEMENT,
                 "input_resident": {"pages": warmed["pages"],
                                    "resident_pages": warmed["resident_pages"]},
                 "records": report["records"], "stored_file_bytes": report["stored_file_bytes"],
@@ -315,7 +340,7 @@ class TickStoreSystem(System):
         return require_all_match([
             Setting("store version", STORE_VERSION, ready["store_version"],
                     "the store section's bytes, read by tools/tick_query"),
-            Setting("segment records", SEGMENT_RECORDS, ready["segment_records"],
+            Setting("segment records", self.segment_records, ready["segment_records"],
                     "the store section's bytes, read by tools/tick_query"),
             Setting("records", self.expected_records, ready["records"],
                     "the store's header, as tools/tick_query opened it"),
@@ -365,7 +390,7 @@ class TickStoreSystem(System):
             require_all_match([
                 Setting("store version", STORE_VERSION, self.ready["store_version"],
                         "the store section's bytes, read by tools/tick_query"),
-                Setting("segment records", SEGMENT_RECORDS, self.ready["segment_records"],
+                Setting("segment records", self.segment_records, self.ready["segment_records"],
                         "the store section's bytes, read by tools/tick_query"),
                 Setting("kernel level", self.kernel_level, self.ready["kernel_level"],
                         "the kernel set tools/tick_query chose"),
@@ -421,15 +446,27 @@ class TickStoreSystem(System):
     def read_all(self):
         """The store's records as the harness's columns, through tick_export --store."""
         directory = self.context.layout.work / "readback-export" / self.name
-        shutil.rmtree(directory, ignore_errors=True)
-        directory.parent.mkdir(parents=True, exist_ok=True)
         self.export_dir = directory
+        self._export(directory)
+        return arrow_table(ColumnSet(directory), self.context.day)
+
+    def read_back_to(self, destination, windows):
+        """A whole day: tick_export --store writes the column files straight to `destination`,
+        every record through the store's read path and the ITCH encoder, with no table between."""
+        started = time.perf_counter()
+        self._export(destination)
+        seconds = time.perf_counter() - started
+        return {"rows": read_manifest(destination)["records"], "read_seconds": seconds,
+                "windows": "none: tick_export --store reads the whole store in order"}
+
+    def _export(self, directory):
+        shutil.rmtree(directory, ignore_errors=True)
+        Path(directory).parent.mkdir(parents=True, exist_ok=True)
         run = subprocess.run([self.tool("tick_export"), "--store", str(self.store_path),
                               str(directory)], capture_output=True, text=True, check=False)
         if run.returncode != 0:
             raise ToolFailure(f"tick_export --store exited {run.returncode}: "
                               f"{run.stderr.strip()[:300]}")
-        return arrow_table(ColumnSet(directory), self.context.day)
 
     def query_rows(self, start_ns, end_ns, locate, columns):
         if tuple(columns) != ROW_COLUMNS:
@@ -475,12 +512,12 @@ class TickStoreSystem(System):
         layout = self.layout_report
         settings, codecs = codec_settings(blocks)
         records = ready["records"]
-        segments = -(-records // SEGMENT_RECORDS)
+        segments = -(-records // self.segment_records)
         g1 = self.verify_g1()
         checked = require_all_match([
             Setting("store version", STORE_VERSION, ready["store_version"],
                     "the store section's bytes"),
-            Setting("segment records", SEGMENT_RECORDS, layout["segment_records"],
+            Setting("segment records", self.segment_records, layout["segment_records"],
                     "tick_roundtrip layout, from the footer"),
             Setting("segments", segments, layout["segments"], "tick_roundtrip layout"),
             Setting("G-1 verdict", "pass", g1.get("verdict"), "tick_roundtrip verify"),

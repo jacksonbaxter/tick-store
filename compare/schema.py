@@ -182,44 +182,97 @@ def plain_array(column, name):
 def write_columns(table, directory, day):
     """Writes a table a system returned as a column directory, and fails on any value that
     does not fit its column. The rows must already be in `seq` order: the reader checks."""
-    import pyarrow as pa
+    with ColumnWriter(directory, day) as writer:
+        writer.append(table)
 
-    missing = set(TABLE_COLUMNS) - set(table.column_names)
-    if missing:
-        raise ColumnsError(f"columns missing from the table: {sorted(missing)}")
-    directory = Path(directory)
-    directory.mkdir(parents=True, exist_ok=True)
-    records = table.num_rows
 
-    midnight = day.midnight_ns
-    for name, numpy_type, _ in FIXED_COLUMNS:
-        source = "ts" if name == "ts_ns" else name
-        array = plain_array(table.column(source), source)
-        if pa.types.is_timestamp(array.type):
-            if array.type.unit != "ns":
-                raise ColumnsError(f"{source}: {array.type.unit} precision came back")
-            values = array.cast(pa.int64()).to_numpy(zero_copy_only=False) - midnight
+class ColumnWriter:
+    """A column directory written one table at a time, in order, so that a whole day read back
+    never has to be one table. Every value must fit its column, as in `write_columns`, and the
+    manifest is written only by `finish`, so a directory left by a failure is never whole."""
+
+    def __init__(self, directory, day):
+        self.directory = Path(directory)
+        self.directory.mkdir(parents=True, exist_ok=True)
+        self.midnight = day.midnight_ns
+        self.records = 0
+        self.text_bytes = dict.fromkeys(TEXT_COLUMNS, 0)
+        self.files = {}
+        for name, _, _ in FIXED_COLUMNS:
+            self.files[f"{name}.bin"] = open(self.directory / f"{name}.bin", "wb")
+        for name in TEXT_COLUMNS:
+            self.files[f"{name}.off"] = open(self.directory / f"{name}.off", "wb")
+            self.files[f"{name}.dat"] = open(self.directory / f"{name}.dat", "wb")
+        for name in TEXT_COLUMNS:
+            np.zeros(1, dtype="<u8").tofile(self.files[f"{name}.off"])
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, kind, value, traceback):
+        if kind is None:
+            self.finish()
         else:
-            values = array.to_numpy(zero_copy_only=False)
-        narrow = values.astype(numpy_type)
-        if not np.array_equal(narrow.astype(np.int64), values.astype(np.int64)):
-            raise ColumnsError(f"{name}: a value does not fit {numpy_type}")
-        narrow.tofile(directory / f"{name}.bin")
+            self.close()
 
-    text_bytes = {}
-    for name in TEXT_COLUMNS:
-        array = plain_array(table.column(name), name).cast(pa.large_string())
-        _, offsets_buffer, data_buffer = array.buffers()
-        offsets = np.frombuffer(offsets_buffer, dtype="<i8", count=records + 1,
-                                offset=array.offset * 8)
-        first = int(offsets[0])
-        (offsets - first).astype("<u8").tofile(directory / f"{name}.off")
-        end = int(offsets[-1])
-        data = b"" if data_buffer is None else memoryview(data_buffer)[first:end]
-        with open(directory / f"{name}.dat", "wb") as out:
-            out.write(data)
-        text_bytes[name] = end - first
+    def close(self):
+        for handle in self.files.values():
+            handle.close()
 
-    (directory / "tail.bin").write_bytes(b"")
-    (directory / MANIFEST_NAME).write_text(format_manifest(records, 0, text_bytes),
-                                           encoding="ascii")
+    def append(self, table):
+        import pyarrow as pa
+
+        missing = set(TABLE_COLUMNS) - set(table.column_names)
+        if missing:
+            raise ColumnsError(f"columns missing from the table: {sorted(missing)}")
+        records = table.num_rows
+        for name, numpy_type, _ in FIXED_COLUMNS:
+            source = "ts" if name == "ts_ns" else name
+            array = plain_array(table.column(source), source)
+            if pa.types.is_timestamp(array.type):
+                if array.type.unit != "ns":
+                    raise ColumnsError(f"{source}: {array.type.unit} precision came back")
+                values = array.cast(pa.int64()).to_numpy(zero_copy_only=False) - self.midnight
+            else:
+                values = array.to_numpy(zero_copy_only=False)
+            narrow = values.astype(numpy_type)
+            if not np.array_equal(narrow.astype(np.int64), values.astype(np.int64)):
+                raise ColumnsError(f"{name}: a value does not fit {numpy_type}")
+            narrow.tofile(self.files[f"{name}.bin"])
+
+        for name in TEXT_COLUMNS:
+            array = plain_array(table.column(name), name).cast(pa.large_string())
+            _, offsets_buffer, data_buffer = array.buffers()
+            offsets = np.frombuffer(offsets_buffer, dtype="<i8", count=records + 1,
+                                    offset=array.offset * 8)
+            first = int(offsets[0])
+            base = self.text_bytes[name]
+            (offsets[1:] - first + base).astype("<u8").tofile(self.files[f"{name}.off"])
+            end = int(offsets[-1])
+            if data_buffer is not None:
+                self.files[f"{name}.dat"].write(memoryview(data_buffer)[first:end])
+            self.text_bytes[name] = base + end - first
+        self.records += records
+
+    def finish(self):
+        """Closes every file, then writes the tail and the manifest that make it whole."""
+        self.close()
+        (self.directory / "tail.bin").write_bytes(b"")
+        (self.directory / MANIFEST_NAME).write_text(
+            format_manifest(self.records, 0, self.text_bytes), encoding="ascii")
+
+
+def read_windows(columns, rows_per_window):
+    """Half-open time windows over the whole day, each holding about `rows_per_window` rows,
+    in order. Rows of one nanosecond never straddle two windows, since a window is a range of
+    times, and the files' times never decrease in file order, so window after window, each sorted
+    by seq, is the table in file order. A system reads a whole day back one window at a time."""
+    ts = columns.fixed["ts_ns"]
+    bounds = [0]
+    for first in range(rows_per_window, columns.records, rows_per_window):
+        value = int(ts[first])
+        if value > bounds[-1]:
+            bounds.append(value)
+    last = int(ts[columns.records - 1]) + 1 if columns.records else 1
+    bounds.append(max(last, bounds[-1] + 1))
+    return list(zip(bounds[:-1], bounds[1:], strict=True))

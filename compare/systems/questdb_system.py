@@ -489,7 +489,7 @@ class QuestDBSystem(System):
     def __init__(self, context):
         super().__init__(context)
         self.mode = MODE_FOR_CLASS[context.durability]
-        server_class = LaunchedServer if context.full_day else QuestDBServer
+        server_class = LaunchedServer if context.launcher else QuestDBServer
         self.server = server_class(context.layout, self.root, context.threads,
                                    {"cairo.commit.mode": self.mode}, heap=context.heap,
                                    gc_log=context.gc_log)
@@ -678,11 +678,19 @@ class QuestDBSystem(System):
         import pyarrow as pa
 
         sql(self._column_definitions(TABLE))
+        chunks = iter(chunks)
         started = time.perf_counter()
         rows = 0
         wal_states = []
-        for table in chunks:
+        python_seconds = 0.0
+        while True:
+            before = time.perf_counter()
+            table = next(chunks, None)
+            if table is None:
+                python_seconds += time.perf_counter() - before
+                break
             prepared, symbols = self._prepare(table)
+            python_seconds += time.perf_counter() - before
             self.client.dataframe(prepared, table_name=TABLE, symbols=symbols, at="ts")
             rows += table.num_rows
             wal_states.append({"rows_sent": rows, "seconds": time.perf_counter() - started,
@@ -700,7 +708,13 @@ class QuestDBSystem(System):
         visible = time.perf_counter()
         return self._require_applied(
             {"seconds": visible - started, "sent_seconds": sent - started,
-             "apply_wait_seconds": visible - sent, "wal_states": wal_states}, rows)
+             "apply_wait_seconds": visible - sent, "python_seconds": python_seconds,
+             "engine_seconds": visible - started - python_seconds,
+             "python_note": "python_seconds reads each chunk of the column files and builds "
+                            "the dictionaries the client needs for SYMBOL columns. "
+                            "engine_seconds covers the client and server, up to every row "
+                            "applied",
+             "wal_states": wal_states}, rows)
 
     def probe_flush(self, table):
         sql(self._column_definitions(PROBE_TABLE))
@@ -720,6 +734,9 @@ class QuestDBSystem(System):
 
     def read_all(self):
         return self._rows(f"SELECT {self._select_list(TABLE_COLUMNS)} FROM {TABLE} ORDER BY seq")
+
+    def read_window(self, start_ns, end_ns):
+        return self._rows(f"{self._rows_text(start_ns, end_ns, -1, TABLE_COLUMNS)} ORDER BY seq")
 
     def _locate_filter(self, locate):
         if locate < 0:

@@ -4,8 +4,8 @@ The ground truth comes from the exported columns with numpy, and shares no code 
 system. A system's answer must equal it, in row count and in a hash of the rows or of the
 aggregate, or the run fails. That is the proof behind "same queries".
 
-The slice is five minutes long, so hour-long windows are clipped to it and Q5 scans the
-slice, not a day. Every result file says so. Nothing here supports a claim about a whole day.
+On the slice, which is five minutes long, hour-long windows are clipped to it and Q5 scans the
+slice, not a day, and every result file says so. On a whole day nothing is clipped.
 """
 
 import hashlib
@@ -50,8 +50,11 @@ def busiest_locate(columns, start_ns, end_ns):
     return int(np.argmax(counts))
 
 
-def build_queries(columns, window_end_ns):
-    """The one parameter set. `window_end_ns` is the slice's window end, from the pin."""
+def build_queries(columns, window_end_ns=None):
+    """The one parameter set. `window_end_ns` is the slice's window end, from the pin, and None
+    on a whole day, where nothing is clipped."""
+    if window_end_ns is None:
+        return full_day_queries(columns)
     clipped_end = min(OPEN_NS + HOUR_NS, window_end_ns)
     locate = busiest_locate(columns, OPEN_NS, clipped_end)
     return (
@@ -72,6 +75,41 @@ def build_queries(columns, window_end_ns):
     )
 
 
+def full_day_queries(columns):
+    """BENCHMARKS.md's queries as defined, on a whole day: the hour runs from the open to
+    10:30:00, the busiest locate is the busiest over that hour of the day, and Q5 scans every
+    record of the day."""
+    end = OPEN_NS + HOUR_NS
+    locate = busiest_locate(columns, OPEN_NS, end)
+    return (
+        Query("Q1", "rows", OPEN_NS, OPEN_NS + NANOS_PER_SECOND,
+              text="One second of all symbols at the open, [09:30:00, 09:30:01)."),
+        Query("Q2", "rows", OPEN_NS, end, locate,
+              "One hour of one symbol: every record of the day's busiest locate in "
+              "[09:30:00, 10:30:00)."),
+        Query("Q3", "minute_aggregate", OPEN_NS, end, locate,
+              "Per-minute aggregate of one symbol over one hour: for the add orders of that "
+              "locate, per minute, count, sum of shares, least and greatest price, over "
+              "[09:30:00, 10:30:00)."),
+        Query("Q4", "rows", OPEN_NS, OPEN_NS + 1_000_000,
+              text="One millisecond of all symbols, [09:30:00.000, 09:30:00.001)."),
+        Query("Q5", "column_sum", 0, 0,
+              text=f"Full scan of one column, the sum of shares, over the whole day: all "
+                   f"{columns.records:,} records."),
+    )
+
+
+def full_day_facts(columns, queries):
+    """What a reader needs to see that nothing was clipped: the windows, the window the busiest
+    locate was chosen over, and the rows Q5 scans."""
+    by_name = {query.name: query for query in queries}
+    return {"hour_window_ns": [OPEN_NS, OPEN_NS + HOUR_NS],
+            "busiest_locate_window_ns": [OPEN_NS, OPEN_NS + HOUR_NS],
+            "busiest_locate": by_name["Q2"].locate,
+            "q5_rows_scanned": columns.records,
+            "clipped": False}
+
+
 def query_to_json(query):
     return asdict(query)
 
@@ -79,6 +117,10 @@ def query_to_json(query):
 def query_from_json(item):
     return Query(**item)
 
+
+FULL_DAY_STATEMENT = (
+    "A whole day. Nothing is clipped: Q2 and Q3 run over the hour [09:30:00, 10:30:00), the "
+    "busiest locate is the busiest over that hour of the day, and Q5 scans every record.")
 
 CLIPPING_STATEMENT = (
     "The slice holds every S and R of 12302019 plus the five minutes [09:29:30, 09:34:30). Q2 "

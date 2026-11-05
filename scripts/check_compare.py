@@ -12,6 +12,13 @@ the full-day capacity check found adequate. It also checks that the file is safe
 system that could not prove something says so in the file, and the file is valid, as long as it
 does not claim the proof.
 
+A full-day file, `<host>-<day>-full-<commit>.json`, is held to every rule above against the
+day's pin, and to more: nothing clipped (every window as BENCHMARKS.md defines it, the busiest
+locate over the whole hour, Q5 over every record), each store read back whole, warm proven query
+by query from the block device's own counter, each system's peak memory from the guard, and its
+variants what compare/variant_rule.py gives from the slice file it names. A slice file can never
+pass as a full-day one, nor the reverse.
+
 Standard library only. tests/scripts/test_check_compare.py shows each rule failing on an
 injected fault.
 """
@@ -25,6 +32,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import check_results  # noqa: E402
+
+sys.path.insert(0, str(REPO_ROOT))
+from compare import variant_rule  # noqa: E402
 
 DEFAULT_PINS = REPO_ROOT / "scripts" / "data_pins.json"
 DEFAULT_CAPACITY = REPO_ROOT / "results" / "fullday-capacity-12302019.json"
@@ -54,6 +64,17 @@ RUNTIME_FIELDS = ("jvm_vendor", "jvm_version", "jvm_read_from", "jemalloc_read_f
 ORACLE_FIELDS = ("verdict", "exit_code", "records", "mismatched_records", "hashes_match",
                  "source_sha256", "stored_sha256")
 LINUX_CPUS = [4, 6]
+FULL_DAY = "full"
+NANOS_PER_SECOND = 1_000_000_000
+OPEN_NS = (9 * 3600 + 30 * 60) * NANOS_PER_SECOND
+HOUR_NS = 3600 * NANOS_PER_SECOND
+# BENCHMARKS.md's windows, unclipped: (kind, start, end, one locate or all).
+FULL_DAY_QUERIES = {"Q1": ("rows", OPEN_NS, OPEN_NS + NANOS_PER_SECOND, False),
+                    "Q2": ("rows", OPEN_NS, OPEN_NS + HOUR_NS, True),
+                    "Q3": ("minute_aggregate", OPEN_NS, OPEN_NS + HOUR_NS, True),
+                    "Q4": ("rows", OPEN_NS, OPEN_NS + 1_000_000, False),
+                    "Q5": ("column_sum", 0, 0, False)}
+MAX_WARM_ATTEMPTS = 3
 
 
 def check_settings(where, settings, name, durability):
@@ -118,6 +139,9 @@ def check_read_back(where, read_back, pin):
             problems.append(f"{where}.read_back: {field} is not the pin")
     if not (read_back.get("stored_settings") or {}).get("checks_passed"):
         problems.append(f"{where}.read_back: no stored settings were checked")
+    if pin.get("full_day") and (read_back.get("streamed") or {}).get("rows") != pin[
+            "message_count"]:
+        problems.append(f"{where}.read_back: the whole day was not read back")
     return problems
 
 
@@ -141,6 +165,9 @@ def check_stored(where, stored, pin):
     for field in ("method", "denominator", "measured"):
         if not stored.get(field):
             problems.append(f"{where}.stored: no {field}")
+    unit = "day" if pin.get("full_day") else "slice"
+    if stored.get("denominator") and unit not in str(stored["denominator"]):
+        problems.append(f"{where}.stored: the ratio is not stated over the {unit}'s source bytes")
     return problems
 
 
@@ -219,7 +246,28 @@ def check_durability(where, durability, name, class_name, control, host):
     return problems
 
 
-def check_warm(where, warm):
+def check_warm_full_day(where, warm):
+    """On a whole day: untimed runs first, then not one byte from the device across every
+    timed repetition, by the block device's own counter."""
+    proof = (warm or {}).get("proof") or {}
+    accepted = proof.get("accepted") or {}
+    problems = []
+    if proof.get("device_slack_bytes") != 0 or accepted.get("device_bytes_read") != 0:
+        problems.append(f"{where}.warm: the device read {accepted.get('device_bytes_read')!r} "
+                        "bytes across the timed repetitions")
+    if not check_results.is_number(accepted.get("warm_up_runs")) or accepted["warm_up_runs"] < 1:
+        problems.append(f"{where}.warm: no untimed run before the repetitions")
+    if not accepted.get("device_counter") or not proof.get("method"):
+        problems.append(f"{where}.warm: the counter or the method is not named")
+    attempts = proof.get("attempts")
+    if attempts != len(proof.get("discarded") or []) + 1 or attempts > MAX_WARM_ATTEMPTS:
+        problems.append(f"{where}.warm: {attempts!r} attempts, and every one must be kept")
+    return problems + ([] if (warm.get("n") or 0) > 0 else [f"{where}.warm: no repetitions"])
+
+
+def check_warm(where, warm, full_day=False):
+    if full_day:
+        return check_warm_full_day(where, warm)
     proof = (warm or {}).get("proof") or {}
     pages = proof.get("pages")
     if not pages or proof.get("resident_before") != pages or proof.get("resident_after") != pages:
@@ -273,7 +321,7 @@ def check_latency(where, query):
     return problems
 
 
-def check_queries(where, queries, truth, system_name=None):
+def check_queries(where, queries, truth, system_name=None, full_day=False):
     problems = []
     for name in QUERY_NAMES:
         query = (queries or {}).get(name)
@@ -283,7 +331,7 @@ def check_queries(where, queries, truth, system_name=None):
         here = f"{where}.queries.{name}"
         if query.get("digest") != truth.get(name) or query.get("matches_ground_truth") is not True:
             problems.append(f"{here}: differs from the ground truth")
-        problems += check_warm(here, query.get("warm"))
+        problems += check_warm(here, query.get("warm"), full_day)
         problems += check_cold(here, query.get("cold"))
         problems += check_latency(here, query)
         if not query.get("scan"):
@@ -332,7 +380,87 @@ def check_system(name, system, document, pin):
                 problems += check_tickstore_write(here, entry.get("write"))
             problems += check_durability(here, entry.get("durability"), name, class_name, control,
                                          host)
-        problems += check_queries(where, variant.get("queries"), truth, name)
+        problems += check_queries(where, variant.get("queries"), truth, name,
+                                  bool(pin.get("full_day")))
+    if pin.get("full_day") and host == "Linux":
+        problems += check_peak_memory(name, system.get("peak_memory"))
+    return problems
+
+
+def check_peak_memory(name, memory):
+    """Each system's peak memory on a whole day, from the guard that watched it."""
+    memory = memory or {}
+    problems = []
+    for field in ("vmhwm_bytes_largest", "mem_available_lowest_bytes", "session_rss_bytes_peak"):
+        if not check_results.is_number(memory.get(field)) or memory[field] <= 0:
+            problems.append(f"{name}.peak_memory: no {field}")
+    if memory.get("guard_fired") is not False or (memory.get("exit") or {}).get("code") != 0:
+        problems.append(f"{name}.peak_memory: the guard stopped the run, or it did not exit 0")
+    return problems
+
+
+def check_full_day_queries(document, pin):
+    """Nothing clipped: every window as BENCHMARKS.md defines it, one busiest locate over the
+    whole hour of the day, and Q5 over every record."""
+    queries = document.get("queries") or {}
+    facts = queries.get("full_day") or {}
+    hour = [OPEN_NS, OPEN_NS + HOUR_NS]
+    problems = []
+    if facts.get("clipped") is not False or facts.get("hour_window_ns") != hour or \
+            facts.get("busiest_locate_window_ns") != hour:
+        problems.append("queries.full_day: the hour or the busiest locate's window is clipped")
+    if facts.get("q5_rows_scanned") != pin["message_count"]:
+        problems.append(f"queries.full_day: Q5 scans {facts.get('q5_rows_scanned')!r} rows, not "
+                        "the day's")
+    found = {item.get("name"): item for item in queries.get("parameters") or []
+             if isinstance(item, dict)}
+    for name, (kind, start, end, one_locate) in FULL_DAY_QUERIES.items():
+        item = found.get(name) or {}
+        locate = item.get("locate")
+        wanted_locate = facts.get("busiest_locate") if one_locate else -1
+        if (item.get("kind"), item.get("start_ns"), item.get("end_ns")) != (kind, start, end) \
+                or locate != wanted_locate or (one_locate and not isinstance(locate, int)):
+            problems.append(f"queries.parameters: {name} is not the full-day query: {item}")
+        if "clipped" in str(item.get("text", "")):
+            problems.append(f"queries.parameters: {name} says it is clipped")
+    return problems
+
+
+def check_variant_selection(document, path):
+    """The variants each system ran are what the rule gives from the slice file named, which
+    must sit beside this one: same host, same commit."""
+    selection = document.get("variant_selection")
+    if not isinstance(selection, dict):
+        return ["variant_selection: a full-day file must state how its variants were chosen"]
+    problems = []
+    if selection.get("rule") != variant_rule.RULE:
+        problems.append("variant_selection: the rule is not compare/variant_rule.py's")
+    header = document["header"]
+    source = path.parent / str(selection.get("source"))
+    try:
+        slice_document = json.loads(source.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return [*problems, f"variant_selection: the slice file {selection.get('source')!r} is "
+                           "not beside this one"]
+    slice_header = slice_document.get("header") or {}
+    if slice_header.get("commit") != header.get("commit") or \
+            slice_header.get("host") != header.get("host") or \
+            "slice" not in (slice_document.get("input") or {}):
+        problems.append("variant_selection: the slice file is not this host's at this commit")
+    try:
+        chosen = variant_rule.select(slice_document)
+    except (KeyError, TypeError) as error:
+        return [*problems, f"variant_selection: the slice file cannot be ranked: {error}"]
+    stated = selection.get("systems") or {}
+    for name, system in (document.get("systems") or {}).items():
+        expected = chosen.get(name)
+        if expected is None or stated.get(name) != expected:
+            problems.append(f"variant_selection: {name} states {stated.get(name)}, and the rule "
+                            f"gives {expected}")
+            continue
+        if list(system.get("variants") or {}) != expected["selected"]:
+            problems.append(f"variant_selection: {name} ran {list(system.get('variants') or {})}, "
+                            f"and the rule gives {expected['selected']}")
     return problems
 
 
@@ -396,7 +524,7 @@ def check_runtime(header):
     return problems
 
 
-def check_document(document, top_keys, path, pins, capacity):
+def check_document(document, top_keys, path, pins, capacity, real_path=None):
     header = document.get("header")
     if not isinstance(header, dict):
         return ["the file does not start with its header"]
@@ -418,17 +546,38 @@ def check_document(document, top_keys, path, pins, capacity):
                                                if key != "frequency"}, list(systems))
         problems += check_heap(document, "Linux", capacity)
     label = str(document.get("label", ""))
-    if "not claims about a full day" not in label:
-        problems.append("label: the file must say it makes no claim about a full day")
     input_block = document.get("input") or {}
-    pin = pins.get("slices", {}).get(input_block.get("slice"))
-    if pin is None:
-        return [*problems, f"input.slice: no pin for {input_block.get('slice')}"]
+    full_day = "day" in input_block or f"-{FULL_DAY}-" in path.name
+    if full_day:
+        day = input_block.get("day")
+        if not path.name.startswith(f"{header.get('host')}-{day}-{FULL_DAY}-") or \
+                "slice" in input_block or input_block.get("full_day") is not True:
+            problems.append(f"input: a full-day file must name its day as <host>-<day>-"
+                            f"{FULL_DAY}-<commit>.json and hold no slice")
+        if "full day" not in label or "nothing clipped" not in label:
+            problems.append("label: a full-day file must say it is a full day, nothing clipped")
+        day_pin = pins.get("days", {}).get(day)
+        if day_pin is None:
+            return [*problems, f"input.day: no pin for {day}"]
+        pin = {"sha256": day_pin["decompressed_sha256"], "size": day_pin["decompressed_size"],
+               "message_count": day_pin["message_count"], "full_day": True}
+        if "Nothing is clipped" not in str(input_block.get("clipping", "")):
+            problems.append("input: a full-day file must state that nothing is clipped")
+        problems += check_full_day_queries(document, pin)
+        problems += check_variant_selection(document, real_path or path)
+    else:
+        if "not claims about a full day" not in label:
+            problems.append("label: the file must say it makes no claim about a full day")
+        pin = pins.get("slices", {}).get(input_block.get("slice"))
+        if pin is None:
+            return [*problems, f"input.slice: no pin for {input_block.get('slice')}"]
+        if "clip" not in str(input_block.get("clipping", "")):
+            problems.append("input: the clipping is not stated")
     if input_block.get("sha256") != pin["sha256"] or input_block.get("messages") != pin[
             "message_count"] or input_block.get("bytes") != pin["size"]:
         problems.append("input: does not match the pin")
-    if "clip" not in str(input_block.get("clipping", "")) or not input_block.get("ratio_baseline"):
-        problems.append("input: the clipping or the ratio baseline is not stated")
+    if not input_block.get("ratio_baseline"):
+        problems.append("input: the ratio baseline is not stated")
     if "tickstore" in systems and ITCH_PARSING not in str(input_block.get("ingest_input", "")):
         problems.append(f"input: does not say that tick-store's ingest holds {ITCH_PARSING} and "
                         "the others' does not")
@@ -457,7 +606,8 @@ def check_file(path, pins, capacity, name_as=None):
         return [f"cannot read it: {error}"]
     if not isinstance(document, dict):
         return ["the file is not a JSON object"]
-    return check_document(document, top_keys, Path(name_as) if name_as else path, pins, capacity)
+    named = path.with_name(name_as) if name_as else path
+    return check_document(document, top_keys, named, pins, capacity, path)
 
 
 def main(argv=None):
