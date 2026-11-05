@@ -116,11 +116,13 @@ void put(std::vector<std::byte>& out, std::uint64_t value, std::size_t width) {
 }
 
 [[nodiscard]] std::expected<std::vector<std::byte>, codec::CodecError> code_values(
-    ColumnCodec kind, std::span<const std::uint64_t> values) {
+    ColumnCodec kind, std::span<const std::uint64_t> values,
+    codec::DictModeSet modes = codec::kDictAllModes) {
     std::vector<std::byte> out;
     switch (kind) {
         case ColumnCodec::dictionary: {
-            if (auto done = codec::encode_dict(values, kColumnBlockValues, out); !done) {
+            if (auto done = codec::encode_dict(values, kColumnBlockValues, out, nullptr, modes);
+                !done) {
                 return std::unexpected(done.error());
             }
             return out;
@@ -475,7 +477,7 @@ std::expected<std::vector<ColumnChunk>, ItchStoreError> encode_column(
         const std::span<const std::uint64_t> part =
             values.subspan(static_cast<std::size_t>(first),
                            static_cast<std::size_t>(std::min(per_piece, values.size() - first)));
-        auto coded = code_values(info.codec, part);
+        auto coded = code_values(info.codec, part, info.dict_modes);
         if (!coded.has_value()) {
             ItchStoreError error =
                 fail(ItchStoreErrorKind::invalid_argument, "column encoder", kNoIndex, 0, 0);

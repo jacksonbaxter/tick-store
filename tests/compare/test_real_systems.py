@@ -153,7 +153,7 @@ class TickStoreReal(unittest.TestCase):
 
         root = Path(self.scratch.name) / f"root-{durability}"
         root.mkdir()
-        context = RunContext(LAYOUT, root, "v3-seg1Mi", durability, TradingDay(2019, 12, 30),
+        context = RunContext(LAYOUT, root, "v3-seg4Mi", durability, TradingDay(2019, 12, 30),
                              source=self.source)
         return TickStoreSystem(context)
 
@@ -186,7 +186,7 @@ class TickStoreReal(unittest.TestCase):
         system = self.write(self.system(CLASS_B))
         names = {item["name"]: item["in_force"] for item in system.settings_after_ingest()}
         self.assertEqual(names["store version"], 3)
-        self.assertEqual(names["segment records"], 1 << 20)
+        self.assertEqual(names["segment records"], 1 << 22)
         self.assertEqual(names["durability mode"], "device_flush")
         self.assertEqual(len(names["flushes made"]), 2)
         self.assertEqual(names["kernel sets that ran"], [names["kernel level"]])

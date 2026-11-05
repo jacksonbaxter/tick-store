@@ -7,15 +7,19 @@ between records and columns), `itch_store_writer.hpp`, `itch_store_reader.hpp` a
 `itch_query.hpp`.
 `tests/unit/golden/itch-store-v3.tsc` is the 26-record test stream and its tail at 8 records a
 segment; the writer must produce it byte for byte and the reader must read it back.
+`itch-store-v3-07b020e.tsc` is the same stream as the writer made it at `07b020e`, before the hot
+dictionary columns were held to ranked PFOR (below): the same version, every byte meaning the same,
+so the reader must read it back too.
 
 All integers in the store's own fields are little-endian, as in the container.
 
 ## Segments
 
-A segment is N consecutive records of the source, N fixed per file, 1 to 2^24, by default 2^20.
+A segment is N consecutive records of the source, N fixed per file, 1 to 2^24, by default 2^22.
 The last segment holds the remainder. A segment decodes from its own blocks and the `symbols`
 section alone: no state crosses a segment boundary, so reading segment k reads segment k's blocks
-and nothing else. N = 2^20 was chosen on the measured day; `NOTES.md` has the sweep.
+and nothing else. N = 2^22 was chosen on the measured day by the layout experiments in `NOTES.md`,
+which have the sweep.
 
 A segment keeps its records in **stored order**: the typed records by ascending locate, each
 locate's in file order, then the raw records in file order. So one locate's records are one run of
@@ -125,7 +129,12 @@ a tracking number. The rest go by type:
 | 37 | locate_run_import_start | each locate's first import | PFOR delta | per run | |
 | 38 | seek | the seek index (below) | PFOR delta | seek | |
 
-A piece's payload is its values coded in blocks of 4,096 back to back. A piece of a column marked
+A piece's payload is its values coded in blocks of 4,096 back to back. The dictionary codec has
+three modes (`codec/dictionary.hpp`); the writer holds the eight hot dictionary columns, `type`,
+`ref_distance`, `add_side`, `add_shares`, `reduce_shares`, `replace_shares`, `trade_side` and
+`trade_shares`, to ranked PFOR, which decodes faster than Huffman for a few more bytes, and lets
+the others take the smallest mode (each column's `dict_modes` in `itch_store.hpp`). The reader takes
+every mode in every dictionary column. A piece of a column marked
 zstd is wrapped in the `zstd` codec where that is smaller (`docs/format.md`); the reader accepts
 either, piece by piece. Every value is checked against its field's width on read.
 

@@ -982,12 +982,12 @@ TEST(ItchStoreCorrupt, SeekIndexRulesParsedAlone) {
 
 // --- The golden file ------------------------------------------------------------------
 
-std::filesystem::path golden_path() {
-    return std::filesystem::path{TICK_STORE_GOLDEN_DIR} / "itch-store-v3.tsc";
+std::filesystem::path golden_path(std::string_view name = "itch-store-v3.tsc") {
+    return std::filesystem::path{TICK_STORE_GOLDEN_DIR} / name;
 }
 
-Bytes read_golden() {
-    std::ifstream in{golden_path(), std::ios::binary};
+Bytes read_golden(std::string_view name = "itch-store-v3.tsc") {
+    std::ifstream in{golden_path(name), std::ios::binary};
     const std::vector<char> chars{std::istreambuf_iterator<char>{in}, {}};
     Bytes out(chars.size());
     std::ranges::transform(chars, out.begin(), [](char c) { return static_cast<std::byte>(c); });
@@ -1001,16 +1001,21 @@ TEST(ItchStoreGolden, TheWriterProducesTheGoldenFileByteForByte) {
     EXPECT_EQ(base_file(), golden);
 }
 
+// The current file, and the one the writer made before the hot dictionary columns were held
+// to ranked PFOR: the same version, every byte meaning the same, so both read back.
 TEST(ItchStoreGolden, TheGoldenFileReadsBackToTheSource) {
-    const Bytes golden = read_golden();
-    ASSERT_FALSE(golden.empty());
-    const Bytes source = tick_store::test::source_with_tail();
-    EXPECT_TRUE(harness::verify_itch_store(source, golden).passed());
-    auto reader = ItchStoreReader::open_bytes(golden);
-    ASSERT_TRUE(reader.has_value());
-    EXPECT_EQ(reader->header().segment_records, kN);
-    EXPECT_EQ(reader->segment_count(), 4U);
-    ASSERT_TRUE(reader->container().verify_all().has_value());
+    for (const std::string_view name : {"itch-store-v3.tsc", "itch-store-v3-07b020e.tsc"}) {
+        SCOPED_TRACE(name);
+        const Bytes golden = read_golden(name);
+        ASSERT_FALSE(golden.empty());
+        const Bytes source = tick_store::test::source_with_tail();
+        EXPECT_TRUE(harness::verify_itch_store(source, golden).passed());
+        auto reader = ItchStoreReader::open_bytes(golden);
+        ASSERT_TRUE(reader.has_value());
+        EXPECT_EQ(reader->header().segment_records, kN);
+        EXPECT_EQ(reader->segment_count(), 4U);
+        ASSERT_TRUE(reader->container().verify_all().has_value());
+    }
 }
 
 }  // namespace

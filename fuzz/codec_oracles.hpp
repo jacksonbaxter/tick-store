@@ -433,6 +433,18 @@ inline std::expected<void, CodecError> encode_dict_plain(std::span<const std::ui
     return encode_dict(values, block_values, out);
 }
 
+// The writer's hot columns allow ranked PFOR alone (store/itch_store.hpp).
+inline std::expected<void, CodecError> encode_dict_block_pfor_only(
+    std::span<const std::uint64_t> values, std::vector<std::byte>& out) {
+    return encode_dict_block(values, out, nullptr, kDictRankedPforOnly);
+}
+
+inline std::expected<void, CodecError> encode_dict_pfor_only(std::span<const std::uint64_t> values,
+                                                             std::size_t block_values,
+                                                             std::vector<std::byte>& out) {
+    return encode_dict(values, block_values, out, nullptr, kDictRankedPforOnly);
+}
+
 inline std::expected<void, CodecError> encode_rle_block_plain(
     std::span<const std::uint64_t> values, std::vector<std::byte>& out) {
     return encode_rle_block(values, out);
@@ -444,8 +456,10 @@ inline std::expected<void, CodecError> encode_rle_plain(std::span<const std::uin
     return encode_rle(values, block_values, out);
 }
 
-inline constexpr std::array<Encoder, 1> kDictEncoders{
-    Encoder{.encode_block = &encode_dict_block_plain, .encode_column = &encode_dict_plain}};
+inline constexpr std::array<Encoder, 2> kDictEncoders{
+    Encoder{.encode_block = &encode_dict_block_plain, .encode_column = &encode_dict_plain},
+    Encoder{.encode_block = &encode_dict_block_pfor_only,
+            .encode_column = &encode_dict_pfor_only}};
 inline constexpr std::array<Encoder, 1> kRleEncoders{
     Encoder{.encode_block = &encode_rle_block_plain, .encode_column = &encode_rle_plain}};
 
@@ -460,7 +474,9 @@ inline constexpr std::array<Encoder, 1> kRleEncoders{
 
 // A dictionary block's entries are distinct and every one is used, so its entry count is
 // the number of distinct values it held, whichever mode it took, and the encoder must
-// give the same count. The encoder takes move-to-front only within its entry limit.
+// give the same count. The encoder takes move-to-front only within its entry limit. Held to
+// ranked PFOR, it must take that mode, with the same count, in a block no smaller than the
+// one it chooses with every mode, since it always tries ranked PFOR.
 [[nodiscard]] inline const char* check_dict_block(std::span<const std::byte> block,
                                                   std::span<const std::uint64_t> values) {
     constexpr std::size_t kModeAt = 0;
@@ -483,6 +499,18 @@ inline constexpr std::array<Encoder, 1> kRleEncoders{
     if (mode == static_cast<std::uint8_t>(DictMode::sorted_move_to_front) &&
         count > kDictMtfMaxEntries) {
         return "the encoder took move-to-front past its entry limit";
+    }
+    Bytes pfor_only;
+    if (!encode_dict_block(values, pfor_only, nullptr, kDictRankedPforOnly).has_value()) {
+        return "the encoder held to ranked PFOR refused values its decoder accepted";
+    }
+    if (std::to_integer<std::uint8_t>(pfor_only[kBlockHeaderSize + kModeAt]) !=
+            static_cast<std::uint8_t>(DictMode::ranked_pfor) ||
+        payload_u32(pfor_only, kEntriesAt) != count) {
+        return "the encoder held to ranked PFOR took another mode or entry count";
+    }
+    if (pfor_only.size() < reencoded.size()) {
+        return "the encoder with every mode wrote a block larger than ranked PFOR alone";
     }
     return nullptr;
 }

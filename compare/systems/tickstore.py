@@ -36,7 +36,7 @@ STORE_NAME = "store.tsc"
 PROBE_NAME = "probe.tsc"
 STORE_FORMAT = "itch-store-v3"
 STORE_VERSION = 3
-SEGMENT_RECORDS = 1 << 20
+SEGMENT_RECORDS = 1 << 22
 QUERY_PATH = "indexed"
 MODE_FOR_CLASS = {"A": "page_cache", "B": "device_flush"}
 WORKER_START_SECONDS = 60
@@ -187,8 +187,8 @@ class EngineAnswer:
 
 class TickStoreSystem(System):
     name = "tickstore"
-    headline_variant = "v3-seg1Mi"
-    variants = {"v3-seg1Mi": {"store_version": STORE_VERSION, "segment_records": SEGMENT_RECORDS,
+    headline_variant = "v3-seg4Mi"
+    variants = {"v3-seg4Mi": {"store_version": STORE_VERSION, "segment_records": SEGMENT_RECORDS,
                               "query_path": QUERY_PATH, "checksums": "verified on every read"}}
 
     def __init__(self, context):

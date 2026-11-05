@@ -45,6 +45,7 @@
 // columns, which it decodes first, and file order from the locate column.
 
 #include "tick_store/codec/codec_error.hpp"
+#include "tick_store/codec/dictionary.hpp"
 #include "tick_store/codec/registry.hpp"
 #include "tick_store/itch/message.hpp"
 #include "tick_store/store/store_error.hpp"
@@ -66,8 +67,9 @@ namespace tick_store::store {
 
 inline constexpr std::uint32_t kItchStoreVersion = 3;
 
-// Records per segment: the writer's default, and the largest a file may hold.
-inline constexpr std::uint32_t kDefaultSegmentRecords = std::uint32_t{1} << 20U;
+// Records per segment: the writer's default, chosen by the layout experiments in NOTES.md,
+// and the largest a file may hold.
+inline constexpr std::uint32_t kDefaultSegmentRecords = std::uint32_t{1} << 22U;
 inline constexpr std::uint32_t kMaxSegmentRecords = std::uint32_t{1} << 24U;
 
 // Values per codec block inside a column's chunk.
@@ -219,6 +221,9 @@ struct ColumnInfo {
     bool zstd = false;
     // The largest value the field holds.
     std::uint64_t max_value = 0;
+    // For a dictionary column, the modes its writer may choose among (codec/dictionary.hpp).
+    // The reader takes any mode in any column.
+    codec::DictModeSet dict_modes = codec::kDictAllModes;
 };
 
 inline constexpr std::uint64_t kMax8 = 0xFFU;
@@ -234,7 +239,8 @@ inline constexpr std::array<ColumnInfo, kColumnCount> kColumns{{
      .codec = ColumnCodec::dictionary,
      .order = ColumnOrder::stored,
      .zstd = false,
-     .max_value = kMax8},
+     .max_value = kMax8,
+     .dict_modes = codec::kDictRankedPforOnly},
     {.id = Column::locate,
      .name = "locate",
      .codec = ColumnCodec::pfor_for,
@@ -264,7 +270,8 @@ inline constexpr std::array<ColumnInfo, kColumnCount> kColumns{{
      .codec = ColumnCodec::dictionary,
      .order = ColumnOrder::by_type,
      .zstd = false,
-     .max_value = kMax32},
+     .max_value = kMax32,
+     .dict_modes = codec::kDictRankedPforOnly},
     {.id = Column::import_ref,
      .name = "import_ref",
      .codec = ColumnCodec::pfor_reference,
@@ -276,7 +283,8 @@ inline constexpr std::array<ColumnInfo, kColumnCount> kColumns{{
      .codec = ColumnCodec::dictionary,
      .order = ColumnOrder::stored,
      .zstd = false,
-     .max_value = kMax8},
+     .max_value = kMax8,
+     .dict_modes = codec::kDictRankedPforOnly},
     {.id = Column::add_price,
      .name = "add_price",
      .codec = ColumnCodec::pfor_delta_scaled,
@@ -288,7 +296,8 @@ inline constexpr std::array<ColumnInfo, kColumnCount> kColumns{{
      .codec = ColumnCodec::dictionary,
      .order = ColumnOrder::by_locate,
      .zstd = false,
-     .max_value = kMax32},
+     .max_value = kMax32,
+     .dict_modes = codec::kDictRankedPforOnly},
     {.id = Column::mpid,
      .name = "mpid",
      .codec = ColumnCodec::dictionary,
@@ -300,7 +309,8 @@ inline constexpr std::array<ColumnInfo, kColumnCount> kColumns{{
      .codec = ColumnCodec::dictionary,
      .order = ColumnOrder::by_type,
      .zstd = false,
-     .max_value = kMax32},
+     .max_value = kMax32,
+     .dict_modes = codec::kDictRankedPforOnly},
     {.id = Column::match,
      .name = "match",
      .codec = ColumnCodec::pfor_delta,
@@ -324,7 +334,8 @@ inline constexpr std::array<ColumnInfo, kColumnCount> kColumns{{
      .codec = ColumnCodec::dictionary,
      .order = ColumnOrder::stored,
      .zstd = false,
-     .max_value = kMax32},
+     .max_value = kMax32,
+     .dict_modes = codec::kDictRankedPforOnly},
     {.id = Column::replace_price,
      .name = "replace_price",
      .codec = ColumnCodec::pfor_for_scaled,
@@ -342,13 +353,15 @@ inline constexpr std::array<ColumnInfo, kColumnCount> kColumns{{
      .codec = ColumnCodec::dictionary,
      .order = ColumnOrder::stored,
      .zstd = false,
-     .max_value = kMax8},
+     .max_value = kMax8,
+     .dict_modes = codec::kDictRankedPforOnly},
     {.id = Column::trade_shares,
      .name = "trade_shares",
      .codec = ColumnCodec::dictionary,
      .order = ColumnOrder::stored,
      .zstd = false,
-     .max_value = kMax32},
+     .max_value = kMax32,
+     .dict_modes = codec::kDictRankedPforOnly},
     {.id = Column::trade_price,
      .name = "trade_price",
      .codec = ColumnCodec::pfor_for_scaled,

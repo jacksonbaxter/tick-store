@@ -1,0 +1,12 @@
+diff --git a/src/codec/dictionary.cpp b/src/codec/dictionary.cpp
+--- a/src/codec/dictionary.cpp
++++ b/src/codec/dictionary.cpp
+@@ -514,7 +514,7 @@
+     const auto allowed = [&](DictMode mode) {
+         return (modes & (1U << static_cast<unsigned>(mode))) != 0;
+     };
+-    if (allowed(DictMode::ranked_huffman)) {
++    if (true || allowed(DictMode::ranked_huffman)) {
+         if (auto done = encode_ranked_huffman(prepared, trial); !done.has_value()) {
+             return done;
+         }

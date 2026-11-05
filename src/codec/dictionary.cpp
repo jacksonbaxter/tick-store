@@ -498,7 +498,8 @@ void add_block(DictStats& column, const DictStats& block) noexcept {
 }  // namespace
 
 std::expected<void, CodecError> encode_dict_block(std::span<const std::uint64_t> values,
-                                                  std::vector<std::byte>& out, DictStats* stats) {
+                                                  std::vector<std::byte>& out, DictStats* stats,
+                                                  DictModeSet modes) {
     if (values.empty() || values.size() > kMaxBlockValues) {
         return std::unexpected(codec_error(CodecErrorKind::bad_parameter, "block values", 0,
                                            kMaxBlockValues, values.size()));
@@ -510,14 +511,19 @@ std::expected<void, CodecError> encode_dict_block(std::span<const std::uint64_t>
     if (auto done = encode_ranked_pfor(prepared, best); !done.has_value()) {
         return done;
     }
-    if (auto done = encode_ranked_huffman(prepared, trial); !done.has_value()) {
-        return done;
+    const auto allowed = [&](DictMode mode) {
+        return (modes & (1U << static_cast<unsigned>(mode))) != 0;
+    };
+    if (allowed(DictMode::ranked_huffman)) {
+        if (auto done = encode_ranked_huffman(prepared, trial); !done.has_value()) {
+            return done;
+        }
+        if (trial.size() < best.size()) {
+            std::swap(best, trial);
+            chosen = DictMode::ranked_huffman;
+        }
     }
-    if (trial.size() < best.size()) {
-        std::swap(best, trial);
-        chosen = DictMode::ranked_huffman;
-    }
-    if (prepared.sorted.size() <= kDictMtfMaxEntries) {
+    if (allowed(DictMode::sorted_move_to_front) && prepared.sorted.size() <= kDictMtfMaxEntries) {
         trial.clear();
         if (auto done = encode_sorted_mtf(prepared, trial); !done.has_value()) {
             return done;
@@ -706,7 +712,7 @@ std::expected<std::size_t, CodecError> decode_dict_block(std::span<const std::by
 
 std::expected<void, CodecError> encode_dict(std::span<const std::uint64_t> values,
                                             std::size_t block_values, std::vector<std::byte>& out,
-                                            DictStats* stats) {
+                                            DictStats* stats, DictModeSet modes) {
     if (const auto checked = check_block_values(block_values); !checked.has_value()) {
         return checked;
     }
@@ -729,7 +735,8 @@ std::expected<void, CodecError> encode_dict(std::span<const std::uint64_t> value
             }
         } else {
             block_stats = DictStats{};
-            if (auto encoded = encode_dict_block(block, out, &block_stats); !encoded.has_value()) {
+            if (auto encoded = encode_dict_block(block, out, &block_stats, modes);
+                !encoded.has_value()) {
                 out.resize(start);
                 return encoded;
             }

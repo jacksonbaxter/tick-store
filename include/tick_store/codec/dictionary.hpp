@@ -65,6 +65,15 @@ enum class DictMode : std::uint8_t {
 
 inline constexpr std::size_t kDictModes = 3;
 
+// The modes the encoder may choose among, one bit per DictMode. Ranked PFOR is always
+// tried, so a set without it still has a mode. The decoder reads every mode whatever the
+// encoder was allowed.
+using DictModeSet = std::uint8_t;
+inline constexpr DictModeSet kDictAllModes = 0b111;
+// Indices bit-packed at one width per PFOR block, with patches: no Huffman stream to
+// decode one code at a time.
+inline constexpr DictModeSet kDictRankedPforOnly = 0b001;
+
 // The longest Huffman code. A block of at most 2^20 values cannot need a code longer than
 // 29 bits, since a code of length l needs counts at least the Fibonacci number F(l + 1).
 inline constexpr unsigned kDictMaxCodeBits = 32;
@@ -90,7 +99,8 @@ struct DictStats {
 // Appends one block holding `values`, which must hold 1 to kMaxBlockValues values.
 [[nodiscard]] std::expected<void, CodecError> encode_dict_block(std::span<const std::uint64_t> values,
                                                                 std::vector<std::byte>& out,
-                                                                DictStats* stats = nullptr);
+                                                                DictStats* stats = nullptr,
+                                                                DictModeSet modes = kDictAllModes);
 
 // Decodes the block at the front of `block`, appending exactly its count of values to
 // `out`, and returns the bytes it took. On error, `out` keeps what it held before.
@@ -105,7 +115,8 @@ struct DictStats {
 [[nodiscard]] std::expected<void, CodecError> encode_dict(std::span<const std::uint64_t> values,
                                                           std::size_t block_values,
                                                           std::vector<std::byte>& out,
-                                                          DictStats* stats = nullptr);
+                                                          DictStats* stats = nullptr,
+                                                          DictModeSet modes = kDictAllModes);
 
 // Decodes a whole column that must hold exactly `count` values, appending them to `out`.
 [[nodiscard]] std::expected<void, CodecError> decode_dict(std::span<const std::byte> column,

@@ -319,10 +319,12 @@ call in a process: for Parquet on macOS, about 1 ms over a second call on warm p
 ## tick-store
 
 tick-store runs through its own tools and nothing else, one variant: store version 3 at its
-default segment of 2^20 records, the indexed query path, CRCs checked on every read.
+default segment of 2^22 records, the indexed query path, CRCs checked on every read. The results
+in `results/compare/` from `25a462b` ran the earlier default, 2^20 records (variant `v3-seg1Mi`),
+before the layout experiments in `NOTES.md` chose 2^22.
 
 - **Ingest.** `tick_roundtrip ingest <slice> <store> --durability page_cache|device_flush
-  --segment-records 1048576`, run and timed from Python as every other write is, with the slice
+  --segment-records 4194304`, run and timed from Python as every other write is, with the slice
   read through first, as the others' column files are. The clock holds the ITCH parsing, which
   the other systems never do, since they load the columns `tick_export` already parsed. Nothing is
   subtracted, and every results file says so in `input.ingest_input` and in each write's

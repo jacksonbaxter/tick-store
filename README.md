@@ -113,7 +113,7 @@ $tools/tick_roundtrip verify $day build/12302019.tsc --expect-sha256 $pin
 ```
 
 `ingest` takes the durability class, `page_cache` or `device_flush`, which is never a default,
-and `--segment-records N`, by default 2^20. `verify` decodes the store segment by segment,
+and `--segment-records N`, by default 2^22. `verify` decodes the store segment by segment,
 re-serialises every record through the ITCH encoder, and walks those frames and the source's in
 lock step, comparing every byte, and hashes both whole streams on worker threads. Block CRCs are
 checked as each block is read. It prints a JSON summary, with records, bytes, both hashes, the

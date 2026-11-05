@@ -327,6 +327,39 @@ TEST(Dictionary, EncodedSizeIsPinned) {
     EXPECT_EQ(stats.blocks, (std::array<std::uint64_t, kDictModes>{0, 3, 0}));
 }
 
+// A mode set limits what the encoder tries, never what the decoder reads: the share mix
+// above under each set, its blocks only in allowed modes, ranked PFOR when nothing else is,
+// and every column decoded back by the same decoder.
+TEST(Dictionary, AModeSetLimitsTheEncoderAlone) {
+    test::SplitMix64 random{5};
+    constexpr std::array<std::uint64_t, 8> kLots{100, 200, 300, 500, 1000, 1, 50, 400};
+    Values shares;
+    for (int i = 0; i < 10'000; ++i) {
+        const std::uint64_t pick = random() % 16;
+        shares.push_back(pick < 8 ? 100 : kLots[pick % kLots.size()]);
+    }
+    const auto under = [&](DictModeSet modes, DictStats& stats) {
+        Bytes out;
+        const auto done = encode_dict(shares, kDefaultBlockValues, out, &stats, modes);
+        EXPECT_TRUE(done.has_value()) << to_string(done.error());
+        EXPECT_EQ(decoded(out, shares.size()), shares);
+        return out;
+    };
+    DictStats all;
+    EXPECT_EQ(under(kDictAllModes, all).size(), 2'929U);
+    EXPECT_EQ(all.blocks, (std::array<std::uint64_t, kDictModes>{0, 3, 0}));
+    for (const DictModeSet modes : {kDictRankedPforOnly, DictModeSet{0}}) {
+        SCOPED_TRACE(static_cast<unsigned>(modes));
+        DictStats stats;
+        EXPECT_EQ(under(modes, stats).size(), 3'937U);
+        EXPECT_EQ(stats.blocks, (std::array<std::uint64_t, kDictModes>{3, 0, 0}));
+    }
+    DictStats no_huffman;
+    EXPECT_LE(under(0b101, no_huffman).size(), 3'937U);
+    EXPECT_EQ(no_huffman.blocks[1], 0U);
+    EXPECT_EQ(no_huffman.blocks[0] + no_huffman.blocks[2], 3U);
+}
+
 // encode_dict copies a block that repeats the one before, and the copy must be exactly
 // what encoding it alone gives, the counts included.
 TEST(Dictionary, ABlockRepeatingTheOneBeforeIsTheSameBytes) {

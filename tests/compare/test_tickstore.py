@@ -40,7 +40,7 @@ DAY = TradingDay(2019, 12, 30)
 
 def system(durability=CLASS_B):
     layout = SimpleNamespace(tool=lambda name: Path("/nonexistent") / name)
-    return TickStoreSystem(RunContext(layout, Path("/nonexistent/root"), "v3-seg1Mi", durability,
+    return TickStoreSystem(RunContext(layout, Path("/nonexistent/root"), "v3-seg4Mi", durability,
                                       DAY, source=Path("/nonexistent/slice.itch")))
 
 
@@ -213,7 +213,7 @@ class SettingsAfterIngest(unittest.TestCase):
         owner.expected_records = 100
         owner.ingest_report = {"durability": owner.mode,
                                "flushes": expected_flushes(durability), **(report or {})}
-        ready_line = {"ready": True, "store_version": 3, "segment_records": 1 << 20,
+        ready_line = {"ready": True, "store_version": 3, "segment_records": 1 << 22,
                       "records": 100, "path": "indexed", "kernel_level": level, **(ready or {})}
         kernel_runs = runs if runs is not None else {level: 5}
 
@@ -239,7 +239,7 @@ class SettingsAfterIngest(unittest.TestCase):
 
     def test_a_segment_size_mismatch_stops_the_run(self):
         with self.assertRaisesRegex(SettingsMismatch,
-                                    "segment records: requested 1048576, in force 65536"):
+                                    "segment records: requested 4194304, in force 65536"):
             self.system(ready={"segment_records": 65536}).settings_after_ingest()
 
     def test_a_store_version_mismatch_stops_the_run(self):
@@ -303,7 +303,7 @@ class Ingest(unittest.TestCase):
 
     def test_no_source_is_refused(self):
         layout = SimpleNamespace(tool=lambda name: Path(name))
-        owner = TickStoreSystem(RunContext(layout, Path("root"), "v3-seg1Mi", CLASS_A, DAY))
+        owner = TickStoreSystem(RunContext(layout, Path("root"), "v3-seg4Mi", CLASS_A, DAY))
         with self.assertRaisesRegex(ToolFailure, "gave none"):
             owner._source()
 
