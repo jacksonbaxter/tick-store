@@ -1941,6 +1941,11 @@ under `/usr/bin/time -l`. Writer memory is the ingest's peak memory footprint. R
 | 3, hot-column codecs | Baseline, as in experiment 2 | 1,750,915,467, 4.713 | 401 MB | as above | No: 2 points (Q2, Q3 cold) |
 | 3 | The eight hot dictionary columns (`type`, `ref_distance`, `add_side`, `add_shares`, `reduce_shares`, `replace_shares`, `trade_side`, `trade_shares`) held to ranked PFOR: ranks bit-packed at one width a PFOR block, no Huffman or move-to-front | 1,808,255,218, 4.563 | 395 MB | Mac warm 36.24 / 35.98 / 18.30 / 20.84 / 289.99; cold 56.52 / 216.88 / 115.57 / 35.80 / 472.04 | Won experiment 3: 10 points |
 | 3 | An interleaved multi-stream Huffman decode | not built | | not timed | No (below) |
+| Final round | N = 2^20, version 3 (baseline), rounds 5 and 6 | 1,750,915,467, 4.713 | 401 MB | Mac warm 41.36 / 46.56 / 21.85 / 25.23 / 543.57; cold 62.44 / 226.00 / 118.75 / 41.48 / 710.29 | No: 0 points |
+| Final round | N = 2^22, experiment 1's winner | 1,707,376,132, 4.833 | 1,236 MB | Mac warm 128.91 / 31.11 / 17.30 / 99.95 / 527.07; cold 187.25 / 109.61 / 55.84 / 157.26 / 652.02 | No: 1 point (Q2 cold) |
+| Final round | Hot columns ranked PFOR at N = 2^20, experiment 3's winner | 1,808,255,218, 4.563 | 395 MB | Mac warm 37.35 / 36.89 / 18.69 / 21.36 / 297.81; cold 56.38 / 216.93 / 115.35 / 35.69 / 473.31 | No: 4 points (Q1, Q4) |
+| Final round | The combination of the winners: N = 2^22, version 3's locate access, hot columns ranked PFOR | 1,758,234,758, 4.693 | 1,238 MB | Mac warm 105.98 / 25.61 / 14.79 / 78.05 / 280.19; cold 162.43 / 106.09 / 52.81 / 130.00 / 417.00. debian at `1669ae0`: warm 287.02 / 73.98 / 35.53 / 205.03 / 911.95; cold 382.65 / 451.04 / 216.11 / 287.33 / 1,141.86 | **Yes**: 6 points (Q2, Q3, Q5), the only finalist |
+| Not a candidate | N = 2^22 with the `file_locate` column and ranked PFOR, which combines experiment 2's loser | 2,136,172,569, 3.863 | 1,272 MB | Mac warm 97.96 / 26.14 / 16.18 / 18.77 / 286.34; cold 176.29 / 110.28 / 57.95 / 78.68 / 414.43 | Not scored: the rule takes each experiment's winner. Entered, it would have had 5 points (Q2, Q4 warm, Q5) |
 
 **Experiments 2 and 3, timed side by side.** Machine load from other work moved single runs by up
 to 10%, so experiments 2 and 3 were timed again in interleaved rounds: `build/layout/batch.sh`
@@ -1980,6 +1985,75 @@ decode was not built: it would still be a variable-length decode, so it could at
 ranked PFOR's speed, and the rule scores time, with size only for eligibility and ties, where the
 57 MB cannot matter (both are far inside 2,393,554,944 bytes). The fixed-width dictionary code that
 TASKS named is ranked PFOR itself: ranks at one width per block, with patches for outliers.
+
+*Experiment 4, the other layout items in TASKS.* "Per-locate against file order" is experiment 2
+and the step from version 2 to 3: version 2's file order cost Q2 and Q3 50 to 60 times what
+version 3's runs do ("Query iteration"), and a file-order locate column beside the runs lost the
+rule. "Separate columns per message type against shared columns" was answered without a build.
+Every field one type alone has (add, trade, cross, imbalance, replace) already has its own columns.
+The fields several types share are either in every typed record (timestamp, locate, tracking), so a
+split would only cut one run into one sub-run per type that the reader merges back by the `type`
+column it reads anyway, or grouped by type inside the segment (`ref_distance`, `reduce_shares`,
+`tracking`), so each type's values are already one range, found from the seek counts. Q1 to Q5 read
+every type of the records they reach, so separate columns would add pieces and block headers and
+take nothing from any query's reads.
+
+*Experiment 5, what the profiles show.* On the Mac, `sample` of the final store: Q5 spends about 85%
+of its samples in the dictionary decoder, half mapping ranks back to values and half in the nested
+PFOR unpack and its patches (`phase3-raw/layout/prof/prof-q5-dpfor.txt`). Q4 on the final store
+(`prof-q4-final.txt`, 5,999 samples): 20% inflating zstd pieces (the `locate` column, creation
+references and add prices are zstd-wrapped, and the whole `locate` column of the segment is read),
+8% rebuilding every record's position from it, 12% in PFOR unpacking and patches, 9% in dictionary
+decoding, 10% in the run scans and 11% in the window's search of each run. The file-order column
+of experiment 2 removes the first two, which is its halving of Q4; the rest is reading each of
+about 9,000 runs from its start, for its reference list and its time and index chains
+(`prof-q1-combo22.txt` shows the same for Q1 on the `file_locate` store). Neither suggested a change
+that fits this round; both are TASKS items.
+
+**The final layout, chosen by the rule.** Store version 3, unchanged: no byte means anything new, so
+every version 3 file still reads and the version is not raised. The writer's defaults change:
+segments of 2^22 records, and the eight hot dictionary columns held to ranked PFOR (each column's
+`dict_modes` in `itch_store.hpp`; the reader takes every mode). The golden file is rewritten and
+the `07b020e` one kept beside it, which the reader must also read. The combination of the winners
+took 6 points against 4, 1 and 0, so it is the only finalist; it was timed on debian as rule 5
+asks, with nothing to score against there.
+
+- `12302019`: 1,758,234,758 bytes, ratio 4.693 (CR-1 and CR-2 pass, 0.55 of Parquet's full day).
+  `10302019`: 1,935,356,610 bytes, ratio 4.668. The store written on debian at `1669ae0` is
+  byte-for-byte the Mac's (SHA-256 `350936cf...5b63`).
+- Writer: peak footprint 1,238 MB on `12302019` and 1,358 MB on `10302019` on the Mac, against
+  395 MB at 2^20; debian's ingest VmHWM 7.68 GB, most of it the source's mapped pages. Verify's
+  footprint 1,288 MB and 1,484 MB.
+- G-1 passes on both days on the Mac and on `12302019` on debian (VmHWM 10.99 GB, mapped pages of
+  source and store, from the tool's own reading). G-2 is caught on both days: a data block flip and a
+  footer flip, each with CRCs on (the block's or the footer's CRC, naming the offset) and off (the
+  oracle names the record and bit for the data flip; for the footer, the container's extent check
+  on `12302019` and the decoder's codec check on `10302019` name the field). On `10302019` the footer's middle byte fell in the last byte
+  of a block entry's CRC32C: with CRCs off nothing reads that field, so verify passed, and the data
+  was intact. The footer flip moved one byte on, to the entry's codec id, which the decoder refused.
+  Both attempts' files are in `phase3-raw/layout/store/10302019/`.
+- The slice store gives every digest of `results/compare/*.json`, both files, both paths, 5 of 5.
+  The full-day store gives the oracle's answer to Q1 to Q5 and the busiest locate on both paths.
+
+**Likely verdicts, iteration-only.**
+
+- **QL-1** (Q2 warm at most 16.9 ms): misses, 25.6 ms on the Mac and 74.0 ms on debian on the whole
+  day. On the slice Q2 took 2.7 ms in the digest check.
+- **QL-2** (Q3 warm at most 0.41 ms): misses, 14.8 and 35.5 ms.
+- **QL-3** (Q4 cold mean at most 10 ms): misses by more than before, 130.0 ms on the Mac and 287.3 ms
+  on debian, against 41.5 ms (version 3 at 2^20, final round) and 105.2 ms (`e257f80`). The rule scores each figure alike, and N = 2^22 won
+  the three Q2, Q3 and Q5 figures in each of warm and cold while losing Q1 and Q4.
+- **QL-4** (lowest median and p99 of the four systems on every query): fails. The slice store holds
+  two segments at 2^22; in the digest check Q1 took 113 ms and Q4 74 ms, against 38 and 23 ms warm
+  for version 3 at 2^20 in the comparison, which was already beaten there. Q2 (2.7 ms) and Q3
+  (1.4 ms) should stay the lowest. Q5 was QuestDB's warm and Parquet's cold, and stays so likely.
+  The next comparison run measures it.
+
+**What did not help.** The file-order locate column, with or without move-to-front, and 1,024-value
+blocks (experiment 2); the single-pass prefix scan on version 3 stores (no faster Q4, slower Q1 and
+Q3); a per-group directory (not built: it cannot start a run's scan mid-run); segments below 2^20
+(Q2 and Q3 2 to 17 times slower warm, Q5 up to 3 times cold, for a smaller Q4); a multi-stream Huffman decode (not built,
+above).
 
 ## Process notes
 

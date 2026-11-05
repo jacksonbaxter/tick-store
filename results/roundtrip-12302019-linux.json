@@ -3,10 +3,10 @@
   "source": "12302019.NASDAQ_ITCH50",
   "host": "Linux",
   "build_preset": "bench",
-  "commit": "e257f80",
+  "commit": "1669ae0",
   "store_format": "itch-store-v3",
   "durability": "page_cache",
-  "segment_records": 1048576,
+  "segment_records": 4194304,
   "placement": "taskset -c 2,6,7 through heavy.sh, so cpu4 and cpu5 stayed free",
   "g1": {
     "gate": "G-1",
@@ -15,16 +15,17 @@
       "command": "ingest",
       "store_format": "itch-store-v3",
       "durability": "page_cache",
-      "segment_records": 1048576,
+      "segment_records": 4194304,
       "records": 268744780,
       "bytes": 8251407909,
       "tail_bytes": 0,
       "raw_unknown_type": 0,
       "raw_wrong_length": 0,
-      "stored_file_bytes": 1750915467,
-      "ratio": 4.712625,
-      "wall_seconds": 254.359837,
-      "peak_rss_bytes": 6655954944
+      "stored_file_bytes": 1758234758,
+      "ratio": 4.693007,
+      "flushes": [],
+      "wall_seconds": 214.85369,
+      "peak_rss_bytes": 7680172032
     },
     "verify": {
       "command": "verify",
@@ -51,8 +52,8 @@
       "stored_matches_expected": true,
       "first_difference": null,
       "store_error": null,
-      "wall_seconds": 145.957089,
-      "peak_rss_bytes": 9861451776
+      "wall_seconds": 112.716755,
+      "peak_rss_bytes": 10992291840
     }
   }
 }

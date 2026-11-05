@@ -3,10 +3,10 @@
   "source": "10302019.NASDAQ_ITCH50",
   "host": "macOS",
   "build_preset": "bench",
-  "commit": "e257f80",
+  "commit": "1669ae0",
   "store_format": "itch-store-v3",
   "durability": "page_cache",
-  "segment_records": 1048576,
+  "segment_records": 4194304,
   "peak_rss_note": "time -l's maximum resident set size counts the clean file-backed pages of the read-only mappings of source and store; peak_memory_footprint_bytes is what the process held beyond them",
   "g1": {
     "gate": "G-1",
@@ -15,19 +15,20 @@
       "command": "ingest",
       "store_format": "itch-store-v3",
       "durability": "page_cache",
-      "segment_records": 1048576,
+      "segment_records": 4194304,
       "records": 293989079,
       "bytes": 9035016843,
       "tail_bytes": 0,
       "raw_unknown_type": 0,
       "raw_wrong_length": 0,
-      "stored_file_bytes": 1928632798,
-      "ratio": 4.684674,
-      "wall_seconds": 115.435227,
-      "peak_rss_bytes": 9371402240,
-      "real_seconds": 115.45,
-      "time_peak_rss_bytes": 9371402240,
-      "peak_memory_footprint_bytes": 383780664
+      "stored_file_bytes": 1935356610,
+      "ratio": 4.668399,
+      "flushes": [],
+      "wall_seconds": 107.752572,
+      "peak_rss_bytes": 10248241152,
+      "real_seconds": 107.79,
+      "time_peak_rss_bytes": 10248241152,
+      "peak_memory_footprint_bytes": 1358448944
     },
     "verify": {
       "command": "verify",
@@ -54,30 +55,30 @@
       "stored_matches_expected": true,
       "first_difference": null,
       "store_error": null,
-      "wall_seconds": 37.078129,
-      "peak_rss_bytes": 11364728832,
-      "real_seconds": 37.12,
-      "time_peak_rss_bytes": 11364728832,
-      "peak_memory_footprint_bytes": 530912200
+      "wall_seconds": 40.909067,
+      "peak_rss_bytes": 12250972160,
+      "real_seconds": 40.96,
+      "time_peak_rss_bytes": 12250972160,
+      "peak_memory_footprint_bytes": 1483658496
     }
   },
   "g2": {
     "gate": "G-2",
-    "seed": "the middle segment's timestamp block, its middle byte, bit 1; the footer's middle byte, bit 1",
+    "seed": "the middle segment's timestamp block, its middle byte, bit 1; the footer's middle byte, bit 1, moved one byte on because it fell in a block entry's CRC32C, the last byte of block 85775's",
     "injected": {
       "data": {
-        "block": 63453,
-        "segment": 140,
+        "block": 61775,
+        "segment": 35,
         "column": "timestamp",
-        "block_payload_offset": 954728661,
-        "block_payload_bytes": 47042,
-        "store_byte_offset": 954752182,
+        "block_payload_offset": 963248207,
+        "block_payload_bytes": 46740,
+        "store_byte_offset": 963271577,
         "bit": 1
       },
       "footer": {
-        "footer_offset": 1922720899,
-        "footer_bytes": 5911875,
-        "store_byte_offset": 1925676836,
+        "footer_offset": 1929866884,
+        "footer_bytes": 5489702,
+        "store_byte_offset": 1932611736,
         "bit": 1
       }
     },
@@ -117,13 +118,13 @@
         "expected_size": 21,
         "actual_size": 0
       },
-      "store_error": "container: block, segment 140, column timestamp, block 63453, file byte 954728661: expected 0, have 0 (bad checksum: block at offset 954728661: expected 506511801, have 2570407760)",
-      "wall_seconds": 29.252441,
-      "peak_rss_bytes": 10439737344,
-      "real_seconds": 29.29,
-      "time_peak_rss_bytes": 10439737344,
-      "peak_memory_footprint_bytes": 533746752,
-      "stderr": "first difference: store_error at record 146800640, source byte 4504201897, type 0x44\nstore error: container: block, segment 140, column timestamp, block 63453, file byte 954728661: expected 0, have 0 (bad checksum: block at offset 954728661: expected 506511801, have 2570407760), store byte 954728661\n147188439 records mismatched\nthe source and the re-serialised stream do not hash the same\nthe re-serialised stream does not match the expected SHA-256"
+      "store_error": "container: block, segment 35, column timestamp, block 61775, file byte 963248207: expected 0, have 0 (bad checksum: block at offset 963248207: expected 3282667078, have 258685976)",
+      "wall_seconds": 37.356617,
+      "peak_rss_bytes": 11161829376,
+      "real_seconds": 37.42,
+      "time_peak_rss_bytes": 11161829376,
+      "peak_memory_footprint_bytes": 1491276984,
+      "stderr": "first difference: store_error at record 146800640, source byte 4504201897, type 0x44\nstore error: container: block, segment 35, column timestamp, block 61775, file byte 963248207: expected 0, have 0 (bad checksum: block at offset 963248207: expected 3282667078, have 258685976), store byte 963248207\n147188439 records mismatched\nthe source and the re-serialised stream do not hash the same\nthe re-serialised stream does not match the expected SHA-256"
     },
     "data_no_checksums": {
       "command": "verify",
@@ -143,29 +144,29 @@
       "extra_records": 0,
       "aliased_records": 0,
       "source_sha256": "55d4620a0cbb1926dbba97ff560a0979cd879dbe9087fcb8a62ebbf993578ab4",
-      "stored_sha256": "ad3b71a5fdd14fcb35b28e20dc5ce90bececffef6a1b58c36ed2d8dd880a71da",
+      "stored_sha256": "f4bb8166b1daa26182b9ab3559323ebb08fc62741b13d5be55987c367934b78e",
       "expected_sha256": "55d4620a0cbb1926dbba97ff560a0979cd879dbe9087fcb8a62ebbf993578ab4",
       "hashes_match": false,
       "source_matches_expected": true,
       "stored_matches_expected": false,
       "first_difference": {
         "kind": "bytes",
-        "record_index": 147538739,
-        "source_byte_offset": 4526664842,
-        "bit": 1,
-        "expected_byte": 104,
-        "actual_byte": 106,
+        "record_index": 147749635,
+        "source_byte_offset": 4533082491,
+        "bit": 5,
+        "expected_byte": 113,
+        "actual_byte": 81,
         "message_type": "D",
         "expected_size": 21,
         "actual_size": 21
       },
       "store_error": null,
-      "wall_seconds": 38.885575,
-      "peak_rss_bytes": 11372216320,
-      "real_seconds": 38.93,
-      "time_peak_rss_bytes": 11372216320,
-      "peak_memory_footprint_bytes": 529486600,
-      "stderr": "first difference: bytes at record 147538739, source byte 4526664842, bit 1, expected 0x68, actual 0x6a, type 0x44\n3 records mismatched\nthe source and the re-serialised stream do not hash the same\nthe re-serialised stream does not match the expected SHA-256"
+      "wall_seconds": 44.239407,
+      "peak_rss_bytes": 12329336832,
+      "real_seconds": 44.31,
+      "time_peak_rss_bytes": 12329336832,
+      "peak_memory_footprint_bytes": 1566956168,
+      "stderr": "first difference: bytes at record 147749635, source byte 4533082491, bit 5, expected 0x71, actual 0x51, type 0x44\n3 records mismatched\nthe source and the re-serialised stream do not hash the same\nthe re-serialised stream does not match the expected SHA-256"
     },
     "footer_crc": {
       "command": "verify",
@@ -201,13 +202,13 @@
         "expected_size": 14,
         "actual_size": 0
       },
-      "store_error": "container: container, file byte 1922720899: expected 0, have 0 (bad checksum: footer at offset 1922720899: expected 3435920291, have 3864464680)",
-      "wall_seconds": 20.78948,
-      "peak_rss_bytes": 9065447424,
-      "real_seconds": 20.82,
-      "time_peak_rss_bytes": 9065447424,
-      "peak_memory_footprint_bytes": 27826752,
-      "stderr": "first difference: store_error at record 0, source byte 0, type 0x53\nstore error: container: container, file byte 1922720899: expected 0, have 0 (bad checksum: footer at offset 1922720899: expected 3435920291, have 3864464680), store byte 1922720899\n293989079 records mismatched\nthe source and the re-serialised stream do not hash the same\nthe re-serialised stream does not match the expected SHA-256"
+      "store_error": "container: container, file byte 1929866884: expected 0, have 0 (bad checksum: footer at offset 1929866884: expected 2034046164, have 2215705030)",
+      "wall_seconds": 21.60691,
+      "peak_rss_bytes": 9077686272,
+      "real_seconds": 21.65,
+      "time_peak_rss_bytes": 9077686272,
+      "peak_memory_footprint_bytes": 33282840,
+      "stderr": "first difference: store_error at record 0, source byte 0, type 0x53\nstore error: container: container, file byte 1929866884: expected 0, have 0 (bad checksum: footer at offset 1929866884: expected 2034046164, have 2215705030), store byte 1929866884\n293989079 records mismatched\nthe source and the re-serialised stream do not hash the same\nthe re-serialised stream does not match the expected SHA-256"
     },
     "footer_no_checksums": {
       "command": "verify",
@@ -243,13 +244,13 @@
         "expected_size": 14,
         "actual_size": 0
       },
-      "store_error": "container: container, file byte 1925676835: expected 0, have 0 (bad extent: block metadata offset at offset 1925676835: expected 1346671, have 1347183)",
-      "wall_seconds": 20.568597,
-      "peak_rss_bytes": 9063563264,
-      "real_seconds": 20.6,
-      "time_peak_rss_bytes": 9063563264,
-      "peak_memory_footprint_bytes": 28940936,
-      "stderr": "first difference: store_error at record 0, source byte 0, type 0x53\nstore error: container: container, file byte 1925676835: expected 0, have 0 (bad extent: block metadata offset at offset 1925676835: expected 1346671, have 1347183), store byte 1925676835\n293989079 records mismatched\nthe source and the re-serialised stream do not hash the same\nthe re-serialised stream does not match the expected SHA-256"
+      "store_error": "bad segment: column codec, segment 49, column type, block 85775, file byte 1341841243: expected 6, have 4",
+      "wall_seconds": 21.622062,
+      "peak_rss_bytes": 9069002752,
+      "real_seconds": 21.67,
+      "time_peak_rss_bytes": 9069002752,
+      "peak_memory_footprint_bytes": 31988048,
+      "stderr": "first difference: store_error at record 0, source byte 0, type 0x53\nstore error: bad segment: column codec, segment 49, column type, block 85775, file byte 1341841243: expected 6, have 4, store byte 1341841243\n293989079 records mismatched\nthe source and the re-serialised stream do not hash the same\nthe re-serialised stream does not match the expected SHA-256"
     },
     "restored": {
       "command": "verify",
@@ -276,11 +277,11 @@
       "stored_matches_expected": true,
       "first_difference": null,
       "store_error": null,
-      "wall_seconds": 36.917542,
-      "peak_rss_bytes": 11371397120,
-      "real_seconds": 36.96,
-      "time_peak_rss_bytes": 11371397120,
-      "peak_memory_footprint_bytes": 529880032
+      "wall_seconds": 40.750776,
+      "peak_rss_bytes": 12300500992,
+      "real_seconds": 40.81,
+      "time_peak_rss_bytes": 12300500992,
+      "peak_memory_footprint_bytes": 1475286272
     }
   }
 }
