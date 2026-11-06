@@ -527,6 +527,11 @@ hours by the table above, over the guide. The rule is kept as written and the ru
 Wins between close variants move from one slice run to the next: `snappy-rg1Mi` and
 `zstd1-rg1Mi-ts-default` each won by one cold measure.
 
+At `dd5de38`, the commit of the full-day results, the Linux slice gives Parquet `zstd1-rg128k` and
+`none-rg1Mi`, ArcticDB `rows10M-cols127`, `rows100k-cols1` and per security, QuestDB
+`locate-index`, and tick-store `v3-seg1Mi`: about 11.2 hours by the table above, over the guide,
+run as the rule gives.
+
 ## What the numbers are
 
 The full-day file is the one the targets are judged on. Slice numbers prove that the harness
