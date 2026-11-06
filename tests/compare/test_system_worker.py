@@ -216,16 +216,49 @@ class PageCacheBeforeWarm(unittest.TestCase):
                     "method": "fadvise"}]
         with (mock.patch.object(coldcache, "evict", side_effect=reports) as evict,
               mock.patch.object(run_system, "sync_tree") as sync,
-              mock.patch.object(coldcache, "meminfo_bytes", side_effect=[1 << 30, 9 << 30])):
+              mock.patch.object(coldcache, "meminfo_bytes",
+                                side_effect=[1 << 30, 2 << 30, 8 << 30, 9 << 30])):
             found = self.runner().clear_page_cache(Path("store"), [Path("store/a")])
         sync.assert_called_once_with(Path("store"))
         self.assertEqual(evict.call_args_list,
                          [mock.call(None, [Path("day.itch"), Path("export/day-full")]),
                           mock.call(None, [Path("store/a")])])
-        self.assertEqual((found["input_pages"], found["store_pages"], found["resident_after"]),
-                         (100, 7, 0))
+        self.assertEqual((found["inputs"]["pages"], found["store_pages"],
+                          found["resident_after"]), (100, 7, 0))
+        self.assertEqual((found["inputs"]["mem_free_bytes_before"],
+                          found["inputs"]["mem_free_bytes_after"]), (2 << 30, 8 << 30))
         self.assertEqual((found["mem_free_bytes_before"], found["mem_free_bytes_after"]),
                          (1 << 30, 9 << 30))
+
+    def test_a_read_back_on_a_day_evicts_the_inputs_first(self):
+        from compare import coldcache
+
+        runner = self.runner()
+        runner.full_day = True
+        runner.windows = [(0, 1)]
+        runner.args = SimpleNamespace(system="parquet")
+        runner.layout = SimpleNamespace(work=Path("work"))
+        order = []
+        report = {"pages": 100, "resident_pages": 0, "passes": 1, "proven": True,
+                  "method": "fadvise"}
+
+        def evict(layout, paths):
+            order.append("evict")
+            return report
+
+        def worker(system, step, **fields):
+            order.append(step)
+            return {"read_seconds": 1.0, "peak_rss_bytes": 1, "stored_settings": [],
+                    "windows": 1, "rows": 5, "write_columns_seconds": 0.5, "method": "windows"}
+
+        runner.worker = worker
+        runner.verify = lambda directory: {"exit_code": 0, "verdict": "pass"}
+        with (mock.patch.object(coldcache, "evict", side_effect=evict),
+              mock.patch.object(coldcache, "meminfo_bytes", return_value=1 << 30),
+              mock.patch("shutil.rmtree")):
+            result = runner.read_back(SimpleNamespace())
+        self.assertEqual(order, ["evict", "read_back"])
+        self.assertEqual(result["streamed"]["inputs_evicted_before"]["pages"], 100)
 
     def test_an_eviction_not_proven_stops_the_run(self):
         from compare import coldcache, run_system

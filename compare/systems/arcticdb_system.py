@@ -27,7 +27,9 @@ MAP_SIZE_BYTES = 2_000_000_000  # ArcticDB reads GB as 10^9. Read back from the 
 MAP_SIZE_TEXT = "2GB"
 FULL_DAY_MAP_SIZE_BYTES = 64_000_000_000  # A slice's 2 GB cannot hold a day. Sparse until used.
 FULL_DAY_MAP_SIZE_TEXT = "64GB"
-CHUNK_SEGMENTS = 40  # Segments per chunk of a streamed day.
+# Rows per chunk of a streamed day, in whole segments, as near this as a segment allows. Each
+# append stores segments of its own, so a chunk holds whole ones; 40 of 100k is the headline's.
+STREAM_CHUNK_ROWS = 4_000_000
 LMDB_NO_SYNC_FLAGS = 0x10000 | 0x40000  # MDB_NOSYNC | MDB_NOMETASYNC
 LMDB_META_MAGIC = 0xBEEFC0DE
 LMDB_META_OFFSET = 16
@@ -208,7 +210,11 @@ class ArcticDBSystem(System):
                                "first, with a Python str per text value"}
 
     def stream_chunk_rows(self):
-        return self.tuning["rows_per_segment"] * CHUNK_SEGMENTS
+        """Whole segments, about STREAM_CHUNK_ROWS rows, and one segment where a segment is
+        larger: `rows10M-cols127` once took the whole day as one chunk, and its frame passed
+        11.9 GB before the guard stopped it on a 15 GB host."""
+        segment = self.tuning["rows_per_segment"]
+        return segment * max(1, STREAM_CHUNK_ROWS // segment)
 
     def ingest_stream(self, chunks):
         """The first chunk is a write, and each one after it an append, so one frame at a time

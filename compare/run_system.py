@@ -49,7 +49,7 @@ WRITE_REPETITIONS = 3
 # would not fit the run: see "Full-day comparison" in compare/README.md.
 FULL_DAY_WRITE_REPETITIONS = 1
 # Rows per window of a full-day read-back: about 600 MB of Arrow at a time.
-READ_WINDOW_ROWS = 1 << 23
+READ_WINDOW_ROWS = 1 << 22
 WARM_REPETITIONS = 30
 COLD_REPETITIONS = 7
 EXIT_FAILED = 1
@@ -174,6 +174,7 @@ class Runner:
         """The store, read whole, must rebuild the source bit for bit. Any failure is fatal."""
         destination = self.layout.work / "readback" / self.args.system
         shutil.rmtree(destination, ignore_errors=True)
+        inputs = self.evict_inputs() if self.full_day else None
         answer = self.worker(system, "read_back", destination=str(destination),
                              windows=self.windows)
         report = self.verify(destination)
@@ -187,7 +188,7 @@ class Runner:
         if self.full_day:
             result["streamed"] = {"windows": answer["windows"], "rows": answer["rows"],
                                   "write_columns_seconds": answer["write_columns_seconds"],
-                                  "method": answer["method"]}
+                                  "method": answer["method"], "inputs_evicted_before": inputs}
         return result
 
     def run_class(self, variant, durability, control_saw_dirty):
@@ -319,13 +320,26 @@ class Runner:
         warm proof itself is unchanged."""
         free_before = coldcache.meminfo_bytes("MemFree")
         sync_tree(root)
-        inputs = coldcache.evict(self.layout, [self.source, self.columns_dir])
+        inputs = self.evict_inputs()
         store = coldcache.evict(self.layout, paths)
         return {"what": "the day's ITCH file and its export, then every store file",
-                "input_pages": inputs["pages"], "store_pages": store["pages"],
-                "resident_after": inputs["resident_pages"] + store["resident_pages"],
-                "passes": [inputs["passes"], store["passes"]], "method": store["method"],
+                "inputs": inputs, "store_pages": store["pages"],
+                "resident_after": inputs["resident_after"] + store["resident_pages"],
+                "store_passes": store["passes"], "method": store["method"],
                 "mem_free_bytes_before": free_before,
+                "mem_free_bytes_after": coldcache.meminfo_bytes("MemFree")}
+
+    def evict_inputs(self):
+        """A day's source and export, 32 GB that nothing reads until the next writes or the
+        oracle, out of the page cache, proven at 0 resident, with MemFree either side. Before a
+        read-back and before warm queries, so that what they allocate comes from free memory and
+        not from reclaim, which on this host also swaps: the guard once stopped ArcticDB's
+        read-back on swap traffic with 12.4 GB available."""
+        free_before = coldcache.meminfo_bytes("MemFree")
+        report = coldcache.evict(self.layout, [self.source, self.columns_dir])
+        return {"what": "the day's ITCH file and its export", "pages": report["pages"],
+                "resident_after": report["resident_pages"], "passes": report["passes"],
+                "method": report["method"], "mem_free_bytes_before": free_before,
                 "mem_free_bytes_after": coldcache.meminfo_bytes("MemFree")}
 
     def after_queries(self, system):

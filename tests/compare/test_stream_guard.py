@@ -193,6 +193,14 @@ class StreamedIngest(unittest.TestCase):
         parquet = self.system("parquet")
         self.assertEqual(parquet.stream_chunk_rows() % parquet.tuning["row_group_rows"], 0)
 
+    def test_a_large_segment_streams_one_segment_at_a_time(self):
+        system = self.system("arcticdb")
+        self.assertEqual(system.stream_chunk_rows(), 4_000_000)
+        system.tuning = {**system.tuning, "rows_per_segment": 10_000_000}
+        self.assertEqual(system.stream_chunk_rows(), 10_000_000)
+        system.tuning = {**system.tuning, "rows_per_segment": 3_000_000}
+        self.assertEqual(system.stream_chunk_rows(), 3_000_000)
+
 
 if __name__ == "__main__":
     unittest.main()

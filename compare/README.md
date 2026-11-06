@@ -443,7 +443,10 @@ TICK_STORE_MEASURE=<wrapper> <venv>/bin/python -I compare/run.py --day 12302019 
   `scripts/check_compare.py` refuses a full-day file with any window clipped.
 - **Writes stream.** No day-sized table is built: Parquet, ArcticDB and QuestDB take the export in
   chunks of their stored unit, as in the capacity check, and their clock holds reading each chunk
-  from the column files, since 24 GB of columns cannot stay in this host's page cache.
+  from the column files, since 24 GB of columns cannot stay in this host's page cache. ArcticDB's
+  chunk is whole segments, about 4 M rows, or one segment where a segment is larger: at
+  `e2ad871` it was 40 segments whatever their size, so `rows10M-cols127` took the whole day as
+  one frame, which passed 11.9 GB before the guard stopped it.
   tick-store's write is the same command on the day's ITCH file, read through first and resident,
   as on the slice. ArcticDB's per-security layout spreads the day by locate into bucket files of
   about one chunk each, then writes each bucket's securities whole in one `write_batch`, so each
@@ -451,11 +454,16 @@ TICK_STORE_MEASURE=<wrapper> <venv>/bin/python -I compare/run.py --day 12302019 
   slice's sort is.
 - **One write per class.** Each is a sustained run of minutes over the whole day, and three of
   each for every variant would not fit the run (below). A write's median is that one write.
-- **Read-back streams.** Each store is read back one time window of about 8 Mi rows at a time,
+- **Read-back streams.** Each store is read back one time window of about 4 Mi rows at a time,
   each window ordered by seq, into one column directory, which `tick_roundtrip verify-columns`
   judges against the day as on the slice; tick-store's goes through `tick_export --store` straight
   into the directory, and G-1 runs on its store too. A window is a range of times, so rows of one
   nanosecond never straddle two, and the export's times never decrease in file order.
+  Before each read-back the day's ITCH file and export are evicted from the page cache, proven
+  at 0 resident, with MemFree recorded either side: what the read-back allocates then comes from
+  free memory and not from reclaim, which on this host also swaps. At `e2ad871`, with 8 Mi-row
+  windows and nothing evicted, the guard stopped ArcticDB's first read-back on swap traffic of 18
+  to 30 MB/s with 12.4 GB still available.
 - **Class A's store goes after its read-back,** since queries run on class B alone and two stores
   of QuestDB's 23 GB beside a 24 GB read-back would crowd the disk the guard watches.
 - **Warm is proven query by query.** QuestDB's store, 22.9 GB in the capacity check, is larger
@@ -511,6 +519,13 @@ again to that slice file and refuses a file whose variants differ. On the slice 
 rule gives Parquet `zstd1-rg128k` and `none-rg1Mi`, ArcticDB `rows10M-cols127` and per security,
 QuestDB `locate-index`, and tick-store `v3-seg1Mi` (its only variant then), about 9.8 hours by the
 table above; the run takes whatever the slice at its own commit gives.
+
+At `e2ad871` the Linux slice gave more: Parquet
+`zstd1-rg128k`, `snappy-rg1Mi`, `none-rg1Mi` and `zstd1-rg1Mi-ts-default`, ArcticDB
+`rows10M-cols127` and per security, QuestDB `locate-index`, and tick-store `v3-seg1Mi`, about 11.2
+hours by the table above, over the guide. The rule is kept as written and the run takes them all.
+Wins between close variants move from one slice run to the next: `snappy-rg1Mi` and
+`zstd1-rg1Mi-ts-default` each won by one cold measure.
 
 ## What the numbers are
 
