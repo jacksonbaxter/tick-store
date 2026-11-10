@@ -998,7 +998,7 @@ class FullDay(Harness):
     def test_a_full_day_file_from_before_swap_was_counted(self):
         def fault(document, source):
             document["header"]["schema"] = 1
-        self.assert_full_fault(fault, "a full-day file must count swap per phase")
+        self.assert_full_fault(fault, "a file must count swap per phase")
 
     def test_the_guard_fired(self):
         def fault(document, source):
@@ -1085,14 +1085,10 @@ class Swap(Harness):
             del document["method"]["swap"]["timed_policy"]
         self.assert_fault(fault, "what a timed query with swap-in becomes is not stated")
 
-    def test_an_old_slice_file_without_swap_still_passes(self):
-        document = copy.deepcopy(valid_document("macOS"))
-        document["header"]["schema"] = 1
-        del document["method"]["swap"]
-        for system in document["systems"].values():
-            del system["swap_by_phase"]
-        result = self.run_on(document)
-        self.assertEqual(result.returncode, 0, result.stderr)
+    def test_a_slice_file_from_before_swap_was_counted(self):
+        def fault(document):
+            document["header"]["schema"] = 1
+        self.assert_fault(fault, "header.schema: 1, and a file must count swap per phase")
 
 
 class VariantRule(unittest.TestCase):

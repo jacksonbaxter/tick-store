@@ -80,8 +80,7 @@ FULL_DAY_QUERIES = {"Q1": ("rows", OPEN_NS, OPEN_NS + NANOS_PER_SECOND, False),
                     "Q4": ("rows", OPEN_NS, OPEN_NS + 1_000_000, False),
                     "Q5": ("column_sum", 0, 0, False)}
 MAX_WARM_ATTEMPTS = 3
-# The first schema whose files count swap per phase. Older slice files are accepted without it
-# until they are replaced; a full-day file must have it.
+# The first schema whose files count swap per phase. Every file must have it.
 SWAP_SCHEMA = 2
 CLASS_PHASES = ("write", "read_back")
 QUERY_PHASES = ("warm_queries", "cold_queries")
@@ -430,7 +429,7 @@ def check_queries(where, queries, truth, system_name=None, full_day=False):
     return problems
 
 
-def check_system(name, system, document, pin, swap_counted=True):
+def check_system(name, system, document, pin):
     host = document["header"].get("host")
     truth = (document.get("queries") or {}).get("truth") or {}
     problems = []
@@ -471,8 +470,7 @@ def check_system(name, system, document, pin, swap_counted=True):
                                          host)
         problems += check_queries(where, variant.get("queries"), truth, name,
                                   bool(pin.get("full_day")))
-    if swap_counted:
-        problems += check_swap(name, system)
+    problems += check_swap(name, system)
     if pin.get("full_day") and host == "Linux":
         problems += check_peak_memory(name, system.get("peak_memory"))
     return problems
@@ -679,17 +677,15 @@ def check_document(document, top_keys, path, pins, capacity, real_path=None):
     if not method.get("warm") or not method.get("cold"):
         problems.append("method: how warm and cold were achieved is not stated")
     schema = header.get("schema")
-    swap_counted = not isinstance(schema, int) or schema >= SWAP_SCHEMA
-    if not swap_counted and full_day:
-        problems.append(f"header.schema: a full-day file must count swap per phase, schema "
-                        f"{SWAP_SCHEMA} or later")
-    if swap_counted:
-        problems += check_swap_method(document)
+    if not isinstance(schema, int) or schema < SWAP_SCHEMA:
+        problems.append(f"header.schema: {schema!r}, and a file must count swap per phase, "
+                        f"schema {SWAP_SCHEMA} or later")
+    problems += check_swap_method(document)
     for name in SYSTEMS:
         if name not in systems:
             problems.append(f"systems: {name} is missing")
     for name, system in systems.items():
-        problems += check_system(name, system, document, pin, swap_counted)
+        problems += check_system(name, system, document, pin)
     problems += check_results.check_leaks(document)
     return problems
 

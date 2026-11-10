@@ -153,6 +153,15 @@ def query_digest_mismatch():
     edit_json(macos_results("compare"), change)
 
 
+def unflagged_swap_in():
+    def change(document):
+        cold = questdb_variant(document)["queries"]["Q1"]["cold"]["swap_timed"]
+        cold["pages_in"] += 1
+        cold["pages_in_by_repetition"][0] += 1
+        cold["flagged"] = False
+    edit_json(macos_results("compare"), change)
+
+
 def hand_edit_readme():
     edit_text("README.md", "**macOS.**", "**macOS, hand edited.**")
 
@@ -452,6 +461,9 @@ FAULTS = (
           "the oracle said mismatch", failed_read_back),
     Fault("compare-query-digest", "check-compare", "a query's digest differs from the ground "
           "truth", CHECK_FAILED, "ground truth", query_digest_mismatch),
+    Fault("compare-swap-unflagged", "check-compare", "a cold query had a page swapped in while "
+          "timed, and is not flagged", CHECK_FAILED, "Q1.cold.swap_timed: flagged is False with",
+          unflagged_swap_in),
     Fault("readme-hand-edit", "render-check", "a hand edit inside the README's table markers",
           CHECK_FAILED, "stale or was edited by hand", hand_edit_readme),
     Fault("actionlint-broken-workflow", "actionlint", "the workflow names a matrix key that does "
