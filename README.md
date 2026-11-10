@@ -220,6 +220,17 @@ The tables below are generated from the results files by `scripts/render_results
 
 Percentiles are the time for one whole batch, in microseconds, with the timer resolving 10.01 ns.
 
+**Linux, real-data column decodes of the slice.** AMD Ryzen Embedded V1605B with Radeon Vega Gfx, Clang 23.1.4, `-O3 -DNDEBUG -std=c++23`. Pinned with taskset -c 4 and verified by sched_getcpu. Counters come from perf stat user-mode events. perf cycles and timer ticks are different units.
+
+| Case | Commit | Kernels | Values | Bits/value | ns/value | MB/s of 8-byte values | Spread (CV) | Cycles/value | Instr/value | Branch misses/value | Load at start |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| `gorilla_xor/add_price` | `bcbf8738d892` | avx2 kernels | 3,153,991 | 37.18 | 20.558 | 389 | 0.52% | 73.35 | 218.11 | 0.391 | 1.49 |
+| `gorilla_xor_l1/add_price` | `bcbf8738d892` | avx2 kernels | 3,072 | 33.34 | 17.115 | 467 | 0.50% | 60.91 | 198.40 | 0.419 | 1.41 |
+| `store_decode/add_price` | `bcbf8738d892` | avx2 kernels | 3,153,991 | 6.30 | 6.252 | 1,280 | 0.66% | 22.32 | 47.00 | 0.051 | 1.32 |
+| `gorilla_dod/timestamp` | `bcbf8738d892` | avx2 kernels | 6,125,294 | 16.95 | 22.204 | 360 | 0.63% | 79.54 | 274.19 | 0.404 | 1.29 |
+| `pfor_delta/timestamp` | `bcbf8738d892` | avx2 kernels | 6,125,294 | 16.82 | 2.931 | 2,730 | 1.01% | 10.45 | 12.08 | 0.020 | 1.30 |
+| `pfor_dod/timestamp` | `bcbf8738d892` | avx2 kernels | 6,125,294 | 18.07 | 3.151 | 2,539 | 1.45% | 11.21 | 14.57 | 0.020 | 1.27 |
+
 **macOS.** Apple M4 Max, Clang 23.1.4, `-O3 -DNDEBUG -std=c++23`, arm64 baseline, scalar kernels. Unpinned. No hardware counters. macOS has no thread pinning, and no unprivileged hardware counters.
 
 | Case | Commit | Passes | Messages/s | Spread (CV) | Batch | p50 µs | p99 µs | p99.9 µs | Cycles/msg | Instr/msg | Branch misses/msg | Load at start |
@@ -228,6 +239,17 @@ Percentiles are the time for one whole batch, in microseconds, with the timer re
 | `itch_decode_encode` | `ad2bab57a412` | 10 | 69.86 M | 0.67% | 1024 msgs | 14.42 | 17.08 | 21.92 | n/a | n/a | n/a | 3.65 |
 
 Percentiles are the time for one whole batch, in microseconds, with the timer resolving 41.67 ns.
+
+**macOS, real-data column decodes of the slice.** Apple M4 Max, Clang 23.1.4, `-O3 -DNDEBUG -std=c++23`. Unpinned. No hardware counters. macOS has no thread pinning, and no unprivileged hardware counters.
+
+| Case | Commit | Kernels | Values | Bits/value | ns/value | MB/s of 8-byte values | Spread (CV) | Cycles/value | Instr/value | Branch misses/value | Load at start |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| `gorilla_xor/add_price` | `bcbf8738d892` | neon kernels | 3,153,991 | 37.18 | 8.393 | 953 | 2.33% | n/a | n/a | n/a | 3.92 |
+| `gorilla_xor_l1/add_price` | `bcbf8738d892` | neon kernels | 3,072 | 33.34 | 4.649 | 1,721 | 2.80% | n/a | n/a | n/a | 3.68 |
+| `store_decode/add_price` | `bcbf8738d892` | neon kernels | 3,153,991 | 6.30 | 2.177 | 3,674 | 0.86% | n/a | n/a | n/a | 3.85 |
+| `gorilla_dod/timestamp` | `bcbf8738d892` | neon kernels | 6,125,294 | 16.95 | 9.650 | 829 | 1.66% | n/a | n/a | n/a | 3.85 |
+| `pfor_delta/timestamp` | `bcbf8738d892` | neon kernels | 6,125,294 | 16.82 | 0.601 | 13,314 | 1.46% | n/a | n/a | n/a | 3.41 |
+| `pfor_dod/timestamp` | `bcbf8738d892` | neon kernels | 6,125,294 | 18.07 | 0.880 | 9,096 | 1.32% | n/a | n/a | n/a | 3.22 |
 <!-- results:end -->
 
 ## Comparison

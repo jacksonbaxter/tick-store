@@ -1,0 +1,692 @@
+{
+  "header": {
+    "schema": 1,
+    "host": "macOS",
+    "measurement": "reported",
+    "statement": "Unpinned. No hardware counters. macOS has no thread pinning, and no unprivileged hardware counters.",
+    "cpu_model": "Apple M4 Max",
+    "kernel": "Darwin 27.2.0",
+    "compiler": "Clang 23.1.4",
+    "compile_flags": "-O3 -DNDEBUG -std=c++23",
+    "build_type": "Release",
+    "sanitizers": "none",
+    "isa": "arm64 baseline, neon kernels",
+    "commit": "bcbf8738d892dd89a206bbfb8058ff88ba0b8483",
+    "core": "not-available",
+    "sibling": "not-available",
+    "sibling_busy_percent": "not-available",
+    "second_thread": "not-available",
+    "governor": "not-available",
+    "frequency": "not-available",
+    "turbo": "not-available",
+    "pinning": "not-supported",
+    "counters": "unavailable",
+    "timer": {
+      "source": "mach_absolute_time",
+      "calibrated_against": "CLOCK_MONOTONIC_RAW",
+      "ticks_per_second": 23999999.96,
+      "resolution_ticks": 1,
+      "resolution_ns": 41.666667,
+      "read_cost_ns": 4.446098,
+      "min_publishable_ns": 416.666667,
+      "calibration_window_ns": 200000042.0
+    },
+    "load_lines": [
+      "measure.sh: start load1=3.92 at=2026-11-10T02:42:13Z",
+      "measure.sh: end load1=3.68 exit=0 at=2026-11-10T02:42:18Z",
+      "measure.sh: start load1=3.68 at=2026-11-10T02:42:18Z",
+      "measure.sh: end load1=4.19 exit=0 at=2026-11-10T02:42:23Z",
+      "measure.sh: start load1=3.85 at=2026-11-10T02:42:29Z",
+      "measure.sh: end load1=3.85 exit=0 at=2026-11-10T02:42:32Z",
+      "measure.sh: start load1=3.85 at=2026-11-10T02:42:32Z",
+      "measure.sh: end load1=3.41 exit=0 at=2026-11-10T02:42:39Z",
+      "measure.sh: start load1=3.41 at=2026-11-10T02:42:39Z",
+      "measure.sh: end load1=3.22 exit=0 at=2026-11-10T02:42:43Z",
+      "measure.sh: start load1=3.22 at=2026-11-10T02:42:43Z",
+      "measure.sh: end load1=3.22 exit=0 at=2026-11-10T02:42:47Z"
+    ],
+    "peak_rss_bytes": 1783332864
+  },
+  "benchmark": "column_decode",
+  "input": {
+    "kind": "column",
+    "items": "values",
+    "slice": "12302019-open",
+    "sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+    "messages": 6125294,
+    "bytes": 206138339,
+    "seed": "the input is a pinned file, and its columns are built from it whole"
+  },
+  "results": [
+    {
+      "case": "gorilla_xor/add_price",
+      "host": "macOS",
+      "isa": "arm64 baseline, neon kernels",
+      "timer": {
+        "source": "mach_absolute_time",
+        "calibrated_against": "CLOCK_MONOTONIC_RAW",
+        "ticks_per_second": 23999999.96,
+        "resolution_ticks": 1,
+        "resolution_ns": 41.666667,
+        "read_cost_ns": 4.446098,
+        "min_publishable_ns": 416.666667,
+        "calibration_window_ns": 200000042.0
+      },
+      "timer_end_ticks_per_second": 24000000.0,
+      "warmup": {
+        "passes_per_repetition": 2,
+        "first_repetition_pass_ms": [
+          26.210833,
+          26.447583
+        ]
+      },
+      "verification": {
+        "messages": 6125294,
+        "bytes": 206138339,
+        "input_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "reencoded_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "column": "add_price",
+        "encoding": "Gorilla XOR on price / 10^4 as a double, blocks of 4,096, one stream",
+        "values": 3153991,
+        "encoded_bytes": 14658242,
+        "items_per_call": 3153991,
+        "calls_per_pass": 1,
+        "against": "the column's own values, bit for bit, before timing and after the timed passes",
+        "matched": true
+      },
+      "throughput": {
+        "repetitions": 10,
+        "pass_ms_median": 26.471145974937826,
+        "values_per_second": {
+          "median": 119148489.50884292,
+          "mean": 118690641.14143729,
+          "stddev": 2765991.2417994225,
+          "cv": 0.02330420676136831
+        },
+        "bytes_per_second_median": 953187916.0707433
+      },
+      "counters": {
+        "cycles": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        },
+        "instructions": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        },
+        "branch_misses": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        },
+        "cache_misses": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        }
+      },
+      "ratio": {
+        "value": 1.721347484916677,
+        "source_bytes": 25231928,
+        "output_bytes": 14658242,
+        "bits_per_value": 37.18017457881142,
+        "note": "the column's values as 8-byte words over its encoded bytes"
+      },
+      "latency": {
+        "unit": "ns per batch",
+        "batch_items": 3153991,
+        "batches": 10,
+        "timer_resolution_ns": 41.666667,
+        "min_publishable_ns": 416.666667,
+        "significant_figures": 3,
+        "min_ns": 26389333.377316,
+        "max_ns": 27647958.379413,
+        "percentiles": [
+          {
+            "percentile": 50.0,
+            "value_ns": 26645291.711075
+          },
+          {
+            "percentile": 90.0,
+            "value_ns": 27071958.378453
+          },
+          {
+            "percentile": 99.0,
+            "value_ns": 27647958.379413
+          },
+          {
+            "percentile": 99.9,
+            "value_ns": 27647958.379413
+          },
+          {
+            "percentile": 99.99,
+            "value_ns": 27647958.379413
+          }
+        ]
+      }
+    },
+    {
+      "case": "gorilla_xor_l1/add_price",
+      "host": "macOS",
+      "isa": "arm64 baseline, neon kernels",
+      "timer": {
+        "source": "mach_absolute_time",
+        "calibrated_against": "CLOCK_MONOTONIC_RAW",
+        "ticks_per_second": 24000000.04,
+        "resolution_ticks": 1,
+        "resolution_ns": 41.666667,
+        "read_cost_ns": 4.431474,
+        "min_publishable_ns": 416.666666,
+        "calibration_window_ns": 200000333.0
+      },
+      "timer_end_ticks_per_second": 24000000.08,
+      "warmup": {
+        "passes_per_repetition": 2,
+        "first_repetition_pass_ms": [
+          38.784292,
+          39.057833
+        ]
+      },
+      "verification": {
+        "messages": 6125294,
+        "bytes": 206138339,
+        "input_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "reencoded_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "column": "add_price",
+        "encoding": "Gorilla XOR on price / 10^4 as a double, 3 vectors of 1,024 evenly spaced through the column, one block each, 12801 encoded bytes in all, decoded in turn",
+        "values": 3072,
+        "encoded_bytes": 12801,
+        "items_per_call": 1024,
+        "calls_per_pass": 8192,
+        "against": "the column's own values, bit for bit, before timing and after the timed passes",
+        "matched": true
+      },
+      "throughput": {
+        "repetitions": 10,
+        "pass_ms_median": 38.99741655914113,
+        "values_per_second": {
+          "median": 215106879.18833923,
+          "mean": 212502055.7301605,
+          "stddev": 5954443.016523227,
+          "cv": 0.02802063724072534
+        },
+        "bytes_per_second_median": 1720855033.5067139
+      },
+      "counters": {
+        "cycles": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        },
+        "instructions": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        },
+        "branch_misses": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        },
+        "cache_misses": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        }
+      },
+      "ratio": {
+        "value": 1.9198500117178345,
+        "source_bytes": 24576,
+        "output_bytes": 12801,
+        "bits_per_value": 33.3359375,
+        "note": "the column's values as 8-byte words over its encoded bytes"
+      },
+      "latency": {
+        "unit": "ns per batch",
+        "batch_items": 16384,
+        "batches": 5120,
+        "timer_resolution_ns": 41.666667,
+        "min_publishable_ns": 416.666666,
+        "significant_figures": 3,
+        "min_ns": 69208.333218,
+        "max_ns": 95208.333175,
+        "percentiles": [
+          {
+            "percentile": 50.0,
+            "value_ns": 76666.666539
+          },
+          {
+            "percentile": 90.0,
+            "value_ns": 78583.333202
+          },
+          {
+            "percentile": 99.0,
+            "value_ns": 88374.999853
+          },
+          {
+            "percentile": 99.9,
+            "value_ns": 92374.999846
+          },
+          {
+            "percentile": 99.99,
+            "value_ns": 93458.333178
+          }
+        ]
+      }
+    },
+    {
+      "case": "store_decode/add_price",
+      "host": "macOS",
+      "isa": "arm64 baseline, neon kernels",
+      "timer": {
+        "source": "mach_absolute_time",
+        "calibrated_against": "CLOCK_MONOTONIC_RAW",
+        "ticks_per_second": 24000000.0,
+        "resolution_ticks": 1,
+        "resolution_ns": 41.666667,
+        "read_cost_ns": 4.43211,
+        "min_publishable_ns": 416.666667,
+        "calibration_window_ns": 200000000.0
+      },
+      "timer_end_ticks_per_second": 24000000.0,
+      "warmup": {
+        "passes_per_repetition": 2,
+        "first_repetition_pass_ms": [
+          6.990542,
+          6.7835
+        ]
+      },
+      "verification": {
+        "messages": 6125294,
+        "bytes": 206138339,
+        "input_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "reencoded_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "column": "add_price",
+        "encoding": "the store's add_price chunks from encode_column, PFOR delta with an adaptive scale, zstd where smaller, decoded by decode_column piece by piece",
+        "values": 3153991,
+        "encoded_bytes": 2482969,
+        "items_per_call": 3153991,
+        "calls_per_pass": 1,
+        "against": "the column's own values, bit for bit, before timing and after the timed passes",
+        "matched": true
+      },
+      "throughput": {
+        "repetitions": 10,
+        "pass_ms_median": 6.867187505122274,
+        "values_per_second": {
+          "median": 459284623.7830382,
+          "mean": 460218770.86623573,
+          "stddev": 3957868.441319281,
+          "cv": 0.008599971778355928
+        },
+        "bytes_per_second_median": 3674276990.2643056
+      },
+      "counters": {
+        "cycles": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        },
+        "instructions": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        },
+        "branch_misses": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        },
+        "cache_misses": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        }
+      },
+      "ratio": {
+        "value": 10.161998800629409,
+        "source_bytes": 25231928,
+        "output_bytes": 2482969,
+        "bits_per_value": 6.297973583310796,
+        "note": "the column's values as 8-byte words over its encoded bytes"
+      },
+      "latency": {
+        "unit": "ns per batch",
+        "batch_items": 3153991,
+        "batches": 10,
+        "timer_resolution_ns": 41.666667,
+        "min_publishable_ns": 416.666667,
+        "significant_figures": 3,
+        "min_ns": 6773333.333333,
+        "max_ns": 6991958.333333,
+        "percentiles": [
+          {
+            "percentile": 50.0,
+            "value_ns": 6901291.666667
+          },
+          {
+            "percentile": 90.0,
+            "value_ns": 6981291.666667
+          },
+          {
+            "percentile": 99.0,
+            "value_ns": 6991958.333333
+          },
+          {
+            "percentile": 99.9,
+            "value_ns": 6991958.333333
+          },
+          {
+            "percentile": 99.99,
+            "value_ns": 6991958.333333
+          }
+        ]
+      }
+    },
+    {
+      "case": "gorilla_dod/timestamp",
+      "host": "macOS",
+      "isa": "arm64 baseline, neon kernels",
+      "timer": {
+        "source": "mach_absolute_time",
+        "calibrated_against": "CLOCK_MONOTONIC_RAW",
+        "ticks_per_second": 24000000.04,
+        "resolution_ticks": 1,
+        "resolution_ns": 41.666667,
+        "read_cost_ns": 4.43211,
+        "min_publishable_ns": 416.666666,
+        "calibration_window_ns": 200000208.0
+      },
+      "timer_end_ticks_per_second": 24000000.04,
+      "warmup": {
+        "passes_per_repetition": 2,
+        "first_repetition_pass_ms": [
+          59.809125,
+          59.012625
+        ]
+      },
+      "verification": {
+        "messages": 6125294,
+        "bytes": 206138339,
+        "input_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "reencoded_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "column": "timestamp",
+        "encoding": "Gorilla delta-of-delta, buckets 16, 19 and 23 bits, blocks of 4,096",
+        "values": 6125294,
+        "encoded_bytes": 12974934,
+        "items_per_call": 6125294,
+        "calls_per_pass": 1,
+        "against": "the column's own values, bit for bit, before timing and after the timed passes",
+        "matched": true
+      },
+      "throughput": {
+        "repetitions": 10,
+        "pass_ms_median": 59.10997948376462,
+        "values_per_second": {
+          "median": 103625387.74013095,
+          "mean": 103155705.04958433,
+          "stddev": 1717327.5866997538,
+          "cv": 0.016647916718462424
+        },
+        "bytes_per_second_median": 829003101.9210476
+      },
+      "counters": {
+        "cycles": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        },
+        "instructions": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        },
+        "branch_misses": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        },
+        "cache_misses": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        }
+      },
+      "ratio": {
+        "value": 3.776693738866032,
+        "source_bytes": 49002352,
+        "output_bytes": 12974934,
+        "bits_per_value": 16.946039161548818,
+        "note": "the column's values as 8-byte words over its encoded bytes"
+      },
+      "latency": {
+        "unit": "ns per batch",
+        "batch_items": 6125294,
+        "batches": 10,
+        "timer_resolution_ns": 41.666667,
+        "min_publishable_ns": 416.666666,
+        "significant_figures": 3,
+        "min_ns": 58709333.235485,
+        "max_ns": 59605291.567325,
+        "percentiles": [
+          {
+            "percentile": 50.0,
+            "value_ns": 58922624.901796
+          },
+          {
+            "percentile": 90.0,
+            "value_ns": 59178624.901369
+          },
+          {
+            "percentile": 99.0,
+            "value_ns": 59605291.567325
+          },
+          {
+            "percentile": 99.9,
+            "value_ns": 59605291.567325
+          },
+          {
+            "percentile": 99.99,
+            "value_ns": 59605291.567325
+          }
+        ]
+      }
+    },
+    {
+      "case": "pfor_delta/timestamp",
+      "host": "macOS",
+      "isa": "arm64 baseline, neon kernels",
+      "timer": {
+        "source": "mach_absolute_time",
+        "calibrated_against": "CLOCK_MONOTONIC_RAW",
+        "ticks_per_second": 24000000.08,
+        "resolution_ticks": 1,
+        "resolution_ns": 41.666667,
+        "read_cost_ns": 4.446097,
+        "min_publishable_ns": 416.666665,
+        "calibration_window_ns": 200000666.0
+      },
+      "timer_end_ticks_per_second": 24000000.0,
+      "warmup": {
+        "passes_per_repetition": 2,
+        "first_repetition_pass_ms": [
+          4.640875,
+          3.605292
+        ]
+      },
+      "verification": {
+        "messages": 6125294,
+        "bytes": 206138339,
+        "input_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "reencoded_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "column": "timestamp",
+        "encoding": "PFOR delta, patched, no scale, blocks of 4,096, the store's pfor_delta options",
+        "values": 6125294,
+        "encoded_bytes": 12878043,
+        "items_per_call": 6125294,
+        "calls_per_pass": 1,
+        "against": "the column's own values, bit for bit, before timing and after the timed passes",
+        "matched": true
+      },
+      "throughput": {
+        "repetitions": 10,
+        "pass_ms_median": 3.6805830313824117,
+        "values_per_second": {
+          "median": 1664218932.0494418,
+          "mean": 1657930091.2337718,
+          "stddev": 24256200.46810153,
+          "cv": 0.014630412100217653
+        },
+        "bytes_per_second_median": 13313751456.395535
+      },
+      "counters": {
+        "cycles": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        },
+        "instructions": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        },
+        "branch_misses": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        },
+        "cache_misses": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        }
+      },
+      "ratio": {
+        "value": 3.805108586762756,
+        "source_bytes": 49002352,
+        "output_bytes": 12878043,
+        "bits_per_value": 16.819493725525664,
+        "note": "the column's values as 8-byte words over its encoded bytes"
+      },
+      "latency": {
+        "unit": "ns per batch",
+        "batch_items": 6125294,
+        "batches": 10,
+        "timer_resolution_ns": 41.666667,
+        "min_publishable_ns": 416.666665,
+        "significant_figures": 3,
+        "min_ns": 3621333.321262,
+        "max_ns": 3791958.320694,
+        "percentiles": [
+          {
+            "percentile": 50.0,
+            "value_ns": 3671958.321094
+          },
+          {
+            "percentile": 90.0,
+            "value_ns": 3701291.654329
+          },
+          {
+            "percentile": 99.0,
+            "value_ns": 3791958.320694
+          },
+          {
+            "percentile": 99.9,
+            "value_ns": 3791958.320694
+          },
+          {
+            "percentile": 99.99,
+            "value_ns": 3791958.320694
+          }
+        ]
+      }
+    },
+    {
+      "case": "pfor_dod/timestamp",
+      "host": "macOS",
+      "isa": "arm64 baseline, neon kernels",
+      "timer": {
+        "source": "mach_absolute_time",
+        "calibrated_against": "CLOCK_MONOTONIC_RAW",
+        "ticks_per_second": 23999999.92,
+        "resolution_ticks": 1,
+        "resolution_ns": 41.666667,
+        "read_cost_ns": 4.431474,
+        "min_publishable_ns": 416.666668,
+        "calibration_window_ns": 200000209.0
+      },
+      "timer_end_ticks_per_second": 24000000.0,
+      "warmup": {
+        "passes_per_repetition": 2,
+        "first_repetition_pass_ms": [
+          5.878208,
+          5.234667
+        ]
+      },
+      "verification": {
+        "messages": 6125294,
+        "bytes": 206138339,
+        "input_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "reencoded_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "column": "timestamp",
+        "encoding": "PFOR delta-of-delta, patched, no scale, blocks of 4,096",
+        "values": 6125294,
+        "encoded_bytes": 13831749,
+        "items_per_call": 6125294,
+        "calls_per_pass": 1,
+        "against": "the column's own values, bit for bit, before timing and after the timed passes",
+        "matched": true
+      },
+      "throughput": {
+        "repetitions": 10,
+        "pass_ms_median": 5.3872084827162325,
+        "values_per_second": {
+          "median": 1137007045.693552,
+          "mean": 1142250424.8235652,
+          "stddev": 15051971.151188582,
+          "cv": 0.013177470390097291
+        },
+        "bytes_per_second_median": 9096056365.548416
+      },
+      "counters": {
+        "cycles": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        },
+        "instructions": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        },
+        "branch_misses": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        },
+        "cache_misses": {
+          "status": "unavailable",
+          "reason": "macOS has no unprivileged hardware counters"
+        }
+      },
+      "ratio": {
+        "value": 3.5427444497438465,
+        "source_bytes": 49002352,
+        "output_bytes": 13831749,
+        "bits_per_value": 18.065090753194866,
+        "note": "the column's values as 8-byte words over its encoded bytes"
+      },
+      "latency": {
+        "unit": "ns per batch",
+        "batch_items": 6125294,
+        "batches": 10,
+        "timer_resolution_ns": 41.666667,
+        "min_publishable_ns": 416.666668,
+        "significant_figures": 3,
+        "min_ns": 5205333.350684,
+        "max_ns": 5471958.351573,
+        "percentiles": [
+          {
+            "percentile": 50.0,
+            "value_ns": 5410625.018035
+          },
+          {
+            "percentile": 90.0,
+            "value_ns": 5429291.684764
+          },
+          {
+            "percentile": 99.0,
+            "value_ns": 5471958.351573
+          },
+          {
+            "percentile": 99.9,
+            "value_ns": 5471958.351573
+          },
+          {
+            "percentile": 99.99,
+            "value_ns": 5471958.351573
+          }
+        ]
+      }
+    }
+  ]
+}

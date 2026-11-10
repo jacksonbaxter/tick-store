@@ -1,0 +1,789 @@
+{
+  "header": {
+    "schema": 1,
+    "host": "Linux",
+    "measurement": "reported",
+    "statement": "Pinned with taskset -c 4 and verified by sched_getcpu. Counters come from perf stat user-mode events. perf cycles and timer ticks are different units.",
+    "cpu_model": "AMD Ryzen Embedded V1605B with Radeon Vega Gfx",
+    "kernel": "Linux 6.12.116+deb13-amd64",
+    "compiler": "Clang 23.1.4",
+    "compile_flags": "-O3 -DNDEBUG -std=c++23",
+    "build_type": "Release",
+    "sanitizers": "none",
+    "isa": "x86-64 baseline, avx2 kernels",
+    "commit": "bcbf8738d892dd89a206bbfb8058ff88ba0b8483",
+    "core": 4,
+    "sibling": "cpu5 idle as stated, not enforced: see sibling_busy_percent",
+    "sibling_busy_percent": {
+      "core": 4,
+      "sibling": 5,
+      "topology": "thread_siblings_list",
+      "method": "Busy jiffies over total jiffies from the kernel's proc stat file, read once the measurement lock is held and again when the wrapper exits. Busy is everything but idle and iowait, and a wait for the lock is not in the window.",
+      "cases": {
+        "gorilla_xor/add_price": 1.1185682326621924,
+        "gorilla_xor_l1/add_price": 1.0416666666666667,
+        "store_decode/add_price": 0.46153846153846156,
+        "gorilla_dod/timestamp": 0.3776435045317221,
+        "pfor_delta/timestamp": 0.8103727714748784,
+        "pfor_dod/timestamp": 0.3225806451612903
+      }
+    },
+    "second_thread": "cpu6 reserved, unused: every case is single-threaded",
+    "governor": "performance",
+    "frequency": {
+      "snapshot_khz": [
+        2794686,
+        1609898,
+        2783858,
+        3162884,
+        2000000,
+        3208038,
+        1766418,
+        2424888,
+        2793251,
+        3190913,
+        1901409,
+        3358148
+      ],
+      "effective_mhz": {
+        "gorilla_xor/add_price": 3565.819069485089,
+        "gorilla_xor_l1/add_price": 3564.9726918724973,
+        "store_decode/add_price": 3564.8251096635304,
+        "gorilla_dod/timestamp": 3576.641497724619,
+        "pfor_delta/timestamp": 3561.933804146803,
+        "pfor_dod/timestamp": 3568.4187723566924
+      },
+      "note": "snapshot_khz is scaling_cur_freq at each load line. effective_mhz is user-mode cycles over the wall time of the timed passes."
+    },
+    "turbo": "enabled",
+    "pinning": "pinned",
+    "counters": "perf stat, :u events",
+    "timer": {
+      "source": "rdtscp+lfence",
+      "calibrated_against": "CLOCK_MONOTONIC_RAW",
+      "ticks_per_second": 1997959741.591402,
+      "resolution_ticks": 20,
+      "resolution_ns": 10.010212,
+      "read_cost_ns": 25.234409,
+      "min_publishable_ns": 126.172047,
+      "calibration_window_ns": 200000156.0
+    },
+    "load_lines": [
+      "measure.sh: start load1=1.49 at=2026-11-10T02:29:22Z cpus=4 governor=performance freq_khz=cpu4:2794686 perf_event_paranoid=2",
+      "measure.sh: end load1=1.41 exit=0 at=2026-11-10T02:29:31Z cpus=4 governor=performance freq_khz=cpu4:1609898 perf_event_paranoid=2",
+      "measure.sh: start load1=1.41 at=2026-11-10T02:29:32Z cpus=4 governor=performance freq_khz=cpu4:2783858 perf_event_paranoid=2",
+      "measure.sh: end load1=1.32 exit=0 at=2026-11-10T02:29:45Z cpus=4 governor=performance freq_khz=cpu4:3162884 perf_event_paranoid=2",
+      "measure.sh: start load1=1.32 at=2026-11-10T02:29:46Z cpus=4 governor=performance freq_khz=cpu4:2000000 perf_event_paranoid=2",
+      "measure.sh: end load1=1.29 exit=0 at=2026-11-10T02:29:52Z cpus=4 governor=performance freq_khz=cpu4:3208038 perf_event_paranoid=2",
+      "measure.sh: start load1=1.29 at=2026-11-10T02:29:52Z cpus=4 governor=performance freq_khz=cpu4:1766418 perf_event_paranoid=2",
+      "measure.sh: end load1=1.30 exit=0 at=2026-11-10T02:30:06Z cpus=4 governor=performance freq_khz=cpu4:2424888 perf_event_paranoid=2",
+      "measure.sh: start load1=1.30 at=2026-11-10T02:30:06Z cpus=4 governor=performance freq_khz=cpu4:2793251 perf_event_paranoid=2",
+      "measure.sh: end load1=1.27 exit=0 at=2026-11-10T02:30:12Z cpus=4 governor=performance freq_khz=cpu4:3190913 perf_event_paranoid=2",
+      "measure.sh: start load1=1.27 at=2026-11-10T02:30:13Z cpus=4 governor=performance freq_khz=cpu4:1901409 perf_event_paranoid=2",
+      "measure.sh: end load1=1.25 exit=0 at=2026-11-10T02:30:19Z cpus=4 governor=performance freq_khz=cpu4:3358148 perf_event_paranoid=2"
+    ],
+    "peak_rss_bytes": 1409826816
+  },
+  "benchmark": "column_decode",
+  "input": {
+    "kind": "column",
+    "items": "values",
+    "slice": "12302019-open",
+    "sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+    "messages": 6125294,
+    "bytes": 206138339,
+    "seed": "the input is a pinned file, and its columns are built from it whole"
+  },
+  "results": [
+    {
+      "case": "gorilla_xor/add_price",
+      "host": "Linux",
+      "isa": "x86-64 baseline, avx2 kernels",
+      "timer": {
+        "source": "rdtscp+lfence",
+        "calibrated_against": "CLOCK_MONOTONIC_RAW",
+        "ticks_per_second": 1997959741.591402,
+        "resolution_ticks": 20,
+        "resolution_ns": 10.010212,
+        "read_cost_ns": 25.234409,
+        "min_publishable_ns": 126.172047,
+        "calibration_window_ns": 200000156.0
+      },
+      "timer_end_ticks_per_second": 1997959791.642368,
+      "warmup": {
+        "passes_per_repetition": 2,
+        "first_repetition_pass_ms": [
+          64.486074,
+          65.083574
+        ]
+      },
+      "verification": {
+        "messages": 6125294,
+        "bytes": 206138339,
+        "input_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "reencoded_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "column": "add_price",
+        "encoding": "Gorilla XOR on price / 10^4 as a double, blocks of 4,096, one stream",
+        "values": 3153991,
+        "encoded_bytes": 14658242,
+        "items_per_call": 3153991,
+        "calls_per_pass": 1,
+        "against": "the column's own values, bit for bit, before timing and after the timed passes",
+        "matched": true
+      },
+      "throughput": {
+        "repetitions": 10,
+        "pass_ms_median": 64.8405574975186,
+        "values_per_second": {
+          "median": 48642256.76530564,
+          "mean": 48538763.2922516,
+          "stddev": 252436.513035126,
+          "cv": 0.005200719917712103
+        },
+        "bytes_per_second_median": 389138054.1224451
+      },
+      "counters": {
+        "cycles": {
+          "value": 2313515762,
+          "unit": "core cycles, user mode",
+          "coverage_percent": 100.0
+        },
+        "instructions": {
+          "value": 6879036612,
+          "unit": "instructions, user mode",
+          "coverage_percent": 100.0
+        },
+        "branch_misses": {
+          "value": 12333699,
+          "unit": "mispredicted branches, user mode",
+          "coverage_percent": 100.0
+        },
+        "cache_misses": {
+          "status": "unavailable",
+          "reason": "not collected until what the event counts on Zen 1 is confirmed"
+        },
+        "scope": "timed throughput passes only, gated by perf's control FIFOs",
+        "gated_values": 31539910,
+        "per_value": {
+          "cycles": 73.35200899431862,
+          "instructions": 218.10577810780057,
+          "branch_misses": 0.3910505451664256
+        }
+      },
+      "ratio": {
+        "value": 1.721347484916677,
+        "source_bytes": 25231928,
+        "output_bytes": 14658242,
+        "bits_per_value": 37.18017457881142,
+        "note": "the column's values as 8-byte words over its encoded bytes"
+      },
+      "latency": {
+        "unit": "ns per batch",
+        "batch_items": 3153991,
+        "batches": 10,
+        "timer_resolution_ns": 10.010212,
+        "min_publishable_ns": 126.172047,
+        "significant_figures": 3,
+        "min_ns": 64946894.223526,
+        "max_ns": 70916759.757703,
+        "percentiles": [
+          {
+            "percentile": 50.0,
+            "value_ns": 65930937.574887
+          },
+          {
+            "percentile": 90.0,
+            "value_ns": 66783775.579842
+          },
+          {
+            "percentile": 99.0,
+            "value_ns": 70916759.757703
+          },
+          {
+            "percentile": 99.9,
+            "value_ns": 70916759.757703
+          },
+          {
+            "percentile": 99.99,
+            "value_ns": 70916759.757703
+          }
+        ]
+      }
+    },
+    {
+      "case": "gorilla_xor_l1/add_price",
+      "host": "Linux",
+      "isa": "x86-64 baseline, avx2 kernels",
+      "timer": {
+        "source": "rdtscp+lfence",
+        "calibrated_against": "CLOCK_MONOTONIC_RAW",
+        "ticks_per_second": 1997959841.489316,
+        "resolution_ticks": 20,
+        "resolution_ns": 10.010211,
+        "read_cost_ns": 25.234255,
+        "min_publishable_ns": 126.171277,
+        "calibration_window_ns": 200000146.0
+      },
+      "timer_end_ticks_per_second": 1997959891.744292,
+      "warmup": {
+        "passes_per_repetition": 2,
+        "first_repetition_pass_ms": [
+          146.280047,
+          142.613607
+        ]
+      },
+      "verification": {
+        "messages": 6125294,
+        "bytes": 206138339,
+        "input_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "reencoded_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "column": "add_price",
+        "encoding": "Gorilla XOR on price / 10^4 as a double, 3 vectors of 1,024 evenly spaced through the column, one block each, 12801 encoded bytes in all, decoded in turn",
+        "values": 3072,
+        "encoded_bytes": 12801,
+        "items_per_call": 1024,
+        "calls_per_pass": 8192,
+        "against": "the column's own values, bit for bit, before timing and after the timed passes",
+        "matched": true
+      },
+      "throughput": {
+        "repetitions": 10,
+        "pass_ms_median": 143.56921400030842,
+        "values_per_second": {
+          "median": 58429031.91730887,
+          "mean": 58438253.34433901,
+          "stddev": 290160.99896532536,
+          "cv": 0.004965257898034587
+        },
+        "bytes_per_second_median": 467432255.33847094
+      },
+      "counters": {
+        "cycles": {
+          "value": 5109901822,
+          "unit": "core cycles, user mode",
+          "coverage_percent": 100.0
+        },
+        "instructions": {
+          "value": 16642820896,
+          "unit": "instructions, user mode",
+          "coverage_percent": 100.0
+        },
+        "branch_misses": {
+          "value": 35143191,
+          "unit": "mispredicted branches, user mode",
+          "coverage_percent": 100.0
+        },
+        "cache_misses": {
+          "status": "unavailable",
+          "reason": "not collected until what the event counts on Zen 1 is confirmed"
+        },
+        "scope": "timed throughput passes only, gated by perf's control FIFOs",
+        "gated_values": 83886080,
+        "per_value": {
+          "cycles": 60.914776587486266,
+          "instructions": 198.39788551330565,
+          "branch_misses": 0.418939483165741
+        }
+      },
+      "ratio": {
+        "value": 1.9198500117178345,
+        "source_bytes": 24576,
+        "output_bytes": 12801,
+        "bits_per_value": 33.3359375,
+        "note": "the column's values as 8-byte words over its encoded bytes"
+      },
+      "latency": {
+        "unit": "ns per batch",
+        "batch_items": 16384,
+        "batches": 5120,
+        "timer_resolution_ns": 10.010211,
+        "min_publishable_ns": 126.171277,
+        "significant_figures": 3,
+        "min_ns": 276249.796687,
+        "max_ns": 544298.727841,
+        "percentiles": [
+          {
+            "percentile": 50.0,
+            "value_ns": 277786.864618
+          },
+          {
+            "percentile": 90.0,
+            "value_ns": 303413.005313
+          },
+          {
+            "percentile": 99.0,
+            "value_ns": 394129.543371
+          },
+          {
+            "percentile": 99.9,
+            "value_ns": 480489.637512
+          },
+          {
+            "percentile": 99.99,
+            "value_ns": 515341.188856
+          }
+        ]
+      }
+    },
+    {
+      "case": "store_decode/add_price",
+      "host": "Linux",
+      "isa": "x86-64 baseline, avx2 kernels",
+      "timer": {
+        "source": "rdtscp+lfence",
+        "calibrated_against": "CLOCK_MONOTONIC_RAW",
+        "ticks_per_second": 1997959740.877311,
+        "resolution_ticks": 20,
+        "resolution_ns": 10.010212,
+        "read_cost_ns": 25.234562,
+        "min_publishable_ns": 126.172811,
+        "calibration_window_ns": 200000086.0
+      },
+      "timer_end_ticks_per_second": 1997959791.744378,
+      "warmup": {
+        "passes_per_repetition": 2,
+        "first_repetition_pass_ms": [
+          19.580034,
+          19.637032
+        ]
+      },
+      "verification": {
+        "messages": 6125294,
+        "bytes": 206138339,
+        "input_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "reencoded_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "column": "add_price",
+        "encoding": "the store's add_price chunks from encode_column, PFOR delta with an adaptive scale, zstd where smaller, decoded by decode_column piece by piece",
+        "values": 3153991,
+        "encoded_bytes": 2482969,
+        "items_per_call": 3153991,
+        "calls_per_pass": 1,
+        "against": "the column's own values, bit for bit, before timing and after the timed passes",
+        "matched": true
+      },
+      "throughput": {
+        "repetitions": 10,
+        "pass_ms_median": 19.717227998626186,
+        "values_per_second": {
+          "median": 159961392.6552278,
+          "mean": 159588618.5150581,
+          "stddev": 1047861.3064417341,
+          "cv": 0.006566015272216059
+        },
+        "bytes_per_second_median": 1279691141.2418225
+      },
+      "counters": {
+        "cycles": {
+          "value": 703939038,
+          "unit": "core cycles, user mode",
+          "coverage_percent": 100.0
+        },
+        "instructions": {
+          "value": 1482430763,
+          "unit": "instructions, user mode",
+          "coverage_percent": 100.0
+        },
+        "branch_misses": {
+          "value": 1614987,
+          "unit": "mispredicted branches, user mode",
+          "coverage_percent": 100.0
+        },
+        "cache_misses": {
+          "status": "unavailable",
+          "reason": "not collected until what the event counts on Zen 1 is confirmed"
+        },
+        "scope": "timed throughput passes only, gated by perf's control FIFOs",
+        "gated_values": 31539910,
+        "per_value": {
+          "cycles": 22.318993237456922,
+          "instructions": 47.00174360040977,
+          "branch_misses": 0.051204553215275506
+        }
+      },
+      "ratio": {
+        "value": 10.161998800629409,
+        "source_bytes": 25231928,
+        "output_bytes": 2482969,
+        "bits_per_value": 6.297973583310796,
+        "note": "the column's values as 8-byte words over its encoded bytes"
+      },
+      "latency": {
+        "unit": "ns per batch",
+        "batch_items": 3153991,
+        "batches": 10,
+        "timer_resolution_ns": 10.010212,
+        "min_publishable_ns": 126.172811,
+        "significant_figures": 3,
+        "min_ns": 19648075.582725,
+        "max_ns": 20304104.31703,
+        "percentiles": [
+          {
+            "percentile": 50.0,
+            "value_ns": 19746479.467437
+          },
+          {
+            "percentile": 90.0,
+            "value_ns": 20238501.393549
+          },
+          {
+            "percentile": 99.0,
+            "value_ns": 20304104.31703
+          },
+          {
+            "percentile": 99.9,
+            "value_ns": 20304104.31703
+          },
+          {
+            "percentile": 99.99,
+            "value_ns": 20304104.31703
+          }
+        ]
+      }
+    },
+    {
+      "case": "gorilla_dod/timestamp",
+      "host": "Linux",
+      "isa": "x86-64 baseline, avx2 kernels",
+      "timer": {
+        "source": "rdtscp+lfence",
+        "calibrated_against": "CLOCK_MONOTONIC_RAW",
+        "ticks_per_second": 1997959741.693414,
+        "resolution_ticks": 20,
+        "resolution_ns": 10.010212,
+        "read_cost_ns": 25.234104,
+        "min_publishable_ns": 126.17052,
+        "calibration_window_ns": 200000166.0
+      },
+      "timer_end_ticks_per_second": 1997959690.928341,
+      "warmup": {
+        "passes_per_repetition": 2,
+        "first_repetition_pass_ms": [
+          136.258942,
+          135.714176
+        ]
+      },
+      "verification": {
+        "messages": 6125294,
+        "bytes": 206138339,
+        "input_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "reencoded_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "column": "timestamp",
+        "encoding": "Gorilla delta-of-delta, buckets 16, 19 and 23 bits, blocks of 4,096",
+        "values": 6125294,
+        "encoded_bytes": 12974934,
+        "items_per_call": 6125294,
+        "calls_per_pass": 1,
+        "against": "the column's own values, bit for bit, before timing and after the timed passes",
+        "matched": true
+      },
+      "throughput": {
+        "repetitions": 10,
+        "pass_ms_median": 136.00434700128972,
+        "values_per_second": {
+          "median": 45037486.9473865,
+          "mean": 44916192.02908619,
+          "stddev": 284784.3781681346,
+          "cv": 0.006340350000813025
+        },
+        "bytes_per_second_median": 360299895.579092
+      },
+      "counters": {
+        "cycles": {
+          "value": 4871943157,
+          "unit": "core cycles, user mode",
+          "coverage_percent": 100.0
+        },
+        "instructions": {
+          "value": 16794704440,
+          "unit": "instructions, user mode",
+          "coverage_percent": 100.0
+        },
+        "branch_misses": {
+          "value": 24776118,
+          "unit": "mispredicted branches, user mode",
+          "coverage_percent": 100.0
+        },
+        "cache_misses": {
+          "status": "unavailable",
+          "reason": "not collected until what the event counts on Zen 1 is confirmed"
+        },
+        "scope": "timed throughput passes only, gated by perf's control FIFOs",
+        "gated_values": 61252940,
+        "per_value": {
+          "cycles": 79.53811126453685,
+          "instructions": 274.1860952306942,
+          "branch_misses": 0.4044886335251826
+        }
+      },
+      "ratio": {
+        "value": 3.776693738866032,
+        "source_bytes": 49002352,
+        "output_bytes": 12974934,
+        "bits_per_value": 16.946039161548818,
+        "note": "the column's values as 8-byte words over its encoded bytes"
+      },
+      "latency": {
+        "unit": "ns per batch",
+        "batch_items": 6125294,
+        "batches": 10,
+        "timer_resolution_ns": 10.010212,
+        "min_publishable_ns": 126.17052,
+        "significant_figures": 3,
+        "min_ns": 135404434.010619,
+        "max_ns": 138028550.448299,
+        "percentiles": [
+          {
+            "percentile": 50.0,
+            "value_ns": 136191668.591566
+          },
+          {
+            "percentile": 90.0,
+            "value_ns": 136847697.826113
+          },
+          {
+            "percentile": 99.0,
+            "value_ns": 138028550.448299
+          },
+          {
+            "percentile": 99.9,
+            "value_ns": 138028550.448299
+          },
+          {
+            "percentile": 99.99,
+            "value_ns": 138028550.448299
+          }
+        ]
+      }
+    },
+    {
+      "case": "pfor_delta/timestamp",
+      "host": "Linux",
+      "isa": "x86-64 baseline, avx2 kernels",
+      "timer": {
+        "source": "rdtscp+lfence",
+        "calibrated_against": "CLOCK_MONOTONIC_RAW",
+        "ticks_per_second": 1997959741.693414,
+        "resolution_ticks": 20,
+        "resolution_ns": 10.010212,
+        "read_cost_ns": 25.234104,
+        "min_publishable_ns": 126.17052,
+        "calibration_window_ns": 200000166.0
+      },
+      "timer_end_ticks_per_second": 1997959790.724274,
+      "warmup": {
+        "passes_per_repetition": 2,
+        "first_repetition_pass_ms": [
+          17.5664,
+          17.853393
+        ]
+      },
+      "verification": {
+        "messages": 6125294,
+        "bytes": 206138339,
+        "input_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "reencoded_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "column": "timestamp",
+        "encoding": "PFOR delta, patched, no scale, blocks of 4,096, the store's pfor_delta options",
+        "values": 6125294,
+        "encoded_bytes": 12878043,
+        "items_per_call": 6125294,
+        "calls_per_pass": 1,
+        "against": "the column's own values, bit for bit, before timing and after the timed passes",
+        "matched": true
+      },
+      "throughput": {
+        "repetitions": 10,
+        "pass_ms_median": 17.95074149777065,
+        "values_per_second": {
+          "median": 341228286.6560453,
+          "mean": 340623699.9531418,
+          "stddev": 3444238.547201205,
+          "cv": 0.010111564602448435
+        },
+        "bytes_per_second_median": 2729826293.2483625
+      },
+      "counters": {
+        "cycles": {
+          "value": 640209638,
+          "unit": "core cycles, user mode",
+          "coverage_percent": 100.0
+        },
+        "instructions": {
+          "value": 740120899,
+          "unit": "instructions, user mode",
+          "coverage_percent": 100.0
+        },
+        "branch_misses": {
+          "value": 1231362,
+          "unit": "mispredicted branches, user mode",
+          "coverage_percent": 100.0
+        },
+        "cache_misses": {
+          "status": "unavailable",
+          "reason": "not collected until what the event counts on Zen 1 is confirmed"
+        },
+        "scope": "timed throughput passes only, gated by perf's control FIFOs",
+        "gated_values": 61252940,
+        "per_value": {
+          "cycles": 10.451900561834256,
+          "instructions": 12.083026529012322,
+          "branch_misses": 0.02010290444834158
+        }
+      },
+      "ratio": {
+        "value": 3.805108586762756,
+        "source_bytes": 49002352,
+        "output_bytes": 12878043,
+        "bits_per_value": 16.819493725525664,
+        "note": "the column's values as 8-byte words over its encoded bytes"
+      },
+      "latency": {
+        "unit": "ns per batch",
+        "batch_items": 6125294,
+        "batches": 10,
+        "timer_resolution_ns": 10.010212,
+        "min_publishable_ns": 126.17052,
+        "significant_figures": 3,
+        "min_ns": 17712789.332785,
+        "max_ns": 18614829.029777,
+        "percentiles": [
+          {
+            "percentile": 50.0,
+            "value_ns": 17843994.679183
+          },
+          {
+            "percentile": 90.0,
+            "value_ns": 18139207.83473
+          },
+          {
+            "percentile": 99.0,
+            "value_ns": 18614829.029777
+          },
+          {
+            "percentile": 99.9,
+            "value_ns": 18614829.029777
+          },
+          {
+            "percentile": 99.99,
+            "value_ns": 18614829.029777
+          }
+        ]
+      }
+    },
+    {
+      "case": "pfor_dod/timestamp",
+      "host": "Linux",
+      "isa": "x86-64 baseline, avx2 kernels",
+      "timer": {
+        "source": "rdtscp+lfence",
+        "calibrated_against": "CLOCK_MONOTONIC_RAW",
+        "ticks_per_second": 1997959841.489316,
+        "resolution_ticks": 20,
+        "resolution_ns": 10.010211,
+        "read_cost_ns": 25.234255,
+        "min_publishable_ns": 126.171277,
+        "calibration_window_ns": 200000146.0
+      },
+      "timer_end_ticks_per_second": 1997959790.928295,
+      "warmup": {
+        "passes_per_repetition": 2,
+        "first_repetition_pass_ms": [
+          18.260817,
+          19.848917
+        ]
+      },
+      "verification": {
+        "messages": 6125294,
+        "bytes": 206138339,
+        "input_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "reencoded_sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
+        "column": "timestamp",
+        "encoding": "PFOR delta-of-delta, patched, no scale, blocks of 4,096",
+        "values": 6125294,
+        "encoded_bytes": 13831749,
+        "items_per_call": 6125294,
+        "calls_per_pass": 1,
+        "against": "the column's own values, bit for bit, before timing and after the timed passes",
+        "matched": true
+      },
+      "throughput": {
+        "repetitions": 10,
+        "pass_ms_median": 19.297839498904068,
+        "values_per_second": {
+          "median": 317409287.6300662,
+          "mean": 318228769.7197953,
+          "stddev": 4616491.7639745055,
+          "cv": 0.014506833458330586
+        },
+        "bytes_per_second_median": 2539274301.0405297
+      },
+      "counters": {
+        "cycles": {
+          "value": 686611399,
+          "unit": "core cycles, user mode",
+          "coverage_percent": 100.0
+        },
+        "instructions": {
+          "value": 892605751,
+          "unit": "instructions, user mode",
+          "coverage_percent": 100.0
+        },
+        "branch_misses": {
+          "value": 1250736,
+          "unit": "mispredicted branches, user mode",
+          "coverage_percent": 100.0
+        },
+        "cache_misses": {
+          "status": "unavailable",
+          "reason": "not collected until what the event counts on Zen 1 is confirmed"
+        },
+        "scope": "timed throughput passes only, gated by perf's control FIFOs",
+        "gated_values": 61252940,
+        "per_value": {
+          "cycles": 11.20944397117918,
+          "instructions": 14.572455640496603,
+          "branch_misses": 0.02041919947026216
+        }
+      },
+      "ratio": {
+        "value": 3.5427444497438465,
+        "source_bytes": 49002352,
+        "output_bytes": 13831749,
+        "bits_per_value": 18.065090753194866,
+        "note": "the column's values as 8-byte words over its encoded bytes"
+      },
+      "latency": {
+        "unit": "ns per batch",
+        "batch_items": 6125294,
+        "batches": 10,
+        "timer_resolution_ns": 10.010211,
+        "min_publishable_ns": 126.171277,
+        "significant_figures": 3,
+        "min_ns": 19074049.041743,
+        "max_ns": 19549669.712523,
+        "percentiles": [
+          {
+            "percentile": 50.0,
+            "value_ns": 19188853.651544
+          },
+          {
+            "percentile": 90.0,
+            "value_ns": 19287258.031811
+          },
+          {
+            "percentile": 99.0,
+            "value_ns": 19549669.712523
+          },
+          {
+            "percentile": 99.9,
+            "value_ns": 19549669.712523
+          },
+          {
+            "percentile": 99.99,
+            "value_ns": 19549669.712523
+          }
+        ]
+      }
+    }
+  ]
+}
