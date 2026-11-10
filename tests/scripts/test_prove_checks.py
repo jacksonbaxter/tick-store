@@ -129,9 +129,20 @@ class MacosResults(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, "exactly one macOS-.*has 2"):
             prove.macos_results("bench", self.root)
 
+    def test_other_benchmarks_beside_it_do_not_count(self):
+        self.add("macOS-itch_codec-0123456789ab.json")
+        self.add("macOS-simd_kernel-0123456789ab.json")
+        self.add("macOS-column_decode-0123456789ab.json")
+        found = prove.macos_results("bench", self.root, benchmark="itch_codec")
+        self.assertEqual(found.name, "macOS-itch_codec-0123456789ab.json")
+        with self.assertRaisesRegex(SystemExit, "exactly one macOS-\\*.json.*has 3"):
+            prove.macos_results("bench", self.root)
+
     def test_the_committed_tree_has_one_of_each(self):
-        for folder in ("bench", "compare"):
-            self.assertTrue(prove.macos_results(folder, REPO_ROOT).is_file(), folder)
+        bench = prove.BENCH_FAULT_BENCHMARK
+        self.assertTrue(prove.macos_results("bench", REPO_ROOT, bench).is_file())
+        self.assertTrue(prove.linux_results("bench", REPO_ROOT, bench).is_file())
+        self.assertTrue(prove.macos_results("compare", REPO_ROOT).is_file())
 
 
 if __name__ == "__main__":

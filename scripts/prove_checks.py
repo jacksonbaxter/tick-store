@@ -75,23 +75,29 @@ def edit_text(path, old, new):
     target.write_text(text.replace(old, new, 1))
 
 
-def macos_results(folder, root=TREE):
-    """The one macOS results file in results/<folder>, by pattern, so a re-measure cannot
-    strand the faults that edit it."""
-    found = sorted((root / "results" / folder).glob("macOS-*.json"))
+# results/bench holds one file per host and benchmark; the faults that edit one take the ITCH
+# codec benchmark's, which every host has.
+BENCH_FAULT_BENCHMARK = "itch_codec"
+
+
+def host_results(host, folder, root=TREE, benchmark=None):
+    """The one results file of a host in results/<folder>, by pattern, so a re-measure cannot
+    strand the faults that edit it. In a folder of several benchmarks, name the benchmark."""
+    pattern = f"{host}-{benchmark}-*.json" if benchmark else f"{host}-*.json"
+    found = sorted((root / "results" / folder).glob(pattern))
     if len(found) != 1:
-        raise SystemExit(f"prove_checks: results/{folder} needs exactly one macOS-*.json, "
+        raise SystemExit(f"prove_checks: results/{folder} needs exactly one {pattern}, "
                          f"and has {len(found)}: {[path.name for path in found]}")
     return found[0]
 
 
-def linux_results(folder, root=TREE):
-    """The one Linux results file in results/<folder>, from the pinned host."""
-    found = sorted((root / "results" / folder).glob("Linux-*.json"))
-    if len(found) != 1:
-        raise SystemExit(f"prove_checks: results/{folder} needs exactly one Linux-*.json, "
-                         f"and has {len(found)}: {[path.name for path in found]}")
-    return found[0]
+def macos_results(folder, root=TREE, benchmark=None):
+    return host_results("macOS", folder, root, benchmark)
+
+
+def linux_results(folder, root=TREE, benchmark=None):
+    """From the pinned host."""
+    return host_results("Linux", folder, root, benchmark)
 
 
 def add_file(path, content):
@@ -102,23 +108,23 @@ def add_file(path, content):
 
 
 def drop_load_lines():
-    edit_json(macos_results("bench"), lambda d: d["header"].update(load_lines=[]))
+    edit_json(macos_results("bench", benchmark=BENCH_FAULT_BENCHMARK), lambda d: d["header"].update(load_lines=[]))
 
 
 def unmeasured_turbo_on_linux():
     """What run_bench.py records on a host with no boost switch, such as a hosted runner."""
-    edit_json(linux_results("bench"), lambda d: d["header"].update(
+    edit_json(linux_results("bench", benchmark=BENCH_FAULT_BENCHMARK), lambda d: d["header"].update(
         turbo="unavailable: no cpufreq boost switch, as on a virtual machine"))
 
 
 def claim_pinned_on_macos():
-    edit_json(macos_results("bench"), lambda d: d["header"].update(pinning="pinned"))
+    edit_json(macos_results("bench", benchmark=BENCH_FAULT_BENCHMARK), lambda d: d["header"].update(pinning="pinned"))
 
 
 def sub_resolution_percentile():
     def change(document):
         document["results"][0]["latency"]["percentiles"][0]["value_ns"] = 0.5
-    edit_json(macos_results("bench"), change)
+    edit_json(macos_results("bench", benchmark=BENCH_FAULT_BENCHMARK), change)
 
 
 def questdb_variant(document):
