@@ -302,12 +302,21 @@ of each query.
    `posix_fadvise(POSIX_FADV_DONTNEED)` over the whole file. Either way it repeats, up to 32
    passes with a wait between them that doubles from 20 ms to 1 s, until `mincore` reads 0 on
    every file. It was 16 passes 20 ms apart until a full day's QuestDB store outlasted that:
-   see "Full-day comparison" in `NOTES.md`.
+   see "Full-day comparison" in `NOTES.md`. Then, 1 s later and with nothing of ours running,
+   the store must still read 0. A store that keeps or regains pages is being read by something
+   else: on `debian`, the host's hourly backup read a new day's store, which takes it
+   minutes. The eviction then runs again, 5 s later and doubling to 60 s apart, for at most
+   30 minutes, and fails the run past that. Each proof records its attempts and the seconds
+   waited.
 3. The device counter is read, the service starts again where there is one, and a fresh process
    opens the store and runs the query once.
 4. The pages now resident can only have come from the device, so the device must have moved at
    least that many bytes. A shortfall is conclusive and fails the run. Only files the engine merely
    reads count: LMDB's lock file, which it writes as it opens, does not.
+5. With the service stopped, the store must not gain a page over 1 s. If it does, something else
+   was reading it, and the run may have found pages it did not read itself. That repetition is
+   not counted and runs again, at most 10 times per query. Each query's cold block keeps the pages
+   gained by each repetition run again, as `run_again_refilled_pages`.
 
 The Linux counter is the block device's sectors read. The macOS counter is `iostat`'s total for
 `disk0`, which is machine-wide, counts reads and writes together, and has two decimals of a MiB, so

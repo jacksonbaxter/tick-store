@@ -437,6 +437,13 @@ FAULTS = (
     Fault("guard-swap-in-stop-disabled", "py-scripts", "compare/guard.py stops firing on "
           "sustained swap-in, so a host thrashing through swap is no longer stopped",
           CHECK_FAILED, "FAIL: test_sustained_swap_in_stops (__main__.Breach"),
+    Fault("coldcache-refill-unchecked", "py-compare", "an eviction counts as proven without "
+          "checking that the store stays empty, so a store something else is reading passes",
+          CHECK_FAILED, "FAIL: test_a_store_refilling_after_eviction_is_not_proven "
+          "(__main__.Evict"),
+    Fault("cold-refilled-run-counted", "py-compare", "a cold repetition after which the store "
+          "refilled, with nothing of ours running, is counted", CHECK_FAILED,
+          "FAIL: test_a_refilled_store_runs_the_repetition_again (__main__.ColdRuns"),
     Fault("compare-tests-settings", "py-compare", "the QuestDB commit mode check stops checking",
           CHECK_FAILED, "FAIL: test_the_parser_outranks_a_matching_echo"),
     Fault("tickstore-settings-unchecked", "py-compare", "tick-store's read-back stops comparing "

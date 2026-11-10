@@ -1,0 +1,18 @@
+diff --git a/compare/run_system.py b/compare/run_system.py
+--- a/compare/run_system.py
++++ b/compare/run_system.py
+@@ -321,14 +321,6 @@
+             while len(cold[query.name]) < self.args.cold_repetitions:
+                 answer, proof, refilled = self.cold_repetition(system, root, paths, query,
+                                                                truth[query.name])
+-                if refilled:
+-                    run_again[query.name].append(refilled)
+-                    self.note(f"{variant}: cold {query.name}: the store gained {refilled} pages "
+-                              f"with nothing of ours running, so this repetition runs again")
+-                    if len(run_again[query.name]) > COLD_RERUNS:
+-                        raise StepFailed(f"cold {query.name}: something else kept reading the "
+-                                         f"store: {run_again[query.name]}")
+-                    continue
+                 proofs[query.name].append(proof)
+                 cold[query.name].append(answer["seconds"])
+                 cold_engine[query.name].append(answer.get("engine_seconds"))

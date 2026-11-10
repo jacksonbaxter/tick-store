@@ -2162,6 +2162,7 @@ comparison" in `compare/README.md`: it stops a run on swap traffic over 10 MiB/s
 | `dd5de38`, 2026-11-09 | QuestDB `plain`, class A read-back, 641 s in | Swap traffic 20.1, 80.7 and 15.0 MB/s |
 | `e0b7df2`, 2026-11-10 | QuestDB `plain`, evicting its class B store before the warm queries, 3,249 s in | 14,080 pages still resident after 16 eviction passes 20 ms apart (fixed at `4b5ade4`) |
 | `4b5ade4`, 2026-11-10 | QuestDB `plain`, the Parquet conversion after its queries, 4,470 s in | `wait_wal_table` hit QuestDB's 60 s query timeout while the day's partition converted (fixed at `7a2e092`) |
+| `7a2e092`, 2026-11-10 | QuestDB `plain`, cold Q2, the fifth repetition's eviction, 4,245 s in | 27,083 pages still resident after 32 passes, in the two files the host's backup was reading (fixed at the next commit) |
 
 The first `dd5de38` run took the systems in their usual order, and Parquet (5,569 s) and ArcticDB
 (16,234 s) finished under the guard before QuestDB stopped. The second ran on a freshly booted host
@@ -2271,7 +2272,7 @@ memory: no collection after start-up, and at most 300 MiB of the heap in use. Bu
 before it started and stayed full, so it never tested what the kernel does with an idle heap
 while swap has room. That is what stopped both `dd5de38` runs.
 
-#### The first two runs under the new rule, lost to the harness
+#### The first three runs under the new rule, lost to the harness
 
 The first full day under the new rule ran at `e0b7df2`, the commit that implemented it, with
 QuestDB first. The guard let QuestDB through both writes and both read-backs. It saw swap-out up
@@ -2307,6 +2308,31 @@ failed run's store, iteration only, the conversion then finished in 184 s, givin
 partition of 5,622,818,382 bytes. This run is lost too, and the slices and the full day were run
 again at `7a2e092`. Raw logs:
 `phase3-raw/compare-fullday/debian-4b5ade4-questdb-conversion-lost/`.
+
+At `7a2e092`, QuestDB's writes, read-backs, warm queries, every cold Q1 and four cold Q2 runs
+passed. Then the eviction before the fifth cold Q2 left 27,083 pages resident after its 32
+passes: 13,643 in `seq.d` and 13,440 in `rest.i`, and no other file. Nothing of ours was running.
+The guard showed 14.1 GiB available, no swap traffic and 0.02 GiB of session memory. The cause
+was not QuestDB. `debian` runs an hourly backup as root with read access to the home directory.
+I cannot read its include list, but its run that hour started at 11:25:39 and ended at
+11:29:01, and the eviction failed from 11:26:57 to 11:27:49, inside it. The store was about 20
+minutes old, so all 23 GB of it was new to a backup. The two files are next to each other in name order: a backup reading two files at
+a time, in name order, refills both as fast as they are evicted. With the backup finished, the same store, on
+the same queries, cold Q1 and Q2 four times each through the same server start and stop,
+evicted in one pass all eight times. The `e0b7df2` loss above, at 03:45, may have been the
+same: its eviction did not name its files, and I cannot read the backup's log.
+
+A reader that refills the store also makes a cold run less than cold. Pages it brings in
+between the eviction and the query are pages the query does not read, and the device counter,
+being machine-wide, counts the backup's reads as the query's. So at the next commit an eviction
+is proven only if the store still reads 0 one second later with nothing of ours running. If
+not, it waits, 5 s and doubling to 60 s, for at most 30 minutes. After each cold run, with the
+service stopped, the store must not gain a page over one second. If it does, the run is not
+counted and runs again, at most 10 times per query, and the pages gained are kept in the cold
+block. Both are new checks, each shown failing on its own fault. A backup that reads only other
+files still competes for the device; that is the host's noise, as before, and not measured.
+This run is lost, and the slices and the full day were run again at that commit. Raw logs:
+`phase3-raw/compare-fullday/debian-7a2e092-questdb-backup-lost/`.
 
 ## Process notes
 

@@ -270,6 +270,49 @@ class PageCacheBeforeWarm(unittest.TestCase):
             self.runner().clear_page_cache(Path("store"), [Path("store/a")])
 
 
+class ColdRuns(unittest.TestCase):
+    """A cold repetition after which the store gained pages, with nothing of ours running, is
+    not counted: something else was reading the store, so it may not have been cold."""
+
+    def runs(self, refills, repetitions=3):
+        from compare import run_system
+
+        runner = run_system.Runner.__new__(run_system.Runner)
+        runner.args = SimpleNamespace(system="questdb", cold_repetitions=repetitions)
+        queue = list(refills)
+        seen = []
+
+        def repetition(system, root, paths, query, truth):
+            seen.append(query.name)
+            answer = {"seconds": 0.5 + len(seen), "engine_seconds": None,
+                      "swap_timed": {"pages_in": 0, "pages_out": 0}}
+            return answer, {"resident_after_eviction": 0}, queue.pop(0) if queue else 0
+
+        runner.cold_repetition = repetition
+        query = Query("Q2", "rows", OPEN_NS, OPEN_NS + NANOS_PER_SECOND, 7)
+        found = runner.cold_runs("plain", None, Path("store"), [Path("store/a")], [query],
+                                 {"Q2": {}})
+        return found, seen
+
+    def test_a_quiet_store_counts_every_repetition(self):
+        (cold, _, _, proofs, again), seen = self.runs([0, 0, 0])
+        self.assertEqual((len(cold["Q2"]), len(proofs["Q2"]), again["Q2"], len(seen)),
+                         (3, 3, [], 3))
+
+    def test_a_refilled_store_runs_the_repetition_again(self):
+        (cold, _, swaps, proofs, again), seen = self.runs([0, 13_643, 0, 0])
+        self.assertEqual(len(seen), 4)
+        self.assertEqual(again["Q2"], [13_643])
+        self.assertEqual(cold["Q2"], [1.5, 3.5, 4.5])
+        self.assertEqual((len(proofs["Q2"]), len(swaps["Q2"])), (3, 3))
+
+    def test_a_store_that_keeps_refilling_stops_the_run(self):
+        from compare import run_system
+
+        with self.assertRaisesRegex(run_system.StepFailed, "kept reading"):
+            self.runs([1] * (run_system.COLD_RERUNS + 1))
+
+
 class RuntimeReading(unittest.TestCase):
     """The reading on both hosts' output, whichever host runs this."""
 

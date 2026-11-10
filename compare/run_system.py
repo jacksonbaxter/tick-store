@@ -52,6 +52,9 @@ FULL_DAY_WRITE_REPETITIONS = 1
 READ_WINDOW_ROWS = 1 << 22
 WARM_REPETITIONS = 30
 COLD_REPETITIONS = 7
+# A cold repetition beside something else reading the store is run again, this many times at
+# most per query.
+COLD_RERUNS = 10
 EXIT_FAILED = 1
 
 
@@ -273,28 +276,9 @@ class Runner:
             system.stop_service()
         warm_phase.stop()
 
-        cold = {query.name: [] for query in queries}
-        cold_engine = {query.name: [] for query in queries}
-        cold_swap = {query.name: [] for query in queries}
-        proofs = {query.name: [] for query in queries}
         cold_phase = swap.Phase().start()
-        for query in queries:
-            self.note(f"{variant}: cold {query.name}")
-            for _ in range(self.args.cold_repetitions):
-                sync_tree(root)
-                evicted = coldcache.evict(self.layout, paths)
-                device = coldcache.DeviceCounter(paths[0])
-                try:
-                    system.start_service()
-                    answer = self.worker(system, "cold_query", query=query_to_json(query),
-                                         truth=truth[query.name])
-                    after = coldcache.residency(self.layout, system.read_paths())
-                finally:
-                    system.stop_service()
-                proofs[query.name].append(coldcache.proof_of_cold(evicted, after, device.delta()))
-                cold[query.name].append(answer["seconds"])
-                cold_engine[query.name].append(answer.get("engine_seconds"))
-                cold_swap[query.name].append(answer["swap_timed"])
+        cold, cold_engine, cold_swap, proofs, run_again = self.cold_runs(
+            variant, system, root, paths, queries, truth)
         cold_phase.stop()
 
         results = {}
@@ -308,6 +292,7 @@ class Runner:
                                    else warm["proof"]),
                          "swap_timed": swap.timed([warm_query["swap_timed"]])},
                 "cold": {**latency(cold[query.name]), "proofs": proofs[query.name],
+                         "run_again_refilled_pages": run_again[query.name],
                          "swap_timed": {**swap.timed(cold_swap[query.name]),
                                         "pages_in_by_repetition": [
                                             item["pages_in"] for item in cold_swap[query.name]]}},
@@ -321,6 +306,52 @@ class Runner:
         floor = latency(warm["floor_seconds"])
         phases = {"warm_queries": warm_phase.counts, "cold_queries": cold_phase.counts}
         return results, floor, warm["peak_rss_bytes"], self.after_queries(system), phases
+
+    def cold_runs(self, variant, system, root, paths, queries, truth):
+        """Each query's cold repetitions. One run beside something else reading the store is
+        not counted and runs again, at most COLD_RERUNS times per query; the pages each such
+        run saw the store gain are kept."""
+        cold = {query.name: [] for query in queries}
+        cold_engine = {query.name: [] for query in queries}
+        cold_swap = {query.name: [] for query in queries}
+        proofs = {query.name: [] for query in queries}
+        run_again = {query.name: [] for query in queries}
+        for query in queries:
+            self.note(f"{variant}: cold {query.name}")
+            while len(cold[query.name]) < self.args.cold_repetitions:
+                answer, proof, refilled = self.cold_repetition(system, root, paths, query,
+                                                               truth[query.name])
+                if refilled:
+                    run_again[query.name].append(refilled)
+                    self.note(f"{variant}: cold {query.name}: the store gained {refilled} pages "
+                              f"with nothing of ours running, so this repetition runs again")
+                    if len(run_again[query.name]) > COLD_RERUNS:
+                        raise StepFailed(f"cold {query.name}: something else kept reading the "
+                                         f"store: {run_again[query.name]}")
+                    continue
+                proofs[query.name].append(proof)
+                cold[query.name].append(answer["seconds"])
+                cold_engine[query.name].append(answer.get("engine_seconds"))
+                cold_swap[query.name].append(answer["swap_timed"])
+        return cold, cold_engine, cold_swap, proofs, run_again
+
+    def cold_repetition(self, system, root, paths, query, truth):
+        """One cold run: the store flushed and evicted, the service started, the query, the
+        residency it left, and the service stopped. Then, with nothing of ours running, the
+        store must not gain a page. If it does, something else is reading it, so this run may
+        have found pages it did not read itself: the third value is the pages gained, and the
+        caller runs it again."""
+        sync_tree(root)
+        evicted = coldcache.evict(self.layout, paths)
+        device = coldcache.DeviceCounter(paths[0])
+        try:
+            system.start_service()
+            answer = self.worker(system, "cold_query", query=query_to_json(query), truth=truth)
+            after = coldcache.residency(self.layout, system.read_paths())
+        finally:
+            system.stop_service()
+        proof = coldcache.proof_of_cold(evicted, after, device.delta())
+        return answer, proof, coldcache.refilled_pages(self.layout, paths)
 
     def clear_page_cache(self, root, paths):
         """On a day, the page cache emptied of the inputs and the store before warm queries.

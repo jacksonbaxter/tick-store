@@ -11,11 +11,20 @@ import os
 import platform
 import resource
 import subprocess
+import time
 from pathlib import Path
 
 IOSTAT_DEVICE = "disk0"
 # iostat's total has two decimals of a MiB, so a delta can be off by this much.
 IOSTAT_SLACK_BYTES = 2 * 10_486
+# Something else reading a store refills it as fast as it is evicted: on debian, the host's
+# hourly backup read a new day's store, over several minutes. An eviction waits that out,
+# retrying 5 s apart and doubling to 60 s, for at most this long.
+EVICTION_WAIT_SECONDS = 1800
+EVICTION_RETRY_SECONDS = (5, 60)
+# With nothing of ours running, a store that gains a page within this long is being read by
+# something else.
+QUIET_SECONDS = 1.0
 
 
 class ProofFailed(Exception):
@@ -58,14 +67,44 @@ def warm(layout, paths):
     return _tool(layout, "warm", paths)[1]
 
 
-def evict(layout, paths):
-    """Returns the tool's proof, or raises if any page stayed resident."""
-    code, report = _tool(layout, "evict", paths)
-    if code != 0 or not report["proven"] or report["resident_pages"] != 0:
-        raise ProofFailed(f"eviction not proven: {report['resident_pages']} pages resident after "
-                          f"{report['passes']} passes, in "
-                          f"{report.get('files_with_resident_pages')}")
-    return report
+def evict(layout, paths, wait_seconds=EVICTION_WAIT_SECONDS, sleep=time.sleep,
+          clock=time.monotonic):
+    """Returns the tool's proof, or raises if pages stay resident.
+
+    Proven means no page resident after the tool's passes and none back QUIET_SECONDS later,
+    with nothing of ours running. A store that refills is being read by something else, and
+    the whole eviction is tried again, for at most `wait_seconds`. The report gains the
+    attempts and the seconds waited."""
+    started = clock()
+    delay, longest = EVICTION_RETRY_SECONDS
+    attempts = 0
+    while True:
+        attempts += 1
+        code, report = _tool(layout, "evict", paths)
+        if code == 0 and report["proven"] and report["resident_pages"] == 0:
+            sleep(QUIET_SECONDS)
+            back = residency(layout, paths)["resident_pages"]
+            if back == 0:
+                return {**report, "attempts": attempts,
+                        "waited_seconds": round(clock() - started, 1)}
+            failure = (f"{back} pages back {QUIET_SECONDS} s after eviction, with nothing of "
+                       f"ours running")
+        else:
+            failure = (f"{report['resident_pages']} pages resident after {report['passes']} "
+                       f"passes, in {report.get('files_with_resident_pages')}")
+        if clock() - started >= wait_seconds:
+            raise ProofFailed(f"eviction not proven: {failure}, after {attempts} attempts over "
+                              f"{round(clock() - started)} s")
+        sleep(delay)
+        delay = min(delay * 2, longest)
+
+
+def refilled_pages(layout, paths, sleep=time.sleep):
+    """Pages a store gains over QUIET_SECONDS with nothing of ours running: more than 0 means
+    something else is reading it, and a cold repetition just run beside that is not cold."""
+    before = residency(layout, paths)["resident_pages"]
+    sleep(QUIET_SECONDS)
+    return max(0, residency(layout, paths)["resident_pages"] - before)
 
 
 def proof_of_warm(before, after):
@@ -95,6 +134,8 @@ def proof_of_cold(evicted, after, device_delta):
                           f"{expected} bytes became resident")
     return {"evicted_pages": evicted["pages"], "resident_after_eviction": 0,
             "eviction_passes": evicted["passes"], "method": evicted["method"],
+            "eviction_attempts": evicted.get("attempts", 1),
+            "eviction_waited_seconds": evicted.get("waited_seconds", 0),
             "resident_bytes_after_run": expected, "device_bytes_read": device_delta["bytes"],
             "device_counter": device_delta["counter"],
             "device_slack": device_delta.get("slack", 0),
