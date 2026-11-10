@@ -250,6 +250,35 @@ Percentiles are the time for one whole batch, in microseconds, with the timer re
 | `gorilla_dod/timestamp` | `bcbf8738d892` | neon kernels | 6,125,294 | 16.95 | 9.650 | 829 | 1.66% | n/a | n/a | n/a | 3.85 |
 | `pfor_delta/timestamp` | `bcbf8738d892` | neon kernels | 6,125,294 | 16.82 | 0.601 | 13,314 | 1.46% | n/a | n/a | n/a | 3.41 |
 | `pfor_dod/timestamp` | `bcbf8738d892` | neon kernels | 6,125,294 | 18.07 | 0.880 | 9,096 | 1.32% | n/a | n/a | n/a | 3.22 |
+
+**macOS, decode kernels on seeded L1-resident input.** Apple M4 Max, Clang 23.1.4, `-O3 -DNDEBUG -std=c++23`. Unpinned. No hardware counters. macOS has no thread pinning, and no unprivileged hardware counters.
+
+Each row is one kernel on one set. A kernel with a width ran at each width listed, one case each, and the row gives the median across them.
+
+| Kernel | Set | Commit | Cases | G values/s, median | Range | Largest CV | Cycles/value, median | Instr/value, median | Branch misses/value, median | Load at start |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `pfor_unpack` | scalar | `bcbf8738d892` | 8 | 7.49 | 4.95 to 9.03 | 11.21% | n/a | n/a | n/a | 3.17 to 3.36 |
+| `linear_unpack` | scalar | `bcbf8738d892` | 8 | 1.40 | 1.32 to 1.41 | 2.67% | n/a | n/a | n/a | 2.76 to 3.08 |
+| `pfor_delta_two_pass` | scalar | `bcbf8738d892` | 65 | 2.02 | 1.77 to 2.44 | 3.73% | n/a | n/a | n/a | 1.28 to 3.84 |
+| `pfor_delta_fused` | scalar | `bcbf8738d892` | 65 | 1.65 | 1.48 to 2.00 | 4.54% | n/a | n/a | n/a | 1.26 to 3.84 |
+| `pfor_delta_narrow` | scalar | `bcbf8738d892` | 5 | 1.73 | 1.69 to 1.76 | 2.14% | n/a | n/a | n/a | 1.26 to 1.32 |
+| `prefix_sum/vector` | scalar | `bcbf8738d892` | 1 | 3.25 | 3.25 to 3.25 | 1.32% | n/a | n/a | n/a | 1.29 to 1.29 |
+| `prefix_sum/tree` | scalar | `bcbf8738d892` | 1 | 3.22 | 3.22 to 3.22 | 1.41% | n/a | n/a | n/a | 1.29 to 1.29 |
+| `for_add` | scalar | `bcbf8738d892` | 1 | 5.27 | 5.27 to 5.27 | 2.33% | n/a | n/a | n/a | 1.29 to 1.29 |
+| `for_add_zigzag` | scalar | `bcbf8738d892` | 1 | 4.00 | 4.00 to 4.00 | 2.49% | n/a | n/a | n/a | 1.35 to 1.35 |
+| `svb_decode` | scalar | `bcbf8738d892` | 1 | 0.74 | 0.74 to 0.74 | 1.15% | n/a | n/a | n/a | 1.35 to 1.35 |
+| `dod_reconstruct` | scalar | `bcbf8738d892` | 1 | 2.94 | 2.94 to 2.94 | 1.37% | n/a | n/a | n/a | 1.35 to 1.35 |
+| `restore_copy` | scalar | `bcbf8738d892` | 1 | 13.36 | 13.36 to 13.36 | 18.64% | n/a | n/a | n/a | 1.32 to 1.32 |
+| `pfor_unpack` | neon | `bcbf8738d892` | 8 | 7.78 | 6.19 to 8.88 | 4.04% | n/a | n/a | n/a | 1.29 to 1.35 |
+| `linear_unpack` | neon | `bcbf8738d892` | 8 | 7.39 | 1.41 to 8.04 | 8.04% | n/a | n/a | n/a | 1.32 to 1.46 |
+| `pfor_delta_two_pass` | neon | `bcbf8738d892` | 65 | 3.35 | 2.92 to 4.42 | 5.58% | n/a | n/a | n/a | 1.35 to 2.40 |
+| `pfor_delta_fused` | neon | `bcbf8738d892` | 65 | 3.27 | 3.06 to 4.27 | 6.36% | n/a | n/a | n/a | 1.35 to 2.40 |
+| `pfor_delta_narrow` | neon | `bcbf8738d892` | 5 | 3.63 | 3.62 to 3.64 | 1.90% | n/a | n/a | n/a | 1.39 to 1.44 |
+| `prefix_sum/vector` | neon | `bcbf8738d892` | 1 | 4.72 | 4.72 to 4.72 | 2.79% | n/a | n/a | n/a | 1.44 to 1.44 |
+| `prefix_sum/tree` | neon | `bcbf8738d892` | 1 | 3.08 | 3.08 to 3.08 | 1.56% | n/a | n/a | n/a | 1.48 to 1.48 |
+| `for_add` | neon | `bcbf8738d892` | 1 | 5.43 | 5.43 to 5.43 | 2.06% | n/a | n/a | n/a | 1.48 to 1.48 |
+| `for_add_zigzag` | neon | `bcbf8738d892` | 1 | 3.94 | 3.94 to 3.94 | 1.15% | n/a | n/a | n/a | 1.48 to 1.48 |
+| `svb_decode` | neon | `bcbf8738d892` | 1 | 6.21 | 6.21 to 6.21 | 4.40% | n/a | n/a | n/a | 1.52 to 1.52 |
 <!-- results:end -->
 
 ## Comparison
