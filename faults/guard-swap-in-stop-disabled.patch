@@ -1,0 +1,13 @@
+diff --git a/compare/guard.py b/compare/guard.py
+--- a/compare/guard.py
++++ b/compare/guard.py
+@@ -105,9 +105,6 @@
+         return f"MemAvailable under {limits.min_available_bytes / GIB:g} GiB", strikes
+     if sample.free_disk_bytes < limits.min_free_disk_bytes:
+         return f"free disk under {limits.min_free_disk_bytes / GIB:g} GiB", strikes
+-    if strikes >= SWAP_STRIKES:
+-        return (f"swap-in over {limits.max_swap_in_bytes_per_second} bytes/s for "
+-                f"{SWAP_STRIKES} samples"), strikes
+     floor = exhausted_floor_bytes(sample, limits)
+     if swap_exhausted(sample) and sample.available_bytes < floor:
+         return (f"swap exhausted with MemAvailable under {floor / GIB:.2f} GiB"), strikes

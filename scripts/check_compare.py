@@ -12,6 +12,11 @@ the full-day capacity check found adequate. It also checks that the file is safe
 system that could not prove something says so in the file, and the file is valid, as long as it
 does not claim the proof.
 
+Every file also counts the host's swap: pages swapped in and out over each phase, write,
+read-back, warm queries and cold queries, for each variant and class, and over each query's
+timed runs alone, with that query flagged whenever any page was swapped in. A count must be a
+whole number, the flag must follow from it, and the system's totals must add up.
+
 A full-day file, `<host>-<day>-full-<commit>.json`, is held to every rule above against the
 day's pin, and to more: nothing clipped (every window as BENCHMARKS.md defines it, the busiest
 locate over the whole hour, Q5 over every record), each store read back whole, warm proven query
@@ -75,6 +80,12 @@ FULL_DAY_QUERIES = {"Q1": ("rows", OPEN_NS, OPEN_NS + NANOS_PER_SECOND, False),
                     "Q4": ("rows", OPEN_NS, OPEN_NS + 1_000_000, False),
                     "Q5": ("column_sum", 0, 0, False)}
 MAX_WARM_ATTEMPTS = 3
+# The first schema whose files count swap per phase. Older slice files are accepted without it
+# until they are replaced; a full-day file must have it.
+SWAP_SCHEMA = 2
+CLASS_PHASES = ("write", "read_back")
+QUERY_PHASES = ("warm_queries", "cold_queries")
+SWAP_FIELDS = ("pages_in", "pages_out")
 
 
 def check_settings(where, settings, name, durability):
@@ -303,6 +314,75 @@ def check_cold(where, cold):
     return problems
 
 
+def is_count(value):
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def check_swap_counts(where, block):
+    """Pages swapped in and out over one phase, each a whole number."""
+    if not isinstance(block, dict) or not all(is_count(block.get(field)) for field in SWAP_FIELDS):
+        return [f"{where}: no swap counts, pages in and out, for the phase: {block!r}"]
+    return []
+
+
+def check_swap_timed(where, query):
+    """Each query's swap over its timed runs, flagged whenever any page came back."""
+    problems = []
+    for kind in ("warm", "cold"):
+        here = f"{where}.{kind}.swap_timed"
+        block = (query.get(kind) or {}).get("swap_timed")
+        found = check_swap_counts(here, block)
+        if found:
+            problems += found
+            continue
+        if block.get("flagged") is not (block["pages_in"] > 0):
+            problems.append(f"{here}: flagged is {block.get('flagged')!r} with "
+                            f"{block['pages_in']} pages swapped in")
+        if kind == "cold":
+            each = block.get("pages_in_by_repetition")
+            if not isinstance(each, list) or len(each) != (query.get("cold") or {}).get("n") or \
+                    not all(is_count(item) for item in each) or sum(each) != block["pages_in"]:
+                problems.append(f"{here}: no pages swapped in for each cold run that add up")
+    return problems
+
+
+def check_swap(name, system):
+    """Swap per phase for every variant and class, and the system's totals over them."""
+    problems = []
+    totals = {phase: [0, 0] for phase in (*CLASS_PHASES, *QUERY_PHASES)}
+    for variant_name, variant in (system.get("variants") or {}).items():
+        blocks = [(f"{name}.{variant_name}.swap.{phase}", phase,
+                   (variant.get("swap") or {}).get(phase)) for phase in QUERY_PHASES]
+        for class_name, entry in (variant.get("classes") or {}).items():
+            blocks += [(f"{name}.{variant_name}.{class_name}.swap.{phase}", phase,
+                        ((entry or {}).get("swap") or {}).get(phase)) for phase in CLASS_PHASES]
+        for where, phase, block in blocks:
+            found = check_swap_counts(where, block)
+            problems += found
+            if not found:
+                totals[phase][0] += block["pages_in"]
+                totals[phase][1] += block["pages_out"]
+        for query_name, query in (variant.get("queries") or {}).items():
+            if isinstance(query, dict):
+                problems += check_swap_timed(f"{name}.{variant_name}.queries.{query_name}", query)
+    by_phase = system.get("swap_by_phase") or {}
+    for phase, (pages_in, pages_out) in totals.items():
+        if by_phase.get(phase) != {"pages_in": pages_in, "pages_out": pages_out}:
+            problems.append(f"{name}.swap_by_phase.{phase}: {by_phase.get(phase)!r}, and its "
+                            f"variants add up to {pages_in} in and {pages_out} out")
+    return problems
+
+
+def check_swap_method(document):
+    swap = (document.get("method") or {}).get("swap") or {}
+    problems = []
+    if not swap.get("source") or not is_count(swap.get("page_bytes")) or not swap["page_bytes"]:
+        problems.append("method.swap: the swap counters' source and page size are not stated")
+    if "flagged" not in str(swap.get("timed_policy", "")):
+        problems.append("method.swap: what a timed query with swap-in becomes is not stated")
+    return problems
+
+
 def check_engine_time(where, query):
     """tick-store's worker reports its engine's time beside each round trip, warm and cold."""
     problems = []
@@ -350,7 +430,7 @@ def check_queries(where, queries, truth, system_name=None, full_day=False):
     return problems
 
 
-def check_system(name, system, document, pin):
+def check_system(name, system, document, pin, swap_counted=True):
     host = document["header"].get("host")
     truth = (document.get("queries") or {}).get("truth") or {}
     problems = []
@@ -391,6 +471,8 @@ def check_system(name, system, document, pin):
                                          host)
         problems += check_queries(where, variant.get("queries"), truth, name,
                                   bool(pin.get("full_day")))
+    if swap_counted:
+        problems += check_swap(name, system)
     if pin.get("full_day") and host == "Linux":
         problems += check_peak_memory(name, system.get("peak_memory"))
     return problems
@@ -403,6 +485,9 @@ def check_peak_memory(name, memory):
     for field in ("vmhwm_bytes_largest", "mem_available_lowest_bytes", "session_rss_bytes_peak"):
         if not check_results.is_number(memory.get(field)) or memory[field] <= 0:
             problems.append(f"{name}.peak_memory: no {field}")
+    for field in ("swap_in_pages_during_run", "swap_out_pages_during_run"):
+        if not is_count(memory.get(field)):
+            problems.append(f"{name}.peak_memory: the guard's {field} is not recorded")
     if memory.get("guard_fired") is not False or (memory.get("exit") or {}).get("code") != 0:
         problems.append(f"{name}.peak_memory: the guard stopped the run, or it did not exit 0")
     return problems
@@ -593,11 +678,18 @@ def check_document(document, top_keys, path, pins, capacity, real_path=None):
     method = document.get("method") or {}
     if not method.get("warm") or not method.get("cold"):
         problems.append("method: how warm and cold were achieved is not stated")
+    schema = header.get("schema")
+    swap_counted = not isinstance(schema, int) or schema >= SWAP_SCHEMA
+    if not swap_counted and full_day:
+        problems.append(f"header.schema: a full-day file must count swap per phase, schema "
+                        f"{SWAP_SCHEMA} or later")
+    if swap_counted:
+        problems += check_swap_method(document)
     for name in SYSTEMS:
         if name not in systems:
             problems.append(f"systems: {name} is missing")
     for name, system in systems.items():
-        problems += check_system(name, system, document, pin)
+        problems += check_system(name, system, document, pin, swap_counted)
     problems += check_results.check_leaks(document)
     return problems
 

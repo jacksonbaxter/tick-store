@@ -368,7 +368,10 @@ class Document(unittest.TestCase):
     GUARD = {"processes": {"11 python3": {"VmHWM": 5}, "12 java": {"VmHWM": 9},
                            "13 python3": {"VmHWM": 7}},
              "session_rss_bytes_peak": 20, "mem_available_lowest_bytes": 3,
-             "mem_available_start_bytes": 8, "swapped_pages_during_run": 0,
+             "mem_available_start_bytes": 8, "swap_in_pages_during_run": 0,
+             "swap_out_pages_during_run": 5, "swap_in_bytes_per_second_peak": 0.0,
+             "swap_out_bytes_per_second_peak": 4096.0, "swap_total_bytes": 1 << 30,
+             "limits": {"max_swap_in_bytes_per_second": 10 << 20},
              "free_disk_lowest_bytes": 100, "guard_fired": False,
              "exit": {"code": 0, "signal": None}}
 

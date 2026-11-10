@@ -388,7 +388,8 @@ run_unittests() {
     return "$code"
 }
 
-step_py_scripts() { run_unittests "$1" python3 tests/scripts/test_*.py; }
+# The guard's tests need nothing beyond the standard library, so they run here, on CI too.
+step_py_scripts() { run_unittests "$1" python3 tests/scripts/test_*.py tests/compare/test_guard.py; }
 
 # test_real_systems.py starts QuestDB and is no part of a quick check.
 step_py_compare() {

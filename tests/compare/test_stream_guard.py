@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""The full-day path on a tiny table: streamed ingest, the host guard, and the walls that keep a
-capacity run out of the results. Needs the repo's .venv.
+"""The full-day path on a tiny table: streamed ingest and the walls that keep a capacity run out
+of the results. Needs the repo's .venv. The guard's own rule is tested in test_guard.py.
 
     .venv/bin/python -I tests/compare/test_stream_guard.py
 """
 
 import json
-import signal
 import subprocess
 import sys
 import tempfile
@@ -26,60 +25,12 @@ from test_schema import DAY, RECORDS, write_fixture  # noqa: E402
 
 from compare.durability import CLASS_B  # noqa: E402
 from compare.fullday import LABEL, MEASUREMENT, refuse_results_folder  # noqa: E402
-from compare.guard import (GIB, SWAP_STRIKES, HostSample, Limits, breach, parse_meminfo,  # noqa: E402
-                           parse_status, parse_swap_pages, session_of, wait_status_fields)
 from compare.layout import Layout  # noqa: E402
 from compare.schema import ColumnSet, arrow_table, read_windows, table_chunks  # noqa: E402
 from compare.systems import system_class  # noqa: E402
 from compare.systems.base import RunContext  # noqa: E402
 
 CHECK_COMPARE = REPO_ROOT / "scripts" / "check_compare.py"
-LIMITS = Limits()
-HEALTHY = HostSample(8 * GIB, GIB, 0, 200 * GIB)
-
-
-class Breach(unittest.TestCase):
-    def test_a_healthy_host_goes_on(self):
-        self.assertEqual(breach(HEALTHY, 0, 0, LIMITS), (None, 0))
-
-    def test_memory_under_the_limit_fires_at_once(self):
-        low = HostSample(3 * GIB - 1, GIB, 0, 200 * GIB)
-        self.assertIn("MemAvailable", breach(low, 0, 0, LIMITS)[0])
-
-    def test_memory_at_the_limit_goes_on(self):
-        self.assertIsNone(breach(HostSample(3 * GIB, GIB, 0, 200 * GIB), 0, 0, LIMITS)[0])
-
-    def test_a_full_disk_fires(self):
-        self.assertIn("disk", breach(HostSample(8 * GIB, GIB, 0, GIB), 0, 0, LIMITS)[0])
-
-    def test_swap_fires_only_when_it_keeps_on(self):
-        fast = LIMITS.max_swap_bytes_per_second + 1
-        strikes = 0
-        for _ in range(SWAP_STRIKES - 1):
-            reason, strikes = breach(HEALTHY, fast, strikes, LIMITS)
-            self.assertIsNone(reason)
-        self.assertEqual(breach(HEALTHY, 0, strikes, LIMITS), (None, 0))
-        self.assertIn("swap", breach(HEALTHY, fast, strikes, LIMITS)[0])
-
-
-class ProcFiles(unittest.TestCase):
-    def test_meminfo(self):
-        fields = parse_meminfo("MemTotal:  10 kB\nMemAvailable:  4 kB\nHugePages_Total:  0\n")
-        self.assertEqual(fields["MemAvailable"], 4096)
-
-    def test_swap_counts_both_ways(self):
-        self.assertEqual(parse_swap_pages("pswpin 3\npswpout 4\nnr_free_pages 9\n"), 7)
-
-    def test_status_fields(self):
-        status = parse_status("Name:\tjava\nVmHWM:\t  100 kB\nRssFile:\t  7 kB\nThreads:\t9\n")
-        self.assertEqual(status, {"VmHWM": 102400, "RssFile": 7168})
-
-    def test_a_comm_with_spaces_and_a_bracket_does_not_move_the_session(self):
-        self.assertEqual(session_of("12 (a b) c) S 1 12 77 0 -1 4194304"), 77)
-
-    def test_a_wait_status_names_its_signal(self):
-        self.assertEqual(wait_status_fields(-signal.SIGILL), {"code": None, "signal": "SIGILL"})
-        self.assertEqual(wait_status_fields(3), {"code": 3, "signal": None})
 
 
 class StaysOutOfResults(unittest.TestCase):

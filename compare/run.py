@@ -47,7 +47,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import run_bench  # noqa: E402
 
-from compare import variant_rule  # noqa: E402
+from compare import swap, variant_rule  # noqa: E402
 from compare.layout import PINS_PATH, SLICE_NAME, Layout  # noqa: E402
 from compare.queries import CLIPPING_STATEMENT, FULL_DAY_STATEMENT  # noqa: E402
 from compare.schema import read_manifest  # noqa: E402
@@ -89,10 +89,15 @@ FULL_DAY_WARM = ("Query by query, since QuestDB's store is larger than this host
 FULL_DAY_WRITES = ("One write per class and variant, each a sustained run of minutes over the "
                    "whole day, so a write's median is that one write. Three of each would not "
                    "fit the run: see compare/README.md.")
-GUARD_STATEMENT = ("Each system ran under compare/guard.py, as the capacity check did: it samples "
-                   "MemAvailable, swap and free disk every 2 s and stops the run under 3 GiB, "
-                   "under 50 GiB free or on sustained swapping. Peak memory is the largest "
-                   "VmHWM of each process it saw, and the largest sum of their RSS at a sample.")
+GUARD_STATEMENT = ("Each system ran under compare/guard.py: it samples MemAvailable, free swap, "
+                   "swap-in, swap-out and free disk every 2 s, and stops the run on MemAvailable "
+                   "under 3 GiB, swap-in over 10 MiB/s for 3 samples in a row, swap exhausted "
+                   "with MemAvailable under 3 GiB plus SwapTotal, or free disk under 50 GiB. "
+                   "Swap-out alone never stops it, and is recorded per phase. Peak memory is the "
+                   "largest VmHWM of each process it saw, and the largest sum of their RSS at a "
+                   "sample.")
+# Results files that carry swap per phase. scripts/check_compare.py requires it from schema 2.
+SCHEMA = 2
 MACOS_STATEMENT = ("Unpinned. No hardware counters. macOS has no thread pinning, and no "
                    "unprivileged hardware counters. Each system gets the same thread budget.")
 LINUX_STATEMENT = (f"Each system ran under taskset -c {LINUX_CORE}, and the run then widened its "
@@ -262,7 +267,12 @@ def peak_memory(report):
             "session_rss_bytes_peak": report.get("session_rss_bytes_peak"),
             "mem_available_lowest_bytes": report["mem_available_lowest_bytes"],
             "mem_available_start_bytes": report["mem_available_start_bytes"],
-            "swapped_pages_during_run": report["swapped_pages_during_run"],
+            "swap_in_pages_during_run": report["swap_in_pages_during_run"],
+            "swap_out_pages_during_run": report["swap_out_pages_during_run"],
+            "swap_in_bytes_per_second_peak": report["swap_in_bytes_per_second_peak"],
+            "swap_out_bytes_per_second_peak": report["swap_out_bytes_per_second_peak"],
+            "swap_total_bytes": report["swap_total_bytes"],
+            "guard_limits": report["limits"],
             "free_disk_lowest_bytes": report["free_disk_lowest_bytes"],
             "guard_fired": report["guard_fired"], "exit": report["exit"],
             "source": "compare/guard.py, sampling every 2 s"}
@@ -288,7 +298,7 @@ def build_document(host, args, layout, pin, commit, measure, parts, load_lines, 
                 (parts / f"{system}.guard.json").read_text(encoding="utf-8")))
     runs = [{"load_lines": lines} for lines in load_lines]
     header = {
-        "schema": 1,
+        "schema": SCHEMA,
         "host": host,
         "measurement": "reported" if measure else "iteration-only",
         "statement": LINUX_STATEMENT if linux else MACOS_STATEMENT,
@@ -321,7 +331,8 @@ def build_document(host, args, layout, pin, commit, measure, parts, load_lines, 
     method = {"warm": WARM_METHOD, "cold": COLD_METHOD[host], "cold_includes": COLD_INCLUDES,
               "one_system_at_a_time": True, "tickstore_queries": TICKSTORE_QUERIES,
               "input_cache": "the export's column files are warm before every write",
-              "p99": "nearest rank, so a small n gives a value that really occurred"}
+              "p99": "nearest rank, so a small n gives a value that really occurred",
+              "swap": swap.method_block()}
     queries = {"parameters": query_sets[0], "truth": truths[0],
                "truth_method": "numpy over the exported columns, sharing no code with any system"}
     if full_day:

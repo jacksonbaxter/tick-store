@@ -406,9 +406,15 @@ benchmark. `compare/fullday.py` needs the day's export at `<data>/export/<day>-f
 - QuestDB starts through `bin/questdb.sh` with `JVM_PREPEND`, not from `java` directly, and writes a
   GC log per server start. It is otherwise the same server: the prepended options are the ones
   `QuestDBServer.command` passes.
-- The guard samples every 2 s. Under 3 GiB of `MemAvailable`, under 50 GiB of free disk, or over
-  10 MiB/s of swap traffic for three samples, it sends the session SIGTERM, then SIGKILL after 90 s
-  or under 2 GiB. It exits 70, and its report says why. Each exit status names its signal.
+- The guard samples every 2 s. It sends the session SIGTERM, then SIGKILL after 90 s or under
+  2 GiB, on any of: (a) `MemAvailable` under 3 GiB; (b) swap-in, `pswpin`, over 10 MiB/s for three
+  samples in a row; (c) swap exhausted, `SwapFree` under 2% of `SwapTotal`, with `MemAvailable`
+  under 3 GiB plus `SwapTotal`; or free disk under 50 GiB. Swap-out alone never stops it: the
+  kernel paging idle memory out while plenty is available is reclaim, not exhaustion. Its samples
+  and report keep swap-in and swap-out apart. It exits 70, and its report says why. Each exit
+  status names its signal. The rule and its thresholds were registered in "The guard's swap
+  rule" in `NOTES.md` before any run under it. Until then, the guard stopped on swap traffic,
+  in and out together, over 10 MiB/s for three samples.
 - Output stays under `<work>/fullday/<tag>/`, marked `iteration-only`. `compare/fullday.py` refuses
   a work folder under any `results` folder, and `scripts/check_compare.py` refuses the file.
   `results/fullday-capacity-12302019.json` is the curated summary, and sits outside `results/compare/`.
@@ -491,7 +497,14 @@ TICK_STORE_MEASURE=<wrapper> <venv>/bin/python -I compare/run.py --day 12302019 
 - **The guard.** Each system runs under `compare/guard.py`, inside the measurement wrapper and
   under the same pin, with the capacity check's limits. Its report gives each system's peak
   memory: the largest VmHWM of each process it saw, the largest sum of their RSS at one sample,
-  and MemAvailable at its lowest.
+  and MemAvailable at its lowest, and the pages it saw swapped in and out.
+- **Swap per phase.** Every results file, slice or day, counts the host's pages swapped in and
+  out over each phase: write, read-back, warm queries and cold queries, for each variant and
+  class, from `/proc/vmstat` on Linux and `vm_stat` on macOS. The counts are host-wide. Each
+  query also counts them over its timed runs alone, as `swap_timed` in its warm and cold blocks.
+  A query with any page swapped in while timed is flagged, the same for every system: its number
+  is kept and marked, and the README marks it `(swap-in)`. `scripts/check_compare.py` requires
+  every count, and a flag that follows from it.
 - Settings read-back, the heap rule, the durability proofs, the sibling meter and the load lines
   apply exactly as on the slice.
 
@@ -537,7 +550,9 @@ traffic: in its class A write, and on a freshly booted host in its read-back. Bo
 paged out QuestDB's own idle heap, 0.65 to 0.93 GB, to keep the store's mapped pages. The free swap
 filled in about 6 s, at up to 81 MB/s, with 11.6 GB or more still available. The capacity check met
 none of this, because swap was already full when it started. See "Full-day comparison" in
-`NOTES.md`.
+`NOTES.md`. The guard's swap rule then changed, as registered in "The guard's swap rule" in
+`NOTES.md` before the rerun: swap-out alone no longer stops a run, and QuestDB's heap stays
+`-Xms1g -Xmx1g`.
 
 ## What the numbers are
 

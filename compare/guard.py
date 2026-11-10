@@ -4,12 +4,18 @@
     python3 -I compare/guard.py --report <file> --samples <file> --watch <dir> -- <command...>
 
 For a full-day run on a shared machine, whose services matter more than the run. Every two
-seconds this reads MemAvailable, swap traffic, free disk and each process of the session. Under
-a limit it sends the session SIGTERM, then SIGKILL, and writes that down as the result. It
-touches nothing outside the session. The report gives the command's wait status with its signal
-named, and each process's peak memory by kind, and appears again every 30 seconds, so a run that
-stops early still leaves its evidence. Linux only. Exits with the command's code, or 70 if the
-guard fired.
+seconds this reads MemAvailable, free swap, swap-in and swap-out, free disk and each process of
+the session. On a breach it sends the session SIGTERM, then SIGKILL, and writes that down as the
+result. It touches nothing outside the session. The report gives the command's wait status with
+its signal named, and each process's peak memory by kind, and appears again every 30 seconds, so
+a run that stops early still leaves its evidence. Linux only. Exits with the command's code, or
+70 if the guard fired.
+
+It stops on (a) MemAvailable under its floor; (b) swap-in over its rate for SWAP_STRIKES
+samples in a row; (c) swap exhausted, SwapFree under SWAP_EXHAUSTED_FRACTION of SwapTotal, with
+MemAvailable under floor (a) plus SwapTotal; or free disk under its floor. Swap-out alone never
+stops a run: the kernel moving idle pages out while memory is plentiful is reclaim, not
+exhaustion. Each threshold's derivation is in "The guard's swap rule" in NOTES.md.
 """
 
 import argparse
@@ -22,12 +28,17 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from compare.swap import parse_vmstat  # noqa: E402
+
 GIB = 1 << 30
 PAGE_BYTES = 4096
 SAMPLE_SECONDS = 2
 REPORT_EVERY_SAMPLES = 15
 TERM_GRACE_SECONDS = 90
-SWAP_STRIKES = 3  # Consecutive samples over the limit, so that one burst does not fire it.
+SWAP_STRIKES = 3  # Consecutive samples of swap-in over the limit, so a burst does not fire it.
+SWAP_EXHAUSTED_FRACTION = 0.02  # SwapFree under this share of SwapTotal is swap exhausted.
 EXIT_GUARD_FIRED = 70
 STATUS_FIELDS = ("VmHWM", "VmRSS", "RssAnon", "RssFile", "RssShmem", "VmSwap")
 
@@ -37,14 +48,16 @@ class Limits:
     min_available_bytes: int = 3 * GIB
     hard_available_bytes: int = 2 * GIB  # Under this, a stopping job gets no more grace.
     min_free_disk_bytes: int = 50 * GIB
-    max_swap_bytes_per_second: int = 10 * (1 << 20)
+    max_swap_in_bytes_per_second: int = 10 * (1 << 20)
 
 
 @dataclass(frozen=True)
 class HostSample:
     available_bytes: int
     swap_free_bytes: int
-    swapped_pages: int  # pswpin + pswpout since boot.
+    swap_total_bytes: int
+    swap_in_pages: int  # pswpin since boot.
+    swap_out_pages: int  # pswpout since boot.
     free_disk_bytes: int
 
 
@@ -56,11 +69,6 @@ def parse_meminfo(text):
         if len(parts) >= 2 and parts[0].endswith(":"):
             fields[parts[0][:-1]] = int(parts[1]) * 1024
     return fields
-
-
-def parse_swap_pages(vmstat_text):
-    counters = dict(line.split() for line in vmstat_text.splitlines())
-    return int(counters["pswpin"]) + int(counters["pswpout"])
 
 
 def parse_status(text):
@@ -78,15 +86,31 @@ def session_of(stat_text):
     return int(stat_text.rsplit(")", 1)[1].split()[3])
 
 
-def breach(sample, swap_bytes_per_second, swap_strikes, limits):
-    """Why the job must stop, or None, with the strikes to carry to the next sample."""
-    strikes = swap_strikes + 1 if swap_bytes_per_second > limits.max_swap_bytes_per_second else 0
+def exhausted_floor_bytes(sample, limits):
+    """Floor (c): with swap exhausted, the headroom floor (a) leaves with swap empty, in
+    MemAvailable alone."""
+    return limits.min_available_bytes + sample.swap_total_bytes
+
+
+def swap_exhausted(sample):
+    return sample.swap_free_bytes < SWAP_EXHAUSTED_FRACTION * sample.swap_total_bytes
+
+
+def breach(sample, swap_in_bytes_per_second, swap_strikes, limits):
+    """Why the job must stop, or None, with the strikes to carry to the next sample. Swap-out
+    is not an argument: it alone never stops a run."""
+    over = swap_in_bytes_per_second > limits.max_swap_in_bytes_per_second
+    strikes = swap_strikes + 1 if over else 0
     if sample.available_bytes < limits.min_available_bytes:
         return f"MemAvailable under {limits.min_available_bytes / GIB:g} GiB", strikes
     if sample.free_disk_bytes < limits.min_free_disk_bytes:
         return f"free disk under {limits.min_free_disk_bytes / GIB:g} GiB", strikes
     if strikes >= SWAP_STRIKES:
-        return f"swap traffic over {limits.max_swap_bytes_per_second} bytes/s", strikes
+        return (f"swap-in over {limits.max_swap_in_bytes_per_second} bytes/s for "
+                f"{SWAP_STRIKES} samples"), strikes
+    floor = exhausted_floor_bytes(sample, limits)
+    if swap_exhausted(sample) and sample.available_bytes < floor:
+        return (f"swap exhausted with MemAvailable under {floor / GIB:.2f} GiB"), strikes
     return None, strikes
 
 
@@ -100,9 +124,17 @@ def wait_status_fields(code):
 def read_host(watch):
     memory = parse_meminfo(Path("/proc/meminfo").read_text(encoding="ascii"))
     disk = os.statvfs(watch)
-    return HostSample(memory["MemAvailable"], memory["SwapFree"],
-                      parse_swap_pages(Path("/proc/vmstat").read_text(encoding="ascii")),
-                      disk.f_bavail * disk.f_frsize)
+    swap_in, swap_out = parse_vmstat(Path("/proc/vmstat").read_text(encoding="ascii"))
+    return HostSample(memory["MemAvailable"], memory["SwapFree"], memory["SwapTotal"], swap_in,
+                      swap_out, disk.f_bavail * disk.f_frsize)
+
+
+def rates(sample, last):
+    """Swap-in and swap-out since the last sample, in bytes per second."""
+    if last is None:
+        return 0.0, 0.0
+    return ((sample.swap_in_pages - last.swap_in_pages) * PAGE_BYTES / SAMPLE_SECONDS,
+            (sample.swap_out_pages - last.swap_out_pages) * PAGE_BYTES / SAMPLE_SECONDS)
 
 
 def session_members(session):
@@ -133,8 +165,12 @@ class Guard:
                              hard_available_bytes=int(args.min_available_gib * GIB * 2 / 3),
                              min_free_disk_bytes=int(args.min_free_disk_gib * GIB))
         self.report = {"command": args.command, "sample_seconds": SAMPLE_SECONDS,
-                       "limits": vars(self.limits), "guard_fired": False, "guard_reason": None,
-                       "exit": None, "processes": {}}
+                       "limits": {**vars(self.limits), "swap_in_strikes": SWAP_STRIKES,
+                                  "swap_exhausted_fraction": SWAP_EXHAUSTED_FRACTION,
+                                  "swap_exhausted_floor": "min_available_bytes plus SwapTotal",
+                                  "swap_out": "recorded, never a stop"},
+                       "guard_fired": False, "guard_reason": None, "exit": None,
+                       "processes": {}}
         self.lowest_available = None
         self.lowest_disk = None
         self.first = None
@@ -144,6 +180,8 @@ class Guard:
         self.asked_to_stop = None
         self.samples_taken = 0
         self.session_rss_peak = 0
+        self.swap_in_peak = 0.0
+        self.swap_out_peak = 0.0
 
     def on_signal(self, number, frame):
         self.asked_to_stop = signal.Signals(number).name
@@ -165,19 +203,19 @@ class Guard:
 
     def take_sample(self, session, samples, elapsed):
         sample = read_host(self.args.watch)
-        rate = 0.0
-        if self.last is not None:
-            rate = (sample.swapped_pages - self.last.swapped_pages) * PAGE_BYTES / SAMPLE_SECONDS
+        swap_in, swap_out = rates(sample, self.last)
+        self.swap_in_peak = max(self.swap_in_peak, swap_in)
+        self.swap_out_peak = max(self.swap_out_peak, swap_out)
         self.first = self.first or sample
         self.last = sample
-        reason, self.strikes = breach(sample, rate, self.strikes, self.limits)
+        reason, self.strikes = breach(sample, swap_in, self.strikes, self.limits)
         self.lowest_available = min(self.lowest_available or sample.available_bytes,
                                     sample.available_bytes)
         self.lowest_disk = min(self.lowest_disk or sample.free_disk_bytes, sample.free_disk_bytes)
         rss = self.note_processes(session)
         self.session_rss_peak = max(self.session_rss_peak, rss)
         samples.write(f"{elapsed:.1f},{sample.available_bytes},{sample.swap_free_bytes},"
-                      f"{rate:.0f},{sample.free_disk_bytes},{rss}\n")
+                      f"{swap_in:.0f},{swap_out:.0f},{sample.free_disk_bytes},{rss}\n")
         samples.flush()
         return reason
 
@@ -188,8 +226,15 @@ class Guard:
             "mem_available_lowest_bytes": self.lowest_available,
             "swap_free_start_bytes": self.first and self.first.swap_free_bytes,
             "swap_free_last_bytes": self.last and self.last.swap_free_bytes,
-            "swapped_pages_during_run": (self.last.swapped_pages - self.first.swapped_pages
+            "swap_total_bytes": self.first and self.first.swap_total_bytes,
+            "swap_exhausted_floor_bytes": self.first and exhausted_floor_bytes(self.first,
+                                                                              self.limits),
+            "swap_in_pages_during_run": (self.last.swap_in_pages - self.first.swap_in_pages
                                          if self.first else None),
+            "swap_out_pages_during_run": (self.last.swap_out_pages - self.first.swap_out_pages
+                                          if self.first else None),
+            "swap_in_bytes_per_second_peak": self.swap_in_peak,
+            "swap_out_bytes_per_second_peak": self.swap_out_peak,
             "free_disk_start_bytes": self.first and self.first.free_disk_bytes,
             "free_disk_lowest_bytes": self.lowest_disk,
             "session_rss_bytes_peak": self.session_rss_peak,
@@ -217,7 +262,8 @@ class Guard:
                                    start_new_session=True)
         session = process.pid
         with open(self.args.samples, "w", encoding="ascii") as samples:
-            samples.write("seconds,mem_available,swap_free,swap_bytes_per_s,free_disk,session_rss\n")
+            samples.write("seconds,mem_available,swap_free,swap_in_bytes_per_s,"
+                          "swap_out_bytes_per_s,free_disk,session_rss\n")
             while process.poll() is None:
                 elapsed = time.monotonic() - started
                 reason = self.take_sample(session, samples, elapsed)

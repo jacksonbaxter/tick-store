@@ -425,6 +425,9 @@ FAULTS = (
           "full-day file's query windows with BENCHMARKS.md's, so an hour clipped to the slice "
           "passes as a full day", CHECK_FAILED,
           "FAIL: test_a_clipped_hour_passing_as_a_full_day (__main__.FullDay"),
+    Fault("guard-swap-in-stop-disabled", "py-scripts", "compare/guard.py stops firing on "
+          "sustained swap-in, so a host thrashing through swap is no longer stopped",
+          CHECK_FAILED, "FAIL: test_sustained_swap_in_stops (__main__.Breach"),
     Fault("compare-tests-settings", "py-compare", "the QuestDB commit mode check stops checking",
           CHECK_FAILED, "FAIL: test_the_parser_outranks_a_matching_echo"),
     Fault("tickstore-settings-unchecked", "py-compare", "tick-store's read-back stops comparing "

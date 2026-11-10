@@ -16,7 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from compare import coldcache  # noqa: E402
+from compare import coldcache, swap  # noqa: E402
 from compare.layout import Layout  # noqa: E402
 from compare.queries import (QueryMismatch, digest_result, query_from_json,  # noqa: E402
                              require_truth, run_query)
@@ -148,8 +148,9 @@ def step_warm_queries(system, request, layout):
     before = coldcache.residency(layout, paths)
     answers = {}
     for query in queries:
-        seconds, engine, digest = timed_repetitions(system, query, truth, repetitions)
-        answers[query.name] = {"seconds": seconds, "digest": digest}
+        with swap.Phase() as phase:
+            seconds, engine, digest = timed_repetitions(system, query, truth, repetitions)
+        answers[query.name] = {"seconds": seconds, "digest": digest, "swap_timed": phase.counts}
         if None not in engine:
             answers[query.name]["engine_seconds"] = engine
     after = coldcache.residency(layout, paths)
@@ -196,7 +197,8 @@ def warm_full_day(system, request, layout):
             device = coldcache.DeviceCounter(paths[0])
             reads = coldcache.ProcessReads({**request.get("service_processes", {}),
                                             **system.query_processes()})
-            seconds, engine, digest = timed_repetitions(system, query, truth, repetitions)
+            with swap.Phase() as phase:
+                seconds, engine, digest = timed_repetitions(system, query, truth, repetitions)
             caused = reads.delta()
             moved = device.delta()
             free_after = coldcache.meminfo_bytes("MemFree")
@@ -209,7 +211,8 @@ def warm_full_day(system, request, layout):
                        "pages": after["pages"], "resident_before": before["resident_pages"],
                        "resident_after": after["resident_pages"],
                        "mem_free_bytes_before": free_before, "mem_free_bytes_after": free_after,
-                       "median_us": statistics.median(seconds) * 1e6}
+                       "median_us": statistics.median(seconds) * 1e6,
+                       "swap_timed": phase.counts}
             attempts.append(attempt)
             if caused["bytes"] == 0:
                 break
@@ -217,7 +220,7 @@ def warm_full_day(system, request, layout):
             raise coldcache.ProofFailed(f"warm {query.name}: the query's processes read from "
                                         f"storage in each of {WARM_ATTEMPTS} attempts: "
                                         f"{attempts}")
-        answers[query.name] = {"seconds": seconds, "digest": digest}
+        answers[query.name] = {"seconds": seconds, "digest": digest, "swap_timed": phase.counts}
         if None not in engine:
             answers[query.name]["engine_seconds"] = engine
         proofs[query.name] = {
@@ -238,10 +241,12 @@ def engine_seconds(result):
 
 def step_cold_query(system, request, layout):
     query = query_from_json(request["query"])
-    elapsed, result = timed_query(system, query)
+    with swap.Phase() as phase:
+        elapsed, result = timed_query(system, query)
     digest = digest_result(query, result)
     require_truth(query, digest, request["truth"], system.name)
-    return {"seconds": elapsed, "digest": digest, "engine_seconds": engine_seconds(result)}
+    return {"seconds": elapsed, "digest": digest, "engine_seconds": engine_seconds(result),
+            "swap_timed": phase.counts}
 
 
 STEPS = {"ingest": step_ingest, "flush_probe": step_flush_probe, "read_back": step_read_back,

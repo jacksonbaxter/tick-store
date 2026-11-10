@@ -30,7 +30,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from compare import coldcache  # noqa: E402
+from compare import coldcache, swap  # noqa: E402
 from compare.durability import CLASS_A, CLASSES, sync_tree  # noqa: E402
 from compare.layout import PINS_PATH, Layout, child_environment  # noqa: E402
 from compare.queries import (build_queries, full_day_facts, ground_truth,  # noqa: E402
@@ -193,6 +193,7 @@ class Runner:
 
     def run_class(self, variant, durability, control_saw_dirty):
         """Flush proof, writes, then the last write's store sized and read back."""
+        write_phase = swap.Phase().start()
         self.note(f"{variant} class {durability}: flush probe")
         probe = self.flush_probe(variant, durability)
         root = self.stores / variant / durability
@@ -224,13 +225,15 @@ class Runner:
                                  else "the slice's source bytes")
         stored["measured"] = "at rest, after commit, service stopped, every file flushed first"
         stored["settle"] = settle
+        write_phase.stop()
 
         self.note(f"{variant} class {durability}: read back")
-        try:
-            system.start_service()
-            read_back = self.read_back(system)
-        finally:
-            service = system.stop_service()
+        with swap.Phase() as read_phase:
+            try:
+                system.start_service()
+                read_back = self.read_back(system)
+            finally:
+                service = system.stop_service()
 
         if self.full_day and durability == CLASS_A:
             # Queries run on class B alone, and two stores of a day at once would not fit beside
@@ -246,13 +249,15 @@ class Runner:
         facts_of_class = system.flush_findings(system.durability_facts(), answer["flush"])
         return {"durability": {"class": durability, **facts_of_class, **verdict, "flush": flush},
                 "settings": settings, "write": summarise_writes(repetitions, self.pin),
-                "facts": facts, "stored": stored, "read_back": read_back}, probe
+                "facts": facts, "stored": stored, "read_back": read_back,
+                "swap": {"write": write_phase.counts, "read_back": read_phase.counts}}, probe
 
     def run_queries(self, variant, durability, queries, truth):
         """Warm and cold on one store, with every answer against the ground truth."""
         root = self.stores / variant / durability
         system = self.system_class(self.context(root, variant, durability))
         paths = system.data_paths()
+        warm_phase = swap.Phase().start()
         if self.full_day:
             self.cleared = self.clear_page_cache(root, paths)
         self.note(f"{variant}: warm queries")
@@ -266,10 +271,13 @@ class Runner:
                 self.sample_memory()
         finally:
             system.stop_service()
+        warm_phase.stop()
 
         cold = {query.name: [] for query in queries}
         cold_engine = {query.name: [] for query in queries}
+        cold_swap = {query.name: [] for query in queries}
         proofs = {query.name: [] for query in queries}
+        cold_phase = swap.Phase().start()
         for query in queries:
             self.note(f"{variant}: cold {query.name}")
             for _ in range(self.args.cold_repetitions):
@@ -286,6 +294,8 @@ class Runner:
                 proofs[query.name].append(coldcache.proof_of_cold(evicted, after, device.delta()))
                 cold[query.name].append(answer["seconds"])
                 cold_engine[query.name].append(answer.get("engine_seconds"))
+                cold_swap[query.name].append(answer["swap_timed"])
+        cold_phase.stop()
 
         results = {}
         for query in queries:
@@ -295,8 +305,12 @@ class Runner:
                 "scan": warm["scan_facts"][query.name],
                 "warm": {**latency(warm_query["seconds"]),
                          "proof": (warm["proofs"][query.name] if self.full_day
-                                   else warm["proof"])},
-                "cold": {**latency(cold[query.name]), "proofs": proofs[query.name]},
+                                   else warm["proof"]),
+                         "swap_timed": swap.timed([warm_query["swap_timed"]])},
+                "cold": {**latency(cold[query.name]), "proofs": proofs[query.name],
+                         "swap_timed": {**swap.timed(cold_swap[query.name]),
+                                        "pages_in_by_repetition": [
+                                            item["pages_in"] for item in cold_swap[query.name]]}},
             }
             # A system that reports its engine's own time gets it beside the round trip, which
             # stays the number that is compared.
@@ -305,7 +319,8 @@ class Runner:
             if None not in cold_engine[query.name]:
                 results[query.name]["cold"]["engine"] = latency(cold_engine[query.name])
         floor = latency(warm["floor_seconds"])
-        return results, floor, warm["peak_rss_bytes"], self.after_queries(system)
+        phases = {"warm_queries": warm_phase.counts, "cold_queries": cold_phase.counts}
+        return results, floor, warm["peak_rss_bytes"], self.after_queries(system), phases
 
     def clear_page_cache(self, root, paths):
         """On a day, the page cache emptied of the inputs and the store before warm queries.
@@ -397,8 +412,8 @@ class Runner:
                 if durability == CLASS_A:
                     control = (probe["data_dirty_pages"] or 0) > 0
                 entry["classes"][durability] = result
-            query_results, floor, peak, extra = self.run_queries(variant, CLASSES[-1], queries,
-                                                                 truth)
+            query_results, floor, peak, extra, phases = self.run_queries(
+                variant, CLASSES[-1], queries, truth)
             if self.full_day:
                 entry["page_cache_before_warm"] = self.cleared
             entry["queries"] = query_results
@@ -406,10 +421,12 @@ class Runner:
             entry["python_floor"] = {**floor, "what": "the same Python call over an empty "
                                                       "window: the path's cost, with no data"}
             entry["query_worker_peak_rss_bytes"] = peak
+            entry["swap"] = phases
             if extra is not None:
                 entry["after_queries"] = extra
             out["variants"][variant] = entry
             shutil.rmtree(self.stores / variant, ignore_errors=True)
+        out["swap_by_phase"] = swap_by_phase(out["variants"])
         out["queries"] = [query_to_json(query) for query in queries]
         out["truth"] = truth
         if self.full_day:
@@ -424,6 +441,18 @@ class Runner:
     def window_end_ns(self):
         hours, minutes, seconds = (int(part) for part in self.pin["to"].split(":"))
         return (hours * 3600 + minutes * 60 + seconds) * 1_000_000_000
+
+
+def swap_by_phase(variants):
+    """Pages swapped in and out per phase, over every variant and class the system ran."""
+    return {"write": swap.add(*(entry["swap"]["write"] for variant in variants.values()
+                                for entry in variant["classes"].values())),
+            "read_back": swap.add(*(entry["swap"]["read_back"] for variant in variants.values()
+                                    for entry in variant["classes"].values())),
+            "warm_queries": swap.add(*(variant["swap"]["warm_queries"]
+                                       for variant in variants.values())),
+            "cold_queries": swap.add(*(variant["swap"]["cold_queries"]
+                                       for variant in variants.values()))}
 
 
 def latency(seconds):

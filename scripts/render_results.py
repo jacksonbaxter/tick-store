@@ -14,7 +14,8 @@ slice's, labelled slice only, so a full-day number and a slice number never shar
 host has its own tables, and so does each durability class: ingest in class A and ingest in
 class B never share a table, and queries are on each system's class B store, as the harness runs
 them. Each system shows its headline variant; a full day also lists every variant it ran, and
-each system's peak memory.
+each system's peak memory and swap per phase. A timed number with any page swapped in while it
+ran carries "(swap-in)".
 """
 
 import argparse
@@ -49,7 +50,12 @@ INGEST_COLUMNS = ("System", "Variant", "Write s, median", "M records/s", "Stored
 VARIANT_COLUMNS = ("System", "Variant", "Stored bytes, B", "Ratio", "Write s, A / B",
                    *(f"{name} ms, warm / cold" for name in QUERY_NAMES))
 MEMORY_COLUMNS = ("System", "Largest VmHWM", "Peak RSS of its processes together",
-                  "MemAvailable, lowest")
+                  "MemAvailable, lowest", "Swap in / out over the run, MiB")
+SWAP_PHASES = (("write", "Write"), ("read_back", "Read-back"), ("warm_queries", "Warm queries"),
+               ("cold_queries", "Cold queries"))
+SWAP_COLUMNS = ("System", *(f"{label}, in / out MiB" for _, label in SWAP_PHASES),
+                "Timed queries with swap-in")
+SWAP_MARK = " (swap-in)"
 
 EXIT_STALE = 1
 EXIT_USAGE = 2
@@ -230,6 +236,12 @@ def lowest_mark(values, name):
     return ", ".join(marks) or "no"
 
 
+def timed_cell(entry, kind, field):
+    """A warm or cold number, marked when a page was swapped in while it was timed."""
+    flagged = (entry[kind].get("swap_timed") or {}).get("flagged")
+    return milliseconds(entry[kind][field]) + (SWAP_MARK if flagged else "")
+
+
 def query_table(document):
     names = ordered_systems(document)
     lines = ["| " + " | ".join(QUERY_COLUMNS) + " |", "|" + "---|" * len(QUERY_COLUMNS)]
@@ -239,10 +251,9 @@ def query_table(document):
             variant, _ = headline(document, name)
             entry = values[name]
             cells = (query, SYSTEM_LABEL[name], f"`{variant}`", f"{entry['digest']['rows']:,}",
-                     milliseconds(entry["warm"]["median_us"]),
-                     milliseconds(entry["warm"]["p99_us"]),
-                     milliseconds(entry["cold"]["median_us"]),
-                     milliseconds(entry["cold"]["p99_us"]), lowest_mark(values, name))
+                     timed_cell(entry, "warm", "median_us"), timed_cell(entry, "warm", "p99_us"),
+                     timed_cell(entry, "cold", "median_us"), timed_cell(entry, "cold", "p99_us"),
+                     lowest_mark(values, name))
             lines.append("| " + " | ".join(cells) + " |")
     return lines
 
@@ -295,13 +306,48 @@ def variant_table(document):
     return lines
 
 
+def mib_of_pages(pages, page_bytes):
+    return f"{pages * page_bytes / (1 << 20):,.1f}"
+
+
 def memory_table(document):
     lines = ["| " + " | ".join(MEMORY_COLUMNS) + " |", "|" + "---|" * len(MEMORY_COLUMNS)]
+    page_bytes = document["method"]["swap"]["page_bytes"]
     for name in ordered_systems(document):
         memory = document["systems"][name]["peak_memory"]
         largest = max(memory["vmhwm_bytes_by_process"].items(), key=lambda item: item[1])
         cells = (SYSTEM_LABEL[name], f"{gib(largest[1])} (`{largest[0]}`)",
-                 gib(memory["session_rss_bytes_peak"]), gib(memory["mem_available_lowest_bytes"]))
+                 gib(memory["session_rss_bytes_peak"]), gib(memory["mem_available_lowest_bytes"]),
+                 f"{mib_of_pages(memory['swap_in_pages_during_run'], page_bytes)} / "
+                 f"{mib_of_pages(memory['swap_out_pages_during_run'], page_bytes)}")
+        lines.append("| " + " | ".join(cells) + " |")
+    return lines
+
+
+def flagged_queries(system):
+    """Every variant's timed query, warm or cold, that had a page swapped in."""
+    found = []
+    for variant, entry in system["variants"].items():
+        for query in QUERY_NAMES:
+            for kind in ("warm", "cold"):
+                if (entry["queries"][query][kind].get("swap_timed") or {}).get("flagged"):
+                    found.append(f"`{variant}` {query} {kind}")
+    return ", ".join(found) or "none"
+
+
+def swap_table(document):
+    """Host-wide pages swapped in and out per phase, over every variant and class a system
+    ran, from the counts in the results file."""
+    lines = ["| " + " | ".join(SWAP_COLUMNS) + " |", "|" + "---|" * len(SWAP_COLUMNS)]
+    page_bytes = document["method"]["swap"]["page_bytes"]
+    for name in ordered_systems(document):
+        system = document["systems"][name]
+        cells = [SYSTEM_LABEL[name]]
+        for phase, _ in SWAP_PHASES:
+            counts = system["swap_by_phase"][phase]
+            cells.append(f"{mib_of_pages(counts['pages_in'], page_bytes)} / "
+                         f"{mib_of_pages(counts['pages_out'], page_bytes)}")
+        cells.append(flagged_queries(system))
         lines.append("| " + " | ".join(cells) + " |")
     return lines
 
@@ -333,6 +379,11 @@ def compare_for(document):
             lines += ["", "Peak memory per system, from compare/guard.py across the system's "
                           "whole run.", ""]
             lines += memory_table(document)
+        lines += ["", "Swap per phase, host-wide, over every variant and class each system ran. "
+                      "Swap-out alone does not stop a run; a timed query with any page swapped "
+                      f"in is kept and marked{SWAP_MARK}. See \"The guard's swap rule\" in "
+                      "NOTES.md.", ""]
+        lines += swap_table(document)
     return lines
 
 

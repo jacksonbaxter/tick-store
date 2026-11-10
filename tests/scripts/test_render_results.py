@@ -306,6 +306,14 @@ class RenderCompareTest(Scratch):
         self.assertIn("`v` (headline)", section)
         self.assertIn("| QuestDB | 0.00 GiB (`java`)", section)
         self.assertNotIn("Peak memory", block[linux:])
+        # Swap per phase, in MiB of 4 KiB pages, and every timed number with swap-in marked.
+        self.assertIn("Swap per phase", section)
+        self.assertIn("| Parquet | 0.0 / 0.8 | 0.0 / 0.2 | 0.0 / 0.0 | 0.0 / 0.0 | `v` Q1 cold, ",
+                      section)
+        query_rows = section[section.index("| Query |"):section.index("Ingest and size")]
+        self.assertIn("| 0.01 | 0.01 | 0.10 (swap-in) | 0.11 (swap-in) |", query_rows)
+        self.assertNotIn("0.01 (swap-in)", query_rows)
+        self.assertNotIn("Swap per phase", block[linux:])
 
     def test_comparison_files_need_their_markers(self):
         self.readme.write_text(README, encoding="utf-8")

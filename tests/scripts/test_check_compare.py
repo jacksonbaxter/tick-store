@@ -115,8 +115,13 @@ def durability_block(system, name, host):
             "flush": {"probe": flush(dirty, calls, engine), "full_ingest": flush(dirty, calls, engine)}}
 
 
+def swap_counts(pages_in=0, pages_out=0):
+    return {"pages_in": pages_in, "pages_out": pages_out}
+
+
 def class_entry(system, name, host):
     entry = {
+        "swap": {"write": swap_counts(1, 100), "read_back": swap_counts(0, 20)},
         "durability": durability_block(system, name, host),
         "settings": settings_of(system, name),
         "write": {"seconds_median": 2.0, "records_per_second_median": MESSAGES / 2.0,
@@ -144,9 +149,12 @@ def query_entry(name, system=None):
     entry = {"digest": digest(name), "matches_ground_truth": True,
              "scan": {"rows_decoded": 5},
              "warm": {"n": 3, "median_us": 10.0, "p99_us": 12.0,
-                      "proof": {"pages": 8, "resident_before": 8, "resident_after": 8}},
+                      "proof": {"pages": 8, "resident_before": 8, "resident_after": 8},
+                      "swap_timed": {**swap_counts(0, 4), "flagged": False}},
              "cold": {"n": 2, "median_us": 100.0, "p99_us": 110.0,
-                      "proofs": [cold_proof, dict(cold_proof)]}}
+                      "proofs": [cold_proof, dict(cold_proof)],
+                      "swap_timed": {**swap_counts(2, 0), "flagged": True,
+                                     "pages_in_by_repetition": [0, 2]}}}
     if system == "tickstore":
         entry["warm"]["engine"] = {"n": 3, "median_us": 9.0}
         entry["cold"]["engine"] = {"n": 2, "median_us": 90.0}
@@ -164,7 +172,10 @@ def system_block(system, host):
             "tuning": {"k": 1},
             "classes": {name: class_entry(system, name, host) for name in ("A", "B")},
             "queries": {name: query_entry(name, system) for name in QUERY_NAMES},
+            "swap": {"warm_queries": swap_counts(0, 7), "cold_queries": swap_counts(12, 3)},
         }},
+        "swap_by_phase": {"write": swap_counts(2, 200), "read_back": swap_counts(0, 40),
+                          "warm_queries": swap_counts(0, 7), "cold_queries": swap_counts(12, 3)},
     }
 
 
@@ -195,7 +206,7 @@ def valid_document(host):
     linux = host == "Linux"
     return {
         "header": {
-            "schema": 1, "host": host, "measurement": "reported",
+            "schema": 2, "host": host, "measurement": "reported",
             "statement": "Pinned." if linux else "Unpinned. No hardware counters.",
             "cpu_model": "cpu", "kernel": "Linux 6.12" if linux else "Darwin 27.2.0",
             "compiler": "clang 23", "compile_flags": "-O3 -DNDEBUG", "build_type": "Release",
@@ -215,7 +226,10 @@ def valid_document(host):
         "input": {"slice": SLICE, "sha256": SHA, "messages": MESSAGES, "bytes": BYTES,
                   "ratio_baseline": "source bytes", "clipping": "Q2 is clipped to the slice",
                   "ingest_input": "tick-store's ingest holds ITCH parsing, the others' not"},
-        "method": {"warm": "how", "cold": "how"},
+        "method": {"warm": "how", "cold": "how",
+                   "swap": {"source": "pswpin and pswpout" if linux else "vm_stat",
+                            "page_bytes": 4096 if linux else 16384, "scope": "host-wide",
+                            "timed_policy": "a timed query with swap-in is flagged"}},
         "queries": {"parameters": [], "truth": {name: digest(name) for name in QUERY_NAMES}},
         "systems": {name: system_block(name, host)
                     for name in ("parquet", "arcticdb", "questdb", "tickstore")},
@@ -847,6 +861,8 @@ def full_day_document():
     for system in document["systems"].values():
         system["peak_memory"] = {"vmhwm_bytes_largest": 10, "mem_available_lowest_bytes": 5,
                                  "session_rss_bytes_peak": 12, "guard_fired": False,
+                                 "swap_in_pages_during_run": 3,
+                                 "swap_out_pages_during_run": 250000,
                                  "exit": {"code": 0, "signal": None}}
         for variant in system["variants"].values():
             for entry in variant["classes"].values():
@@ -974,6 +990,16 @@ class FullDay(Harness):
             del document["systems"]["questdb"]["peak_memory"]
         self.assert_full_fault(fault, "questdb.peak_memory: no vmhwm_bytes_largest")
 
+    def test_no_swap_counts_from_the_guard(self):
+        def fault(document, source):
+            del document["systems"]["questdb"]["peak_memory"]["swap_in_pages_during_run"]
+        self.assert_full_fault(fault, "the guard's swap_in_pages_during_run is not recorded")
+
+    def test_a_full_day_file_from_before_swap_was_counted(self):
+        def fault(document, source):
+            document["header"]["schema"] = 1
+        self.assert_full_fault(fault, "a full-day file must count swap per phase")
+
     def test_the_guard_fired(self):
         def fault(document, source):
             document["systems"]["parquet"]["peak_memory"]["guard_fired"] = True
@@ -1007,6 +1033,66 @@ class FullDay(Harness):
         def fault(document, source):
             del document["variant_selection"]
         self.assert_full_fault(fault, "must state how its variants were chosen")
+
+
+class Swap(Harness):
+    """Swap per phase, and each timed query's swap-in with its flag."""
+
+    def test_a_class_with_no_write_phase(self):
+        def fault(document):
+            del b_of(document, "questdb")["swap"]["write"]
+        self.assert_fault(fault, "questdb.v.B.swap.write: no swap counts")
+
+    def test_a_class_with_no_read_back_phase(self):
+        def fault(document):
+            b_of(document, "tickstore")["swap"]["read_back"]["pages_out"] = -1
+        self.assert_fault(fault, "tickstore.v.B.swap.read_back: no swap counts", "Linux")
+
+    def test_a_variant_with_no_warm_or_cold_phase(self):
+        for phase in ("warm_queries", "cold_queries"):
+            def fault(document, phase=phase):
+                del document["systems"]["arcticdb"]["variants"]["v"]["swap"][phase]
+            self.assert_fault(fault, f"arcticdb.v.swap.{phase}: no swap counts")
+
+    def test_totals_that_do_not_add_up(self):
+        def fault(document):
+            document["systems"]["parquet"]["swap_by_phase"]["cold_queries"]["pages_in"] = 0
+        self.assert_fault(fault, "parquet.swap_by_phase.cold_queries")
+
+    def test_a_query_with_no_timed_swap(self):
+        def fault(document):
+            del q1_of(document)["warm"]["swap_timed"]
+        self.assert_fault(fault, "parquet.v.queries.Q1.warm.swap_timed: no swap counts")
+
+    def test_swap_in_during_a_timed_query_left_unflagged(self):
+        def fault(document):
+            q1_of(document, "questdb")["cold"]["swap_timed"]["flagged"] = False
+        self.assert_fault(fault, "Q1.cold.swap_timed: flagged is False with 2 pages swapped in",
+                          "Linux")
+
+    def test_a_flag_with_no_swap_in(self):
+        def fault(document):
+            q1_of(document)["warm"]["swap_timed"]["flagged"] = True
+        self.assert_fault(fault, "Q1.warm.swap_timed: flagged is True with 0 pages")
+
+    def test_cold_runs_whose_swap_in_does_not_add_up(self):
+        def fault(document):
+            q1_of(document)["cold"]["swap_timed"]["pages_in_by_repetition"] = [0, 1]
+        self.assert_fault(fault, "no pages swapped in for each cold run that add up")
+
+    def test_no_swap_method(self):
+        def fault(document):
+            del document["method"]["swap"]["timed_policy"]
+        self.assert_fault(fault, "what a timed query with swap-in becomes is not stated")
+
+    def test_an_old_slice_file_without_swap_still_passes(self):
+        document = copy.deepcopy(valid_document("macOS"))
+        document["header"]["schema"] = 1
+        del document["method"]["swap"]
+        for system in document["systems"].values():
+            del system["swap_by_phase"]
+        result = self.run_on(document)
+        self.assertEqual(result.returncode, 0, result.stderr)
 
 
 class VariantRule(unittest.TestCase):
