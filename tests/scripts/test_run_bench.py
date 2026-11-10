@@ -86,6 +86,20 @@ def fake_seeded_report(commit, case):
     return report
 
 
+COLUMN_CASES = ("gorilla_xor/add_price", "store_decode/add_price")
+
+
+def fake_column_report(commit, case):
+    """A real-data column decode: the slice's checks, then its column given back exactly."""
+    report = fake_seeded_report(commit, case)
+    report["build"]["isa"] = fake_report(commit, False, case)["build"]["isa"]
+    report["verification"] = {"messages": MESSAGES, "bytes": 5000, "input_sha256": SHA,
+                              "reencoded_sha256": SHA, "column": "add_price", "values": 3000,
+                              "encoded_bytes": 2400, "items_per_call": 3000,
+                              "calls_per_pass": 1, "matched": True}
+    return report
+
+
 def fake_gbench(case):
     rows = [{"name": f"{case}/throughput/real_time", "run_type": "iteration"}]
     for name, rate in (("mean", 6e7), ("median", 6e7), ("stddev", 1e5), ("cv", 0.01)):
@@ -271,6 +285,19 @@ class RunBenchTest(unittest.TestCase):
         write_script(path, BINARY.format(python=sys.executable, record=str(self.record),
                                          reports=reports, gbench=gbench, exit_code=0,
                                          cases="\n".join(SEEDED_CASES), kind=kind))
+        return path
+
+    def make_column_binary(self, matched=True):
+        reports = {}
+        for case in COLUMN_CASES:
+            report = fake_column_report(self.commit, case)
+            report["verification"]["matched"] = matched
+            reports[case] = json.dumps(report)
+        gbench = {c: json.dumps(fake_gbench(c)) for c in COLUMN_CASES}
+        path = self.dir / "column_decode_bench"
+        write_script(path, BINARY.format(python=sys.executable, record=str(self.record),
+                                         reports=reports, gbench=gbench, exit_code=0,
+                                         cases="\n".join(COLUMN_CASES), kind="column"))
         return path
 
     def make_wrapper(self, text=WRAPPER):
@@ -573,6 +600,50 @@ class RunBenchTest(unittest.TestCase):
         counters = document["results"][0]["counters"]
         self.assertEqual(counters["per_value"]["cycles"], 0.4)
         self.assertEqual(counters["gated_values"], 10000)
+
+    # A real-data column decode: the pinned slice goes in, values per second come out.
+
+    def column_path(self):
+        return self.results / f"{HOST}-column_decode-{self.commit[:12]}.json"
+
+    def test_a_column_run_writes_a_file_the_validator_passes(self):
+        result = self.run_bench(self.make_column_binary(), self.make_wrapper())
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        document = json.loads(self.column_path().read_text(encoding="utf-8"))
+        self.assertEqual(document["input"]["kind"], "column")
+        self.assertEqual(document["input"]["sha256"], SHA)
+        self.assertEqual([row["case"] for row in document["results"]], list(COLUMN_CASES))
+        row = document["results"][0]
+        self.assertIn("values_per_second", row["throughput"])
+        self.assertEqual(row["ratio"]["value"], 10.0)
+        self.assertEqual(row["ratio"]["bits_per_value"], 6.4)
+        checked = subprocess.run(
+            [sys.executable, "-I", str(CHECK), "--pins", str(self.pins), str(self.column_path())],
+            capture_output=True, text=True, check=False)
+        self.assertEqual(checked.returncode, 0, msg=checked.stderr)
+
+    def test_a_column_case_gets_the_slice_and_its_pin(self):
+        self.run_bench(self.make_column_binary(), self.make_wrapper())
+        runs = [line for line in self.record.read_text(encoding="utf-8").splitlines()
+                if line.startswith("binary ")]
+        self.assertEqual(len(runs), len(COLUMN_CASES))
+        for line in runs:
+            self.assertIn(f"--slice={self.slice}", line)
+            self.assertIn(f"--expect-sha256={SHA}", line)
+            self.assertIn(f"--expect-messages={MESSAGES}", line)
+
+    def test_a_column_case_that_did_not_give_back_its_column_is_never_published(self):
+        result = self.run_bench(self.make_column_binary(matched=False), self.make_wrapper())
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("give back its column", result.stderr)
+        self.assertEqual(list(self.results.iterdir()), [])
+
+    @unittest.skipUnless(HOST == "Linux", "the pinned path exists only on Linux")
+    def test_linux_counts_a_column_case_per_value(self):
+        self.run_bench(self.make_column_binary(), self.make_wrapper())
+        document = json.loads(self.column_path().read_text(encoding="utf-8"))
+        counters = document["results"][0]["counters"]
+        self.assertEqual(counters["per_value"]["cycles"], 0.4)
 
 
 if __name__ == "__main__":

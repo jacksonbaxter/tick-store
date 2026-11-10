@@ -384,7 +384,9 @@ def check_results_rows(document, pins):
         return ["results: no results"]
     input_block = document.get("input", {})
     seeded = input_block.get("kind") == "seeded"
-    items = "values" if seeded else "messages"
+    # Columns built from the pinned slice: the slice's own checks, and the column's too.
+    column = input_block.get("kind") == "column"
+    items = "values" if seeded or column else "messages"
     slices = pins.get("slices", {})
     pin = None if seeded else slices.get(input_block.get("slice"))
     if pin is None and not seeded:
@@ -401,7 +403,7 @@ def check_results_rows(document, pins):
             problems.append(f"{where}.latency: missing")
         else:
             problems += check_latency(f"{where}.latency", latency, timer,
-                                      "batch_items" if seeded else "batch_messages")
+                                      "batch_items" if seeded or column else "batch_messages")
         counters = result.get("counters")
         if not isinstance(counters, dict):
             problems.append(f"{where}.counters: missing")
@@ -427,6 +429,17 @@ def check_results_rows(document, pins):
             if verification.get("matched") is not True:
                 problems.append(f"{where}.verification.matched: the output was not shown to "
                                 "match the scalar set")
+        if column:
+            # B2 and B4 for a real column: the decode gave back the column exactly, and the
+            # column's size and encoded size, which the ratio comes from, are recorded.
+            if verification.get("matched") is not True:
+                problems.append(f"{where}.verification.matched: the decode was not shown to "
+                                "give back its column")
+            for field in ("values", "encoded_bytes"):
+                if not is_number(verification.get(field)) or verification.get(field, 0) < 1:
+                    problems.append(f"{where}.verification.{field}: a column case records it")
+            if not is_number(result.get("ratio", {}).get("value")):
+                problems.append(f"{where}.ratio: a column case has a measured ratio")
         throughput = result.get("throughput", {})
         if not is_number(throughput.get(f"{items}_per_second", {}).get("median")):
             problems.append(f"{where}.throughput: no median")

@@ -19,6 +19,8 @@ each system's peak memory.
 
 import argparse
 import json
+import re
+import statistics
 import subprocess
 import sys
 from pathlib import Path
@@ -55,6 +57,13 @@ EXIT_USAGE = 2
 COLUMNS = ("Case", "Commit", "Passes", "Messages/s", "Spread (CV)", "Batch", "p50 µs", "p99 µs",
            "p99.9 µs", "Cycles/msg", "Instr/msg", "Branch misses/msg", "Load at start")
 HOSTS = ("Linux", "macOS")
+COLUMN_COLUMNS = ("Case", "Commit", "Kernels", "Values", "Bits/value", "ns/value",
+                  "MB/s of 8-byte values", "Spread (CV)", "Cycles/value", "Instr/value",
+                  "Branch misses/value", "Load at start")
+KERNEL_COLUMNS = ("Kernel", "Set", "Commit", "Cases", "G values/s, median", "Range",
+                  "Largest CV", "Cycles/value, median", "Instr/value, median",
+                  "Branch misses/value, median", "Load at start")
+WIDTH = re.compile(r"/w=\d+")
 
 
 def percentile_us(latency, percentile):
@@ -71,6 +80,83 @@ def per_message(counters, name):
 
 def start_load(line):
     return line.split("load1=", 1)[1].split()[0]
+
+
+def kind_of(document):
+    return document.get("input", {}).get("kind", "slice")
+
+
+def starts_of(document):
+    """Each case's start load, in the order of its results."""
+    return [start_load(line) for line in document["header"]["load_lines"][0::2]]
+
+
+def per_value(counters, name):
+    value = counters.get("per_value", {}).get(name)
+    return None if value is None else value
+
+
+def number_or_na(value, digits=2):
+    return "n/a" if value is None else f"{value:.{digits}f}"
+
+
+def header_line(host, document, what):
+    header = document["header"]
+    return (f"**{host}, {what}.** {header['cpu_model']}, {header['compiler']}, "
+            f"`{header['compile_flags']}`. {header['statement']}")
+
+
+def column_table(host, document):
+    """Real-data column decodes, one row a case: values per second and the column's size."""
+    lines = [header_line(host, document, "real-data column decodes of the slice"), "",
+             "| " + " | ".join(COLUMN_COLUMNS) + " |", "|" + "---|" * len(COLUMN_COLUMNS)]
+    commit = document["header"]["commit"][:12]
+    for result, start in zip(document["results"], starts_of(document)):
+        rate = result["throughput"]["values_per_second"]
+        counters = result["counters"]
+        cells = (f"`{result['case']}`", f"`{commit}`", result["isa"].split(", ", 1)[-1],
+                 f"{result['verification']['values']:,}",
+                 f"{result['ratio']['bits_per_value']:.2f}", f"{1e9 / rate['median']:.3f}",
+                 f"{rate['median'] * 8 / 1e6:,.0f}", f"{rate['cv'] * 100:.2f}%",
+                 number_or_na(per_value(counters, "cycles")),
+                 number_or_na(per_value(counters, "instructions")),
+                 number_or_na(per_value(counters, "branch_misses"), 3), start)
+        lines.append("| " + " | ".join(cells) + " |")
+    return lines
+
+
+def median_or_none(values):
+    present = [value for value in values if value is not None]
+    return statistics.median(present) if present else None
+
+
+def kernel_table(host, document):
+    """Seeded kernel cases, one row a kernel and set: the median across its widths."""
+    groups = {}
+    for result, start in zip(document["results"], starts_of(document)):
+        family, _, kernel_set = WIDTH.sub("", result["case"]).rpartition("/")
+        groups.setdefault((family, kernel_set), []).append((result, float(start)))
+    lines = [header_line(host, document, "decode kernels on seeded L1-resident input"), "",
+             "Each row is one kernel on one set. A kernel with a width ran at each width "
+             "listed, one case each, and the row gives the median across them.", "",
+             "| " + " | ".join(KERNEL_COLUMNS) + " |", "|" + "---|" * len(KERNEL_COLUMNS)]
+    commit = document["header"]["commit"][:12]
+    for (family, kernel_set), rows in groups.items():
+        rates = [row["throughput"]["values_per_second"]["median"] / 1e9 for row, _ in rows]
+        cvs = [row["throughput"]["values_per_second"]["cv"] for row, _ in rows]
+        loads = [load for _, load in rows]
+
+        def median_counter(name, rows=rows):
+            return median_or_none([per_value(row["counters"], name) for row, _ in rows])
+
+        cells = (f"`{family}`", kernel_set, f"`{commit}`", str(len(rows)),
+                 f"{statistics.median(rates):.2f}", f"{min(rates):.2f} to {max(rates):.2f}",
+                 f"{max(cvs) * 100:.2f}%", number_or_na(median_counter("cycles"), 3),
+                 number_or_na(median_counter("instructions"), 3),
+                 number_or_na(median_counter("branch_misses"), 4),
+                 f"{min(loads):.2f} to {max(loads):.2f}")
+        lines.append("| " + " | ".join(cells) + " |")
+    return lines
 
 
 def table_for(host, documents):
@@ -109,8 +195,15 @@ def render(results_dir):
     lines = []
     for host in HOSTS:
         mine = [document for document in documents if document["header"]["host"] == host]
-        if mine:
-            lines += table_for(host, mine) + [""]
+        messages = [document for document in mine if kind_of(document) == "slice"]
+        if messages:
+            lines += table_for(host, messages) + [""]
+        for document in mine:
+            if kind_of(document) == "column":
+                lines += column_table(host, document) + [""]
+        for document in mine:
+            if kind_of(document) == "seeded":
+                lines += kernel_table(host, document) + [""]
     return lines[:-1]
 
 

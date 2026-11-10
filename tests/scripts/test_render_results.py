@@ -143,6 +143,65 @@ class RenderResultsTest(Scratch):
         self.assertEqual(self.render().returncode, 0)
         self.assertIn("No reported results yet.", self.readme.read_text(encoding="utf-8"))
 
+    # Values, not messages: a real-data column file gets a row a case, and a kernel file a
+    # row a kernel and set, the median across its widths.
+
+    def add_named(self, host, benchmark, document):
+        path = self.results / f"{host}-{benchmark}-{FIXTURES.COMMIT[:12]}.json"
+        path.write_text(json.dumps(document), encoding="utf-8")
+
+    def kernel_document(self, host):
+        document = FIXTURES.seeded_document(host)
+        row = document["results"][0]
+        rows = []
+        for width, rate in ((1, 3e9), (13, 1e9), (64, 2e9)):
+            copied = json.loads(json.dumps(row))
+            copied["case"] = f"pfor_delta_two_pass/w={width}/scalar"
+            copied["throughput"]["values_per_second"]["median"] = rate
+            if host == "Linux":
+                copied["counters"]["per_value"]["cycles"] = 3.5e9 / rate
+            rows.append(copied)
+        document["results"] = rows
+        header = document["header"]
+        header["load_lines"] = header["load_lines"] * len(rows)
+        if host == "Linux":
+            header["sibling_busy_percent"]["cases"] = {r["case"]: 0.5 for r in rows}
+        return document
+
+    def test_a_column_file_gets_a_row_a_case_in_values(self):
+        self.add_named("Linux", "column_decode", FIXTURES.column_document("Linux"))
+        result = self.render()
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        text = self.readme.read_text(encoding="utf-8")
+        self.assertIn("**Linux, real-data column decodes of the slice.**", text)
+        row = next(line for line in text.splitlines() if "store_decode/add_price" in line)
+        cells = [cell.strip() for cell in row.strip("|").split("|")]
+        # 6e7 values a second: 16.667 ns a value, 480 MB/s of 8-byte values, 6.40 bits.
+        self.assertEqual(cells[3:7], ["3,000", "6.40", "16.667", "480"])
+
+    def test_a_kernel_file_gets_the_median_across_widths(self):
+        for host in ("Linux", "macOS"):
+            with self.subTest(host=host):
+                self.add_named(host, "simd_kernel", self.kernel_document(host))
+        result = self.render()
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        text = self.readme.read_text(encoding="utf-8")
+        rows = [line for line in text.splitlines() if "`pfor_delta_two_pass`" in line]
+        self.assertEqual(len(rows), 2)
+        linux = [cell.strip() for cell in rows[0].strip("|").split("|")]
+        self.assertEqual(linux[3:8], ["3", "2.00", "1.00 to 3.00", "1.00%", "1.750"])
+        macos = [cell.strip() for cell in rows[1].strip("|").split("|")]
+        self.assertEqual(macos[7], "n/a")
+        self.assertLess(text.index("**Linux, decode kernels"), text.index("**macOS, decode kernels"))
+
+    def test_value_files_never_join_the_message_table(self):
+        self.add_result("Linux")
+        self.add_named("Linux", "column_decode", FIXTURES.column_document("Linux"))
+        self.render()
+        text = self.readme.read_text(encoding="utf-8")
+        message_table = text[text.index("**Linux.**"):text.index("**Linux, real-data")]
+        self.assertNotIn("store_decode", message_table)
+
 
 
 class RenderCompareTest(Scratch):

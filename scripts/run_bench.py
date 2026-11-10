@@ -5,8 +5,10 @@
         python3 -I scripts/run_bench.py build/bench/bench/itch_codec_bench
 
 A binary says what it reads with --input-kind: "slice", a pinned file of real messages,
-whose cases are messages per second, or "seeded", input it makes from a fixed seed per
-case, as simd_kernel_bench does, whose cases are values per second.
+whose cases are messages per second; "seeded", input it makes from a fixed seed per case,
+as simd_kernel_bench does, whose cases are values per second; or "column", columns it
+builds from the pinned slice, as column_decode_bench does, whose cases are values per
+second of real data.
 
 Each case in the binary runs as its own process directly under the measurement wrapper,
 because the wrapper signals only its direct child, and so that `perf stat` around that
@@ -251,7 +253,9 @@ def macos_counters():
 
 
 # What a case counts, by the binary's input kind.
-ITEMS = {"slice": "messages", "seeded": "values"}
+ITEMS = {"slice": "messages", "seeded": "values", "column": "values"}
+# The kinds that read the pinned slice, and so get its path and pin.
+READS_SLICE = ("slice", "column")
 
 
 def input_kind_of(binary):
@@ -314,6 +318,13 @@ def counters_of(host, case_files, report, items="messages"):
 
 
 def ratio_of(case, report, kind="slice"):
+    if kind == "column":
+        verification = report["verification"]
+        values = verification["values"]
+        stored = verification["encoded_bytes"]
+        return {"value": 8 * values / stored, "source_bytes": 8 * values,
+                "output_bytes": stored, "bits_per_value": 8 * stored / values,
+                "note": "the column's values as 8-byte words over its encoded bytes"}
     if kind == "seeded":
         return {"status": "not-applicable", "reason": "a decode kernel, so nothing is stored"}
     if case.endswith("_encode"):
@@ -345,7 +356,7 @@ def run_case(host, measure, binary, case, slice_path, pin, work_dir, meter=None,
         path.unlink(missing_ok=True)
 
     arguments = [str(binary)]
-    if kind == "slice":
+    if kind in READS_SLICE:
         arguments += [f"--slice={slice_path}", f"--expect-sha256={pin['sha256']}",
                       f"--expect-messages={pin['message_count']}"]
     arguments += [f"--case={case}", f"--report={files['report']}",
@@ -466,11 +477,22 @@ def build_document(host, benchmark, slice_name, pin, commit, measure, runs, mete
         "load_lines": [line for run in runs for line in run["load_lines"]],
         "peak_rss_bytes": peak_rss_bytes(),
     }
-    if runs[0].get("kind", "slice") == "seeded":
+    kind = runs[0].get("kind", "slice")
+    if kind == "seeded":
         input_block = {
             "kind": "seeded",
             "items": "values",
             "seed": "each case makes its own input from a fixed seed, in its verification block",
+        }
+    elif kind == "column":
+        input_block = {
+            "kind": "column",
+            "items": "values",
+            "slice": slice_name,
+            "sha256": pin["sha256"],
+            "messages": pin["message_count"],
+            "bytes": pin["size"],
+            "seed": "the input is a pinned file, and its columns are built from it whole",
         }
     else:
         input_block = {
@@ -543,9 +565,9 @@ def run(args):
     kind = input_kind_of(binary)
     pins = json.loads(args.pins.read_text(encoding="utf-8"))
     pin = pins["slices"].get(args.slice)
-    if pin is None and kind == "slice":
+    if pin is None and kind in READS_SLICE:
         raise Failure(EXIT_USAGE, f"no pin for slice {args.slice}")
-    slice_path = (args.slice_path or REPO_ROOT / pin["path"]) if kind == "slice" else None
+    slice_path = (args.slice_path or REPO_ROOT / pin["path"]) if kind in READS_SLICE else None
     benchmark = binary.name.removesuffix("_bench")
     commit = current_commit()
     args.work_dir.mkdir(parents=True, exist_ok=True)

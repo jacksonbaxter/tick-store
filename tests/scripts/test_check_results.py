@@ -144,6 +144,27 @@ def seeded_document(host):
     return document
 
 
+def column_document(host):
+    """A real-data column decode's file: the pinned slice, counted in values."""
+    document = seeded_document(host)
+    document["benchmark"] = "column_decode"
+    document["input"] = {"kind": "column", "items": "values", "slice": SLICE, "sha256": SHA,
+                         "messages": MESSAGES, "bytes": 5000,
+                         "seed": "the input is a pinned file"}
+    result = document["results"][0]
+    case = "store_decode/add_price"
+    result["case"] = case
+    result["verification"] = {"messages": MESSAGES, "bytes": 5000, "input_sha256": SHA,
+                              "reencoded_sha256": SHA, "column": "add_price",
+                              "values": 3000, "encoded_bytes": 2400, "matched": True}
+    result["ratio"] = {"value": 10.0, "source_bytes": 24000, "output_bytes": 2400,
+                       "bits_per_value": 6.4}
+    if host == "Linux":
+        document["header"]["sibling_busy_percent"]["cases"] = {case: 0.5}
+        document["header"]["frequency"]["effective_mhz"] = {case: 3390.0}
+    return document
+
+
 def remove(document, *keys):
     target = document
     for key in keys[:-1]:
@@ -625,6 +646,58 @@ class CheckResultsTest(unittest.TestCase):
         self.assert_seeded_fails(
             "Linux", lambda d: set_value(d, "arm64 baseline, neon kernels", "results", 0, "isa"),
             "results[0].isa is not from Linux")
+
+    # A real-data column decode: the slice's pin, and the column given back exactly.
+
+    def check_column(self, host, mutate=None):
+        document = copy.deepcopy(column_document(host))
+        if mutate is not None:
+            mutate(document)
+        return self.run_check(document, f"{host}-column_decode-{COMMIT[:12]}.json")
+
+    def assert_column_fails(self, host, mutate, expected):
+        result = self.check_column(host, mutate)
+        self.assertEqual(result.returncode, 1, msg=result.stdout + result.stderr)
+        self.assertIn(expected, result.stderr)
+
+    def test_a_valid_column_file_passes_on_both_hosts(self):
+        for host in ("Linux", "macOS"):
+            with self.subTest(host=host):
+                result = self.check_column(host)
+                self.assertEqual(result.returncode, 0, msg=result.stderr)
+
+    def test_a_column_file_keeps_the_slices_pin(self):
+        self.assert_column_fails(
+            "Linux", lambda d: set_value(d, "cd" * 32, "results", 0, "verification",
+                                         "input_sha256"),
+            "verification.input_sha256: not the slice's pin")
+
+    def test_a_column_file_needs_a_pinned_slice(self):
+        self.assert_column_fails("macOS", lambda d: remove(d, "input", "slice"), "has no pin")
+
+    def test_a_column_file_must_show_its_column_came_back(self):
+        self.assert_column_fails(
+            "Linux", lambda d: set_value(d, False, "results", 0, "verification", "matched"),
+            "give back its column")
+
+    def test_a_column_file_records_its_sizes(self):
+        for field in ("values", "encoded_bytes"):
+            with self.subTest(field=field):
+                self.assert_column_fails(
+                    "macOS", lambda d, f=field: remove(d, "results", 0, "verification", f),
+                    f"verification.{field}")
+
+    def test_a_column_file_has_a_measured_ratio(self):
+        self.assert_column_fails(
+            "Linux", lambda d: set_value(d, {"status": "not-applicable", "reason": "x"},
+                                         "results", 0, "ratio"),
+            "a column case has a measured ratio")
+
+    def test_a_column_file_counts_values_not_messages(self):
+        def rename(document):
+            throughput = document["results"][0]["throughput"]
+            throughput["messages_per_second"] = throughput.pop("values_per_second")
+        self.assert_column_fails("macOS", rename, "throughput: no median")
 
     def test_a_slice_file_cannot_drop_its_pin_by_omitting_the_kind(self):
         self.assert_fails("Linux", lambda d: remove(d, "input", "slice"), "has no pin")
