@@ -20,3 +20,7 @@ add_test(NAME itch_codec_bench_refuses_a_wrong_pin
 set_tests_properties(itch_codec_bench_refuses_a_wrong_pin PROPERTIES
     PASS_REGULAR_EXPRESSION "does not match the pin"
 )
+
+# B2 for the kernel cases: every case of every set this processor runs, at every width,
+# matches its reference before anything is timed.
+add_test(NAME simd_kernel_bench_every_case_verifies COMMAND simd_kernel_bench --verify-all)

@@ -3,6 +3,12 @@
 // DS-3 and DS-4's FastLanes figures use. Case names say the kernel, the width where it
 // has one, and the set, as pfor_unpack/w=13/neon.
 //
+// What BENCHMARKS.md's decode targets read here: DS-3 and DS-4 the two delta forms,
+// pfor_delta_two_pass and pfor_delta_fused, listed at every width 0 to 64 so that the
+// median across widths is the source's own statistic; DS-8 dod_reconstruct/scalar, the
+// delta-of-delta reconstruct the PFOR decoder runs, with no bit parsing. Real-data
+// decodes are in column_decode_bench.
+//
 // Two ways to run it:
 //
 //   run_bench.py drives one process per case, --case=NAME --report=PATH, through the
@@ -32,6 +38,7 @@
 #include "tick_store/bench_support/latency_recorder.hpp"
 #include "tick_store/bench_support/resolution_guard.hpp"
 #include "tick_store/bench_support/timer.hpp"
+#include "tick_store/codec/int_transform.hpp"
 #include "tick_store/codec/lane_pack.hpp"
 #include "tick_store/codec/simd.hpp"
 #include "tick_store/harness/json_writer.hpp"
@@ -81,8 +88,10 @@ constexpr int kRepetitions = 10;
 constexpr int kWarmupPasses = 2;
 constexpr std::chrono::milliseconds kCalibrationWindow{200};
 constexpr std::uint64_t kHighestBatchTicks = 1ULL << 40U;
-// The widths run_bench lists; by hand, every width runs.
+// The widths run_bench lists for the unpack, linear and narrow cases; by hand, every width
+// runs. The two 64-bit delta forms are listed at every width 0 to 64 (DS-3, DS-4).
 constexpr std::array<unsigned, 8> kListedWidths{1, 8, 13, 16, 21, 32, 45, 64};
+constexpr unsigned kWidest = 64;
 constexpr unsigned kNarrowWidest = 21;
 
 // One kernel on one set: what it runs, how many values a call yields, and whether its
@@ -308,6 +317,45 @@ Case svb_case(const simd::Kernels& set) {
     return c;
 }
 
+// DS-8: the delta-of-delta reconstruct PFOR runs once a block's second differences are
+// unpacked, codec::delta_of_delta_decode, with no bit parsing: two running sums over 1,024
+// values in place. It has no kernel of its own, so it is the same code in every set, and
+// runs once, under the scalar set's name. Each call first restores the second differences
+// from a copy, so every call sums the same input, and that copy is timed too:
+// restore_copy/scalar times the copy alone. The input is a rising sequence like
+// timestamps, its steps below 2^20, and the check is against that sequence itself, which
+// the encoder's inverse turned into the second differences.
+Case dod_case(bool copy_only) {
+    const std::uint64_t seed = copy_only ? 0x5EED'0701ULL : 0x5EED'0700ULL;
+    const auto values = std::make_shared<Vector>();
+    // NOLINTNEXTLINE(cert-msc32-c,cert-msc51-cpp,bugprone-random-generator-seed): fixed for B1
+    std::mt19937_64 rng{seed};
+    constexpr unsigned kStartBits = 40;
+    constexpr unsigned kStepBits = 20;
+    std::uint64_t time = rng() & mask_of(kStartBits);
+    for (std::uint64_t& value : *values) {
+        time += rng() & mask_of(kStepBits);
+        value = time;
+    }
+    const auto second = std::make_shared<Vector>();
+    codec::delta_of_delta_encode(*values, *second);
+    const auto out = std::make_shared<Vector>();
+    Case c = named(copy_only ? "restore_copy/scalar" : "dod_reconstruct/scalar", seed);
+    c.run = [second, out, copy_only](std::size_t calls) {
+        for (std::size_t i = 0; i < calls; ++i) {
+            *out = *second;
+            if (!copy_only) {
+                codec::delta_of_delta_decode(*out);
+            }
+            benchmark::DoNotOptimize(out->data());
+        }
+    };
+    c.verify = [values, second, out, copy_only] {
+        return same(*out, copy_only ? *second : *values);
+    };
+    return c;
+}
+
 std::vector<Case> all_cases(bool every_width) {
     std::vector<unsigned> widths;
     if (every_width) {
@@ -329,9 +377,11 @@ std::vector<Case> all_cases(bool every_width) {
         for (const unsigned w : widths) {
             cases.push_back(linear_case(*set, w));
         }
-        for (const unsigned w : widths) {
+        for (unsigned w = 0; w <= kWidest; ++w) {
             cases.push_back(delta_case(*set, w, DeltaForm::two_pass));
             cases.push_back(delta_case(*set, w, DeltaForm::fused));
+        }
+        for (const unsigned w : widths) {
             if (w <= kNarrowWidest) {
                 cases.push_back(delta_case(*set, w, DeltaForm::narrow));
             }
@@ -342,6 +392,10 @@ std::vector<Case> all_cases(bool every_width) {
         cases.push_back(for_case(*set, false));
         cases.push_back(for_case(*set, true));
         cases.push_back(svb_case(*set));
+        if (level == simd::KernelLevel::scalar) {
+            cases.push_back(dod_case(false));
+            cases.push_back(dod_case(true));
+        }
     }
     return cases;
 }
@@ -437,6 +491,7 @@ struct Options {
     std::optional<std::filesystem::path> perf_acknowledge;
     bool list_cases = false;
     bool input_kind = false;
+    bool verify_all = false;
 };
 
 template <class Number>
@@ -460,6 +515,8 @@ template <class Number>
             options.list_cases = true;
         } else if (argument == "--input-kind") {
             options.input_kind = true;
+        } else if (argument == "--verify-all") {
+            options.verify_all = true;
         } else if (const auto workload = value_of("--case=")) {
             options.workload = *workload;
         } else if (const auto report = value_of("--report=")) {
@@ -478,7 +535,7 @@ template <class Number>
             return std::unexpected(std::format(
                 "unknown argument: {}\nusage: simd_kernel_bench [--case=NAME --report=PATH "
                 "[--core=N] [--perf-control=FIFO --perf-ack=FIFO]] [benchmark flags]\n"
-                "       simd_kernel_bench --list-cases | --input-kind",
+                "       simd_kernel_bench --list-cases | --input-kind | --verify-all",
                 argument));
         }
     }
@@ -607,7 +664,7 @@ int fail(std::string_view message) {
 [[nodiscard]] std::expected<void, std::string> verify_before(Case& c) {
     c.run(1);
     if (!c.verify()) {
-        return std::unexpected(std::format("{} does not match the scalar set", c.name));
+        return std::unexpected(std::format("{} does not match its reference", c.name));
     }
     return {};
 }
@@ -709,6 +766,17 @@ int run(int argc, char** argv) {
         for (const Case& c : all_cases(false)) {
             std::println("{}", c.name);
         }
+        return kExitOk;
+    }
+    // B2 for every case at every width, with nothing timed: what ctest runs.
+    if (options->verify_all) {
+        std::vector<Case> cases = all_cases(true);
+        for (Case& c : cases) {
+            if (auto checked = verify_before(c); !checked.has_value()) {
+                return fail(checked.error());
+            }
+        }
+        std::println("{} cases match their reference", cases.size());
         return kExitOk;
     }
     if (options->workload.empty()) {
