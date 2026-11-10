@@ -2181,6 +2181,94 @@ different heap is not the setting the capacity check proved. Swap and swappiness
 host. The run waits for a decision on one of them. Raw logs:
 `phase3-raw/compare-fullday/`.
 
+#### The guard's swap rule, changed before the rerun
+
+This was written and committed before any run under the new rule.
+
+**The decision.** The user keeps debian's swap and swappiness as they are. The guard changes,
+and QuestDB's heap stays `-Xms1g -Xmx1g`. The guard exists to keep the host from running out of
+memory or thrashing. Moving idle anonymous pages to swap while about 12 GB is still available is
+neither. It is the kernel's ordinary reclaim: it keeps the store's mapped pages, which are in
+use, and moves out pages nobody has touched. The old rule counted swap-in and swap-out together,
+so it could not tell that apart from thrashing. Shrinking the heap would only satisfy the guard.
+It would move the system under test away from the setting Phase 2 checked, and it would not help
+anyway: under a 23 GB mapped store the kernel would still page out other processes' idle pages.
+
+**What the samples show.** The guard's CSVs record swap traffic as pswpin and pswpout added
+together. Every page written out takes a free swap slot, so the fall in SwapFree over a sample,
+over 2 s, is at least the swap-out rate. That makes the total minus that fall an upper bound on
+the swap-in rate. Over the nine sample files in `phase3-raw/compare-fullday/`:
+
+| Run | How it ended | Highest total, MiB/s | Swap-in bound, highest single sample, MiB/s | Swap-in bound, highest held for 3 samples, MiB/s | Lowest MemAvailable, GiB | Lowest SwapFree, MiB | Lowest MemAvailable with swap exhausted, GiB |
+|---|---|---|---|---|---|---|---|
+| `193177b` Parquet | warm proof | 1.1 | 0.09 | 0.00 | 11.24 | 839 | never exhausted |
+| `953f3d4` Parquet | warm proof | 1.9 | 0.12 | 0.01 | 10.63 | 827 | never exhausted |
+| `e2ad871` Parquet | finished | 3.5 | 1.52 | 0.11 | 11.15 | 789 | never exhausted |
+| `e2ad871` ArcticDB | guard, swap | 28.4 | 28.40 | 0.14 | 10.97 | 681 | never exhausted |
+| `e2ad871` ArcticDB, second | guard, MemAvailable | 64.5 | 24.54 | 0.13 | 2.75 | 581 | never exhausted |
+| `dd5de38` Parquet | finished | 15.6 | 15.59 | 2.15 | 12.34 | 660 | never exhausted |
+| `dd5de38` ArcticDB | finished | 41.1 | 41.11 | 0.49 | 10.21 | 436 | never exhausted |
+| `dd5de38` QuestDB | guard, swap | 68.1 | 1.42 | 0.60 | 8.04 | 0.01 | 11.81 |
+| `dd5de38` QuestDB, second | guard, swap | 107.8 | 4.25 | 0.38 | 8.52 | 0.01 | 8.52 |
+
+Across both QuestDB stops, at most 98 MiB of the 1,125 MiB of traffic could have been swap-in.
+The second stop gives an independent check. debian has not rebooted since, and its counters
+since boot read 60,735 pages swapped in and 203,092 out: 237 MiB in and 793 MiB out. That covers
+the stop's 861 MiB and everything after it, so most of the stop was swap-out. The capacity
+check's lowest MemAvailable was 6.07 GiB, with swap full the whole time. debian has 15.33 GiB of
+memory and 976 MiB of swap on an SSD, with 4 KiB pages.
+
+**The new rule.** It samples every 2 s, as before. It stops the run on any of these:
+
+- **(a)** MemAvailable under 3 GiB, the guard's existing floor, unchanged, with the existing 2 GiB
+  hard floor for SIGKILL. The lowest in any run that finished was 10.21 GiB. The one run this
+  floor stopped, `e2ad871`'s ArcticDB, was a day-sized frame, which was a bug.
+- **(b)** Sustained swap-in: pswpin from `/proc/vmstat` over 10 MiB/s, 2,560 pages/s, for 3
+  consecutive samples (6 s). The rate and the count are the old rule's, now applied to swap-in
+  alone. The highest swap-in held for 3 samples in any of the nine files is at most 2.15 MiB/s,
+  so the limit sits 4.6 times above it. Single samples reached 41 MiB/s in runs that finished,
+  which is why one sample is not enough. At 10 MiB/s, the whole 976 MiB swap device would be
+  read back in 98 s. A working set cycling through swap that fast, for 6 s, is thrashing.
+- **(c)** Swap exhausted with too little memory left: SwapFree under 2% of SwapTotal (19.5 MiB on
+  debian), and MemAvailable under floor (a) plus SwapTotal, which is 3.95 GiB on debian. With swap
+  empty, floor (a) leaves 3 GiB available plus 976 MiB of swap. With swap exhausted, this floor
+  leaves the same headroom in memory alone. Swap was exhausted only in the two QuestDB stops and
+  in the capacity check. MemAvailable was then at least 8.52, 11.81 and 6.07 GiB, so none of those
+  runs would have stopped. Every other run kept at least 436 MiB of swap free.
+- Every stop the guard already had: free disk under 50 GiB, and SIGTERM or SIGINT to the guard.
+
+**Swap-out alone no longer stops a run.** The guard samples swap-in and swap-out separately.
+`compare/run_system.py` records each as host-wide page counts per phase, for each variant and
+class: write, read-back, warm queries and cold queries. The counts come from `/proc/vmstat` on
+Linux and from `vm_stat`'s Swapins and Swapouts on macOS. `scripts/check_compare.py` refuses a
+results file without them.
+
+**What the rule still catches:** memory running out, with or without swap left; thrashing, by
+the swap-in it causes; a full disk.
+
+**What it now lets through:** swap-out of idle pages, at any rate, until the device is full.
+That includes other processes' idle pages: a service on the host, or another project's session,
+may pay for it later in swap-in latency when it next touches them. It also lets the swap device
+fill, as it did in both stops, so for the rest of the run nothing else on the host can swap out.
+The device frees again as the pages come back or their owners exit.
+
+**Swap-in during a timed query is flagged, not rerun or refused,** the same way for all four
+systems. Each query's worker reads pswpin and pswpout just before and just after its timed
+repetitions: all 30 warm ones together, or the accepted attempt on a full day, and each cold
+run. The results record those counts under each query's warm and cold blocks as `swap_timed`,
+with `flagged` true whenever any page was swapped in. The full-day table and the notes show
+every flagged number beside its value. A verdict that rests on one says so.
+
+Flagging is the choice because pswpin is host-wide. It cannot say whose page came back, so a
+rerun could chase another process's swap-in for as long as that process kept doing it, and
+refusing would throw away an 11-hour run over a page the query may never have touched. A flag
+keeps the number and puts the doubt next to it.
+
+**Phase 2's capacity check.** Its heap verdict covers garbage collection and running out of
+memory: no collection after start-up, and at most 300 MiB of the heap in use. But swap was full
+before it started and stayed full, so it never tested what the kernel does with an idle heap
+while swap has room. That is what stopped both `dd5de38` runs.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
