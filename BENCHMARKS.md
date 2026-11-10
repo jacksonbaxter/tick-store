@@ -1,6 +1,6 @@
 # tick-store benchmarks and targets
 
-Status: Phase 2. No target here has been measured on tick-store yet, because the store does not exist, though the census has measured both pinned files (`results/census-*.json`). Every number below is a published figure, or
+Status: Phase 3. The decode targets, DS-1 to DS-9, are measured under `measure.sh` at `bcbf873`, with verdicts under "Measured decode results": DS-6 is met on timestamps and missed on prices, DS-8 is met, DS-1, DS-2, DS-3 and DS-5 are missed, DS-7 and DS-9 are reported with no target figure, and DS-4 has no reported figure because the Linux kernel file was refused twice by the sibling rule. Verdicts for the other targets are not recorded in this file yet; NOTES.md has their figures. Every source figure below is a published figure, or
 arithmetic on one, used as a target or as context. The exceptions are the file facts in CR-1 and Data, which come from the downloaded
 files. A research subagent opened each source, and the `Checked` column records that the project session then opened it too and
 recomputed any derived figure from the raw values.
@@ -105,6 +105,28 @@ timestamps in file order. Every rate is the median of ten timed passes.
 | DS-7 | As DS-6 | As DS-6, with the instruction set | Linux |
 | DS-8 | `dod_reconstruct/scalar`: `delta_of_delta_decode`, the two running sums PFOR runs after unpacking, on 1,024 values, no bit parsing. Each call restores its input from a copy, and `restore_copy/scalar` times that copy alone | GB/s counted as 32-bit values, values a second times 4, since the source counts 32-bit values and ours are 64-bit lanes | macOS |
 | DS-9 | `gorilla_dod/timestamp`, Gorilla's bit parsing; `pfor_dod/timestamp`, delta-of-delta on the vector layout | ns a value and values a second, with the instruction set | both |
+
+### Measured decode results
+
+At `bcbf873`, the cases above through `scripts/run_bench.py` under each host's `measure.sh`:
+`TICK_STORE_MEASURE=<measure.sh> python3 -I scripts/run_bench.py build/bench/bench/column_decode_bench`, and the same for
+`simd_kernel_bench`. macOS is the M4 Max, NEON, unpinned, no counters, at load 1.26 to 3.92 at the start of a case. Linux is Zen 1,
+AVX2, pinned to cpu4 with `cycles:u`, at load 1.25 to 1.49, cpu5 at most 1.12% busy. Results: `results/bench/macOS-column_decode-bcbf8738d892.json`,
+`results/bench/macOS-simd_kernel-bcbf8738d892.json`, `results/bench/Linux-column_decode-bcbf8738d892.json`. The Linux kernel file
+does not exist: two complete runs were refused for cpu5 over 5% busy in 4 and in 7 of 314 cases (NOTES.md, "Decode targets under
+measure.sh"). Gaps and reasons are there too.
+
+| ID | Measured | Host, instruction set | Verdict |
+|---|---|---|---|
+| DS-1 | 8.393 ns a value | macOS, NEON build (Gorilla is scalar code) | Missed: 3.96 times the 2.12 ns |
+| DS-2 | 60.91 cycles a value | Linux, AVX2 build (Gorilla is scalar code) | Missed: 2.86 times the 21.3 cycles |
+| DS-3 | 3.35 G values/s, two passes, median of 65 widths | macOS, NEON | Missed: 7.0% under 3.6 |
+| DS-4 | No reported figure. The refused runs read 2.72 cycles a value, fused | Linux, AVX2 | Not judged. The refused runs are 7.2 times the 0.377 cycles |
+| DS-5 | 3,674 MB/s on macOS, 1,280 MB/s on Linux | macOS NEON, Linux AVX2 | Missed on both: 20.2% under 4,605, and 3.6 times under |
+| DS-6 | Timestamps 16.06 times; prices 3.86 times | macOS, NEON | Met on timestamps, missed on prices |
+| DS-7 | Timestamps 7.58 times; prices 3.29 times | Linux, AVX2 | No published figure |
+| DS-8 | 11.77 GB/s counted as 32-bit values, 2.94 G values/s | macOS, scalar code in every set | Met: 1.44 times the 8.20 GB/s |
+| DS-9 | Gorilla 9.650 ns a value on macOS, 22.204 ns on Linux; PFOR delta-of-delta 0.880 and 3.151 ns | macOS NEON, Linux AVX2 | No published figure |
 
 ## Write targets
 

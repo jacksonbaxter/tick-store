@@ -1773,7 +1773,7 @@ ground truth. Mac, warm median ms, before (`a7c3742`) and after (`57ec582`) run 
 - The frame of reference add and zigzag, and on the M4 the interleaved unpack: the compiler's scalar output already matches.
 - The AVX2 in-register prefix sum, which loses to the scalar tree on Zen 1.
 
-**Against the targets** (iteration-only, so no verdict):
+**Against the targets** (iteration-only, so no verdict; the measured verdicts are in "Decode targets under measure.sh", below):
 
 - DS-3, 64-bit block delta decode at least 3.6 G values/s on NEON: two passes reach 3.42, the median over widths 0 to 64 on the
   M4 Max. Short by 5%, against FastLanes on an M1, whose transposed layout needs no cross-lane prefix sum.
@@ -1798,6 +1798,83 @@ ground truth. Mac, warm median ms, before (`a7c3742`) and after (`57ec582`) run 
 of the answers, which `tick_query` computes outside `engine_ns`, take 24.3%. The dictionary decoder is therefore about 55% of
 the engine's own time, the bound it is on the Mac. Of the kernels, the AVX2 linear unpack takes 1.2%, `decode_pfor_block` 1.0%
 and `read_patches` 0.7%; CRC32C takes 1.1%.
+
+### Decode targets under measure.sh
+
+Every decode target, DS-1 to DS-9, measured at `bcbf873` through `scripts/run_bench.py` under each host's `measure.sh`, one
+process per case, with the cases BENCHMARKS.md maps to each target ("How each decode target is measured", written before the
+first run). Two benchmarks were added for it: `bench/column_decode_bench` (`7efbad3`) for the real-data targets, and in
+`bench/simd_kernel_bench` (`bdf5e47`) the two 64-bit delta forms listed at every width 0 to 64, so the median across widths is
+FastLanes' own statistic, and `dod_reconstruct` for DS-8. The harness took a third input kind, `column`, for them (`7c12c3e`).
+Raw outputs, per case, are kept with the logs (`decode-targets/mac/`, `decode-targets/debian/`).
+
+- macOS: Apple M4 Max, NEON, unpinned, no counters. Column cases at load 3.22 to 3.92 at start, kernel cases at 1.26 to 3.84;
+  another project's `check.sh` was running before and during the column cases, and `measure.sh` admits a case below load 4.
+  `results/bench/macOS-column_decode-bcbf8738d892.json`, `results/bench/macOS-simd_kernel-bcbf8738d892.json`.
+- Linux: Zen 1, AVX2, `taskset -c 4`, perf `cycles:u`, `instructions:u` and `branch-misses:u` around the timed passes,
+  `cache-misses` marked unavailable and not quoted, governor `performance`, turbo enabled, 3,562 to 3,577 MHz from cycles over
+  wall time. Column cases at load 1.25 to 1.49 at start, cpu5 busy 0.64% median and 1.12% at most.
+  `results/bench/Linux-column_decode-bcbf8738d892.json`.
+- Commands, from the repository root, after `cmake --build --preset bench` on the Mac and the same Release `-O3 -DNDEBUG` build in
+  `build/bench-ds` on debian (`heavy.sh`, `taskset -c 2,6,7`):
+  `TICK_STORE_MEASURE=<measure.sh> python3 -I scripts/run_bench.py build/bench/bench/column_decode_bench` and the same for
+  `simd_kernel_bench`; on debian with `--slice-path` to the slice there.
+
+**The Linux kernel file was refused twice.** Both runs of `simd_kernel_bench` on debian finished all 314 cases and failed
+`check_results.py` on the sibling rule: 4 cases over 5% in the first run (5.2% to 8.5%), 7 in the rerun (5.4% to 9.4%), the rest
+under. A kernel case lasts about 1.1 s, so its window is about 117 jiffies of cpu5 and 6 busy jiffies pass the limit. During the
+first run another project's test job (`aadp_run_oracle` under `ctest`) was using most cores; during the rerun the load was 0.86
+to 1.44 and nothing else was seen. Six idle one-second commands under `measure.sh` read cpu5 at 0%, 0%, 0%, 1.68%, 0% and 2.52%,
+so the wrapper's own start and end are not enough by themselves; what took cpu5 in the rerun is not established. The rule says
+rerun once, so there is no reported Linux kernel file, and DS-4 has no reported figure. The two refused runs agree closely, and
+their figures below are labelled as refused: they are what the pinned host measured, not results this repository publishes.
+
+**Verdicts.** Ratios of ns a value between cases come from one results file each.
+
+| ID | Target | Measured | Host, set | Verdict |
+|---|---|---|---|---|
+| DS-1 | Gorilla XOR on doubles at most 2.12 ns a value | 8.393 ns a value (CV 2.33%), 37.18 bits a value | macOS, NEON build, Gorilla is scalar | Missed, 3.96 times over |
+| DS-2 | Gorilla decode at most 21.3 cycles a value, L1-resident | 60.91 `cycles:u` a value (CV 0.50%), 198.4 instructions, 0.419 branch misses | Linux, AVX2 build, Gorilla is scalar | Missed, 2.86 times over |
+| DS-3 | 64-bit delta decode at least 3.6 G values/s | 3.35 G values/s, median over widths 0 to 64, two passes; fused 3.27 | macOS, NEON | Missed by 7.0% |
+| DS-4 | Same kernel at most 0.377 cycles a value | No reported figure. Refused runs: 2.716 and 2.720 cycles a value fused, 2.950 and 2.955 two passes | Linux, AVX2 | Not judged: no reported file. The refused runs miss by 7.2 times |
+| DS-5 | Price block decode at least 4,605 MB/s of 8-byte values | 3,674 MB/s (CV 0.86%) on macOS; 1,280 MB/s (CV 0.66%), 22.3 cycles and 47.0 instructions a value, on Linux | macOS NEON, Linux AVX2 | Missed on both: by 20.2% and 3.6 times |
+| DS-6 | Layout at least 14 times faster than Gorilla on the same column | Timestamps 16.06 times (9.650 against 0.601 ns); prices 3.86 times (8.393 against 2.177 ns) | macOS, NEON | Met on timestamps, missed on prices |
+| DS-7 | Layout speedup over Gorilla, no published figure | Timestamps 7.58 times (22.204 against 2.931 ns); prices 3.29 times (20.558 against 6.252 ns) | Linux, AVX2 | Measured, no target figure |
+| DS-8 | Delta-of-delta reconstruct at least 8.20 GB/s of 32-bit values | 2.94 G values/s, 11.77 GB/s counted as 32-bit values, the restore copy included | macOS, scalar code, as every set runs it | Met, 1.44 times over the figure |
+| DS-9 | Delta-of-delta decode with bit parsing, no published figure | Gorilla: 9.650 ns a value on macOS, 22.204 ns and 79.5 cycles on Linux. PFOR delta-of-delta: 0.880 and 3.151 ns | macOS NEON, Linux AVX2 | Measured, no target figure |
+
+**Why each miss.**
+
+- DS-1 and DS-2: the data, mostly. The source's 2.12 ns is 500,000 smooth synthetic values, and ALP's 21.3 cycles is its data
+  sets on Ice Lake. Add-order prices as dollar doubles take 37.18 bits a value in the store's (locate, side) order, beside the
+  37.7 published for Gorilla on Stocks-USA, because a price over 10^4 fills its mantissa (NOTES.md, Gorilla on ITCH). On Zen 1 the
+  L1 case runs 198 instructions a value at 3.3 instructions a cycle, so the cost is mainly instruction count, with 0.42 mispredicted
+  branches a value on top; the whole column, out of L1, takes 73.4 cycles. The M4 decodes the same stream 2.45 times faster in
+  wall time than Zen 1.
+- DS-3: 7% short, against FastLanes on an M1, and the M4 is the faster core. The layout keeps values in value order across the 16
+  lanes, so the inverse delta needs a prefix sum across lanes in the register; FastLanes' transposed layout does a vertical add
+  instead (NOTES.md, SIMD, "What the layout gave up"). 18 of the 65 widths reach 3.6 two-pass; one does fused. The iteration figure
+  was 3.42; this is 3.35 at a higher load.
+- DS-4: the same layout cost, on Zen 1, which splits every 256-bit operation in two and is slow at cross-lane permutes, against
+  FastLanes on Zen 3. The refused runs put the AVX2 set's fused form at 2.72 cycles a value, as at iteration (2.71).
+- DS-5: VIREL's figure is ALP on an EPYC 9554. Ours is the store's own column, 6.30 bits a value, through the reader's
+  `decode_column`: per piece, any zstd frame inflated, a vector allocated, PFOR with its scale and patches decoded, and every value
+  range-checked, then appended. The shares of those steps are not separated here. Zen 1 runs it at 2.1 instructions a cycle.
+- DS-6 on prices: the store's price column is PFOR delta with an adaptive scale and zstd, 6.30 bits a value, and decodes at 2.18 ns,
+  over three times the 0.601 ns of PFOR delta on timestamps; Gorilla on prices costs 8.39 ns, less than on timestamps. Timestamps
+  are the column the iteration verdict used, and they meet the target; prices do not, and both are stated.
+
+**Kernel figures beside the targets**, G values a second, median over the widths each ran (README table): on the M4, interleaved
+unpack 7.78 NEON and 7.49 scalar, linear unpack 7.39 and 1.40, two-pass delta 3.35 and 2.02, fused 3.27 and 1.65, prefix sum 4.72
+NEON in-register against 3.08 for the tree, Stream VByte 6.21 and 0.74. `restore_copy` alone, the 8 KiB copy DS-8's case makes before
+each call, runs at 13.36 G values a second, so about a fifth of `dod_reconstruct`'s time is the copy. In the refused Zen 1 runs:
+interleaved unpack 3.39 AVX2 against 2.81 scalar, two-pass delta 1.215 against 0.968, fused 1.313 against 0.962, Stream VByte
+2.23 against 0.43, `dod_reconstruct` 1.80 at 1.98 cycles a value.
+
+**What did not work.** The first `gorilla_xor_l1` took 16 vectors at 16 positions and kept the first few that fit 16 KiB, which put
+them all near the start of the column; it now takes the largest count, up to 16, whose evenly spaced vectors fit, which is 3 on
+this column (12,801 bytes). The Mac run waited 14 minutes before its first case, and again partway through the kernel cases, for
+another project's `check.sh` to bring the load under 4.
 
 ### tick-store in the comparison (slice)
 
