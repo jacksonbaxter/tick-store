@@ -170,6 +170,27 @@ python3 -I scripts/check_results.py results/bench/*.json
 python3 -I scripts/render_results.py
 ```
 
+Two more binaries measure decoding, for `BENCHMARKS.md`'s decode targets, which say which
+case answers which target. `bench/simd_kernel_bench` times each decode kernel of each set on
+seeded input, one vector of 1,024 values in L1 (input kind `seeded`), and
+`bench/column_decode_bench` times real columns built from the same slice (input kind
+`column`): its add-order prices and timestamps, Gorilla against the store's own layout. Both
+count values, not messages, and run the same way:
+
+```sh
+TICK_STORE_MEASURE=/path/to/measure.sh \
+    python3 -I scripts/run_bench.py build/bench/bench/simd_kernel_bench
+TICK_STORE_MEASURE=/path/to/measure.sh \
+    python3 -I scripts/run_bench.py build/bench/bench/column_decode_bench
+```
+
+A kernel case is checked against the scalar set's output, or for `dod_reconstruct` against the
+sequence it came from, before timing and after; `--verify-all` does that for every case at
+every width, and ctest runs it. A column case runs only once the slice matches its pin and the
+decode gives its column back bit for bit, and records the column's encoded size, so its
+results carry a ratio. The README gives a column file a row a case, and a kernel file a row a
+kernel and set, the median across the widths it ran.
+
 `TICK_STORE_MEASURE` names a wrapper that takes the machine, runs its arguments and prints
 a load line at each end. Exit 75 from it means retry later. Without the variable there is
 no lock, so the file is marked iteration-only, goes under `build/`, and the validator

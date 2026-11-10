@@ -84,6 +84,28 @@ bits/value (ALP Table 4, Stocks-USA), and the original 1.37 bytes per point is o
 | DS-8 | Delta-of-delta reconstruct kernel at least 8.20 GB/s of 32-bit values, with no bit parsing | macOS | 8.20 GB/s pipelined; 3.65 GB/s naive | Ashton Six, https://github.com/ashtonsix/perf-portfolio/tree/main/delta, README Results | Neoverse V2, NEON, 4 KiB, single thread, L1 hot. One unreviewed author | Context. The only delta-of-delta kernel figure found | opened 2026-10-30 |
 | DS-9 | Delta-of-delta decode including bit parsing | Both | None | **UNCONFIRMED** | Looked at Gorilla, Chimp, Elf, ALP, FastLanes, Sprintz Fig. 6 (plot only), TurboPFor, Beringei. Gorilla states no per-core rate | Report the measured figure | n/a |
 
+### How each decode target is measured
+
+Written before the first reported run. Two binaries hold every case, each run through `scripts/run_bench.py` under the
+host's `measure.sh`, one process per case (README.md, "Benchmarks"). `bench/simd_kernel_bench` times kernels on seeded
+input, one vector of 1,024 values in L1, as FastLanes and Ashton Six measure. `bench/column_decode_bench` builds two
+columns of real data from the pinned slice `12302019-open` and times their decode, after the slice matches its pin and
+each decode gives its column back bit for bit. The price column is the store's own add-order price column, 3,153,991
+values grouped by (locate, side) as the store's segments keep them; the timestamp column is the slice's 6,125,294
+timestamps in file order. Every rate is the median of ten timed passes.
+
+| ID | Cases | Figure | Host |
+|---|---|---|---|
+| DS-1 | `gorilla_xor/add_price`: the price column as dollar doubles, price / 10^4, one Gorilla XOR stream in blocks of 4,096 | ns a value, 10^9 over the median values a second | macOS |
+| DS-2 | `gorilla_xor_l1/add_price`: the same coding, as many 1,024-value vectors evenly spaced through the column as fit 16 KiB encoded, one block each, decoded in turn, so input and output stay in Zen 1's 32 KiB L1 | `cycles:u` over values decoded, from the same timed passes | Linux |
+| DS-3 | `pfor_delta_two_pass/w=0..64/neon`, unpack then inverse delta, the form the NEON set uses; `pfor_delta_fused/w=0..64/neon` beside it | G values a second, the median across the 65 widths, FastLanes' own statistic | macOS |
+| DS-4 | `pfor_delta_fused/w=0..64/avx2`, the form the AVX2 set uses; `pfor_delta_two_pass/w=0..64/avx2` beside it | `cycles:u` a value, the median across the 65 widths | Linux |
+| DS-5 | `store_decode/add_price`: the store's chunks of the price column from `encode_column`, PFOR delta with an adaptive scale and zstd where smaller, decoded by `decode_column` piece by piece as the reader does | MB/s of 8-byte values, the median values a second times 8 | both |
+| DS-6 | Timestamps: `gorilla_dod/timestamp` against `pfor_delta/timestamp`, the same values. Prices: `gorilla_xor/add_price` against `store_decode/add_price`, the same values | Gorilla's ns a value over the layout's, from one results file. Judged on each column | macOS |
+| DS-7 | As DS-6 | As DS-6, with the instruction set | Linux |
+| DS-8 | `dod_reconstruct/scalar`: `delta_of_delta_decode`, the two running sums PFOR runs after unpacking, on 1,024 values, no bit parsing. Each call restores its input from a copy, and `restore_copy/scalar` times that copy alone | GB/s counted as 32-bit values, values a second times 4, since the source counts 32-bit values and ours are 64-bit lanes | macOS |
+| DS-9 | `gorilla_dod/timestamp`, Gorilla's bit parsing; `pfor_dod/timestamp`, delta-of-delta on the vector layout | ns a value and values a second, with the instruction set | both |
+
 ## Write targets
 
 Every write number states its durability class and flush granularity.
