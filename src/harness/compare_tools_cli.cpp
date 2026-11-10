@@ -17,6 +17,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <cerrno>
 #include <chrono>
 #include <cstddef>
@@ -45,9 +46,14 @@ constexpr std::string_view kColdcacheUsage =
     "       tick_coldcache warm <paths...>\n";
 
 // A rare pass leaves pages behind, so the tool retries. The machine probe saw 1 pass in
-// about 38 leave 128 pages. Sixteen passes mean a stuck page, not bad luck.
-constexpr int kMaxEvictionPasses = 16;
+// about 38 leave 128 pages. On a full day, QuestDB's 22 GB store, just written and read back,
+// kept 14,080 pages after 16 passes 20 ms apart, and with nothing running took 14 passes:
+// pages a store's own run left behind can take seconds to become droppable. So the wait
+// between passes doubles from 20 ms up to 1 s, and 32 passes, about 27 s of waiting, mean a
+// stuck page. The proof is unchanged: every page must go.
+constexpr int kMaxEvictionPasses = 32;
 constexpr std::chrono::milliseconds kEvictionRetryDelay{20};
+constexpr std::chrono::milliseconds kEvictionRetryDelayMax{1000};
 constexpr std::size_t kReportedFiles = 8;
 constexpr std::size_t kReadChunk = std::size_t{1} << 20U;
 
@@ -197,11 +203,13 @@ std::expected<void, std::string> read_through(const std::filesystem::path& path)
 
 int run_evict(const std::vector<std::filesystem::path>& files, CliOutput& output) {
     int passes = 0;
+    std::chrono::milliseconds delay = kEvictionRetryDelay;
     std::expected<Totals, std::string> totals = measure(files);
     while (totals.has_value() && totals->resident_pages != 0 && passes < kMaxEvictionPasses) {
         ++passes;
         if (passes > 1) {
-            std::this_thread::sleep_for(kEvictionRetryDelay);
+            std::this_thread::sleep_for(delay);
+            delay = std::min(delay * 2, kEvictionRetryDelayMax);
         }
         for (const std::filesystem::path& path : files) {
             if (const auto evicted = evict_file(path); !evicted.has_value()) {

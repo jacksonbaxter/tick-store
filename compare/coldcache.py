@@ -63,7 +63,8 @@ def evict(layout, paths):
     code, report = _tool(layout, "evict", paths)
     if code != 0 or not report["proven"] or report["resident_pages"] != 0:
         raise ProofFailed(f"eviction not proven: {report['resident_pages']} pages resident after "
-                          f"{report['passes']} passes")
+                          f"{report['passes']} passes, in "
+                          f"{report.get('files_with_resident_pages')}")
     return report
 
 

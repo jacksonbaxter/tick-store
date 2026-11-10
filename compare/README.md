@@ -299,8 +299,10 @@ of each query.
 1. The service stops, and every file is flushed.
 2. `tick_coldcache evict` removes every file from the cache. On macOS that is `msync(MS_INVALIDATE)`
    on a fresh read-only `MAP_SHARED` mapping. On Linux it is `fsync`, then
-   `posix_fadvise(POSIX_FADV_DONTNEED)` over the whole file. Either way it repeats, up to 16
-   passes, until `mincore` reads 0 on every file.
+   `posix_fadvise(POSIX_FADV_DONTNEED)` over the whole file. Either way it repeats, up to 32
+   passes with a wait between them that doubles from 20 ms to 1 s, until `mincore` reads 0 on
+   every file. It was 16 passes 20 ms apart until a full day's QuestDB store outlasted that:
+   see "Full-day comparison" in `NOTES.md`.
 3. The device counter is read, the service starts again where there is one, and a fresh process
    opens the store and runs the query once.
 4. The pages now resident can only have come from the device, so the device must have moved at
