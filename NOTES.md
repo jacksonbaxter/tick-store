@@ -2161,6 +2161,7 @@ comparison" in `compare/README.md`: it stops a run on swap traffic over 10 MiB/s
 | `dd5de38`, 2026-11-05 | QuestDB `plain`, class A write, 345 s in | Swap traffic 30.3, 71.5 and 23.4 MB/s |
 | `dd5de38`, 2026-11-09 | QuestDB `plain`, class A read-back, 641 s in | Swap traffic 20.1, 80.7 and 15.0 MB/s |
 | `e0b7df2`, 2026-11-10 | QuestDB `plain`, evicting its class B store before the warm queries, 3,249 s in | 14,080 pages still resident after 16 eviction passes 20 ms apart (fixed at `4b5ade4`) |
+| `4b5ade4`, 2026-11-10 | QuestDB `plain`, the Parquet conversion after its queries, 4,470 s in | `wait_wal_table` hit QuestDB's 60 s query timeout while the day's partition converted (fixed at `7a2e092`) |
 
 The first `dd5de38` run took the systems in their usual order, and Parquet (5,569 s) and ArcticDB
 (16,234 s) finished under the guard before QuestDB stopped. The second ran on a freshly booted host
@@ -2270,7 +2271,7 @@ memory: no collection after start-up, and at most 300 MiB of the heap in use. Bu
 before it started and stayed full, so it never tested what the kernel does with an idle heap
 while swap has room. That is what stopped both `dd5de38` runs.
 
-#### The first run under the new rule, lost to eviction
+#### The first two runs under the new rule, lost to the harness
 
 The first full day under the new rule ran at `e0b7df2`, the commit that implemented it, with
 QuestDB first. The guard let QuestDB through both writes and both read-backs. It saw swap-out up
@@ -2292,6 +2293,20 @@ doubles from 20 ms up to 1 s, for at most 32 passes, about 27 s of waiting in al
 unchanged, and every page must still go. The run is lost and none of it is used: both slice
 files and the full day were run again at `4b5ade4`. Raw logs:
 `phase3-raw/compare-fullday/debian-e0b7df2-questdb-eviction-lost/`.
+
+At `4b5ade4`, QuestDB went further. Its store evicted, and it ran all its warm and cold queries.
+The guard again let swap fill: free swap was at 0 for 76 samples, with MemAvailable at least
+8.61 GiB, swap-out up to 41.9 MiB/s, and swap-in over 10 MiB/s for at most two samples in a row.
+Over 4,470 s, 789 MiB came in from swap and 1,340 MiB went out. Then the step after the queries
+failed. That step converts QuestDB's partition to its own Parquet, a size the docs say to report,
+and no target. The ALTER returns at once, and the conversion is applied through the WAL. One
+`wait_wal_table` call then hit QuestDB's 60 s query timeout, with a 2.36 GB Parquet file
+part-written. The day's ingest already handles this: it polls the WAL state down before its
+last `wait_wal_table`. At `7a2e092` the conversion does the same, for at most an hour. On the
+failed run's store, iteration only, the conversion then finished in 184 s, giving one Parquet
+partition of 5,622,818,382 bytes. This run is lost too, and the slices and the full day were run
+again at `7a2e092`. Raw logs:
+`phase3-raw/compare-fullday/debian-4b5ade4-questdb-conversion-lost/`.
 
 ## Process notes
 
