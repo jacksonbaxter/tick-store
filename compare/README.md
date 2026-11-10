@@ -561,12 +561,17 @@ gave Parquet `zstd1-rg128k`, `zstd9-rg1Mi` and `none-rg1Mi`, ArcticDB `rows10M-c
 security, QuestDB `locate-index`, and tick-store `v3-seg1Mi`. Against `dd5de38`, Parquet gained
 `zstd9-rg1Mi`, which won Q5 cold, and ArcticDB lost `rows100k-cols1`, which won nothing.
 
-At `7a2e092`, the commit of the full-day results, the list changed again before the run: Parquet
-`zstd1-rg128k`, `snappy-rg1Mi` and `none-rg1Mi`, ArcticDB `rows10M-cols127` and per security,
-QuestDB `locate-index`, and tick-store `v3-seg1Mi`. `snappy-rg1Mi` won Q2 cold, and no other
-Parquet variant beat the rest on Q5 cold, so `zstd9-rg1Mi` dropped out. By the table above that is
-about 10.6 hours: Parquet four variants, about 150 minutes, ArcticDB 193, QuestDB 182, tick-store
-86, and 24 for the checks before each system.
+At `7a2e092` the list changed again: Parquet `zstd1-rg128k`, `snappy-rg1Mi` and `none-rg1Mi`,
+ArcticDB `rows10M-cols127` and per security, QuestDB `locate-index`, and tick-store `v3-seg1Mi`.
+`snappy-rg1Mi` won Q2 cold, and no other Parquet variant beat the rest on Q5 cold, so
+`zstd9-rg1Mi` dropped out. That full day was lost to the host's backup reading QuestDB's store.
+
+At `67ae574`, the commit of the full-day results, the list changed before the run: Parquet
+`zstd1-rg128k` and `none-rg1Mi`, ArcticDB `rows100k-cols1` and per security, QuestDB
+`locate-index`, and tick-store `v3-seg1Mi`. Against `7a2e092`, Parquet lost `snappy-rg1Mi`, and
+ArcticDB lost `rows10M-cols127` and gained `rows100k-cols1`, as at `dd5de38`. By the table above
+that is about 10.3 hours: Parquet three variants, about 112 minutes, ArcticDB 213, QuestDB 182,
+tick-store 86, and 24 for the checks before each system.
 
 At `dd5de38` the full day has not finished. The guard stopped QuestDB `plain` twice on swap
 traffic: in its class A write, and on a freshly booted host in its read-back. Both times the kernel
