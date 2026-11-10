@@ -2334,6 +2334,14 @@ files still competes for the device; that is the host's noise, as before, and no
 This run is lost, and the slices and the full day were run again at that commit. Raw logs:
 `phase3-raw/compare-fullday/debian-7a2e092-questdb-backup-lost/`.
 
+The slice pair at `67ae574` met both checks at once. On `debian`, the backup ran from 12:25:54 to
+12:27:05, and at 12:26:21 ArcticDB `rows100k-cols1`'s store gained 16,442 pages over a second
+with nothing of ours running, after a cold Q1. That repetition was run again. On the Mac three
+cold repetitions were run again, after stores gained 107, 131 and 654 pages: ArcticDB Q3 and Q2,
+and QuestDB `locate-index` Q1. I have not found what read them. So slice files before `67ae574`,
+on both hosts, may hold cold repetitions that ran beside another reader. None of them is used
+for a verdict below.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
