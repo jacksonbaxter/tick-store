@@ -40,6 +40,9 @@ EVIDENCE_PLAN = "Interval forward scan"
 PROBE_CLASS = "CommitModeProbe"
 LAUNCHER_TAG = "tick-store"
 WAL_POLL_SECONDS = 2
+# The Parquet conversion after the queries goes through the WAL. On a day it outlasts one
+# query's timeout, 60 s, so the WAL is polled down first, for at most this long.
+CONVERSION_WAIT_SECONDS = 3600
 LINUX_JEMALLOC = "libjemalloc.so"
 # Beyond bin/questdb.sh's options: the JVM prints its own properties to the log as it starts.
 SHOW_PROPERTIES = "-XshowSettings:properties"
@@ -820,18 +823,27 @@ class QuestDBSystem(System):
                 "partitions": sql(f"SELECT name, numRows, diskSize FROM table_partitions('{TABLE}')")}
 
     def after_queries(self):
-        """QuestDB's own Parquet partitions. The docs say to report size after this too."""
+        """QuestDB's own Parquet partitions. The docs say to report size after this too. The
+        conversion is applied through the WAL, and a day's partition takes minutes, longer than
+        one wait_wal_table call may run, so the WAL is polled down first, as after ingest."""
         day = self.context.day.iso
         try:
             sql(f"ALTER TABLE {TABLE} CONVERT PARTITION TO PARQUET LIST '{day}'")
         except ServerFailure as failure:
             return {"status": "refused", "reason": str(failure)}
+        started = time.perf_counter()
+        while (state := self._wal_state())["writerTxn"] != state["sequencerTxn"]:
+            if time.perf_counter() - started > CONVERSION_WAIT_SECONDS:
+                raise ServerFailure(f"the conversion was not applied in "
+                                    f"{CONVERSION_WAIT_SECONDS} s: {state}")
+            time.sleep(WAL_POLL_SECONDS)
         sql(f"SELECT wait_wal_table('{TABLE}')")
+        applied = time.perf_counter() - started
         partitions = sql(f"SELECT name, numRows, isParquet, parquetFileSize "
                          f"FROM table_partitions('{TABLE}')")
         return {"status": "converted" if partitions[0]["isParquet"] else "accepted, not converted",
                 "partitions": partitions, "codec": "QuestDB's default for this conversion",
-                "read_back": "not repeated on the converted form"}
+                "apply_seconds": applied, "read_back": "not repeated on the converted form"}
 
     # Either side.
 
