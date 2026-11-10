@@ -547,12 +547,13 @@ At `dd5de38`, the commit of the full-day results, the Linux slice gives Parquet 
 `locate-index`, and tick-store `v3-seg1Mi`: about 11.2 hours by the table above, over the guide,
 run as the rule gives.
 
-At `e0b7df2`, the commit of the guard's new swap rule, the Linux slice gives Parquet
-`zstd1-rg128k`, `zstd9-rg1Mi` and `none-rg1Mi`, ArcticDB `rows10M-cols127` and per security,
-QuestDB `locate-index`, and tick-store `v3-seg1Mi`. Against `dd5de38`, Parquet gains `zstd9-rg1Mi`,
-which won Q5 cold, and ArcticDB loses `rows100k-cols1`, which won nothing. By the table above that
-is about 10.6 hours: Parquet four variants, about 150 minutes, ArcticDB 193, QuestDB 182,
-tick-store 86, and 24 for the checks before each system.
+At `e0b7df2`, the commit of the guard's new swap rule, and again at `4b5ade4`, the commit of the
+full-day results, the Linux slice gives Parquet `zstd1-rg128k`, `zstd9-rg1Mi` and `none-rg1Mi`,
+ArcticDB `rows10M-cols127` and per security, QuestDB `locate-index`, and tick-store `v3-seg1Mi`.
+Against `dd5de38`, Parquet gains `zstd9-rg1Mi`, which won Q5 cold, and ArcticDB loses
+`rows100k-cols1`, which won nothing. By the table above that is about 10.6 hours: Parquet four
+variants, about 150 minutes, ArcticDB 193, QuestDB 182, tick-store 86, and 24 for the checks
+before each system.
 
 At `dd5de38` the full day has not finished. The guard stopped QuestDB `plain` twice on swap
 traffic: in its class A write, and on a freshly booted host in its read-back. Both times the kernel

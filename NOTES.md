@@ -2160,6 +2160,7 @@ comparison" in `compare/README.md`: it stops a run on swap traffic over 10 MiB/s
 | `e2ad871` | ArcticDB's first read-back, then `rows10M-cols127`'s write | Swap traffic of 18 to 30 MB/s, then MemAvailable under 3 GiB (fixed at `dd5de38`) |
 | `dd5de38`, 2026-11-05 | QuestDB `plain`, class A write, 345 s in | Swap traffic 30.3, 71.5 and 23.4 MB/s |
 | `dd5de38`, 2026-11-09 | QuestDB `plain`, class A read-back, 641 s in | Swap traffic 20.1, 80.7 and 15.0 MB/s |
+| `e0b7df2`, 2026-11-10 | QuestDB `plain`, evicting its class B store before the warm queries, 3,249 s in | 14,080 pages still resident after 16 eviction passes 20 ms apart (fixed at `4b5ade4`) |
 
 The first `dd5de38` run took the systems in their usual order, and Parquet (5,569 s) and ArcticDB
 (16,234 s) finished under the guard before QuestDB stopped. The second ran on a freshly booted host
@@ -2268,6 +2269,29 @@ keeps the number and puts the doubt next to it.
 memory: no collection after start-up, and at most 300 MiB of the heap in use. But swap was full
 before it started and stayed full, so it never tested what the kernel does with an idle heap
 while swap has room. That is what stopped both `dd5de38` runs.
+
+#### The first run under the new rule, lost to eviction
+
+The first full day under the new rule ran at `e0b7df2`, the commit that implemented it, with
+QuestDB first. The guard let QuestDB through both writes and both read-backs. It saw swap-out up
+to 103.7 MiB/s and free swap at 0 for 178 samples, with MemAvailable at least 8.36 GiB
+throughout. Swap-in reached 35.1 MiB/s in one sample and stayed over 10 MiB/s for at most two
+samples in a row, both times at the start of a phase. The most it held for three samples was
+2.78 MiB/s, the same order as the samples behind the rule. Over 3,249 s, 758 MiB came back from
+swap and 1,545 MiB went out. The JVMs held up to 755 MiB in swap.
+
+Then the harness failed, not the guard. QuestDB's queries had never run on a whole day, because
+every earlier attempt stopped first. Before the warm queries, the class B store, 22.9 GB in 312
+files, must be evicted from the page cache and proven at 0 pages resident. `tick_coldcache evict`
+still had 14,080 pages resident after its 16 passes, 20 ms apart, and the run stopped. With
+nothing running afterwards, the same store took 14 passes. A 2 GB file of it, freshly read
+through, took 1 pass three times out of three. So it is the pages the store's own run left
+behind that take seconds to become droppable. My guess at why is ext4 releasing their buffers
+only at a later journal commit; I have not shown that. At `4b5ade4` the wait between passes
+doubles from 20 ms up to 1 s, for at most 32 passes, about 27 s of waiting in all. The proof is
+unchanged, and every page must still go. The run is lost and none of it is used: both slice
+files and the full day were run again at `4b5ade4`. Raw logs:
+`phase3-raw/compare-fullday/debian-e0b7df2-questdb-eviction-lost/`.
 
 ## Process notes
 
