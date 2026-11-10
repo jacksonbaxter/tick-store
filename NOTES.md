@@ -1813,7 +1813,7 @@ Raw outputs, per case, are kept with the logs (`decode-targets/mac/`, `decode-ta
   `results/bench/macOS-column_decode-bcbf8738d892.json`, `results/bench/macOS-simd_kernel-bcbf8738d892.json`.
 - Linux: Zen 1, AVX2, `taskset -c 4`, perf `cycles:u`, `instructions:u` and `branch-misses:u` around the timed passes,
   `cache-misses` marked unavailable and not quoted, governor `performance`, turbo enabled, 3,562 to 3,577 MHz from cycles over
-  wall time. Column cases at load 1.25 to 1.49 at start, cpu5 busy 0.64% median and 1.12% at most.
+  wall time. Column cases at load 1.27 to 1.49 at start, cpu5 busy 0.64% median and 1.12% at most.
   `results/bench/Linux-column_decode-bcbf8738d892.json`.
 - Commands, from the repository root, after `cmake --build --preset bench` on the Mac and the same Release `-O3 -DNDEBUG` build in
   `build/bench-ds` on debian (`heavy.sh`, `taskset -c 2,6,7`):

@@ -111,7 +111,7 @@ timestamps in file order. Every rate is the median of ten timed passes.
 At `bcbf873`, the cases above through `scripts/run_bench.py` under each host's `measure.sh`:
 `TICK_STORE_MEASURE=<measure.sh> python3 -I scripts/run_bench.py build/bench/bench/column_decode_bench`, and the same for
 `simd_kernel_bench`. macOS is the M4 Max, NEON, unpinned, no counters, at load 1.26 to 3.92 at the start of a case. Linux is Zen 1,
-AVX2, pinned to cpu4 with `cycles:u`, at load 1.25 to 1.49, cpu5 at most 1.12% busy. Results: `results/bench/macOS-column_decode-bcbf8738d892.json`,
+AVX2, pinned to cpu4 with `cycles:u`, at load 1.27 to 1.49 at the start of a case, cpu5 at most 1.12% busy. Results: `results/bench/macOS-column_decode-bcbf8738d892.json`,
 `results/bench/macOS-simd_kernel-bcbf8738d892.json`, `results/bench/Linux-column_decode-bcbf8738d892.json`. The Linux kernel file
 does not exist: two complete runs were refused for cpu5 over 5% busy in 4 and in 7 of 314 cases (NOTES.md, "Decode targets under
 measure.sh"). Gaps and reasons are there too.
