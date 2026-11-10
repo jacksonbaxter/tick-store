@@ -2070,6 +2070,40 @@ Q3); a per-group directory (not built: it cannot start a run's scan mid-run); se
 (Q2 and Q3 2 to 17 times slower warm, Q5 up to 3 times cold, for a smaller Q4); a multi-stream Huffman decode (not built,
 above).
 
+### Full-day comparison
+
+No full-day result exists yet, so no CR-2, WT or QL verdict is drawn from a full day here. Every
+attempt below is lost and none of its parts is used. The guard is the one in "Full-day
+comparison" in `compare/README.md`: it stops a run on swap traffic over 10 MiB/s for three
+2-second samples.
+
+| Commit | Where it stopped | Why |
+|---|---|---|
+| `193177b`, `953f3d4` | Parquet's warm Q2, three failed attempts each | Warm proof on the device's machine-wide read count (fixed at `e2ad871`) |
+| `e2ad871` | ArcticDB's first read-back, then `rows10M-cols127`'s write | Swap traffic of 18 to 30 MB/s, then MemAvailable under 3 GiB (fixed at `dd5de38`) |
+| `dd5de38`, 2026-11-05 | QuestDB `plain`, class A write, 345 s in | Swap traffic 30.3, 71.5 and 23.4 MB/s |
+| `dd5de38`, 2026-11-09 | QuestDB `plain`, class A read-back, 641 s in | Swap traffic 20.1, 80.7 and 15.0 MB/s |
+
+The first `dd5de38` run took the systems in their usual order, and Parquet (5,569 s) and ArcticDB
+(16,234 s) finished under the guard before QuestDB stopped. The second ran on a freshly booted host
+with QuestDB first, so that a repeat would cost minutes and not six hours. It did repeat.
+
+**The two QuestDB stops are one effect.** Both times, free swap went to nothing within about 6 s:
+from 651 MB to 12 KB, then from 654 MB to 16 KB. MemAvailable stayed between 11.6 and 12.7 GB. What
+went to swap was QuestDB's own JVM. The write's server held 648 MB in swap on 2026-11-05. On
+2026-11-09 the write's server held 926 MB and the read-back's 651 MB, beside 10.3 GB of the store's
+pages mapped and 1.5 GB anonymous. The session's processes together peaked at 13.8 GB of RSS on
+this 15.7 GB host. QuestDB's heap is the fixed `-Xms1g -Xmx1g` of Phase 3, and the capacity check
+found at most 300 MiB of it in use. The kernel pages that idle heap out to keep the store's mapped
+pages, since the 23 GB store does not fit in memory, and the free swap fills in one burst. The
+capacity check passed because swap was already full before it started, so it had nothing to fill.
+Swappiness is 60 and swap is 975 MB. The cgroups set no memory limit.
+
+No harness change answers this. Raising or dropping the guard's swap limit weakens a check. A
+different heap is not the setting the capacity check proved. Swap and swappiness belong to the
+host. The run waits for a decision on one of them. Raw logs:
+`phase3-raw/compare-fullday/`.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from

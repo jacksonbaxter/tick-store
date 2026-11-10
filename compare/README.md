@@ -532,6 +532,13 @@ At `dd5de38`, the commit of the full-day results, the Linux slice gives Parquet 
 `locate-index`, and tick-store `v3-seg1Mi`: about 11.2 hours by the table above, over the guide,
 run as the rule gives.
 
+At `dd5de38` the full day has not finished. The guard stopped QuestDB `plain` twice on swap
+traffic: in its class A write, and on a freshly booted host in its read-back. Both times the kernel
+paged out QuestDB's own idle heap, 0.65 to 0.93 GB, to keep the store's mapped pages. The free swap
+filled in about 6 s, at up to 81 MB/s, with 11.6 GB or more still available. The capacity check met
+none of this, because swap was already full when it started. See "Full-day comparison" in
+`NOTES.md`.
+
 ## What the numbers are
 
 The full-day file is the one the targets are judged on. Slice numbers prove that the harness
