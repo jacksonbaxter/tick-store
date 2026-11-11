@@ -2149,10 +2149,11 @@ above).
 
 ### Full-day comparison
 
-No full-day result exists yet, so no CR-2, WT or QL verdict is drawn from a full day here. Every
-attempt below is lost and none of its parts is used. The guard is the one in "Full-day
-comparison" in `compare/README.md`: it stops a run on swap traffic over 10 MiB/s for three
-2-second samples.
+The full day ran to the end at `67ae574`, and the verdicts are in "The full day at `67ae574`"
+below, read from `results/compare/Linux-12302019-full-67ae574f5666.json` alone. Every attempt in
+the table is lost and none of its parts is used. Up to `dd5de38` the guard stopped a run on swap
+traffic over 10 MiB/s for three 2-second samples; the rule from `e0b7df2` on is in "The guard's
+swap rule" below.
 
 | Commit | Where it stopped | Why |
 |---|---|---|
@@ -2341,6 +2342,141 @@ cold repetitions were run again, after stores gained 107, 131 and 654 pages: Arc
 and QuestDB `locate-index` Q1. I have not found what read them. So slice files before `67ae574`,
 on both hosts, may hold cold repetitions that ran beside another reader. None of them is used
 for a verdict below.
+
+#### The full day at `67ae574`
+
+`results/compare/Linux-12302019-full-67ae574f5666.json`, at `67ae574`, the commit of the slice pair
+whose Linux file chose the variants. It passes `scripts/check_compare.py`. Day `12302019`:
+268,744,780 messages, 8,251,407,909 source bytes, nothing clipped. Each system ran alone under
+`measure.sh`, pinned to cpu4 and cpu6, QuestDB first, from 13:26 to 21:58 MST on 2026-11-10:
+QuestDB 10,030 s, Parquet 5,694, ArcticDB 11,548, tick-store 3,432, 8.53 hours in all. Load at
+start 1.60, 1.38, 1.19 and 1.41, at end 1.38, 1.19, 1.73 and 0.80, in that order. cpu5, cpu4's
+sibling, was busy 3.32%, 1.73%, 3.38% and 1.44% of each system's window. The guard never fired,
+and no cold repetition ran again: each eviction was proven at its first attempt, the longest
+taking 3.8 s with the one-second quiet check.
+
+Queries run on each system's class B store only, so no query has a class A number. Each system's
+headline variant, median / p99 in ms, warm over 30 runs and cold over 7. `(swap-in)` marks a
+measure with any page swapped in, host-wide, while it was timed; it is kept, as registered.
+
+| Query | Parquet `zstd1-rg1Mi` | ArcticDB `rows100k-cols127` | QuestDB `plain` | tick-store `v3-seg4Mi` |
+|---|---|---|---|---|
+| Q1 warm | 66.45 / 97.79 | 37.41 / 67.98 | 58.57 / 95.96 (swap-in) | 297.58 / 325.72 |
+| Q1 cold | 118.82 / 141.25 | 83.18 / 89.98 | 550.62 / 588.18 | 406.96 / 461.20 |
+| Q2 warm | 2,702.10 / 2,808.72 (swap-in) | 2,050.34 / 2,475.90 (swap-in) | 319.30 / 364.42 (swap-in) | 74.32 / 83.95 |
+| Q2 cold | 3,957.57 / 4,081.60 (swap-in) | 5,190.59 / 5,211.48 | 17,592.34 / 17,607.18 (swap-in) | 485.13 / 500.41 |
+| Q3 warm | 1,638.97 / 1,707.02 (swap-in) | 1,175.26 / 1,224.26 (swap-in) | 68.71 / 85.62 (swap-in) | 35.81 / 36.53 |
+| Q3 cold | 2,112.55 / 2,513.76 | 4,389.00 / 4,475.13 | 7,613.49 / 8,834.35 (swap-in) | 214.40 / 226.00 |
+| Q4 warm | 60.75 / 99.96 | 6.95 / 8.84 | 1.18 / 1.75 | 207.10 / 217.01 |
+| Q4 cold | 112.02 / 248.31 | 23.46 / 25.08 | 73.26 / 97.23 | 302.45 / 341.35 |
+| Q5 warm | 1,011.17 / 1,333.77 (swap-in) | 3,004.35 / 3,081.97 (swap-in) | 61.07 / 73.75 | 907.64 / 936.87 (swap-in) |
+| Q5 cold | 1,718.55 / 1,725.01 | 12,209.75 / 12,272.84 (swap-in) | 4,110.39 / 4,135.53 (swap-in) | 1,233.89 / 1,283.58 |
+
+Every variant's medians are in the README's full-day block. Of the others, tick-store `v3-seg1Mi`
+answers Q1 in 115.88 / 160.05 ms warm / cold and Q4 in 51.40 / 88.76, and is slower on Q2 and
+Q3, warm and cold, and on Q5 cold. ArcticDB per security answers Q2 in 49.65 / 111.23 ms and Q3 in 26.19 / 91.93, under
+tick-store's headline, but Q1 and Q4 in 9.8 and 9.7 s warm.
+
+**Ingest**, the median of one write per class, headline variants. tick-store's write holds ITCH
+parsing; the others ingest columns already parsed by `tools/tick_export`, and nothing is
+subtracted.
+
+| System | Class A s | Class A M records/s | Class B s | Class B M records/s |
+|---|---|---|---|---|
+| Parquet | 158.4 | 1.696 | 266.3 | 1.009 |
+| ArcticDB | 120.1 | 2.237 | 123.6 | 2.175 |
+| QuestDB | 273.6 | 0.982 | 1,269.2 | 0.212 |
+| tick-store | 195.3 | 1.376 | 188.9 | 1.423 |
+
+QuestDB's class B is not like-for-like, and on the day its durability proof failed: the flush
+probe found one data page, in `_cv`, still dirty when a commit returned. Every other class is
+proven and like-for-like.
+
+**Stored bytes**, class B, allocated at rest, and the ratio of the day's source bytes to them:
+tick-store 1,758,240,768 (4.693), Parquet 3,191,406,592 (2.586), ArcticDB 6,352,642,048 (1.299),
+QuestDB 22,897,786,880 (0.360). QuestDB's own conversion of the day to Parquet, after its
+queries, is 5,622,818,382 bytes. The smallest variant of each other system is Parquet
+`zstd1-rg1Mi`, ArcticDB per security at 5,666,115,584 and QuestDB `plain`.
+
+**Peak memory**, across each system's whole run: session RSS 13.64, 13.46, 13.81 and 13.54 GiB
+for Parquet, ArcticDB, QuestDB and tick-store, with `tick_roundtrip`, the oracle, the largest
+process in every system but QuestDB, whose JVM peaked at 11.66 GiB. MemAvailable fell to 11.64,
+10.59, 7.13 and 12.96 GiB.
+
+**Swap per phase**, host-wide, MiB in / out, over every variant and class:
+
+| System | Write | Read-back | Warm queries | Cold queries | Guard, whole run |
+|---|---|---|---|---|---|
+| Parquet | 1.8 / 3.3 | 3.8 / 1.2 | 0.7 / 0.0 | 0.2 / 0.0 | 6.7 / 4.5 |
+| ArcticDB | 35.3 / 181.4 | 317.7 / 443.8 | 17.1 / 16.9 | 7.7 / 0.0 | 414.5 / 642.1 |
+| QuestDB | 124.7 / 255.4 | 1,563.9 / 2,774.7 | 11.7 / 0.0 | 60.8 / 0.0 | 1,765.7 / 3,030.1 |
+| tick-store | 4.2 / 0.0 | 8.4 / 0.2 | 0.0 / 0.0 | 0.1 / 0.0 | 12.8 / 0.2 |
+
+45 timed measures had a page swapped in: 10 of Parquet's, 18 of ArcticDB's, 15 of QuestDB's and
+2 of tick-store's, Q5 warm in both its variants. The counts are host-wide, so a flag says the host
+swapped in during the timing, not that the query's own pages did.
+
+**Against the `dd5de38` stops.** Then the guard stopped QuestDB `plain` at 345 s, in its class A
+write, on swap traffic of 30.3, 71.5 and 23.4 MB/s, and at 641 s, in its read-back, on 20.1, 80.7
+and 15.0 MB/s. This time QuestDB ran 10,030 s. Its guard saw swap-out up to 72.2 MiB/s and
+swap-in up to 28.3 MiB/s, swap-in over 10 MiB/s in 16 samples and never more than two in a row,
+and at most 3.78 MiB/s held for three samples. Free swap was under 2% for 20 samples, while
+MemAvailable stayed at 7.13 GiB or more, over the 3.95 GiB floor. The old rule, in plus out over
+10 MiB/s for three samples, would have stopped it at 1,105 s, on 19.6, 22.0 and 10.8 MiB/s, and
+would have fired four times in the run. Most of QuestDB's swap came in its read-backs, 1,564 MiB
+in and 2,775 MiB out. ArcticDB's guard saw 17.8 MiB/s in at most, for one sample; Parquet and
+tick-store had almost none.
+
+**Verdicts**, on the headline variants, on `debian` alone. A full day runs only on Linux, since
+its warm proof reads the block device's own counter, so a target marked Both has no macOS
+full-day verdict.
+
+- **CR-2, met.** tick-store's store is 1,758,240,768 bytes. Parquet's smallest is 1.82 times
+  that, ArcticDB's smallest 3.22 times and its headline 3.61, QuestDB's 13.02, and QuestDB's own
+  Parquet conversion 3.20.
+- **WT-1, missed.** Class A, one thread: 1.376 M records/s against 8.59 M, short by 7.21 M
+  records/s, 16.0% of the target. `v3-seg1Mi` reached 1.472 M. The target is QuestDB's 32
+  workers on uncompressed TSBS rows; this is one thread that parses ITCH and compresses.
+- **WT-2, missed.** 1.376 M messages/s in class A and 1.423 M in class B, against 2,732,762:
+  short by 1.36 M and 1.31 M messages/s, about half the published TotalView rate. The writer is
+  one thread that parses, sorts by locate and codes; how much of its 195 s is parsing is not yet
+  measured (TASKS).
+- **WT-3, class A against each system, tick-store's ingest including ITCH parsing:** missed
+  against Parquet, 195.3 s against 158.4, by 36.8 s; missed against ArcticDB, 120.1 s, by 75.2
+  s; met against QuestDB, 273.6 s, by 78.3 s.
+- **WT-4, class B against each system, at each one's stated flush:** met against Parquet,
+  188.9 s against 266.3, by 77.4 s, though Parquet `none-rg1Mi` wrote class B in 153.8 s; missed
+  against ArcticDB, 123.6 s, by 65.3 s; met against QuestDB, 1,269.2 s, by 1,080.3 s, but QuestDB's
+  class B is not like-for-like and its durability proof failed, so that win proves little.
+- **QL-1, missed.** Q2 warm median 74.32 ms against 16.9 ms, 57.42 ms over, 4.4 times. Q2
+  returns 739,944 records of the busiest locate through `tools/tick_query` and Python; the
+  target returns 52 rows from a 1.5 M-row store.
+- **QL-2, missed.** Q3 warm median 35.81 ms against 0.41 ms, 35.40 ms over. Q3 decodes the
+  locate's hour of records to aggregate them; the per-locate minute aggregate in TASKS is not
+  built.
+- **QL-3, missed.** Q4 cold mean 308.83 ms against 10 ms, 298.83 ms over; `v3-seg1Mi` 101.57 ms.
+  Q4 decodes its segment's whole locate column to put records back in file order, and at
+  2^22 records a segment the runs it reads are four times longer (TASKS).
+- **QL-4, per query, both median and p99 lowest of the four:**
+  - Q2 warm, met: 74.32 / 83.95 ms, against QuestDB's 319.30 / 364.42.
+  - Q2 cold, met: 485.13 / 500.41, against Parquet's 3,957.57 / 4,081.60.
+  - Q3 warm, met: 35.81 / 36.53, against QuestDB's 68.71 / 85.62.
+  - Q3 cold, met: 214.40 / 226.00, against Parquet's 2,112.55 / 2,513.76.
+  - Q5 cold, met: 1,233.89 / 1,283.58, against Parquet's 1,718.55 / 1,725.01.
+  - Q1 warm, missed: 297.58 / 325.72 against ArcticDB's 37.41 / 67.98, over by 260.17 / 257.74.
+  - Q1 cold, missed: 406.96 / 461.20 against ArcticDB's 83.18 / 89.98, over by 323.78 / 371.23.
+  - Q4 warm, missed: 207.10 / 217.01 against QuestDB's 1.18 / 1.75, over by 205.92 / 215.26.
+  - Q4 cold, missed: 302.45 / 341.35 against ArcticDB's 23.46 / 25.08, over by 278.99 / 316.27.
+  - Q5 warm, missed: 907.64 / 936.87, swap-in flagged, against QuestDB's 61.07 / 73.75, over by
+    846.57 / 863.12.
+
+  Q1 and Q4 decode the segment's whole locate column, as on the slice; `v3-seg1Mi` cuts them to
+  115.88 and 51.40 ms warm and is still not lowest. Q5 unpacks 268.7 M share values from ranked
+  PFOR, where QuestDB sums a fixed-width column it maps; the sum over ranks in TASKS is not
+  built. Q5 warm here, 907.64 ms, is in line with the 911.95 ms measured on `debian` at
+  iteration for the final layout (`1669ae0`); the 280 ms there was the Mac's.
+
+Raw logs: `phase3-raw/compare-fullday/debian-67ae574/`.
 
 ## Process notes
 
