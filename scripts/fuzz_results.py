@@ -215,11 +215,13 @@ def assemble(commit, hosts, prefixes, cmake):
                       f"{check_fuzz.REQUIRED_SECONDS} s under the heavy-job lock, with "
                       "scripts/check.sh's flags and caps, on the existing corpus and the seeds "
                       "the real encoders write; on Linux, each target whose decode reaches the "
-                      "AVX2 kernels, with the level set to avx2. Coverage, corpus and exec/s are "
-                      "libFuzzer's own final figures."),
+                      "AVX2 kernels or that verifies CRC32C, which runs the SSE4.2 kernel there, "
+                      "with the level set to avx2. Coverage, corpus and exec/s are libFuzzer's "
+                      "own final figures."),
         "required_seconds": check_fuzz.REQUIRED_SECONDS,
         "targets_file": "fuzz/CMakeLists.txt", "targets": targets,
-        "avx2_path_targets": list(check_fuzz.AVX2_PATH), "hosts": header_hosts,
+        "avx2_path_targets": list(check_fuzz.AVX2_PATH),
+        "crc32c_path_targets": list(check_fuzz.CRC32C_PATH), "hosts": header_hosts,
     }
     document = {"header": header, "runs": runs}
     document["summary"] = check_fuzz.summary_of(header, runs)

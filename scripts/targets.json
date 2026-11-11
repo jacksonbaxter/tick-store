@@ -36,14 +36,14 @@
       {"label": "footer, CRCs off:", "value": {"path": ["g2", "footer_no_checksums", "verdict"]}, "equals": "mismatch"},
       {"label": "restored store exits", "value": {"path": ["g2", "exit_code_restored"]}, "equals": 0}]}]},
   {"id": "G-3", "host": "any", "target_text": "each libFuzzer target clean for 30 minutes under heavy.sh",
-   "judged": "every target of fuzz/CMakeLists.txt on macOS, and each target whose decode reaches the AVX2 kernels on Linux, at avx2; check_fuzz.py refuses the file if one is missing",
+   "judged": "every target of fuzz/CMakeLists.txt on macOS, and on Linux, at avx2, each target whose decode reaches the AVX2 kernels or that verifies CRC32C, which runs the SSE4.2 kernel there; check_fuzz.py refuses the file if one is missing",
    "parts": [
     {"label": "macOS", "file": "results/fuzz-g3-*.json", "all": [
       {"label": "targets clean for 1,800 s:", "value": {"path": ["summary", "macOS", "targets_clean"]},
        "equals": {"path": ["summary", "macOS", "targets_required"]}},
       {"label": "shortest run", "value": {"path": ["summary", "macOS", "shortest_seconds"]},
        "at_least": {"path": ["header", "required_seconds"]}, "unit": " s"}]},
-    {"label": "Linux, AVX2 path", "file": "results/fuzz-g3-*.json", "all": [
+    {"label": "Linux, AVX2 and SSE4.2 CRC32C paths", "file": "results/fuzz-g3-*.json", "all": [
       {"label": "targets clean for 1,800 s:", "value": {"path": ["summary", "Linux", "targets_clean"]},
        "equals": {"path": ["summary", "Linux", "targets_required"]}},
       {"label": "shortest run", "value": {"path": ["summary", "Linux", "shortest_seconds"]},

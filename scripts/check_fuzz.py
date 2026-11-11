@@ -5,7 +5,8 @@
 
 G-3 in BENCHMARKS.md: every libFuzzer target runs clean for 30 minutes under heavy.sh. A file
 that claims it has to hold that run for every target fuzz/CMakeLists.txt defines, on macOS, and
-for every target whose decode reaches the AVX2 kernels, on Linux, since the Mac cannot run them.
+on Linux for every target whose decode reaches the AVX2 kernels or that verifies CRC32C, which
+runs the SSE4.2 kernel there, since the Mac can run neither.
 This refuses a file that leaves a target out, a clean run shorter than 1,800 s, a run whose own
 final lines disagree with its numbers, a run looser than the targets' memory caps, and summary
 counts that are not the runs'. A run that was not clean may stop early, but must say what it
@@ -49,6 +50,15 @@ RSS_LIMIT_MB = 2048
 # A new target that reaches the kernels must be added here, with its reason.
 AVX2_PATH = ("fuzz_dictionary", "fuzz_itch_query", "fuzz_itch_store", "fuzz_pfor",
              "fuzz_run_length", "fuzz_stream_vbyte")
+# The targets that verify CRC32C on their input through store::crc32c(), which on x86-64 runs
+# the SSE4.2 kernel (src/store/crc32c_sse42.cpp) and on the Mac the ARMv8 one: the container
+# parser, and the ITCH store and the query, whose files are containers. Replaying the seeds
+# with -print_coverage=1 on Linux lists crc32c_sse42 as covered for these three, and not for
+# the column directory or the stub store, which carry no CRC; nor do the codecs or the ITCH
+# parsers call it. A new target that verifies a CRC must be added here.
+CRC32C_PATH = ("fuzz_container", "fuzz_itch_query", "fuzz_itch_store")
+# What Linux must run: the union of the two.
+LINUX_REQUIRED = tuple(sorted(set(AVX2_PATH) | set(CRC32C_PATH)))
 
 HOSTS = {"macOS": {"kernel": "Darwin ", "levels": ("neon",)},
          "Linux": {"kernel": "Linux ", "levels": ("avx2", "scalar")}}
@@ -56,7 +66,7 @@ HOSTS = {"macOS": {"kernel": "Darwin ", "levels": ("neon",)},
 REQUIRED_LEVEL = {"macOS": "neon", "Linux": "avx2"}
 
 HEADER_FIELDS = ("schema", "gate", "commit", "statement", "required_seconds", "targets_file",
-                 "targets", "avx2_path_targets", "hosts")
+                 "targets", "avx2_path_targets", "crc32c_path_targets", "hosts")
 HOST_FIELDS = ("cpu_model", "kernel", "compiler", "compile_flags", "sanitizer_options",
                "concurrency", "peak_memory")
 RUN_FIELDS = ("target", "host", "commit", "kernel_level", "seconds", "wall_seconds", "runs",
@@ -104,10 +114,16 @@ def check_header(header, top_keys, path, targets):
     if header.get("avx2_path_targets") != list(AVX2_PATH):
         problems.append(f"header.avx2_path_targets: {header.get('avx2_path_targets')} is not "
                         f"{list(AVX2_PATH)}")
+    if header.get("crc32c_path_targets") != list(CRC32C_PATH):
+        problems.append(f"header.crc32c_path_targets: {header.get('crc32c_path_targets')} is "
+                        f"not {list(CRC32C_PATH)}")
     for name in AVX2_PATH:
         if name not in targets:
             problems.append(f"{name} reaches the AVX2 kernels and fuzz/CMakeLists.txt has no "
                             "such target")
+    for name in CRC32C_PATH:
+        if name not in targets:
+            problems.append(f"{name} verifies CRC32C and fuzz/CMakeLists.txt has no such target")
     hosts = header.get("hosts")
     if not isinstance(hosts, dict) or sorted(hosts) != sorted(HOSTS):
         problems.append(f"header.hosts: needs exactly {sorted(HOSTS)}")
@@ -224,7 +240,7 @@ def check_runs(document, header):
 
 
 def required_of(header):
-    return {"macOS": list(header.get("targets", [])), "Linux": list(AVX2_PATH)}
+    return {"macOS": list(header.get("targets", [])), "Linux": list(LINUX_REQUIRED)}
 
 
 def summary_of(header, runs):

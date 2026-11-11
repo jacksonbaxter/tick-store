@@ -3,7 +3,7 @@
   "schema": "tick-store-fuzz-1",
   "gate": "G-3",
   "commit": "ea1dde4c02e48961e1369b51183a5c6c6a16e396",
-  "statement": "Each libFuzzer target of fuzz/CMakeLists.txt, run for at least 1800 s under the heavy-job lock, with scripts/check.sh's flags and caps, on the existing corpus and the seeds the real encoders write; on Linux, each target whose decode reaches the AVX2 kernels, with the level set to avx2. Coverage, corpus and exec/s are libFuzzer's own final figures.",
+  "statement": "Each libFuzzer target of fuzz/CMakeLists.txt, run for at least 1800 s under the heavy-job lock, with scripts/check.sh's flags and caps, on the existing corpus and the seeds the real encoders write; on Linux, each target whose decode reaches the AVX2 kernels or that verifies CRC32C, which runs the SSE4.2 kernel there, with the level set to avx2. Coverage, corpus and exec/s are libFuzzer's own final figures.",
   "required_seconds": 1800,
   "targets_file": "fuzz/CMakeLists.txt",
   "targets": [
@@ -29,6 +29,11 @@
    "fuzz_run_length",
    "fuzz_stream_vbyte"
   ],
+  "crc32c_path_targets": [
+   "fuzz_container",
+   "fuzz_itch_query",
+   "fuzz_itch_store"
+  ],
   "hosts": {
    "macOS": {
     "cpu_model": "Apple M4 Max",
@@ -44,8 +49,8 @@
     "kernel": "Linux 6.12.116+deb13-amd64",
     "compiler": "clang version 23.1.4 (https://github.com/llvm/llvm-project 7a941dfb2877a0b8cf30323fefa85ad019e0b0f5)",
     "compile_flags": "fuzz preset, RelWithDebInfo: -O2 -g -DNDEBUG -std=c++23 -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer, -DTICK_STORE_SIMD_AVX2 -DTICK_STORE_CRC32C_SSE42; targets linked with -fsanitize=fuzzer,address,undefined",
-    "sanitizer_options": "ASAN_OPTIONS=abort_on_error=0:exitcode=77 UBSAN_OPTIONS=print_stacktrace=1, as check.sh sets them; LeakSanitizer is on by default on Linux. TICK_STORE_SIMD=avx2, which aborts before the first decode if the build or processor cannot run AVX2",
-    "concurrency": "three targets at once, each pinned with taskset to one of cpu2, cpu6 and cpu7, in two batches, each its own heavy.sh job; cpu4 and cpu5 left alone, no measurement running",
+    "sanitizer_options": "ASAN_OPTIONS=abort_on_error=0:exitcode=77 UBSAN_OPTIONS=print_stacktrace=1, as check.sh sets them; LeakSanitizer is on by default on Linux. TICK_STORE_SIMD=avx2, which aborts before the first decode if the build or processor cannot run AVX2. TICK_STORE_CRC32C unset, so store::crc32c() runs the SSE4.2 kernel, which this processor has",
+    "concurrency": "three targets at once, each pinned with taskset to one of cpu2, cpu6 and cpu7, in two batches, each its own heavy.sh job; then fuzz_container alone on cpu2, in a third heavy.sh job, for the SSE4.2 CRC32C kernel; cpu4 and cpu5 left alone, no measurement running",
     "peak_memory": "libFuzzer's peak_rss_mb, and the fuzzer's VmHWM read from /proc every 5 s; this host has no GNU time"
    }
   }
@@ -698,6 +703,53 @@
    "checkout_at_start": "95f7eb04e9b4d0188661b41e9d0dad24f59fd0ce"
   },
   {
+   "target": "fuzz_container",
+   "host": "Linux",
+   "commit": "ea1dde4c02e48961e1369b51183a5c6c6a16e396",
+   "cpu": "cpu 2",
+   "cpu_model": "AMD Ryzen Embedded V1605B with Radeon Vega Gfx",
+   "compiler": "clang version 23.1.4 (https://github.com/llvm/llvm-project 7a941dfb2877a0b8cf30323fefa85ad019e0b0f5)",
+   "compile_flags": "fuzz preset, RelWithDebInfo: -O2 -g -DNDEBUG -std=c++23 -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer, -DTICK_STORE_SIMD_AVX2 -DTICK_STORE_CRC32C_SSE42; targets linked with -fsanitize=fuzzer,address,undefined",
+   "kernel_level": "avx2",
+   "seconds": 1801,
+   "wall_seconds": 1802,
+   "runs": 73167626,
+   "exec_per_second": 40626,
+   "coverage": {
+    "cov": 521,
+    "ft": 1797
+   },
+   "corpus": {
+    "units": 170,
+    "size": "176Kb"
+   },
+   "peak_rss_mb": 555,
+   "clean": true,
+   "exit_code": 0,
+   "findings": [],
+   "final_status_line": "#73167626 DONE cov: 521 ft: 1797 corp: 170/176Kb lim: 70000 exec/s: 40626 rss: 555Mb",
+   "done_line": "Done 73167626 runs in 1801 second(s)",
+   "final_stats": {
+    "number_of_executed_units": 73167626,
+    "average_exec_per_sec": 40626,
+    "new_units_added": 36,
+    "slowest_unit_time_sec": 0,
+    "peak_rss_mb": 555
+   },
+   "command": "ASAN_OPTIONS=abort_on_error=0:exitcode=77 UBSAN_OPTIONS=print_stacktrace=1 TICK_STORE_SIMD=avx2 taskset -c 2 build/fuzz/fuzz/fuzz_container -max_total_time=1800 -max_len=70000 -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 -artifact_prefix=artifacts/ corpus/container build/fuzz/fuzz-seeds/container",
+   "max_len": 70000,
+   "started": "2026-11-11T21:38:47Z",
+   "ended": "2026-11-11T22:08:49Z",
+   "inited": {
+    "runs": 744,
+    "approx_seconds": null
+   },
+   "os_peak_memory": {
+    "method": "VmHWM read from /proc every 5 s while it ran",
+    "vmhwm_bytes": 582352896
+   }
+  },
+  {
    "target": "fuzz_dictionary",
    "host": "Linux",
    "commit": "ea1dde4c02e48961e1369b51183a5c6c6a16e396",
@@ -987,8 +1039,8 @@
    "shortest_seconds": 1801
   },
   "Linux": {
-   "targets_required": 6,
-   "targets_clean": 6,
+   "targets_required": 7,
+   "targets_clean": 7,
    "shortest_seconds": 1801
   }
  }

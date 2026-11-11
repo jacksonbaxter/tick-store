@@ -164,7 +164,7 @@ from `results/codec-eval-12302019.json` and `results/store-size-12302019.json`.
 |---|---|---|---|
 | G-1 | Any | Bit-exact on 12302019 on both hosts and 10302019 on macOS, both stream hashes equal | Met |
 | G-2 | Any | A flipped bit is caught in a data block and in the footer, with CRCs on and off | Met |
-| G-3 | Any | All 13 targets clean for at least 1,801 s on macOS (NEON), and the 6 whose decode reaches the SIMD kernels clean for at least 1,801 s on Linux at AVX2, each comparing its kernel set with the scalar set inside the run, at `ea1dde4` (`results/fuzz-g3-ea1dde4c02e4.json`) | Met |
+| G-3 | Any | All 13 targets clean for at least 1,801 s on macOS (NEON), and on Linux at AVX2 the 6 whose decode reaches the SIMD kernels, each comparing its kernel set with the scalar set inside the run, and the 3 that verify CRC32C through the SSE4.2 kernel, 7 targets in all, each clean for at least 1,801 s, at `ea1dde4` (`results/fuzz-g3-ea1dde4c02e4.json`) | Met |
 | G-4 | Any | Gorilla delta-of-delta and XOR built, exact, and measured | Met |
 | CR-1 | Any | 4.6930 | Met |
 | CR-2 | Linux | 1,758,240,768 bytes, against Parquet's smallest 3,191,406,592, ArcticDB's 5,666,115,584, QuestDB's 22,897,786,880 | Met |

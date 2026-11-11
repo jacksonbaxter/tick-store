@@ -176,7 +176,12 @@ build/fuzz/fuzz/fuzz_run_length -max_total_time=60 -max_len=16384 \
 - The G-3 gate is 30 minutes per target under the heavy-job lock: every target on macOS, and on
   Linux each target whose decode reaches the SIMD kernels (`check_fuzz.py`'s `AVX2_PATH`), with
   `TICK_STORE_SIMD=avx2`. Those targets also decode each block with the scalar set forced and
-  compare, so one run covers both sets. Run each with the flags above and
+  compare, so one run covers both sets. Linux also runs each target that verifies CRC32C on its
+  input (`CRC32C_PATH`: `fuzz_container`, `fuzz_itch_store` and `fuzz_itch_query`), since
+  there `store::crc32c()` runs the SSE4.2 kernel, which the Mac cannot. The oracles compute the
+  CRCs they recompute with the same kernel, so these runs check the kernel for memory errors
+  on fuzzed lengths and offsets; its agreement with the software table is the unit test
+  `Crc32c.HardwareMatchesSoftwareOnRandomLengthsAndOffsets`. Run each with the flags above and
   `-max_total_time=1800`, then `scripts/fuzz_results.py` builds `results/fuzz-g3-<commit>.json`
   from the logs, and `scripts/check_fuzz.py` refuses it if a target is missing or a clean run is
   under 1,800 s. On macOS, add `detect_leaks=1:leak_check_at_exit=0` to `ASAN_OPTIONS`: ASan

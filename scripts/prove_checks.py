@@ -167,18 +167,28 @@ def unflagged_swap_in():
     edit_json(macos_results("compare", benchmark=COMPARE_FAULT_SLICE), change)
 
 
-def fuzz_g3_target_missing():
-    """G-3's results file with one target's Mac run taken out, and its summary recounted, so
-    only the check that every target of fuzz/CMakeLists.txt is there can refuse it."""
+def drop_g3_run(target, host):
+    """G-3's results file with one target's run on a host taken out, and its summary
+    recounted, so only the check that the target is required there can refuse it."""
     found = sorted((TREE / "results").glob("fuzz-g3-*.json"))
     if len(found) != 1:
         raise SystemExit(f"prove_checks: results/ needs exactly one fuzz-g3-*.json, has {len(found)}")
 
     def change(document):
         document["runs"] = [run for run in document["runs"]
-                            if (run["target"], run["host"]) != ("fuzz_columns", "macOS")]
-        document["summary"]["macOS"]["targets_clean"] -= 1
+                            if (run["target"], run["host"]) != (target, host)]
+        document["summary"][host]["targets_clean"] -= 1
     edit_json(found[0].relative_to(TREE), change)
+
+
+def fuzz_g3_target_missing():
+    """Every target of fuzz/CMakeLists.txt on the Mac."""
+    drop_g3_run("fuzz_columns", "macOS")
+
+
+def fuzz_g3_crc_target_missing():
+    """The container target on Linux, which reaches the SSE4.2 CRC32C kernel and no SIMD."""
+    drop_g3_run("fuzz_container", "Linux")
 
 
 def hand_edit_readme():
@@ -516,6 +526,11 @@ FAULTS = (
           "twelve of thirteen targets", EXIT_RENDER_REFUSED,
           "no run of fuzz_columns on macOS at neon: G-3 needs every target",
           fuzz_g3_target_missing),
+    Fault("fuzz-g3-crc-target-missing", "render-check", "G-3's results file without the "
+          "container target's Linux run, its summary recounted to match, so the SSE4.2 CRC32C "
+          "kernel would go unfuzzed for 30 minutes with G-3 still met", EXIT_RENDER_REFUSED,
+          "no run of fuzz_container on Linux at avx2: G-3 needs every target",
+          fuzz_g3_crc_target_missing),
     Fault("fuzz-g3-short-run-accepted", "py-scripts", "check_fuzz.py stops refusing a clean run "
           "shorter than 1,800 s, so a 20-second run could stand for G-3's 30 minutes",
           CHECK_FAILED, "FAIL: test_a_clean_run_under_1800_seconds_is_refused "

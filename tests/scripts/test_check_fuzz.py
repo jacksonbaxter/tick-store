@@ -30,7 +30,7 @@ import check_fuzz  # noqa: E402
 
 COMMIT = "0123456789abcdef0123456789abcdef01234567"
 NAME = f"fuzz-g3-{COMMIT[:12]}.json"
-TARGETS = sorted({"fuzz_columns", "fuzz_itch_message", *check_fuzz.AVX2_PATH})
+TARGETS = sorted({"fuzz_columns", "fuzz_itch_message", *check_fuzz.LINUX_REQUIRED})
 CMAKE = "".join(f"tick_store_add_fuzzer({name})\n" for name in reversed(TARGETS))
 
 HOST_FACTS = {
@@ -70,11 +70,12 @@ def clean_run(target, host, level):
 
 def valid_document():
     runs = [clean_run(name, "macOS", "neon") for name in TARGETS]
-    runs += [clean_run(name, "Linux", "avx2") for name in check_fuzz.AVX2_PATH]
+    runs += [clean_run(name, "Linux", "avx2") for name in check_fuzz.LINUX_REQUIRED]
     header = {"schema": check_fuzz.SCHEMA, "gate": "G-3", "commit": COMMIT,
               "statement": "every target for 1,800 s", "required_seconds": 1800,
               "targets_file": "fuzz/CMakeLists.txt", "targets": TARGETS,
               "avx2_path_targets": list(check_fuzz.AVX2_PATH),
+              "crc32c_path_targets": list(check_fuzz.CRC32C_PATH),
               "hosts": copy.deepcopy(HOST_FACTS)}
     document = {"header": header, "runs": runs}
     document["summary"] = check_fuzz.summary_of(header, runs)
@@ -175,6 +176,21 @@ class CheckFuzzTest(Scratch):
             document["header"]["avx2_path_targets"] = list(check_fuzz.AVX2_PATH[1:])
         self.assert_fails(fewer, "header.avx2_path_targets")
 
+    def test_the_crc32c_list_is_the_validators(self):
+        def fewer(document):
+            document["header"]["crc32c_path_targets"] = list(check_fuzz.CRC32C_PATH[1:])
+        self.assert_fails(fewer, "header.crc32c_path_targets")
+
+    def test_linux_must_run_the_sse42_crc_target_that_uses_no_simd(self):
+        # fuzz_container reaches no SIMD kernel, only the SSE4.2 CRC32C kernel.
+        self.assertNotIn("fuzz_container", check_fuzz.AVX2_PATH)
+
+        def drop(document):
+            document["runs"] = [run for run in document["runs"]
+                                if (run["target"], run["host"]) != ("fuzz_container", "Linux")]
+            resummarise(document)
+        self.assert_fails(drop, "no run of fuzz_container on Linux at avx2: G-3 needs every target")
+
     def test_a_done_line_that_disagrees_is_refused(self):
         def disagree(document):
             find(document, "fuzz_columns", "macOS")["done_line"] = "Done 5 runs in 1801 second(s)"
@@ -240,7 +256,7 @@ class CheckFuzzTest(Scratch):
     def test_the_repos_own_cmake_lists_every_avx2_target(self):
         targets = check_fuzz.targets_in(check_fuzz.DEFAULT_CMAKE)
         self.assertEqual(len(targets), 13)
-        for name in check_fuzz.AVX2_PATH:
+        for name in check_fuzz.LINUX_REQUIRED:
             self.assertIn(name, targets)
 
 
@@ -269,7 +285,7 @@ class AssembleTest(Scratch):
         folder.mkdir()
         facts = {**HOST_FACTS[host], "default_kernel_level": "neon" if host == "macOS" else "avx2"}
         (folder / "host.json").write_text(json.dumps(facts), encoding="utf-8")
-        names = TARGETS if host == "macOS" else check_fuzz.AVX2_PATH
+        names = TARGETS if host == "macOS" else check_fuzz.LINUX_REQUIRED
         for name in names:
             tag = name if host == "macOS" else f"{name}-avx2"
             exit_code = 77 if logs.get(name) is LOG_CRASH else 0
