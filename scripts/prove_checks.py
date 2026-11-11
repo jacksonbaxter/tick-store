@@ -240,6 +240,14 @@ FAULTS = (
     Fault("asan-bit-reader-bound", "asan-test", "the codecs' bit reader stops checking a read "
           "against the bits left, so a cut block is read past its end", EXIT_CTEST,
           "heap-buffer-overflow"),
+    # LeakSanitizer is off by default under ASan on macOS, where these two once passed.
+    Fault("asan-leak-trailing-bytes", "asan-test", "the strict decoder leaks two sizes each "
+          "time it refuses trailing bytes", EXIT_CTEST,
+          "ERROR: LeakSanitizer: detected memory leaks",
+          arguments=("--test-regex", "ItchTruncation")),
+    Fault("fuzz-itch-message-leak", "fuzz-itch-message", "the decoder leaks a copy of each "
+          "unknown type byte it refuses", EXIT_LIBFUZZER,
+          "ERROR: LeakSanitizer: detected memory leaks", arguments=FUZZ_ARGUMENTS),
     Fault("tsan-queue-race", "tsan-test", "the bounded queue pushes after releasing its lock",
           EXIT_CTEST, "ThreadSanitizer: data race"),
     Fault("tidy-c-style-cast", "clang-tidy", "a C-style cast in src/itch/frame.cpp", CHECK_FAILED,

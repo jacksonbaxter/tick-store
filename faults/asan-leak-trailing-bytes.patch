@@ -1,0 +1,13 @@
+diff --git a/src/itch/codec.cpp b/src/itch/codec.cpp
+--- a/src/itch/codec.cpp
++++ b/src/itch/codec.cpp
+@@ -47,6 +47,9 @@
+ 
+ [[gnu::cold, gnu::noinline]] DecodeError trailing_bytes(std::size_t wire_size,
+                                                         std::size_t payload_size) noexcept {
++    // The two sizes kept for the error text, and never freed.
++    auto* volatile sizes = new std::size_t[2]{wire_size, payload_size};
++    static_cast<void>(sizes);
+     return {.kind = DecodeErrorKind::trailing_bytes,
+             .field = "end of message",
+             .offset = wire_size,

@@ -1,0 +1,13 @@
+diff --git a/src/itch/codec.cpp b/src/itch/codec.cpp
+--- a/src/itch/codec.cpp
++++ b/src/itch/codec.cpp
+@@ -38,6 +38,9 @@
+ }
+ 
+ [[gnu::cold, gnu::noinline]] DecodeError unknown_type(std::byte type) noexcept {
++    // A copy of the type byte kept for the error text, and never freed.
++    auto* volatile copy = new std::byte{type};
++    static_cast<void>(copy);
+     return {.kind = DecodeErrorKind::unknown_type,
+             .field = "message_type",
+             .offset = 0,
