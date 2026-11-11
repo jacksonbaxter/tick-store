@@ -2732,6 +2732,39 @@ At `76703fb` both faults are PROVEN with `--only`: `asan-test` exits 8, with
 memory leaks", 48 bytes in 3 objects; `fuzz-itch-message` exits 77 on the same line, the leaked
 byte beside libFuzzer's thread. The two `--only` runs took 141 s and 70 s under `heavy.sh`.
 
+### The SSE4.2 CRC32C kernel under G-3
+
+Three fuzz targets verify CRC32C on fuzzed bytes, through `store::crc32c()`, which on x86-64
+runs `crc32c_sse42`: `fuzz_container`, `fuzz_itch_store` and `fuzz_itch_query`, which read
+their input with CRCs verified after recomputing every CRC its structure points at, and the
+container target also as it stands. No target bypasses the CRCs entirely, so no new target was
+needed. Replaying each target's seeds once on `debian` with `-runs=0 -print_coverage=1`, with
+the `ea1dde4` fuzz build, lists `crc32c_sse42` as covered by those three (31, 58 and 89 calls)
+and the software kernel as never called. `fuzz_columns` and `fuzz_stub_store` do not reach it:
+neither format has a CRC. The G-3 note above named the column target among them; it does not.
+
+`fuzz_itch_store` and `fuzz_itch_query` already ran 1,801 s on `debian` for G-3, so the kernel
+had 30 minutes there. `fuzz_container` had run only CI's 4 minutes on Linux. It ran 1,801 s on
+`debian` at `ea1dde4` through `heavy.sh`, pinned to cpu2, with no measurement lock held and
+`check.sh`'s flags, from a copy of the Mac's G-3 corpus: 73,167,626 runs, 40,626 a second,
+cov 521 and ft 1,797, 170 corpus units, peak RSS 555 MB by libFuzzer and 555 MiB by `VmHWM`,
+exit 0 with no sanitizer report. It waited about 7.4 hours for the lock, behind another
+project's two measurements. `fuzz_results.py` added it to `results/fuzz-g3-ea1dde4c02e4.json`,
+and `check_fuzz.py` now requires the three `CRC32C_PATH` targets on Linux beside `AVX2_PATH`,
+7 in all, so a file without the container's Linux run is refused. Fault
+`fuzz-g3-crc-target-missing` drops it and recounts the summary, and `render-check` exits 2.
+The README's Targets row reads 7 against 7.
+
+What these runs check is memory safety on fuzzed lengths and offsets, under ASan and UBSan.
+They do not check the kernel's value: the oracles recompute CRCs with the same kernel, so a
+kernel wrong the same way every time would agree with itself. That is
+`Crc32c.HardwareMatchesSoftwareOnRandomLengthsAndOffsets`, in every Linux `dev-test`. Replaying
+the container's corpus after the run covers 10 of the kernel's 17 edges, as the seeds alone
+did; the three uncovered points are all on line 26, the `memcpy` in its load helper. Which
+branches those are was not established.
+
+Raw logs, with the reach replays and the runner scripts: `phase3-raw/close-p3/crc-g3/`.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
