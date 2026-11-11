@@ -131,9 +131,9 @@ TICKSTORE_ONLY_WARM = (
 TIME_TOOL = ("/usr/bin/time", "-l")
 TICKSTORE_ONLY_MEMORY = (
     "BSD time -l around the system's whole run, inside the measured command: the largest "
-    "resident set of the runner and every process it waited for, which counts the clean "
-    "file-backed pages of every mapped file, and the runner's own peak memory footprint. Each "
-    "worker's and tool's own peak is in its step.")
+    "resident set of compare/run_system.py and every process it waited for, which counts the "
+    "clean file-backed pages of every mapped file, and run_system.py's own peak memory "
+    "footprint. Each worker's and tool's own peak is in its step.")
 # Results files that carry swap per phase. scripts/check_compare.py requires it from schema 2.
 SCHEMA = 2
 MACOS_STATEMENT = ("Unpinned. No hardware counters. macOS has no thread pinning, and no "

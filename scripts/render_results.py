@@ -381,7 +381,7 @@ def time_memory_lines(document):
         memory = document["systems"][name]["peak_memory"]
         lines.append(f"Peak memory of {SYSTEM_LABEL[name]}'s whole run, by BSD time -l: "
                      f"maximum resident set {gib(memory['maximum_resident_set_size_bytes'])}, "
-                     "which counts the mapped day and store, and the runner's peak memory "
+                     "which counts the mapped day and store, and run_system.py's peak memory "
                      f"footprint {gib(memory['peak_memory_footprint_bytes'])}, over "
                      f"{memory['real_seconds']:,.0f} s.")
     return lines
