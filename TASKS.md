@@ -227,7 +227,7 @@ SIMD on both architectures
 - [ ] QL-1 on macOS misses by 8.89 ms: Q2 warm is 25.79 ms against 16.9. It is the closest query target on either host. Profile Q2's warm path on the Mac, splitting the tool's decode from the Python round trip, before the Q2 work in the items above
 - [ ] WT-3 and QL-4 have no macOS verdict: the four-system day runs on Linux only. Decide whether a macOS four-system day is wanted. The Linux day took 8.53 hours. The Mac's 64 GiB would hold QuestDB's 22.9 GB day store, and the harness would need a warm proof for macOS that does not read `/proc`
 Measure on both hosts
-- [ ] Every target in BENCHMARKS.md measured on its stated hosts, from committed code, with raw outputs on disk. Decode targets DS-1 to DS-9 were done at `bcbf873`, except DS-4's Linux file, refused five times (above). The Linux full day ran at `67ae574`. The Both targets' macOS figures come from a full day of tick-store alone at `2503d1e`. WT-3 and QL-4 have no macOS four-system day, and G-3 waits for Phase 4. The README's Targets block lists each gap
+- [ ] Every target in BENCHMARKS.md measured on its stated hosts, from committed code, with raw outputs on disk. Decode targets DS-1 to DS-9 were done at `bcbf873`, except DS-4's Linux file, refused five times (above). The Linux full day ran at `67ae574`. The Both targets' macOS figures come from a full day of tick-store alone at `2503d1e`. WT-3 and QL-4 have no macOS four-system day. G-3 was met at `ea1dde4`. The README's Targets block lists each gap
 - [ ] Sync to `debian` with `debian_sync.sh`. Every Linux number cites its commit
 - [ ] Full comparison runs, one system at a time, with Linux as the headline for pinned numbers
 - [x] Note in any macOS comparison that QuestDB runs scalar `Vanilla` kernels on arm64: README.md's comparison and NOTES.md say so
@@ -236,7 +236,11 @@ Measure on both hosts
 
 - [ ] Every target met or beaten, or the write-up states the measured number, the gap and why
 - [ ] Local check script passes
-- [ ] Each fuzzer clean for 30 minutes, run under `heavy.sh`
+- [x] Each fuzzer clean for 30 minutes, run under `heavy.sh`: all 13 on macOS and the 6 SIMD-path targets on `debian` at AVX2, 1,801 to 1,804 s each at `ea1dde4`, nothing found (`results/fuzz-g3-ea1dde4c02e4.json`, NOTES.md, G-3). `check_fuzz.py` refuses a missing target or a clean run under 1,800 s (faults `fuzz-g3-target-missing`, `fuzz-g3-short-run-accepted`)
+- [ ] Rerun G-3 whenever store, codec, query or fuzz code changes: the file names its commit, and nothing yet ties it to the code it judged. Consider making `check_fuzz.py` refuse a file whose commit is older than the last change to `src/`, `include/` or `fuzz/`
+- [ ] Shorten the corpus replay before the next G-3 run: `fuzz_pfor` on `debian` spent about 567 of its 1,801 s replaying 5,103 seeds and corpus inputs, and `fuzz_dictionary` about 262 s. A `-merge=1` pass, or a smaller PFOR seed set than its 4,289 files, would leave more of the half hour for new inputs
+- [ ] `check.sh` fuzzes on macOS with ASan's leak detection off, its default there. Add `detect_leaks=1:leak_check_at_exit=0` to its macOS `ASAN_OPTIONS`, as the G-3 runs did, so the Mac's runs check each input for a leak
+- [ ] The CRC32C SSE4.2 kernel is fuzzed only by CI's 4-minute Linux runs of the container, store and column targets. G-3 asks only for the AVX2 path on Linux; decide whether those targets get 30 minutes on `debian` too
 - [ ] Full-day round trip passes on the pinned file, on both hosts
 - [ ] README: what the project is, how to build and run it, generated results table, definition of "record"
 - [ ] WRITEUP.md: design trade-offs with numbers on data layout, memory and branch prediction, what was tried and what did not work, including whether Gorilla lost on this data and what SIMD cost

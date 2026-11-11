@@ -2609,6 +2609,105 @@ enough that a stray jiffy does not count, or a host where cpu5 is reserved (TASK
 
 Raw logs, with every case's perf, report and `/proc/stat` snapshots: `phase3-raw/ds4-b053aff/`.
 
+### G-3: 30-minute fuzz runs
+
+G-3 is met at `ea1dde4`, whose store, codec, query and writer code is unchanged since `67ae574`.
+No fuzzer found anything, so no code changed. `results/fuzz-g3-ea1dde4c02e4.json` holds every
+run. `scripts/fuzz_results.py` built it from the raw logs, and `scripts/check_fuzz.py` validates
+it before the Targets block reads it.
+
+All 13 targets in `fuzz/CMakeLists.txt` ran on the Mac at the NEON level. Six of them reach the
+SIMD kernels through `codec::simd::active_kernels()`: PFOR and Stream VByte directly,
+dictionary and run-length through nested PFOR blocks, and the ITCH store and the query through
+their column chunks. Those six also ran on `debian`, with `TICK_STORE_SIMD=avx2`, since the Mac
+cannot run AVX2. The other seven use no kernel set, and neither do Gorilla, the container
+parser, the column directory, the stub store or the ITCH parsers. The container, store and
+column targets do reach the CRC32C SSE4.2 path on x86-64, which is not AVX2; it ran only in
+CI's 4-minute Linux runs. All six SIMD targets decode each block, or read the whole file, again
+with `ScalarKernelsOnThisThread` and require the same result (`scalar_agrees` in
+`codec_oracles.hpp`, and the scalar pass in the ITCH store and query oracles). So one AVX2 run
+covers both sets, and no separate scalar-capped run was made.
+
+Each run used `scripts/check.sh`'s flags: `-max_total_time=1800 -rss_limit_mb=2048
+-malloc_limit_mb=256 -timeout=10`, its own `-max_len`, the existing corpus first and the seeds
+the build writes from the real encoders second. On the Mac, four ran at once, unpinned, in
+four batches. Each batch was its own `heavy.sh` job, and the fourth waited out another project's
+`measure.sh` run. On `debian`, three ran at once, each pinned by `taskset` to cpu2, cpu6 or cpu7,
+in two `heavy.sh` batches with no measurement lock held, after a fresh sync and fuzz-preset
+build. The Linux corpora started as copies of the Mac's.
+
+| Target | Host | Level | Seconds | Runs | exec/s | cov / ft | Corpus | Peak RSS, MB |
+|---|---|---|---|---|---|---|---|---|
+| `fuzz_columns` | macOS | neon | 1,801 | 54,069,697 | 30,022 | 829 / 2,738 | 188 | 460 |
+| `fuzz_container` | macOS | neon | 1,801 | 167,158,633 | 92,814 | 526 / 1,804 | 166 | 701 |
+| `fuzz_dictionary` | macOS | neon | 1,804 | 93,165 | 51 | 1,958 / 12,175 | 1,103 | 1,336 |
+| `fuzz_gorilla_timestamps` | macOS | neon | 1,801 | 5,565,301 | 3,090 | 413 / 2,244 | 209 | 581 |
+| `fuzz_gorilla_xor` | macOS | neon | 1,801 | 6,097,812 | 3,385 | 455 / 2,441 | 251 | 651 |
+| `fuzz_itch_frame` | macOS | neon | 1,801 | 211,171,384 | 117,252 | 399 / 2,345 | 1,305 | 664 |
+| `fuzz_itch_message` | macOS | neon | 1,801 | 504,472,078 | 280,106 | 635 / 690 | 396 | 491 |
+| `fuzz_itch_query` | macOS | neon | 1,801 | 338,313 | 187 | 4,036 / 20,688 | 1,505 | 782 |
+| `fuzz_itch_store` | macOS | neon | 1,801 | 3,563,885 | 1,978 | 4,747 / 13,734 | 795 | 487 |
+| `fuzz_pfor` | macOS | neon | 1,801 | 114,498 | 63 | 1,548 / 8,201 | 1,115 | 1,176 |
+| `fuzz_run_length` | macOS | neon | 1,801 | 390,986 | 217 | 1,449 / 7,954 | 727 | 1,140 |
+| `fuzz_stream_vbyte` | macOS | neon | 1,801 | 1,031,497 | 572 | 750 / 4,611 | 453 | 832 |
+| `fuzz_stub_store` | macOS | neon | 1,801 | 334,181,975 | 185,553 | 396 / 1,503 | 569 | 448 |
+| `fuzz_dictionary` | Linux | avx2 | 1,801 | 23,477 | 13 | 1,783 / 11,018 | 1,046 | 958 |
+| `fuzz_itch_query` | Linux | avx2 | 1,802 | 74,145 | 41 | 3,802 / 19,303 | 1,165 | 581 |
+| `fuzz_itch_store` | Linux | avx2 | 1,801 | 535,195 | 297 | 4,449 / 12,699 | 649 | 422 |
+| `fuzz_pfor` | Linux | avx2 | 1,801 | 19,690 | 10 | 1,470 / 7,621 | 986 | 613 |
+| `fuzz_run_length` | Linux | avx2 | 1,801 | 35,664 | 19 | 1,357 / 7,405 | 700 | 723 |
+| `fuzz_stream_vbyte` | Linux | avx2 | 1,801 | 68,783 | 38 | 710 / 4,380 | 449 | 607 |
+
+Seconds, runs, exec/s, coverage, corpus and peak RSS are libFuzzer's own final figures. Every
+run exited 0, with no sanitizer report and no artifact. BSD `time -l` agreed with libFuzzer's
+peak RSS to within 1 MB on every Mac run. On `debian`, the fuzzer's `VmHWM`, read every 5 s,
+agreed too: this host has no GNU `time`. The four peaks of the first Mac batch, `fuzz_dictionary`,
+`fuzz_pfor`, `fuzz_itch_query` and `fuzz_itch_store`, sum to 3.8 GB, the most of any batch. The
+largest `debian` batch's three peaks sum to 2.3 GB.
+
+What the runs showed:
+
+- **Leak checking on the Mac.** ASan on macOS leaves LeakSanitizer off, so `check.sh`'s options
+  check nothing for leaks there. With `detect_leaks=1`, the check at exit reports 56 bytes from
+  libFuzzer's own RSS thread, which is never freed. It was seen on `fuzz_itch_message`, and it
+  comes from libFuzzer's driver, so it affects every target. The Mac runs used
+  `detect_leaks=1:leak_check_at_exit=0`, so libFuzzer still checks each input for a leak. A
+  five-line target that leaks 64 bytes on inputs starting with `L` was caught at once, exit 77,
+  under the same options. Under `check.sh`'s options alone, the same target exits 0. The Linux runs kept `check.sh`'s options, where LeakSanitizer is on
+  by default.
+- **Zen 1 is slow under ASan.** The SIMD targets ran 4 to 15 times fewer inputs a second on
+  `debian` than on the M4. Replaying the starting corpus took a large share of the half hour.
+  For example, `fuzz_pfor` on `debian` replayed its 5,103 seeds and corpus inputs in about
+  567 s, judged from libFuzzer's runs and exec/s at `INITED`. That left about 1,234 s for new
+  inputs; `fuzz_dictionary` took about 262 s and `fuzz_itch_query` about 192 s. The replay runs every
+  input through the full oracle, so it counts as fuzzing, but it finds nothing new. The Mac's
+  slowest replay was 81 s, also `fuzz_pfor`. The PFOR seed set alone is 4,289 files. A
+  `-merge=1` pass over seeds and corpus would cut the replay (TASKS).
+- **Coverage on Linux is a little lower** on every SIMD target, for example 1,470 against
+  1,548 for `fuzz_pfor`: fewer inputs, and the AVX2 set's code is not the NEON set's.
+- **A checkout that moved.** The runner recorded `git rev-parse HEAD` as each run started.
+  Nine Mac runs started after `95f7eb0`, which added only the validator and its tests. The
+  binaries built at `ea1dde4` ran throughout. `fuzz_results.py` takes such a run only if
+  `git diff` shows nothing a fuzz build reads, and it keeps the checkout as `checkout_at_start`.
+
+The check: `check_fuzz.py` reads the target list from `fuzz/CMakeLists.txt`. It refuses a file
+that lacks any target on macOS, or any `AVX2_PATH` target on Linux at `avx2` (a scalar run does
+not stand in for one). It also refuses a clean run under 1,800 s by libFuzzer's count or by the
+wall clock, and a budget under 1,800 s or a looser cap in the command. A done line, final status
+line or final stats that disagree with the recorded numbers are refused, and so is a summary
+that does not recount from the runs. A run that is not clean may stop early, but only if it
+names its finding, and the row then reads missed. `tests/scripts/test_check_fuzz.py` has one test
+for each rule. Two faults are proven with `prove_checks.py --only`. `fuzz-g3-target-missing` drops
+`fuzz_columns`' Mac run and recounts the summary, and `render-check` exits 2 with "no run of
+fuzz_columns on macOS at neon". `fuzz-g3-short-run-accepted` lets a clean 1,799 s run through,
+and `py-scripts` fails `test_a_clean_run_under_1800_seconds_is_refused`.
+`results/check-proofs.json` was restored from git after each.
+
+The full `scripts/check.sh` passed all 30 steps at `28435e4` under `heavy.sh`, in 2,122 s.
+
+Raw logs, with every fuzzer's log, `.meta`, BSD `time` output, the runner scripts and the leak
+probe: `phase3-raw/fuzz-g3/`.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
