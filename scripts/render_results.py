@@ -24,6 +24,10 @@ not judged, and the file. scripts/targets.json says where each value is and how 
 this script computes every verdict from the value and the target; a row with no figure gives the
 reason the definitions state. A file a row needs that is missing, or a field that is not in it,
 stops the render rather than leave a gap.
+
+G-3's file, results/fuzz-g3-<commit>.json, must pass check_fuzz.py first, against the fuzz
+targets fuzz/CMakeLists.txt defines: one that leaves a target out, or holds a clean run under
+1,800 s, stops the render.
 """
 
 import argparse
@@ -39,6 +43,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CHECK_RESULTS = REPO_ROOT / "scripts" / "check_results.py"
 CHECK_COMPARE = REPO_ROOT / "scripts" / "check_compare.py"
+CHECK_FUZZ = REPO_ROOT / "scripts" / "check_fuzz.py"
 DEFAULT_README = REPO_ROOT / "README.md"
 DEFAULT_RESULTS = REPO_ROOT / "results" / "bench"
 DEFAULT_COMPARE = REPO_ROOT / "results" / "compare"
@@ -682,8 +687,8 @@ def block_of(text, begin=BEGIN, end=END):
 def validate(paths, pins, validator=CHECK_RESULTS, extra=()):
     if not paths:
         return True
-    command = [sys.executable, "-I", str(validator), "--pins", str(pins), *extra,
-               *[str(path) for path in paths]]
+    command = [sys.executable, "-I", str(validator), *(("--pins", str(pins)) if pins else ()),
+               *extra, *[str(path) for path in paths]]
     checked = subprocess.run(command, check=False, capture_output=True, text=True)
     print(checked.stderr, end="", file=sys.stderr)
     return checked.returncode == 0
@@ -711,6 +716,12 @@ def main(argv=None):
     if not validate(compare_paths, args.compare_pins or args.pins, CHECK_COMPARE,
                     ("--capacity", str(args.capacity))):
         print("render_results: a comparison results file failed validation", file=sys.stderr)
+        return EXIT_USAGE
+    # G-3's file, which the targets block reads, against the fuzz targets of the same tree.
+    fuzz_paths = sorted((args.targets_root / "results").glob("fuzz-g3-*.json"))
+    if not validate(fuzz_paths, None, CHECK_FUZZ,
+                    ("--cmake", str(args.targets_root / "fuzz" / "CMakeLists.txt"))):
+        print("render_results: a fuzzing results file failed validation", file=sys.stderr)
         return EXIT_USAGE
     text = args.readme.read_text(encoding="utf-8")
     if block_of(text) is None:

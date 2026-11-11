@@ -1,0 +1,236 @@
+#!/usr/bin/env python3
+"""Assemble the G-3 fuzzing results file from the raw logs of each host's runs.
+
+    python3 -I scripts/fuzz_results.py --commit SHA --out results/fuzz-g3-<commit>.json \\
+        --host macOS=DIR --host Linux=DIR [--strip PREFIX ...]
+
+Each DIR holds host.json, the host's facts (cpu_model, kernel, compiler, compile_flags,
+sanitizer_options, concurrency, peak_memory, default_kernel_level), and for each run:
+
+    <tag>.meta   key=value lines the runner wrote: commit=, start= epoch=, the environment line,
+                 command=, and end= epoch= exit= (and vmhwm_kb_polled= on Linux)
+    <tag>.log    the fuzzer's own output, with -print_final_stats=1
+    <tag>.time   on macOS, what /usr/bin/time -l wrote
+
+Every value comes from those files. A run is clean only if the fuzzer exited 0, printed its final
+DONE line, its Done line and its final stats, and its log holds no sanitizer report, no libFuzzer
+error and no crash artifact. --strip removes a machine's own folder from the commands, which
+must be relative to the repository or the project folder in the file. The output is checked with
+check_fuzz.py before it is written, and not written if it fails.
+
+Standard library only.
+"""
+
+import argparse
+import json
+import re
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
+import check_fuzz  # noqa: E402
+
+FINDINGS = (
+    ("leak", re.compile(r"ERROR: LeakSanitizer")),
+    ("oom", re.compile(r"ERROR: libFuzzer: (?:out-of-memory|malloc\()")),
+    ("timeout", re.compile(r"ERROR: libFuzzer: timeout")),
+    ("crash", re.compile(r"ERROR: AddressSanitizer|runtime error:|ERROR: libFuzzer: deadly "
+                         r"signal|ERROR: libFuzzer: fuzz target|==ERROR: UndefinedBehavior")),
+    ("crash", re.compile(r"^check_\w+: ")),
+    ("other", re.compile(r"Test unit written to|ERROR: libFuzzer")),
+)
+STAT = re.compile(r"^stat::(\w+):\s+(\d+)$")
+INITED = re.compile(r"^#(\d+)\s+INITED .*exec/s: (\d+) ")
+TIME_FIELDS = {"maximum resident set size": "max_rss_bytes",
+               "peak memory footprint": "peak_footprint_bytes"}
+
+
+class Refused(Exception):
+    pass
+
+
+def read_meta(path):
+    meta = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("command="):
+            meta["command"] = line.split("=", 1)[1]
+        elif line.startswith(("ASAN_OPTIONS=", "UBSAN_OPTIONS=")):
+            meta["environment"] = line
+        else:
+            for word in line.split():
+                if "=" in word:
+                    key, value = word.split("=", 1)
+                    meta[key] = value
+    for key in ("commit", "epoch", "exit", "command", "environment"):
+        if key not in meta:
+            raise Refused(f"{path.name}: no {key}")
+    return meta
+
+
+def epochs(path):
+    found = re.findall(r"epoch=(\d+)", path.read_text(encoding="utf-8"))
+    if len(found) != 2:
+        raise Refused(f"{path.name}: needs a start and an end epoch, has {len(found)}")
+    return int(found[0]), int(found[1])
+
+
+def read_log(path):
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    status = [line for line in lines if re.match(r"^#\d+\s+DONE ", line)]
+    done = [line for line in lines if line.startswith("Done ")]
+    stats = {match[1]: int(match[2]) for match in map(STAT.match, lines) if match}
+    findings = []
+    for line in lines:
+        for kind, pattern in FINDINGS:
+            if pattern.search(line):
+                findings.append({"kind": kind, "detail": line.strip()})
+                break
+    inited = next((match for match in map(INITED.match, lines) if match), None)
+    return {"status": status[-1] if status else "", "done": done[-1] if done else "",
+            "stats": stats, "findings": findings, "inited": inited}
+
+
+def read_time(path):
+    values = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        parts = line.split(None, 1)
+        if len(parts) == 2 and parts[1].strip() in TIME_FIELDS:
+            values[TIME_FIELDS[parts[1].strip()]] = int(parts[0])
+        elif line.strip().endswith("sys") and "real" in line:
+            values["real_seconds"] = float(line.split()[0])
+    return values
+
+
+def relative(text, prefixes):
+    for prefix in prefixes:
+        text = text.replace(prefix.rstrip("/") + "/", "")
+    return text
+
+
+def flag_value(command, name):
+    for word in command.split():
+        if word.startswith(f"-{name}="):
+            return word.split("=", 1)[1]
+    return None
+
+
+def run_of(host, folder, tag, facts, prefixes):
+    meta = read_meta(folder / f"{tag}.meta")
+    start, end = epochs(folder / f"{tag}.meta")
+    log = read_log(folder / f"{tag}.log")
+    command = relative(meta["command"], prefixes)
+    words = command.split()
+    target = Path(next(word for word in words if "fuzz_" in Path(word).name)).name
+    level = meta.get("TICK_STORE_SIMD") or facts["default_kernel_level"]
+    done = re.match(r"^Done (\d+) runs in (\d+) second\(s\)$", log["done"])
+    status = check_fuzz.STATUS.match(log["status"])
+    stats = log["stats"]
+    exit_code = int(meta["exit"])
+    findings = log["findings"]
+    if exit_code != 0 and not findings:
+        findings = [{"kind": "other", "detail": f"the fuzzer exited {exit_code}"}]
+    clean = (exit_code == 0 and not findings and done is not None and status is not None
+             and "number_of_executed_units" in stats and "peak_rss_mb" in stats)
+    environment = " ".join(word for word in meta["environment"].split()
+                           if word.split("=", 1)[0] in ("ASAN_OPTIONS", "UBSAN_OPTIONS",
+                                                        "TICK_STORE_SIMD"))
+    cpu = "unpinned"
+    if words[:2] == ["taskset", "-c"]:
+        cpu = f"cpu {words[2]}"
+    run = {
+        "target": target, "host": host, "commit": meta["commit"], "cpu": cpu,
+        "cpu_model": facts["cpu_model"], "compiler": facts["compiler"],
+        "compile_flags": facts["compile_flags"], "kernel_level": level,
+        "seconds": int(done[2]) if done else None, "wall_seconds": end - start,
+        "runs": int(done[1]) if done else stats.get("number_of_executed_units"),
+        "exec_per_second": stats.get("average_exec_per_sec"),
+        "coverage": {"cov": int(status[2]), "ft": int(status[3])} if status else None,
+        "corpus": ({"units": int(status[4]),
+                    "size": log["status"].split("corp: ", 1)[1].split()[0].split("/", 1)[1]}
+                   if status else None),
+        "peak_rss_mb": stats.get("peak_rss_mb"),
+        "clean": clean, "exit_code": exit_code, "findings": findings,
+        "final_status_line": re.sub(r"\s+", " ", log["status"]).strip(),
+        "done_line": log["done"], "final_stats": stats,
+        "command": f"{environment} {command}",
+        "max_len": int(flag_value(command, "max_len") or 0),
+        "started": meta.get("start"), "ended": meta.get("end"),
+    }
+    if log["inited"] is not None:
+        runs, rate = int(log["inited"][1]), int(log["inited"][2])
+        run["inited"] = {"runs": runs, "approx_seconds": round(runs / rate) if rate else None}
+    time_path = folder / f"{tag}.time"
+    if time_path.exists():
+        run["os_peak_memory"] = {"method": "BSD time -l", **read_time(time_path)}
+    elif "vmhwm_kb_polled" in meta:
+        run["os_peak_memory"] = {"method": "VmHWM read from /proc every 5 s while it ran",
+                                 "vmhwm_bytes": int(meta["vmhwm_kb_polled"]) * 1024}
+    return run
+
+
+def assemble(commit, hosts, prefixes, cmake):
+    targets = check_fuzz.targets_in(cmake)
+    header_hosts = {}
+    runs = []
+    for host, folder in hosts:
+        facts = json.loads((folder / "host.json").read_text(encoding="utf-8"))
+        header_hosts[host] = {key: value for key, value in facts.items()
+                              if key != "default_kernel_level"}
+        for meta in sorted(folder.glob("*.meta")):
+            runs.append(run_of(host, folder, meta.stem, facts, prefixes))
+    for run in runs:
+        if run["commit"] != commit:
+            raise Refused(f"{run['target']} on {run['host']} ran at {run['commit']}, not {commit}")
+    order = {"macOS": 0, "Linux": 1}
+    runs.sort(key=lambda run: (order[run["host"]], run["target"], run["kernel_level"]))
+    header = {
+        "schema": check_fuzz.SCHEMA, "gate": "G-3", "commit": commit,
+        "statement": ("Each libFuzzer target of fuzz/CMakeLists.txt, run for at least "
+                      f"{check_fuzz.REQUIRED_SECONDS} s under the heavy-job lock, with "
+                      "scripts/check.sh's flags and caps, on the existing corpus and the seeds "
+                      "the real encoders write; on Linux, each target whose decode reaches the "
+                      "AVX2 kernels, with the level set to avx2. Coverage, corpus and exec/s are "
+                      "libFuzzer's own final figures."),
+        "required_seconds": check_fuzz.REQUIRED_SECONDS,
+        "targets_file": "fuzz/CMakeLists.txt", "targets": targets,
+        "avx2_path_targets": list(check_fuzz.AVX2_PATH), "hosts": header_hosts,
+    }
+    document = {"header": header, "runs": runs}
+    document["summary"] = check_fuzz.summary_of(header, runs)
+    return document
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Assemble the G-3 fuzzing results file.")
+    parser.add_argument("--commit", required=True)
+    parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--host", action="append", required=True, help="HOST=DIR")
+    parser.add_argument("--strip", action="append", default=[])
+    parser.add_argument("--cmake", type=Path, default=check_fuzz.DEFAULT_CMAKE)
+    args = parser.parse_args(argv)
+    hosts = []
+    for item in args.host:
+        name, _, folder = item.partition("=")
+        if name not in check_fuzz.HOSTS or not folder:
+            parser.error(f"--host {item}: use HOST=DIR with HOST one of {sorted(check_fuzz.HOSTS)}")
+        hosts.append((name, Path(folder)))
+    try:
+        document = assemble(args.commit, hosts, args.strip, args.cmake)
+    except (Refused, OSError, KeyError, StopIteration, json.JSONDecodeError) as error:
+        print(f"fuzz_results: {error}", file=sys.stderr)
+        return 1
+    problems = check_fuzz.check_document(document, list(document), args.out,
+                                         check_fuzz.targets_in(args.cmake))
+    if problems:
+        for problem in problems:
+            print(f"fuzz_results: {problem}", file=sys.stderr)
+        return 1
+    args.out.write_text(json.dumps(document, indent=1) + "\n", encoding="utf-8")
+    print(f"wrote {args.out}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
