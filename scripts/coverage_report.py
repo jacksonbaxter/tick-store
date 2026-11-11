@@ -428,13 +428,26 @@ def totals_of(rows):
             "functions_percent": percent(*functions)}
 
 
+# A tree exported with git archive, as a sync to the Linux host makes, has no .git and carries
+# its commit in a COMMIT file, and every file in it was tracked.
+def exported_commit(root):
+    path = Path(root) / "COMMIT"
+    return path.read_text(encoding="utf-8").strip() if path.is_file() else None
+
+
 def tracked_sources(root):
+    if exported_commit(root) is not None:
+        return sorted(path.relative_to(root).as_posix()
+                      for path in (Path(root) / "src").rglob("*.cpp"))
     listing = subprocess.run(["git", "-C", str(root), "ls-files", "src/*.cpp"], check=True,
                              capture_output=True, text=True).stdout
     return listing.split()
 
 
 def commit_of(root):
+    exported = exported_commit(root)
+    if exported is not None:
+        return exported[:12]
     return subprocess.run(["git", "-C", str(root), "rev-parse", "--short=12", "HEAD"], check=True,
                           capture_output=True, text=True).stdout.strip()
 

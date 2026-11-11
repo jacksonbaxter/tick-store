@@ -23,8 +23,13 @@
 #   --tidy-files a,b  run clang-tidy on these repo-relative files only
 #   --list            print the step names
 #
-# CHECK_CMAKE_ARGS holds extra arguments for each configure, and ACTIONLINT a path to the
-# actionlint binary if it is neither in .tools/ nor on PATH.
+# CHECK_CMAKE_ARGS holds extra arguments for each configure, ACTIONLINT a path to the
+# actionlint binary if it is neither in .tools/ nor on PATH, and CHECK_VENV the Python
+# environment for py-compare if it is not .venv.
+#
+# In a tree exported with git archive, as a sync to the Linux host makes, the steps that read
+# git's file list read the exported files instead. A step that needs a tool the host lacks
+# skips there with its reason, where a git checkout fails; CI runs every step in a checkout.
 
 # Step lists split on purpose. A step reads its own log only after writing it.
 # shellcheck disable=SC2086,SC2094
@@ -265,13 +270,18 @@ files_of_other_platforms() {
     esac
 }
 
-# The tracked C++ sources. A tree exported with git archive, as a sync to the Linux host
-# makes, has no .git and carries a COMMIT file instead, and every file in it is tracked.
-# Without this, clang-tidy on that host found no files, and so never saw the Linux-only ones.
+# A tree exported with git archive, as a sync to the Linux host makes, has no .git and
+# carries a COMMIT file instead, and every file in it was tracked.
+exported_tree() {
+    [[ $(git rev-parse --show-toplevel 2>/dev/null) != "$ROOT" && -f COMMIT ]]
+}
+
+# The tracked C++ sources. Without the exported tree's own list, clang-tidy on the Linux host
+# found no files, and so never saw the Linux-only ones.
 tracked_sources() {
     if [[ $(git rev-parse --show-toplevel 2>/dev/null) == "$ROOT" ]]; then
         git ls-files 'src/*.cpp' 'tests/*.cpp' 'fuzz/*.cpp' 'tools/*.cpp' 'bench/*.cpp'
-    elif [[ -f COMMIT ]]; then
+    elif exported_tree; then
         find src tests fuzz tools bench -type f -name '*.cpp' | LC_ALL=C sort
     else
         echo "neither a git work tree nor an exported tree with a COMMIT file, so no sources"
@@ -405,11 +415,13 @@ step_py_scripts() { run_unittests "$1" python3 tests/scripts/test_*.py tests/com
 
 # test_real_systems.py starts QuestDB and is no part of a quick check.
 step_py_compare() {
-    if [[ ! -x .venv/bin/python ]]; then
-        skip_step "no .venv, so tests/compare did not run"
+    local venv=${CHECK_VENV:-.venv}
+    if [[ ! -x $venv/bin/python ]]; then
+        skip_step "no .venv and no CHECK_VENV, so tests/compare did not run"
         return 0
     fi
-    run_unittests "$1" .venv/bin/python tests/compare/test_coldcache.py \
+    echo "python: $venv/bin/python"
+    run_unittests "$1" "$venv/bin/python" tests/compare/test_coldcache.py \
         tests/compare/test_schema.py tests/compare/test_settings.py \
         tests/compare/test_system_worker.py tests/compare/test_tickstore.py
     local code=$?
@@ -445,6 +457,10 @@ step_actionlint() {
         tool=.tools/actionlint
     fi
     [[ -n $tool ]] || tool=$(command -v actionlint)
+    if [[ -z $tool ]] && exported_tree; then
+        skip_step "actionlint is not installed here, an exported tree; CI runs it in a checkout"
+        return 0
+    fi
     if [[ -z $tool ]]; then
         echo "actionlint not found: run scripts/install_tools.sh actionlint"
         return 1

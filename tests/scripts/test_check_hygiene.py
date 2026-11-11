@@ -109,5 +109,56 @@ class Hygiene(unittest.TestCase):
         self.assertIn("b.gz", done.stderr)
 
 
+class ExportedTree(unittest.TestCase):
+    """A tree exported with git archive, as a sync to the Linux host makes: no .git, a COMMIT
+    file, and every file tracked. The scratch folder sits inside this checkout but is not the
+    top of a work tree, as the export is not."""
+
+    def setUp(self):
+        SCRATCH_ROOT.mkdir(parents=True, exist_ok=True)
+        self.root = Path(tempfile.mkdtemp(dir=SCRATCH_ROOT))
+        self.addCleanup(shutil.rmtree, self.root)
+        self.write("COMMIT", b"0123456789abcdef0123456789abcdef01234567\n")
+        self.write(".gitignore", b"/build/\n__pycache__/\n")
+        self.write("README.md", b"A clean file\n")
+
+    def write(self, name, content):
+        path = self.root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+
+    def run_check(self):
+        return subprocess.run([sys.executable, "-I", str(CHECK), "--root", str(self.root)],
+                              capture_output=True, text=True)
+
+    def test_a_clean_export_passes_and_says_what_it_read(self):
+        done = self.run_check()
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn("2 files of the tree exported at 0123456789ab clean", done.stdout)
+
+    def test_a_home_path_in_an_exported_file_is_refused(self):
+        self.write("docs/notes.txt", b"see " + LINUX_HOME + b"/data\n")
+        done = self.run_check()
+        self.assertEqual(done.returncode, 1, done.stderr)
+        self.assertIn("docs/notes.txt:1: absolute home path", done.stderr)
+
+    def test_a_data_file_in_an_export_is_refused(self):
+        self.write("12302019.NASDAQ_ITCH50", b"x")
+        done = self.run_check()
+        self.assertEqual(done.returncode, 1, done.stderr)
+        self.assertIn("12302019.NASDAQ_ITCH50: data file is tracked", done.stderr)
+
+    def test_what_the_gitignore_excludes_is_not_read(self):
+        self.write("build/check/step.log", b"ran in " + LINUX_HOME + b"/x\n")
+        self.write("scripts/__pycache__/a.pyc", LINUX_HOME)
+        self.assertEqual(self.run_check().returncode, 0)
+
+    def test_a_folder_with_no_commit_file_is_refused(self):
+        (self.root / "COMMIT").unlink()
+        done = self.run_check()
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("neither the top of a git work tree nor an exported tree", done.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

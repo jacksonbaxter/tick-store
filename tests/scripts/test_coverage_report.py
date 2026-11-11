@@ -123,5 +123,26 @@ class Names(unittest.TestCase):
         self.assertIsNone(report.relative_to_repo("/elsewhere/a.cpp", "/repo"))
 
 
+class ExportedTree(unittest.TestCase):
+    """A tree exported with git archive has no .git, and names its commit in a COMMIT file."""
+
+    def setUp(self):
+        scratch = REPO_ROOT / "build" / "test_coverage_report"
+        scratch.mkdir(parents=True, exist_ok=True)
+        self.temp = tempfile.TemporaryDirectory(dir=scratch)
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        (self.root / "COMMIT").write_text("0123456789abcdef0123456789abcdef01234567\n")
+        for name in ("src/store/b.cpp", "src/a.cpp", "src/store/b.hpp", "tests/t.cpp"):
+            (self.root / name).parent.mkdir(parents=True, exist_ok=True)
+            (self.root / name).write_text("")
+
+    def test_the_commit_comes_from_the_commit_file(self):
+        self.assertEqual(report.commit_of(self.root), "0123456789ab")
+
+    def test_the_sources_are_every_cpp_file_under_src(self):
+        self.assertEqual(report.tracked_sources(self.root), ["src/a.cpp", "src/store/b.cpp"])
+
+
 if __name__ == "__main__":
     unittest.main()
