@@ -1,0 +1,12 @@
+diff --git a/scripts/run_bench.py b/scripts/run_bench.py
+--- a/scripts/run_bench.py
++++ b/scripts/run_bench.py
+@@ -205,7 +205,7 @@
+         busy, total = cpu_jiffies(self.stat.read_text(encoding="ascii"), self.sibling)
+         if total <= total_before:
+             raise Failure(1, f"no jiffies passed on cpu{self.sibling} across the case")
+-        return 100.0 * (busy - busy_before) / (total - total_before)
++        return 100.0 * (busy - busy_before) / total
+ 
+     def statement(self):
+         return f"cpu{self.sibling} idle as stated, not enforced: see sibling_busy_percent"
