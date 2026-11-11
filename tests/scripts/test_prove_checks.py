@@ -142,7 +142,8 @@ class MacosResults(unittest.TestCase):
         bench = prove.BENCH_FAULT_BENCHMARK
         self.assertTrue(prove.macos_results("bench", REPO_ROOT, bench).is_file())
         self.assertTrue(prove.linux_results("bench", REPO_ROOT, bench).is_file())
-        self.assertTrue(prove.macos_results("compare", REPO_ROOT).is_file())
+        self.assertTrue(prove.macos_results("compare", REPO_ROOT,
+                                            prove.COMPARE_FAULT_SLICE).is_file())
 
 
 if __name__ == "__main__":

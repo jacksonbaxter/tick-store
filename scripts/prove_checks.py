@@ -78,6 +78,9 @@ def edit_text(path, old, new):
 # results/bench holds one file per host and benchmark; the faults that edit one take the ITCH
 # codec benchmark's, which every host has.
 BENCH_FAULT_BENCHMARK = "itch_codec"
+# results/compare holds a host's slice and its full days; the faults that edit one take the
+# macOS slice, which has all four systems.
+COMPARE_FAULT_SLICE = "12302019-open"
 
 
 def host_results(host, folder, root=TREE, benchmark=None):
@@ -136,7 +139,7 @@ def mismatched_commit_mode():
         for setting in questdb_variant(document)["classes"]["B"]["settings"]:
             if setting["name"] == "cairo.commit.mode (conf file)":
                 setting["in_force"] = "nosync"
-    edit_json(macos_results("compare"), change)
+    edit_json(macos_results("compare", benchmark=COMPARE_FAULT_SLICE), change)
 
 
 def failed_read_back():
@@ -144,13 +147,13 @@ def failed_read_back():
         oracle = questdb_variant(document)["classes"]["B"]["read_back"]["oracle"]
         oracle["verdict"] = "mismatch"
         oracle["exit_code"] = 1
-    edit_json(macos_results("compare"), change)
+    edit_json(macos_results("compare", benchmark=COMPARE_FAULT_SLICE), change)
 
 
 def query_digest_mismatch():
     def change(document):
         questdb_variant(document)["queries"]["Q1"]["digest"] = "0" * 64
-    edit_json(macos_results("compare"), change)
+    edit_json(macos_results("compare", benchmark=COMPARE_FAULT_SLICE), change)
 
 
 def unflagged_swap_in():
@@ -159,7 +162,7 @@ def unflagged_swap_in():
         cold["pages_in"] += 1
         cold["pages_in_by_repetition"][0] += 1
         cold["flagged"] = False
-    edit_json(macos_results("compare"), change)
+    edit_json(macos_results("compare", benchmark=COMPARE_FAULT_SLICE), change)
 
 
 def hand_edit_readme():
@@ -438,6 +441,11 @@ FAULTS = (
           "tick-store-only full day from Linux, so a subset of the four-system day could pass "
           "as a full-day result", CHECK_FAILED,
           "FAIL: test_a_tickstore_only_day_on_linux (__main__.TickstoreOnly"),
+    Fault("targets-at-most-reversed", "py-scripts", "render_results.py judges an at-most "
+          "target the wrong way round, so a latency above its target would read met in the "
+          "README's targets block", CHECK_FAILED,
+          "FAIL: test_each_verdict_is_computed_from_the_value_and_the_target "
+          "(__main__.RenderTargetsTest"),
     Fault("guard-swap-in-stop-disabled", "py-scripts", "compare/guard.py stops firing on "
           "sustained swap-in, so a host thrashing through swap is no longer stopped",
           CHECK_FAILED, "FAIL: test_sustained_swap_in_stops (__main__.Breach"),
