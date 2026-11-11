@@ -24,6 +24,14 @@ by query from the block device's own counter, each system's peak memory from the
 variants what compare/variant_rule.py gives from the slice file it names. A slice file can never
 pass as a full-day one, nor the reverse.
 
+A tick-store-only full day, `<host>-<day>-full-tickstore-<commit>.json`, is the macOS figure for
+the targets whose host is Both. It is held to the full day's rules on tick-store, with three
+differences, each stated in the file: tick-store is the only system and every variant it has ran,
+the headline first; warm is the slice's residency proof, since the per-process proof reads
+/proc; and peak memory comes from BSD time -l, since the guard reads /proc too. It runs on
+macOS only, so that a Linux subset can never stand in for the four-system day, and a four-system
+file can never carry its name, nor the reverse.
+
 Standard library only. tests/scripts/test_check_compare.py shows each rule failing on an
 injected fault.
 """
@@ -70,6 +78,10 @@ ORACLE_FIELDS = ("verdict", "exit_code", "records", "mismatched_records", "hashe
                  "source_sha256", "stored_sha256")
 LINUX_CPUS = [4, 6]
 FULL_DAY = "full"
+TICKSTORE_ONLY_NAME = "full-tickstore"
+TICKSTORE_ONLY_HOSTS = ("macOS",)
+# The BSD time in /usr/bin, named without its path, which no results file may hold.
+TIME_SOURCE = "time -l"
 NANOS_PER_SECOND = 1_000_000_000
 OPEN_NS = (9 * 3600 + 30 * 60) * NANOS_PER_SECOND
 HOUR_NS = 3600 * NANOS_PER_SECOND
@@ -469,10 +481,24 @@ def check_system(name, system, document, pin):
             problems += check_durability(here, entry.get("durability"), name, class_name, control,
                                          host)
         problems += check_queries(where, variant.get("queries"), truth, name,
-                                  bool(pin.get("full_day")))
+                                  bool(pin.get("full_day")) and not pin.get("alone"))
     problems += check_swap(name, system)
     if pin.get("full_day") and host == "Linux":
         problems += check_peak_memory(name, system.get("peak_memory"))
+    if pin.get("alone"):
+        problems += check_time_memory(name, system.get("peak_memory"))
+    return problems
+
+
+def check_time_memory(name, memory):
+    """A tick-store-only day's peak memory, from /usr/bin/time -l around its run."""
+    memory = memory or {}
+    problems = [f"{name}.peak_memory: no {field} from {TIME_SOURCE}"
+                for field in ("maximum_resident_set_size_bytes", "peak_memory_footprint_bytes",
+                              "real_seconds")
+                if not check_results.is_number(memory.get(field)) or memory[field] <= 0]
+    if TIME_SOURCE not in str(memory.get("source", "")):
+        problems.append(f"{name}.peak_memory: does not say it comes from {TIME_SOURCE}")
     return problems
 
 
@@ -515,6 +541,41 @@ def check_full_day_queries(document, pin):
             problems.append(f"queries.parameters: {name} is not the full-day query: {item}")
         if "clipped" in str(item.get("text", "")):
             problems.append(f"queries.parameters: {name} says it is clipped")
+    return problems
+
+
+def check_tickstore_only(document, path):
+    """tick-store alone on a day: the host, the systems, the variants, the label, the heap."""
+    header = document["header"]
+    systems = document.get("systems") or {}
+    problems = []
+    if header.get("host") not in TICKSTORE_ONLY_HOSTS:
+        problems.append(f"scope: a tick-store-only full day runs on "
+                        f"{', '.join(TICKSTORE_ONLY_HOSTS)} alone, and this is "
+                        f"{header.get('host')!r}: Linux runs the four-system day")
+    if list(systems) != ["tickstore"] or \
+            (document.get("input") or {}).get("systems_run") != ["tickstore"]:
+        problems.append(f"systems: a tick-store-only full day holds tick-store alone, and this "
+                        f"holds {list(systems)}")
+    if "tick-store alone" not in str(document.get("label", "")):
+        problems.append("label: a tick-store-only full day must say it is tick-store alone")
+    heap = document.get("heap") or {}
+    if heap.get("setting") != "not-run" or "did not run" not in str(heap.get("statement", "")):
+        problems.append("heap: a tick-store-only full day must state that QuestDB did not run")
+    if header.get("questdb_runtime") != "not-run":
+        problems.append("header.questdb_runtime: QuestDB did not run, so it must say not-run")
+    selection = document.get("variant_selection")
+    if not isinstance(selection, dict) or selection.get("rule") != variant_rule.TICKSTORE_ONLY_RULE:
+        return [*problems, "variant_selection: a tick-store-only full day must state "
+                           "compare/variant_rule.py's tick-store-only rule"]
+    stated = ((selection.get("systems") or {}).get("tickstore") or {}).get("selected")
+    ran = list(((systems.get("tickstore") or {}).get("variants")) or {})
+    wanted = list(variant_rule.TICKSTORE_VARIANTS)
+    if stated != wanted or ran != wanted:
+        problems.append(f"variant_selection: tick-store states {stated} and ran {ran}, and "
+                        f"alone it runs every variant, the headline first: {wanted}")
+    if (systems.get("tickstore") or {}).get("headline_variant") != wanted[0]:
+        problems.append("variant_selection: tick-store's headline is not the one it runs first")
     return problems
 
 
@@ -625,14 +686,23 @@ def check_document(document, top_keys, path, pins, capacity, real_path=None):
         problems.append("the file does not start with its header")
     problems += [f"header: missing field '{field}'" for field in HEADER_FIELDS
                  if field not in header]
-    problems += check_runtime(header)
     systems = document.get("systems") or {}
+    alone = document.get("scope") == variant_rule.TICKSTORE_ONLY
+    named_alone = f"-{TICKSTORE_ONLY_NAME}-" in path.name
+    if "scope" in document and not alone:
+        problems.append(f"scope: {document['scope']!r} is not a scope this validator knows")
+    if alone != named_alone:
+        problems.append(f"scope: a tick-store-only full day must be named <host>-<day>-"
+                        f"{TICKSTORE_ONLY_NAME}-<commit>.json, and only it may be")
+    if not alone:
+        problems += check_runtime(header)
     problems += check_results.check_load_lines(header, len(systems))
     problems += check_results.check_build(header)
     problems += check_results.check_host({"header": header}, path)
     if header.get("host") == "macOS":
         problems += check_results.check_macos({"header": header})
-        problems += check_heap(document, "macOS", capacity)
+        if not alone:
+            problems += check_heap(document, "macOS", capacity)
     elif header.get("host") == "Linux":
         problems += check_results.check_linux({key: value for key, value in header.items()
                                                if key != "frequency"}, list(systems))
@@ -642,7 +712,8 @@ def check_document(document, top_keys, path, pins, capacity, real_path=None):
     full_day = "day" in input_block or f"-{FULL_DAY}-" in path.name
     if full_day:
         day = input_block.get("day")
-        if not path.name.startswith(f"{header.get('host')}-{day}-{FULL_DAY}-") or \
+        stem = TICKSTORE_ONLY_NAME if alone else FULL_DAY
+        if not path.name.startswith(f"{header.get('host')}-{day}-{stem}-") or \
                 "slice" in input_block or input_block.get("full_day") is not True:
             problems.append(f"input: a full-day file must name its day as <host>-<day>-"
                             f"{FULL_DAY}-<commit>.json and hold no slice")
@@ -652,12 +723,17 @@ def check_document(document, top_keys, path, pins, capacity, real_path=None):
         if day_pin is None:
             return [*problems, f"input.day: no pin for {day}"]
         pin = {"sha256": day_pin["decompressed_sha256"], "size": day_pin["decompressed_size"],
-               "message_count": day_pin["message_count"], "full_day": True}
+               "message_count": day_pin["message_count"], "full_day": True, "alone": alone}
         if "Nothing is clipped" not in str(input_block.get("clipping", "")):
             problems.append("input: a full-day file must state that nothing is clipped")
         problems += check_full_day_queries(document, pin)
-        problems += check_variant_selection(document, real_path or path)
+        if alone:
+            problems += check_tickstore_only(document, path)
+        else:
+            problems += check_variant_selection(document, real_path or path)
     else:
+        if alone:
+            problems.append("scope: only a full day can be tick-store alone")
         if "not claims about a full day" not in label:
             problems.append("label: the file must say it makes no claim about a full day")
         pin = pins.get("slices", {}).get(input_block.get("slice"))
@@ -681,7 +757,7 @@ def check_document(document, top_keys, path, pins, capacity, real_path=None):
         problems.append(f"header.schema: {schema!r}, and a file must count swap per phase, "
                         f"schema {SWAP_SCHEMA} or later")
     problems += check_swap_method(document)
-    for name in SYSTEMS:
+    for name in ([] if alone else SYSTEMS):
         if name not in systems:
             problems.append(f"systems: {name} is missing")
     for name, system in systems.items():

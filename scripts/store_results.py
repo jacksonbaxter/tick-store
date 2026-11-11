@@ -65,7 +65,15 @@ def read_text(folder, name):
 def time_figures(folder, name):
     """Real seconds, peak resident bytes and, on macOS, the peak memory footprint: from BSD
     time -l, or from GNU time -v, whose peak is in kilobytes."""
-    text = read_text(folder, name)
+    figures = parse_time(read_text(folder, name))
+    if figures is None:
+        raise Refused(f"{name} holds no time figures")
+    return figures
+
+
+def parse_time(text):
+    """time_figures from the text time printed, or None if it holds none. compare/run.py uses
+    it too, on what /usr/bin/time -l wrote around a measured run."""
     real = re.search(r"^\s*([0-9.]+) real", text, re.M)
     rss = re.search(r"^\s*([0-9]+)\s+maximum resident set size", text, re.M)
     footprint = re.search(r"^\s*([0-9]+)\s+peak memory footprint", text, re.M)
@@ -80,7 +88,7 @@ def time_figures(folder, name):
             seconds = seconds * 60 + float(part)
         return {"real_seconds": seconds, "peak_rss_bytes": int(kilobytes.group(1)) * 1024,
                 "peak_memory_footprint_bytes": None}
-    raise Refused(f"{name} holds no time figures")
+    return None
 
 
 def run(folder, stem, timed=True):

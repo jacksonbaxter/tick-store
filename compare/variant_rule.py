@@ -46,3 +46,25 @@ def select(slice_document):
                                  if variant != headline and variant in won]
         chosen[name] = {"headline": headline, "won": won, "selected": selected}
     return chosen
+
+
+# The full day of tick-store alone. The four-system full day runs on Linux only, since its warm
+# proof reads each process's own storage reads from /proc. On macOS, where BENCHMARKS.md's WT-1,
+# WT-2 and QL-1 to QL-3 also ask for a figure, tick-store runs the same full day by itself, so
+# there is no other system's result for a rule to rank: it runs every variant it has, the
+# headline first. compare/systems/tickstore.py defines them, and tests/compare/test_tickstore.py
+# fails if this list and that one part.
+TICKSTORE_ONLY = "tickstore-only"
+TICKSTORE_VARIANTS = ("v3-seg4Mi", "v3-seg1Mi")
+TICKSTORE_ONLY_RULE = ("tick-store alone, every variant it has, the headline first. The "
+                       "four-system full day runs on Linux only, so a host without it runs "
+                       "tick-store by itself, and with no other system there is nothing for "
+                       "the slice rule to rank.")
+
+
+def tickstore_only():
+    """The variant selection of a tick-store-only full day."""
+    return {"rule": TICKSTORE_ONLY_RULE, "source": "none: no slice file chooses them",
+            "systems": {"tickstore": {"headline": TICKSTORE_VARIANTS[0],
+                                      "won": "not ranked: tick-store ran alone",
+                                      "selected": list(TICKSTORE_VARIANTS)}}}

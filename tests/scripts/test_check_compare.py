@@ -1035,6 +1035,135 @@ class FullDay(Harness):
         self.assert_full_fault(fault, "must state how its variants were chosen")
 
 
+def tickstore_only_document():
+    """tick-store alone on the day, on macOS: the full day's rules, every variant it has, warm
+    by residency, and peak memory from /usr/bin/time -l."""
+    document, _ = full_day_document()
+    linux_only = valid_document("macOS")
+    document["header"] = linux_only["header"]
+    document["header"]["questdb_runtime"] = "not-run"
+    document["header"]["load_lines"] = LOAD_MAC
+    document["method"]["swap"] = linux_only["method"]["swap"]
+    document["label"] = ("A full day of tick-store alone, every query with nothing clipped, and "
+                         "no other system.")
+    document["scope"] = "tickstore-only"
+    document["heap"] = {"setting": "not-run", "full_day_check": "Linux only",
+                        "statement": "QuestDB did not run: tick-store ran alone."}
+    document["input"]["systems_run"] = ["tickstore"]
+    system = document["systems"]["tickstore"]
+    document["systems"] = {"tickstore": system}
+    del system["peak_memory"]
+    system["pinning"] = {"cpus": []}
+    system["mem_available_bytes"] = "not-available"
+    only = system["variants"].pop("v")
+    for entry in only["queries"].values():
+        entry["warm"]["proof"] = {"pages": 8, "resident_before": 8, "resident_after": 8}
+    for name in variant_rule.TICKSTORE_VARIANTS:
+        system["variants"][name] = copy.deepcopy(only)
+    system["headline_variant"] = variant_rule.TICKSTORE_VARIANTS[0]
+    count = len(variant_rule.TICKSTORE_VARIANTS)
+    system["swap_by_phase"] = {phase: {field: value * count for field, value in counts.items()}
+                               for phase, counts in system["swap_by_phase"].items()}
+    system["peak_memory"] = {"maximum_resident_set_size_bytes": 12 << 30,
+                             "peak_memory_footprint_bytes": 2 << 30, "real_seconds": 1800.0,
+                             "source": "BSD time -l around the system's whole run"}
+    document["variant_selection"] = variant_rule.tickstore_only()
+    return document
+
+
+ALONE_NAME = f"macOS-{DAY}-full-tickstore-{COMMIT[:12]}.json"
+
+
+class TickstoreOnly(Harness):
+    """The macOS full day of tick-store alone: never a subset passing for the four-system day."""
+
+    def run_alone(self, document, name=ALONE_NAME):
+        path = self.directory / name
+        path.write_text(json.dumps(document), encoding="utf-8")
+        return subprocess.run([sys.executable, "-I", str(SCRIPT), "--pins", str(self.pins),
+                               "--capacity", str(self.capacity), str(path)],
+                              check=False, capture_output=True, text=True)
+
+    def assert_alone_fault(self, mutate, expected, name=ALONE_NAME):
+        document = tickstore_only_document()
+        mutate(document)
+        result = self.run_alone(document, name)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn(expected, result.stderr)
+
+    def test_the_valid_tickstore_only_day_passes(self):
+        result = self.run_alone(tickstore_only_document())
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_a_tickstore_only_day_on_linux(self):
+        def fault(document):
+            linux = valid_document("Linux")["header"]
+            linux["questdb_runtime"] = "not-run"
+            linux["load_lines"] = LOAD_LINUX
+            linux["sibling_busy_percent"] = {**sibling_block(), "cases": {"tickstore": 0.2}}
+            document["header"] = linux
+            document["systems"]["tickstore"]["pinning"] = {"status": "verified", "cpus": [4, 6]}
+            document["systems"]["tickstore"]["mem_available_bytes"] = {"lowest": 1, "highest": 2,
+                                                                       "samples": 2}
+        self.assert_alone_fault(fault, "Linux runs the four-system day",
+                                f"Linux-{DAY}-full-tickstore-{COMMIT[:12]}.json")
+
+    def test_another_system_beside_it(self):
+        def fault(document):
+            document["systems"]["parquet"] = system_block("parquet", "macOS")
+        self.assert_alone_fault(fault, "holds tick-store alone, and this holds")
+
+    def test_a_variant_left_out(self):
+        def fault(document):
+            del document["systems"]["tickstore"]["variants"][variant_rule.TICKSTORE_VARIANTS[1]]
+        self.assert_alone_fault(fault, "alone it runs every variant")
+
+    def test_the_four_system_rule_stated(self):
+        def fault(document):
+            document["variant_selection"]["rule"] = variant_rule.RULE
+        self.assert_alone_fault(fault, "tick-store-only rule")
+
+    def test_a_tickstore_only_day_named_as_the_four_system_day(self):
+        result = self.run_alone(tickstore_only_document(),
+                                f"macOS-{DAY}-full-{COMMIT[:12]}.json")
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("must be named <host>-<day>-full-tickstore-<commit>.json", result.stderr)
+
+    def test_a_four_system_day_named_as_tickstore_only(self):
+        document, _ = full_day_document()
+        result = self.run_alone(document, f"Linux-{DAY}-full-tickstore-{COMMIT[:12]}.json")
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("and only it may be", result.stderr)
+
+    def test_no_peak_memory_from_time(self):
+        def fault(document):
+            del document["systems"]["tickstore"]["peak_memory"]["peak_memory_footprint_bytes"]
+        self.assert_alone_fault(fault, "no peak_memory_footprint_bytes from time -l")
+
+    def test_a_warm_number_without_residency(self):
+        def fault(document):
+            variant = document["systems"]["tickstore"]["variants"]["v3-seg1Mi"]
+            variant["queries"]["Q3"]["warm"]["proof"]["resident_after"] = 7
+        self.assert_alone_fault(fault, "without residency proven before and after")
+
+    def test_a_label_that_does_not_say_alone(self):
+        def fault(document):
+            document["label"] = "A full day, every query with nothing clipped."
+        self.assert_alone_fault(fault, "must say it is tick-store alone")
+
+    def test_a_heap_claimed_for_a_questdb_that_did_not_run(self):
+        def fault(document):
+            document["heap"] = heap_block("macOS")
+        self.assert_alone_fault(fault, "must state that QuestDB did not run")
+
+    def test_a_slice_cannot_be_tickstore_only(self):
+        document = valid_document("macOS")
+        document["scope"] = "tickstore-only"
+        result = self.run_alone(document, f"macOS-{SLICE}-{COMMIT[:12]}.json")
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("only a full day can be tick-store alone", result.stderr)
+
+
 class Swap(Harness):
     """Swap per phase, and each timed query's swap-in with its flag."""
 

@@ -137,8 +137,10 @@ def python_floor(system):
 
 def step_warm_queries(system, request, layout):
     """Every query, `repetitions` times, between two residency proofs. A whole day's store can
-    be larger than memory, so there the proof is the query's own: see `warm_full_day`."""
-    if request.get("full_day"):
+    be larger than memory, so on a Linux day the proof is the query's own: see `warm_full_day`.
+    tick-store's day off Linux keeps the residency proof (compare/run_system.py)."""
+    proof = request.get("warm_proof", "process_reads")
+    if request.get("full_day") and proof == "process_reads":
         return warm_full_day(system, request, layout)
     queries = [query_from_json(item) for item in request["queries"]]
     truth = request["truth"]

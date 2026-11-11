@@ -15,7 +15,8 @@ host has its own tables, and so does each durability class: ingest in class A an
 class B never share a table, and queries are on each system's class B store, as the harness runs
 them. Each system shows its headline variant; a full day also lists every variant it ran, and
 each system's peak memory and swap per phase. A timed number with any page swapped in while it
-ran carries "(swap-in)".
+ran carries "(swap-in)". A tick-store-only full day, the macOS figure for the targets whose host is
+Both, is labelled so, and ranks nothing, since no other system ran.
 """
 
 import argparse
@@ -242,8 +243,13 @@ def timed_cell(entry, kind, field):
     return milliseconds(entry[kind][field]) + (SWAP_MARK if flagged else "")
 
 
+def is_alone(document):
+    return document.get("scope") == "tickstore-only"
+
+
 def query_table(document):
     names = ordered_systems(document)
+    alone = is_alone(document)
     lines = ["| " + " | ".join(QUERY_COLUMNS) + " |", "|" + "---|" * len(QUERY_COLUMNS)]
     for query in QUERY_NAMES:
         values = {name: headline(document, name)[1]["queries"][query] for name in names}
@@ -253,7 +259,7 @@ def query_table(document):
             cells = (query, SYSTEM_LABEL[name], f"`{variant}`", f"{entry['digest']['rows']:,}",
                      timed_cell(entry, "warm", "median_us"), timed_cell(entry, "warm", "p99_us"),
                      timed_cell(entry, "cold", "median_us"), timed_cell(entry, "cold", "p99_us"),
-                     lowest_mark(values, name))
+                     "not ranked: alone" if alone else lowest_mark(values, name))
             lines.append("| " + " | ".join(cells) + " |")
     return lines
 
@@ -352,16 +358,32 @@ def swap_table(document):
     return lines
 
 
+def time_memory_lines(document):
+    """A tick-store-only day's peak memory, from BSD time -l around its run."""
+    lines = []
+    for name in ordered_systems(document):
+        memory = document["systems"][name]["peak_memory"]
+        lines.append(f"Peak memory of {SYSTEM_LABEL[name]}'s whole run, by BSD time -l: "
+                     f"maximum resident set {gib(memory['maximum_resident_set_size_bytes'])}, "
+                     "which counts the mapped day and store, and the runner's peak memory "
+                     f"footprint {gib(memory['peak_memory_footprint_bytes'])}, over "
+                     f"{memory['real_seconds']:,.0f} s.")
+    return lines
+
+
 def compare_for(document):
     header = document["header"]
     host = header["host"]
     day = full_day_of(document)
-    scope = f"full day {day}" if day else "slice only"
+    alone = is_alone(document)
+    scope = (f"full day {day}, tick-store alone" if alone else f"full day {day}") if day else \
+        "slice only"
+    ranking = ("No other system ran, so nothing is ranked." if alone else
+               "\"Lowest\" names the measures, warm or cold, on which a system had both the "
+               "lowest median and the lowest p99 of the four.")
     lines = [f"**{host}, {scope}.** {header['cpu_model']}, commit `{header['commit'][:12]}`. "
              f"{header['statement']} {document['label']}", "",
-             "Queries, on each system's class B store, in milliseconds. \"Lowest\" names the "
-             "measures, warm or cold, on which a system had both the lowest median and the "
-             "lowest p99 of the four.", ""]
+             f"Queries, on each system's class B store, in milliseconds. {ranking}", ""]
     lines += query_table(document)
     for class_name, meaning in (("A", "returns once data is in the OS page cache"),
                                 ("B", "returns after a flush to the device")):
@@ -372,13 +394,17 @@ def compare_for(document):
         lines += ingest_table(document, class_name)
     lines += ["", document["input"]["ingest_input"]]
     if day:
-        lines += ["", "Every variant run on the full day, by the rule in compare/README.md. "
+        rule = ("every variant tick-store has, since it ran alone" if alone
+                else "by the rule in compare/README.md")
+        lines += ["", f"Every variant run on the full day, {rule}. "
                       "Queries are medians on the class B store.", ""]
         lines += variant_table(document)
         if host == "Linux":
             lines += ["", "Peak memory per system, from compare/guard.py across the system's "
                           "whole run.", ""]
             lines += memory_table(document)
+        if alone:
+            lines += [""] + time_memory_lines(document)
         lines += ["", "Swap per phase, host-wide, over every variant and class each system ran. "
                       "Swap-out alone does not stop a run; a timed query with any page swapped "
                       f"in is kept and marked{SWAP_MARK}. See \"The guard's swap rule\" in "

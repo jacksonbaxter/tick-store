@@ -33,7 +33,10 @@ from test_schema import DAY, write_fixture  # noqa: E402
 
 import check_compare  # noqa: E402
 
+import store_results  # noqa: E402
+
 from compare import run as compare_run  # noqa: E402
+from compare import variant_rule  # noqa: E402
 from compare.durability import CLASS_B  # noqa: E402
 from compare.layout import Layout  # noqa: E402
 from compare.queries import OPEN_NS, Query, ground_truth, query_to_json  # noqa: E402
@@ -192,6 +195,45 @@ class FullDayWarm(unittest.TestCase):
         accepted = self.run_warm([0])["proofs"]["Q5"]["accepted"]
         self.assertIn("mem_free_bytes_before", accepted)
         self.assertIn("mem_free_bytes_after", accepted)
+
+
+class ResidencyWarmOnADay(unittest.TestCase):
+    """tick-store's day off Linux keeps the slice's warm proof: every store file resident before
+    and after, never the per-process reads of /proc."""
+
+    def test_a_day_asking_for_residency_never_reads_proc(self):
+        from compare import coldcache, worker
+
+        system = SimpleNamespace(name="fake", query_rows=lambda *args: [[1, 2]],
+                                 query_column_sum=lambda column: [[1, 2]],
+                                 scan_facts=lambda query: {"status": "unavailable"})
+        query = Query("Q5", "column_sum", 0, 0)
+        request = {"queries": [query_to_json(query)], "repetitions": 3, "paths": ["store"],
+                   "truth": {"Q5": {"rows": 1, "sha256": "x"}}, "full_day": True,
+                   "warm_proof": "residency"}
+        residency = {"pages": 8, "resident_pages": 8, "page_size": 4096}
+
+        def refuse(*args):
+            raise AssertionError("the per-process proof ran")
+
+        with (mock.patch.object(coldcache, "ProcessReads", refuse),
+              mock.patch.object(coldcache, "warm", return_value=residency) as warmed,
+              mock.patch.object(coldcache, "residency", return_value=residency),
+              mock.patch.object(worker, "digest_result", return_value={"rows": 1, "sha256": "x"}),
+              mock.patch.object(worker, "python_floor", return_value=[0.0])):
+            answer = worker.step_warm_queries(system, request, None)
+        warmed.assert_called_once()
+        self.assertEqual(answer["proof"]["resident_before"], 8)
+        self.assertEqual(len(answer["queries"]["Q5"]["seconds"]), 3)
+
+    def test_a_linux_day_keeps_the_per_process_proof(self):
+        from compare import run_system
+
+        with mock.patch.object(run_system.platform, "system", return_value="Linux"):
+            self.assertEqual(run_system.warm_proof_kind(True), run_system.PROCESS_READS)
+            self.assertEqual(run_system.warm_proof_kind(False), run_system.RESIDENCY)
+        with mock.patch.object(run_system.platform, "system", return_value="Darwin"):
+            self.assertEqual(run_system.warm_proof_kind(True), run_system.RESIDENCY)
 
 
 class PageCacheBeforeWarm(unittest.TestCase):
@@ -476,6 +518,60 @@ class Document(unittest.TestCase):
         memory = document["systems"]["questdb"]["peak_memory"]
         self.assertEqual(memory["vmhwm_bytes_by_process"], {"java": 9, "python3": 7})
         self.assertEqual(memory["mem_available_lowest_bytes"], 3)
+
+
+class TickstoreOnlyDocument(unittest.TestCase):
+    """A full day off Linux: tick-store alone, labelled so, with its peak memory from time -l."""
+
+    TIME = ("     1800.25 real      1500.00 user       200.00 sys\n"
+            "  12884901888  maximum resident set size\n"
+            "   2147483648  peak memory footprint\n")
+
+    def build(self, parts):
+        part = {"truth": {}, "queries": [], "full_day": {"clipped": False},
+                "headline_variant": "v3-seg4Mi", "variants": {"v3-seg4Mi": {}, "v3-seg1Mi": {}}}
+        (parts / "tickstore.json").write_text(json.dumps(part), encoding="utf-8")
+        (parts / "tickstore.time.json").write_text(
+            json.dumps(store_results.parse_time(self.TIME)), encoding="utf-8")
+        args = SimpleNamespace(systems=["tickstore"], slice="s", day="12302019",
+                               full_day_smoke=False)
+        pin = {"sha256": "ab", "message_count": 1, "size": 1}
+        layout = SimpleNamespace(export_dir=lambda name: name)
+        run_bench = compare_run.run_bench
+        with (mock.patch.object(compare_run, "compiler_facts", return_value={}),
+              mock.patch.object(compare_run, "read_manifest", return_value={}),
+              mock.patch.object(run_bench, "cpu_model", return_value="cpu")):
+            return compare_run.build_document("macOS", args, layout, pin, "c" * 40, "wrapper",
+                                              parts, [[]], None, variant_rule.tickstore_only())
+
+    def test_the_document_says_tickstore_alone_and_passes_its_rules(self):
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "build") as scratch:
+            document = self.build(Path(scratch))
+        self.assertEqual(document["scope"], variant_rule.TICKSTORE_ONLY)
+        self.assertEqual(document["label"], compare_run.TICKSTORE_ONLY_LABEL)
+        self.assertEqual(document["heap"], compare_run.TICKSTORE_ONLY_HEAP)
+        self.assertEqual(document["header"]["questdb_runtime"], "not-run")
+        self.assertEqual(document["method"]["warm"], compare_run.TICKSTORE_ONLY_WARM)
+        self.assertNotIn("guard", document["method"])
+        self.assertEqual(document["input"]["systems_run"], ["tickstore"])
+        memory = document["systems"]["tickstore"]["peak_memory"]
+        self.assertEqual(memory["maximum_resident_set_size_bytes"], 12884901888)
+        self.assertEqual(memory["peak_memory_footprint_bytes"], 2147483648)
+        self.assertEqual(check_compare.check_time_memory("tickstore", memory), [])
+        self.assertEqual(check_compare.check_tickstore_only(document, Path("x.json")), [])
+
+    def test_a_full_day_off_linux_is_tickstore_alone(self):
+        args = compare_run.parse_arguments(["--day", "12302019", "--systems", "parquet"])
+        self.assertTrue(compare_run.is_tickstore_only(args, "macOS"))
+        self.assertFalse(compare_run.is_tickstore_only(args, "Linux"))
+        with self.assertRaises(compare_run.run_bench.Failure):
+            compare_run.run(args)
+
+    def test_no_statement_trips_the_leak_check(self):
+        for text in (compare_run.TICKSTORE_ONLY_LABEL, compare_run.TICKSTORE_ONLY_HEAP,
+                     compare_run.TICKSTORE_ONLY_WARM, compare_run.TICKSTORE_ONLY_MEMORY,
+                     compare_run.TICKSTORE_ONLY_INPUT_CACHE, variant_rule.tickstore_only()):
+            self.assertEqual(check_compare.check_results.check_leaks({"text": text}), [])
 
 
 class HeapStatements(unittest.TestCase):

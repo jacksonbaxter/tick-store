@@ -4,9 +4,12 @@
     python3 -I compare/run_system.py --system questdb --part <file> [layout options]
     python3 -I compare/run_system.py --system questdb --part <file> --day 12302019 ...
 
-The second is a full-day run, Linux only: the day's ITCH file and its whole export, every
-query as BENCHMARKS.md defines it with nothing clipped, each write streamed, each store read
-back a window at a time, and warm proven query by query (compare/worker.py).
+The second is a full-day run: the day's ITCH file and its whole export, every query as
+BENCHMARKS.md defines it with nothing clipped, each write streamed, each store read back a
+window at a time, and on Linux warm proven query by query (compare/worker.py). Off Linux a full
+day is tick-store alone, and its warm proof is the slice's, every store file resident before and
+after the repetitions, since the per-query proof reads /proc and tick-store's day store fits
+the host's memory.
 
 compare/run.py is the way to call this. It leaves no process behind: a server runs only
 inside a try/finally, SIGTERM is turned into an exception so that the finally runs, and on
@@ -56,6 +59,10 @@ COLD_REPETITIONS = 7
 # most per query.
 COLD_RERUNS = 10
 EXIT_FAILED = 1
+# How warm is proven: every store file resident before and after (the slice, and tick-store's
+# day off Linux), or the query's own processes reading nothing from storage (a day on Linux).
+RESIDENCY = "residency"
+PROCESS_READS = "process_reads"
 
 
 class StepFailed(Exception):
@@ -97,6 +104,7 @@ class Runner:
         self.memory_seen = []
         self.write_repetitions = args.write_repetitions or (
             FULL_DAY_WRITE_REPETITIONS if self.full_day else WRITE_REPETITIONS)
+        self.warm_proof = warm_proof_kind(self.full_day)
         self.step_number = 0
 
     def context(self, root, variant, durability):
@@ -269,7 +277,8 @@ class Runner:
             warm = self.worker(system, "warm_queries", paths=[str(path) for path in paths],
                                queries=[query_to_json(query) for query in queries], truth=truth,
                                repetitions=self.args.warm_repetitions,
-                               service_processes=system.service_processes())
+                               service_processes=system.service_processes(),
+                               warm_proof=self.warm_proof)
             if self.full_day:
                 self.sample_memory()
         finally:
@@ -288,8 +297,8 @@ class Runner:
                 "digest": warm_query["digest"], "matches_ground_truth": True,
                 "scan": warm["scan_facts"][query.name],
                 "warm": {**latency(warm_query["seconds"]),
-                         "proof": (warm["proofs"][query.name] if self.full_day
-                                   else warm["proof"]),
+                         "proof": (warm["proofs"][query.name]
+                                   if self.warm_proof == PROCESS_READS else warm["proof"]),
                          "swap_timed": swap.timed([warm_query["swap_timed"]])},
                 "cold": {**latency(cold[query.name]), "proofs": proofs[query.name],
                          "run_again_refilled_pages": run_again[query.name],
@@ -528,6 +537,11 @@ def parse_arguments(argv):
     return parser.parse_args(argv)
 
 
+def warm_proof_kind(full_day):
+    """Per-process storage reads on a Linux day, residency everywhere else."""
+    return PROCESS_READS if full_day and platform.system() == "Linux" else RESIDENCY
+
+
 def pin_threads():
     """On Linux, the run's two CPUs. taskset -c 4 is the wrapper's. cpu6 is the second."""
     if platform.system() != "Linux":
@@ -547,9 +561,10 @@ def day_pin(pins, day):
 def main(argv):
     signal.signal(signal.SIGTERM, on_terminate)
     args = parse_arguments(argv)
-    if (args.day or args.full_day_smoke) and platform.system() != "Linux":
-        raise SystemExit("run_system: a full-day run is Linux only: its warm proof reads the "
-                         "block device's own counter")
+    if (args.day or args.full_day_smoke) and platform.system() != "Linux" and \
+            args.system != "tickstore":
+        raise SystemExit("run_system: off Linux a full day is tick-store alone: the other "
+                         "systems' warm proof on a day reads /proc")
     runner = Runner(args)
     runner.stores.mkdir(parents=True, exist_ok=True)
     runner.requests.mkdir(parents=True, exist_ok=True)

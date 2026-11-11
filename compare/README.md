@@ -22,7 +22,8 @@ One system runs at a time, each as one process. `compare/run.py` writes
 `results/compare/<host>-<slice>-<commit>.json` only when every system has finished and
 `scripts/check_compare.py` has passed the file, so a file that exists is complete. A full-day
 run, Linux only, does the same on a whole pinned day and writes
-`results/compare/<host>-<day>-full-<commit>.json`: see "Full-day comparison" below.
+`results/compare/<host>-<day>-full-<commit>.json`: see "Full-day comparison" below. On macOS a
+full day is tick-store alone: see "Full day of tick-store alone".
 
 | Path | Job |
 |---|---|
@@ -581,6 +582,39 @@ none of this, because swap was already full when it started. See "Full-day compa
 `NOTES.md`. The guard's swap rule then changed, as registered in "The guard's swap rule" in
 `NOTES.md` before the rerun: swap-out alone no longer stops a run, and QuestDB's heap stays
 `-Xms1g -Xmx1g`.
+
+## Full day of tick-store alone
+
+BENCHMARKS.md gives WT-1, WT-2 and QL-1 to QL-3 the host "Both", and the four-system full day
+runs on Linux only: its warm proof and its guard read `/proc`. On macOS the same day runs with
+tick-store by itself:
+
+```sh
+TICK_STORE_MEASURE=<wrapper> .venv/bin/python -I compare/run.py --day 12302019 --systems tickstore
+```
+
+It writes `results/compare/<host>-<day>-full-tickstore-<commit>.json`. Everything is the full day
+above, on tick-store's own path: the day's ITCH file and its export checked against the pin and
+the oracle, one write per class through `tick_roundtrip ingest`, the store read back whole through
+`tick_export --store` and judged by `tick_roundtrip verify-columns`, G-1 on the store, Q1 to Q5
+as BENCHMARKS.md defines them with nothing clipped, each answer against the numpy ground truth, and
+cold through `tick_coldcache` with the eviction, the quiet second and the refill check. Three
+things differ, and the file states each:
+
+- **Every variant, no rule.** With no other system there is nothing for the slice rule to rank, so
+  it runs every variant tick-store has, the headline first (`compare/variant_rule.py`).
+- **Warm by residency.** Before the warm queries the day's ITCH file, its export and the store are
+  evicted, as on Linux; then every store file is read through and must be 100% resident before and
+  after all repetitions, the slice's proof. The store, 1.76 GB, fits the Mac's 64 GiB many times
+  over, so the proof that a store larger than memory forced on Linux is not needed.
+- **Peak memory from `time -l`.** The guard reads `/proc`, so `compare/run.py` runs the system's
+  whole run under BSD `time -l`, inside the measured command, and records its maximum resident set
+  and the runner's peak memory footprint.
+
+It runs on macOS only. `scripts/check_compare.py` refuses one from Linux, any other system in it,
+a variant left out, the four-system rule stated, the per-process warm proof, peak memory without
+`time -l`, a heap claimed for a QuestDB that did not run, and either kind under the other's name.
+Its numbers rank nothing: the README marks its queries "not ranked: alone".
 
 ## What the numbers are
 

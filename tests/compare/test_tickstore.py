@@ -74,6 +74,12 @@ class Variants(unittest.TestCase):
         self.assertEqual(tickstore.SEGMENT_RECORDS, 1 << 22)
         self.assertEqual(TickStoreSystem.variants["v3-seg1Mi"]["segment_records"], 1 << 20)
 
+    def test_the_tickstore_only_day_runs_exactly_these_variants(self):
+        from compare import variant_rule
+
+        self.assertEqual(variant_rule.TICKSTORE_VARIANTS, tuple(TickStoreSystem.variants))
+        self.assertEqual(variant_rule.TICKSTORE_VARIANTS[0], TickStoreSystem.headline_variant)
+
     def test_the_variant_reaches_the_command_and_every_check(self):
         owner = system(variant="v3-seg1Mi")
         command = owner.ingest_command("in.itch", "out.tsc", "page_cache")
