@@ -3,7 +3,7 @@
 A C++23 columnar time-series store for Nasdaq TotalView-ITCH 5.0 tick data. A
 **record** is one ITCH message of the source file.
 
-Status: Phase 2, harness. `BENCHMARKS.md` holds the targets and `TASKS.md` the plan.
+Status: Phase 3. `BENCHMARKS.md` holds the targets, the Targets block below each one's measured verdict, and `TASKS.md` the plan.
 
 ## Targets
 
@@ -31,7 +31,7 @@ Every target in BENCHMARKS.md, on each host it states. Each value is read from t
 | DS-1 | macOS | at most 2.120 ns | 8.393 ns | missed | `results/bench/macOS-column_decode-bcbf8738d892.json` |
 | DS-2 | Linux | at most 21.30 cycles | 60.91 cycles | missed | `results/bench/Linux-column_decode-bcbf8738d892.json` |
 | DS-3 | macOS | at least 3.60 G values/s | 3.35 G values/s | missed | `results/bench/macOS-simd_kernel-bcbf8738d892.json` |
-| DS-4 | Linux | at most 0.377 cycles | no figure | not judged: no reported Linux kernel file: every run was refused by check_results.py's sibling rule, cpu5 over 5% busy in some cases (NOTES.md, Decode targets under measure.sh) | none |
+| DS-4 | Linux | at most 0.377 cycles | no figure | not judged: no reported Linux kernel file: all five runs, two at bcbf873 and three at b053aff, were refused by check_results.py's sibling rule, cpu5 over 5% busy in 4 to 13 of 314 cases (NOTES.md, DS-4: three more refusals) | none |
 | DS-5 | macOS | at least 4,605 MB/s | 3,674 MB/s | missed | `results/bench/macOS-column_decode-bcbf8738d892.json` |
 | DS-5 | Linux | at least 4,605 MB/s | 1,280 MB/s | missed | `results/bench/Linux-column_decode-bcbf8738d892.json` |
 | DS-6 | macOS | at least 14.00x; judged on Gorilla's ns a value over the layout's, the same values, one results file | timestamps: 16.06x; prices: 3.85x | met on (timestamps); missed on (prices) | `results/bench/macOS-column_decode-bcbf8738d892.json` |

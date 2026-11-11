@@ -2478,6 +2478,130 @@ full-day verdict.
 
 Raw logs: `phase3-raw/compare-fullday/debian-67ae574/`.
 
+#### The macOS full day, tick-store alone
+
+The verdicts above are Linux's. The four-system day runs only on Linux, so the targets marked
+Both, WT-1, WT-2 and QL-1 to QL-3, had no macOS figure. `compare/run.py --day 12302019 --systems
+tickstore` now runs every tick-store variant over the whole day off Linux, with no other system
+(`63f8def`). It is the same harness: the same write, oracle read-back, warm and cold queries and
+ground truth. The warm proof is the slice's residency proof: every store file is read through,
+and mincore reads 100% resident before and after every repetition. That holds here because the
+day's store is about 1.8 GB. The per-process proof of the Linux day reads `/proc`, which macOS
+does not have. Peak memory comes from BSD `time -l` around the system's whole run.
+`scripts/check_compare.py` holds the file to the full day's rules. It refuses such a file from
+Linux, next to another system, short of a variant, or under the four-system name; fault
+`compare-tickstore-only-on-linux`.
+
+`results/compare/macOS-12302019-full-tickstore-63f8defe451d.json`. It was run from an exported
+tree of `63f8def`; the store, codec, query and writer code is unchanged since `67ae574`, the
+commit of the Linux day. Apple M4 Max, clang 23.1.4, Release `-O3 -DNDEBUG`, unpinned, no
+counters. The command, from the exported tree:
+
+    TICK_STORE_MEASURE=<measure.sh> heavy.sh time -l python3 -I compare/run.py --day 12302019 \
+        --systems tickstore --data <repo>/data --vendor <repo>/vendor --work <work> \
+        --tools <repo>/build/bench/tools --results-dir <results>
+
+`measure.sh` admitted it at load1 1.72 at 06:37:13Z on 2026-11-11, and it ended at load1 1.76 at
+06:54:12Z: 1,018.6 s for both variants and both classes. Another project's `check.sh` was running
+on the Mac when it started. Peak memory: maximum resident set 32,159,875,072 bytes (29.95 GiB),
+which counts the clean file-backed pages of the mapped day and stores. The runner's peak memory
+footprint was 757,878,504 bytes, and the class A write's own peak RSS 9,396,404,224 bytes. No
+page was swapped in or out in any phase. Day `12302019`, 268,744,780 messages, nothing clipped.
+Stored bytes, class B, allocated at rest: 1,762,250,752 (4.682), against 1,758,240,768 on
+`debian`.
+
+| Measure | macOS `v3-seg4Mi` | macOS `v3-seg1Mi` | Linux `v3-seg4Mi` (above) |
+|---|---|---|---|
+| Write class A, s / M records/s | 83.14 / 3.232 | 79.82 / 3.367 | 195.3 / 1.376 |
+| Write class B, s / M records/s | 83.70 / 3.211 | 80.71 / 3.330 | 188.9 / 1.423 |
+| Q1 warm / cold median ms | 107.98 / 169.12 | 36.85 / 57.48 | 297.58 / 406.96 |
+| Q2 warm / cold median ms | 25.92 / 108.26 | 36.44 / 213.01 | 74.32 / 485.13 |
+| Q3 warm / cold median ms | 14.64 / 53.35 | 18.14 / 114.53 | 35.81 / 214.40 |
+| Q4 warm median / cold mean ms | 79.63 / 135.29 | 20.87 / 36.27 | 207.10 / 308.83 |
+| Q5 warm / cold median ms | 282.69 / 411.14 | 293.81 / 476.05 | 907.64 / 1,233.89 |
+
+Warm is 30 runs and cold 7, as on Linux. The p99s are in the README's macOS full-day block.
+
+**Verdicts on macOS**, headline `v3-seg4Mi`, with the Linux verdict beside each:
+
+- **WT-1, missed.** Class A, one thread: 3.232 M records/s against 8.59 M, short by 5.36 M, 37.6%
+  of the target; `v3-seg1Mi` 3.367 M. Linux: 1.376 M, missed.
+- **WT-2, met.** 3.232 M messages/s in class A and 3.211 M in class B, against 2,732,762: over by
+  499,526 and 477,905 messages/s, 18.3% and 17.5%. The target is an average trading day's rate,
+  not a peak (BENCHMARKS.md). Linux: 1.376 M and 1.423 M, missed. The same code writes the day
+  2.35 times as fast on the M4 as on Zen 1.
+- **QL-1, missed.** Q2 warm median 25.92 ms against 16.9, 9.02 ms over, 1.53 times. Linux: 74.32 ms.
+- **QL-2, missed.** Q3 warm median 14.64 ms against 0.41, 14.23 ms over. Linux: 35.81 ms.
+- **QL-3, missed.** Q4 cold mean 135.29 ms against 10, 125.29 ms over; `v3-seg1Mi` 36.27 ms.
+  Linux: 308.83 ms, and 101.57 for `v3-seg1Mi`.
+- WT-3 and QL-4 compare systems. Only Linux ran the day with all four, so on macOS they are not
+  judged, and the targets block says so.
+
+Raw logs: `phase3-raw/mac-day/`: the runner's log with `time -l`, each step's log, the parts files
+and the smoke run.
+
+### The targets block
+
+The README's Targets block is generated. `scripts/targets.json` defines one row per target and
+host: the target, and the path to its figure in a committed results file. Some rows name more
+than one case, each judged on its own; where NOTES.md judged a target per query or per baseline,
+the row does too (QL-4, CR-5, WT-3, WT-4). `scripts/render_results.py` reads each figure, applies
+the comparison, and writes met, missed, met on some cases and missed on others, or "not judged"
+with a reason. A row with no file says why: G-3 has no 30-minute fuzz record, DS-4 no Linux
+kernel file, and WT-3 and QL-4 no macOS four-system day. `--check` fails on any difference, and
+exits 2 when a file or field is missing. The tests cover a hand-edited value, a changed results
+file, a missing file and a missing field. Fault `targets-at-most-reversed` judges at-most targets
+the wrong way round and fails the tests.
+
+Every value read agrees with the verdicts in NOTES.md except one. DS-6 prices read 3.85 times from
+the file, where "Decode targets under measure.sh" gave 3.86, computed from rounded figures. The
+verdict, missed against 14, is the same.
+
+The CR rows add the store as built (`results/store-size-12302019.json`) to the per-codec figures
+NOTES.md judged. Three targets met by a codec in the estimate are missed by the store's own
+columns:
+
+- **CR-3**: the store's timestamps, with their per-group time bases, cost 22.82 bits a record.
+  That is 2.82 over 20.0, between file order's 18.76 and per locate's 25.49. The store keeps
+  records in locate order, so the per-locate miss NOTES.md recorded carries through to the store.
+- **CR-6**: `creation_ref` costs 11.363 bits, 0.16 over 11.2, where the estimate's A, F and U
+  creations together cost 7.80. `import_ref`, each segment's list of the orders created
+  before it, which lets a segment decode on its own, costs 25.94 bits. `ref_distance`, the per-stock distance, meets at 7.56.
+- **CR-7**: `add_shares` costs 4.165 bits in ranked PFOR, against 3.69 in file order and 2.61
+  per locate in the estimate. `reduce_shares` costs 7.28. `replace_shares` meets at 2.90.
+
+### DS-4: three more refusals
+
+DS-4 needs the Linux kernel file, and two runs at `bcbf873` were refused ("Decode targets under
+measure.sh"). Three more ran at `b053aff`, synced to `debian` with `debian_sync.sh`. The kernel
+code is the same as at `bcbf873`. Each was a complete `simd_kernel_bench` run of 314 cases through
+`scripts/run_bench.py` under `~/quant-projects/bin/measure.sh`, pinned to cpu4, with
+`perf_event_paranoid` at 2, after `--verify-all` passed. The runs were spaced to find a quiet
+host. Before each one, the load was under 1 and nothing held the `measure.sh` lock. Before the
+third, cpu5 was busy 5 jiffies in 20 s.
+
+| Attempt | Start, UTC | Load at start / end | Cases over 5% | Their range | Fused AVX2, cycles a value, median of 65 widths |
+|---|---|---|---|---|---|
+| 1 | 06:26:05 | 0.20 / 1.08 | 9 | 6.19% to 15.25% | 2.716 |
+| 2 | 06:48:31 | 0.05 / 1.02 | 7 | 5.26% to 7.02% | 2.714 |
+| 3 | 07:05:38 | 0.55 / 1.02 | 13 | 5.41% to 11.43% | 2.717 |
+
+`check_results.py` refused every one, so no Linux kernel file was written. DS-4 is not judged.
+The refused runs agree with each other and with the two at `bcbf873` (2.716 and 2.720). Two-pass
+AVX2 reads 2.968, 2.950 and 2.951. These are what the pinned host measured, labelled as refused;
+this repository does not publish them as results. Against 0.377 they would be 7.2 times the
+target. The likely reason is the one BENCHMARKS.md gives: Zen 1 splits each 256-bit operation
+into two 128-bit halves, where the Zen 3 source does not.
+
+Between attempts 2 and 3, another job pushed the load to 6.89 for about four minutes, and cpu5
+was fully busy. A check after it found nothing pinned away from cpu5. Long-running host processes,
+among them an interactive agent session, a VPN daemon and a file sync, were last scheduled on
+cpu5 and cpu4. Any of them can take the 6 jiffies of cpu5 that put a 1.1 s case over the limit.
+That is an observation, not a proven cause. The rule stands. What would get a file is a case long
+enough that a stray jiffy does not count, or a host where cpu5 is reserved (TASKS).
+
+Raw logs, with every case's perf, report and `/proc/stat` snapshots: `phase3-raw/ds4-b053aff/`.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
