@@ -36,7 +36,18 @@
       {"label": "footer, CRCs off:", "value": {"path": ["g2", "footer_no_checksums", "verdict"]}, "equals": "mismatch"},
       {"label": "restored store exits", "value": {"path": ["g2", "exit_code_restored"]}, "equals": 0}]}]},
   {"id": "G-3", "host": "any", "target_text": "each libFuzzer target clean for 30 minutes under heavy.sh",
-   "no_figure": "no results file records a 30-minute run of each target yet: check.sh runs each for 20 s, and CI's scheduled 30-minute runs write nothing to results/ (TASKS.md, Phase 4)"},
+   "judged": "every target of fuzz/CMakeLists.txt on macOS, and each target whose decode reaches the AVX2 kernels on Linux, at avx2; check_fuzz.py refuses the file if one is missing",
+   "parts": [
+    {"label": "macOS", "file": "results/fuzz-g3-*.json", "all": [
+      {"label": "targets clean for 1,800 s:", "value": {"path": ["summary", "macOS", "targets_clean"]},
+       "equals": {"path": ["summary", "macOS", "targets_required"]}},
+      {"label": "shortest run", "value": {"path": ["summary", "macOS", "shortest_seconds"]},
+       "at_least": {"path": ["header", "required_seconds"]}, "unit": " s"}]},
+    {"label": "Linux, AVX2 path", "file": "results/fuzz-g3-*.json", "all": [
+      {"label": "targets clean for 1,800 s:", "value": {"path": ["summary", "Linux", "targets_clean"]},
+       "equals": {"path": ["summary", "Linux", "targets_required"]}},
+      {"label": "shortest run", "value": {"path": ["summary", "Linux", "shortest_seconds"]},
+       "at_least": {"path": ["header", "required_seconds"]}, "unit": " s"}]}]},
   {"id": "G-4", "host": "any", "target_text": "Gorilla delta-of-delta and XOR built, exact, and measured on this data",
    "judged": "codec-eval's exactness on the whole day, and the decode benchmark",
    "parts": [

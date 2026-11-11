@@ -173,7 +173,14 @@ build/fuzz/fuzz/fuzz_run_length -max_total_time=60 -max_len=16384 \
   140 runs a second under ASan on the Mac.
 - `fuzz_itch_message` returns -1 for an input over 65,535 bytes, which no frame can
   declare, so it stays out of the corpus.
-- The G-3 gate is 30 minutes per target under the heavy-job lock.
+- The G-3 gate is 30 minutes per target under the heavy-job lock: every target on macOS, and on
+  Linux each target whose decode reaches the SIMD kernels (`check_fuzz.py`'s `AVX2_PATH`), with
+  `TICK_STORE_SIMD=avx2`. Those targets also decode each block with the scalar set forced and
+  compare, so one run covers both sets. Run each with the flags above and
+  `-max_total_time=1800`, then `scripts/fuzz_results.py` builds `results/fuzz-g3-<commit>.json`
+  from the logs, and `scripts/check_fuzz.py` refuses it if a target is missing or a clean run is
+  under 1,800 s. On macOS, add `detect_leaks=1:leak_check_at_exit=0` to `ASAN_OPTIONS`: ASan
+  leaves leak detection off there, and the check at exit reports libFuzzer's own RSS thread.
 
 ## Reach
 

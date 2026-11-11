@@ -15,8 +15,10 @@ sanitizer_options, concurrency, peak_memory, default_kernel_level), and for each
 Every value comes from those files. A run is clean only if the fuzzer exited 0, printed its final
 DONE line, its Done line and its final stats, and its log holds no sanitizer report, no libFuzzer
 error and no crash artifact. --strip removes a machine's own folder from the commands, which
-must be relative to the repository or the project folder in the file. The output is checked with
-check_fuzz.py before it is written, and not written if it fails.
+must be relative to the repository or the project folder in the file. A run whose checkout had
+moved past --commit is taken only if nothing a fuzz build reads changed in between, and keeps
+that checkout as checkout_at_start. The output is checked with check_fuzz.py before it is
+written, and not written if it fails.
 
 Standard library only.
 """
@@ -24,6 +26,7 @@ Standard library only.
 import argparse
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -170,6 +173,20 @@ def run_of(host, folder, tag, facts, prefixes):
     return run
 
 
+# What a commit can change without changing a fuzz binary.
+NOT_BUILT = (":(exclude)scripts", ":(exclude)tests/scripts", ":(exclude)faults",
+             ":(exclude)results", ":(exclude)*.md")
+
+
+def code_changes(first, second):
+    """The files between two commits that a fuzz build reads, or "" if none."""
+    done = subprocess.run(["git", "-C", str(REPO_ROOT), "diff", "--name-only", first, second,
+                           "--", ".", *NOT_BUILT], capture_output=True, text=True, check=False)
+    if done.returncode != 0:
+        raise Refused(f"git diff {first} {second}: {done.stderr.strip()}")
+    return " ".join(done.stdout.split())
+
+
 def assemble(commit, hosts, prefixes, cmake):
     targets = check_fuzz.targets_in(cmake)
     header_hosts = {}
@@ -182,7 +199,14 @@ def assemble(commit, hosts, prefixes, cmake):
             runs.append(run_of(host, folder, meta.stem, facts, prefixes))
     for run in runs:
         if run["commit"] != commit:
-            raise Refused(f"{run['target']} on {run['host']} ran at {run['commit']}, not {commit}")
+            changed = code_changes(commit, run["commit"])
+            if changed:
+                raise Refused(f"{run['target']} on {run['host']} ran at {run['commit']}, not "
+                              f"{commit}, and these differ: {changed}")
+            # The checkout moved on while the binaries built at the commit ran: only scripts,
+            # their tests, faults or prose changed in between. Both are recorded.
+            run["checkout_at_start"] = run["commit"]
+            run["commit"] = commit
     order = {"macOS": 0, "Linux": 1}
     runs.sort(key=lambda run: (order[run["host"]], run["target"], run["kernel_level"]))
     header = {

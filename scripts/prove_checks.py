@@ -54,6 +54,8 @@ FUZZ_ARGUMENTS = ("--fuzz-seconds", "45", "--fuzz-seed", "1", "--fresh-corpus")
 EXIT_CTEST = 8
 EXIT_BUILD = 1
 EXIT_LIBFUZZER = 77
+# render_results.py when a results file it reads fails its validator.
+EXIT_RENDER_REFUSED = 2
 
 TIDY_ONE_FILE = ("--tidy-files", "src/itch/frame.cpp")
 STORE_CORRUPT = ("--test-regex", "ItchStoreCorrupt")
@@ -163,6 +165,20 @@ def unflagged_swap_in():
         cold["pages_in_by_repetition"][0] += 1
         cold["flagged"] = False
     edit_json(macos_results("compare", benchmark=COMPARE_FAULT_SLICE), change)
+
+
+def fuzz_g3_target_missing():
+    """G-3's results file with one target's Mac run taken out, and its summary recounted, so
+    only the check that every target of fuzz/CMakeLists.txt is there can refuse it."""
+    found = sorted((TREE / "results").glob("fuzz-g3-*.json"))
+    if len(found) != 1:
+        raise SystemExit(f"prove_checks: results/ needs exactly one fuzz-g3-*.json, has {len(found)}")
+
+    def change(document):
+        document["runs"] = [run for run in document["runs"]
+                            if (run["target"], run["host"]) != ("fuzz_columns", "macOS")]
+        document["summary"]["macOS"]["targets_clean"] -= 1
+    edit_json(found[0].relative_to(TREE), change)
 
 
 def hand_edit_readme():
@@ -483,6 +499,11 @@ FAULTS = (
     Fault("compare-swap-unflagged", "check-compare", "a cold query had a page swapped in while "
           "timed, and is not flagged", CHECK_FAILED, "Q1.cold.swap_timed: flagged is False with",
           unflagged_swap_in),
+    Fault("fuzz-g3-target-missing", "render-check", "G-3's results file without one target's "
+          "Mac run, its summary recounted to match, so the Targets block would judge G-3 on "
+          "twelve of thirteen targets", EXIT_RENDER_REFUSED,
+          "no run of fuzz_columns on macOS at neon: G-3 needs every target",
+          fuzz_g3_target_missing),
     Fault("fuzz-g3-short-run-accepted", "py-scripts", "check_fuzz.py stops refusing a clean run "
           "shorter than 1,800 s, so a 20-second run could stand for G-3's 30 minutes",
           CHECK_FAILED, "FAIL: test_a_clean_run_under_1800_seconds_is_refused "

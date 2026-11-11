@@ -1,0 +1,995 @@
+{
+ "header": {
+  "schema": "tick-store-fuzz-1",
+  "gate": "G-3",
+  "commit": "ea1dde4c02e48961e1369b51183a5c6c6a16e396",
+  "statement": "Each libFuzzer target of fuzz/CMakeLists.txt, run for at least 1800 s under the heavy-job lock, with scripts/check.sh's flags and caps, on the existing corpus and the seeds the real encoders write; on Linux, each target whose decode reaches the AVX2 kernels, with the level set to avx2. Coverage, corpus and exec/s are libFuzzer's own final figures.",
+  "required_seconds": 1800,
+  "targets_file": "fuzz/CMakeLists.txt",
+  "targets": [
+   "fuzz_columns",
+   "fuzz_container",
+   "fuzz_dictionary",
+   "fuzz_gorilla_timestamps",
+   "fuzz_gorilla_xor",
+   "fuzz_itch_frame",
+   "fuzz_itch_message",
+   "fuzz_itch_query",
+   "fuzz_itch_store",
+   "fuzz_pfor",
+   "fuzz_run_length",
+   "fuzz_stream_vbyte",
+   "fuzz_stub_store"
+  ],
+  "avx2_path_targets": [
+   "fuzz_dictionary",
+   "fuzz_itch_query",
+   "fuzz_itch_store",
+   "fuzz_pfor",
+   "fuzz_run_length",
+   "fuzz_stream_vbyte"
+  ],
+  "hosts": {
+   "macOS": {
+    "cpu_model": "Apple M4 Max",
+    "kernel": "Darwin 27.2.0",
+    "compiler": "clang version 23.1.4 (https://github.com/llvm/llvm-project 7a941dfb2877a0b8cf30323fefa85ad019e0b0f5)",
+    "compile_flags": "fuzz preset, RelWithDebInfo: -O2 -g -DNDEBUG -std=c++23 -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer, -DTICK_STORE_SIMD_NEON -DTICK_STORE_CRC32C_ARMV8; targets linked with -fsanitize=fuzzer,address,undefined -fuse-ld=lld",
+    "sanitizer_options": "ASAN_OPTIONS=detect_leaks=1:leak_check_at_exit=0:abort_on_error=0:exitcode=77 UBSAN_OPTIONS=print_stacktrace=1. check.sh's own options plus leak detection, which ASan leaves off on macOS: libFuzzer checks each input for a leak; the check at exit is off because it reports libFuzzer's own RSS thread, never freed",
+    "concurrency": "four targets at once, unpinned, in four batches, each batch its own heavy.sh job; the Mac has 16 cores and other sessions' jobs ran beside it",
+    "peak_memory": "libFuzzer's peak_rss_mb, and BSD time -l per fuzzer: maximum resident set size and peak memory footprint"
+   },
+   "Linux": {
+    "cpu_model": "AMD Ryzen Embedded V1605B with Radeon Vega Gfx",
+    "kernel": "Linux 6.12.116+deb13-amd64",
+    "compiler": "clang version 23.1.4 (https://github.com/llvm/llvm-project 7a941dfb2877a0b8cf30323fefa85ad019e0b0f5)",
+    "compile_flags": "fuzz preset, RelWithDebInfo: -O2 -g -DNDEBUG -std=c++23 -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer, -DTICK_STORE_SIMD_AVX2 -DTICK_STORE_CRC32C_SSE42; targets linked with -fsanitize=fuzzer,address,undefined",
+    "sanitizer_options": "ASAN_OPTIONS=abort_on_error=0:exitcode=77 UBSAN_OPTIONS=print_stacktrace=1, as check.sh sets them; LeakSanitizer is on by default on Linux. TICK_STORE_SIMD=avx2, which aborts before the first decode if the build or processor cannot run AVX2",
+    "concurrency": "three targets at once, each pinned with taskset to one of cpu2, cpu6 and cpu7, in two batches, each its own heavy.sh job; cpu4 and cpu5 left alone, no measurement running",
+    "peak_memory": "libFuzzer's peak_rss_mb, and the fuzzer's VmHWM read from /proc every 5 s; this host has no GNU time"
+   }
+  }
+ },
+ "runs": [
+  {
+   "target": "fuzz_columns",
+   "host": "macOS",
+   "commit": "ea1dde4c02e48961e1369b51183a5c6c6a16e396",
+   "cpu": "unpinned",
+   "cpu_model": "Apple M4 Max",
+   "compiler": "clang version 23.1.4 (https://github.com/llvm/llvm-project 7a941dfb2877a0b8cf30323fefa85ad019e0b0f5)",
+   "compile_flags": "fuzz preset, RelWithDebInfo: -O2 -g -DNDEBUG -std=c++23 -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer, -DTICK_STORE_SIMD_NEON -DTICK_STORE_CRC32C_ARMV8; targets linked with -fsanitize=fuzzer,address,undefined -fuse-ld=lld",
+   "kernel_level": "neon",
+   "seconds": 1801,
+   "wall_seconds": 1801,
+   "runs": 54069697,
+   "exec_per_second": 30022,
+   "coverage": {
+    "cov": 829,
+    "ft": 2738
+   },
+   "corpus": {
+    "units": 188,
+    "size": "244Kb"
+   },
+   "peak_rss_mb": 460,
+   "clean": true,
+   "exit_code": 0,
+   "findings": [],
+   "final_status_line": "#54069697 DONE cov: 829 ft: 2738 corp: 188/244Kb lim: 70000 exec/s: 30022 rss: 460Mb",
+   "done_line": "Done 54069697 runs in 1801 second(s)",
+   "final_stats": {
+    "number_of_executed_units": 54069697,
+    "average_exec_per_sec": 30022,
+    "new_units_added": 12,
+    "slowest_unit_time_sec": 0,
+    "peak_rss_mb": 460
+   },
+   "command": "ASAN_OPTIONS=detect_leaks=1:leak_check_at_exit=0:abort_on_error=0:exitcode=77 UBSAN_OPTIONS=print_stacktrace=1 build/fuzz/fuzz/fuzz_columns -max_total_time=1800 -max_len=70000 -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 -artifact_prefix=build/fuzz/artifacts/ build/fuzz/corpus/columns build/fuzz/fuzz-seeds/columns",
+   "max_len": 70000,
+   "started": "2026-11-11T11:10:42Z",
+   "ended": "2026-11-11T11:40:43Z",
+   "inited": {
+    "runs": 409,
+    "approx_seconds": null
+   },
+   "os_peak_memory": {
+    "method": "BSD time -l",
+    "real_seconds": 1801.05,
+    "max_rss_bytes": 483328000,
+    "peak_footprint_bytes": 484776224
+   },
+   "checkout_at_start": "95f7eb04e9b4d0188661b41e9d0dad24f59fd0ce"
+  },
+  {
+   "target": "fuzz_container",
+   "host": "macOS",
+   "commit": "ea1dde4c02e48961e1369b51183a5c6c6a16e396",
+   "cpu": "unpinned",
+   "cpu_model": "Apple M4 Max",
+   "compiler": "clang version 23.1.4 (https://github.com/llvm/llvm-project 7a941dfb2877a0b8cf30323fefa85ad019e0b0f5)",
+   "compile_flags": "fuzz preset, RelWithDebInfo: -O2 -g -DNDEBUG -std=c++23 -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer, -DTICK_STORE_SIMD_NEON -DTICK_STORE_CRC32C_ARMV8; targets linked with -fsanitize=fuzzer,address,undefined -fuse-ld=lld",
+   "kernel_level": "neon",
+   "seconds": 1801,
+   "wall_seconds": 1801,
+   "runs": 167158633,
+   "exec_per_second": 92814,
+   "coverage": {
+    "cov": 526,
+    "ft": 1804
+   },
+   "corpus": {
+    "units": 166,
+    "size": "185Kb"
+   },
+   "peak_rss_mb": 701,
+   "clean": true,
+   "exit_code": 0,
+   "findings": [],
+   "final_status_line": "#167158633 DONE cov: 526 ft: 1804 corp: 166/185Kb lim: 70000 exec/s: 92814 rss: 701Mb",
+   "done_line": "Done 167158633 runs in 1801 second(s)",
+   "final_stats": {
+    "number_of_executed_units": 167158633,
+    "average_exec_per_sec": 92814,
+    "new_units_added": 36,
+    "slowest_unit_time_sec": 0,
+    "peak_rss_mb": 701
+   },
+   "command": "ASAN_OPTIONS=detect_leaks=1:leak_check_at_exit=0:abort_on_error=0:exitcode=77 UBSAN_OPTIONS=print_stacktrace=1 build/fuzz/fuzz/fuzz_container -max_total_time=1800 -max_len=70000 -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 -artifact_prefix=build/fuzz/artifacts/ build/fuzz/corpus/container build/fuzz/fuzz-seeds/container",
+   "max_len": 70000,
+   "started": "2026-11-11T11:10:40Z",
+   "ended": "2026-11-11T11:40:41Z",
+   "inited": {
+    "runs": 707,
+    "approx_seconds": null
+   },
+   "os_peak_memory": {
+    "method": "BSD time -l",
+    "real_seconds": 1801.06,
+    "max_rss_bytes": 735526912,
+    "peak_footprint_bytes": 737188152
+   },
+   "checkout_at_start": "95f7eb04e9b4d0188661b41e9d0dad24f59fd0ce"
+  },
+  {
+   "target": "fuzz_dictionary",
+   "host": "macOS",
+   "commit": "ea1dde4c02e48961e1369b51183a5c6c6a16e396",
+   "cpu": "unpinned",
+   "cpu_model": "Apple M4 Max",
+   "compiler": "clang version 23.1.4 (https://github.com/llvm/llvm-project 7a941dfb2877a0b8cf30323fefa85ad019e0b0f5)",
+   "compile_flags": "fuzz preset, RelWithDebInfo: -O2 -g -DNDEBUG -std=c++23 -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer, -DTICK_STORE_SIMD_NEON -DTICK_STORE_CRC32C_ARMV8; targets linked with -fsanitize=fuzzer,address,undefined -fuse-ld=lld",
+   "kernel_level": "neon",
+   "seconds": 1804,
+   "wall_seconds": 1805,
+   "runs": 93165,
+   "exec_per_second": 51,
+   "coverage": {
+    "cov": 1958,
+    "ft": 12175
+   },
+   "corpus": {
+    "units": 1103,
+    "size": "5460Kb"
+   },
+   "peak_rss_mb": 1336,
+   "clean": true,
+   "exit_code": 0,
+   "findings": [],
+   "final_status_line": "#93165 DONE cov: 1958 ft: 12175 corp: 1103/5460Kb lim: 16384 exec/s: 51 rss: 1336Mb",
+   "done_line": "Done 93165 runs in 1804 second(s)",
+   "final_stats": {
+    "number_of_executed_units": 93165,
+    "average_exec_per_sec": 51,
+    "new_units_added": 314,
+    "slowest_unit_time_sec": 0,
+    "peak_rss_mb": 1336
+   },
+   "command": "ASAN_OPTIONS=detect_leaks=1:leak_check_at_exit=0:abort_on_error=0:exitcode=77 UBSAN_OPTIONS=print_stacktrace=1 build/fuzz/fuzz/fuzz_dictionary -max_total_time=1800 -max_len=16384 -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 -artifact_prefix=build/fuzz/artifacts/ build/fuzz/corpus/dictionary build/fuzz/fuzz-seeds/dictionary",
+   "max_len": 16384,
+   "started": "2026-11-11T10:40:31Z",
+   "ended": "2026-11-11T11:10:36Z",
+   "inited": {
+    "runs": 2869,
+    "approx_seconds": 61
+   },
+   "os_peak_memory": {
+    "method": "BSD time -l",
+    "real_seconds": 1804.15,
+    "max_rss_bytes": 1401274368,
+    "peak_footprint_bytes": 1403051112
+   }
+  },
+  {
+   "target": "fuzz_gorilla_timestamps",
+   "host": "macOS",
+   "commit": "ea1dde4c02e48961e1369b51183a5c6c6a16e396",
+   "cpu": "unpinned",
+   "cpu_model": "Apple M4 Max",
+   "compiler": "clang version 23.1.4 (https://github.com/llvm/llvm-project 7a941dfb2877a0b8cf30323fefa85ad019e0b0f5)",
+   "compile_flags": "fuzz preset, RelWithDebInfo: -O2 -g -DNDEBUG -std=c++23 -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer, -DTICK_STORE_SIMD_NEON -DTICK_STORE_CRC32C_ARMV8; targets linked with -fsanitize=fuzzer,address,undefined -fuse-ld=lld",
+   "kernel_level": "neon",
+   "seconds": 1801,
+   "wall_seconds": 1801,
+   "runs": 5565301,
+   "exec_per_second": 3090,
+   "coverage": {
+    "cov": 413,
+    "ft": 2244
+   },
+   "corpus": {
+    "units": 209,
+    "size": "220Kb"
+   },
+   "peak_rss_mb": 581,
+   "clean": true,
+   "exit_code": 0,
+   "findings": [],
+   "final_status_line": "#5565301 DONE cov: 413 ft: 2244 corp: 209/220Kb lim: 70000 exec/s: 3090 rss: 581Mb",
+   "done_line": "Done 5565301 runs in 1801 second(s)",
+   "final_stats": {
+    "number_of_executed_units": 5565301,
+    "average_exec_per_sec": 3090,
+    "new_units_added": 227,
+    "slowest_unit_time_sec": 0,
+    "peak_rss_mb": 581
+   },
+   "command": "ASAN_OPTIONS=detect_leaks=1:leak_check_at_exit=0:abort_on_error=0:exitcode=77 UBSAN_OPTIONS=print_stacktrace=1 build/fuzz/fuzz/fuzz_gorilla_timestamps -max_total_time=1800 -max_len=70000 -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 -artifact_prefix=build/fuzz/artifacts/ build/fuzz/corpus/gorilla_timestamps build/fuzz/fuzz-seeds/gorilla_timestamps",
+   "max_len": 70000,
+   "started": "2026-11-11T11:40:43Z",
+   "ended": "2026-11-11T12:10:44Z",
+   "inited": {
+    "runs": 1135,
+    "approx_seconds": null
+   },
+   "os_peak_memory": {
+    "method": "BSD time -l",
+    "real_seconds": 1801.06,
+    "max_rss_bytes": 610222080,
+    "peak_footprint_bytes": 612407992
+   },
+   "checkout_at_start": "95f7eb04e9b4d0188661b41e9d0dad24f59fd0ce"
+  },
+  {
+   "target": "fuzz_gorilla_xor",
+   "host": "macOS",
+   "commit": "ea1dde4c02e48961e1369b51183a5c6c6a16e396",
+   "cpu": "unpinned",
+   "cpu_model": "Apple M4 Max",
+   "compiler": "clang version 23.1.4 (https://github.com/llvm/llvm-project 7a941dfb2877a0b8cf30323fefa85ad019e0b0f5)",
+   "compile_flags": "fuzz preset, RelWithDebInfo: -O2 -g -DNDEBUG -std=c++23 -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer, -DTICK_STORE_SIMD_NEON -DTICK_STORE_CRC32C_ARMV8; targets linked with -fsanitize=fuzzer,address,undefined -fuse-ld=lld",
+   "kernel_level": "neon",
+   "seconds": 1801,
+   "wall_seconds": 1801,
+   "runs": 6097812,
+   "exec_per_second": 3385,
+   "coverage": {
+    "cov": 455,
+    "ft": 2441
+   },
+   "corpus": {
+    "units": 251,
+    "size": "390Kb"
+   },
+   "peak_rss_mb": 651,
+   "clean": true,
+   "exit_code": 0,
+   "findings": [],
+   "final_status_line": "#6097812 DONE cov: 455 ft: 2441 corp: 251/390Kb lim: 70000 exec/s: 3385 rss: 651Mb",
+   "done_line": "Done 6097812 runs in 1801 second(s)",
+   "final_stats": {
+    "number_of_executed_units": 6097812,
+    "average_exec_per_sec": 3385,
+    "new_units_added": 619,
+    "slowest_unit_time_sec": 0,
+    "peak_rss_mb": 651
+   },
+   "command": "ASAN_OPTIONS=detect_leaks=1:leak_check_at_exit=0:abort_on_error=0:exitcode=77 UBSAN_OPTIONS=print_stacktrace=1 build/fuzz/fuzz/fuzz_gorilla_xor -max_total_time=1800 -max_len=70000 -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 -artifact_prefix=build/fuzz/artifacts/ build/fuzz/corpus/gorilla_xor build/fuzz/fuzz-seeds/gorilla_xor",
+   "max_len": 70000,
+   "started": "2026-11-11T11:40:45Z",
+   "ended": "2026-11-11T12:10:46Z",
+   "inited": {
+    "runs": 1351,
+    "approx_seconds": 1
+   },
+   "os_peak_memory": {
+    "method": "BSD time -l",
+    "real_seconds": 1801.06,
+    "max_rss_bytes": 683327488,
+    "peak_footprint_bytes": 685431456
+   },
+   "checkout_at_start": "95f7eb04e9b4d0188661b41e9d0dad24f59fd0ce"
+  },
+  {
+   "target": "fuzz_itch_frame",
+   "host": "macOS",
+   "commit": "ea1dde4c02e48961e1369b51183a5c6c6a16e396",
+   "cpu": "unpinned",
+   "cpu_model": "Apple M4 Max",
+   "compiler": "clang version 23.1.4 (https://github.com/llvm/llvm-project 7a941dfb2877a0b8cf30323fefa85ad019e0b0f5)",
+   "compile_flags": "fuzz preset, RelWithDebInfo: -O2 -g -DNDEBUG -std=c++23 -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer, -DTICK_STORE_SIMD_NEON -DTICK_STORE_CRC32C_ARMV8; targets linked with -fsanitize=fuzzer,address,undefined -fuse-ld=lld",
+   "kernel_level": "neon",
+   "seconds": 1801,
+   "wall_seconds": 1801,
+   "runs": 211171384,
+   "exec_per_second": 117252,
+   "coverage": {
+    "cov": 399,
+    "ft": 2345
+   },
+   "corpus": {
+    "units": 1305,
+    "size": "922Kb"
+   },
+   "peak_rss_mb": 664,
+   "clean": true,
+   "exit_code": 0,
+   "findings": [],
+   "final_status_line": "#211171384 DONE cov: 399 ft: 2345 corp: 1305/922Kb lim: 70000 exec/s: 117252 rss: 664Mb",
+   "done_line": "Done 211171384 runs in 1801 second(s)",
+   "final_stats": {
+    "number_of_executed_units": 211171384,
+    "average_exec_per_sec": 117252,
+    "new_units_added": 1507,
+    "slowest_unit_time_sec": 0,
+    "peak_rss_mb": 664
+   },
+   "command": "ASAN_OPTIONS=detect_leaks=1:leak_check_at_exit=0:abort_on_error=0:exitcode=77 UBSAN_OPTIONS=print_stacktrace=1 build/fuzz/fuzz/fuzz_itch_frame -max_total_time=1800 -max_len=70000 -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 -artifact_prefix=build/fuzz/artifacts/ build/fuzz/corpus/itch_frame build/fuzz/fuzz-seeds/frame",
+   "max_len": 70000,
+   "started": "2026-11-11T11:40:47Z",
+   "ended": "2026-11-11T12:10:48Z",
+   "inited": {
+    "runs": 3712,
+    "approx_seconds": null
+   },
+   "os_peak_memory": {
+    "method": "BSD time -l",
+    "real_seconds": 1801.05,
+    "max_rss_bytes": 697237504,
+    "peak_footprint_bytes": 699324992
+   },
+   "checkout_at_start": "95f7eb04e9b4d0188661b41e9d0dad24f59fd0ce"
+  },
+  {
+   "target": "fuzz_itch_message",
+   "host": "macOS",
+   "commit": "ea1dde4c02e48961e1369b51183a5c6c6a16e396",
+   "cpu": "unpinned",
+   "cpu_model": "Apple M4 Max",
+   "compiler": "clang version 23.1.4 (https://github.com/llvm/llvm-project 7a941dfb2877a0b8cf30323fefa85ad019e0b0f5)",
+   "compile_flags": "fuzz preset, RelWithDebInfo: -O2 -g -DNDEBUG -std=c++23 -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer, -DTICK_STORE_SIMD_NEON -DTICK_STORE_CRC32C_ARMV8; targets linked with -fsanitize=fuzzer,address,undefined -fuse-ld=lld",
+   "kernel_level": "neon",
+   "seconds": 1801,
+   "wall_seconds": 1801,
+   "runs": 504472078,
+   "exec_per_second": 280106,
+   "coverage": {
+    "cov": 635,
+    "ft": 690
+   },
+   "corpus": {
+    "units": 396,
+    "size": "10244b"
+   },
+   "peak_rss_mb": 491,
+   "clean": true,
+   "exit_code": 0,
+   "findings": [],
+   "final_status_line": "#504472078 DONE cov: 635 ft: 690 corp: 396/10244b lim: 256 exec/s: 280106 rss: 491Mb",
+   "done_line": "Done 504472078 runs in 1801 second(s)",
+   "final_stats": {
+    "number_of_executed_units": 504472078,
+    "average_exec_per_sec": 280106,
+    "new_units_added": 0,
+    "slowest_unit_time_sec": 0,
+    "peak_rss_mb": 491
+   },
+   "command": "ASAN_OPTIONS=detect_leaks=1:leak_check_at_exit=0:abort_on_error=0:exitcode=77 UBSAN_OPTIONS=print_stacktrace=1 build/fuzz/fuzz/fuzz_itch_message -max_total_time=1800 -max_len=256 -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 -artifact_prefix=build/fuzz/artifacts/ build/fuzz/corpus/itch_message build/fuzz/fuzz-seeds/message",
+   "max_len": 256,
+   "started": "2026-11-11T11:40:49Z",
+   "ended": "2026-11-11T12:10:50Z",
+   "inited": {
+    "runs": 1143,
+    "approx_seconds": null
+   },
+   "os_peak_memory": {
+    "method": "BSD time -l",
+    "real_seconds": 1801.05,
+    "max_rss_bytes": 516014080,
+    "peak_footprint_bytes": 516985728
+   },
+   "checkout_at_start": "95f7eb04e9b4d0188661b41e9d0dad24f59fd0ce"
+  },
+  {
+   "target": "fuzz_itch_query",
+   "host": "macOS",
+   "commit": "ea1dde4c02e48961e1369b51183a5c6c6a16e396",
+   "cpu": "unpinned",
+   "cpu_model": "Apple M4 Max",
+   "compiler": "clang version 23.1.4 (https://github.com/llvm/llvm-project 7a941dfb2877a0b8cf30323fefa85ad019e0b0f5)",
+   "compile_flags": "fuzz preset, RelWithDebInfo: -O2 -g -DNDEBUG -std=c++23 -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer, -DTICK_STORE_SIMD_NEON -DTICK_STORE_CRC32C_ARMV8; targets linked with -fsanitize=fuzzer,address,undefined -fuse-ld=lld",
+   "kernel_level": "neon",
+   "seconds": 1801,
+   "wall_seconds": 1802,
+   "runs": 338313,
+   "exec_per_second": 187,
+   "coverage": {
+    "cov": 4036,
+    "ft": 20688
+   },
+   "corpus": {
+    "units": 1505,
+    "size": "63Mb"
+   },
+   "peak_rss_mb": 782,
+   "clean": true,
+   "exit_code": 0,
+   "findings": [],
+   "final_status_line": "#338313 DONE cov: 4036 ft: 20688 corp: 1505/63Mb lim: 128412 exec/s: 187 rss: 782Mb",
+   "done_line": "Done 338313 runs in 1801 second(s)",
+   "final_stats": {
+    "number_of_executed_units": 338313,
+    "average_exec_per_sec": 187,
+    "new_units_added": 625,
+    "slowest_unit_time_sec": 0,
+    "peak_rss_mb": 782
+   },
+   "command": "ASAN_OPTIONS=detect_leaks=1:leak_check_at_exit=0:abort_on_error=0:exitcode=77 UBSAN_OPTIONS=print_stacktrace=1 build/fuzz/fuzz/fuzz_itch_query -max_total_time=1800 -max_len=131072 -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 -artifact_prefix=build/fuzz/artifacts/ build/fuzz/corpus/itch_query build/fuzz/fuzz-seeds/itch_query",
+   "max_len": 131072,
+   "started": "2026-11-11T10:40:25Z",
+   "ended": "2026-11-11T11:10:27Z",
+   "inited": {
+    "runs": 1882,
+    "approx_seconds": 47
+   },
+   "os_peak_memory": {
+    "method": "BSD time -l",
+    "real_seconds": 1801.12,
+    "max_rss_bytes": 820871168,
+    "peak_footprint_bytes": 820042664
+   }
+  },
+  {
+   "target": "fuzz_itch_store",
+   "host": "macOS",
+   "commit": "ea1dde4c02e48961e1369b51183a5c6c6a16e396",
+   "cpu": "unpinned",
+   "cpu_model": "Apple M4 Max",
+   "compiler": "clang version 23.1.4 (https://github.com/llvm/llvm-project 7a941dfb2877a0b8cf30323fefa85ad019e0b0f5)",
+   "compile_flags": "fuzz preset, RelWithDebInfo: -O2 -g -DNDEBUG -std=c++23 -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer, -DTICK_STORE_SIMD_NEON -DTICK_STORE_CRC32C_ARMV8; targets linked with -fsanitize=fuzzer,address,undefined -fuse-ld=lld",
+   "kernel_level": "neon",
+   "seconds": 1801,
+   "wall_seconds": 1801,
+   "runs": 3563885,
+   "exec_per_second": 1978,
+   "coverage": {
+    "cov": 4747,
+    "ft": 13734
+   },
+   "corpus": {
+    "units": 795,
+    "size": "8716Kb"
+   },
+   "peak_rss_mb": 487,
+   "clean": true,
+   "exit_code": 0,
+   "findings": [],
+   "final_status_line": "#3563885 DONE cov: 4747 ft: 13734 corp: 795/8716Kb lim: 70000 exec/s: 1978 rss: 487Mb",
+   "done_line": "Done 3563885 runs in 1801 second(s)",
+   "final_stats": {
+    "number_of_executed_units": 3563885,
+    "average_exec_per_sec": 1978,
+    "new_units_added": 241,
+    "slowest_unit_time_sec": 0,
+    "peak_rss_mb": 487
+   },
+   "command": "ASAN_OPTIONS=detect_leaks=1:leak_check_at_exit=0:abort_on_error=0:exitcode=77 UBSAN_OPTIONS=print_stacktrace=1 build/fuzz/fuzz/fuzz_itch_store -max_total_time=1800 -max_len=70000 -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 -artifact_prefix=build/fuzz/artifacts/ build/fuzz/corpus/itch_store build/fuzz/fuzz-seeds/itch_store",
+   "max_len": 70000,
+   "started": "2026-11-11T10:40:27Z",
+   "ended": "2026-11-11T11:10:28Z",
+   "inited": {
+    "runs": 2079,
+    "approx_seconds": 7
+   },
+   "os_peak_memory": {
+    "method": "BSD time -l",
+    "real_seconds": 1801.05,
+    "max_rss_bytes": 510885888,
+    "peak_footprint_bytes": 509795072
+   }
+  },
+  {
+   "target": "fuzz_pfor",
+   "host": "macOS",
+   "commit": "ea1dde4c02e48961e1369b51183a5c6c6a16e396",
+   "cpu": "unpinned",
+   "cpu_model": "Apple M4 Max",
+   "compiler": "clang version 23.1.4 (https://github.com/llvm/llvm-project 7a941dfb2877a0b8cf30323fefa85ad019e0b0f5)",
+   "compile_flags": "fuzz preset, RelWithDebInfo: -O2 -g -DNDEBUG -std=c++23 -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer, -DTICK_STORE_SIMD_NEON -DTICK_STORE_CRC32C_ARMV8; targets linked with -fsanitize=fuzzer,address,undefined -fuse-ld=lld",
+   "kernel_level": "neon",
+   "seconds": 1801,
+   "wall_seconds": 1802,
+   "runs": 114498,
+   "exec_per_second": 63,
+   "coverage": {
+    "cov": 1548,
+    "ft": 8201
+   },
+   "corpus": {
+    "units": 1115,
+    "size": "3635Kb"
+   },
+   "peak_rss_mb": 1176,
+   "clean": true,
+   "exit_code": 0,
+   "findings": [],
+   "final_status_line": "#114498 DONE cov: 1548 ft: 8201 corp: 1115/3635Kb lim: 16384 exec/s: 63 rss: 1176Mb",
+   "done_line": "Done 114498 runs in 1801 second(s)",
+   "final_stats": {
+    "number_of_executed_units": 114498,
+    "average_exec_per_sec": 63,
+    "new_units_added": 531,
+    "slowest_unit_time_sec": 0,
+    "peak_rss_mb": 1176
+   },
+   "command": "ASAN_OPTIONS=detect_leaks=1:leak_check_at_exit=0:abort_on_error=0:exitcode=77 UBSAN_OPTIONS=print_stacktrace=1 build/fuzz/fuzz/fuzz_pfor -max_total_time=1800 -max_len=16384 -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 -artifact_prefix=build/fuzz/artifacts/ build/fuzz/corpus/pfor build/fuzz/fuzz-seeds/pfor",
+   "max_len": 16384,
+   "started": "2026-11-11T10:40:29Z",
+   "ended": "2026-11-11T11:10:31Z",
+   "inited": {
+    "runs": 5099,
+    "approx_seconds": 81
+   },
+   "os_peak_memory": {
+    "method": "BSD time -l",
+    "real_seconds": 1801.2,
+    "max_rss_bytes": 1233977344,
+    "peak_footprint_bytes": 1235032808
+   }
+  },
+  {
+   "target": "fuzz_run_length",
+   "host": "macOS",
+   "commit": "ea1dde4c02e48961e1369b51183a5c6c6a16e396",
+   "cpu": "unpinned",
+   "cpu_model": "Apple M4 Max",
+   "compiler": "clang version 23.1.4 (https://github.com/llvm/llvm-project 7a941dfb2877a0b8cf30323fefa85ad019e0b0f5)",
+   "compile_flags": "fuzz preset, RelWithDebInfo: -O2 -g -DNDEBUG -std=c++23 -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer, -DTICK_STORE_SIMD_NEON -DTICK_STORE_CRC32C_ARMV8; targets linked with -fsanitize=fuzzer,address,undefined -fuse-ld=lld",
+   "kernel_level": "neon",
+   "seconds": 1801,
+   "wall_seconds": 1801,
+   "runs": 390986,
+   "exec_per_second": 217,
+   "coverage": {
+    "cov": 1449,
+    "ft": 7954
+   },
+   "corpus": {
+    "units": 727,
+    "size": "2428Kb"
+   },
+   "peak_rss_mb": 1140,
+   "clean": true,
+   "exit_code": 0,
+   "findings": [],
+   "final_status_line": "#390986 DONE cov: 1449 ft: 7954 corp: 727/2428Kb lim: 16384 exec/s: 217 rss: 1140Mb",
+   "done_line": "Done 390986 runs in 1801 second(s)",
+   "final_stats": {
+    "number_of_executed_units": 390986,
+    "average_exec_per_sec": 217,
+    "new_units_added": 459,
+    "slowest_unit_time_sec": 0,
+    "peak_rss_mb": 1140
+   },
+   "command": "ASAN_OPTIONS=detect_leaks=1:leak_check_at_exit=0:abort_on_error=0:exitcode=77 UBSAN_OPTIONS=print_stacktrace=1 build/fuzz/fuzz/fuzz_run_length -max_total_time=1800 -max_len=16384 -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 -artifact_prefix=build/fuzz/artifacts/ build/fuzz/corpus/run_length build/fuzz/fuzz-seeds/run_length",
+   "max_len": 16384,
+   "started": "2026-11-11T11:10:36Z",
+   "ended": "2026-11-11T11:40:37Z",
+   "inited": {
+    "runs": 2051,
+    "approx_seconds": 9
+   },
+   "os_peak_memory": {
+    "method": "BSD time -l",
+    "real_seconds": 1801.06,
+    "max_rss_bytes": 1195687936,
+    "peak_footprint_bytes": 1197055008
+   },
+   "checkout_at_start": "95f7eb04e9b4d0188661b41e9d0dad24f59fd0ce"
+  },
+  {
+   "target": "fuzz_stream_vbyte",
+   "host": "macOS",
+   "commit": "ea1dde4c02e48961e1369b51183a5c6c6a16e396",
+   "cpu": "unpinned",
+   "cpu_model": "Apple M4 Max",
+   "compiler": "clang version 23.1.4 (https://github.com/llvm/llvm-project 7a941dfb2877a0b8cf30323fefa85ad019e0b0f5)",
+   "compile_flags": "fuzz preset, RelWithDebInfo: -O2 -g -DNDEBUG -std=c++23 -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer, -DTICK_STORE_SIMD_NEON -DTICK_STORE_CRC32C_ARMV8; targets linked with -fsanitize=fuzzer,address,undefined -fuse-ld=lld",
+   "kernel_level": "neon",
+   "seconds": 1801,
+   "wall_seconds": 1801,
+   "runs": 1031497,
+   "exec_per_second": 572,
+   "coverage": {
+    "cov": 750,
+    "ft": 4611
+   },
+   "corpus": {
+    "units": 453,
+    "size": "1487Kb"
+   },
+   "peak_rss_mb": 832,
+   "clean": true,
+   "exit_code": 0,
+   "findings": [],
+   "final_status_line": "#1031497 DONE cov: 750 ft: 4611 corp: 453/1487Kb lim: 62222 exec/s: 572 rss: 832Mb",
+   "done_line": "Done 1031497 runs in 1801 second(s)",
+   "final_stats": {
+    "number_of_executed_units": 1031497,
+    "average_exec_per_sec": 572,
+    "new_units_added": 495,
+    "slowest_unit_time_sec": 0,
+    "peak_rss_mb": 832
+   },
+   "command": "ASAN_OPTIONS=detect_leaks=1:leak_check_at_exit=0:abort_on_error=0:exitcode=77 UBSAN_OPTIONS=print_stacktrace=1 build/fuzz/fuzz/fuzz_stream_vbyte -max_total_time=1800 -max_len=70000 -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 -artifact_prefix=build/fuzz/artifacts/ build/fuzz/corpus/stream_vbyte build/fuzz/fuzz-seeds/stream_vbyte",
+   "max_len": 70000,
+   "started": "2026-11-11T11:10:38Z",
+   "ended": "2026-11-11T11:40:39Z",
+   "inited": {
+    "runs": 1350,
+    "approx_seconds": 4
+   },
+   "os_peak_memory": {
+    "method": "BSD time -l",
+    "real_seconds": 1801.15,
+    "max_rss_bytes": 872841216,
+    "peak_footprint_bytes": 874945328
+   },
+   "checkout_at_start": "95f7eb04e9b4d0188661b41e9d0dad24f59fd0ce"
+  },
+  {
+   "target": "fuzz_stub_store",
+   "host": "macOS",
+   "commit": "ea1dde4c02e48961e1369b51183a5c6c6a16e396",
+   "cpu": "unpinned",
+   "cpu_model": "Apple M4 Max",
+   "compiler": "clang version 23.1.4 (https://github.com/llvm/llvm-project 7a941dfb2877a0b8cf30323fefa85ad019e0b0f5)",
+   "compile_flags": "fuzz preset, RelWithDebInfo: -O2 -g -DNDEBUG -std=c++23 -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer, -DTICK_STORE_SIMD_NEON -DTICK_STORE_CRC32C_ARMV8; targets linked with -fsanitize=fuzzer,address,undefined -fuse-ld=lld",
+   "kernel_level": "neon",
+   "seconds": 1801,
+   "wall_seconds": 1801,
+   "runs": 334181975,
+   "exec_per_second": 185553,
+   "coverage": {
+    "cov": 396,
+    "ft": 1503
+   },
+   "corpus": {
+    "units": 569,
+    "size": "437Kb"
+   },
+   "peak_rss_mb": 448,
+   "clean": true,
+   "exit_code": 0,
+   "findings": [],
+   "final_status_line": "#334181975 DONE cov: 396 ft: 1503 corp: 569/437Kb lim: 70000 exec/s: 185553 rss: 448Mb",
+   "done_line": "Done 334181975 runs in 1801 second(s)",
+   "final_stats": {
+    "number_of_executed_units": 334181975,
+    "average_exec_per_sec": 185553,
+    "new_units_added": 100,
+    "slowest_unit_time_sec": 0,
+    "peak_rss_mb": 448
+   },
+   "command": "ASAN_OPTIONS=detect_leaks=1:leak_check_at_exit=0:abort_on_error=0:exitcode=77 UBSAN_OPTIONS=print_stacktrace=1 build/fuzz/fuzz/fuzz_stub_store -max_total_time=1800 -max_len=70000 -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 -artifact_prefix=build/fuzz/artifacts/ build/fuzz/corpus/stub_store build/fuzz/fuzz-seeds/store",
+   "max_len": 70000,
+   "started": "2026-11-11T12:20:31Z",
+   "ended": "2026-11-11T12:50:32Z",
+   "inited": {
+    "runs": 788,
+    "approx_seconds": null
+   },
+   "os_peak_memory": {
+    "method": "BSD time -l",
+    "real_seconds": 1801.05,
+    "max_rss_bytes": 470859776,
+    "peak_footprint_bytes": 472192664
+   },
+   "checkout_at_start": "95f7eb04e9b4d0188661b41e9d0dad24f59fd0ce"
+  },
+  {
+   "target": "fuzz_dictionary",
+   "host": "Linux",
+   "commit": "ea1dde4c02e48961e1369b51183a5c6c6a16e396",
+   "cpu": "cpu 2",
+   "cpu_model": "AMD Ryzen Embedded V1605B with Radeon Vega Gfx",
+   "compiler": "clang version 23.1.4 (https://github.com/llvm/llvm-project 7a941dfb2877a0b8cf30323fefa85ad019e0b0f5)",
+   "compile_flags": "fuzz preset, RelWithDebInfo: -O2 -g -DNDEBUG -std=c++23 -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer, -DTICK_STORE_SIMD_AVX2 -DTICK_STORE_CRC32C_SSE42; targets linked with -fsanitize=fuzzer,address,undefined",
+   "kernel_level": "avx2",
+   "seconds": 1801,
+   "wall_seconds": 1803,
+   "runs": 23477,
+   "exec_per_second": 13,
+   "coverage": {
+    "cov": 1783,
+    "ft": 11018
+   },
+   "corpus": {
+    "units": 1046,
+    "size": "4974Kb"
+   },
+   "peak_rss_mb": 958,
+   "clean": true,
+   "exit_code": 0,
+   "findings": [],
+   "final_status_line": "#23477 DONE cov: 1783 ft: 11018 corp: 1046/4974Kb lim: 16384 exec/s: 13 rss: 958Mb",
+   "done_line": "Done 23477 runs in 1801 second(s)",
+   "final_stats": {
+    "number_of_executed_units": 23477,
+    "average_exec_per_sec": 13,
+    "new_units_added": 112,
+    "slowest_unit_time_sec": 0,
+    "peak_rss_mb": 958
+   },
+   "command": "ASAN_OPTIONS=abort_on_error=0:exitcode=77 UBSAN_OPTIONS=print_stacktrace=1 TICK_STORE_SIMD=avx2 taskset -c 2 build/fuzz/fuzz/fuzz_dictionary -max_total_time=1800 -max_len=16384 -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 -artifact_prefix=artifacts/ corpus/dictionary build/fuzz/fuzz-seeds/dictionary",
+   "max_len": 16384,
+   "started": "2026-11-11T11:15:50Z",
+   "ended": "2026-11-11T11:45:53Z",
+   "inited": {
+    "runs": 2877,
+    "approx_seconds": 262
+   },
+   "os_peak_memory": {
+    "method": "VmHWM read from /proc every 5 s while it ran",
+    "vmhwm_bytes": 1005264896
+   }
+  },
+  {
+   "target": "fuzz_itch_query",
+   "host": "Linux",
+   "commit": "ea1dde4c02e48961e1369b51183a5c6c6a16e396",
+   "cpu": "cpu 2",
+   "cpu_model": "AMD Ryzen Embedded V1605B with Radeon Vega Gfx",
+   "compiler": "clang version 23.1.4 (https://github.com/llvm/llvm-project 7a941dfb2877a0b8cf30323fefa85ad019e0b0f5)",
+   "compile_flags": "fuzz preset, RelWithDebInfo: -O2 -g -DNDEBUG -std=c++23 -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer, -DTICK_STORE_SIMD_AVX2 -DTICK_STORE_CRC32C_SSE42; targets linked with -fsanitize=fuzzer,address,undefined",
+   "kernel_level": "avx2",
+   "seconds": 1802,
+   "wall_seconds": 1804,
+   "runs": 74145,
+   "exec_per_second": 41,
+   "coverage": {
+    "cov": 3802,
+    "ft": 19303
+   },
+   "corpus": {
+    "units": 1165,
+    "size": "47Mb"
+   },
+   "peak_rss_mb": 581,
+   "clean": true,
+   "exit_code": 0,
+   "findings": [],
+   "final_status_line": "#74145 DONE cov: 3802 ft: 19303 corp: 1165/47Mb lim: 127644 exec/s: 41 rss: 581Mb",
+   "done_line": "Done 74145 runs in 1802 second(s)",
+   "final_stats": {
+    "number_of_executed_units": 74145,
+    "average_exec_per_sec": 41,
+    "new_units_added": 235,
+    "slowest_unit_time_sec": 0,
+    "peak_rss_mb": 581
+   },
+   "command": "ASAN_OPTIONS=abort_on_error=0:exitcode=77 UBSAN_OPTIONS=print_stacktrace=1 TICK_STORE_SIMD=avx2 taskset -c 2 build/fuzz/fuzz/fuzz_itch_query -max_total_time=1800 -max_len=131072 -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 -artifact_prefix=artifacts/ corpus/itch_query build/fuzz/fuzz-seeds/itch_query",
+   "max_len": 131072,
+   "started": "2026-11-11T10:45:42Z",
+   "ended": "2026-11-11T11:15:46Z",
+   "inited": {
+    "runs": 1921,
+    "approx_seconds": 192
+   },
+   "os_peak_memory": {
+    "method": "VmHWM read from /proc every 5 s while it ran",
+    "vmhwm_bytes": 609517568
+   }
+  },
+  {
+   "target": "fuzz_itch_store",
+   "host": "Linux",
+   "commit": "ea1dde4c02e48961e1369b51183a5c6c6a16e396",
+   "cpu": "cpu 6",
+   "cpu_model": "AMD Ryzen Embedded V1605B with Radeon Vega Gfx",
+   "compiler": "clang version 23.1.4 (https://github.com/llvm/llvm-project 7a941dfb2877a0b8cf30323fefa85ad019e0b0f5)",
+   "compile_flags": "fuzz preset, RelWithDebInfo: -O2 -g -DNDEBUG -std=c++23 -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer, -DTICK_STORE_SIMD_AVX2 -DTICK_STORE_CRC32C_SSE42; targets linked with -fsanitize=fuzzer,address,undefined",
+   "kernel_level": "avx2",
+   "seconds": 1801,
+   "wall_seconds": 1804,
+   "runs": 535195,
+   "exec_per_second": 297,
+   "coverage": {
+    "cov": 4449,
+    "ft": 12699
+   },
+   "corpus": {
+    "units": 649,
+    "size": "7507Kb"
+   },
+   "peak_rss_mb": 422,
+   "clean": true,
+   "exit_code": 0,
+   "findings": [],
+   "final_status_line": "#535195 DONE cov: 4449 ft: 12699 corp: 649/7507Kb lim: 49083 exec/s: 297 rss: 422Mb",
+   "done_line": "Done 535195 runs in 1801 second(s)",
+   "final_stats": {
+    "number_of_executed_units": 535195,
+    "average_exec_per_sec": 297,
+    "new_units_added": 66,
+    "slowest_unit_time_sec": 0,
+    "peak_rss_mb": 422
+   },
+   "command": "ASAN_OPTIONS=abort_on_error=0:exitcode=77 UBSAN_OPTIONS=print_stacktrace=1 TICK_STORE_SIMD=avx2 taskset -c 6 build/fuzz/fuzz/fuzz_itch_store -max_total_time=1800 -max_len=70000 -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 -artifact_prefix=artifacts/ corpus/itch_store build/fuzz/fuzz-seeds/itch_store",
+   "max_len": 70000,
+   "started": "2026-11-11T10:45:44Z",
+   "ended": "2026-11-11T11:15:48Z",
+   "inited": {
+    "runs": 2111,
+    "approx_seconds": 49
+   },
+   "os_peak_memory": {
+    "method": "VmHWM read from /proc every 5 s while it ran",
+    "vmhwm_bytes": 443428864
+   }
+  },
+  {
+   "target": "fuzz_pfor",
+   "host": "Linux",
+   "commit": "ea1dde4c02e48961e1369b51183a5c6c6a16e396",
+   "cpu": "cpu 7",
+   "cpu_model": "AMD Ryzen Embedded V1605B with Radeon Vega Gfx",
+   "compiler": "clang version 23.1.4 (https://github.com/llvm/llvm-project 7a941dfb2877a0b8cf30323fefa85ad019e0b0f5)",
+   "compile_flags": "fuzz preset, RelWithDebInfo: -O2 -g -DNDEBUG -std=c++23 -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer, -DTICK_STORE_SIMD_AVX2 -DTICK_STORE_CRC32C_SSE42; targets linked with -fsanitize=fuzzer,address,undefined",
+   "kernel_level": "avx2",
+   "seconds": 1801,
+   "wall_seconds": 1804,
+   "runs": 19690,
+   "exec_per_second": 10,
+   "coverage": {
+    "cov": 1470,
+    "ft": 7621
+   },
+   "corpus": {
+    "units": 986,
+    "size": "3138Kb"
+   },
+   "peak_rss_mb": 613,
+   "clean": true,
+   "exit_code": 0,
+   "findings": [],
+   "final_status_line": "#19690 DONE cov: 1470 ft: 7621 corp: 986/3138Kb lim: 16384 exec/s: 10 rss: 613Mb",
+   "done_line": "Done 19690 runs in 1801 second(s)",
+   "final_stats": {
+    "number_of_executed_units": 19690,
+    "average_exec_per_sec": 10,
+    "new_units_added": 125,
+    "slowest_unit_time_sec": 0,
+    "peak_rss_mb": 613
+   },
+   "command": "ASAN_OPTIONS=abort_on_error=0:exitcode=77 UBSAN_OPTIONS=print_stacktrace=1 TICK_STORE_SIMD=avx2 taskset -c 7 build/fuzz/fuzz/fuzz_pfor -max_total_time=1800 -max_len=16384 -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 -artifact_prefix=artifacts/ corpus/pfor build/fuzz/fuzz-seeds/pfor",
+   "max_len": 16384,
+   "started": "2026-11-11T10:45:46Z",
+   "ended": "2026-11-11T11:15:50Z",
+   "inited": {
+    "runs": 5103,
+    "approx_seconds": 567
+   },
+   "os_peak_memory": {
+    "method": "VmHWM read from /proc every 5 s while it ran",
+    "vmhwm_bytes": 643424256
+   }
+  },
+  {
+   "target": "fuzz_run_length",
+   "host": "Linux",
+   "commit": "ea1dde4c02e48961e1369b51183a5c6c6a16e396",
+   "cpu": "cpu 6",
+   "cpu_model": "AMD Ryzen Embedded V1605B with Radeon Vega Gfx",
+   "compiler": "clang version 23.1.4 (https://github.com/llvm/llvm-project 7a941dfb2877a0b8cf30323fefa85ad019e0b0f5)",
+   "compile_flags": "fuzz preset, RelWithDebInfo: -O2 -g -DNDEBUG -std=c++23 -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer, -DTICK_STORE_SIMD_AVX2 -DTICK_STORE_CRC32C_SSE42; targets linked with -fsanitize=fuzzer,address,undefined",
+   "kernel_level": "avx2",
+   "seconds": 1801,
+   "wall_seconds": 1803,
+   "runs": 35664,
+   "exec_per_second": 19,
+   "coverage": {
+    "cov": 1357,
+    "ft": 7405
+   },
+   "corpus": {
+    "units": 700,
+    "size": "2364Kb"
+   },
+   "peak_rss_mb": 723,
+   "clean": true,
+   "exit_code": 0,
+   "findings": [],
+   "final_status_line": "#35664 DONE cov: 1357 ft: 7405 corp: 700/2364Kb lim: 16384 exec/s: 19 rss: 723Mb",
+   "done_line": "Done 35664 runs in 1801 second(s)",
+   "final_stats": {
+    "number_of_executed_units": 35664,
+    "average_exec_per_sec": 19,
+    "new_units_added": 63,
+    "slowest_unit_time_sec": 0,
+    "peak_rss_mb": 723
+   },
+   "command": "ASAN_OPTIONS=abort_on_error=0:exitcode=77 UBSAN_OPTIONS=print_stacktrace=1 TICK_STORE_SIMD=avx2 taskset -c 6 build/fuzz/fuzz/fuzz_run_length -max_total_time=1800 -max_len=16384 -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 -artifact_prefix=artifacts/ corpus/run_length build/fuzz/fuzz-seeds/run_length",
+   "max_len": 16384,
+   "started": "2026-11-11T11:15:52Z",
+   "ended": "2026-11-11T11:45:55Z",
+   "inited": {
+    "runs": 2051,
+    "approx_seconds": 64
+   },
+   "os_peak_memory": {
+    "method": "VmHWM read from /proc every 5 s while it ran",
+    "vmhwm_bytes": 758267904
+   }
+  },
+  {
+   "target": "fuzz_stream_vbyte",
+   "host": "Linux",
+   "commit": "ea1dde4c02e48961e1369b51183a5c6c6a16e396",
+   "cpu": "cpu 7",
+   "cpu_model": "AMD Ryzen Embedded V1605B with Radeon Vega Gfx",
+   "compiler": "clang version 23.1.4 (https://github.com/llvm/llvm-project 7a941dfb2877a0b8cf30323fefa85ad019e0b0f5)",
+   "compile_flags": "fuzz preset, RelWithDebInfo: -O2 -g -DNDEBUG -std=c++23 -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer, -DTICK_STORE_SIMD_AVX2 -DTICK_STORE_CRC32C_SSE42; targets linked with -fsanitize=fuzzer,address,undefined",
+   "kernel_level": "avx2",
+   "seconds": 1801,
+   "wall_seconds": 1803,
+   "runs": 68783,
+   "exec_per_second": 38,
+   "coverage": {
+    "cov": 710,
+    "ft": 4380
+   },
+   "corpus": {
+    "units": 449,
+    "size": "1511Kb"
+   },
+   "peak_rss_mb": 607,
+   "clean": true,
+   "exit_code": 0,
+   "findings": [],
+   "final_status_line": "#68783 DONE cov: 710 ft: 4380 corp: 449/1511Kb lim: 55187 exec/s: 38 rss: 607Mb",
+   "done_line": "Done 68783 runs in 1801 second(s)",
+   "final_stats": {
+    "number_of_executed_units": 68783,
+    "average_exec_per_sec": 38,
+    "new_units_added": 122,
+    "slowest_unit_time_sec": 0,
+    "peak_rss_mb": 607
+   },
+   "command": "ASAN_OPTIONS=abort_on_error=0:exitcode=77 UBSAN_OPTIONS=print_stacktrace=1 TICK_STORE_SIMD=avx2 taskset -c 7 build/fuzz/fuzz/fuzz_stream_vbyte -max_total_time=1800 -max_len=70000 -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1 -artifact_prefix=artifacts/ corpus/stream_vbyte build/fuzz/fuzz-seeds/stream_vbyte",
+   "max_len": 70000,
+   "started": "2026-11-11T11:15:54Z",
+   "ended": "2026-11-11T11:45:57Z",
+   "inited": {
+    "runs": 1350,
+    "approx_seconds": 28
+   },
+   "os_peak_memory": {
+    "method": "VmHWM read from /proc every 5 s while it ran",
+    "vmhwm_bytes": 636907520
+   }
+  }
+ ],
+ "summary": {
+  "macOS": {
+   "targets_required": 13,
+   "targets_clean": 13,
+   "shortest_seconds": 1801
+  },
+  "Linux": {
+   "targets_required": 6,
+   "targets_clean": 6,
+   "shortest_seconds": 1801
+  }
+ }
+}
