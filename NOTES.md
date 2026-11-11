@@ -2708,6 +2708,30 @@ The full `scripts/check.sh` passed all 30 steps at `28435e4` under `heavy.sh`, i
 Raw logs, with every fuzzer's log, `.meta`, BSD `time` output, the runner scripts and the leak
 probe: `phase3-raw/fuzz-g3/`.
 
+### Leak checking on the Mac
+
+`check.sh` could not fail on a leak on macOS: ASan leaves LeakSanitizer off there, and the
+script set no option to turn it on. Two faults show it. `asan-leak-trailing-bytes` makes the
+strict decoder leak two sizes each time it refuses trailing bytes, and `fuzz-itch-message-leak`
+makes it leak a copy of each unknown type byte. Both were registered first, at `59b7066`, and
+`prove_checks.py --only` reported both UNDETECTED: `asan-test` passed all six `ItchTruncation`
+tests, and `fuzz-itch-message` ran its 45 s and exited 0.
+
+`check.sh` now asks for leak detection itself, ahead of anything in `ASAN_OPTIONS`:
+`detect_leaks=1` for `asan-test`, and `detect_leaks=1:leak_check_at_exit=0` for the fuzzers on
+macOS. The check at exit stays off for the fuzzers there, since it reports 56 bytes from
+libFuzzer's own RSS thread; libFuzzer still checks each input for a leak and exits 77. On Linux,
+where LeakSanitizer is on by default, `detect_leaks=1` is set too and changes nothing. CI's jobs
+call `check.sh`, so its macOS jobs take the same options. Before the change, the whole Mac
+`asan-ubsan` suite ran with `detect_leaks=1` and the check at exit on: 625 of 625 passed in
+256 s, with no leak reported, so nothing in the tests or the system libraries needs a
+suppression.
+
+At `76703fb` both faults are PROVEN with `--only`: `asan-test` exits 8, with
+`ItchTruncation.TrailingBytesAreRejectedNotIgnored` failing on "ERROR: LeakSanitizer: detected
+memory leaks", 48 bytes in 3 objects; `fuzz-itch-message` exits 77 on the same line, the leaked
+byte beside libFuzzer's thread. The two `--only` runs took 141 s and 70 s under `heavy.sh`.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
