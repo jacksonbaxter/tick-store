@@ -483,6 +483,10 @@ FAULTS = (
     Fault("compare-swap-unflagged", "check-compare", "a cold query had a page swapped in while "
           "timed, and is not flagged", CHECK_FAILED, "Q1.cold.swap_timed: flagged is False with",
           unflagged_swap_in),
+    Fault("fuzz-g3-short-run-accepted", "py-scripts", "check_fuzz.py stops refusing a clean run "
+          "shorter than 1,800 s, so a 20-second run could stand for G-3's 30 minutes",
+          CHECK_FAILED, "FAIL: test_a_clean_run_under_1800_seconds_is_refused "
+          "(__main__.CheckFuzzTest"),
     Fault("readme-hand-edit", "render-check", "a hand edit inside the README's table markers",
           CHECK_FAILED, "stale or was edited by hand", hand_edit_readme),
     Fault("actionlint-broken-workflow", "actionlint", "the workflow names a matrix key that does "

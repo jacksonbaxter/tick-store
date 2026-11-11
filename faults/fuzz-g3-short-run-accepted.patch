@@ -1,0 +1,12 @@
+diff --git a/scripts/check_fuzz.py b/scripts/check_fuzz.py
+--- a/scripts/check_fuzz.py
++++ b/scripts/check_fuzz.py
+@@ -145,7 +145,7 @@
+     if run["findings"]:
+         problems.append(f"{where}: clean, with findings")
+     for field in ("seconds", "wall_seconds"):
+-        if not is_number(run[field]) or run[field] < REQUIRED_SECONDS:
++        if not is_number(run[field]) or run[field] < 0:
+             problems.append(f"{where}.{field}: {run[field]} s is under the {REQUIRED_SECONDS} s "
+                             "G-3 asks for")
+     if not is_number(run["runs"]) or run["runs"] < 1:
