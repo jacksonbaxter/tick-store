@@ -160,6 +160,15 @@ rm -f "$LOG_DIR"/*.log "$LOG_DIR/summary.tsv"
 export TMPDIR=$ROOT/build/tmp
 export TSAN_OPTIONS=${TSAN_OPTIONS:-halt_on_error=1}
 export UBSAN_OPTIONS=${UBSAN_OPTIONS:-print_stacktrace=1}
+# LeakSanitizer comes with ASan, on by default on Linux and off on macOS, where a leaking test
+# or fuzz target passed. It is asked for on both. libFuzzer checks each input for a leak
+# itself; its check at exit stays off on macOS, where it reports libFuzzer's own RSS thread,
+# which is never freed. Options set in ASAN_OPTIONS come after these, so they win.
+if [[ $(uname -s) == Darwin ]]; then
+    FUZZ_LEAKS=detect_leaks=1:leak_check_at_exit=0
+else
+    FUZZ_LEAKS=detect_leaks=1
+fi
 
 SUMMARY=$LOG_DIR/summary.tsv
 : >"$SUMMARY"
@@ -227,7 +236,10 @@ test_preset() {
 step_dev_build() { build_preset dev; }
 step_dev_test() { test_preset dev "$1"; }
 step_asan_build() { build_preset asan-ubsan; }
-step_asan_test() { test_preset asan-ubsan "$1"; }
+step_asan_test() {
+    local -x ASAN_OPTIONS=detect_leaks=1${ASAN_OPTIONS:+:$ASAN_OPTIONS}
+    test_preset asan-ubsan "$1"
+}
 step_tsan_build() { build_preset tsan; }
 step_tsan_test() { test_preset tsan "$1"; }
 
@@ -332,7 +344,7 @@ run_fuzzer() {
                 -artifact_prefix=build/fuzz/artifacts/)
     [[ -z $FUZZ_SEED ]] || args+=("-seed=$FUZZ_SEED")
     # ASan aborts on macOS and exits 1 on Linux. Pinned to libFuzzer's own code for a defect.
-    ASAN_OPTIONS=${ASAN_OPTIONS:-abort_on_error=0:exitcode=77} \
+    ASAN_OPTIONS=$FUZZ_LEAKS:abort_on_error=0:exitcode=77${ASAN_OPTIONS:+:$ASAN_OPTIONS} \
         "build/fuzz/fuzz/$target" "${args[@]}" "$corpus_dir" "$seeds"
     code=$?
     runs=$(sed -n 's/^stat::number_of_executed_units: *//p' "$log")

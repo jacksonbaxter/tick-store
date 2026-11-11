@@ -181,6 +181,10 @@ build/fuzz/fuzz/fuzz_run_length -max_total_time=60 -max_len=16384 \
   from the logs, and `scripts/check_fuzz.py` refuses it if a target is missing or a clean run is
   under 1,800 s. On macOS, add `detect_leaks=1:leak_check_at_exit=0` to `ASAN_OPTIONS`: ASan
   leaves leak detection off there, and the check at exit reports libFuzzer's own RSS thread.
+- `scripts/check.sh` sets those leak options itself: `detect_leaks=1:leak_check_at_exit=0` for
+  the fuzzers on macOS and `detect_leaks=1` on Linux, where it is the default, ahead of anything
+  in `ASAN_OPTIONS`. libFuzzer then checks each input for a leak and exits 77 on one. Its
+  `asan-test` step sets `detect_leaks=1` too, so a leaking unit test fails on the Mac as well.
 
 ## Reach
 
