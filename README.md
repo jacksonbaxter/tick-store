@@ -40,18 +40,18 @@ Every target in BENCHMARKS.md, on each host it states. Each value is read from t
 | DS-9 | macOS | none published (UNCONFIRMED); the figure, NEON build | Gorilla: 9.650 ns; PFOR delta-of-delta: 0.880 ns | not judged: no published figure, reported as measured | `results/bench/macOS-column_decode-bcbf8738d892.json` |
 | DS-9 | Linux | none published (UNCONFIRMED); the figure, AVX2 build | Gorilla: 22.204 ns; PFOR delta-of-delta: 3.151 ns | not judged: no published figure, reported as measured | `results/bench/Linux-column_decode-bcbf8738d892.json` |
 | WT-1 | Linux | at least 8.59 M records/s | 1.376 M records/s | missed | `results/compare/Linux-12302019-full-67ae574f5666.json` |
-| WT-1 | macOS | at least 8.59 M records/s | 3.232 M records/s | missed | `results/compare/macOS-12302019-full-tickstore-63f8defe451d.json` |
+| WT-1 | macOS | at least 8.59 M records/s | 3.215 M records/s | missed | `results/compare/macOS-12302019-full-tickstore-2503d1e7c5f6.json` |
 | WT-2 | Linux | above 2,732,762 messages/s | class A: 1.376 M messages/s; class B: 1.423 M messages/s | missed | `results/compare/Linux-12302019-full-67ae574f5666.json` |
-| WT-2 | macOS | above 2,732,762 messages/s | class A: 3.232 M messages/s; class B: 3.211 M messages/s | met | `results/compare/macOS-12302019-full-tickstore-63f8defe451d.json` |
+| WT-2 | macOS | above 2,732,762 messages/s | class A: 3.215 M messages/s; class B: 3.208 M messages/s | met | `results/compare/macOS-12302019-full-tickstore-2503d1e7c5f6.json` |
 | WT-3 | Linux | class A write no slower than each system's headline | against Parquet: 195.3 s against 158.4 s; against ArcticDB: 195.3 s against 120.1 s; against QuestDB: 195.3 s against 273.6 s | met on (against QuestDB); missed on (against Parquet), (against ArcticDB) | `results/compare/Linux-12302019-full-67ae574f5666.json` |
 | WT-3 | macOS | class A write no slower than each system's headline | no figure | not judged: the four-system full day runs on Linux only; on macOS tick-store ran the day alone, and the slice files make no claim about a full day | none |
 | WT-4 | Linux | class B write no slower than each system's headline, at its stated flush | against Parquet: 188.9 s against 266.3 s; against ArcticDB: 188.9 s against 123.6 s; against QuestDB, not like-for-like: 188.9 s against 1,269.2 s | met on (against Parquet), (against QuestDB, not like-for-like); missed on (against ArcticDB) | `results/compare/Linux-12302019-full-67ae574f5666.json` |
 | QL-1 | Linux | at most 16.90 ms | 74.32 ms | missed | `results/compare/Linux-12302019-full-67ae574f5666.json` |
-| QL-1 | macOS | at most 16.90 ms | 25.92 ms | missed | `results/compare/macOS-12302019-full-tickstore-63f8defe451d.json` |
+| QL-1 | macOS | at most 16.90 ms | 25.79 ms | missed | `results/compare/macOS-12302019-full-tickstore-2503d1e7c5f6.json` |
 | QL-2 | Linux | at most 0.41 ms | 35.81 ms | missed | `results/compare/Linux-12302019-full-67ae574f5666.json` |
-| QL-2 | macOS | at most 0.41 ms | 14.64 ms | missed | `results/compare/macOS-12302019-full-tickstore-63f8defe451d.json` |
+| QL-2 | macOS | at most 0.41 ms | 14.69 ms | missed | `results/compare/macOS-12302019-full-tickstore-2503d1e7c5f6.json` |
 | QL-3 | Linux | at most 10.00 ms | 308.83 ms | missed | `results/compare/Linux-12302019-full-67ae574f5666.json` |
-| QL-3 | macOS | at most 10.00 ms | 135.29 ms | missed | `results/compare/macOS-12302019-full-tickstore-63f8defe451d.json` |
+| QL-3 | macOS | at most 10.00 ms | 133.63 ms | missed | `results/compare/macOS-12302019-full-tickstore-2503d1e7c5f6.json` |
 | QL-4 | Linux | lowest median and p99 of the four headlines, each query, warm and cold | Q1 warm: 297.58 ms / 325.72 ms against ArcticDB's 37.41 ms / 67.98 ms; Q1 cold: 406.96 ms / 461.20 ms against ArcticDB's 83.18 ms / 89.98 ms; Q2 warm: 74.32 ms / 83.95 ms against QuestDB's 319.30 ms / 364.42 ms; Q2 cold: 485.13 ms / 500.41 ms against Parquet's 3,957.57 ms / 4,081.60 ms; Q3 warm: 35.81 ms / 36.53 ms against QuestDB's 68.71 ms / 85.62 ms; Q3 cold: 214.40 ms / 226.00 ms against Parquet's 2,112.55 ms / 2,513.76 ms; Q4 warm: 207.10 ms / 217.01 ms against QuestDB's 1.18 ms / 1.75 ms; Q4 cold: 302.45 ms / 341.35 ms against ArcticDB's 23.46 ms / 25.08 ms; Q5 warm: 907.64 ms / 936.87 ms against QuestDB's 61.07 ms / 73.75 ms; Q5 cold: 1,233.89 ms / 1,283.58 ms against Parquet's 1,718.55 ms / 1,725.01 ms | met on (Q2 warm), (Q2 cold), (Q3 warm), (Q3 cold), (Q5 cold); missed on (Q1 warm), (Q1 cold), (Q4 warm), (Q4 cold), (Q5 warm) | `results/compare/Linux-12302019-full-67ae574f5666.json` |
 | QL-4 | macOS | lowest median and p99 of the four headlines, each query, warm and cold | no figure | not judged: the four-system full day runs on Linux only; on macOS tick-store ran the day alone, and the slice files make no claim about a full day | none |
 <!-- targets:end -->
@@ -433,29 +433,29 @@ Swap per phase, host-wide, over every variant and class each system ran. Swap-ou
 | QuestDB | 124.7 / 255.4 | 1,563.9 / 2,774.7 | 11.7 / 0.0 | 60.8 / 0.0 | `plain` Q1 warm, `plain` Q2 warm, `plain` Q2 cold, `plain` Q3 warm, `plain` Q3 cold, `plain` Q5 cold, `locate-index` Q1 warm, `locate-index` Q1 cold, `locate-index` Q2 warm, `locate-index` Q2 cold, `locate-index` Q3 warm, `locate-index` Q3 cold, `locate-index` Q4 cold, `locate-index` Q5 warm, `locate-index` Q5 cold |
 | tick-store | 4.2 / 0.0 | 8.4 / 0.2 | 0.0 / 0.0 | 0.1 / 0.0 | `v3-seg4Mi` Q5 warm, `v3-seg1Mi` Q5 warm |
 
-**macOS, full day 12302019, tick-store alone.** Apple M4 Max, commit `63f8defe451d`. Unpinned. No hardware counters. macOS has no thread pinning, and no unprivileged hardware counters. Each system gets the same thread budget. A full day of tick-store alone: every record of the pinned day, every query as BENCHMARKS.md defines it with nothing clipped, and no other system. The four-system full day runs on Linux only; this gives the targets whose host is Both their figure on this host. No figure here is compared with another system's.
+**macOS, full day 12302019, tick-store alone.** Apple M4 Max, commit `2503d1e7c5f6`. Unpinned. No hardware counters. macOS has no thread pinning, and no unprivileged hardware counters. Each system gets the same thread budget. A full day of tick-store alone: every record of the pinned day, every query as BENCHMARKS.md defines it with nothing clipped, and no other system. The four-system full day runs on Linux only; this gives the targets whose host is Both their figure on this host. No figure here is compared with another system's.
 
 Queries, on each system's class B store, in milliseconds. No other system ran, so nothing is ranked.
 
 | Query | System | Variant | Rows | Warm median ms | Warm p99 ms | Cold median ms | Cold p99 ms | Lowest |
 |---|---|---|---|---|---|---|---|---|
-| Q1 | tick-store | `v3-seg4Mi` | 527,644 | 107.98 | 124.73 | 169.12 | 179.11 | not ranked: alone |
-| Q2 | tick-store | `v3-seg4Mi` | 739,944 | 25.92 | 30.29 | 108.26 | 109.19 | not ranked: alone |
-| Q3 | tick-store | `v3-seg4Mi` | 60 | 14.64 | 15.33 | 53.35 | 53.79 | not ranked: alone |
-| Q4 | tick-store | `v3-seg4Mi` | 338 | 79.63 | 82.27 | 134.96 | 136.80 | not ranked: alone |
-| Q5 | tick-store | `v3-seg4Mi` | 1 | 282.69 | 288.57 | 411.14 | 412.72 | not ranked: alone |
+| Q1 | tick-store | `v3-seg4Mi` | 527,644 | 107.09 | 128.46 | 166.22 | 172.98 | not ranked: alone |
+| Q2 | tick-store | `v3-seg4Mi` | 739,944 | 25.79 | 30.28 | 106.24 | 110.64 | not ranked: alone |
+| Q3 | tick-store | `v3-seg4Mi` | 60 | 14.69 | 15.30 | 52.78 | 53.80 | not ranked: alone |
+| Q4 | tick-store | `v3-seg4Mi` | 338 | 78.92 | 79.62 | 133.21 | 134.60 | not ranked: alone |
+| Q5 | tick-store | `v3-seg4Mi` | 1 | 282.88 | 288.40 | 410.52 | 411.24 | not ranked: alone |
 
 Ingest and size, class A: returns once data is in the OS page cache. Stored bytes are allocated at rest, and the ratio is the day's source bytes over them.
 
 | System | Variant | Write s, median | M records/s | Stored bytes | Ratio | Proof | Like-for-like |
 |---|---|---|---|---|---|---|---|
-| tick-store (parses ITCH) | `v3-seg4Mi` | 83.144 | 3.23 | 1,762,254,848 | 4.682 | proven | yes |
+| tick-store (parses ITCH) | `v3-seg4Mi` | 83.596 | 3.21 | 1,762,254,848 | 4.682 | proven | yes |
 
 Ingest and size, class B: returns after a flush to the device. Stored bytes are allocated at rest, and the ratio is the day's source bytes over them.
 
 | System | Variant | Write s, median | M records/s | Stored bytes | Ratio | Proof | Like-for-like |
 |---|---|---|---|---|---|---|---|
-| tick-store (parses ITCH) | `v3-seg4Mi` | 83.704 | 3.21 | 1,762,250,752 | 4.682 | proven | yes |
+| tick-store (parses ITCH) | `v3-seg4Mi` | 83.774 | 3.21 | 1,762,250,752 | 4.682 | proven | yes |
 
 tick-store ingests the day's ITCH file itself, so its write time holds ITCH parsing. The other systems ingest the columns tools/tick_export wrote from the same day, already parsed, and their times do not. Nothing is subtracted.
 
@@ -463,10 +463,10 @@ Every variant run on the full day, every variant tick-store has, since it ran al
 
 | System | Variant | Stored bytes, B | Ratio | Write s, A / B | Q1 ms, warm / cold | Q2 ms, warm / cold | Q3 ms, warm / cold | Q4 ms, warm / cold | Q5 ms, warm / cold |
 |---|---|---|---|---|---|---|---|---|---|
-| tick-store | `v3-seg4Mi` (headline) | 1,762,250,752 | 4.682 | 83.1 / 83.7 | 107.98 / 169.12 | 25.92 / 108.26 | 14.64 / 53.35 | 79.63 / 134.96 | 282.69 / 411.14 |
-| tick-store | `v3-seg1Mi` | 1,812,439,040 | 4.553 | 79.8 / 80.7 | 36.85 / 57.48 | 36.44 / 213.01 | 18.14 / 114.53 | 20.87 / 36.38 | 293.81 / 476.05 |
+| tick-store | `v3-seg4Mi` (headline) | 1,762,250,752 | 4.682 | 83.6 / 83.8 | 107.09 / 166.22 | 25.79 / 106.24 | 14.69 / 52.78 | 78.92 / 133.21 | 282.88 / 410.52 |
+| tick-store | `v3-seg1Mi` | 1,812,545,536 | 4.552 | 82.5 / 82.6 | 36.40 / 56.33 | 36.78 / 208.80 | 18.24 / 111.68 | 21.07 / 34.00 | 296.69 / 453.82 |
 
-Peak memory of tick-store's whole run, by BSD time -l: maximum resident set 29.95 GiB, which counts the mapped day and store, and the runner's peak memory footprint 0.71 GiB, over 1,019 s.
+Peak memory of tick-store's whole run, by BSD time -l: maximum resident set 29.95 GiB, which counts the mapped day and store, and run_system.py's peak memory footprint 0.70 GiB, over 1,041 s.
 
 Swap per phase, host-wide, over every variant and class each system ran. No guard ran beside tick-store alone. A timed query with any page swapped in is kept and marked (swap-in). See "The guard's swap rule" in NOTES.md.
 

@@ -2492,8 +2492,8 @@ does not have. Peak memory comes from BSD `time -l` around the system's whole ru
 Linux, next to another system, short of a variant, or under the four-system name; fault
 `compare-tickstore-only-on-linux`.
 
-`results/compare/macOS-12302019-full-tickstore-63f8defe451d.json`. It was run from an exported
-tree of `63f8def`; the store, codec, query and writer code is unchanged since `67ae574`, the
+`results/compare/macOS-12302019-full-tickstore-2503d1e7c5f6.json`. It was run from an exported
+tree of `2503d1e`; the store, codec, query and writer code is unchanged since `67ae574`, the
 commit of the Linux day. Apple M4 Max, clang 23.1.4, Release `-O3 -DNDEBUG`, unpinned, no
 counters. The command, from the exported tree:
 
@@ -2501,44 +2501,51 @@ counters. The command, from the exported tree:
         --systems tickstore --data <repo>/data --vendor <repo>/vendor --work <work> \
         --tools <repo>/build/bench/tools --results-dir <results>
 
-`measure.sh` admitted it at load1 1.72 at 06:37:13Z on 2026-11-11, and it ended at load1 1.76 at
-06:54:12Z: 1,018.6 s for both variants and both classes. Another project's `check.sh` was running
-on the Mac when it started. Peak memory: maximum resident set 32,159,875,072 bytes (29.95 GiB),
-which counts the clean file-backed pages of the mapped day and stores. The runner's peak memory
-footprint was 757,878,504 bytes, and the class A write's own peak RSS 9,396,404,224 bytes. No
-page was swapped in or out in any phase. Day `12302019`, 268,744,780 messages, nothing clipped.
-Stored bytes, class B, allocated at rest: 1,762,250,752 (4.682), against 1,758,240,768 on
-`debian`.
+`measure.sh` admitted the run at load1 2.67 at 08:57:35Z on 2026-11-11, and it ended at load1
+2.26 at 09:14:56Z: 1,040.7 s for both variants and both classes. It started once the Mac's load
+had fallen under 3, after another session's build. Peak memory: maximum resident set
+32,160,907,264 bytes (29.95 GiB), which counts the clean file-backed pages of the mapped day and
+stores. `run_system.py`'s peak memory footprint was 756,584,192 bytes, and the class A write's own
+peak RSS 9,430,138,880 bytes. No page was swapped in or out in any phase. Day `12302019`,
+268,744,780 messages, nothing clipped. Stored bytes, class B, allocated at rest: 1,762,250,752
+(4.682), against 1,758,240,768 on `debian`.
+
+**This is the second run.** The first, at `63f8def`, 06:37 to 06:54Z at load1 1.72 to 1.76, gave
+3.232 M records/s in class A, Q2 warm 25.92 ms, Q3 warm 14.64 ms and Q4 cold mean 135.29 ms, with
+the same verdicts. CI refused its file (run 42984860903). The peak-memory text said "the runner",
+and CI's checks run as the user `runner`, so `check_compare.py`'s leak check read the word as the
+machine's name. The text now names `run_system.py`, and the day ran again, with figures to be
+read from the file rather than edited into it.
 
 | Measure | macOS `v3-seg4Mi` | macOS `v3-seg1Mi` | Linux `v3-seg4Mi` (above) |
 |---|---|---|---|
-| Write class A, s / M records/s | 83.14 / 3.232 | 79.82 / 3.367 | 195.3 / 1.376 |
-| Write class B, s / M records/s | 83.70 / 3.211 | 80.71 / 3.330 | 188.9 / 1.423 |
-| Q1 warm / cold median ms | 107.98 / 169.12 | 36.85 / 57.48 | 297.58 / 406.96 |
-| Q2 warm / cold median ms | 25.92 / 108.26 | 36.44 / 213.01 | 74.32 / 485.13 |
-| Q3 warm / cold median ms | 14.64 / 53.35 | 18.14 / 114.53 | 35.81 / 214.40 |
-| Q4 warm median / cold mean ms | 79.63 / 135.29 | 20.87 / 36.27 | 207.10 / 308.83 |
-| Q5 warm / cold median ms | 282.69 / 411.14 | 293.81 / 476.05 | 907.64 / 1,233.89 |
+| Write class A, s / M records/s | 83.60 / 3.215 | 82.46 / 3.259 | 195.3 / 1.376 |
+| Write class B, s / M records/s | 83.77 / 3.208 | 82.64 / 3.252 | 188.9 / 1.423 |
+| Q1 warm / cold median ms | 107.09 / 166.22 | 36.40 / 56.33 | 297.58 / 406.96 |
+| Q2 warm / cold median ms | 25.79 / 106.24 | 36.78 / 208.80 | 74.32 / 485.13 |
+| Q3 warm / cold median ms | 14.69 / 52.78 | 18.24 / 111.68 | 35.81 / 214.40 |
+| Q4 warm median / cold mean ms | 78.92 / 133.63 | 21.07 / 34.37 | 207.10 / 308.83 |
+| Q5 warm / cold median ms | 282.88 / 410.52 | 296.69 / 453.82 | 907.64 / 1,233.89 |
 
 Warm is 30 runs and cold 7, as on Linux. The p99s are in the README's macOS full-day block.
 
 **Verdicts on macOS**, headline `v3-seg4Mi`, with the Linux verdict beside each:
 
-- **WT-1, missed.** Class A, one thread: 3.232 M records/s against 8.59 M, short by 5.36 M, 37.6%
-  of the target; `v3-seg1Mi` 3.367 M. Linux: 1.376 M, missed.
-- **WT-2, met.** 3.232 M messages/s in class A and 3.211 M in class B, against 2,732,762: over by
-  499,526 and 477,905 messages/s, 18.3% and 17.5%. The target is an average trading day's rate,
+- **WT-1, missed.** Class A, one thread: 3.215 M records/s against 8.59 M, short by 5.38 M, 37.4%
+  of the target; `v3-seg1Mi` 3.259 M. Linux: 1.376 M, missed.
+- **WT-2, met.** 3.215 M messages/s in class A and 3.208 M in class B, against 2,732,762: over by
+  482,048 and 475,212 messages/s, 17.6% and 17.4%. The target is an average trading day's rate,
   not a peak (BENCHMARKS.md). Linux: 1.376 M and 1.423 M, missed. The same code writes the day
-  2.35 times as fast on the M4 as on Zen 1.
-- **QL-1, missed.** Q2 warm median 25.92 ms against 16.9, 9.02 ms over, 1.53 times. Linux: 74.32 ms.
-- **QL-2, missed.** Q3 warm median 14.64 ms against 0.41, 14.23 ms over. Linux: 35.81 ms.
-- **QL-3, missed.** Q4 cold mean 135.29 ms against 10, 125.29 ms over; `v3-seg1Mi` 36.27 ms.
+  2.34 times as fast on the M4 as on Zen 1.
+- **QL-1, missed.** Q2 warm median 25.79 ms against 16.9, 8.89 ms over, 1.53 times. Linux: 74.32 ms.
+- **QL-2, missed.** Q3 warm median 14.69 ms against 0.41, 14.28 ms over. Linux: 35.81 ms.
+- **QL-3, missed.** Q4 cold mean 133.63 ms against 10, 123.63 ms over; `v3-seg1Mi` 34.37 ms.
   Linux: 308.83 ms, and 101.57 for `v3-seg1Mi`.
 - WT-3 and QL-4 compare systems. Only Linux ran the day with all four, so on macOS they are not
   judged, and the targets block says so.
 
-Raw logs: `phase3-raw/mac-day/`: the runner's log with `time -l`, each step's log, the parts files
-and the smoke run.
+Raw logs: `phase3-raw/mac-day2/`: the runner's log with `time -l`, each step's log and the parts
+files. The first run and the smoke run are in `phase3-raw/mac-day/`.
 
 ### The targets block
 

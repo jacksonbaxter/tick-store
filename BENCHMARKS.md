@@ -156,8 +156,8 @@ The README's Targets block is generated from `scripts/targets.json` and the comm
 files, and `scripts/check.sh` fails if it goes stale. It holds every figure below. The decode
 targets are under "Measured decode results". Linux figures are pinned to cpu4, from
 `results/compare/Linux-12302019-full-67ae574f5666.json`, at `67ae574`. macOS figures are
-unpinned, from `results/compare/macOS-12302019-full-tickstore-63f8defe451d.json`, a full day of
-tick-store alone at `63f8def`, with store code unchanged since `67ae574`. The CR figures come
+unpinned, from `results/compare/macOS-12302019-full-tickstore-2503d1e7c5f6.json`, a full day of
+tick-store alone at `2503d1e`, with store code unchanged since `67ae574`. The CR figures come
 from `results/codec-eval-12302019.json` and `results/store-size-12302019.json`.
 
 | ID | Host | Measured | Verdict |
@@ -174,18 +174,18 @@ from `results/codec-eval-12302019.json` and `results/store-size-12302019.json`.
 | CR-6 | Any | 6.11 to 9.22 bits in the estimate; in the store, `creation_ref` 11.36, `ref_distance` 7.56, `import_ref` 25.94 | Met in the estimate; the store misses on `creation_ref` and `import_ref` |
 | CR-7 | Any | Adds 2.61 to 3.69 bits and `U` 2.57 in the estimate, `E`, `C`, `X`, `P`, `Q`, `I` 3.91 to 7.76; in the store, `add_shares` 4.17, `reduce_shares` 7.28, `replace_shares` 2.90 | Met for adds and replaces in the estimate; the store meets on `replace_shares` only |
 | WT-1 | Linux | 1.376 M records/s, class A | Missed, 16.0% of 8.59 M |
-| WT-1 | macOS | 3.232 M records/s, class A | Missed, 37.6% of 8.59 M |
+| WT-1 | macOS | 3.215 M records/s, class A | Missed, 37.4% of 8.59 M |
 | WT-2 | Linux | 1.376 M messages/s class A, 1.423 M class B | Missed |
-| WT-2 | macOS | 3.232 M messages/s class A, 3.211 M class B | Met, 18.3% and 17.5% over 2,732,762 |
+| WT-2 | macOS | 3.215 M messages/s class A, 3.208 M class B | Met, 17.6% and 17.4% over 2,732,762 |
 | WT-3 | Linux | 195.3 s, against Parquet 158.4, ArcticDB 120.1, QuestDB 273.6 | Met against QuestDB only |
 | WT-3 | macOS | No four-system day: it runs on Linux only | Not judged |
 | WT-4 | Linux | 188.9 s, against Parquet 266.3, ArcticDB 123.6, QuestDB 1,269.2 (not like-for-like) | Met against Parquet and QuestDB; missed against ArcticDB |
 | QL-1 | Linux | Q2 warm median 74.32 ms | Missed, 4.4 times 16.9 ms |
-| QL-1 | macOS | Q2 warm median 25.92 ms | Missed, 1.53 times 16.9 ms |
+| QL-1 | macOS | Q2 warm median 25.79 ms | Missed, 1.53 times 16.9 ms |
 | QL-2 | Linux | Q3 warm median 35.81 ms | Missed against 0.41 ms |
-| QL-2 | macOS | Q3 warm median 14.64 ms | Missed against 0.41 ms |
+| QL-2 | macOS | Q3 warm median 14.69 ms | Missed against 0.41 ms |
 | QL-3 | Linux | Q4 cold mean 308.83 ms | Missed against 10 ms |
-| QL-3 | macOS | Q4 cold mean 135.29 ms | Missed against 10 ms |
+| QL-3 | macOS | Q4 cold mean 133.63 ms | Missed against 10 ms |
 | QL-4 | Linux | Lowest median and p99 on Q2 warm and cold, Q3 warm and cold, Q5 cold | Met on those five; missed on Q1 and Q4 warm and cold and on Q5 warm |
 | QL-4 | macOS | No four-system day: it runs on Linux only | Not judged |
 
