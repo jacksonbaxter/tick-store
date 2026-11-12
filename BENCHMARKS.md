@@ -152,7 +152,7 @@ Warm and cold are reported separately, with how cold was achieved and proven.
 
 ## Measured results for the other targets
 
-The README's Targets block is generated from `scripts/targets.json` and the committed results
+The Targets block of `RESULTS.md` is generated from `scripts/targets.json` and the committed results
 files, and `scripts/check.sh` fails if it goes stale. It holds every figure below. The decode
 targets are under "Measured decode results". Linux figures are pinned to cpu4, from
 `results/compare/Linux-12302019-full-67ae574f5666.json`, at `67ae574`. macOS figures are

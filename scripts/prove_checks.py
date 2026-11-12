@@ -193,8 +193,70 @@ def fuzz_g3_crc_target_missing():
     drop_g3_run("fuzz_container", "Linux")
 
 
-def hand_edit_readme():
-    edit_text("README.md", "**macOS.**", "**macOS, hand edited.**")
+def hand_edit_results_md():
+    edit_text("RESULTS.md", "**macOS.**", "**macOS, hand edited.**")
+
+
+def edit_table_cells(path, prefix, cells):
+    """One table row of a tracked file, found by how it starts, with some cells replaced, so a
+    re-measure that changes the figures cannot strand the fault."""
+    target = TREE / path
+    lines = target.read_text().split("\n")
+    found = [index for index, line in enumerate(lines) if line.startswith(prefix)]
+    if not found:
+        raise RuntimeError(f"{path} has no row starting {prefix!r}")
+    row = lines[found[0]].strip("|").split("|")
+    for column, value in cells.items():
+        if row[column].strip() == value:
+            raise RuntimeError(f"{path}: {prefix!r} already holds {value!r}")
+        row[column] = f" {value} "
+    lines[found[0]] = "|" + "|".join(row) + "|"
+    target.write_text("\n".join(lines))
+
+
+def hand_edit_targets_value():
+    """WT-1 on Linux in RESULTS.md's Targets block, its figure raised past the target and the
+    verdict turned to met."""
+    edit_table_cells("RESULTS.md", "| WT-1 | Linux |", {3: "9.000 M records/s", 4: "met"})
+
+
+def hand_edit_compare_value():
+    """tick-store's Q2 warm median in RESULTS.md's first comparison table, the Linux full day."""
+    edit_table_cells("RESULTS.md", "| Q2 | tick-store |", {4: "1.00"})
+
+
+def hand_edit_headline_value():
+    """WT-1 in the README's headline, its figure raised past the target and the verdict met."""
+    edit_table_cells("README.md", "| [WT-1](RESULTS.md#targets),", {1: "9.000 M records/s",
+                                                                   3: "met"})
+
+
+def drop_headline_markers():
+    target = TREE / "README.md"
+    lines = target.read_text().split("\n")
+    kept = [line for line in lines if not line.startswith(("<!-- headline:begin",
+                                                           "<!-- headline:end"))]
+    if len(kept) != len(lines) - 2:
+        raise RuntimeError("README.md does not hold one pair of headline markers")
+    target.write_text("\n".join(kept))
+
+
+def readme_keeps_the_targets_block():
+    """The README with a copy of RESULTS.md's Targets block, markers and all, as if the move
+    had left the old block behind: a copy --check would otherwise never compare."""
+    text = (TREE / "RESULTS.md").read_text()
+    begin = text.index("<!-- targets:begin")
+    end = text.index("<!-- targets:end -->") + len("<!-- targets:end -->")
+    readme = TREE / "README.md"
+    readme.write_text(readme.read_text() + "\n" + text[begin:end] + "\n")
+
+
+def headline_without_a_miss():
+    """The headline cut to the gates G-1 and G-3, both met, so it shows no missed target."""
+    def change(document):
+        document["headline"]["rows"] = [row for row in document["headline"]["rows"]
+                                        if row["id"].startswith("G-")]
+    edit_json("scripts/targets.json", change)
 
 
 def break_workflow():
@@ -553,8 +615,34 @@ FAULTS = (
           "shorter than 1,800 s, so a 20-second run could stand for G-3's 30 minutes",
           CHECK_FAILED, "FAIL: test_a_clean_run_under_1800_seconds_is_refused "
           "(__main__.CheckFuzzTest"),
-    Fault("readme-hand-edit", "render-check", "a hand edit inside the README's table markers",
-          CHECK_FAILED, "stale or was edited by hand", hand_edit_readme),
+    Fault("results-md-hand-edit", "render-check", "a hand edit inside RESULTS.md's benchmark "
+          "block, a host's heading changed", CHECK_FAILED,
+          "the table in RESULTS.md is stale or was edited by hand", hand_edit_results_md),
+    Fault("results-md-targets-hand-edit", "render-check", "a hand edit of a value in RESULTS.md's "
+          "Targets block: WT-1 on Linux shown as 9.000 M records/s and met", CHECK_FAILED,
+          "the table in RESULTS.md is stale or was edited by hand", hand_edit_targets_value),
+    Fault("results-md-compare-hand-edit", "render-check", "a hand edit of a value in "
+          "RESULTS.md's comparison block: tick-store's full-day Q2 warm median shown as 1.00 ms",
+          CHECK_FAILED, "the table in RESULTS.md is stale or was edited by hand",
+          hand_edit_compare_value),
+    Fault("readme-headline-hand-edit", "render-check", "a hand edit of a value in the README's "
+          "headline: WT-1 shown as 9.000 M records/s and met", CHECK_FAILED,
+          "the table in README.md is stale or was edited by hand", hand_edit_headline_value),
+    Fault("readme-headline-markers-removed", "render-check", "the README without its headline "
+          "markers, so no headline would be rendered or checked", EXIT_RENDER_REFUSED,
+          "README.md has the headline markers and targets.json no headline, or the reverse",
+          drop_headline_markers),
+    Fault("readme-keeps-a-results-block", "render-check", "the README holding a copy of the "
+          "Targets block, which --check would otherwise never compare", EXIT_RENDER_REFUSED,
+          "README.md holds the targets block's markers, and that block belongs in RESULTS.md "
+          "alone", readme_keeps_the_targets_block),
+    Fault("headline-without-a-miss", "render-check", "the headline cut to targets that were "
+          "met, so the README's top would show no missed target", EXIT_RENDER_REFUSED,
+          "no row is a missed target", headline_without_a_miss),
+    Fault("headline-verdict-all-parts", "py-scripts", "render_results.py judges a headline row "
+          "that shows some of its parts on all of them, so its verdict is not the shown parts'",
+          CHECK_FAILED, "FAIL: test_a_row_of_some_parts_names_the_rest_below "
+          "(__main__.RenderHeadlineTest"),
     Fault("actionlint-broken-workflow", "actionlint", "the workflow names a matrix key that does "
           "not exist", CHECK_FAILED, "no_such_key", break_workflow),
     Fault("hygiene-home-path", "hygiene", "a tracked file holds a home path", CHECK_FAILED,

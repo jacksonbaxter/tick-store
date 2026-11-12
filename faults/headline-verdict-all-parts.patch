@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -772,7 +772,7 @@
+             if wanted:
+                 parts = [part for part in parts if part[0] in wanted]
+             labels.update(part[0] for part in parts)
+-            verdict = verdict_of(parts)
++            verdict = verdict_of(every)
+             host = row["host"] if row["host"] != "any" else hosts_of(part[4] for part in parts)
+         except (TargetError, KeyError, TypeError, ZeroDivisionError) as error:
+             raise TargetError(f"headline {name}: {error}") from error

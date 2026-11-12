@@ -515,7 +515,7 @@ TICK_STORE_MEASURE=<wrapper> <venv>/bin/python -I compare/run.py --day 12302019 
   class, from `/proc/vmstat` on Linux and `vm_stat` on macOS. The counts are host-wide. Each
   query also counts them over its timed runs alone, as `swap_timed` in its warm and cold blocks.
   A query with any page swapped in while timed is flagged, the same for every system: its number
-  is kept and marked, and the README marks it `(swap-in)`. `scripts/check_compare.py` requires
+  is kept and marked, and RESULTS.md marks it `(swap-in)`. `scripts/check_compare.py` requires
   every count, and a flag that follows from it.
 - Settings read-back, the heap rule, the durability proofs, the sibling meter and the load lines
   apply exactly as on the slice.
@@ -614,7 +614,7 @@ things differ, and the file states each:
 It runs on macOS only. `scripts/check_compare.py` refuses one from Linux, any other system in it,
 a variant left out, the four-system rule stated, the per-process warm proof, peak memory without
 `time -l`, a heap claimed for a QuestDB that did not run, and either kind under the other's name.
-Its numbers rank nothing: the README marks its queries "not ranked: alone".
+Its numbers rank nothing: RESULTS.md marks its queries "not ranked: alone".
 
 ## What the numbers are
 

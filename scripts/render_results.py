@@ -1,29 +1,39 @@
 #!/usr/bin/env python3
-"""Generate the README results tables from the results files.
+"""Generate the results tables of RESULTS.md and the README's headline from the results files.
 
-    python3 -I scripts/render_results.py           rewrite the README between its markers
-    python3 -I scripts/render_results.py --check   exit 1 if the README is stale
+    python3 -I scripts/render_results.py           rewrite both files between their markers
+    python3 -I scripts/render_results.py --check   exit 1 if either file is stale
 
-The tables are never typed. Each host gets its own table, because numbers from the two
-hosts are never mixed, and every file must pass check_results.py to appear. --check
-regenerates the block and compares, so a hand edit inside the markers shows as stale.
+The tables are never typed. RESULTS.md holds every generated results table: the targets block,
+the benchmark block and the comparison block. README.md holds only the headline block, a few
+rows of the targets block. --check regenerates every block of both files and compares, so a hand
+edit inside any pair of markers shows as stale. A README that still holds a RESULTS.md block,
+or a file without the markers it needs, exits 2.
 
-The comparison block, between its own markers, comes from results/compare/ and every file
-there must pass check_compare.py. Each file has its own tables, a full day's first, then each
-slice's, labelled slice only, so a full-day number and a slice number never share a table. Each
-host has its own tables, and so does each durability class: ingest in class A and ingest in
-class B never share a table, and queries are on each system's class B store, as the harness runs
-them. Each system shows its headline variant; a full day also lists every variant it ran, and
-each system's peak memory and swap per phase. A timed number with any page swapped in while it
-ran carries "(swap-in)". A tick-store-only full day, the macOS figure for the targets whose host is
-Both, is labelled so, and ranks nothing, since no other system ran.
+The benchmark block gives each host its own table, because numbers from the two hosts are never
+mixed, and every file must pass check_results.py to appear.
 
-The targets block, between its own markers, has one row for every target of BENCHMARKS.md on each
-host it states: the target, the measured value read from a committed results file, met, missed or
-not judged, and the file. scripts/targets.json says where each value is and how it is judged, and
-this script computes every verdict from the value and the target; a row with no figure gives the
-reason the definitions state. A file a row needs that is missing, or a field that is not in it,
-stops the render rather than leave a gap.
+The comparison block comes from results/compare/ and every file there must pass check_compare.py.
+Each file has its own tables, a full day's first, then each slice's, labelled slice only, so a
+full-day number and a slice number never share a table. Each host has its own tables, and so does
+each durability class: ingest in class A and ingest in class B never share a table, and queries
+are on each system's class B store, as the harness runs them. Each system shows its headline
+variant; a full day also lists every variant it ran, and each system's peak memory and swap per
+phase. A timed number with any page swapped in while it ran carries "(swap-in)". A
+tick-store-only full day, the macOS figure for the targets whose host is Both, is labelled so,
+and ranks nothing, since no other system ran.
+
+The targets block has one row for every target of BENCHMARKS.md on each host it states: the
+target, the measured value read from a committed results file, met, missed or not judged, and the
+file. scripts/targets.json says where each value is and how it is judged, and this script computes
+every verdict from the value and the target; a row with no figure gives the reason the
+definitions state. A file a row needs that is missing, or a field that is not in it, stops the
+render rather than leave a gap.
+
+The headline block is the rows scripts/targets.json lists under "headline", each a target row of
+the targets block, or some of its parts, judged by the same code, so every figure and verdict
+in it is the targets block's own. A row may show some of its parts; the parts it leaves out are
+named under the table with their verdicts. A headline with no missed target stops the render.
 
 G-3's file, results/fuzz-g3-<commit>.json, must pass check_fuzz.py first, against the fuzz
 targets fuzz/CMakeLists.txt defines: one that leaves a target out, or holds a clean run under
@@ -45,6 +55,7 @@ CHECK_RESULTS = REPO_ROOT / "scripts" / "check_results.py"
 CHECK_COMPARE = REPO_ROOT / "scripts" / "check_compare.py"
 CHECK_FUZZ = REPO_ROOT / "scripts" / "check_fuzz.py"
 DEFAULT_README = REPO_ROOT / "README.md"
+DEFAULT_RESULTS_MD = REPO_ROOT / "RESULTS.md"
 DEFAULT_RESULTS = REPO_ROOT / "results" / "bench"
 DEFAULT_COMPARE = REPO_ROOT / "results" / "compare"
 DEFAULT_PINS = REPO_ROOT / "scripts" / "data_pins.json"
@@ -58,6 +69,14 @@ COMPARE_END = "<!-- compare:end -->"
 TARGETS_BEGIN = "<!-- targets:begin, generated by scripts/render_results.py, do not edit -->"
 TARGETS_END = "<!-- targets:end -->"
 TARGET_COLUMNS = ("Target", "Host", "Target value", "Measured", "Verdict", "Results file")
+HEADLINE_BEGIN = "<!-- headline:begin, generated by scripts/render_results.py, do not edit -->"
+HEADLINE_END = "<!-- headline:end -->"
+HEADLINE_COLUMNS = ("Target", "Measured", "Host", "Verdict")
+# Where the README's headline links for the full targets block.
+TARGETS_ANCHOR = "RESULTS.md#targets"
+# The blocks that belong in RESULTS.md, never in the README.
+RESULTS_MD_BLOCKS = (("targets", TARGETS_BEGIN), ("benchmark", BEGIN),
+                     ("comparison", COMPARE_BEGIN))
 COMPARATORS = {"at_least": (operator.ge, "at least"), "at_most": (operator.le, "at most"),
                "above": (operator.gt, "above"), "below": (operator.lt, "below"),
                "equals": (operator.eq, "equal to")}
@@ -606,51 +625,73 @@ def lowest_parts(row, document):
     return parts
 
 
-def target_row(row, root):
-    """The cells of one row: (target text, measured, verdict, files)."""
-    target_text = row.get("target_text") or " ".join(
+def target_text_of(row):
+    return row.get("target_text") or " ".join(
         f"{COMPARATORS[name][1]} {shown(value, row)}" for name, value in row["target"].items())
+
+
+def judged_parts(row, root):
+    """A row judged on its files: (parts, None), each part (label, text, met, file, document),
+    or (None, the reason it has no figure)."""
     if "no_figure" in row:
-        return target_text, "no figure", f"not judged: {row['no_figure']}", "none"
+        return None, f"not judged: {row['no_figure']}"
     specs = [row["lowest_of"]] if "lowest_of" in row else row["parts"]
     files = []
     for spec in specs:
         path = target_file(root, spec["file"])
         if path is None:
             if "if_missing" in row:
-                return target_text, "no figure", f"not judged: {row['if_missing']}", "none"
+                return None, f"not judged: {row['if_missing']}"
             raise TargetError(f"no results file matches {spec['file']}")
         files.append(path)
     documents = {path: json.loads(path.read_text(encoding="utf-8")) for path in files}
     if "lowest_of" in row:
-        parts = lowest_parts(row, documents[files[0]])
-    else:
-        parts = []
-        for spec, path in zip(row["parts"], files):
-            conditions = spec.get("all") or [{key: value for key, value in spec.items()
-                                              if key != "label"}]
-            judged = [judge(item, row, documents[path]) for item in conditions]
-            verdicts = [met for _, met in judged]
-            met = None if None in verdicts else all(verdicts)
-            parts.append((spec["label"], ", ".join(text for text, _ in judged), met))
+        document = documents[files[0]]
+        return [(*part, files[0], document) for part in lowest_parts(row, document)], None
+    parts = []
+    for spec, path in zip(row["parts"], files):
+        conditions = spec.get("all") or [{key: value for key, value in spec.items()
+                                          if key != "label"}]
+        judged = [judge(item, row, documents[path]) for item in conditions]
+        verdicts = [met for _, met in judged]
+        met = None if None in verdicts else all(verdicts)
+        parts.append((spec["label"], ", ".join(text for text, _ in judged), met, path,
+                      documents[path]))
+    return parts, None
+
+
+def measured_of(parts):
     if len(parts) == 1:
-        measured = parts[0][1]
-    else:
-        measured = "; ".join(f"{label}: {text}" for label, text, _ in parts)
-    verdicts = [met for _, _, met in parts]
+        return parts[0][1]
+    return "; ".join(f"{label}: {text}" for label, text, *_ in parts)
+
+
+def verdict_of(parts):
+    verdicts = [part[2] for part in parts]
     if all(met is None for met in verdicts):
-        verdict = "not judged: no published figure, reported as measured"
-    elif None in verdicts:
+        return "not judged: no published figure, reported as measured"
+    if None in verdicts:
         raise TargetError("a row with a target on some parts and not on others")
-    elif all(verdicts):
-        verdict = "met"
-    elif not any(verdicts):
-        verdict = "missed"
-    else:
-        verdict = ("met on " + ", ".join(f"({label})" for label, _, met in parts if met) +
-                   "; missed on " + ", ".join(f"({label})" for label, _, met in parts if not met))
-    names = ", ".join(f"`{path.relative_to(root)}`" for path in dict.fromkeys(files))
-    return target_text, measured, verdict, names
+    if all(verdicts):
+        return "met"
+    if not any(verdicts):
+        return "missed"
+    return ("met on " + ", ".join(f"({part[0]})" for part in parts if part[2]) +
+            "; missed on " + ", ".join(f"({part[0]})" for part in parts if not part[2]))
+
+
+def files_of(parts, root):
+    paths = dict.fromkeys(part[3] for part in parts)
+    return ", ".join(f"`{path.relative_to(root)}`" for path in paths)
+
+
+def target_row(row, root):
+    """The cells of one row: (target text, measured, verdict, files)."""
+    target_text = target_text_of(row)
+    parts, reason = judged_parts(row, root)
+    if parts is None:
+        return target_text, "no figure", reason, "none"
+    return target_text, measured_of(parts), verdict_of(parts), files_of(parts, root)
 
 
 def render_targets(definitions_path, root):
@@ -671,6 +712,84 @@ def render_targets(definitions_path, root):
             target_text += f"; judged on {row['judged']}"
         cells = (row["id"], row["host"], target_text, measured, verdict, names)
         lines.append("| " + " | ".join(cells) + " |")
+    return lines
+
+
+def hosts_of(documents):
+    """The hosts a target's results files were measured on, as each file records it."""
+    found = set()
+    for document in documents:
+        header = document.get("header") if isinstance(document.get("header"), dict) else {}
+        found.update(host for host in (document.get("host"), header.get("host"))
+                     if isinstance(host, str))
+        found.update(run["host"] for run in document.get("runs", [])
+                     if isinstance(run, dict) and isinstance(run.get("host"), str))
+    if not found:
+        raise TargetError("no host recorded in its results files")
+    return ", ".join(sorted(found, key=lambda host: (host not in HOSTS, host)))
+
+
+VERDICT_WORD = {True: "met", False: "missed", None: "not judged"}
+
+
+def has_headline(definitions_path):
+    if not definitions_path.exists():
+        return False
+    return "headline" in json.loads(definitions_path.read_text(encoding="utf-8"))
+
+
+def render_headline(definitions_path, root):
+    """The README's headline: the rows "headline" names, judged as in the targets block, a
+    subset of a row's parts where it names them, and what it leaves out named below."""
+    definitions = json.loads(definitions_path.read_text(encoding="utf-8"))
+    rows = {(row["id"], row["host"]): row for row in definitions["rows"]}
+    lines = ["Generated by `scripts/render_results.py` from `scripts/targets.json` and the "
+             "committed results files. Each figure and verdict is the same as in the Targets "
+             f"table of [RESULTS.md]({TARGETS_ANCHOR}), which names each row's results file. "
+             "A pair of latencies is the median / p99. Linux is the pinned host; macOS figures "
+             "are unpinned, with no counters.", "",
+             "| " + " | ".join(HEADLINE_COLUMNS) + " |", "|" + "---|" * len(HEADLINE_COLUMNS)]
+    # Per target row, its parts and the labels some headline row shows, so the parts no
+    # headline row shows can be named below the table.
+    shown_of = {}
+    missed = False
+    for entry in definitions["headline"]["rows"]:
+        name = f"{entry.get('id')} on {entry.get('host')}"
+        try:
+            row = rows.get((entry["id"], entry["host"]))
+            if row is None:
+                raise TargetError("no such row in the targets")
+            parts, reason = judged_parts(row, root)
+            if parts is None:
+                raise TargetError(f"a headline row needs a figure, and this one is {reason}")
+            wanted = entry.get("parts")
+            if wanted:
+                names = [part[0] for part in parts]
+                unknown = [label for label in wanted if label not in names]
+                if unknown:
+                    raise TargetError(f"no part {unknown} in {names}")
+            every, labels = shown_of.setdefault((entry["id"], entry["host"]), (parts, set()))
+            if wanted:
+                parts = [part for part in parts if part[0] in wanted]
+            labels.update(part[0] for part in parts)
+            verdict = verdict_of(parts)
+            host = row["host"] if row["host"] != "any" else hosts_of(part[4] for part in parts)
+        except (TargetError, KeyError, TypeError, ZeroDivisionError) as error:
+            raise TargetError(f"headline {name}: {error}") from error
+        missed = missed or any(part[2] is False for part in parts)
+        cells = (f"[{entry['id']}]({TARGETS_ANCHOR}), {entry['name']}: {target_text_of(row)}",
+                 measured_of(parts), host, verdict)
+        lines.append("| " + " | ".join(cells) + " |")
+    if not missed:
+        raise TargetError("headline: no row is a missed target, and the headline must show one")
+    left_out = [f"{ident} on {host}, " + ", ".join(f"{part[0]} {VERDICT_WORD[part[2]]}"
+                                                   for part in every if part[0] not in labels)
+                for (ident, host), (every, labels) in shown_of.items()
+                if any(part[0] not in labels for part in every)]
+    if left_out:
+        lines += ["", "Not shown above: " + "; ".join(left_out) + "."]
+    lines += ["", f"Every target on every host, with each figure in full: [RESULTS.md]"
+                  f"({TARGETS_ANCHOR})."]
     return lines
 
 
@@ -695,9 +814,14 @@ def validate(paths, pins, validator=CHECK_RESULTS, extra=()):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Generate the README results tables.")
-    parser.add_argument("--check", action="store_true", help="exit 1 if the README is stale")
-    parser.add_argument("--readme", type=Path, default=DEFAULT_README)
+    parser = argparse.ArgumentParser(
+        description="Generate RESULTS.md's results tables and the README's headline.")
+    parser.add_argument("--check", action="store_true",
+                        help="exit 1 if a block of either file is stale")
+    parser.add_argument("--readme", type=Path, default=DEFAULT_README,
+                        help="the file with the headline block")
+    parser.add_argument("--results-md", type=Path, default=DEFAULT_RESULTS_MD,
+                        help="the file with the targets, benchmark and comparison blocks")
     parser.add_argument("--results", type=Path, default=DEFAULT_RESULTS)
     parser.add_argument("--pins", type=Path, default=DEFAULT_PINS)
     parser.add_argument("--compare-results", type=Path, default=DEFAULT_COMPARE)
@@ -723,44 +847,79 @@ def main(argv=None):
                     ("--cmake", str(args.targets_root / "fuzz" / "CMakeLists.txt"))):
         print("render_results: a fuzzing results file failed validation", file=sys.stderr)
         return EXIT_USAGE
-    text = args.readme.read_text(encoding="utf-8")
+    if not args.results_md.exists():
+        print(f"render_results: there is no {args.results_md.name}", file=sys.stderr)
+        return EXIT_USAGE
+    text = args.results_md.read_text(encoding="utf-8")
+    md_name = args.results_md.name
     if block_of(text) is None:
-        print(f"render_results: the markers are not in {args.readme.name}", file=sys.stderr)
+        print(f"render_results: the markers are not in {md_name}", file=sys.stderr)
         return EXIT_USAGE
     blocks = [(BEGIN, END, render(args.results))]
     if block_of(text, COMPARE_BEGIN, COMPARE_END) is not None:
         blocks.append((COMPARE_BEGIN, COMPARE_END, render_compare(args.compare_results)))
     elif compare_paths:
-        print(f"render_results: the comparison markers are not in {args.readme.name}",
-              file=sys.stderr)
+        print(f"render_results: the comparison markers are not in {md_name}", file=sys.stderr)
         return EXIT_USAGE
     has_targets = block_of(text, TARGETS_BEGIN, TARGETS_END) is not None
     if has_targets != args.targets.exists():
-        print(f"render_results: {args.readme.name} has the targets markers and there is no "
+        print(f"render_results: {md_name} has the targets markers and there is no "
               f"{args.targets.name}, or the reverse: both or neither", file=sys.stderr)
         return EXIT_USAGE
-    if has_targets:
-        try:
+
+    readme = args.readme.read_text(encoding="utf-8") if args.readme.exists() else None
+    for label, begin in RESULTS_MD_BLOCKS:
+        if readme is not None and begin in readme:
+            print(f"render_results: {args.readme.name} holds the {label} block's markers, and "
+                  f"that block belongs in {md_name} alone", file=sys.stderr)
+            return EXIT_USAGE
+    try:
+        wants_headline = has_headline(args.targets)
+    except (OSError, json.JSONDecodeError) as error:
+        print(f"render_results: targets: {error}", file=sys.stderr)
+        return EXIT_USAGE
+    has_markers = readme is not None and block_of(readme, HEADLINE_BEGIN, HEADLINE_END) is not None
+    if has_markers != wants_headline:
+        print(f"render_results: {args.readme.name} has the headline markers and "
+              f"{args.targets.name} no headline, or the reverse: both or neither",
+              file=sys.stderr)
+        return EXIT_USAGE
+    headline = []
+    try:
+        if has_targets:
             blocks.append((TARGETS_BEGIN, TARGETS_END, render_targets(args.targets,
                                                                       args.targets_root)))
-        except (OSError, json.JSONDecodeError, TargetError) as error:
-            print(f"render_results: targets: {error}", file=sys.stderr)
-            return EXIT_USAGE
+        if wants_headline:
+            headline.append((HEADLINE_BEGIN, HEADLINE_END,
+                             render_headline(args.targets, args.targets_root)))
+    except (OSError, json.JSONDecodeError, TargetError) as error:
+        print(f"render_results: targets: {error}", file=sys.stderr)
+        return EXIT_USAGE
 
-    stale = False
-    for begin, end, lines in blocks:
-        before, current, after = block_of(text, begin, end)
-        wanted = "\n" + "\n".join(lines) + "\n"
-        stale = stale or current != wanted
-        text = before + wanted + after
+    files = [(args.results_md, text, blocks)]
+    if headline:
+        files.append((args.readme, readme, headline))
+    stale = []
+    rendered = []
+    for path, content, wanted_blocks in files:
+        fresh = content
+        for begin, end, lines in wanted_blocks:
+            before, _, after = block_of(fresh, begin, end)
+            fresh = before + "\n" + "\n".join(lines) + "\n" + after
+        if fresh != content:
+            stale.append(path.name)
+        rendered.append((path, content, fresh))
     if args.check:
+        for name in stale:
+            print(f"render_results: the table in {name} is stale or was edited by hand. "
+                  "Regenerate it.", file=sys.stderr)
         if stale:
-            print(f"render_results: the table in {args.readme.name} is stale or was edited by "
-                  "hand. Regenerate it.", file=sys.stderr)
             return EXIT_STALE
-        print(f"{args.readme.name}: table is current")
+        print(" and ".join(path.name for path, _, _ in rendered) + ": tables are current")
         return 0
-    args.readme.write_text(text, encoding="utf-8")
+    for path, content, fresh in rendered:
+        if fresh != content:
+            path.write_text(fresh, encoding="utf-8")
     return 0
 
 

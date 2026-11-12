@@ -10,7 +10,7 @@ runs the SSE4.2 kernel there, since the Mac can run neither.
 This refuses a file that leaves a target out, a clean run shorter than 1,800 s, a run whose own
 final lines disagree with its numbers, a run looser than the targets' memory caps, and summary
 counts that are not the runs'. A run that was not clean may stop early, but must say what it
-found; the README's Targets block then reads it as missed, never as met.
+found; RESULTS.md's Targets block then reads it as missed, never as met.
 
 It also refuses anything not safe to publish, with check_results.py's rules.
 

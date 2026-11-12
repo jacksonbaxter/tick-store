@@ -4,7 +4,7 @@ Every variant of every system on a whole day would take more than the measuremen
 host can give (the estimate is in compare/README.md), so a full-day run takes each system's
 headline variant, and every other variant of that system that won a query on the Linux slice
 at the same commit. A variant wins a query if, among its own system's variants, it has both the
-lowest median and the lowest p99 of that query, warm or cold: the test the README's "Lowest"
+lowest median and the lowest p99 of that query, warm or cold: the test RESULTS.md's "Lowest"
 column and QL-4 use. The rule is the same for all four systems.
 
 Standard library only, so that scripts/check_compare.py can apply it again to the slice file a

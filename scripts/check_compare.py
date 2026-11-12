@@ -409,7 +409,7 @@ def check_engine_time(where, query):
 
 
 def check_latency(where, query):
-    """The median and p99 the README prints, each a number, the p99 no lower than the median."""
+    """The median and p99 RESULTS.md prints, each a number, the p99 no lower than the median."""
     problems = []
     for kind in ("warm", "cold"):
         block = query.get(kind) or {}

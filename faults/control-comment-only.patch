@@ -4,6 +4,6 @@ diff --git a/scripts/render_results.py b/scripts/render_results.py
 @@ -1,4 +1,5 @@
  #!/usr/bin/env python3
 +# A comment, so a check that passes here shows the prover can report a miss.
- """Generate the README results tables from the results files.
+ """Generate the results tables of RESULTS.md and the README's headline from the results files.
  
-     python3 -I scripts/render_results.py           rewrite the README between its markers
+     python3 -I scripts/render_results.py           rewrite both files between their markers
