@@ -2822,7 +2822,7 @@ were not, and neither was a check that had broken:
   in the prove clone: one found it, at 43 s after 84,029 runs; the full run's 45 s did not, nor
   did two runs at CI's 240 s budget, of 555,923 and 581,679 runs. With one seed and one corpus,
   libFuzzer's runs still differ, and this fault is found by chance. A longer budget is therefore
-  no fix. Seven other single-check patches, each run once for 45 s, were not caught either:
+  no fix. Seven other patches, each run once for 45 s, were not caught either:
   `store-metadata-records`, `store-segment-records-sum`, `store-piece-value-count`,
   `store-piece-index-next`, the column value count, the type symbol and the writer's
   `itch-store-import-not-appended`. The decoder's checks overlap, so one removed is masked by
