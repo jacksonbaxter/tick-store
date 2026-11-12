@@ -54,6 +54,8 @@ FUZZ_ARGUMENTS = ("--fuzz-seconds", "45", "--fuzz-seed", "1", "--fresh-corpus")
 EXIT_CTEST = 8
 EXIT_BUILD = 1
 EXIT_LIBFUZZER = 77
+# The fuzz build when the seed generator it runs aborts on an uncaught exception.
+EXIT_SEED_GENERATOR = 134
 # render_results.py when a results file it reads fails its validator.
 EXIT_RENDER_REFUSED = 2
 
@@ -318,9 +320,16 @@ FAULTS = (
     Fault("fuzz-run-length-maximal-runs", "fuzz-run-length", "the run-length decoder stops "
           "refusing two neighbouring runs of one value", EXIT_LIBFUZZER, "check_rle_column:",
           arguments=FUZZ_ARGUMENTS),
-    Fault("fuzz-container-metadata-start", "fuzz-container", "the container parser starts the "
-          "footer's metadata area one byte past the section entries", EXIT_LIBFUZZER,
-          "check_container:", arguments=FUZZ_ARGUMENTS),
+    # The seed generator takes real store files apart and rebuilds them, so a parser that
+    # misreads every valid file stops fuzz-build before any fuzzing, as it does here: the
+    # rebuilt metadata names a codec that does not exist. The fault after it is one only a
+    # corrupt file shows, which reaches the fuzzer.
+    Fault("fuzz-container-metadata-start", "fuzz-build", "the container parser starts the "
+          "footer's metadata area one byte past the section entries", EXIT_SEED_GENERATOR,
+          "uncaught exception of type std::runtime_error: invalid argument: codec id"),
+    Fault("fuzz-container-block-reserved", "fuzz-container", "the container parser stops "
+          "refusing a block entry whose reserved field is not zero, so a file the writer cannot "
+          "make is accepted", EXIT_LIBFUZZER, "check_container:", arguments=FUZZ_ARGUMENTS),
     Fault("container-block-crc-skipped", "dev-test", "a block lookup stops checking the "
           "block's CRC32C", EXIT_CTEST, "ContainerBlock.RefusesAPayloadWhoseCrcDiffers",
           arguments=("--test-regex", "ContainerBlock")),

@@ -1,0 +1,15 @@
+diff --git a/src/store/container.cpp b/src/store/container.cpp
+--- a/src/store/container.cpp
++++ b/src/store/container.cpp
+@@ -341,11 +341,6 @@
+ 
+         if (block_here && !empty_section_here) {
+             const std::uint64_t at = block_entries_at + (block * kBlockEntrySize);
+-            const std::uint64_t entry_reserved = field<2>(block_entry, kBlockReserved);
+-            if (entry_reserved != 0) {
+-                return std::unexpected(fail(StoreErrorKind::bad_field, "block reserved",
+-                                            at + kBlockReserved, 0, entry_reserved));
+-            }
+             const std::uint64_t codec_id = field<2>(block_entry, kBlockCodec);
+             if (!codec::codec_readable(static_cast<std::uint16_t>(codec_id))) {
+                 return std::unexpected(fail(StoreErrorKind::unknown_codec, "codec id",
