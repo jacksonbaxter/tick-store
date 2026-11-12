@@ -466,7 +466,16 @@ TICK_STORE_MEASURE=<wrapper> <venv>/bin/python -I compare/run.py --day 12302019 
   `e2ad871` it was 40 segments whatever their size, so `rows10M-cols127` took the whole day as
   one frame, which passed 11.9 GB before the guard stopped it.
   tick-store's write is the same command on the day's ITCH file, read through first and resident,
-  as on the slice. ArcticDB's per-security layout spreads the day by locate into bucket files of
+  as on the slice. If one read through leaves it short, the day's export, which that write never
+  reads, is evicted and proven at 0 resident, and the file is read through again, all before the
+  clock; a file still short stops the run, naming its pages resident against those wanted,
+  MemAvailable, MemFree and Cached, and what else under the data and work folders holds the page
+  cache. `input_resident` in the write's detail records the reads and any eviction. On debian at
+  `ca96b36` one read left 1.71 to 1.73 M of the file's 2.01 M pages resident, because reclaim
+  kept about 5.1 GB of the export the oracle and the ground truth had just read and dropped the
+  file's own pages ("The full day's source precondition" in `docs/NOTES.md`). The other systems'
+  writes read the export inside their clocks and have no such precondition, so nothing is evicted
+  before them. ArcticDB's per-security layout spreads the day by locate into bucket files of
   about one chunk each, then writes each bucket's securities whole in one `write_batch`, so each
   security is still written once, in file order; that partitioning is inside its clock, as the
   slice's sort is.
@@ -582,6 +591,32 @@ none of this, because swap was already full when it started. See "Full-day compa
 `docs/NOTES.md`. The guard's swap rule then changed, as registered in "The guard's swap rule" in
 `docs/NOTES.md` before the rerun: swap-out alone no longer stops a run, and QuestDB's heap stays
 `-Xms1g -Xmx1g`.
+
+**Reproducing tick-store's Linux figures at a later commit.** `--variant-source` wants Linux slice
+results of the same commit, and the only ones committed are `67ae574`'s, so at any other commit
+name tick-store's variants instead: the headline `v3-seg4Mi` and `v3-seg1Mi`, the pair the rule
+chose at `67ae574`. `--variants` applies to every system named, so run tick-store alone:
+
+```sh
+TICK_STORE_MEASURE=<wrapper> <venv>/bin/python -I compare/run.py --day 12302019 \
+    --systems tickstore --variants v3-seg4Mi,v3-seg1Mi \
+    --data <dir> --vendor <dir> --work <dir> --tools <dir> --results-dir <dir>
+```
+
+On disk first: the decompressed day at `<data>/12302019.NASDAQ_ITCH50` from
+`scripts/fetch_data.py --day 12302019`, 8.25 GB, which the run checks against its pin; its export
+at `<data>/export/12302019-full`, 23.9 GB, from `<tools>/tick_export <data>/12302019.NASDAQ_ITCH50
+<data>/export/12302019-full`, which the oracle proves before anything is loaded; the `bench`
+build's tools in `<tools>`; the environment `compare/setup.py` makes; and at least 50 GiB free
+on the work folder's disk, the guard's floor. One variant took 32 minutes on debian at `4c049c7`,
+the checks before it included, so the pair takes a little over an hour. The run measures tick-store exactly as the four-system day did, but
+`compare/run.py` validates the document as a four-system day and refuses it, since the other
+three systems and the variant selection are missing: it exits 1 and keeps
+`<results>/Linux-12302019-full-<commit>.json.pending`, and the system's own part is
+`<work>/parts/<commit>-12302019-full/tickstore.json`. Read tick-store's figures from either,
+beside its block in `results/compare/Linux-12302019-full-67ae574f5666.json`. That file is not a
+result: `scripts/check_compare.py` refuses it, and a tick-store-only day from Linux is refused by
+design ("Full day of tick-store alone" below).
 
 ## Full day of tick-store alone
 
