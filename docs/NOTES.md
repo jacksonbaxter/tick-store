@@ -3019,6 +3019,15 @@ a script, which moves the proof key off `5a810a2` and voids the full re-proof of
 waits for Phase 4 with the republished `results/coverage.json` and one full re-proof after
 both (docs/TASKS.md).
 
+Checks on `2c683c1`: the proof key is still `5a810a2`, all 77 fault patches apply,
+`render_results.py --check` exits 0, and `check.sh` passed `check-results`, `render-check`,
+`hygiene`, `py-scripts` (500 tests, 4 skipped) and `actionlint`. The three faults that edit
+the README, `readme-headline-hand-edit`, `readme-headline-markers-removed` and
+`readme-keeps-a-results-block`, were proven again with `prove_checks.py --force --only` through
+`heavy.sh`: 3 of 3 PROVEN, and `results/check-proofs.json` came out unchanged.
+
+Raw: `phase3-raw/readme-accuracy/`, the check logs and `prove-only.txt` with its logs.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
