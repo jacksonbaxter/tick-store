@@ -638,7 +638,7 @@ Measured costs:
 - A store that keeps locates only as its partitions must add at least 11.05 bits per add. That makes the per-locate add price 17.3
   and 17.5 bits, worse than file order.
 - So CR-4 is met per locate only if the locate column is stored, as the planned schema stores it. The layout experiment in
-  TASKS.md decides that, with the column's own cost counted.
+  docs/TASKS.md decides that, with the column's own cost counted.
 
 **CR-5, best integer scheme at least 1.53x smaller than Gorilla on the same column and ordering.**
 
@@ -802,7 +802,7 @@ same aligned window of time:
 - An execution of all the order's remaining shares is common: 73.6% and 71.9% of `E`, 60.9% and 64.6% of `C`. No `X` cancels
   all of them, since that is a `D`. Coding that case as 0 brings the three to 3.91 and 3.99 bits. Their order-0 entropy is 3.89
   and 3.99, so the miss is not the codec: a code that sees each value with no context cannot reach 3.8 on these values.
-  Context the book holds, such as the remaining shares as an upper bound, is the next thing to try. It is in TASKS.md.
+  Context the book holds, such as the remaining shares as an upper bound, is the next thing to try. It is in docs/TASKS.md.
 
 **The other fields.** Each field a day needs to be re-serialised exactly, with its best codec, its bits per value, and what
 the result depends on:
@@ -826,7 +826,7 @@ the result depends on:
 - Timestamps and the price columns are as in "Integer codecs on ITCH".
 - Locate: move-to-front over the 8,907 and 8,887 locates in use would cost at least its recency entropy, 6.76 and 6.80 bits,
   2.5 below the dictionary. No codec for it was built: the dictionary's move-to-front mode stops at 2,048 entries, and a
-  recency rank over 8,900 entries needs a Fenwick tree or similar per value. It is in TASKS.md, with its decode cost unknown.
+  recency rank over 8,900 entries needs a Fenwick tree or similar per value. It is in docs/TASKS.md, with its decode cost unknown.
 - Stock symbols in `A`, `F`, `P`, `Q` and `I` all agree with the stock directory's symbol for their locate, so they are derived
   and not stored. On `12302019`, 3 `K` messages on locate 0 have no directory entry; `K` is stored whole with the other rare
   types. Lengths are derived from the type: no message on either day had another length. The estimate charges an exception
@@ -932,11 +932,11 @@ the columns named, for exploring.
   CRC, and is not decoded as the wrong format.
 - **CRCs are checked at lookup, not at open.** Opening a file reads its two ends: header, trailer and footer, with the
   footer's own CRC. `verify_all()` checks every block and section. The price is that a caller reading a payload by
-  offset, instead of through the reader, gets no check (TASKS.md).
+  offset, instead of through the reader, gets no check (docs/TASKS.md).
 - **The reader's views hold the mapping.** Each one carries a `shared_ptr`, so a lookup costs an atomic increment. In
   return, a view that outlives its reader stays valid, where a borrowed span would fault after `munmap`.
 - **One dependent chain of crc32 instructions.** Three interleaved streams would run about three times faster on long
-  payloads. Verification has not yet been measured against decode, so this is not done (TASKS.md).
+  payloads. Verification has not yet been measured against decode, so this is not done (docs/TASKS.md).
 - **Durability.** `device_flush` uses `F_FULLFSYNC` on macOS, because `fsync` there does not flush the drive's cache. On
   Linux it calls `fdatasync` on the file and `fsync` on the directory. A failed flush is returned once and never
   retried, following PostgreSQL's fsyncgate ruling. Flush granularity is one flush per file, at commit.
@@ -1847,13 +1847,13 @@ their figures below are labelled as refused: they are what the pinned host measu
 
 - DS-1 and DS-2: the data, mostly. The source's 2.12 ns is 500,000 smooth synthetic values, and ALP's 21.3 cycles is its data
   sets on Ice Lake. Add-order prices as dollar doubles take 37.18 bits a value in the store's (locate, side) order, beside the
-  37.7 published for Gorilla on Stocks-USA, because a price over 10^4 fills its mantissa (NOTES.md, Gorilla on ITCH). On Zen 1 the
+  37.7 published for Gorilla on Stocks-USA, because a price over 10^4 fills its mantissa (docs/NOTES.md, Gorilla on ITCH). On Zen 1 the
   L1 case runs 198 instructions a value at 3.3 instructions a cycle, so the cost is mainly instruction count, with 0.42 mispredicted
   branches a value on top; the whole column, out of L1, takes 73.4 cycles. The M4 decodes the same stream 2.45 times faster in
   wall time than Zen 1.
 - DS-3: 7% short, against FastLanes on an M1, and the M4 is the faster core. The layout keeps values in value order across the 16
   lanes, so the inverse delta needs a prefix sum across lanes in the register; FastLanes' transposed layout does a vertical add
-  instead (NOTES.md, SIMD, "What the layout gave up"). 18 of the 65 widths reach 3.6 two-pass; one does fused. The iteration figure
+  instead (docs/NOTES.md, SIMD, "What the layout gave up"). 18 of the 65 widths reach 3.6 two-pass; one does fused. The iteration figure
   was 3.42; this is 3.35 at a higher load.
 - DS-4: the same layout cost, on Zen 1, which splits every 256-bit operation in two and is slow at cross-lane permutes, against
   FastLanes on Zen 3. The refused runs put the AVX2 set's fused form at 2.72 cycles a value, as at iteration (2.71).
@@ -2551,7 +2551,7 @@ files. The first run and the smoke run are in `phase3-raw/mac-day/`.
 
 The README's Targets block is generated. `scripts/targets.json` defines one row per target and
 host: the target, and the path to its figure in a committed results file. Some rows name more
-than one case, each judged on its own; where NOTES.md judged a target per query or per baseline,
+than one case, each judged on its own; where docs/NOTES.md judged a target per query or per baseline,
 the row does too (QL-4, CR-5, WT-3, WT-4). `scripts/render_results.py` reads each figure, applies
 the comparison, and writes met, missed, met on some cases and missed on others, or "not judged"
 with a reason. A row with no file says why: G-3 has no 30-minute fuzz record, DS-4 no Linux
@@ -2560,17 +2560,17 @@ exits 2 when a file or field is missing. The tests cover a hand-edited value, a 
 file, a missing file and a missing field. Fault `targets-at-most-reversed` judges at-most targets
 the wrong way round and fails the tests.
 
-Every value read agrees with the verdicts in NOTES.md except one. DS-6 prices read 3.85 times from
+Every value read agrees with the verdicts in docs/NOTES.md except one. DS-6 prices read 3.85 times from
 the file, where "Decode targets under measure.sh" gave 3.86, computed from rounded figures. The
 verdict, missed against 14, is the same.
 
 The CR rows add the store as built (`results/store-size-12302019.json`) to the per-codec figures
-NOTES.md judged. Three targets met by a codec in the estimate are missed by the store's own
+docs/NOTES.md judged. Three targets met by a codec in the estimate are missed by the store's own
 columns:
 
 - **CR-3**: the store's timestamps, with their per-group time bases, cost 22.82 bits a record.
   That is 2.82 over 20.0, between file order's 18.76 and per locate's 25.49. The store keeps
-  records in locate order, so the per-locate miss NOTES.md recorded carries through to the store.
+  records in locate order, so the per-locate miss docs/NOTES.md recorded carries through to the store.
 - **CR-6**: `creation_ref` costs 11.363 bits, 0.16 over 11.2, where the estimate's A, F and U
   creations together cost 7.80. `import_ref`, each segment's list of the orders created
   before it, which lets a segment decode on its own, costs 25.94 bits. `ref_distance`, the per-stock distance, meets at 7.56.
@@ -2869,7 +2869,7 @@ The rows, and why:
 - G-3, every fuzz target 30 minutes clean on both hosts.
 
 The pitch quotes the Q2 and Q3 win as a win among headline variants, the wording rule in
-TASKS.md, and gives ArcticDB's per-security variant's 49.65 and 26.19 ms warm from the full-day
+docs/TASKS.md, and gives ArcticDB's per-security variant's 49.65 and 26.19 ms warm from the full-day
 variants table.
 
 Seven faults are new, and `readme-hand-edit` is now `results-md-hand-edit`, on RESULTS.md's

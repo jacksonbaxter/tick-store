@@ -465,7 +465,7 @@ constexpr Kernels kAvx2{
     // Fused measured faster than two passes on Zen 1, 1.29 against 1.19 G values/s, the
     // median over every width; the in-register prefix sum lost to the scalar tree, 1.57
     // against 2.04, since a cross-lane permute costs more than the adds it saves when
-    // each 256-bit operation is split in two (NOTES.md, "SIMD").
+    // each 256-bit operation is split in two (docs/NOTES.md, "SIMD").
     .fuse_delta = true,
     .unpack_vector = &unpack_vector_avx2,
     .unpack_linear = &unpack_linear_avx2,

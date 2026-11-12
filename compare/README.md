@@ -303,7 +303,7 @@ of each query.
    `posix_fadvise(POSIX_FADV_DONTNEED)` over the whole file. Either way it repeats, up to 32
    passes with a wait between them that doubles from 20 ms to 1 s, until `mincore` reads 0 on
    every file. It was 16 passes 20 ms apart until a full day's QuestDB store outlasted that:
-   see "Full-day comparison" in `NOTES.md`. Then, 1 s later and with nothing of ours running,
+   see "Full-day comparison" in `docs/NOTES.md`. Then, 1 s later and with nothing of ours running,
    the store must still read 0. A store that keeps or regains pages is being read by something
    else: on `debian`, the host's hourly backup read a new day's store, which takes it
    minutes. The eviction then runs again, 5 s later and doubling to 60 s apart, for at most
@@ -336,7 +336,7 @@ call in a process: for Parquet on macOS, about 1 ms over a second call on warm p
 tick-store runs through its own tools and nothing else: store version 3, the indexed query path,
 CRCs checked on every read. Its headline, `v3-seg4Mi`, is the writer's default segment of 2^22
 records with the eight hot dictionary columns held to ranked PFOR, the layout the rule in "Layout
-experiments" in `NOTES.md` chose before it was measured, and it stays fixed in
+experiments" in `docs/NOTES.md` chose before it was measured, and it stays fixed in
 `compare/systems/tickstore.py`. Its tuning variant, `v3-seg1Mi`, is the same writer at 2^20
 records, the segment size it replaced, which the layout experiments found faster on Q1 and Q4 and
 slower on Q2, Q3 and Q5, so the comparison itself shows that trade. Both write the hot columns
@@ -376,7 +376,7 @@ it was before these were added. The settings come from section 7 of
 |---|---|---|---|
 | Parquet | `none-rg1Mi` | No compression codec, against snappy and zstd | Section 7 sweeps "none, snappy (pyarrow default), zstd level 1 (Arrow default), one higher level". pyarrow's `compression` lists `'NONE'` among its valid values (`python/pyarrow/parquet/core.py` lines 778 to 780, Arrow 26.0.0), and the footer reads `UNCOMPRESSED` |
 | Parquet | `zstd1-rg1Mi-ts-default` | `ts` on the writer's default encoding, against `DELTA_BINARY_PACKED` | Section 7: "Time column: `column_encoding={'ts': 'DELTA_BINARY_PACKED'}`, one run vs default". The default is `use_dictionary`, "default True", and "if the dictionary size is too large, the column will fallback to ``PLAIN`` encoding" (`core.py` lines 772 to 776), past the 1 MB dictionary page limit |
-| tick-store | `v3-seg1Mi` | Segments of 2^20 records, against the headline's 2^22, both with the hot columns held to ranked PFOR: faster on Q1 and Q4, slower on Q2, Q3 and Q5 in the layout experiments | "Layout experiments" in `NOTES.md`, experiment 1 and the final round, scored by a rule committed before any of them was measured. tick-store's own measurements, not a documentation source, since it is ours |
+| tick-store | `v3-seg1Mi` | Segments of 2^20 records, against the headline's 2^22, both with the hot columns held to ranked PFOR: faster on Q1 and Q4, slower on Q2, Q3 and Q5 in the layout experiments | "Layout experiments" in `docs/NOTES.md`, experiment 1 and the final round, scored by a rule committed before any of them was measured. tick-store's own measurements, not a documentation source, since it is ours |
 | ArcticDB | `rows100k-cols127-per-security` | One symbol per security, against one symbol for the whole table | ArcticDB's [data organisation](https://docs.arcticdb.io/latest/tutorials/data_organisation/) lists "Separate Symbol for Each Security": "Every security has its own symbol with the same data shape", "Ideal for single security analysis", and "Analysis involving many securities requires reading many symbols". Section 7: "Run one symbol for all, and one symbol per security". `Library.write_batch` and `Library.read_batch` are its documented calls for many symbols (docstrings in `arcticdb/version_store/library.py`, 6.28.2) |
 
 **ArcticDB per security** needs a query path of its own, and it is ArcticDB's documented one. The
@@ -425,7 +425,7 @@ benchmark. `compare/fullday.py` needs the day's export at `<data>/export/<day>-f
   kernel paging idle memory out while plenty is available is reclaim, not exhaustion. Its samples
   and report keep swap-in and swap-out apart. It exits 70, and its report says why. Each exit
   status names its signal. The rule and its thresholds were registered in "The guard's swap
-  rule" in `NOTES.md` before any run under it. Until then, the guard stopped on swap traffic,
+  rule" in `docs/NOTES.md` before any run under it. Until then, the guard stopped on swap traffic,
   in and out together, over 10 MiB/s for three samples.
 - Output stays under `<work>/fullday/<tag>/`, marked `iteration-only`. `compare/fullday.py` refuses
   a work folder under any `results` folder, and `scripts/check_compare.py` refuses the file.
@@ -579,8 +579,8 @@ traffic: in its class A write, and on a freshly booted host in its read-back. Bo
 paged out QuestDB's own idle heap, 0.65 to 0.93 GB, to keep the store's mapped pages. The free swap
 filled in about 6 s, at up to 81 MB/s, with 11.6 GB or more still available. The capacity check met
 none of this, because swap was already full when it started. See "Full-day comparison" in
-`NOTES.md`. The guard's swap rule then changed, as registered in "The guard's swap rule" in
-`NOTES.md` before the rerun: swap-out alone no longer stops a run, and QuestDB's heap stays
+`docs/NOTES.md`. The guard's swap rule then changed, as registered in "The guard's swap rule" in
+`docs/NOTES.md` before the rerun: swap-out alone no longer stops a run, and QuestDB's heap stays
 `-Xms1g -Xmx1g`.
 
 ## Full day of tick-store alone
@@ -624,4 +624,4 @@ carries its median, nearest-rank p99 and mean. The slice is five minutes long, s
 clipped from an hour to `[09:30:00, 09:34:30)`, and Q5 scans 6,125,294 rows and not a day's
 268,744,780. Every results file says which it is, and `scripts/render_results.py` never puts a
 full-day number and a slice number in one table. What the runs found is in "Comparison harness",
-"tick-store in the comparison (slice)" and "Full-day comparison" in `NOTES.md`.
+"tick-store in the comparison (slice)" and "Full-day comparison" in `docs/NOTES.md`.

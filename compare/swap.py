@@ -3,7 +3,7 @@
 Linux reads pswpin and pswpout from /proc/vmstat, macOS vm_stat's Swapins and Swapouts. Both
 count since boot, for the whole host: a change says how many pages went in or out while a phase
 ran, not whose they were. A timed query with any page swapped in is flagged, never rerun or
-refused: see "The guard's swap rule" in NOTES.md.
+refused: see "The guard's swap rule" in docs/NOTES.md.
 
 Standard library only, so that compare/guard.py can use it.
 """

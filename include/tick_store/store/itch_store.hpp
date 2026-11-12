@@ -41,7 +41,7 @@
 // Column orders. Most columns are in stored order. tracking, ref_distance and
 // reduce_shares are grouped by type: their values sorted by type symbol, stably. add_price
 // is grouped by (locate, side) and add_shares by locate, so each holds one run per stock,
-// as NOTES.md found smaller. The reader rebuilds stored order from the type, locate and side
+// as docs/NOTES.md found smaller. The reader rebuilds stored order from the type, locate and side
 // columns, which it decodes first, and file order from the locate column.
 
 #include "tick_store/codec/codec_error.hpp"
@@ -67,7 +67,7 @@ namespace tick_store::store {
 
 inline constexpr std::uint32_t kItchStoreVersion = 3;
 
-// Records per segment: the writer's default, chosen by the layout experiments in NOTES.md,
+// Records per segment: the writer's default, chosen by the layout experiments in docs/NOTES.md,
 // and the largest a file may hold.
 inline constexpr std::uint32_t kDefaultSegmentRecords = std::uint32_t{1} << 22U;
 inline constexpr std::uint32_t kMaxSegmentRecords = std::uint32_t{1} << 24U;

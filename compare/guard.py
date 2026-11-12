@@ -15,7 +15,7 @@ It stops on (a) MemAvailable under its floor; (b) swap-in over its rate for SWAP
 samples in a row; (c) swap exhausted, SwapFree under SWAP_EXHAUSTED_FRACTION of SwapTotal, with
 MemAvailable under floor (a) plus SwapTotal; or free disk under its floor. Swap-out alone never
 stops a run: the kernel moving idle pages out while memory is plentiful is reclaim, not
-exhaustion. Each threshold's derivation is in "The guard's swap rule" in NOTES.md.
+exhaustion. Each threshold's derivation is in "The guard's swap rule" in docs/NOTES.md.
 """
 
 import argparse

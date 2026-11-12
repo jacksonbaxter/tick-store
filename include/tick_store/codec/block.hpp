@@ -35,7 +35,7 @@ inline constexpr std::uint32_t kMaxBlockValues = std::uint32_t{1} << 20U;
 // pinned day carries on the order of a few thousand records per millisecond, so 4,096
 // values keeps a point query to one or two blocks. The fixed cost per block, the
 // 8-byte header and the 64-bit first value, is 128 bits, under 0.04 bits per value at
-// this size. The block size sweep in TASKS.md measures the trade properly.
+// this size. The block size sweep in docs/TASKS.md measures the trade properly.
 inline constexpr std::uint32_t kDefaultBlockValues = 4096;
 
 struct BlockHeader {

@@ -386,7 +386,7 @@ bool svb_decode_neon(std::span<const std::byte> control, std::span<const std::by
 
 constexpr Kernels kNeon{
     .level = kLevel,
-    // two passes measured faster on the M4 (NOTES.md, "SIMD").
+    // two passes measured faster on the M4 (docs/NOTES.md, "SIMD").
     .fuse_delta = false,
     .unpack_vector = &unpack_vector_neon,
     .unpack_linear = &unpack_linear_neon,

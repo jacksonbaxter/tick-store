@@ -9,9 +9,10 @@
 # as skipped in the summary table, and is not a pass. There is no .venv either, so py-compare
 # shows as SKIP. No job uses a secret.
 #
-# It is validated locally by actionlint. Its first run on GitHub failed 10 of the 14 jobs; NOTES.md,
-# "The first runs on GitHub Actions", has the causes and fixes. All 14 passed at ad542fd, in run
-# 41825067372. The Linux clang-tidy job covers the Linux-only sources the macOS job cannot see.
+# It is validated locally by actionlint. Its first run on GitHub failed 10 of the 14 jobs;
+# docs/NOTES.md, "The first runs on GitHub Actions", has the causes and fixes. All 14 passed at
+# ad542fd, in run 41825067372. The Linux clang-tidy job covers the Linux-only sources the macOS
+# job cannot see.
 
 name: CI
 

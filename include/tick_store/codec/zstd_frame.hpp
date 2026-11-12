@@ -2,7 +2,7 @@
 
 // zstd over another codec's bytes: the composite codec the registry names `zstd` (id 8).
 // The store wraps a column's encoded bytes in it where zstd makes them smaller, on the
-// few columns where NOTES.md found that it pays.
+// few columns where docs/NOTES.md found that it pays.
 //
 // A payload, little-endian:
 //

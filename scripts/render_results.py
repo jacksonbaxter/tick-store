@@ -449,7 +449,7 @@ def compare_for(document):
                  "Swap-out alone does not stop a run. ")
         lines += ["", "Swap per phase, host-wide, over every variant and class each system ran. "
                       f"{guard}A timed query with any page swapped in is kept and "
-                      f"marked{SWAP_MARK}. See \"The guard's swap rule\" in NOTES.md.", ""]
+                      f"marked{SWAP_MARK}. See \"The guard's swap rule\" in docs/NOTES.md.", ""]
         lines += swap_table(document)
     return lines
 

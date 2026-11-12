@@ -483,7 +483,7 @@ class QuestDBSystem(System):
     # else is outside that and is listed in each result. This is how the real server behaves:
     # under sync it leaves the table's symbol maps and each segment's _meta dirty on a commit,
     # keeps the schema files CREATE TABLE wrote dirty, and after a large apply leaves partition
-    # column files dirty for several seconds. See "Comparison harness" in NOTES.md, and
+    # column files dirty for several seconds. See "Comparison harness" in docs/NOTES.md, and
     # like_for_like below.
     flush_exempt = (re.compile(r"^\d{4}-\d{2}-\d{2}"),
                     re.compile(r"^(?:stock|mpid|locate)\.[kovc](?:\.\d+)?$"),

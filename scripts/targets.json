@@ -169,7 +169,7 @@
    "parts": [{"label": "two passes, median of the widths", "file": "results/bench/macOS-simd_kernel-*.json",
               "value": {"div": [{"cases_median": "pfor_delta_two_pass/w=*/neon", "field": ["throughput", "values_per_second", "median"]}, 1e9]}}]},
   {"id": "DS-4", "host": "Linux", "target": {"at_most": 0.377}, "digits": 3, "unit": " cycles",
-   "if_missing": "no reported Linux kernel file: all five runs, two at bcbf873 and three at b053aff, were refused by check_results.py's sibling rule, cpu5 over 5% busy in 4 to 13 of 314 cases (NOTES.md, DS-4: three more refusals)",
+   "if_missing": "no reported Linux kernel file: all five runs, two at bcbf873 and three at b053aff, were refused by check_results.py's sibling rule, cpu5 over 5% busy in 4 to 13 of 314 cases (docs/NOTES.md, DS-4: three more refusals)",
    "parts": [{"label": "fused, median of the widths", "file": "results/bench/Linux-simd_kernel-*.json",
               "value": {"cases_median": "pfor_delta_fused/w=*/avx2", "field": ["counters", "per_value", "cycles"]}}]},
   {"id": "DS-5", "host": "macOS", "target": {"at_least": 4605}, "digits": 0, "unit": " MB/s",

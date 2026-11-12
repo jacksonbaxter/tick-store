@@ -67,7 +67,7 @@ COUNTER_UNITS = {
     "branch_misses": "mispredicted branches, user mode",
 }
 COUNTER_SCOPE = "timed throughput passes only, gated by perf's control FIFOs"
-# TASKS.md: confirm what cache-misses counts on Zen 1 before quoting it.
+# docs/TASKS.md: confirm what cache-misses counts on Zen 1 before quoting it.
 CACHE_MISSES_UNAVAILABLE = {
     "status": "unavailable",
     "reason": "not collected until what the event counts on Zen 1 is confirmed",

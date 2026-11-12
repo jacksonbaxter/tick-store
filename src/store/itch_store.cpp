@@ -819,7 +819,7 @@ std::expected<std::vector<std::uint64_t>, ItchStoreError> times_from_residuals(
     std::span<const std::uint64_t> starts, std::span<const std::uint64_t> bases) {
     // A max-plus recurrence, t = r + max(t before, base), so each value waits on the one
     // before: no vector form, since the residuals wrap modulo 2^64 and a wrapped sum breaks
-    // the associativity a parallel scan needs (NOTES.md, "SIMD"). The loop keeps only the
+    // the associativity a parallel scan needs (docs/NOTES.md, "SIMD"). The loop keeps only the
     // add and the max on that chain: the run start is a compare with the next start, and
     // the 48-bit check is an OR over all values, with the first offender found after.
     std::vector<std::uint64_t> out(residuals.size());

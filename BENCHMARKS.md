@@ -37,7 +37,7 @@ Results from the two hosts are kept apart and never mixed.
   indexes, permutations, exceptions and metadata. Every system is measured against the same baseline.
 - **Durability class A**: returns once data is in the OS page cache. **Class B**: returns after a flush to the device.
   Classes are never compared with each other. See `research/evidence/column-systems.md` section 2.4.
-- **Warm**: the files a query reads are proven resident, not assumed. **Cold**: proven evicted. See `TASKS.md` for the methods.
+- **Warm**: the files a query reads are proven resident, not assumed. **Cold**: proven evicted. See `docs/TASKS.md` for the methods.
 - **Query set**: Q1 one second of all symbols at the open; Q2 one hour of one symbol; Q3 per-minute aggregate of one symbol over
   one hour; Q4 one millisecond of all symbols; Q5 full-day scan of one column. Rows returned and bytes decoded are reported with
   each latency.
@@ -113,8 +113,8 @@ At `bcbf873`, the cases above through `scripts/run_bench.py` under each host's `
 `simd_kernel_bench`. macOS is the M4 Max, NEON, unpinned, no counters, at load 1.26 to 3.92 at the start of a case. Linux is Zen 1,
 AVX2, pinned to cpu4 with `cycles:u`, at load 1.27 to 1.49 at the start of a case, cpu5 at most 1.12% busy. Results: `results/bench/macOS-column_decode-bcbf8738d892.json`,
 `results/bench/macOS-simd_kernel-bcbf8738d892.json`, `results/bench/Linux-column_decode-bcbf8738d892.json`. The Linux kernel file
-does not exist: two complete runs were refused for cpu5 over 5% busy in 4 and in 7 of 314 cases (NOTES.md, "Decode targets under
-measure.sh"), and three more at `b053aff` in 9, 7 and 13 (NOTES.md, "DS-4: three more refusals"). Gaps and reasons are there too.
+does not exist: two complete runs were refused for cpu5 over 5% busy in 4 and in 7 of 314 cases (docs/NOTES.md, "Decode targets under
+measure.sh"), and three more at `b053aff` in 9, 7 and 13 (docs/NOTES.md, "DS-4: three more refusals"). Gaps and reasons are there too.
 
 | ID | Measured | Host, instruction set | Verdict |
 |---|---|---|---|

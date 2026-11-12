@@ -202,7 +202,7 @@ def _variant(segment_records):
 class TickStoreSystem(System):
     name = "tickstore"
     # The headline is the writer's default, 2^22 records, chosen by the rule in "Layout
-    # experiments" in NOTES.md before it was measured. 2^20 is the layout it replaced, faster
+    # experiments" in docs/NOTES.md before it was measured. 2^20 is the layout it replaced, faster
     # on Q1 and Q4 and slower on Q2, Q3 and Q5: see compare/README.md.
     headline_variant = "v3-seg4Mi"
     variants = {"v3-seg4Mi": _variant(SEGMENT_RECORDS),

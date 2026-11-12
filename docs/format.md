@@ -148,8 +148,8 @@ bytes is a new id, never an edit to the old one.
 - Each version keeps a checked-in golden file, `tests/unit/golden/container-v<N>.tsc`, which the
   reader must open with every value, for as long as that version is readable. The writer test compares
   only against the current version's file.
-- Raising `kOldestReadableVersion` drops a version. That is a decision recorded in `NOTES.md`, and its
-  golden file goes with it.
+- Raising `kOldestReadableVersion` drops a version. That is a decision recorded in
+  `docs/NOTES.md`, and its golden file goes with it.
 
 ## Writing and durability (M1-M4, M8)
 

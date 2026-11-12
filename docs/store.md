@@ -18,8 +18,8 @@ All integers in the store's own fields are little-endian, as in the container.
 A segment is N consecutive records of the source, N fixed per file, 1 to 2^24, by default 2^22.
 The last segment holds the remainder. A segment decodes from its own blocks and the `symbols`
 section alone: no state crosses a segment boundary, so reading segment k reads segment k's blocks
-and nothing else. N = 2^22 was chosen on the measured day by the layout experiments in `NOTES.md`,
-which have the sweep.
+and nothing else. N = 2^22 was chosen on the measured day by the layout experiments in
+`docs/NOTES.md`, which have the sweep.
 
 A segment keeps its records in **stored order**: the typed records by ascending locate, each
 locate's in file order, then the raw records in file order. So one locate's records are one run of
@@ -202,7 +202,7 @@ its run by the stored groups' times, and a query over every locate finds the rec
 by the file groups'. When the index is parsed, the counts must sum to each group's records, the
 times must be within 48 bits and ordered, the imports within the group's naming records, and the
 maxima within each column's range. When the segment is decoded whole, every value is checked
-against the columns. `NOTES.md` has the index's bytes and the locate column's on both days.
+against the columns. `docs/NOTES.md` has the index's bytes and the locate column's on both days.
 
 ### Order references
 
@@ -246,7 +246,7 @@ semantics, so each answer equals what `compare/queries.py` computes from `tick_e
   type byte and takes the timestamp of the row before it, 0 for the file's first, with locate 0.
 - A window is half-open on that timestamp. The harness finds it by a binary search over the
   timestamps, which equals a filter only because a day's timestamps never go down; the query
-  filters, and the full-day oracle in `NOTES.md` shows the two agree on 12302019.
+  filters, and the full-day oracle in `docs/NOTES.md` shows the two agree on 12302019.
 - The minute aggregate counts A and F rows of the locate in the window per minute, with their
   shares summed and the least and greatest price. The share sum is over every row: add, reduce,
   replace and trade shares. The busiest locate is the most rows in a window, locate 0 excluded, the
@@ -297,7 +297,7 @@ byte), the grouping keys (at most 9 bytes per record), and a table of the segmen
 (at most 2N), plus 8 bytes a reference; then, while a column is coded, that column's chunk. The
 tables of 65,536 locates are fixed: 256 KiB of list lengths, an 8 KiB bitmap, and the symbol
 table's 256 KiB index with 10 bytes per symbol. The container keeps 12 bytes of metadata per block
-and each segment summary for the footer. `NOTES.md` has the footprint measured on the full days.
+and each segment summary for the footer. `docs/NOTES.md` has the footprint measured on the full days.
 The durability class,
 `page_cache` or `device_flush`, is a parameter of `ItchStoreWriter::create` and of `tick_roundtrip
 ingest`, never a default. The writer refuses a timestamp over 48 bits and a raw message that is

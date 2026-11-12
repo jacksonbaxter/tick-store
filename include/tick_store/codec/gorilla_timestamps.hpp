@@ -24,7 +24,7 @@
 // search over three widths, costing each census bucket at the bits a two's-complement
 // field needs, puts 16, 19 and 23 first on the sum of both days, at about 20.38 bits per
 // value; Prometheus's widths cost 22.3 and Gorilla's 59.1 on the same histograms. The
-// search is in NOTES.md, "Gorilla on ITCH".
+// search is in docs/NOTES.md, "Gorilla on ITCH".
 //
 // All arithmetic is on uint64_t and wraps modulo 2^64 (D5), so every sequence of 64-bit
 // values round-trips, including a step backwards or a jump across the whole range, and

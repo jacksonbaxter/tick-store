@@ -93,8 +93,8 @@ inline void add_base_from(std::span<std::uint64_t> values, std::size_t first, st
 
 // The same sums with the carry's chain one add long for every four values: each group's
 // own sums are formed off the chain, then the carry is added to all four. Arm's engineers
-// report this scalar form beating NEON on Neoverse (TASKS.md), so each set measures both
-// and keeps the faster (NOTES.md, "SIMD").
+// report this scalar form beating NEON on Neoverse (docs/TASKS.md), so each set measures both
+// and keeps the faster (docs/NOTES.md, "SIMD").
 [[nodiscard]] inline std::uint64_t prefix_sum_tree_from(std::span<std::uint64_t> values,
                                                         std::size_t first,
                                                         std::uint64_t carry) noexcept {

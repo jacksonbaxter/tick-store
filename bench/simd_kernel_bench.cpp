@@ -30,7 +30,7 @@
 //   B5  The kernels are called through the same table entries the codecs call.
 //   B6  The input is one vector, decoded repeatedly: a predictor can learn it, which is
 //       the point of an L1-resident kernel figure and why the store's own decode and the
-//       queries are measured separately, on the real day (NOTES.md, "SIMD").
+//       queries are measured separately, on the real day (docs/NOTES.md, "SIMD").
 
 #include "tick_store/bench_support/affinity.hpp"
 #include "tick_store/bench_support/build_info.hpp"

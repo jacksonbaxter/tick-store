@@ -5,7 +5,7 @@ runs everywhere scripts/check.sh's py-scripts step does, CI included.
     python3 -I tests/compare/test_guard.py
 
 Each stop condition is shown firing, and swap-out alone, however fast and however full the
-swap device, is shown not stopping a run: "The guard's swap rule" in NOTES.md.
+swap device, is shown not stopping a run: "The guard's swap rule" in docs/NOTES.md.
 """
 
 import signal

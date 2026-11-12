@@ -8,7 +8,7 @@
 // The loops are written so a compiler can vectorise them: no early exits, no calls, and
 // the delta loops read only the input and the previous input. The inverses of delta and
 // delta-of-delta are prefix sums, a dependency chain a later SIMD kernel may break up,
-// as TASKS.md plans.
+// as docs/TASKS.md plans.
 //
 // Delta takes the value before the first as 0, so the first output is the first value
 // itself. Delta-of-delta takes the delta before the first delta as 0, as Gorilla does:
@@ -18,7 +18,7 @@
 //   y[i] = (q[i] - q[i-1]) - (q[i-1] - q[i-2])   for i >= 2
 //
 // Head delta is for columns that interleave several rising sequences, as ITCH order
-// references do (NOTES.md, "Order references"): each value is coded against one of the
+// references do (docs/NOTES.md, "Order references"): each value is coded against one of the
 // last kHeadDeltaHeads values the column has taken from different sequences, its heads,
 // kept most recently used first. The output word is a payload and a 3-bit token:
 //

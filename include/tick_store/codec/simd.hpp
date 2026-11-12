@@ -5,7 +5,7 @@
 // Three kernel sets exist, and each gives the same values for the same input:
 //
 //   scalar  plain C++ written so a compiler may vectorise it, always built, any host.
-//           On arm64, clang turns the lane unpack loop into NEON by itself (NOTES.md),
+//           On arm64, clang turns the lane unpack loop into NEON by itself (docs/NOTES.md),
 //           so "scalar" there means "no hand-written intrinsics", not "no vectors"
 //   neon    hand-written NEON, built on arm64. NEON is part of the arm64 baseline, so
 //           there is no runtime check, as for the CRC32C instructions. No SVE or SME:
@@ -65,7 +65,7 @@ struct Kernels {
 
     // Whether PFOR decodes a full delta vector with no exceptions by unpack_delta, in one
     // pass, rather than by unpack_vector then delta_pass. Set per set from what measured
-    // faster on its host (NOTES.md, "SIMD").
+    // faster on its host (docs/NOTES.md, "SIMD").
     bool fuse_delta = false;
 
     // Unpacks a full interleaved vector at `width`, 0 to 64, from exactly 128 * width
@@ -116,7 +116,7 @@ struct Kernels {
                        std::span<std::uint64_t> values) noexcept = nullptr;
 };
 
-// The two forms of the inverse delta a set was measured with (NOTES.md, "SIMD"): its
+// The two forms of the inverse delta a set was measured with (docs/NOTES.md, "SIMD"): its
 // own vector form, and the scalar tree, whose carry chain is one add for every four
 // values. Kernels::prefix_sum is whichever measured faster on that set's host. Both
 // members are null if the level is not available; for the scalar set, `vector` is the

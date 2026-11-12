@@ -44,8 +44,8 @@ comparison to cpu4 and cpu6. macOS figures come from an Apple M4 Max, unpinned.
 - [RESULTS.md](RESULTS.md): every generated results table, every target with its verdict, the
   four-system comparison and the decode benchmarks.
 - `BENCHMARKS.md`: the targets, and the published figure each one comes from.
-- `NOTES.md`: what was tried, including what did not help, with numbers.
-- `TASKS.md`: the plan.
+- [docs/NOTES.md](docs/NOTES.md): what was tried, including what did not help, with numbers.
+- [docs/TASKS.md](docs/TASKS.md): the plan.
 
 ## Data
 
@@ -151,7 +151,7 @@ step group, on a pinned LLVM. The steps are the same as a local run, and
 absent on CI, so `ItchRealDay` skips visibly, and with no `.venv`, `py-compare` shows as `SKIP`.
 
 It is validated locally by actionlint with shellcheck. On GitHub, the first run failed 10 of
-its 14 jobs; the causes and fixes are in `NOTES.md`, "The first runs on GitHub Actions". All 14
+its 14 jobs; the causes and fixes are in `docs/NOTES.md`, "The first runs on GitHub Actions". All 14
 jobs passed at `ad542fd`, in [run 41825067372](https://github.com/jacksonbaxter/tick-store/actions/runs/41825067372).
 
 ## Round-trip check

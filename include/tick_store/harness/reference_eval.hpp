@@ -17,7 +17,7 @@
 //   values_head_delta,     delta, Stream VByte on deltas. No state.
 //   values_svb_delta
 //   day_distance_checkpoint  the distance back in the locate's creations over the whole day,
-//                          as NOTES.md measured it, with a checkpoint at each segment's start:
+//                          as docs/NOTES.md measured it, with a checkpoint at each segment's start:
 //                          every order live on the book then, by locate, with its creation
 //                          ordinal in the locate and its reference. Measured where asked for.
 //   day_distance_index     the same distances with no checkpoint: each segment stores how many
