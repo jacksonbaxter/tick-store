@@ -579,6 +579,10 @@ FAULTS = (
     Fault("tickstore-settings-unchecked", "py-compare", "tick-store's read-back stops comparing "
           "each setting with the one requested, so a store of another segment size passes "
           "silently", CHECK_FAILED, "FAIL: test_a_segment_size_mismatch_stops_the_run"),
+    Fault("tickstore-source-warm-no-eviction", "py-compare", "tick-store's write on a day "
+          "reads its source through again after a short warm without evicting the day's "
+          "export, which on debian left it short again, as at ca96b36", CHECK_FAILED,
+          "FAIL: test_a_short_warm_on_a_day_evicts_the_export_and_reads_the_source_again"),
     Fault("results-no-load-lines", "check-results", "a macOS results file with no load lines",
           CHECK_FAILED, "no load lines", drop_load_lines),
     Fault("results-macos-pinned", "check-results", "a macOS results file claiming pinned",

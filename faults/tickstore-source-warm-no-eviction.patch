@@ -1,0 +1,12 @@
+diff --git a/compare/systems/tickstore.py b/compare/systems/tickstore.py
+--- a/compare/systems/tickstore.py
++++ b/compare/systems/tickstore.py
+@@ -331,7 +331,7 @@ class TickStoreSystem(System):
+             return record
+         record["first_warm_resident_pages"] = warmed["resident_pages"]
+         if self.context.full_day:
+-            evicted = coldcache.evict(layout, [columns.directory])
++            evicted = {"pages": 0, "resident_pages": 0, "passes": 0, "method": "none"}
+             warmed = coldcache.warm(layout, [source])
+             record.update({"resident_pages": warmed["resident_pages"], "warms": 2,
+                            "evicted_before_second_warm": {
