@@ -8,3 +8,4 @@
 *.dmg
 __pycache__/
 /.tools/
+/CLAUDE.md
