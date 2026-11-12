@@ -95,14 +95,20 @@ struct Kernels {
                                 bool zigzag, std::uint64_t carry) noexcept = nullptr;
 
     // unpack_vector, add_base and prefix_sum fused, each row of 16 values going from
-    // packed words to sums in registers. Only for a vector with no exceptions.
+    // packed words to sums in registers. Only for a vector with no exceptions. PFOR calls
+    // it only where fuse_delta is true, the AVX2 set alone; the scalar and NEON ones run
+    // only in the kernel tests and simd_kernel_bench, so on arm64 not even the fuzz
+    // oracle's kernel-against-scalar check reaches NEON's.
     std::uint64_t (*unpack_delta)(std::span<const std::byte> packed, unsigned width,
                                   std::uint64_t base, bool zigzag, std::uint64_t carry,
                                   std::span<std::uint64_t, kVectorValues> values) noexcept =
         nullptr;
 
     // The same, with the sums taken in 32-bit lanes relative to `carry` and widened on
-    // the way out. Only when base + low_bits(width) < kNarrowDeltaLimit; the caller checks.
+    // the way out, when base + low_bits(width) < kNarrowDeltaLimit: the NEON and AVX2
+    // kernels check that themselves and run their unpack_delta otherwise, and the scalar
+    // set's is its unpack_delta. No decoder calls it: it runs only in the kernel tests and
+    // simd_kernel_bench.
     std::uint64_t (*unpack_delta_narrow)(std::span<const std::byte> packed, unsigned width,
                                          std::uint64_t base, bool zigzag, std::uint64_t carry,
                                          std::span<std::uint64_t, kVectorValues> values) noexcept =
