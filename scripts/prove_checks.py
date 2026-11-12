@@ -355,10 +355,19 @@ FAULTS = (
           "an import to its locate's list, so the distances after it in the segment are off",
           EXIT_CTEST, "ItchStoreReferences.AnOrderFromAnEarlierSegmentIsImportedOnceThenADistance",
           arguments=("--test-regex", "ItchStore")),
-    Fault("fuzz-itch-store-distance-bound", "fuzz-itch-store", "the ITCH store's segment decoder "
-          "stops checking a reference distance against its locate's list", EXIT_LIBFUZZER,
-          # ASan or UBSan, by whether the list is empty; either trace names the function.
-          "in tick_store::store::SegmentAssembler::State::named", arguments=FUZZ_ARGUMENTS),
+    # The fuzzer reaches a distance past its list only by chance: of four runs at seed 1, one
+    # found it at 43 s and three did not, at 45 s and twice at 240 s. The unit test that sets
+    # one is what reliably fails, so the fault is proven there.
+    Fault("store-ref-distance-bound", "dev-test", "the ITCH store's segment decoder stops "
+          "checking a reference distance against its locate's list", EXIT_CTEST,
+          "ItchStoreCorrupt.ValuesThatBreakTheRulesTyingColumnsTogether",
+          arguments=STORE_CORRUPT),
+    # fuzz_itch_store fails on what changes an accepted file's round trip: a field misread
+    # comes back misread twice through the writer, on the first seeds.
+    Fault("fuzz-itch-store-tracking-misread", "fuzz-itch-store", "the ITCH store's segment "
+          "decoder reads every tracking number one high", EXIT_LIBFUZZER,
+          "check_itch_store: the rewritten file reads back differently",
+          arguments=FUZZ_ARGUMENTS),
     Fault("query-window-group-boundary", "dev-test", "the query's time zone map treats a seek "
           "group whose last time equals the window's start as before the window, an off-by-one "
           "at the time boundary", EXIT_CTEST, "ItchQuery.BothPathsEqualTheColumnFormAtEveryBoundary",

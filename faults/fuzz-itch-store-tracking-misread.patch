@@ -1,0 +1,13 @@
+diff --git a/src/store/itch_segment.cpp b/src/store/itch_segment.cpp
+index fd16776..ed98634 100644
+--- a/src/store/itch_segment.cpp
++++ b/src/store/itch_segment.cpp
+@@ -863,7 +863,7 @@ struct SegmentAssembler::State {
+         itch::MessageHeader h;
+         h.stock_locate = static_cast<std::uint16_t>(locates[next_record]);
+         h.timestamp_ns = take(Column::timestamp);
+-        h.tracking_number = static_cast<std::uint16_t>(take(Column::tracking));
++        h.tracking_number = static_cast<std::uint16_t>(take(Column::tracking) + 1);
+         const std::uint16_t locate = h.stock_locate;
+         const auto price = [&](Column column) { return itch::Price4{static_cast<std::uint32_t>(take(column))}; };
+         const auto u32 = [&](Column column) { return static_cast<std::uint32_t>(take(column)); };
