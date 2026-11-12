@@ -78,7 +78,9 @@ using BlockDecoder = std::expected<std::size_t, CodecError> (*)(std::span<const 
 // appends them to `out`. Errors carry offsets from the column's first byte. On error,
 // `out` keeps what it held before. For a column short of `count`, the error is
 // truncated with expected = `count` and actual = the values found; for one with more,
-// bad_count with the same two values, or trailing_bits for bytes after the last value.
+// bad_count with the same two values, or trailing_bits for bytes after the last value. A
+// block whose stated count would pass `count` is refused before it is decoded, so a column
+// costs at most the work of `count` values, whatever its blocks claim.
 [[nodiscard]] std::expected<void, CodecError> decode_column(std::span<const std::byte> column,
                                                             std::uint64_t count,
                                                             std::vector<std::uint64_t>& out,

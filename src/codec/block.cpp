@@ -104,6 +104,15 @@ std::expected<void, CodecError> decode_column(std::span<const std::byte> column,
             return fail(codec_error(CodecErrorKind::trailing_bits, "column", offset * 8U, 0,
                                     (column.size() - offset) * 8U));
         }
+        // Every block states its count first, so one that would pass `count` is refused
+        // before it is decoded: a short column costs its own count, not a block's cap. A
+        // count of 0 or past the cap is the block decoder's to refuse.
+        if (const auto stated = store::read_le<4>(column, offset + kCountOffset);
+            stated.has_value() && *stated >= 1 && *stated <= kMaxBlockValues &&
+            decoded + *stated > count) {
+            return fail(codec_error(CodecErrorKind::bad_count, "column count", offset * 8U, count,
+                                    decoded + *stated));
+        }
         const auto taken = decode_block(column.subspan(offset), out);
         if (!taken.has_value()) {
             CodecError error = taken.error();

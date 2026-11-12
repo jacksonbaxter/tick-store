@@ -676,6 +676,47 @@ TEST(Pfor, ColumnCountMustMatchExactly) {
                                        8 * (column.size() - last.size()), 0, 8 * last.size())));
 }
 
+// The values the block decoder appended, over every call, for the column test below.
+std::uint64_t g_values_decoded = 0;
+
+std::expected<std::size_t, CodecError> counting_decoder(std::span<const std::byte> block,
+                                                        std::vector<std::uint64_t>& out) {
+    const std::size_t before = out.size();
+    auto taken = decode_pfor_block(block, out);
+    g_values_decoded += out.size() - before;
+    return taken;
+}
+
+// Every block's header states its count, so a column refuses a block that would take it past
+// the count it was asked for before decoding the block (B-4 of the final review,
+// docs/REVIEW.md): a store piece of one value must not cost a whole block of 2^20.
+TEST(Pfor, AColumnRefusesABlockPastItsCountBeforeDecodingIt) {
+    const Values values = walk(9, kMaxBlockValues, 1'000);
+    const Bytes block = encoded(values, kDelta, kMaxBlockValues);
+    for (const std::uint64_t count : {std::uint64_t{1}, std::uint64_t{kMaxBlockValues - 1}}) {
+        SCOPED_TRACE(count);
+        g_values_decoded = 0;
+        Values out{42};
+        EXPECT_EQ(decode_column(block, count, out, &counting_decoder),
+                  std::unexpected(error_of(CodecErrorKind::bad_count, "column count", 0, count,
+                                           kMaxBlockValues)));
+        EXPECT_EQ(g_values_decoded, 0U);
+        EXPECT_EQ(out, Values{42});
+    }
+    // The second block of three is refused before it is decoded, the first decoded whole.
+    const Bytes column = encoded(walk(9, 3'000, 1'000), kDelta, 1'000);
+    const auto first = read_block_header(column, 0, 0);
+    ASSERT_TRUE(first.has_value());
+    g_values_decoded = 0;
+    Values out;
+    EXPECT_EQ(decode_column(column, 1'500, out, &counting_decoder),
+              std::unexpected(error_of(CodecErrorKind::bad_count, "column count",
+                                       8 * (kBlockHeaderSize + first->payload_bytes), 1'500,
+                                       2'000)));
+    EXPECT_EQ(g_values_decoded, 1'000U);
+    EXPECT_TRUE(out.empty());
+}
+
 // A whole column cut at every byte length is refused, never read as zeros (D10).
 TEST(Pfor, TruncationAtEveryByteLengthIsAnError) {
     Values values = walk(5, 2'100, 100);
