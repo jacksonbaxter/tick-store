@@ -285,6 +285,20 @@ count for byte columns. Stored order comes back by a counting sort for the colum
 type, O(N), and a sort of the adds by key, O(A log A) for A adds; file order by each record's
 index, O(N). Each reference is one list lookup. Nothing outside segment k is read but the `symbols` section, parsed once at open.
 
+Two codec costs are not linear in the values, and a reader of files it did not write should
+budget for them, since the reader takes every dictionary mode in every dictionary column. A
+dictionary block in mode 2, move-to-front, turns each rank r into an index by moving r 16-bit
+list entries, and r may be up to K - 1 = 2,047 (`kDictMtfMaxEntries` is 2,048), so it costs up
+to 2,047 moves, 4,094 bytes, per value, not O(1). A valid block of 2^20 values all of rank 2,047
+over a dictionary of 0 to 2,047 is 7,342 bytes and asks for 2^20 x 2,047 x 2 = 4.29 GB of
+moves. A block in modes 0 or 1 checks its K entries for a repeat by a hash set that sorts a copy
+when entries crowd one slot, O(K log K) at worst, K at most the block's count. The column
+decoder reads each block's count before decoding it and refuses one that would pass the piece's
+count, so neither cost reaches past the values a piece declares: at most 16,384 values a piece,
+which in mode 2 is at most 67 MB of moves. For an untrusted file, then, assume a dictionary column
+costs up to 2,047 16-bit moves a value and every other column O(1) a value, on top of what this
+section lists (B-1, B-3 and B-4 in `docs/REVIEW.md`).
+
 ## Writing
 
 `ItchStoreWriter` takes one message at a time and writes each segment as it fills, so its private
