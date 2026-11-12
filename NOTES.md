@@ -2765,6 +2765,43 @@ branches those are was not established.
 
 Raw logs, with the reach replays and the runner scripts: `phase3-raw/close-p3/crc-g3/`.
 
+### check.sh on the Linux host
+
+`debian` holds an exported tree: `debian_sync.sh` unpacks `git archive` and writes `COMMIT`, so
+there is no `.git`. Phase 3's kickoff found 17 of 21 steps passing there at `469e9cd`. With 30
+steps, the four that could not pass were still the same at `ea1dde4`, the tree `debian` held,
+whose `check.sh` is the one this task started from. Run alone with `--only` through `heavy.sh`
+pinned to cpu2, cpu6 and cpu7: `coverage` failed after 813 s, when `coverage_report.py` asked
+git for the commit; `hygiene` failed at once, on `git ls-files`; `actionlint` failed, since the
+host has none; `py-compare` skipped for want of a `.venv`. The other 26 were not run then.
+
+What changed, at `21fda00`:
+
+- `check_hygiene.py` reads an exported tree's own files: every file but `COMMIT` and those its
+  `.gitignore` files exclude, listed by git against an empty repository of its own, so build
+  output made after the export is left out by the same rules git uses. A home path or a data
+  file in an export is refused, and a folder that is neither a checkout nor an export is an error;
+  `test_check_hygiene.py` has a test for each.
+- `coverage_report.py` takes the commit from `COMMIT` and the sources from `src/` there.
+- `py-compare` takes `CHECK_VENV`, the Python environment to use when there is no `.venv`. On
+  `debian` that is the project's own `venv`, outside the exported tree.
+- `actionlint` skips, with its reason in the summary, when the host has no actionlint and the
+  tree is an export. In a git checkout a missing actionlint still fails. A skip is not a pass:
+  the summary counts it apart, and CI's Linux jobs run `check.sh` in a git checkout, where
+  `hygiene` and `coverage` read git and actionlint is installed by the toolchain action.
+
+The whole `check.sh` then ran on `debian` at `d307a31`, through `heavy.sh` pinned to cpu2,
+cpu6 and cpu7 with `CHECK_VENV` set: 29 of 30 steps passed and `actionlint` skipped, in
+7,962 s. `dev-test`, `asan-test` and `tsan-test` each ran 625 tests with the two `ItchRealDay`
+tests skipped; `clang-tidy` analysed 121 files in 1,652 s and named the four it could not,
+the Mac, Arm and NEON sources that Linux does not build; coverage was 93.58% of lines and
+97.08% of functions, 256 of 256 required functions reached; `py-compare` ran its fast set of
+132 tests, without `test_real_systems.py`. Then `docs/injected-home.txt`, holding a home path, was added to the export:
+`hygiene` failed with exit 1 on `docs/injected-home.txt:1: absolute home path`, and passed
+again once the file was removed.
+
+Raw logs: `phase3-raw/close-p3/linux-check/`.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
