@@ -2978,6 +2978,47 @@ from the record.
 Raw: `phase3-raw/close-final/`, `prove-full.txt` with `prove-logs/`, and the record as written,
 `check-proofs-full-5a810a2.json`.
 
+### The README's stale lines
+
+The README's Coverage section said "No SIMD kernels exist yet, so none are reported." That has
+been false since `0a03ce5`, which put the dispatch, the scalar set and this processor's own set
+(NEON on arm64, AVX2 and its CPUID check on x86-64) on the required list in
+`scripts/coverage_report.py`: 255 functions on arm64 and 256 on x86-64, counted from
+`required_functions`. The section now lists the groups the script's docstring names, which it
+had left out (the codecs, the container's and the store's readers and writers, the queries,
+CRC32C, the kernels), and gives the gate's last full run: `coverage.sh` inside the full
+`check.sh` of the repo layout work, on the Mac, whose summary records `83cd39b`, reached 255 of
+255, with 93.68% of lines and 97.06% of functions. The C++ of `83cd39b` differs from `5a810a2`'s
+only in comments. It also says that `results/coverage.json` is the summary published at
+`4302ce8`: 204 required functions, with the ITCH store but before the queries and the kernels.
+
+A read of the rest of the README against the tree found four more present-tense lines that
+were false:
+
+- `check.sh` "about 8 minutes on a warm build tree": the last full run took 2,230 s on the Mac
+  with every build warm, so it now reads about 37 minutes.
+- "The two sources a host does not compile": `files_of_other_platforms` in `check.sh` names
+  four on each host, the other operating system's two and the other processor's CRC32C and
+  SIMD kernels, and the last clang-tidy step named four.
+- The bit-flip walk-through flipped byte 721,746,430, "segment 128's timestamp block". The
+  store at the default 2^22 records a segment has 65 segments, so there is no segment 128. The
+  offset is now 878,213,784, bit 1, the middle byte of segment 32's timestamp block, block
+  56537, which is the flip `results/roundtrip-12302019.json` records under G-2. The file is from
+  `1669ae0`, and no commit since has changed the store's code beyond comments.
+- "Each step needs under a minute; the store is 1.45 GB, 5.69 times smaller": the same file
+  records `ingest` at 85 s and `verify` at 38 s on the Mac, and 1,758,234,758 bytes, 4.69
+  times. 1.45 GB and 5.69 were store version 1, at 2^20.
+
+The fault-proof paragraph now says that a full run is 101 runs, 100 faults a check must catch
+and one control no check may notice, in place of "all 101 faults".
+
+Deferred: `scripts/coverage_report.py` still says no SIMD kernel exists, in its docstring and in
+`SIMD_STATEMENT`, which it writes into each summary, so the summaries `check.sh` and CI write
+under `build/` carry that line while their required list holds the kernels. Fixing it changes
+a script, which moves the proof key off `5a810a2` and voids the full re-proof of 8,532 s, so it
+waits for Phase 4 with the republished `results/coverage.json` and one full re-proof after
+both (docs/TASKS.md).
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from

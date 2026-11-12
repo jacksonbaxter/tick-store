@@ -83,7 +83,7 @@ sanitizer build at once have run this shared machine out of memory. Every step r
 a failure. It then prints a summary table, and exits 1 if any step failed.
 
 ```sh
-scripts/check.sh                          # everything, about 8 minutes on a warm build tree
+scripts/check.sh                          # everything, about 37 minutes on the Mac, warm build tree
 scripts/check.sh --quick                  # no sanitizers, fuzzing or coverage, and it says so
 scripts/check.sh --fuzz-seconds 60        # each fuzz target's budget, 20 s by default
 scripts/check.sh --only dev-test,hygiene  # chosen steps, plus the builds they need
@@ -105,7 +105,8 @@ the named results. No step loads a whole day. `ItchRealDay` reads the first 2 mi
 
 A skip is never a pass. A step that cannot run shows as `SKIP`, as `py-compare` does with no
 `.venv`, and a test skipped inside a passing step is named in that row. `ItchRealDay` skips
-this way where the data is absent. The two sources a host does not compile, such as
+this way where the data is absent. The four sources a host does not compile, the other
+operating system's two and the other processor's CRC32C and SIMD kernels, such as
 `src/harness/page_cache_linux.cpp` on macOS, are named as not analysed by clang-tidy.
 
 A warning in a dependency cannot fail the build. `-Werror` is a `PRIVATE` option on our own
@@ -119,11 +120,19 @@ source and header print a warning and the build passes.
 `scripts/coverage.sh` builds the `coverage` preset, runs the unit tests and reports line and
 function coverage per file for `src/` and `include/`, with llvm-cov. It fails if a function on
 the required list in `scripts/coverage_report.py` is missing or was never called: every
-`decode_as` and `encode_as` for the 23 types, every parser and validator entry point, the fuzz
-oracles and the oracle's compare path. `results/coverage.json` is the curated summary, written
-with `--output results/coverage.json`. No SIMD kernels exist yet, so none are reported. llvm-cov
-sees only the C++, so the Python validators are covered by their tests in `tests/scripts/`
-instead.
+`decode_as` and `encode_as` for the 23 types, every parser and validator entry point, the
+codecs' decoders and encoders, the container's and the ITCH store's readers and writers, the
+queries, CRC32C in software and in this processor's hardware kernel, the SIMD kernels (the
+dispatch, the scalar set and this processor's own set, NEON on arm64 or AVX2 and its CPUID
+check on x86-64), the fuzz oracles and the oracle's compare path: 255 functions on arm64 and
+256 on x86-64. The gate's last full run on the Mac, at `83cd39b`, whose C++ differs from
+`5a810a2`'s only in comments, reached all 255, with 93.68% of lines and 97.06% of functions
+covered. `results/coverage.json`, written with `--output results/coverage.json`, is the summary
+as published at `4302ce8`, before the queries and the kernels joined the list: 204 required
+functions, all reached. Its line that no SIMD kernels exist is out of date, and so is the same
+line in each summary the script writes; both wait for Phase 4 ([docs/TASKS.md](docs/TASKS.md)).
+llvm-cov sees only the C++, so the Python validators are covered by their tests in
+`tests/scripts/` instead.
 
 ## Proof that each check can fail
 
@@ -140,9 +149,10 @@ Each fault is a patch in `faults/` or a data mutation in the script. It runs in 
 clone under `build/fault-proofs/`, never the working tree, and no production code knows about
 it. The step must pass on the clean clone, then fail with the expected exit code and the
 expected string in its own log, so a build error cannot pass for a detection. The clone keeps
-one incremental build per preset; proving all 101 faults took 8,532 s, about 2 hours 20
-minutes, on the Mac. `results/check-proofs.json` records each fault, and an undetected one is a
-bug in the check.
+one incremental build per preset. A full run is 101 runs: 100 faults that a check must catch,
+and one control, a comment-only change, that no check may notice. At `5a810a2` it took
+8,532 s, about 2 hours 20 minutes, on the Mac. `results/check-proofs.json` records each run,
+and an undetected fault is a bug in the check.
 
 ## Continuous integration
 
@@ -195,16 +205,17 @@ the footer's CRC:
 
 ```sh
 $tools/tick_roundtrip layout build/12302019.tsc --blocks > build/12302019-layout.json
-$tools/tick_roundtrip flip-bit build/12302019.tsc 721746430 1   # segment 128's timestamp block
+$tools/tick_roundtrip flip-bit build/12302019.tsc 878213784 1   # segment 32's timestamp block
 $tools/tick_roundtrip verify $day build/12302019.tsc --expect-sha256 $pin                  # exits 1
 $tools/tick_roundtrip verify $day build/12302019.tsc --expect-sha256 $pin --no-checksums   # exits 1
-$tools/tick_roundtrip flip-bit build/12302019.tsc 721746430 1
+$tools/tick_roundtrip flip-bit build/12302019.tsc 878213784 1
 $tools/tick_roundtrip verify $day build/12302019.tsc --expect-sha256 $pin                  # exits 0
 ```
 
-Byte 721,746,430 is the middle of segment 128's timestamp block in the store `ingest` writes from
-the pinned day at the default settings; the writer is deterministic, so the offset is the same on
-any host. Each step needs under a minute; the store is 1.45 GB, 5.69 times smaller than the day.
+Byte 878,213,784 is the middle of segment 32's timestamp block, the middle segment of 65, in the
+store `ingest` writes from the pinned day at the default settings; the writer is deterministic,
+so the offset is the same on any host. On the Mac, `ingest` took 85 s and `verify` 38 s; the
+store is 1.76 GB, 4.69 times smaller than the day.
 Results for both pinned days are in `results/roundtrip-12302019.json` and
 `results/roundtrip-10302019.json`, with every byte of each store by column, section and footer in
 `results/store-size-*.json`, and G-1 for one day on Linux in `results/roundtrip-12302019-linux.json`.
