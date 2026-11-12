@@ -3134,6 +3134,90 @@ Raw: `phase4-raw/fullday-precondition/`: `diag.py`, the replay's logs (`debian/a
 `debian/cold.*`), `67ae574`'s guard samples, the gate's work folder logs, the check logs, the
 proof run, and the iteration run's script, logs, part and `.pending` file (`iter/`).
 
+### The final review's codec findings
+
+Reviewer B read the codecs and kernels at `ca96b36` and found one BLOCK, two SHOULD and four
+NOTE findings (B-1 to B-7). Each was confirmed by reading the code and then by a test that failed
+before its fix; one claim in B-6 was wrong. The record is `docs/REVIEW.md`. Timings below are
+Debug builds on the Mac outside `measure.sh`: iteration figures, not results.
+
+B-1, the dictionary decoder's repeat check. Confirmed: the hash set took bits 32 and up of
+`value * 0x9E3779B97F4A7C15`, so entries agreeing in their low 32 + log2(slots) bits share a
+slot. `scan_for_repeats` now reports its steps, every slot looked at, and the failing test counted
+536,887,296 steps for 32,768 entries `k << 48` (K(K + 1) / 2) and 524,800 for 1,024; the same with
+`k` times the multiplier's inverse, whose products are all below 2^32. The reviewer's block, both
+nested PFOR blocks delta-coded, is 738 bytes and took 1,507 ms to decode; as a crasher it took
+the dictionary replay from 3.8 s to 17.7 s. The fix keeps the hash set, which came in with `da20832`'s
+decoder changes (dictionary decoding from 7.05–7.42 to 2.41–3.53 ns a value, all of them
+together), and gives it a budget of 4 steps an entry plus 16:
+past that it sorts a copy and looks for a neighbouring pair, counting the comparisons, so the
+work is at most 5 K + 17 steps and the sort, O(K log K). The block now decodes in 8 ms and the
+replay takes 5.2 s. What was tried: taking the product's top log2(slots) bits, the true Fibonacci
+hash the comment named. On arithmetic progressions of 16 to 2^20 values with steps of 1 to 2^32
+(`b1-pattern-steps*.txt`) it spread no better: the original hash ran past the budget on 16 values
+of step 64, 65,536 of steps 2, 4 and 10, and 2^20 of steps 4, 64 and 1,000; the top bits on
+65,536 of step 65,536 and 2^20 of steps 10,000 and 65,536, and they took up to 2.9 steps an entry
+at 2,048 and 16,384 values, where the original stays under 2. Any fixed hash can be defeated, so
+the budget is the fix, and the hash stayed as measured. The fuzz corpus on the Mac,
+1,373 inputs, holds 75,373 ranked blocks whose dictionary decodes: the largest has 2,418 entries,
+the most steps any took is 2,964, and none took more than 2 steps an entry, so the fuzzer had come
+nowhere near the 16,384 an entry of the hostile block, and no block in it reaches the sort. The
+block is now `tests/unit/crashers/dictionary/timeout-entries-in-one-hash-slot` and a seed from
+`generate_seeds`.
+
+B-2. The scalar-capped run's filter lacked `RunLength`, `PatchList` and `CodecRegistry`, and also
+`CodecEval`, whose harness decodes PFOR and Stream VByte; 34 tests joined it, and the run went
+from 257.9 s to 267.6 s. No injected kernel fault can show the gap: `SimdKernels` checks the
+scalar set against its references directly on every host, so the run adds the codecs' own edge
+cases under the scalar dispatch, which is what the comment promised.
+
+B-3. The reviewer's arithmetic holds. A sorted dictionary of 0 to 2,047 and 2^20 ranks of 2,047 is
+a valid 7,342-byte block; it decodes to 2,047, 2,046, ..., 0 over and over, and moves
+2,146,435,072 16-bit entries, 4.29 GB, in 0.162 s. A store piece's 16,384 such values are 286
+bytes and 67 MB of moves. No format change: `docs/store.md`'s worst case now states the cost and
+what a reader of untrusted files should assume, and a test pins the 286-byte block.
+
+B-4. `decode_column` decoded 1,048,576 values of a block before refusing it against a count of
+1. It now reads each block's count first, as the query path's piece index already did, and refuses
+with the same error and values; a count of 0 or past the cap is still the block decoder's to refuse.
+
+B-5. The columns oracle read a frame's prefix before checking its length. Not reachable, since
+`rebuild_row` always gives a whole frame; the check moved into `frame_states_its_size`, whose test
+crashed on an empty frame (SIGSEGV) before the reorder.
+
+B-6. Confirmed that no decoder calls `unpack_delta_narrow` and that PFOR calls `unpack_delta` only
+where `fuse_delta` is set, AVX2 alone. But the narrow kernels check their own precondition and
+fall back to `unpack_delta` (`kernels_neon.cpp`, `kernels_avx2.cpp`), and the kernel test passes
+bases on both sides of it, so the reviewer's "a future caller would inherit a precondition nothing
+enforces" does not hold. Only the comment changed; no kernel was deleted. Which kernels the store
+calls, from every call site: on every set `unpack_vector`, `unpack_linear`, `add_base` and
+`delta_pass`; on AVX2 also `unpack_delta`, for full delta vectors with no exceptions. Stream
+VByte's `svb_decode` and `prefix_sum` are never on the store's path, since the store writes and
+reads only PFOR, dictionary, run-length, raw and zstd. Bench and tests only: `unpack_delta` on
+scalar and NEON, `unpack_delta_narrow` on every set, and each set's unchosen prefix-sum form. Of
+the decode targets, DS-3's two-pass NEON form and DS-4's fused AVX2 form are the store's own;
+DS-3's fused NEON companion is bench-only, and DS-8's `delta_of_delta_decode` is reached only by a
+PFOR block of transform 3, which the store's writer never chooses. The full list is
+`fix-codecs/kernels-in-use.md` in the raw folder.
+
+B-7. Two 1,025-value PFOR columns joined the unit suite's integer oracle test: a clock by delta
+with no exceptions and prices by frame of reference with one. Their first try, a clock starting at
+34.2 * 10^12, put an exception in the vector, since a delta block's first delta is its first
+value, so AVX2 would not have fused it; the clock starts at 40 now, and the encoder's stats pin
+the shape. Trying every cut and flip of both took the test from 10.5 s to 74 s; a cut at each of
+the first 24 bytes and every 97 after, and a flip every 7 bits there and every 257 after, take it
+to 16 s. With `values[1023] ^= 1` injected in NEON's `unpack_vector`, the 40-value columns passed
+and the new ones failed 92 times.
+
+The TASKS item on PFOR's fuzz oracle checking values, not bytes, is closed with its evidence there.
+With the tail-padding refusal removed from `decode_pfor_block`, `Pfor.EachVectorCorruptionHasItsError`
+failed and `FuzzOracles.PassEveryCutAndFlipOfAnIntegerColumn` and the PFOR, dictionary and
+run-length crasher replays passed, as the item says.
+
+Raw: `phase4-raw/fix-codecs/`: each finding's failing and passing logs, the helpers in `tools/`
+(the hostile block, the corpus scan, the hash patterns, the worst move-to-front block),
+`kernels-in-use.md` and the check logs.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from

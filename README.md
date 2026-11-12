@@ -46,6 +46,8 @@ comparison to cpu4 and cpu6. macOS figures come from an Apple M4 Max, unpinned.
 - `BENCHMARKS.md`: the targets, and the published figure each one comes from.
 - [docs/NOTES.md](docs/NOTES.md): what was tried, including what did not help, with numbers.
 - [docs/TASKS.md](docs/TASKS.md): the plan.
+- [docs/REVIEW.md](docs/REVIEW.md): the final review's findings, each with the test that
+  showed it failing and the commit that fixed or closed it.
 
 ## Data
 
