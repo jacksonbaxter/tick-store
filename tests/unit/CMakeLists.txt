@@ -64,8 +64,10 @@ gtest_discover_tests(tick_store_unit_tests DISCOVERY_TIMEOUT 60)
 
 # The same codec, store and query tests again with the kernels capped to the scalar set,
 # so the path every processor can fall back to runs everywhere (S1). SimdDispatch fails
-# here if the cap did not take (S6).
+# here if the cap did not take (S6). Every codec suite whose decodes reach the kernels is
+# here: run-length and the registry decode nested PFOR blocks, patch lists unpack by the
+# kernels, and the codec evaluation decodes PFOR and Stream VByte (B-2, docs/REVIEW.md).
 add_test(NAME simd_capped_to_scalar
     COMMAND tick_store_unit_tests
-        "--gtest_filter=Simd*:Pfor*:StreamVByte*:Dictionary*:LanePack*:LinearPack*:ItchStore*:ItchQuery*:FuzzOracles*:FuzzRegression*")
+        "--gtest_filter=Simd*:Pfor*:StreamVByte*:Dictionary*:RunLength*:LanePack*:LinearPack*:PatchList*:CodecRegistry*:CodecEval*:ItchStore*:ItchQuery*:FuzzOracles*:FuzzRegression*")
 set_tests_properties(simd_capped_to_scalar PROPERTIES ENVIRONMENT "TICK_STORE_SIMD=scalar")
