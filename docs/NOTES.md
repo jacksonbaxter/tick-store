@@ -3028,6 +3028,112 @@ the README, `readme-headline-hand-edit`, `readme-headline-markers-removed` and
 
 Raw: `phase3-raw/readme-accuracy/`, the check logs and `prove-only.txt` with its logs.
 
+## Phase 4 notes
+
+### The full day's source precondition
+
+The orchestrator's Phase 3 gate ran tick-store alone on the full day at `ca96b36` on debian,
+`compare/run.py --day 12302019 --systems tickstore --variants v3-seg4Mi,v3-seg1Mi` under
+`measure.sh`, three times. Each stopped at the first write: `ToolFailure: the source is not
+resident before the write`. tick-store's write reads the day's ITCH file, 8,251,407,909 bytes,
+2,014,504 pages, and `compare/systems/tickstore.py` requires every page resident before its clock
+starts, after one `tick_coldcache warm`, which reads the file through with `read()`. The
+four-system day at `67ae574` passed the same check on all four of tick-store's writes, and no
+harness code on that path changed since.
+
+**What the cache holds when it fails.** A replay on debian at `ca96b36` (`diag.py` in the raw
+folder, through `heavy.sh` on cpus 2, 6 and 7, iteration only) made the reads `run_system.py`
+makes before the first write, in its order: the pin's SHA-256 over the source, `tick_roundtrip
+verify-columns` over the source and the 23.9 GB export, the numpy ground truth, then the warm.
+Residency came from `tick_coldcache residency`, a per-page `mincore` map of the source in 64
+parts, `/proc/meminfo` and `/proc/vmstat`:
+
+| Step (start as the gate left it) | Source pages | Export pages | MemAvailable | Cached |
+|---|---|---|---|---|
+| start | 1,552,356 | 1,282,116 | 14.84 GB | 13.96 GB |
+| after verify-columns | 627,226 | 2,317,000 | 15.01 GB | 14.26 GB |
+| after the ground truth | 593,221 | 2,355,575 | 15.07 GB | 14.28 GB |
+| warm 1, the precondition's | 1,709,646 | 1,252,448 | 15.06 GB | 14.34 GB |
+| warm 2, nothing evicted | 1,725,924 | 1,252,410 | 15.06 GB | 14.40 GB |
+| the export evicted | 1,725,924 | 0 | 15.06 GB | 9.27 GB |
+| warm 3 | **2,014,504** | 0 | 15.06 GB | 10.46 GB |
+
+The first warm left 1,709,646 of 2,014,504 pages, as the orchestrator's 1,729,873. The missing
+pages were the file's own first quarter: the warm read them, then reclaim dropped them while it
+read the rest. Each warm stole about 1.78 M file pages and refaulted as many, while the export
+kept 1.25 M pages, 5.1 GB, untouched since the ground truth. A second warm added 16,278 pages,
+so reading again is no fix. With the export evicted, one warm made the file wholly resident.
+The pages the export kept follow what the ground truth read through numpy's mappings: in the
+cold-start replay below, `shares.bin`, which Q5 sums over the whole day, kept 205,550 of its
+262,447 pages, and the 8-byte columns 65 K to 126 K pages each. With source, export and every other file the replay read
+evicted, 2.2 GB of the page cache belonged to other files on the host.
+
+**What was ruled out.**
+- *The cache as the gate left it.* The same replay from a cold start, the source and the export
+  evicted first and 12.4 GB free, as tick-store's run began at `67ae574` after ArcticDB's run had
+  evicted both and deleted its store, failed the same way: 1,734,378 pages after the warm, the
+  export keeping 1,237,811.
+- *Other inputs and stores.* At every step itch-orderbook's copy of the day, the `.gz` the data
+  folder links to, the slice, the slice's export and `build/simd-day.tsc` held 0 pages. The work
+  folders `build/compare`, `build/compare-iteration`, `build/compare-smoke` and the gate's own held
+  no store.
+- *Harness changes.* `git diff 67ae574 ca96b36` touches the off-Linux tick-store day and comments
+  on this path, nothing that runs before a Linux write.
+
+**Why `67ae574` passed is not fully explained.** Its guard recorded 15.41 GB available when
+tick-store's run began, against 15.05 GB at the gate and 15.06 GB in the replay: 0.36 GB more,
+short of the 1.15 to 1.25 GB the warm misses now. What else the page cache held that day was not
+recorded. The precondition sits close to the host's limit: the source, 8.25 GB, has to fit beside
+the 5.1 GB of the export that reclaim keeps and the other files' 2.2 GB. Reclaim here is the
+multi-generation LRU (`/sys/kernel/mm/lru_gen/enabled` reads `0x0007`, `min_ttl_ms` 0); a plain
+LRU would have dropped the export's older pages first. Its generations are in debugfs, which a
+normal user cannot read, and turning it off is a host change, so which part of its policy keeps
+those pages was not tested. What would have falsified the cause found: the warm reaching every
+page with the export still resident, or still falling short with it evicted. Neither happened.
+
+**The fix** (`compare/systems/tickstore.py`, `warm_source`). Before the clock, as before, one warm.
+If it leaves the source short on a day, the day's export, which tick-store's write never reads, is
+evicted through `coldcache.evict` (the proof at 0 resident, the quiet second and the refill
+wait), and the source is read through once more. If it is still short, or short on the slice, the
+run stops with the pages resident against those wanted, the reads made, MemAvailable, MemFree and
+Cached, and the largest holders of the page cache under the data and work folders, a directory
+such as the export counted as one (`coldcache.cache_holders`, new, called only here). The write's
+`input_resident` records the reads, the first read's pages and the eviction. A write whose first
+warm succeeds runs exactly as before, so the slice and every write of `67ae574` are unchanged.
+The eviction only advances what the read-back after the write does anyway: `evict_inputs`
+evicts the source and the export before every full-day read-back.
+
+The other systems share none of it. Their writes read the export inside their clocks, and a day's
+export cannot be held resident here, so there is no export precondition to match; on the slice the
+export is loaded into an Arrow table before their clocks. The functions the fix calls in
+`compare/coldcache.py`, `warm`, `evict`, `residency` and `meminfo_bytes`, are the ones every
+system's cold and warm proofs already use, unchanged. `run_system.py` and `worker.py` are
+unchanged, so no system's timing moved.
+
+**The fault.** `tickstore-source-warm-no-eviction` reads the source again without evicting the
+export. `tests/compare/test_tickstore.py` (`SourcePrecondition`) fails on it, and
+`prove_checks.py --only tickstore-source-warm-no-eviction` through `heavy.sh` gave PROVEN. That run
+rewrote `results/check-proofs.json`, which was restored; the full re-proof at the end of the phase
+covers it. The README's fault-proof paragraph counts 101 runs, which is now 102.
+
+**On debian after the fix**, an iteration run at `4c049c7`, run as the gate ran it (the bench
+build through `heavy.sh`, then `compare/run.py --day 12302019 --systems tickstore --variants
+v3-seg4Mi` under `measure.sh`), went through every step of tick-store's day. The class A write
+took the new path: the first warm left 1,700,243 of 2,014,504 pages, the export was evicted,
+5,825,603 pages to 0 in one pass, and the second warm left 2,014,504. Class B's write, after the
+read-back's own eviction, needed one warm. Both read-backs passed the oracle. As a sanity check
+only, not a measurement to report: the writes took 182.0 s in class A and 183.6 s in class B,
+against 195.3 s and 188.9 s at `67ae574`, and Q2 warm's median was 74.20 ms against 74.32 ms. Then
+`compare/run.py` refused its own document, as it must for a four-system day with three systems
+missing and no variant selection, exited 1 and kept the `.pending` file; the gate's command can
+produce no results file, and `compare/README.md` now says how to read tick-store's figures from
+such a run. The work folder and the gate's `build/compare-orchestrator-gate`, which held no store,
+were removed after their logs were copied.
+
+Raw: `phase4-raw/fullday-precondition/`: `diag.py`, the replay's logs (`debian/asis.*`,
+`debian/cold.*`), `67ae574`'s guard samples, the gate's work folder logs, the check logs, the
+proof run, and the iteration run's script, logs, part and `.pending` file (`iter/`).
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
