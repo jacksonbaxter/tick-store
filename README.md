@@ -151,8 +151,12 @@ step group, on a pinned LLVM. The steps are the same as a local run, and
 absent on CI, so `ItchRealDay` skips visibly, and with no `.venv`, `py-compare` shows as `SKIP`.
 
 It is validated locally by actionlint with shellcheck. On GitHub, the first run failed 10 of
-its 14 jobs; the causes and fixes are in `docs/NOTES.md`, "The first runs on GitHub Actions". All 14
-jobs passed at `ad542fd`, in [run 41825067372](https://github.com/jacksonbaxter/tick-store/actions/runs/41825067372).
+its 14 jobs; the causes and fixes are in `docs/NOTES.md`, "The first runs on GitHub Actions". All
+14 first passed at `ad542fd`, in
+[run 41825067372](https://github.com/jacksonbaxter/tick-store/actions/runs/41825067372). The
+workflow has gained jobs since, and
+[its runs on `main`](https://github.com/jacksonbaxter/tick-store/actions/workflows/ci.yml?query=branch%3Amain)
+give each commit's result, job by job.
 
 ## Round-trip check
 
