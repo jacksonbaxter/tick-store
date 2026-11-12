@@ -91,6 +91,17 @@ struct Rebuilt {
     std::vector<std::byte> tail;
 };
 
+// Whether a frame the parser gave is whole: a 2-byte big-endian size, then that many bytes,
+// at least one.
+[[nodiscard]] inline bool frame_states_its_size(std::span<const std::byte> bytes) {
+    if (bytes.size() < 3) {
+        return false;
+    }
+    const std::uint64_t declared =
+        (std::to_integer<std::uint64_t>(bytes[0]) << 8U) | std::to_integer<std::uint64_t>(bytes[1]);
+    return declared == bytes.size() - 2;
+}
+
 // Reads a directory to its end. nullopt means it was refused somewhere, with the refusal
 // proven repeatable. A broken property sets `failure`.
 [[nodiscard]] inline std::optional<Rebuilt> read_columns(const ColumnSections& input_sections,
@@ -137,9 +148,7 @@ struct Rebuilt {
             break;
         }
         const std::span<const std::byte> bytes = **frame;
-        const std::uint64_t declared =
-            (std::to_integer<std::uint64_t>(bytes[0]) << 8U) | std::to_integer<std::uint64_t>(bytes[1]);
-        if (bytes.size() < 3 || declared != bytes.size() - 2) {
+        if (!frame_states_its_size(bytes)) {
             failure = "a frame's prefix does not state its size";
             return std::nullopt;
         }

@@ -36,6 +36,7 @@
 #include <fstream>
 #include <ios>
 #include <iterator>
+#include <memory>
 #include <span>
 #include <string>
 #include <utility>
@@ -210,6 +211,21 @@ TEST(FuzzOracles, PassEveryCutAndFlipOfAColumnDirectory) {
         EXPECT_EQ(text(store::oracle::check_columns(flipped)), "") << "byte " << byte;
         flipped[byte] ^= static_cast<std::byte>(1U << bit);
     }
+}
+
+// The columns oracle's check of a frame from the parser refuses one too short to hold its
+// own size without reading past it (B-5 of the final review, docs/REVIEW.md): no input gives
+// such a frame today, but the oracle is there for the day the parser does. Empty, and one
+// byte in a heap block of its own, so ASan sees a read past it.
+TEST(FuzzOracles, TheColumnsFrameCheckRefusesAFrameTooShortToStateItsSize) {
+    EXPECT_FALSE(store::oracle::frame_states_its_size(std::span<const std::byte>{}));
+    const auto one = std::make_unique<std::byte[]>(1);
+    EXPECT_FALSE(store::oracle::frame_states_its_size(std::span<const std::byte>{one.get(), 1}));
+    EXPECT_FALSE(store::oracle::frame_states_its_size(exact_copy(Bytes(2, std::byte{0}))));
+    EXPECT_TRUE(store::oracle::frame_states_its_size(
+        exact_copy(Bytes{std::byte{0}, std::byte{1}, std::byte{0x41}})));
+    EXPECT_FALSE(store::oracle::frame_states_its_size(
+        exact_copy(Bytes{std::byte{0}, std::byte{2}, std::byte{0x41}})));
 }
 
 // The golden container, cut at every length and with every bit flipped in turn, and a
