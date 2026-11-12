@@ -182,6 +182,30 @@ class Allocated(unittest.TestCase):
         self.assertEqual(report["apparent_bytes"], 10000)
 
 
+class CacheHolders(unittest.TestCase):
+    def test_what_holds_the_cache_by_file_and_directory_largest_first(self):
+        (REPO_ROOT / "build").mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "build") as directory:
+            root = Path(directory)
+            data, outside = root / "data", root / "outside"
+            (data / "export" / "day").mkdir(parents=True)
+            outside.mkdir()
+            for path in (data / "source", data / "slice", data / "export" / "day" / "a.bin",
+                         data / "export" / "day" / "b.bin", outside / "copy.gz"):
+                path.write_bytes(b"x")
+            os.symlink(outside / "copy.gz", data / "copy.gz")
+            pages = {"source": 900, "slice": 0, "a.bin": 30, "b.bin": 50, "copy.gz": 70}
+
+            def tool(layout, command, paths):
+                self.assertEqual(command, "residency")
+                return 0, {"resident_pages": pages[Path(paths[0]).name]}
+
+            with mock.patch.object(coldcache, "_tool", tool):
+                found = coldcache.cache_holders(None, [data], leave_out=[data / "source"])
+        self.assertEqual(found, [(str(data / "export" / "day"), 80),
+                                 (str(data / "copy.gz"), 70)])
+
+
 
 @unittest.skipUnless(platform.system() == "Linux", "reads /proc/<pid>/io")
 class ProcessReadsOnLinux(unittest.TestCase):

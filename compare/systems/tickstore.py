@@ -89,6 +89,29 @@ class ToolFailure(Exception):
     """A tick-store tool exited non-zero or gave an answer that is not one."""
 
 
+MEMORY_FIELDS = ("MemAvailable", "MemFree", "Cached")
+
+
+def _gigabytes(value):
+    return "not available on this host" if value is None else f"{value / 1e9:.2f} GB"
+
+
+def not_resident_message(source, record, memory, holders):
+    """Why the write cannot start: the source's pages resident against those wanted, after
+    which warms, the memory there was, and what else holds the page cache."""
+    steps = f"{record['warms']} read{'s' if record['warms'] > 1 else ''} through"
+    if "evicted_before_second_warm" in record:
+        evicted = record["evicted_before_second_warm"]
+        steps += (f" ({record['first_warm_resident_pages']} pages after the first; then the "
+                  f"day's export evicted, {evicted['pages']} pages, "
+                  f"{evicted['resident_after']} left)")
+    held = "; ".join(f"{path} {pages} pages" for path, pages in holders) or "nothing found"
+    return (f"the source is not resident before the write: {record['resident_pages']} of "
+            f"{record['pages']} pages of {source} resident after {steps}. Memory: "
+            + ", ".join(f"{field} {_gigabytes(value)}" for field, value in memory.items())
+            + f". Other files holding the page cache, under the data and work folders: {held}")
+
+
 def allowed_codecs(column):
     codec, zstd = COLUMN_CODECS[column]
     return {codec, "zstd"} if zstd else {codec}
@@ -288,11 +311,43 @@ class TickStoreSystem(System):
         and no table is built."""
         return self.ingest(columns, None)
 
+    def warm_source(self, source, columns):
+        """The write's precondition, before its clock: the source wholly resident, read through
+        by tick_coldcache warm. Returns the record kept with the write.
+
+        On a day, a short first warm gets one more: the day's export, which tick-store's write
+        never reads and which the oracle and the ground truth have just read, is evicted, proven
+        at 0 resident, and the source is read through again. On debian at ca96b36 reclaim kept
+        about 5.1 GB of the export's pages and dropped the source's own, so one read left 1.71 M
+        to 1.73 M of its 2.01 M pages resident, and a second read added 16 K: see "The full
+        day's source precondition" in docs/NOTES.md. The read-back's eviction of the inputs
+        comes after the write anyway. A source still short stops the run, saying what stopped
+        it. Nothing here is inside the write's clock."""
+        layout = self.context.layout
+        warmed = coldcache.warm(layout, [source])
+        record = {"pages": warmed["pages"], "resident_pages": warmed["resident_pages"],
+                  "warms": 1}
+        if warmed["resident_pages"] == warmed["pages"]:
+            return record
+        record["first_warm_resident_pages"] = warmed["resident_pages"]
+        if self.context.full_day:
+            evicted = coldcache.evict(layout, [columns.directory])
+            warmed = coldcache.warm(layout, [source])
+            record.update({"resident_pages": warmed["resident_pages"], "warms": 2,
+                           "evicted_before_second_warm": {
+                               "what": "the day's export, which this write does not read",
+                               "pages": evicted["pages"],
+                               "resident_after": evicted["resident_pages"],
+                               "passes": evicted["passes"], "method": evicted["method"]}})
+            if warmed["resident_pages"] == warmed["pages"]:
+                return record
+        raise ToolFailure(not_resident_message(
+            source, record, {field: coldcache.meminfo_bytes(field) for field in MEMORY_FIELDS},
+            coldcache.cache_holders(layout, [layout.data, layout.work], leave_out=[source])))
+
     def ingest(self, columns, table):
         source = self._source()
-        warmed = coldcache.warm(self.context.layout, [source])
-        if warmed["resident_pages"] != warmed["pages"]:
-            raise ToolFailure("the source is not resident before the write")
+        warmed = self.warm_source(source, columns)
         self.expected_records = columns.records
         command = self.ingest_command(source, self.store_path, self.mode)
         started = time.perf_counter()
@@ -308,8 +363,7 @@ class TickStoreSystem(System):
                                "the source, parsing ITCH, coding and writing the store, and its "
                                "commit",
                 "input": FULL_DAY_INPUT_STATEMENT if self.context.full_day else INPUT_STATEMENT,
-                "input_resident": {"pages": warmed["pages"],
-                                   "resident_pages": warmed["resident_pages"]},
+                "input_resident": warmed,
                 "records": report["records"], "stored_file_bytes": report["stored_file_bytes"],
                 "tool_peak_rss_bytes": report["peak_rss_bytes"], "flushes": report["flushes"],
                 "clock_stops": "when tick_roundtrip exits, after the rename that publishes the "

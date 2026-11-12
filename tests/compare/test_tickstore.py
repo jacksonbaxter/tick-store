@@ -13,6 +13,7 @@ import sys
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
@@ -22,6 +23,7 @@ try:
 except ImportError:
     raise unittest.SkipTest("needs the .venv: compare/setup.py makes it") from None
 
+from compare import coldcache  # noqa: E402
 from compare.durability import CLASS_A, CLASS_B  # noqa: E402
 from compare.queries import (ADD_ORDER_TYPES, ROW_COLUMNS, Query, aggregate_digest,  # noqa: E402
                              digest_result)
@@ -334,6 +336,100 @@ class Ingest(unittest.TestCase):
         owner = TickStoreSystem(RunContext(layout, Path("root"), "v3-seg4Mi", CLASS_A, DAY))
         with self.assertRaisesRegex(ToolFailure, "gave none"):
             owner._source()
+
+
+PAGES = 2_014_504
+EXPORT = Path("/nonexistent/data/export/12302019-full")
+MEMORY = {"MemAvailable": 14_724_488_192, "MemFree": 370_948_096, "Cached": 13_843_780_608}
+
+
+class SourcePrecondition(unittest.TestCase):
+    """The source wholly resident before the write's clock, and what happens when one read
+    through does not make it so: on a day the export goes and the source is read again, and a
+    source still short stops the run with what stopped it."""
+
+    def run_ingest(self, resident, full_day=True):
+        """ingest with the tools faked. `resident` is the pages each warm leaves. Returns the
+        write's timings and every call in order."""
+        owner = system(CLASS_A, full_day=full_day)
+        calls = []
+        warms = iter(resident)
+
+        def warm(layout, paths):
+            calls.append(("warm", [str(path) for path in paths]))
+            return {"pages": PAGES, "resident_pages": next(warms)}
+
+        def evict(layout, paths):
+            calls.append(("evict", [str(path) for path in paths]))
+            return {"pages": 5_825_603, "resident_pages": 0, "passes": 1, "method": "m"}
+
+        def holders(layout, roots, leave_out=()):
+            calls.append(("holders", [str(path) for path in leave_out]))
+            return [(str(EXPORT), 1_282_116), ("/nonexistent/data/slices", 12)]
+
+        def run_ingest(command):
+            calls.append(("write", command[1]))
+            return {"wall_seconds": 1.0, "records": 9, "stored_file_bytes": 1,
+                    "peak_rss_bytes": 1, "flushes": []}
+
+        owner.context.layout.data = Path("/nonexistent/data")
+        owner.context.layout.work = Path("/nonexistent/work")
+        owner._run_ingest = run_ingest
+        columns = SimpleNamespace(directory=EXPORT, records=9)
+        with mock.patch.object(coldcache, "warm", warm), \
+                mock.patch.object(coldcache, "evict", evict), \
+                mock.patch.object(coldcache, "cache_holders", holders), \
+                mock.patch.object(coldcache, "meminfo_bytes", MEMORY.get):
+            try:
+                return owner.ingest(columns, None), calls
+            except ToolFailure as failure:
+                return failure, calls
+
+    def test_a_resident_source_is_read_once_and_nothing_is_evicted(self):
+        for full_day in (False, True):
+            timings, calls = self.run_ingest([PAGES], full_day=full_day)
+            self.assertEqual(calls, [("warm", ["/nonexistent/slice.itch"]),
+                                     ("write", "ingest")])
+            self.assertEqual(timings["input_resident"],
+                             {"pages": PAGES, "resident_pages": PAGES, "warms": 1})
+
+    def test_a_short_warm_on_a_day_evicts_the_export_and_reads_the_source_again(self):
+        timings, calls = self.run_ingest([1_729_873, PAGES])
+        self.assertEqual(calls, [("warm", ["/nonexistent/slice.itch"]),
+                                 ("evict", [str(EXPORT)]),
+                                 ("warm", ["/nonexistent/slice.itch"]),
+                                 ("write", "ingest")])
+        record = timings["input_resident"]
+        self.assertEqual((record["pages"], record["resident_pages"], record["warms"],
+                          record["first_warm_resident_pages"]), (PAGES, PAGES, 2, 1_729_873))
+        self.assertEqual(record["evicted_before_second_warm"]["resident_after"], 0)
+
+    def test_a_source_still_short_stops_the_run_saying_what_stopped_it(self):
+        failure, calls = self.run_ingest([1_729_873, 1_900_000])
+        self.assertIsInstance(failure, ToolFailure)
+        self.assertNotIn("write", [call[0] for call in calls])
+        self.assertEqual(calls[-1], ("holders", ["/nonexistent/slice.itch"]))
+        message = str(failure)
+        for text in ("the source is not resident before the write: 1900000 of 2014504 pages",
+                     "after 2 reads through (1729873 pages after the first; then the day's "
+                     "export evicted, 5825603 pages, 0 left)",
+                     "MemAvailable 14.72 GB, MemFree 0.37 GB, Cached 13.84 GB",
+                     f"{EXPORT} 1282116 pages; /nonexistent/data/slices 12 pages"):
+            self.assertIn(text, message)
+
+    def test_a_short_warm_on_the_slice_evicts_nothing_and_stops(self):
+        failure, calls = self.run_ingest([10], full_day=False)
+        self.assertIsInstance(failure, ToolFailure)
+        self.assertEqual([call[0] for call in calls], ["warm", "holders"])
+        self.assertIn("10 of 2014504 pages of /nonexistent/slice.itch resident after 1 read "
+                      "through. Memory:", str(failure))
+
+    def test_memory_a_host_cannot_read_is_said(self):
+        message = tickstore.not_resident_message(
+            "s", {"pages": 2, "resident_pages": 1, "warms": 1}, {"MemAvailable": None}, [])
+        self.assertIn("MemAvailable not available on this host", message)
+        self.assertIn("holding the page cache, under the data and work folders: nothing found",
+                      message)
 
 
 if __name__ == "__main__":

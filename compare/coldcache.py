@@ -67,6 +67,29 @@ def warm(layout, paths):
     return _tool(layout, "warm", paths)[1]
 
 
+def cache_holders(layout, roots, leave_out=(), largest=8):
+    """[(path, resident pages)], largest first and at most `largest` of them: what holds the
+    page cache under `roots`, when a file cannot be made resident. A file directly under a root
+    counts alone; a file deeper down counts with its directory, so the day's export or a store
+    is one entry. A symlink is read at its target. `leave_out` and anything already seen are
+    skipped, and nothing with no resident page is listed. One call per file, milliseconds each."""
+    skip = {Path(path).resolve() for path in leave_out}
+    found = {}
+    for root in roots:
+        root = Path(root)
+        members = [root] if root.is_file() else sorted(root.rglob("*")) if root.is_dir() else []
+        for path in members:
+            target = path.resolve()
+            if target in skip or not target.is_file():
+                continue
+            skip.add(target)
+            pages = residency(layout, [target])["resident_pages"]
+            if pages:
+                holder = str(path if path.parent == root else path.parent)
+                found[holder] = found.get(holder, 0) + pages
+    return sorted(found.items(), key=lambda item: -item[1])[:largest]
+
+
 def evict(layout, paths, wait_seconds=EVICTION_WAIT_SECONDS, sleep=time.sleep,
           clock=time.monotonic):
     """Returns the tool's proof, or raises if pages stay resident.
