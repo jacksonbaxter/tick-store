@@ -2802,6 +2802,47 @@ again once the file was removed.
 
 Raw logs: `phase3-raw/close-p3/linux-check/`.
 
+### The full fault re-proof at d307a31
+
+`scripts/prove_checks.py --force` ran every fault through `heavy.sh` under `/usr/bin/time -l` at
+source commit `d307a31`: 8,339 s, a maximum resident set of 1.50 GB and a peak memory footprint
+of 113 MB. Of its 92 faults, 89 were PROVEN and the control UNDETECTED, so 90 of 92 came out as
+expected. The sibling meter's new fault, `sibling-meter-whole-uptime`, was among the 89. Two
+were not, and neither was a check that had broken:
+
+- `fuzz-container-metadata-start` was WRONG REASON: `fuzz-container` ended BLOCKED, because
+  `fuzz-build` failed first. Since `7ebb81b` the seed generator takes real store files apart
+  with the container parser and rebuilds them, so a parser that starts the metadata one byte
+  late misreads every valid file, and the generator aborts with exit 134 on `invalid argument:
+  codec id`. The fault is now registered on `fuzz-build` with that exit and message. To keep a
+  fault on `fuzz-container`, `fuzz-container-block-reserved` stops refusing a block entry whose
+  reserved field is not zero, which only a corrupt file shows; a generated seed sets it to 1.
+- `fuzz-itch-store-distance-bound` was UNDETECTED: 135,020 runs in 45 s at seed 1, clean. It
+  had been proven once, alone, when it was added, and never in a full run. Four runs at seed 1
+  in the prove clone: one found it, at 43 s after 84,029 runs; the full run's 45 s did not, nor
+  did two runs at CI's 240 s budget, of 555,923 and 581,679 runs. With one seed and one corpus,
+  libFuzzer's runs still differ, and this fault is found by chance. A longer budget is therefore
+  no fix. Seven other single-check patches, each run once for 45 s, were not caught either:
+  `store-metadata-records`, `store-segment-records-sum`, `store-piece-value-count`,
+  `store-piece-index-next`, the column value count, the type symbol and the writer's
+  `itch-store-import-not-appended`. The decoder's checks overlap, so one removed is masked by
+  another. The oracle compares only what files read as, so a check on a field that changes no
+  record goes unseen. And a writer fault also writes the seeds, which the reader then refuses.
+  The patch is now `store-ref-distance-bound` on `dev-test`, where
+  `ItchStoreCorrupt.ValuesThatBreakTheRulesTyingColumnsTogether` sets a distance past its list.
+  `fuzz-itch-store-tracking-misread` makes the decoder read every tracking number one high: a
+  file read wrong comes back wrong twice through the writer, and the step fails on its 7th
+  input with `check_itch_store: the rewritten file reads back differently`. A seed with a
+  distance past its list is carried to Phase 4, since it changes the fuzz build and so G-3.
+
+`prove_checks.py --only` then ran the four changed faults at the same source commit, through
+`heavy.sh` under `/usr/bin/time -l`: all four PROVEN in 137 s, with a 619 MB maximum resident
+set. `results/check-proofs.json` holds all 94 entries at `d307a31`: 93 PROVEN, and the control
+UNDETECTED.
+
+Raw logs: `phase3-raw/close-p3/reproof/`, with the four-run study and the seven patches under
+`investigate/distance-bound/`.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
