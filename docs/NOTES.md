@@ -2890,6 +2890,63 @@ modes, and only `markdown` mode shows the README as the repository page does.
 
 Raw: `phase3-raw/readme/`, the renders and `prove-only-9f77e52.txt` with its logs.
 
+### Repo layout: CLAUDE.md, docs/ and the licence
+
+At the user's request, three changes to what the repository holds, and none to the store.
+
+- `CLAUDE.md` is no longer tracked (`eb72b71`): `git rm --cached`, and `/CLAUDE.md` in
+  `.gitignore`. The file stays on disk, and history is not rewritten, so every commit a results
+  file cites still exists. No check or test named it, and it named neither moved file.
+- `NOTES.md` and `TASKS.md` moved to `docs/` with `git mv` (`2596d04`). At `83cd39b`, 93
+  references in 29 files named them; all 93 now read `docs/NOTES.md` or `docs/TASKS.md`, and
+  `git grep -E '(^|[^/])(NOTES|TASKS)\.md'` finds none. 17 are C++ comments, and the C++ diff is
+  comment-only. The reference in `scripts/targets.json` and the one string in
+  `scripts/render_results.py` changed with them, and RESULTS.md was regenerated. The moved files
+  held no Markdown link to `store.md` or the README, so none needed rewriting; the README's list
+  now links the two files. A link checker over the eight changed Markdown files found 18
+  relative links, none broken. All 77 fault patches still apply. `prove_checks.py --only`, through
+  `heavy.sh` at source commit `5a810a2`, ran 30 faults, the 18 whose patches touch a changed file
+  and the 12, the control among them, that mutate a changed file or run `render-check`,
+  `actionlint` or `hygiene`: 29 PROVEN and the control UNDETECTED. `results/check-proofs.json` was restored from git, so it still
+  records the full run at `d307a31`.
+- `LICENSE` is MIT, `Copyright (c) 2026 Jackson Baxter` (`5a810a2`), and the README has a
+  "Licence" section.
+
+The full `scripts/check.sh` passed all 30 steps on the Mac before the commits, in 2,230 s.
+
+The third-party audit, file by file:
+
+- No committed file holds Nasdaq message bytes. The golden stores in `tests/unit/golden/` are the
+  26-record stream of `tests/unit/stub_fixture.hpp`, built from the hand-typed records of
+  `tests/unit/itch_fixtures.hpp`, and `container-v1.tsc` is `test::golden_parts()`. The two
+  crashers in `tests/unit/crashers/`, of 31 and 48 bytes, are libFuzzer inputs grown from the
+  seeds `fuzz/generate_seeds.cpp` makes with the real encoder at build time.
+- The results files measured on the two sample days hold counts, sizes, timings, statistics and
+  digests. `research/evidence/itch-data.md`, L7, found no terms for the sample files and left
+  redistribution of derived data unresolved, so the README lists these files as keeping their
+  source's terms. `macOS-simd_kernel-*`, on seeded input, and the proof, coverage and fuzz records
+  are the project's own.
+- `research/evidence/*.md` quotes third-party documentation and code, each quote with its
+  location, and the README lists those quotations. One quotation in `column-systems.md` keeps the
+  QuestDB docs' own site-relative link, `/docs/query/sql/copy/`, which does not resolve here. It
+  is left as quoted.
+- `compare/requirements.lock` holds package names, versions and hashes, and
+  `compare/java/CommitModeProbe.java` reaches QuestDB through reflection alone, with none of its
+  code. Neither is third-party material.
+- No source says it is adapted from another project. The Stream VByte shuffle tables, the linear
+  layout's tables and the CRC32C tables are computed by `constexpr` code here, and Gorilla and
+  Stream VByte are implemented from their papers, which the headers cite.
+- GoogleTest, HdrHistogram_c, Google Benchmark and zstd come through FetchContent, and pyarrow,
+  ArcticDB, the QuestDB client and server and a Temurin JDK through `compare/setup.py` into the
+  gitignored `.venv/` and `vendor/`. None is committed. Each carries its licence in its own
+  release, and the README says so without copying them.
+
+The README's CI paragraph (`72bceaf`) keeps the history, all 14 jobs passing at `ad542fd`, and
+points at the workflow's runs on `main` in place of a job count that would go stale. The
+workflow has 16 jobs, and all 16 passed at `83cd39b`, in run 43152738984.
+
+Raw: `phase3-raw/layout-docs/`, the check.sh logs and `prove-only.txt` with its logs.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from

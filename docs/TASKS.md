@@ -246,6 +246,7 @@ Carried from Phase 3, each open with the reason it ends with
 - [x] The CRC32C SSE4.2 kernel is fuzzed only by CI's 4-minute Linux runs of the container, store and column targets. G-3 asks only for the AVX2 path on Linux; decide whether those targets get 30 minutes on `debian` too. The container, ITCH store and query targets reach it, the column target does not; `fuzz_container` ran 1,801 s clean on `debian`, the other two already had, and `check_fuzz.py` now requires all three on Linux (`d307a31`)
 - [ ] Full-day round trip passes on the pinned file, on both hosts
 - [x] README: what the project is, how to build and run it, generated results table, definition of "record". A pitch, a generated headline of six rows with two misses, then "What it is", "Data", build, checks and runs; every results table in the generated RESULTS.md (docs/NOTES.md, README layout and RESULTS.md)
+- [x] Repo layout: `CLAUDE.md` untracked and ignored, `NOTES.md` and `TASKS.md` moved to `docs/` with all 93 references updated, an MIT `LICENSE`, and a README "Licence" section naming the files derived from Nasdaq's sample days or quoting third-party sources (docs/NOTES.md, Repo layout)
 - [ ] WRITEUP.md: design trade-offs with numbers on data layout, memory and branch prediction, what was tried and what did not work, including whether Gorilla lost on this data and what SIMD cost
 - [ ] Full repo review against the code-quality bar finds nothing that would block a merge. Each problem gets file and line, why it is wrong and how to show it fails, then a fix
 - [ ] Final phase report
