@@ -456,7 +456,8 @@ TEST(FuzzOracles, PassEveryCutAndFlipOfAnIntegerColumn) {
     // gets one; then a cut every 97 bytes and a flip every 257 bits through the packed words.
     // Each check re-encodes 1,025 values in every option set, so this samples rather than
     // trying every bit as the columns above do.
-    std::vector<std::uint64_t> times{34'200'000'000'000ULL};
+    // The first delta is the first value, so it starts small enough to need no exception.
+    std::vector<std::uint64_t> times{40};
     for (std::uint64_t i = 1; i < 1'025; ++i) {
         times.push_back(times.back() + 1 + ((i * 7'919U) % 61U));
     }
@@ -466,19 +467,29 @@ TEST(FuzzOracles, PassEveryCutAndFlipOfAnIntegerColumn) {
         vector_prices.push_back(i == 500 ? 1'999'999'900U : 1'234'500U + ((i * 37U) % 11U * 100U));
     }
     Bytes time_vector;
+    codec::PforStats time_stats;
     ASSERT_TRUE(codec::encode_pfor(times, 1'025,
                                    codec::PforOptions{.transform = codec::IntTransform::delta,
                                                       .adaptive_scale = false,
                                                       .patch = true},
-                                   time_vector)
+                                   time_vector, &time_stats)
                     .has_value());
     Bytes price_vector;
+    codec::PforStats price_stats;
     ASSERT_TRUE(codec::encode_pfor(vector_prices, 1'025,
                                    codec::PforOptions{.transform = codec::IntTransform::none,
                                                       .adaptive_scale = false,
                                                       .patch = true},
-                                   price_vector)
+                                   price_vector, &price_stats)
                     .has_value());
+    // A full vector and a one-value tail each, the timestamps' vector with no exceptions,
+    // which AVX2 decodes fused, and the prices' with its one.
+    for (const codec::PforStats& stats : {time_stats, price_stats}) {
+        EXPECT_EQ(stats.full_vectors, 1U);
+        EXPECT_EQ(stats.tail_values, 1U);
+    }
+    EXPECT_EQ(time_stats.exceptions, 0U);
+    EXPECT_EQ(price_stats.exceptions, 1U);
     for (const Bytes& column : {time_vector, price_vector}) {
         EXPECT_EQ(text(codec::oracle::check_pfor_column(exact_copy(column))), "");
         for (std::size_t length = 0; length < column.size(); length += length < 24 ? 1 : 97) {
