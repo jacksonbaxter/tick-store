@@ -123,4 +123,14 @@ struct DictStats {
                                                           std::uint64_t count,
                                                           std::vector<std::uint64_t>& out);
 
+// The check the decoder runs on a ranked dictionary, whose order alone does not rule out an
+// entry repeated: whether any value appears twice in `entries`, and the steps it took, so a
+// test can bound the work a hostile block can ask for.
+struct RepeatScan {
+    bool repeated = false;
+    // Slots of the hash set looked at, plus comparisons made by the sort if it ran.
+    std::uint64_t steps = 0;
+};
+[[nodiscard]] RepeatScan scan_for_repeats(std::span<const std::uint64_t> entries);
+
 }  // namespace tick_store::codec

@@ -455,38 +455,6 @@ using Encoded = std::expected<void, CodecError>;
     return reader.finish("dict codes");
 }
 
-// Whether any value appears twice in `entries`: an open-addressing set of at least twice
-// as many slots, each stamped with the call that filled it, so no call clears the table.
-[[nodiscard]] bool repeats_an_entry(std::span<const std::uint64_t> entries) {
-    thread_local std::vector<std::uint64_t> keys;
-    thread_local std::vector<std::uint32_t> stamps;
-    thread_local std::uint32_t stamp = 0;
-    const std::size_t slots = std::bit_ceil(std::max<std::size_t>(entries.size() * 2U, 16U));
-    if (slots > keys.size()) {
-        keys.assign(slots, 0);
-        stamps.assign(slots, 0);
-        stamp = 0;
-    }
-    if (++stamp == 0) {
-        std::ranges::fill(stamps, 0U);
-        stamp = 1;
-    }
-    const std::size_t mask = slots - 1U;
-    for (const std::uint64_t value : entries) {
-        // Fibonacci hashing: the top bits of the product spread any pattern of values.
-        std::size_t at = static_cast<std::size_t>((value * 0x9E3779B97F4A7C15ULL) >> 32U) & mask;
-        while (stamps[at] == stamp) {
-            if (keys[at] == value) {
-                return true;
-            }
-            at = (at + 1U) & mask;
-        }
-        stamps[at] = stamp;
-        keys[at] = value;
-    }
-    return false;
-}
-
 // One block's counts, added to a column's.
 void add_block(DictStats& column, const DictStats& block) noexcept {
     for (std::size_t mode = 0; mode < kDictModes; ++mode) {
@@ -690,7 +658,7 @@ std::expected<std::size_t, CodecError> decode_dict_block(std::span<const std::by
                                                    dictionary_at, i - 1, i));
             }
         }
-        if (repeats_an_entry(dictionary)) {
+        if (scan_for_repeats(dictionary).repeated) {
             return std::unexpected(
                 codec_error(CodecErrorKind::bad_field, "dict entry repeated", dictionary_at, 0, 1));
         }
@@ -753,6 +721,64 @@ std::expected<void, CodecError> encode_dict(std::span<const std::uint64_t> value
 std::expected<void, CodecError> decode_dict(std::span<const std::byte> column, std::uint64_t count,
                                             std::vector<std::uint64_t>& out) {
     return decode_column(column, count, out, &decode_dict_block);
+}
+
+// An open-addressing set of at least twice as many slots as entries, each stamped with the
+// call that filled it, so no call clears the table. Its hash is fixed, so a hostile block can
+// choose entries that share one slot and make the set K^2 / 2 probes; past
+// kRepeatStepsPerEntry steps an entry, it gives up and sorts a copy, O(K log K) whatever the
+// entries. The 75,373 ranked dictionaries of the fuzz corpus took at most 2 steps an entry.
+RepeatScan scan_for_repeats(std::span<const std::uint64_t> entries) {
+    constexpr std::uint64_t kRepeatStepsPerEntry = 4;
+    thread_local std::vector<std::uint64_t> keys;
+    thread_local std::vector<std::uint32_t> stamps;
+    thread_local std::uint32_t stamp = 0;
+    const std::size_t slots = std::bit_ceil(std::max<std::size_t>(entries.size() * 2U, 16U));
+    if (slots > keys.size()) {
+        keys.assign(slots, 0);
+        stamps.assign(slots, 0);
+        stamp = 0;
+    }
+    if (++stamp == 0) {
+        std::ranges::fill(stamps, 0U);
+        stamp = 1;
+    }
+    RepeatScan scan;
+    const auto by_sorting = [&scan, entries] {
+        thread_local std::vector<std::uint64_t> sorted;
+        sorted.assign(entries.begin(), entries.end());
+        std::ranges::sort(sorted, [&scan](std::uint64_t a, std::uint64_t b) {
+            ++scan.steps;
+            return a < b;
+        });
+        scan.repeated = std::ranges::adjacent_find(sorted) != sorted.end();
+        scan.steps += sorted.size();
+        return scan;
+    };
+    const std::uint64_t budget = (kRepeatStepsPerEntry * entries.size()) + 16U;
+    const std::size_t mask = slots - 1U;
+    for (const std::uint64_t value : entries) {
+        // The product's bits from 32 up, which differ for values that differ anywhere in
+        // their low 32 + log2(slots) bits; values that agree there all share a slot. Taking
+        // the top bits instead spread regular steps no better (docs/NOTES.md, "The final
+        // review's codec findings").
+        std::size_t at = static_cast<std::size_t>((value * 0x9E3779B97F4A7C15ULL) >> 32U) & mask;
+        ++scan.steps;
+        while (stamps[at] == stamp) {
+            if (keys[at] == value) {
+                scan.repeated = true;
+                return scan;
+            }
+            if (scan.steps > budget) {
+                return by_sorting();
+            }
+            at = (at + 1U) & mask;
+            ++scan.steps;
+        }
+        stamps[at] = stamp;
+        keys[at] = value;
+    }
+    return scan;
 }
 
 }  // namespace tick_store::codec

@@ -1422,6 +1422,23 @@ void add_dict_refusals(SeedDir& seeds) {
     add(2, kSorted, {100, 200, 300}, {0, 1, 2, 0}, "");
     add(2, kSorted, {100, 100, 300}, {0, 1, 2}, "dict entry order");
     add(2, kSorted, {300, 200, 100}, {0, 1, 2}, "dict entry order");
+    // A valid ranked block whose 32,768 entries, k * 2^48, all share one slot of the
+    // decoder's repeat check, each used once, the dictionary and the indices delta-coded so
+    // the block is 738 bytes: the input that made the check K^2 / 2 probes (B-1 of the final
+    // review). Also kept as crashers/dictionary/timeout-entries-in-one-hash-slot.
+    constexpr PforOptions kDeltas{.transform = IntTransform::delta, .adaptive_scale = false,
+                                  .patch = true};
+    constexpr std::uint32_t kInOneSlot = 32'768;
+    Words in_one_slot;
+    Words each_once;
+    for (std::uint64_t k = 0; k < kInOneSlot; ++k) {
+        in_one_slot.push_back((k + 1) << 48U);
+        each_once.push_back(k);
+    }
+    add_checked(seeds, &tick_store::codec::decode_dict_block,
+                nested_block(kInOneSlot, fixed_fields(0, kInOneSlot),
+                             {{in_one_slot, kDeltas}, {each_once, kDeltas}}),
+                "");
 }
 
 // Each refusal of the run-length decoder's own checks: runs not maximal, and lengths one

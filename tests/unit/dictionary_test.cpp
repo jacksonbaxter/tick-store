@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -518,6 +519,77 @@ TEST(Dictionary, EachDictionaryOrderCorruptionHasItsError) {
     // Sorted: not ascending.
     EXPECT_EQ(decoded_block(dict_block(2, 2, 2, pfor_of({5, 3}, IntTransform::delta), pfor_of({0, 1}))),
               std::unexpected(error_of(CodecErrorKind::bad_field, "dict entry order", 104, 0, 1)));
+}
+
+// Entries the decoder's hash set puts in one slot (B-1 of the final review, docs/REVIEW.md).
+// The set hashes a value by the bits from 32 up of its product with 0x9E3779B97F4A7C15, so
+// entries that agree in their low 48 bits share a slot, as do entries whose products with
+// it are all below 2^32 (j times the multiplier's inverse). In a ranked block each entry used
+// once, both are valid dictionaries; the second also defeats a hash on the top bits.
+Values entries_in_one_slot(std::size_t count, bool by_inverse) {
+    constexpr std::uint64_t kMultiplier = 0x9E3779B97F4A7C15ULL;
+    std::uint64_t inverse = kMultiplier;
+    for (int i = 0; i < 6; ++i) {
+        inverse *= 2U - (kMultiplier * inverse);
+    }
+    Values entries;
+    entries.reserve(count);
+    for (std::uint64_t k = 1; k <= count; ++k) {
+        entries.push_back(by_inverse ? k * inverse : k << 48U);
+    }
+    std::ranges::sort(entries);
+    return entries;
+}
+
+// The repeat check's work on K entries in one slot was K^2 / 2 probes, 536,887,296 steps for
+// K = 32,768, from a block of under a kilobyte. Bounded now: at most 4 K + 17 steps in the
+// hash set, then the sort's comparisons, at most 3 K log2 K for these entries, and one pass
+// of K to find a pair. Work, not wall time.
+TEST(Dictionary, RepeatScanWorkIsBoundedOnEntriesInOneHashSlot) {
+    for (const bool by_inverse : {false, true}) {
+        for (const std::size_t count : {std::size_t{1'024}, std::size_t{32'768}}) {
+            SCOPED_TRACE(by_inverse);
+            SCOPED_TRACE(count);
+            const auto bound = [](std::uint64_t k) {
+                const auto log2 = static_cast<std::uint64_t>(std::bit_width(k - 1));
+                return (4U * k) + 17U + (3U * k * log2) + k;
+            };
+            const Values entries = entries_in_one_slot(count, by_inverse);
+            const RepeatScan distinct = scan_for_repeats(entries);
+            EXPECT_FALSE(distinct.repeated);
+            EXPECT_LE(distinct.steps, bound(count));
+            // The same entries with the last repeated at the end, where a scan finds it last.
+            Values repeated = entries;
+            repeated.push_back(entries.back());
+            const RepeatScan found = scan_for_repeats(repeated);
+            EXPECT_TRUE(found.repeated);
+            EXPECT_LE(found.steps, bound(count + 1));
+        }
+    }
+    // An ordinary dictionary takes the hash set alone: about one step an entry.
+    test::SplitMix64 random{48};
+    Values ordinary(32'768);
+    for (std::uint64_t& value : ordinary) {
+        value = random();
+    }
+    EXPECT_LE(scan_for_repeats(ordinary).steps, 2U * ordinary.size());
+}
+
+// The reviewer's block: 32,768 entries in one slot, each used once, the dictionary and the
+// indices both delta-coded PFOR blocks, so it is 738 bytes. It must decode. These are the
+// bytes of crashers/dictionary/timeout-entries-in-one-hash-slot and of a fuzz seed, which
+// cost the crasher replay 13.9 s in a Debug build before the repeat check could sort.
+TEST(Dictionary, ABlockOfEntriesInOneHashSlotDecodes) {
+    constexpr std::uint32_t kEntries = 32'768;
+    const Values dictionary = entries_in_one_slot(kEntries, false);
+    Values indices(kEntries);
+    for (std::uint32_t i = 0; i < kEntries; ++i) {
+        indices[i] = i;
+    }
+    const Bytes block = dict_block(kEntries, 0, kEntries, pfor_of(dictionary, IntTransform::delta),
+                                   pfor_of(indices, IntTransform::delta));
+    EXPECT_EQ(block.size(), 738U);
+    EXPECT_EQ(decoded_block(block), dictionary);
 }
 
 TEST(Dictionary, ColumnCountMustMatchExactly) {

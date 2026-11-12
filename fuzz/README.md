@@ -60,7 +60,9 @@ sizes and cut, and the first 64 values of each as one block with each header fie
 corrupted and each of its first 48 payload bytes changed as above. Each also gets a
 hand-built block for each of its decoder's own refusals: a dictionary entry repeated, out of
 frequency order, tied but not ascending, unused, and a sorted dictionary not ascending; runs
-not maximal, and lengths one short of and one past the count.
+not maximal, and lengths one short of and one past the count. The dictionary seeds also hold
+a valid block of 738 bytes whose 32,768 entries share one slot of the decoder's repeat check,
+the input that made that check quadratic (B-1 in `docs/REVIEW.md`).
 
 ```sh
 cmake --preset fuzz && cmake --build --preset fuzz
