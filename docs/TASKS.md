@@ -247,6 +247,7 @@ Carried from Phase 3, each open with the reason it ends with
 - [ ] Full-day round trip passes on the pinned file, on both hosts
 - [x] README: what the project is, how to build and run it, generated results table, definition of "record". A pitch, a generated headline of six rows with two misses, then "What it is", "Data", build, checks and runs; every results table in the generated RESULTS.md (docs/NOTES.md, README layout and RESULTS.md)
 - [x] Repo layout: `CLAUDE.md` untracked and ignored, `NOTES.md` and `TASKS.md` moved to `docs/` with all 93 references updated, an MIT `LICENSE`, and a README "Licence" section naming the files derived from Nasdaq's sample days or quoting third-party sources (docs/NOTES.md, Repo layout)
+- [x] After the layout, the Linux build gate and a full fault re-proof. debian at `e9ee24b`: the dev preset builds and ctest passes 625 of 625. `prove_checks.py --force` at source commit `5a810a2`: all 101 faults as expected, 100 PROVEN and the control UNDETECTED, in 8,532 s, recorded in `results/check-proofs.json` (docs/NOTES.md, The full fault re-proof at 5a810a2)
 - [ ] WRITEUP.md: design trade-offs with numbers on data layout, memory and branch prediction, what was tried and what did not work, including whether Gorilla lost on this data and what SIMD cost
 - [ ] Full repo review against the code-quality bar finds nothing that would block a merge. Each problem gets file and line, why it is wrong and how to show it fails, then a fix
 - [ ] Final phase report

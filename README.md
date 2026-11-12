@@ -140,8 +140,9 @@ Each fault is a patch in `faults/` or a data mutation in the script. It runs in 
 clone under `build/fault-proofs/`, never the working tree, and no production code knows about
 it. The step must pass on the clean clone, then fail with the expected exit code and the
 expected string in its own log, so a build error cannot pass for a detection. The clone keeps
-one incremental build per preset, and proving every fault on those builds takes about 22 minutes.
-`results/check-proofs.json` records each fault, and an undetected one is a bug in the check.
+one incremental build per preset; proving all 101 faults took 8,532 s, about 2 hours 20
+minutes, on the Mac. `results/check-proofs.json` records each fault, and an undetected one is a
+bug in the check.
 
 ## Continuous integration
 

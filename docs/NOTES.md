@@ -2907,12 +2907,16 @@ At the user's request, three changes to what the repository holds, and none to t
   relative links, none broken. All 77 fault patches still apply. `prove_checks.py --only`, through
   `heavy.sh` at source commit `5a810a2`, ran 30 faults, the 18 whose patches touch a changed file
   and the 12, the control among them, that mutate a changed file or run `render-check`,
-  `actionlint` or `hygiene`: 29 PROVEN and the control UNDETECTED. `results/check-proofs.json` was restored from git, so it still
-  records the full run at `d307a31`.
+  `actionlint` or `hygiene`: 29 PROVEN and the control UNDETECTED. `results/check-proofs.json`
+  was restored from git, so it still recorded the full run at `d307a31` (see "The full fault
+  re-proof at 5a810a2" below).
 - `LICENSE` is MIT, `Copyright (c) 2026 Jackson Baxter` (`5a810a2`), and the README has a
   "Licence" section.
 
 The full `scripts/check.sh` passed all 30 steps on the Mac before the commits, in 2,230 s.
+On debian, the Linux build gate ran at `e9ee24b`, whose code is that of `5a810a2`: the dev
+preset built through `heavy.sh` on CPUs 2, 6 and 7, and ctest passed 625 of 625, with none
+failed or skipped, in 908 s.
 
 The third-party audit, file by file:
 
@@ -2945,7 +2949,34 @@ The README's CI paragraph (`72bceaf`) keeps the history, all 14 jobs passing at 
 points at the workflow's runs on `main` in place of a job count that would go stale. The
 workflow has 16 jobs, and all 16 passed at `83cd39b`, in run 43152738984.
 
-Raw: `phase3-raw/layout-docs/`, the check.sh logs and `prove-only.txt` with its logs.
+At `72bceaf`, run 43171535758 on `jb-build` passed all 16 jobs. Run 43251305872, on `main` at
+the same commit, failed its first attempt with 12 jobs passed and 4 cancelled, all on macOS
+arm64: tsan, asan-ubsan, coverage and fuzz-stores. None of the four ran a step. Each carries
+GitHub's annotation "The job was not acquired by Runner of type hosted even after multiple
+attempts", with the notice "Due to capacity constraints, jobs targeting macOS arm64 runners may
+experience longer queue times." That is a GitHub-side fault, so the failed jobs were rerun with
+`gh run rerun 43251305872 --failed`, with no change to the code. The second attempt passed all 16.
+
+Raw: `phase3-raw/layout-docs/`, the check.sh logs and `prove-only.txt` with its logs;
+`phase3-raw/close-final/debian/`, the debian gate's script, status, build log tail and ctest
+summary; `phase3-raw/close-final/ci/`, the CI run's jobs and annotations.
+
+### The full fault re-proof at 5a810a2
+
+`scripts/prove_checks.py --force` ran every fault through `heavy.sh` under `/usr/bin/time -l`,
+from a clean tree at `e9ee24b`, keyed to source commit `5a810a2`, the last commit that changed
+code: 8,532 s, a maximum resident set of 1.50 GB and a peak memory footprint of 114 MB. All 101
+faults came out as expected at the first attempt: 100 PROVEN and the control,
+`control-comment-only`, UNDETECTED. No baseline failed, and no check, test or fault changed.
+`results/check-proofs.json` now holds all 101 entries at `5a810a2`, in place of the 94 at
+`d307a31`.
+
+A first start was stopped seconds in, on its first fault, because its runner had a two-hour
+limit; the run above started again from the beginning with `--force`, and nothing was resumed
+from the record.
+
+Raw: `phase3-raw/close-final/`, `prove-full.txt` with `prove-logs/`, and the record as written,
+`check-proofs-full-5a810a2.json`.
 
 ## Process notes
 
