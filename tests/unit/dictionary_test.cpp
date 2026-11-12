@@ -592,6 +592,27 @@ TEST(Dictionary, ABlockOfEntriesInOneHashSlotDecodes) {
     EXPECT_EQ(decoded_block(block), dictionary);
 }
 
+// Move-to-front at its worst is a valid block (B-3 of the final review, docs/REVIEW.md): a
+// sorted dictionary of 0 to 2,047 and every rank 2,047, so each value moves 2,047 list entries.
+// A store piece's 16,384 such values are 286 bytes; docs/store.md's worst case counts them.
+TEST(Dictionary, MoveToFrontAtItsWorstIsAValidBlock) {
+    constexpr std::uint32_t kValues = 16'384;
+    Values dictionary(kDictMtfMaxEntries);
+    for (std::uint64_t i = 0; i < kDictMtfMaxEntries; ++i) {
+        dictionary[i] = i;
+    }
+    const Bytes block = dict_block(kValues, 2, static_cast<std::uint32_t>(kDictMtfMaxEntries),
+                                   pfor_of(dictionary, IntTransform::delta),
+                                   pfor_of(Values(kValues, kDictMtfMaxEntries - 1)));
+    EXPECT_EQ(block.size(), 286U);
+    // Each rank 2,047 takes the list's last entry: 2,047, 2,046, ..., 0, then round again.
+    Values expected(kValues);
+    for (std::size_t i = 0; i < kValues; ++i) {
+        expected[i] = kDictMtfMaxEntries - 1 - (i % kDictMtfMaxEntries);
+    }
+    EXPECT_EQ(decoded_block(block), expected);
+}
+
 TEST(Dictionary, ColumnCountMustMatchExactly) {
     const Values values{1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
     const Bytes column = encoded(values, 4);  // blocks of 4, 4 and 2
