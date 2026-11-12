@@ -446,6 +446,51 @@ TEST(FuzzOracles, PassEveryCutAndFlipOfAnIntegerColumn) {
             EXPECT_EQ(text(check(flipped)), "") << "bit " << bit;
         }
     }
+
+    // One full vector of 1,024 values and a one-value tail, so the checks, kernel against
+    // scalar among them, reach the interleaved vector path and AVX2's fused delta, not only
+    // the linear tails the blocks of 16 above take (B-7 of the final review,
+    // docs/REVIEW.md): timestamps by delta with no exceptions, and prices by frame of
+    // reference with one exception in the vector. A cut at each of the first 24 bytes, which
+    // hold the block's and the vector's fields, and a flip every 7 bits there, so each byte
+    // gets one; then a cut every 97 bytes and a flip every 257 bits through the packed words.
+    // Each check re-encodes 1,025 values in every option set, so this samples rather than
+    // trying every bit as the columns above do.
+    std::vector<std::uint64_t> times{34'200'000'000'000ULL};
+    for (std::uint64_t i = 1; i < 1'025; ++i) {
+        times.push_back(times.back() + 1 + ((i * 7'919U) % 61U));
+    }
+    std::vector<std::uint64_t> vector_prices;
+    vector_prices.reserve(1'025);
+    for (std::uint64_t i = 0; i < 1'025; ++i) {
+        vector_prices.push_back(i == 500 ? 1'999'999'900U : 1'234'500U + ((i * 37U) % 11U * 100U));
+    }
+    Bytes time_vector;
+    ASSERT_TRUE(codec::encode_pfor(times, 1'025,
+                                   codec::PforOptions{.transform = codec::IntTransform::delta,
+                                                      .adaptive_scale = false,
+                                                      .patch = true},
+                                   time_vector)
+                    .has_value());
+    Bytes price_vector;
+    ASSERT_TRUE(codec::encode_pfor(vector_prices, 1'025,
+                                   codec::PforOptions{.transform = codec::IntTransform::none,
+                                                      .adaptive_scale = false,
+                                                      .patch = true},
+                                   price_vector)
+                    .has_value());
+    for (const Bytes& column : {time_vector, price_vector}) {
+        EXPECT_EQ(text(codec::oracle::check_pfor_column(exact_copy(column))), "");
+        for (std::size_t length = 0; length < column.size(); length += length < 24 ? 1 : 97) {
+            const Bytes cut = exact_copy(std::span{column}.first(length));
+            EXPECT_EQ(text(codec::oracle::check_pfor_column(cut)), "") << "length " << length;
+        }
+        for (std::size_t bit = 0; bit < column.size() * 8; bit += bit < 24 * 8 ? 7 : 257) {
+            Bytes flipped = exact_copy(column);
+            flipped[bit / 8] ^= static_cast<std::byte>(1U << (bit % 8));
+            EXPECT_EQ(text(codec::oracle::check_pfor_column(flipped)), "") << "bit " << bit;
+        }
+    }
 }
 
 }  // namespace
