@@ -277,3 +277,25 @@ Linux on a whole day, and writes one file per host and input to `results/compare
 classes, how each setting is read back, the read-back oracle, the queries and how warm and cold
 are proven. The tables, and what is needed to read them, are in
 [RESULTS.md](RESULTS.md#comparison).
+
+## Licence
+
+The project's own code and documentation are under the MIT licence, in [LICENSE](LICENSE). The
+files listed here derive from third-party material, and they keep their source's terms:
+
+- The results files measured on Nasdaq's public TotalView-ITCH 5.0 sample days: in `results/`,
+  `census-*`, `codec-eval-*`, `store-estimate.json`, `store-size-*`, `roundtrip-*` and
+  `fullday-capacity-*`, and every file in `results/compare/`, plus `*-itch_codec-*` and
+  `*-column_decode-*` in `results/bench/`. They hold counts, sizes, timings and statistics, and
+  no message bytes. The sample files themselves are not in this repository, and no terms for
+  them were found (`research/evidence/itch-data.md`, L7).
+- The quotations of third-party documentation and source code in `research/evidence/*.md`, each
+  cited with its location.
+
+The test fixtures and golden files in `tests/` are built by this project's code from records
+typed in from the ITCH 5.0 specification, and the fuzz crashers came from fuzzing those, so none
+holds Nasdaq data. The dependencies that CMake fetches at build time (GoogleTest, HdrHistogram_c,
+Google Benchmark and zstd, pinned in `cmake/Dependencies.cmake`) and the comparison systems that
+`compare/setup.py` installs into the gitignored `.venv/` and `vendor/` (pyarrow, ArcticDB, the
+QuestDB client and server, and a Temurin JDK) are not committed, and each carries its own licence
+in its release.
