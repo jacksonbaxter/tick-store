@@ -2843,6 +2843,53 @@ UNDETECTED.
 Raw logs: `phase3-raw/close-p3/reproof/`, with the four-run study and the seven patches under
 `investigate/distance-bound/`.
 
+### README layout and RESULTS.md
+
+At `9f77e52` the README opens with a pitch and a generated six-row headline, and every results
+table moved to `RESULTS.md`, also generated. The targets, benchmark and comparison blocks there
+are byte for byte the blocks the README held at `46ab0df`. `scripts/targets.json` names the
+headline under `"headline"`: a target row by id and host, a short name, and optionally which of
+its parts to show. `render_results.py` judges each entry with the Targets block's own code, so
+each figure and verdict is that block's. The parts no headline row shows are named under the
+table with their verdicts, so the headline cannot quietly drop a miss. `--check` now covers both
+files, and exits 2 when the README keeps a RESULTS.md block, a file lacks its markers, or the
+headline shows no missed target.
+
+The rows, and why:
+
+- G-1, both days bit-exact: every other figure depends on the store giving the day back.
+- CR-2, store bytes against each system's smallest variant on the Linux full day: it compares
+  with real systems on the same day, where CR-1 compares with the file's own `.gz`.
+- QL-4 on Q2 and Q3, met warm and cold, and QL-4 on Q1 and Q4, missed warm and cold. Together
+  they say which queries tick-store wins and which it loses, and Q5, split, is named under the
+  table. QL-3, also missed, was left out, because QL-4 on Q1 and Q4 already shows the loss on
+  the all-symbol windows.
+- WT-1 on Linux, missed at 1.376 M records/s against 8.59 M: the headline ingest target, from
+  a published QuestDB figure, so the table shows the write side as well as the read side.
+- G-3, every fuzz target 30 minutes clean on both hosts.
+
+The pitch quotes the Q2 and Q3 win as a win among headline variants, the wording rule in
+TASKS.md, and gives ArcticDB's per-security variant's 49.65 and 26.19 ms warm from the full-day
+variants table.
+
+Seven faults are new, and `readme-hand-edit` is now `results-md-hand-edit`, on RESULTS.md's
+benchmark block. Hand edits of a value in RESULTS.md's Targets block and in its comparison block,
+and of WT-1 in the README's headline, each make `render-check` exit 1, naming the file. The
+README without its headline markers, the README with a copy of the Targets block, and a headline
+cut to G-1 and G-3 each make it exit 2. `headline-verdict-all-parts` judges a headline row on all
+of its parts rather than those shown, and `test_render_results.py` fails. `prove_checks.py
+--only`, through `heavy.sh` at source commit `9f77e52`, ran these eight faults, the two renderer
+patches rebased onto the new file, and the three faults that run `render-check`. 12 of 13 were
+PROVEN, and the control was UNDETECTED. `results/check-proofs.json` was restored from git, so it
+still records the full run at `d307a31`, where the fault was `readme-hand-edit`. The renderer
+changed, so the next `prove_checks.py` run re-proves every fault.
+
+GitHub's markdown API in `gfm` mode renders each newline in a paragraph as a line break. A
+repository file is not rendered that way. The previews were made in both `gfm` and `markdown`
+modes, and only `markdown` mode shows the README as the repository page does.
+
+Raw: `phase3-raw/readme/`, the renders and `prove-only-9f77e52.txt` with its logs.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
