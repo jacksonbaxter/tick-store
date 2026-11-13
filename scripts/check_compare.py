@@ -26,13 +26,16 @@ by query from the block device's own counter, each system's peak memory from the
 variants what compare/variant_rule.py gives from the slice file it names. A slice file can never
 pass as a full-day one, nor the reverse.
 
-A tick-store-only full day, `<host>-<day>-full-tickstore-<commit>.json`, is the macOS figure for
-the targets whose host is Both. It is held to the full day's rules on tick-store, with three
-differences, each stated in the file: tick-store is the only system and every variant it has ran,
-the headline first; warm is the slice's residency proof, since the per-process proof reads
-/proc; and peak memory comes from BSD time -l, since the guard reads /proc too. It runs on
-macOS only, so that a Linux subset can never stand in for the four-system day, and a four-system
-file can never carry its name, nor the reverse.
+A tick-store-only full day, `<host>-<day>-full-tickstore-<commit>.json`, gives macOS's figures
+for the targets whose host is Both, and tick-store's own Linux figures at a commit with no
+four-system day. It is held to the full day's rules on tick-store, and tick-store is the only
+system and every variant it has ran, the headline first. On macOS two more things differ, each
+stated in the file: warm is the slice's residency proof, since the per-process proof reads
+/proc, and peak memory comes from BSD time -l, since the guard reads /proc too. On Linux it
+keeps the four-system day's proofs: warm by each process's storage reads, and the guard's peak
+memory. Its name and its scope keep the two kinds of day apart: only a file whose scope is
+tick-store-only may carry `-full-tickstore-`, and it must, so a Linux subset can never stand in
+for the four-system day, which must hold all four systems, nor the reverse.
 
 Every file states the comparison protocol it was measured under. The committed files measured
 before the final review's protocol state none and count as protocol 1, held to the rules above;
