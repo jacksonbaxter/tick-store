@@ -148,6 +148,18 @@ def linux_turbo(sysfs=CPU_SYSFS):
     return "unavailable: no cpufreq boost switch, as on a virtual machine"
 
 
+def turbo_across(before, after):
+    """The boost state across a run, read before its first case and after its last, outside
+    the lock: measure.sh sets the governor there and leaves boost alone, so a state that
+    differs at the two ends, or was not read before, is not stated (review E-10)."""
+    if before is None:
+        return "unavailable: cpufreq boost was not read before the first case"
+    if before != after:
+        return (f"unavailable: cpufreq boost read {before!r} before the first case and "
+                f"{after!r} after the last")
+    return after
+
+
 def parse_cpu_list(text):
     """A kernel CPU list, such as 4-5 or 4,5."""
     cpus = []
@@ -447,7 +459,7 @@ def result_row(host, run):
 
 
 def build_document(host, benchmark, slice_name, pin, commit, measure, runs, meter=None,
-                   sysfs=CPU_SYSFS):
+                   sysfs=CPU_SYSFS, turbo_before=None):
     first = runs[0]["report"]
     build = first["build"]
     linux = host == "Linux"
@@ -475,7 +487,7 @@ def build_document(host, benchmark, slice_name, pin, commit, measure, runs, mete
         "second_thread": LINUX_SECOND_THREAD if linux else "not-available",
         "governor": governor_of(host, runs),
         "frequency": frequency_block(host, runs),
-        "turbo": linux_turbo(sysfs) if linux else "not-available",
+        "turbo": turbo_across(turbo_before, linux_turbo(sysfs)) if linux else "not-available",
         "pinning": first["pinning"]["status"],
         "counters": "perf stat, :u events" if linux else "unavailable",
         "timer": first["timer"],
@@ -579,12 +591,13 @@ def run(args):
     meter = SiblingMeter(args.sysfs_cpu, args.proc_stat) if host == "Linux" else None
 
     cases = run_text([str(binary), "--list-cases"]).split()
+    turbo_before = linux_turbo(args.sysfs_cpu) if host == "Linux" else None
     runs = [run_case(host, measure, binary, case, slice_path, pin, args.work_dir, meter, kind)
             for case in cases]
     check_builds_match(runs, commit, measure)
 
     document = build_document(host, benchmark, args.slice, pin, commit, measure, runs, meter,
-                              args.sysfs_cpu)
+                              args.sysfs_cpu, turbo_before)
     directory = args.results_dir if measure else args.iteration_dir
     output = directory / f"{host}-{benchmark}-{commit[:12]}.json"
     publish(document, output, args.pins, measure)

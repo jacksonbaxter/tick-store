@@ -465,11 +465,29 @@ class RunBenchTest(unittest.TestCase):
         self.assertEqual(CHECK_RESULTS.check_linux({"sibling": header["sibling"]}, []), [])
         self.assertEqual(CHECK_RESULTS.check_leaks(document), [])
 
-    def linux_document(self, run):
+    def linux_document(self, run, turbo_before="enabled"):
         meter = RUN_BENCH.SiblingMeter(self.sysfs, self.stat)
         with mock.patch.object(RUN_BENCH, "cpu_model", return_value="cpu"):
             return RUN_BENCH.build_document("Linux", "itch_codec", SLICE, PINS["slices"][SLICE],
-                                            COMMIT, "wrapper", [run], meter, self.sysfs)
+                                            COMMIT, "wrapper", [run], meter, self.sysfs,
+                                            turbo_before=turbo_before)
+
+    def test_turbo_that_changed_across_the_run_is_not_stated(self):
+        # Review E-10: boost read once, after the last case, outside the lock, would state
+        # what held after the run. It is read before the first case too, and must agree.
+        run = self.linux_case(self.make_wrapper())
+        header = self.linux_document(run, turbo_before="disabled")["header"]
+        self.assertTrue(header["turbo"].startswith("unavailable: "), header["turbo"])
+        self.assertIn("'disabled' before the first case and 'enabled' after the last",
+                      header["turbo"])
+        self.assertIn("header.turbo: Linux must record it",
+                      CHECK_RESULTS.check_linux(header, ["itch_decode"]))
+
+    def test_turbo_not_read_before_the_run_is_not_stated(self):
+        run = self.linux_case(self.make_wrapper())
+        header = self.linux_document(run, turbo_before=None)["header"]
+        self.assertIn("header.turbo: Linux must record it",
+                      CHECK_RESULTS.check_linux(header, ["itch_decode"]))
 
     def test_turbo_is_read_from_the_given_sysfs_and_the_pinned_core_comes_first(self):
         self.assertEqual(RUN_BENCH.linux_turbo(self.sysfs), "enabled")
@@ -483,7 +501,7 @@ class RunBenchTest(unittest.TestCase):
     def test_with_no_boost_switch_turbo_is_unavailable_with_why_and_the_validator_refuses(self):
         self.boost.unlink()
         run = self.linux_case(self.make_wrapper())
-        header = self.linux_document(run)["header"]
+        header = self.linux_document(run, RUN_BENCH.linux_turbo(self.sysfs))["header"]
         state, _, reason = header["turbo"].partition(": ")
         self.assertEqual(state, "unavailable")
         self.assertIn("no cpufreq boost switch", reason)
