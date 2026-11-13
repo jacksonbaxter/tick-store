@@ -1,0 +1,12 @@
+diff --git a/scripts/check_compare.py b/scripts/check_compare.py
+--- a/scripts/check_compare.py
++++ b/scripts/check_compare.py
+@@ -926,7 +926,7 @@ def check_protocol(header, sha256, pins):
+     measured before there was a protocol, which state none (review RF-1). Those are known by
+     their bytes, `sha256`, pinned in the pins file, never by a field of the header (RV-6)."""
+     if "protocol" not in header:
+-        if sha256 is not None and sha256 in (pins.get(PROTOCOL_1_FILES) or {}).values():
++        if True:
+             return []
+         return ["header.protocol: none stated, and only the committed files measured before "
+                 f"protocol 2, each pinned by its SHA-256 under {PROTOCOL_1_FILES} in "

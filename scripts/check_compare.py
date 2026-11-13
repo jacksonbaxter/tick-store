@@ -39,8 +39,8 @@ for the four-system day, which must hold all four systems, nor the reverse.
 
 Every file states the comparison protocol it was measured under. The committed files measured
 before the final review's protocol state none and count as protocol 1, held to the rules above;
-only a file of one of their commits may state none, and any file that states one must state
-exactly the integer 2. A protocol 2 file is held to more: each latency block names its tail
+only those files, each pinned by the SHA-256 of its bytes in the pins file, may state none, and
+any file that states one must state exactly the integer 2. A protocol 2 file is held to more: each latency block names its tail
 figure for what it is, the nearest-rank 99th percentile with n and the rank used, which below
 100 runs is the slowest run and must say so; and every latency block and every write keeps each
 repetition's seconds, from which its median, its tail figure and its write medians are
@@ -60,6 +60,7 @@ injected fault.
 """
 
 import argparse
+import hashlib
 import json
 import math
 import statistics
@@ -137,11 +138,11 @@ SWAP_FIELDS = ("pages_in", "pages_out")
 # A file with no protocol was measured before the final review's comparison protocol.
 PROTOCOL_1 = 1
 PROTOCOL_2 = 2
-# The commits of the committed files measured before protocol 2, the only ones that may state no
-# protocol (review RF-1): everything the current harness writes is protocol 2. docs/TASKS.md
-# empties this once the freeze rerun has replaced those files.
-PROTOCOL_1_COMMITS = ("67ae574f566674b883e9199b375f88e12dbeeeca",
-                      "2503d1e7c5f68c657fab7c02ddb59c489b005c73")
+# The committed files measured before protocol 2 are the only ones that may state no protocol
+# (review RF-1), and they are pinned by the SHA-256 of their bytes, under this key of the pins
+# file, not by anything a document says of itself (review RV-6): everything the current harness
+# writes is protocol 2. docs/TASKS.md removes the key once the freeze rerun has replaced them.
+PROTOCOL_1_FILES = "protocol_1_comparison_files"
 
 
 def check_settings(where, settings, name, durability):
@@ -920,20 +921,25 @@ def protocol_of(document):
     return (document.get("header") or {}).get("protocol", PROTOCOL_1)
 
 
-def check_protocol(header):
+def check_protocol(header, sha256, pins):
     """A file states protocol 2, exactly the integer, unless it is one of the committed files
-    measured before there was a protocol, which state none (review RF-1)."""
-    commits = " and ".join(commit[:12] for commit in PROTOCOL_1_COMMITS)
+    measured before there was a protocol, which state none (review RF-1). Those are known by
+    their bytes, `sha256`, pinned in the pins file, never by a field of the header (RV-6)."""
     if "protocol" not in header:
-        if header.get("commit") in PROTOCOL_1_COMMITS:
+        if sha256 is not None and sha256 in (pins.get(PROTOCOL_1_FILES) or {}).values():
             return []
-        return [f"header.protocol: none stated, and only the files measured before protocol 2, "
-                f"at {commits}, may state none"]
+        return ["header.protocol: none stated, and only the committed files measured before "
+                f"protocol 2, each pinned by its SHA-256 under {PROTOCOL_1_FILES} in "
+                "scripts/data_pins.json, may state none"]
     stated = header["protocol"]
     if type(stated) is not int or stated != PROTOCOL_2:
         return [f"header.protocol: {stated!r}, and a file states protocol {PROTOCOL_2}, or none "
-                f"if it was measured before it, at {commits}"]
+                f"if it is one of the committed files measured before it"]
     return []
+
+
+def file_sha256(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def check_second_sibling(header, cases, protocol):
@@ -966,6 +972,7 @@ def check_variant_selection(document, path, pins, capacity):
     source = path.parent / str(selection.get("source"))
     try:
         slice_document = json.loads(source.read_text(encoding="utf-8"))
+        slice_sha256 = file_sha256(source)
     except (OSError, json.JSONDecodeError):
         return [*problems, f"variant_selection: the slice file {selection.get('source')!r} is "
                            "not beside this one"]
@@ -977,7 +984,7 @@ def check_variant_selection(document, path, pins, capacity):
     if isinstance(slice_document, dict):
         problems += [f"variant_selection: the slice file {source.name}: {problem}"
                      for problem in check_document(slice_document, list(slice_document), source,
-                                                   pins, capacity)]
+                                                   pins, capacity, sha256=slice_sha256)]
     try:
         chosen = variant_rule.select(slice_document)
     except (KeyError, TypeError) as error:
@@ -1055,7 +1062,7 @@ def check_runtime(header):
     return problems
 
 
-def check_document(document, top_keys, path, pins, capacity, real_path=None):
+def check_document(document, top_keys, path, pins, capacity, real_path=None, sha256=None):
     header = document.get("header")
     if not isinstance(header, dict):
         return ["the file does not start with its header"]
@@ -1064,7 +1071,7 @@ def check_document(document, top_keys, path, pins, capacity, real_path=None):
         problems.append("the file does not start with its header")
     problems += [f"header: missing field '{field}'" for field in HEADER_FIELDS
                  if field not in header]
-    stated = check_protocol(header)
+    stated = check_protocol(header, sha256, pins)
     if stated:
         return [*problems, *stated]
     systems = document.get("systems") or {}
@@ -1158,12 +1165,13 @@ def check_file(path, pins, capacity, name_as=None):
             return dict(pairs)
 
         document = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=remember_order)
+        sha256 = file_sha256(path)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
         return [f"cannot read it: {error}"]
     if not isinstance(document, dict):
         return ["the file is not a JSON object"]
     named = path.with_name(name_as) if name_as else path
-    return check_document(document, top_keys, named, pins, capacity, path)
+    return check_document(document, top_keys, named, pins, capacity, path, sha256)
 
 
 def main(argv=None):

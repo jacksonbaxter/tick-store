@@ -1,12 +1,12 @@
 diff --git a/scripts/check_compare.py b/scripts/check_compare.py
 --- a/scripts/check_compare.py
 +++ b/scripts/check_compare.py
-@@ -829,7 +829,7 @@
-         return [f"header.protocol: none stated, and only the files measured before protocol 2, "
-                 f"at {commits}, may state none"]
+@@ -932,7 +932,7 @@ def check_protocol(header, sha256, pins):
+                 f"protocol 2, each pinned by its SHA-256 under {PROTOCOL_1_FILES} in "
+                 "scripts/data_pins.json, may state none"]
      stated = header["protocol"]
 -    if type(stated) is not int or stated != PROTOCOL_2:
 +    if type(stated) is not int or stated not in (PROTOCOL_2, 3):
          return [f"header.protocol: {stated!r}, and a file states protocol {PROTOCOL_2}, or none "
-                 f"if it was measured before it, at {commits}"]
+                 f"if it is one of the committed files measured before it"]
      return []

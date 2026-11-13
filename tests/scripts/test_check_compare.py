@@ -10,6 +10,7 @@ the message naming that rule. Both hosts' valid files are shown passing first.
 """
 
 import copy
+import hashlib
 import json
 import shutil
 import subprocess
@@ -29,6 +30,11 @@ SCRATCH_ROOT = REPO_ROOT / "build" / "test_check_compare"
 # a file that states no protocol is valid only from those (review RF-1).
 COMMIT = "67ae574f566674b883e9199b375f88e12dbeeeca"
 OTHER_COMMIT = "0123456789abcdef0123456789abcdef01234567"
+# What check_compare.py says of a file that states no protocol and is not one of the committed
+# protocol 1 files, pinned by their SHA-256 (review RV-6).
+PROTOCOL_1_UNPINNED = ("header.protocol: none stated, and only the committed files measured "
+                       "before protocol 2, each pinned by its SHA-256 under "
+                       "protocol_1_comparison_files in scripts/data_pins.json, may state none")
 SHA = "ab" * 32
 MESSAGES = 1000
 BYTES = 20000
@@ -247,6 +253,29 @@ def valid_document(host):
     }
 
 
+# The commits of the committed protocol 1 files, which the fixtures that state no protocol stand
+# for.
+PROTOCOL_1_FIXTURE_COMMITS = (COMMIT, "2503d1e7c5f68c657fab7c02ddb59c489b005c73")
+
+
+def pin_protocol_1(pins_path, folder):
+    """check_compare.py knows the committed protocol 1 files by their bytes, pinned in the pins
+    file (review RV-6). A fixture that states no protocol, with one of their commits, stands for
+    one of them, so each such file in `folder` is pinned as written."""
+    pins = json.loads(pins_path.read_text(encoding="utf-8"))
+    pinned = {}
+    for path in sorted(folder.glob("*.json")):
+        try:
+            header = json.loads(path.read_text(encoding="utf-8")).get("header")
+        except (AttributeError, json.JSONDecodeError):
+            continue
+        if isinstance(header, dict) and "protocol" not in header and \
+                header.get("commit") in PROTOCOL_1_FIXTURE_COMMITS:
+            pinned[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+    pins["protocol_1_comparison_files"] = pinned
+    pins_path.write_text(json.dumps(pins), encoding="utf-8")
+
+
 class Harness(unittest.TestCase):
     def setUp(self):
         SCRATCH_ROOT.mkdir(parents=True, exist_ok=True)
@@ -260,6 +289,7 @@ class Harness(unittest.TestCase):
     def run_on(self, document, host="macOS", capacity=None):
         path = self.directory / f"{host}-{SLICE}-{COMMIT[:12]}.json"
         path.write_text(json.dumps(document), encoding="utf-8")
+        pin_protocol_1(self.pins, self.directory)
         return subprocess.run([sys.executable, "-I", str(SCRIPT), "--pins", str(self.pins),
                                "--capacity", str(capacity or self.capacity), str(path)],
                               check=False, capture_output=True, text=True)
@@ -961,6 +991,7 @@ class FullDay(Harness):
             json.dumps(source), encoding="utf-8")
         path = self.directory / (name or f"Linux-{DAY}-full-{COMMIT[:12]}.json")
         path.write_text(json.dumps(document), encoding="utf-8")
+        pin_protocol_1(self.pins, self.directory)
         return subprocess.run([sys.executable, "-I", str(SCRIPT), "--pins", str(self.pins),
                                "--capacity", str(self.capacity), str(path)],
                               check=False, capture_output=True, text=True)
@@ -1197,6 +1228,7 @@ class TickstoreOnly(Harness):
     def run_alone(self, document, name=ALONE_NAME):
         path = self.directory / name
         path.write_text(json.dumps(document), encoding="utf-8")
+        pin_protocol_1(self.pins, self.directory)
         return subprocess.run([sys.executable, "-I", str(SCRIPT), "--pins", str(self.pins),
                                "--capacity", str(self.capacity), str(path)],
                               check=False, capture_output=True, text=True)
@@ -1784,9 +1816,35 @@ class Protocol2(Harness):
             document["header"]["commit"] = OTHER_COMMIT
             del document["header"]["protocol"]
             del q1_of(document)["warm"]["proof"]["warm_up_runs"]
-        self.assert_fault_2(fault, "header.protocol: none stated, and only the files measured "
-                                   "before protocol 2, at 67ae574f5666 and 2503d1e7c5f6, may "
-                                   "state none")
+        self.assert_fault_2(fault, PROTOCOL_1_UNPINNED)
+
+    def test_a_current_harness_document_stating_a_committed_files_commit(self):
+        # Review RV-6: a header's commit is the document's own word, so it exempts nothing.
+        document = protocol_2(copy.deepcopy(valid_document("Linux")))
+        del document["header"]["protocol"]
+        del q1_of(document)["warm"]["proof"]["warm_up_runs"]
+        document["header"]["commit"] = COMMIT
+        path = self.directory / f"Linux-{SLICE}-{COMMIT[:12]}.json"
+        path.write_text(json.dumps(document), encoding="utf-8")
+        result = subprocess.run([sys.executable, "-I", str(SCRIPT), "--pins", str(self.pins),
+                                 "--capacity", str(self.capacity), str(path)],
+                                check=False, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn(PROTOCOL_1_UNPINNED, result.stderr)
+
+    def test_a_committed_protocol_1_file_with_a_byte_changed(self):
+        # Review RV-6: the committed files are pinned by their bytes. The same document written
+        # again, its content unchanged and its bytes not, is no longer one of them.
+        committed = REPO_ROOT / "results" / "compare" / "macOS-12302019-open-67ae574f5666.json"
+        document = json.loads(committed.read_text(encoding="utf-8"))
+        copied = self.directory / committed.name
+        copied.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+        for path, code in ((committed, 0), (copied, 1)):
+            with self.subTest(path=path.parent.name):
+                result = subprocess.run([sys.executable, "-I", str(SCRIPT), str(path)],
+                                        check=False, capture_output=True, text=True)
+                self.assertEqual(result.returncode, code, result.stderr)
+        self.assertIn(PROTOCOL_1_UNPINNED, result.stderr)
 
     def test_a_document_declaring_protocol_1(self):
         for commit in (COMMIT, OTHER_COMMIT):

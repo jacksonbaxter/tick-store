@@ -639,10 +639,15 @@ FAULTS = (
           "a protocol it does not know, protocol 3, as if it knew its rules", CHECK_FAILED,
           "FAIL: test_an_unknown_protocol (__main__.Protocol2"),
     # Review RF-1: protocol 1 belongs to the committed files measured before protocol 2.
-    Fault("compare-protocol-1-any-commit", "py-scripts", "check_compare.py takes a file that "
-          "states no protocol from any commit, so a document of the current harness escapes "
-          "every protocol 2 rule by leaving its protocol out", CHECK_FAILED,
+    Fault("compare-protocol-1-unpinned", "py-scripts", "check_compare.py takes any file that "
+          "states no protocol, so a document of the current harness escapes every protocol 2 "
+          "rule by leaving its protocol out", CHECK_FAILED,
           "FAIL: test_a_current_harness_document_without_its_protocol (__main__.Protocol2"),
+    # Review RV-6: the committed protocol 1 files are known by their bytes, not their header.
+    Fault("compare-protocol-1-by-commit", "py-scripts", "check_compare.py exempts a file from "
+          "protocol 2 by the commit its header states, which a new document can copy",
+          CHECK_FAILED, "FAIL: test_a_current_harness_document_stating_a_committed_files_commit "
+          "(__main__.Protocol2"),
     Fault("compare-protocol-1-declared", "py-scripts", "check_compare.py takes a file that "
           "declares protocol 1, which no harness ever wrote", CHECK_FAILED,
           "FAIL: test_a_document_declaring_protocol_1 (__main__.Protocol2"),

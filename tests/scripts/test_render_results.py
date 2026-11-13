@@ -76,6 +76,9 @@ class Scratch(unittest.TestCase):
         path.write_text(json.dumps(document or FIXTURES.valid_document(host)), encoding="utf-8")
 
     def render(self, *flags):
+        # The fixtures that state no protocol stand for the committed protocol 1 files, which
+        # the validator knows by their bytes (review RV-6).
+        COMPARE.pin_protocol_1(self.compare_pins, self.compare)
         return subprocess.run(
             [sys.executable, "-I", str(SCRIPT), "--readme", str(self.readme), "--results-md",
              str(self.results_md), "--results",
