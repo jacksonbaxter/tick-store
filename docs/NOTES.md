@@ -4207,6 +4207,11 @@ literal 10.1.0. It is now the version in each running server's `SELECT build` ("
 Information: QuestDB 10.1.0, JDK 25.0.2, Commit Hash ..." in every committed file), one version
 for every class of the part, or the part fails. The committed files are unchanged and right.
 
+**RV-2, the validator's docstring.** It said a tick-store-only day runs on macOS only; it now
+says the day runs on either host, with residency and BSD time -l on macOS and the four-system
+day's proofs on Linux, and that the name and the scope together keep it from standing in for the
+four-system day.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
