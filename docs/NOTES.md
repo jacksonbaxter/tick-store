@@ -3862,6 +3862,20 @@ the bench files unchanged, and `check_compare.py` applies it to `second_sibling_
 core 6 for a protocol 2 Linux file. Five faults in `Protocol2` passed with exit 0 before
 (`e3-fail-before.log`).
 
+**F-2, recording only.** Confirmed on `results/compare/Linux-12302019-full-67ae574f5666.json`:
+Parquet `zstd1-rg1Mi` read its input for 77.4 of 158.4 s in class A and 168.0 of 266.3 s in class
+B, its writer 81.1 and 88.5 s, while tick-store `v3-seg4Mi` took 195.3 and 188.9 s with 0.3 and
+0.4 s outside its tool. The triage keeps the write protocol, so no eviction was added. Every
+write repetition now records `engine_only_seconds`, which is `seconds` less `python_seconds` for
+every system (Parquet's `engine_seconds` leaves out its class B flush, so it is not the same
+thing), the input's pages and resident pages read just before the clock, and the device's bytes
+over the write. To read tick-store's residency after its warm and keep the warm's reads off the
+device counter, the warm moved from `ingest` into `ready_input`, which the worker calls first;
+`ingest` refuses to run without it. The `tickstore-source-warm-no-eviction` patch still
+applies, and `SourcePrecondition` still fails on it. On macOS the device counter is `iostat`'s
+`disk0` total, reads and writes, so a write's own output is in it. The cold worker test now
+gives its scratch layout a stand-in `tick_coldcache`, since the write step reads residency.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
