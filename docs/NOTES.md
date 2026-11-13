@@ -3656,6 +3656,42 @@ The reason string stays as it is in the committed files; the rule for the future
 from this event on this host is called "L2 misses", with the event code (PMCx064, unit mask 0x09)
 beside it, never "cache misses" or "LLC misses", and is never divided by `cache-references`.
 
+**Boost on, no fixed clock: closed without a fixed-clock run.** The item asked for a choice
+between a fixed-clock run and cycles as the headline. The user has approved no change to the
+Linux host beyond the governor write inside its measuring wrapper, and turning boost off is
+such a change, so there is no fixed-clock run and none will be made in this project. Cycles
+did not become the headline either: the speed rows of the README's headline are Linux times. What the
+repository holds:
+
+- Units. Two Linux targets are stated in cycles, DS-2 (`cycles:u` a value) and DS-4 (cycles a
+  value, which has no reported figure). Every other Linux speed target is a time or a ratio of
+  times: DS-5 in MB/s, DS-9 in ns a value, DS-7 as Gorilla's time over the layout's, WT-1 and
+  WT-2 in records a second, WT-3 and WT-4 in seconds against the other systems, QL-1 to QL-3 in
+  ms, and QL-4 in ms against the other systems.
+- The clock. `results/bench/Linux-column_decode-bcbf8738d892.json` and
+  `results/bench/Linux-itch_codec-1b7cfe196483.json` record governor `performance`, turbo
+  `enabled`, and an effective clock, user-mode cycles over the wall time of the timed passes, of
+  3,562 to 3,577 MHz across their eight cases. Their snapshots of the reported clock at the
+  wrapper's load lines, before and after each case, read 1.61 to 3.36 GHz. The two comparison
+  files, `results/compare/Linux-12302019-full-67ae574f5666.json` and the slice's, record
+  governor `performance` and turbo `enabled` and nothing more: no frequency and no counters. So
+  the clock during each system's run in the comparison is not recorded.
+- Spread between repetitions. In the two bench files, the coefficient of variation of the rate
+  over each case's ten timed passes is 0.24% to 1.45%. In the full-day comparison, tick-store's
+  headline queries spread, max less min over the median, 2.7% to 13.7% over 30 warm repetitions
+  and 4.8% to 17.7% over 7 cold ones; each write ran once per class, so it has no spread. These
+  spreads hold every source of variation together, and no file separates the clock's share.
+
+What the results give up: every Linux figure stated in time carries whatever clock boost gave
+during that run, and none can be restated at a fixed clock. A rerun on the same code could run
+at another clock if the host is warmer or busier, and how far that would move a figure is not
+measured. The relative targets compare systems that ran one after another across 8.53 hours,
+and whether they ran at the same clock is not measured either. The cycle figures avoid most of
+this for work inside the core, but a wait on memory costs more cycles at a higher clock, so
+they are not wholly free of it; by how much is not measured. BENCHMARKS.md's Linux host row now
+says that boost stays on and no run used a fixed clock. The write-up's statement of this is an
+open Phase 4 item.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
