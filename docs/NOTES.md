@@ -3967,6 +3967,8 @@ of one of them may state no protocol, and a stated protocol must be exactly the 
 test fixtures, which stand for the committed files, carry `67ae574`'s commit. The list empties
 after the freeze rerun (docs/TASKS.md).
 
+**RF-2, engine-only seconds as defined.** Confirmed by a test: every class B Parquet write repetition set to 0.5 s of engine-only time, its median 0.5, passed, though each total was 1.9 to 2.1 s with 0.1 s of Python. Each repetition's `engine_only_seconds` must now equal its `seconds` less its `python_seconds`, the worker's own subtraction, to 1 part in 10^9.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
