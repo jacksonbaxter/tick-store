@@ -74,7 +74,8 @@ enum class EncodeErrorKind : std::uint8_t {
     // `out` is smaller than the message. `expected` is the bytes needed.
     buffer_too_small,
     // The value of `field` does not fit its wire width, so writing it would
-    // silently change it. `actual` is the value and `expected` the largest allowed.
+    // silently change it. `actual` is the value and `expected` the largest allowed;
+    // for "raw bytes", a RawMessage with none, `expected` is 1, the fewest allowed.
     value_out_of_range,
 };
 
@@ -108,7 +109,8 @@ struct EncodeError {
                                                              std::span<std::byte> out) noexcept;
 
 // As encode(), with the 2-byte length prefix in front, so consecutive calls
-// rebuild a BinaryFILE stream. Returns the bytes written, prefix included.
+// rebuild a BinaryFILE stream. Returns the bytes written, prefix included. Both refuse
+// an empty RawMessage, whose frame would be the stream's end of session.
 [[nodiscard]] std::expected<std::size_t, EncodeError> encode_frame(
     const Message& message, std::span<std::byte> out) noexcept;
 

@@ -122,17 +122,22 @@ TEST(ItchRawPath, EncodeFrameRefusesAPayloadAPrefixCannotDeclare) {
     EXPECT_EQ(written.error(), expected);
 }
 
-TEST(ItchRawPath, EncodeFrameOfAnEmptyRawMessageNeedsTheWholePrefix) {
+// A frame of no bytes is BinaryFILE's end of session, where FrameCursor stops, so a stream
+// rebuilt through an empty RawMessage would end there (review A-5). Neither decoder gives
+// one and the store refuses one; only a RawMessage built by hand has no bytes.
+TEST(ItchRawPath, AnEmptyRawMessageIsRefusedNotWrittenAsTheEndOfSession) {
     const Message raw{RawMessage{{}, RawReason::wrong_length}};
-    Bytes small(1);
-    const auto refused = encode_frame(raw, small);
-    ASSERT_FALSE(refused.has_value());
-    const EncodeError expected{EncodeErrorKind::buffer_too_small, "out", 2, 1};
-    EXPECT_EQ(refused.error(), expected);
-
-    Bytes out(2, std::byte{0x5A});
-    ASSERT_EQ(encode_frame(raw, out).value_or(0), 2U);
-    EXPECT_EQ(out, Bytes(2, std::byte{0x00}));
+    const EncodeError expected{EncodeErrorKind::value_out_of_range, "raw bytes", 1, 0};
+    for (const std::size_t size : {std::size_t{0}, std::size_t{1}, std::size_t{2}, std::size_t{8}}) {
+        SCOPED_TRACE(size);
+        Bytes out(size, std::byte{0x5A});
+        const auto framed = encode_frame(raw, out);
+        ASSERT_FALSE(framed.has_value()) << "wrote " << *framed << " bytes";
+        EXPECT_EQ(framed.error(), expected);
+        const auto bare = encode(raw, out);
+        ASSERT_FALSE(bare.has_value());
+        EXPECT_EQ(bare.error(), expected);
+    }
 }
 
 TEST(ItchLifetime, ATypedMessageAndAnErrorOutliveThePayload) {

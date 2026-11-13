@@ -217,6 +217,11 @@ template <class T>
 
 [[nodiscard]] std::expected<std::size_t, EncodeError> encode_as(
     const RawMessage& message, std::span<std::byte> out) noexcept {
+    // A frame of no bytes is BinaryFILE's end of session, so an empty payload would end a
+    // rebuilt stream there (review A-5). Neither decoder gives one; only a caller can.
+    if (message.bytes.empty()) [[unlikely]] {
+        return std::unexpected(out_of_range("raw bytes", 1, 0));
+    }
     if (BigEndianWriter writer{out}; !writer.write_bytes(0, message.bytes)) [[unlikely]] {
         return std::unexpected(buffer_too_small(message.bytes.size(), out.size()));
     }
