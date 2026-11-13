@@ -736,7 +736,9 @@ a 1% tail. Each block records its `n`, the rank used (`tail_rank`), whether the 
 slowest run (`tail_is_slowest`) and what it is (`tail`, such as "slowest of 7"). `p99_us` holds the
 same figure under its old name, which the files measured before the final review's protocol use;
 those files carry no `protocol` in their header and count as protocol 1, and every file since says
-`"protocol": 2`. The slice is five minutes long, so Q2 and Q3 are
+`"protocol": 2`. `scripts/check_compare.py` accepts no protocol only from those files' commits,
+`67ae574` and `2503d1e`, listed in its `PROTOCOL_1_COMMITS`, and any stated protocol only as the
+integer 2. The slice is five minutes long, so Q2 and Q3 are
 clipped from an hour to `[09:30:00, 09:34:30)`, and Q5 scans 6,125,294 rows and not a day's
 268,744,780. Every results file says which it is, and `scripts/render_results.py` never puts a
 full-day number and a slice number in one table. What the runs found is in "Comparison harness",

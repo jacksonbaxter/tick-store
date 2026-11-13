@@ -1,12 +1,12 @@
 diff --git a/scripts/check_compare.py b/scripts/check_compare.py
 --- a/scripts/check_compare.py
 +++ b/scripts/check_compare.py
-@@ -937,7 +937,7 @@ def check_document(document, top_keys, path, pins, capacity, real_path=None):
-         problems.append("the file does not start with its header")
-     problems += [f"header: missing field '{field}'" for field in HEADER_FIELDS
-                  if field not in header]
--    if protocol_of(document) not in PROTOCOLS:
-+    if protocol_of(document) not in PROTOCOLS + (3,):
-         return [*problems, f"header.protocol: {protocol_of(document)!r}, and this validator "
-                            f"knows protocols {list(PROTOCOLS)}"]
-     systems = document.get("systems") or {}
+@@ -829,7 +829,7 @@
+         return [f"header.protocol: none stated, and only the files measured before protocol 2, "
+                 f"at {commits}, may state none"]
+     stated = header["protocol"]
+-    if type(stated) is not int or stated != PROTOCOL_2:
++    if type(stated) is not int or stated not in (PROTOCOL_2, 3):
+         return [f"header.protocol: {stated!r}, and a file states protocol {PROTOCOL_2}, or none "
+                 f"if it was measured before it, at {commits}"]
+     return []

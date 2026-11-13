@@ -25,7 +25,10 @@ sys.path.insert(0, str(REPO_ROOT))
 from compare import variant_rule  # noqa: E402
 SCRATCH_ROOT = REPO_ROOT / "build" / "test_check_compare"
 
-COMMIT = "0123456789abcdef0123456789abcdef01234567"
+# The fixtures stand for the committed protocol 1 files, so they carry one of their commits:
+# a file that states no protocol is valid only from those (review RF-1).
+COMMIT = "67ae574f566674b883e9199b375f88e12dbeeeca"
+OTHER_COMMIT = "0123456789abcdef0123456789abcdef01234567"
 SHA = "ab" * 32
 MESSAGES = 1000
 BYTES = 20000
@@ -1567,6 +1570,39 @@ class Protocol2(Harness):
 
     def test_protocol_1_files_keep_the_rules_they_were_measured_by(self):
         result = self.run_on(valid_document("Linux"), "Linux")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    # Review RF-1: protocol 1 is the committed files' alone, never a way round protocol 2.
+
+    def test_a_current_harness_document_without_its_protocol(self):
+        def fault(document):
+            document["header"]["commit"] = OTHER_COMMIT
+            del document["header"]["protocol"]
+            del q1_of(document)["warm"]["proof"]["warm_up_runs"]
+        self.assert_fault_2(fault, "header.protocol: none stated, and only the files measured "
+                                   "before protocol 2, at 67ae574f5666 and 2503d1e7c5f6, may "
+                                   "state none")
+
+    def test_a_document_declaring_protocol_1(self):
+        for commit in (COMMIT, OTHER_COMMIT):
+            def fault(document, commit=commit):
+                document["header"]["commit"] = commit
+                document["header"]["protocol"] = 1
+            with self.subTest(commit=commit):
+                self.assert_fault_2(fault, "header.protocol: 1, and a file states protocol 2")
+
+    def test_a_protocol_that_is_not_the_integer_2(self):
+        for stated in (True, 2.0, "2", None):
+            def fault(document, stated=stated):
+                document["header"]["protocol"] = stated
+            with self.subTest(stated=stated):
+                self.assert_fault_2(fault, f"header.protocol: {stated!r}, and a file states "
+                                           "protocol 2")
+
+    def test_a_protocol_2_document_from_any_commit_passes(self):
+        document = protocol_2(valid_document("Linux"))
+        document["header"]["commit"] = OTHER_COMMIT
+        result = self.run_on(document, "Linux")
         self.assertEqual(result.returncode, 0, result.stderr)
 
 

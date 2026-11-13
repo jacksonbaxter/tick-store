@@ -563,6 +563,17 @@ FAULTS = (
     Fault("compare-protocol-unknown-accepted", "py-scripts", "check_compare.py takes a file of "
           "a protocol it does not know, protocol 3, as if it knew its rules", CHECK_FAILED,
           "FAIL: test_an_unknown_protocol (__main__.Protocol2"),
+    # Review RF-1: protocol 1 belongs to the committed files measured before protocol 2.
+    Fault("compare-protocol-1-any-commit", "py-scripts", "check_compare.py takes a file that "
+          "states no protocol from any commit, so a document of the current harness escapes "
+          "every protocol 2 rule by leaving its protocol out", CHECK_FAILED,
+          "FAIL: test_a_current_harness_document_without_its_protocol (__main__.Protocol2"),
+    Fault("compare-protocol-1-declared", "py-scripts", "check_compare.py takes a file that "
+          "declares protocol 1, which no harness ever wrote", CHECK_FAILED,
+          "FAIL: test_a_document_declaring_protocol_1 (__main__.Protocol2"),
+    Fault("compare-protocol-not-an-integer", "py-scripts", "check_compare.py takes a protocol "
+          "equal to 2 that is not the integer 2, such as 2.0", CHECK_FAILED,
+          "FAIL: test_a_protocol_that_is_not_the_integer_2 (__main__.Protocol2"),
     Fault("compare-tail-name-unchecked", "py-scripts", "check_compare.py stops checking what a "
           "protocol 2 tail figure is called, so the slowest of 30 could pass as a 99th "
           "percentile", CHECK_FAILED,

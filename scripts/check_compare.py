@@ -33,8 +33,9 @@ macOS only, so that a Linux subset can never stand in for the four-system day, a
 file can never carry its name, nor the reverse.
 
 Every file states the comparison protocol it was measured under. The committed files measured
-before the final review's protocol state none and count as protocol 1, held to the rules above.
-A protocol 2 file is held to more: each latency block names its tail figure for what it is, the
+before the final review's protocol state none and count as protocol 1, held to the rules above;
+only a file of one of their commits may state none, and any file that states one must state
+exactly the integer 2. A protocol 2 file is held to more: each latency block names its tail figure for what it is, the
 nearest-rank 99th percentile with n and the rank used, which below 100 runs is the slowest run
 and must say so; and every latency block and every write keeps each repetition's seconds, from
 which its median, its tail figure and its write medians are recomputed here. On Linux the
@@ -125,7 +126,11 @@ SWAP_FIELDS = ("pages_in", "pages_out")
 # A file with no protocol was measured before the final review's comparison protocol.
 PROTOCOL_1 = 1
 PROTOCOL_2 = 2
-PROTOCOLS = (PROTOCOL_1, PROTOCOL_2)
+# The commits of the committed files measured before protocol 2, the only ones that may state no
+# protocol (review RF-1): everything the current harness writes is protocol 2. docs/TASKS.md
+# empties this once the freeze rerun has replaced those files.
+PROTOCOL_1_COMMITS = ("67ae574f566674b883e9199b375f88e12dbeeeca",
+                      "2503d1e7c5f68c657fab7c02ddb59c489b005c73")
 
 
 def check_settings(where, settings, name, durability):
@@ -814,6 +819,22 @@ def protocol_of(document):
     return (document.get("header") or {}).get("protocol", PROTOCOL_1)
 
 
+def check_protocol(header):
+    """A file states protocol 2, exactly the integer, unless it is one of the committed files
+    measured before there was a protocol, which state none (review RF-1)."""
+    commits = " and ".join(commit[:12] for commit in PROTOCOL_1_COMMITS)
+    if "protocol" not in header:
+        if header.get("commit") in PROTOCOL_1_COMMITS:
+            return []
+        return [f"header.protocol: none stated, and only the files measured before protocol 2, "
+                f"at {commits}, may state none"]
+    stated = header["protocol"]
+    if type(stated) is not int or stated != PROTOCOL_2:
+        return [f"header.protocol: {stated!r}, and a file states protocol {PROTOCOL_2}, or none "
+                f"if it was measured before it, at {commits}"]
+    return []
+
+
 def check_second_sibling(header, cases, protocol):
     """Protocol 2: the second pinned CPU's sibling, under the first one's rule on Linux, and
     stated as not available on macOS, which pins nothing."""
@@ -937,9 +958,9 @@ def check_document(document, top_keys, path, pins, capacity, real_path=None):
         problems.append("the file does not start with its header")
     problems += [f"header: missing field '{field}'" for field in HEADER_FIELDS
                  if field not in header]
-    if protocol_of(document) not in PROTOCOLS:
-        return [*problems, f"header.protocol: {protocol_of(document)!r}, and this validator "
-                           f"knows protocols {list(PROTOCOLS)}"]
+    stated = check_protocol(header)
+    if stated:
+        return [*problems, *stated]
     systems = document.get("systems") or {}
     alone = document.get("scope") == variant_rule.TICKSTORE_ONLY
     named_alone = f"-{TICKSTORE_ONLY_NAME}-" in path.name
