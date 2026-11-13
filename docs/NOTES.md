@@ -3298,6 +3298,14 @@ in `SegmentAssembler::State::named`; the other seeds, each run once with the bou
 Before the seed, one run in four found it, at 43 s. G-3's 30-minute runs predate the seed, so TASKS
 carries running them again at the freeze.
 
+The checks. clang-tidy's first run over this round's code failed on ten findings in the new
+code and tests: unchecked optional accesses the checker could not follow, a boolean it wanted by
+De Morgan, two loops without a reserve, two headers included only indirectly and a discarded
+`future::get`. They were fixed in `e70d3ab` with no change in behaviour. At `e70d3ab` on the Mac,
+`check.sh` passed 23 of 23 steps: dev, ASan/UBSan and TSan builds and their 644 tests each, the
+round-trip oracle, clang-tidy, the fuzz build and 20 s of each of the 13 targets, and hygiene. On debian at the same commit, the dev build
+and 644 of 644 tests passed, the two real-day tests skipped for want of the day's file.
+
 Raw: `phase4-raw/fix-store/`: each finding's failing and passing logs, the fault runs for C-5,
 C-9 and the seed (`tasks238-*`), and the check logs.
 
