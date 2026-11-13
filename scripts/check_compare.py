@@ -258,6 +258,12 @@ def check_write_record(where, write, name, full_day=False):
                 not 0 <= engine_only <= total * (1 + 1e-9):
             problems.append(f"{where}.write: repetition {number} has no engine-only seconds "
                             "within its total")
+        elif check_results.is_number(item.get("python_seconds")) and not same(
+                engine_only, total - item["python_seconds"]):
+            # Review RF-2: engine-only is the repetition's own total less its Python seconds.
+            problems.append(f"{where}.write: repetition {number}'s engine-only seconds "
+                            f"{figure(engine_only)} are not its seconds less its python_seconds, "
+                            f"{figure(total - item['python_seconds'])}")
         pages, resident = item.get("input_pages"), item.get("input_resident_pages_at_start")
         if not is_count(pages) or pages == 0 or not is_count(resident) or resident > pages:
             problems.append(f"{where}.write: repetition {number} does not say how much of its "

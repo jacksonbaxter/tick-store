@@ -1480,6 +1480,16 @@ class Protocol2(Harness):
         self.assert_fault_2(fault, "parquet.v.B.write: repetition 1 has no engine-only seconds "
                                    "within its total")
 
+    def test_an_engine_only_time_that_is_not_the_total_less_python(self):
+        # Review RF-2: within the total, and its median right, but not the repetition's own.
+        def fault(document):
+            write = b_of(document, "parquet")["write"]
+            for item in write["by_repetition"]:
+                item["engine_only_seconds"] = 0.5
+            write["engine_only_seconds_median"] = 0.5
+        self.assert_fault_2(fault, "parquet.v.B.write: repetition 1's engine-only seconds 0.5 are "
+                                   "not its seconds less its python_seconds, 2.0")
+
     def test_an_engine_only_median_that_does_not_follow(self):
         def fault(document):
             b_of(document, "arcticdb")["write"]["engine_only_seconds_median"] = 1.8

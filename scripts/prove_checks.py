@@ -587,6 +587,10 @@ FAULTS = (
     Fault("compare-write-device-reads-unchecked", "py-scripts", "check_compare.py stops "
           "requiring a write's device reads", CHECK_FAILED,
           "FAIL: test_a_write_with_no_device_reads (__main__.Protocol2"),
+    Fault("compare-engine-only-not-its-own", "py-scripts", "check_compare.py stops tying a "
+          "write repetition's engine-only seconds to its own total less its Python seconds, so "
+          "any figure within the total passes (review RF-2)", CHECK_FAILED,
+          "FAIL: test_an_engine_only_time_that_is_not_the_total_less_python (__main__.Protocol2"),
     Fault("compare-cold-open-resident-unchecked", "py-scripts", "check_compare.py stops "
           "requiring 0 store bytes resident before a cold clock that holds the whole open",
           CHECK_FAILED,
