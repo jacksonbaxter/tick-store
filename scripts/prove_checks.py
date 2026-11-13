@@ -617,6 +617,11 @@ FAULTS = (
           "day, so one that ran without the guard passes", CHECK_FAILED,
           "FAIL: test_a_linux_tickstore_only_day_without_the_guards_memory "
           "(__main__.TickstoreOnly"),
+    # Review RV-4: a protocol 2 day of tick-store alone passes on each host.
+    Fault("compare-tickstore-alone-protocol-2-refused", "py-scripts", "check_compare.py "
+          "wants the second sibling read for all four systems, so a protocol 2 Linux day of "
+          "tick-store alone is refused", CHECK_FAILED,
+          "FAIL: test_a_tickstore_alone_day_passes (__main__.Protocol2FullDay"),
     # The comparison protocol 2 rules (docs/REVIEW.md, F-4 to F-11 and E-3).
     Fault("compare-protocol-unknown-accepted", "py-scripts", "check_compare.py takes a file of "
           "a protocol it does not know, protocol 3, as if it knew its rules", CHECK_FAILED,

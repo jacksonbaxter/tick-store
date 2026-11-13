@@ -1,0 +1,12 @@
+diff --git a/scripts/check_compare.py b/scripts/check_compare.py
+--- a/scripts/check_compare.py
++++ b/scripts/check_compare.py
+@@ -1086,7 +1086,7 @@ def check_document(document, top_keys, path, pins, capacity, real_path=None):
+                                                if key != "frequency"}, list(systems))
+         if not alone:
+             problems += check_heap(document, "Linux", capacity)
+-    problems += check_second_sibling(header, list(systems), protocol_of(document))
++    problems += check_second_sibling(header, list(SYSTEMS), protocol_of(document))
+     label = str(document.get("label", ""))
+     input_block = document.get("input") or {}
+     full_day = "day" in input_block or f"-{FULL_DAY}-" in path.name

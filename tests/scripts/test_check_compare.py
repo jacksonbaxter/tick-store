@@ -1851,6 +1851,23 @@ class Protocol2FullDay(Harness):
         self.assertIn("variant_selection: the rule is not compare/variant_rule.py's",
                       result.stderr)
 
+    def test_a_tickstore_alone_day_passes(self):
+        # Review RV-4: a protocol 2 day of tick-store alone, the only kind the harness writes
+        # now, passes on each host, from a commit that must state its protocol (RF-1).
+        alone = TickstoreOnly.run_alone
+        for host, make in (("macOS", tickstore_only_document),
+                           ("Linux", linux_tickstore_only_document)):
+            with self.subTest(host=host):
+                document = protocol_2(make())
+                document["header"]["commit"] = OTHER_COMMIT
+                if host == "Linux":
+                    # The second sibling is read for the one system that ran, as the first is.
+                    document["header"]["second_sibling_busy_percent"]["cases"] = {
+                        "tickstore": 0.1}
+                result = alone(self, document, f"{host}-{DAY}-full-tickstore-"
+                                               f"{OTHER_COMMIT[:12]}.json")
+                self.assertEqual(result.returncode, 0, result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=1)
