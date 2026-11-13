@@ -1,0 +1,13 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+index 1a399ad..d07ab17 100644
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -791,7 +791,7 @@ def lowest_parts(row, document):
+             names = " / ".join("median" if field == "median_us" else
+                                tail if field in TAIL_FIELDS else field
+                                for field in spec["fields"])
+-            note = faster_variants(spec, document, query, kind, ours, row) if met else ""
++            note = ""
+             parts.append((f"{query} {kind}", f"{values} against {others} ({names}){note}", met))
+     return parts
+ 

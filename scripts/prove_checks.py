@@ -920,6 +920,12 @@ FAULTS = (
           "out the locate sequence that rebuilds file order", CHECK_FAILED,
           "FAIL: test_a_per_locate_figure_says_it_leaves_out_the_permutation "
           "(__main__.RenderTargetsTest"),
+    # Review F's note for RESULTS: QL-4 compares headline variants, and says so where it is met.
+    Fault("render-ql4-met-unqualified", "py-scripts", "render_results.py calls a QL-4 part met "
+          "with no word that it compares headline variants, nor of another system's faster "
+          "variant", CHECK_FAILED,
+          "FAIL: test_a_met_part_says_it_is_among_the_headlines_and_names_a_faster_variant "
+          "(__main__.RenderLowestTest"),
     Fault("results-md-hand-edit", "render-check", "a hand edit inside RESULTS.md's benchmark "
           "block, a host's heading changed", CHECK_FAILED,
           "the table in RESULTS.md is stale or was edited by hand", hand_edit_results_md),

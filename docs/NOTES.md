@@ -4162,6 +4162,11 @@ per locate (2.614). The sequence costs at least 11.17 bits a message by its orde
 column. Version 4 files carry `excludes_permutation` and the generator reads it; the committed
 version 3 files do not, and the generator takes the column's order, by which the tool sets it.
 
+**QL-4's met parts.** A met part now says it is met among the four headline variants, and
+names another system's variant the file shows with a lower median on that query. On the Linux
+day ArcticDB's `rows100k-cols127-per-security` is faster on all four met Q2 and Q3 parts, as the
+README's pitch already said; Q5 cold has no faster variant.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
