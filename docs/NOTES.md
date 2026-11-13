@@ -3429,6 +3429,15 @@ an integer locate for `rows` and `minute_aggregate`, and nothing but the kind fo
 which still needs no window. `locate` may still be absent, meaning every locate, as the header
 says.
 
+D-14. One helper beside `CliOutput` in `roundtrip_cli.hpp`, `write_cli_output(output, code)`,
+replaces the two `std::print` lines in all eight tools. It writes with `fwrite`, flushes, checks
+`ferror`, writes stderr, and turns a pass into exit 2 when stdout failed; a failing code stays as
+it is, so a mismatch is still 1. `tick_query`'s answers go to `std::cout` as they are made, so
+`run_query_cli` stops at an answer it cannot write and returns 2. The helper's test holds the
+file-size limit at 256 bytes for a 4,096-byte output, and closes the file under the limit too:
+closed after the limit is lifted, the stream wrote out what its flush could not, and the file
+reached 4,096 bytes.
+
 Raw: `phase4-raw/fix-harness/`: each finding's failing and passing logs.
 
 ## Process notes
