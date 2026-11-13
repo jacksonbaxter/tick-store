@@ -6,6 +6,9 @@
 #   cmake -DBINARY=<unit test binary> -DWHOLE=<filter> -DPARTS=<filter>,<filter>,...
 #         -P check_scalar_capped_parts.cmake
 
+# Script mode sets no policies by itself, and before CMake 4 if(IN_LIST) needs CMP0057.
+cmake_minimum_required(VERSION 3.28)
+
 function(list_tests filter out)
     execute_process(
         COMMAND "${BINARY}" "--gtest_filter=${filter}" --gtest_list_tests
