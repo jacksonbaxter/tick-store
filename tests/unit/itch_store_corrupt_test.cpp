@@ -793,6 +793,50 @@ TEST(ItchStoreCorrupt, LocateRunFields) {
     }
 }
 
+// After a seek that fails, next() gives that failure until a seek succeeds, rather than
+// the rest of the segment before or an empty segment (review C-7): once where the columns
+// cannot be read, and once where they are read but do not fit together.
+TEST(ItchStoreCorrupt, NextAfterAFailedSeekGivesTheFailure) {
+    const Bytes file = base_file();
+    std::vector<Bytes> broken;
+    {
+        // More runs than typed records: read_columns refuses.
+        StoreParts parts = test::parts_of(file);
+        put_field(parts.block(1, Column::locate_run).metadata, kMetaValueCountOffset, 4, kN + 1);
+        broken.push_back(parts.build());
+    }
+    {
+        // A first run not at 0: load() refuses.
+        StoreParts parts = test::parts_of(file);
+        std::vector<std::uint64_t> starts = test::column_values(file, 1, Column::locate_run_start);
+        starts[0] = 1;
+        test::set_column(parts, 1, Column::locate_run_start, starts);
+        broken.push_back(parts.build());
+    }
+    for (std::size_t i = 0; i < broken.size(); ++i) {
+        SCOPED_TRACE(i == 0 ? "read_columns refuses" : "load refuses");
+        auto reader = ItchStoreReader::open_bytes(broken[i]);
+        ASSERT_TRUE(reader.has_value()) << to_string(reader.error());
+        SegmentReader records;
+        ASSERT_TRUE(records.seek(*reader, 0).has_value());
+        const auto first = records.next();
+        ASSERT_TRUE(first.has_value() && first->has_value());
+        const auto failed = records.seek(*reader, 1);
+        ASSERT_FALSE(failed.has_value());
+        for (int twice = 0; twice < 2; ++twice) {
+            const auto next = records.next();
+            ASSERT_FALSE(next.has_value())
+                << (next->has_value() ? "a record of the segment before" : "an empty segment");
+            EXPECT_EQ(next.error(), failed.error());
+        }
+        // A seek that succeeds clears it.
+        ASSERT_TRUE(records.seek(*reader, 0).has_value());
+        const auto again = records.next();
+        ASSERT_TRUE(again.has_value() && again->has_value());
+        EXPECT_EQ(test::payload_of(**again), test::payload_of(**first));
+    }
+}
+
 // The time bases of the same segment: one value, its least time, and the times' residuals
 // over the larger of it and the time before in the run.
 TEST(ItchStoreCorrupt, TimeBaseFields) {

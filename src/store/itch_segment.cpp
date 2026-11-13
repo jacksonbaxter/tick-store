@@ -1006,6 +1006,13 @@ SegmentAssembler::SegmentAssembler(SegmentAssembler&&) noexcept = default;
 SegmentAssembler& SegmentAssembler::operator=(SegmentAssembler&&) noexcept = default;
 SegmentAssembler::~SegmentAssembler() = default;
 
+void SegmentAssembler::fail(const ItchStoreError& error) {
+    State& s = *state_;
+    s.records = 0;
+    s.decoded.clear();
+    s.failure = error;
+}
+
 std::expected<void, ItchStoreError> SegmentAssembler::load(std::uint64_t segment,
                                                            SegmentColumns columns,
                                                            const SegmentSummary& summary,

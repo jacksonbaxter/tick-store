@@ -75,8 +75,11 @@ public:
                                                            const SymbolTable& symbols);
 
     // The next record, or nullopt after the last. A RawMessage borrows from the assembler
-    // and is valid until the next call.
+    // and is valid until the next call. After fail(), its error, until a load() succeeds.
     [[nodiscard]] std::expected<std::optional<itch::Message>, ItchStoreError> next();
+
+    // Drops the segment held: next() returns `error` until a load() succeeds.
+    void fail(const ItchStoreError& error);
 
 private:
     struct State;

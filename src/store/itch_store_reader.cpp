@@ -530,10 +530,15 @@ std::expected<void, ItchStoreError> SegmentReader::seek(const ItchStoreReader& r
                                                         std::uint64_t segment) {
     auto columns = reader.read_columns(segment);
     if (!columns.has_value()) {
+        assembler_.fail(columns.error());
         return std::unexpected(columns.error());
     }
-    return assembler_.load(segment, std::move(*columns), reader.segment(segment).summary,
-                           reader.symbols());
+    auto loaded = assembler_.load(segment, std::move(*columns), reader.segment(segment).summary,
+                                  reader.symbols());
+    if (!loaded.has_value()) {
+        assembler_.fail(loaded.error());
+    }
+    return loaded;
 }
 
 }  // namespace tick_store::store

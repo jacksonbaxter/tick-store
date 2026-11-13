@@ -140,12 +140,13 @@ private:
 // The records of one segment at a time, in file order.
 class SegmentReader {
 public:
-    // Reads and decodes segment `segment`. The reader must outlive the records read.
+    // Reads and decodes segment `segment`. The reader must outlive the records read. After
+    // a failure, next() returns the same error until a seek succeeds.
     [[nodiscard]] std::expected<void, ItchStoreError> seek(const ItchStoreReader& reader,
                                                            std::uint64_t segment);
 
     // The next record of the segment, or nullopt after its last. A RawMessage borrows from
-    // this reader until the next call.
+    // this reader until the next call. Before any seek, a segment of no records.
     [[nodiscard]] std::expected<std::optional<itch::Message>, ItchStoreError> next() {
         return assembler_.next();
     }
