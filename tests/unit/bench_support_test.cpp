@@ -15,10 +15,12 @@
 #include <gtest/gtest.h>
 
 #include <fcntl.h>
+#include <pthread.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 #include <array>
+#include <csignal>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -365,6 +367,53 @@ TEST(CounterGate, WithoutFifosItIsInertAndSaysWhy) {
     EXPECT_NE(gate->status(), CounterStatus::gated);
     EXPECT_TRUE(gate->enable().has_value());
     EXPECT_TRUE(gate->disable().has_value());
+}
+
+// A run given one FIFO and not the other was started under perf with a mistyped flag, so
+// its counters would never be enabled (review A-6).
+TEST(CounterGate, OneFifoWithoutTheOtherIsAnError) {
+    const test::ScratchDir scratch;
+    const FakePerf perf{scratch};
+    const auto control_only = CounterGate::for_run(perf.control(), std::nullopt);
+    EXPECT_FALSE(control_only.has_value()) << to_string(control_only->status());
+    const auto acknowledge_only = CounterGate::for_run(std::nullopt, perf.acknowledge());
+    EXPECT_FALSE(acknowledge_only.has_value()) << to_string(acknowledge_only->status());
+}
+
+void ignore_signal(int /*signal*/) {}
+
+// A signal while the gate waits for perf interrupts poll(); the wait goes on for the time
+// left, and an acknowledgement after it is taken (review A-6).
+TEST(CounterGate, ASignalWhileWaitingDoesNotEndTheWait) {
+    struct sigaction quiet{};
+    quiet.sa_handler = ignore_signal;  // no SA_RESTART, so poll() returns EINTR
+    struct sigaction before{};
+    ASSERT_EQ(::sigaction(SIGUSR1, &quiet, &before), 0);
+
+    const test::ScratchDir scratch;
+    const FakePerf perf{scratch};
+    auto gate = CounterGate::open(perf.control(), perf.acknowledge());
+    ASSERT_TRUE(gate.has_value()) << gate.error();
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg): open is variadic
+    const int in = ::open(perf.control().c_str(), O_RDWR | O_CLOEXEC);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg): open is variadic
+    const int out = ::open(perf.acknowledge().c_str(), O_RDWR | O_CLOEXEC);
+    const pthread_t waiting = ::pthread_self();
+    std::thread perf_side{[in, out, waiting] {
+        std::array<char, 32> buffer{};
+        EXPECT_GT(::read(in, buffer.data(), buffer.size()), 0);
+        // The command is written just before the wait starts, so give it time to start.
+        std::this_thread::sleep_for(std::chrono::milliseconds{50});
+        EXPECT_EQ(::pthread_kill(waiting, SIGUSR1), 0);
+        std::this_thread::sleep_for(std::chrono::milliseconds{50});
+        EXPECT_EQ(::write(out, "ack\n", 4), 4);
+    }};
+    const auto enabled = gate->enable();
+    perf_side.join();
+    ::close(in);
+    ::close(out);
+    ASSERT_EQ(::sigaction(SIGUSR1, &before, nullptr), 0);
+    EXPECT_TRUE(enabled.has_value()) << enabled.error();
 }
 
 class StreamCheckTest : public ::testing::Test {

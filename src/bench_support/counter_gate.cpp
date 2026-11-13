@@ -5,6 +5,7 @@
 #include <poll.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cstddef>
@@ -57,7 +58,13 @@ std::string_view to_string(CounterStatus status) noexcept {
 std::expected<CounterGate, std::string> CounterGate::for_run(
     const std::optional<std::filesystem::path>& control,
     const std::optional<std::filesystem::path>& acknowledge) {
-    if (!kPlatformHasPerf || !control.has_value() || !acknowledge.has_value()) {
+    // One without the other is a mistyped command line under perf, whose counters would
+    // then never be enabled, not a run without perf (review A-6).
+    if (control.has_value() != acknowledge.has_value()) {
+        return std::unexpected(std::string{
+            "the perf control FIFOs come as a pair, and only one was given"});
+    }
+    if (!kPlatformHasPerf || !control.has_value()) {
         return CounterGate{kWithoutFifos};
     }
     return open(*control, *acknowledge);
@@ -118,11 +125,25 @@ std::expected<void, std::string> CounterGate::command(std::string_view text) {
         return std::unexpected(
             std::format("cannot write to the perf control FIFO: {}", last_error()));
     }
-    pollfd waiting{.fd = acknowledge_fd_, .events = POLLIN, .revents = 0};
-    const int ready = ::poll(&waiting, 1, static_cast<int>(ack_timeout_.count()));
-    if (ready <= 0) {
-        return std::unexpected(
-            std::format("perf did not acknowledge within {} ms", ack_timeout_.count()));
+    // A signal ends poll() early with EINTR; the wait goes on for the time left (A-6).
+    const auto deadline = std::chrono::steady_clock::now() + ack_timeout_;
+    while (true) {
+        const auto left = std::max(std::chrono::ceil<std::chrono::milliseconds>(
+                                       deadline - std::chrono::steady_clock::now()),
+                                   std::chrono::milliseconds{0});
+        pollfd waiting{.fd = acknowledge_fd_, .events = POLLIN, .revents = 0};
+        const int ready = ::poll(&waiting, 1, static_cast<int>(left.count()));
+        if (ready > 0) {
+            break;
+        }
+        if (ready == 0) {
+            return std::unexpected(
+                std::format("perf did not acknowledge within {} ms", ack_timeout_.count()));
+        }
+        if (errno != EINTR) {
+            return std::unexpected(
+                std::format("waiting for perf's acknowledgement failed: {}", last_error()));
+        }
     }
     std::array<char, 16> reply{};
     const auto got = ::read(acknowledge_fd_, reply.data(), reply.size());

@@ -37,7 +37,8 @@ public:
     static constexpr std::chrono::milliseconds kDefaultAckTimeout{5000};
 
     // What this run should use: FIFOs where given, otherwise an inert gate. On a
-    // platform without perf, the status is not_supported even if FIFOs are given.
+    // platform without perf, the status is not_supported even if FIFOs are given. One
+    // FIFO without the other is an error.
     [[nodiscard]] static std::expected<CounterGate, std::string> for_run(
         const std::optional<std::filesystem::path>& control,
         const std::optional<std::filesystem::path>& acknowledge);
