@@ -75,15 +75,21 @@ namespace tick_store::itch::oracle {
 }
 
 // One stop against the bytes the cursor left, `tail` being everything from the stopped
-// frame on. The stop must be justified by those bytes: a whole frame must never be
-// reported as truncated, a zero-length stop must sit on a prefix of 00 00 and a truncated
-// body on a prefix declaring more than is left, and each fault stop's `expected` and
-// `actual` must be the numbers frame.hpp gives for it, read from the tail. Apart from
-// check_stream so that a test can hand it stops no correct cursor makes (review RA-1).
+// frame on. The stop must be justified by those bytes: end only with no bytes left, a
+// fault only with some, a truncated prefix on 1 byte, a zero-length stop on a prefix of
+// 00 00 and a truncated body on a prefix declaring more than is left, so that a whole
+// frame is never reported as truncated. And every stop's `expected` and `actual` must be
+// the numbers frame.hpp gives for it: 0 and 0 for end (review RA-2), 2 and 1 for a
+// truncated prefix, and for the other two the prefix's length, 0 for zero-length, and the
+// bytes after the prefix, read from the tail. Apart from check_stream so that a test can
+// hand it stops no correct cursor makes (review RA-1).
 [[nodiscard]] inline const char* check_stop(const FrameStop& stop,
                                             std::span<const std::byte> tail) {
     if (stop.kind == FrameStopKind::end && !tail.empty()) {
         return "the cursor reported end with bytes left";
+    }
+    if (stop.kind == FrameStopKind::end && (stop.expected != 0 || stop.actual != 0)) {
+        return "an end stop states bytes needed or bytes left";
     }
     if (stop.kind != FrameStopKind::end && tail.empty()) {
         return "the cursor reported a fault with no bytes left";
@@ -126,8 +132,8 @@ namespace tick_store::itch::oracle {
 // A byte stream through the cursor. Each frame must lie inside the input, directly
 // after the one before; re-encoding every frame and appending the tail the cursor
 // reports must rebuild the input exactly; the stop must pass check_stop against that
-// tail; and a cursor over any shorter prefix must agree on every frame that fits and
-// stop where the cut lands.
+// tail; and a cursor over a shorter prefix must agree on every frame that fits, stop
+// where the last of them ends, and pass check_stop against what it leaves.
 [[nodiscard]] inline const char* check_stream(std::span<const std::byte> stream) {
     std::vector<std::byte> rebuilt(stream.size());
     std::size_t out = 0;
@@ -199,8 +205,20 @@ namespace tick_store::itch::oracle {
     if (std::cmp_not_equal(index, std::ranges::count_if(frames, fits))) {
         return "a shorter input gave a different number of frames";
     }
-    if (short_step.error().offset > cut) {
-        return "a stop was reported past the end of a shorter input";
+    // The shorter cursor's stop, checked as the whole input's is (review RA-2).
+    const FrameStop short_stop = short_step.error();
+    const std::size_t short_out =
+        index == 0 ? 0
+                   : frames[index - 1].offset + kFramePrefixSize + frames[index - 1].payload.size();
+    if (short_stop.offset != short_out || short_cursor.offset() != short_out) {
+        return "a shorter input's stop is not at the end of its last whole frame";
+    }
+    const auto short_tail = short_cursor.remaining();
+    if (short_tail.size() != cut - short_out) {
+        return "a shorter input's tail does not cover its unread bytes";
+    }
+    if (const char* failure = check_stop(short_stop, short_tail); failure != nullptr) {
+        return failure;
     }
     return nullptr;
 }

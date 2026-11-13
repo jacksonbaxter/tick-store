@@ -244,6 +244,10 @@ TEST(FuzzOracles, TheFrameOracleRefusesAStopTheBytesDoNotJustify) {
         {"body over one byte", {truncated_body, 0, 2, 0}, one,
          "the cursor read a prefix that is not there"},
         {"end with bytes left", {end, 0, 0, 0}, one, "the cursor reported end with bytes left"},
+        {"end, states bytes needed", {end, 0, 1, 0}, none,
+         "an end stop states bytes needed or bytes left"},
+        {"end, states bytes left", {end, 0, 0, 1}, none,
+         "an end stop states bytes needed or bytes left"},
         {"fault with no bytes", {zero_length, 0, 0, 0}, none,
          "the cursor reported a fault with no bytes left"},
     };
