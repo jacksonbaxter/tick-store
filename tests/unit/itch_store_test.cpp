@@ -4,6 +4,7 @@
 
 #include "itch_fixtures.hpp"
 #include "itch_store_fixture.hpp"
+#include "recording_file_ops.hpp"
 #include "scratch_dir.hpp"
 #include "stub_fixture.hpp"
 #include "test_bytes.hpp"
@@ -24,8 +25,10 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <cerrno>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <map>
 #include <set>
 #include <span>
@@ -804,6 +807,51 @@ TEST(ItchStoreWriter, AWriterMovedWithASegmentOpenWritesItsStocks) {
     ASSERT_TRUE(records.has_value()) << to_string(records.error());
     const std::vector<itch::Message> want{test::add(7, 1, 100, "AAPL")};
     EXPECT_EQ(*records, payloads_of(want));
+}
+
+// A failed segment write is fatal, as the header says: every later append and the finish
+// return it, and nothing is published (review C-2). Twenty raw records of 65,535 bytes
+// that zstd cannot shrink make a raw_bytes block over the container writer's 1 MiB
+// buffer, so its first write is made while the segment is written, and that one fails.
+TEST(ItchStoreWriter, AFailedSegmentWriteIsFatal) {
+    constexpr std::uint32_t kRecords = 20;
+    std::vector<Bytes> payloads;
+    std::uint64_t state = 0x9E3779B97F4A7C15ULL;
+    for (std::uint32_t r = 0; r < kRecords; ++r) {
+        Bytes payload(itch::kMaxPayloadSize);
+        payload[0] = std::byte{'z'};
+        for (std::size_t i = 1; i < payload.size(); ++i) {
+            state ^= state << 13U;
+            state ^= state >> 7U;
+            state ^= state << 17U;
+            payload[i] = static_cast<std::byte>(state & 0xFFU);
+        }
+        payloads.push_back(std::move(payload));
+    }
+    const tick_store::test::ScratchDir dir;
+    const auto path = dir / "store.tsc";
+    test::RecordingFileOps ops;
+    ops.fail_on("write", EIO);
+    auto writer = ItchStoreWriter::create(path, Durability::page_cache,
+                                          {.segment_records = kRecords}, ops);
+    ASSERT_TRUE(writer.has_value()) << to_string(writer.error());
+    for (std::uint32_t r = 0; r + 1 < kRecords; ++r) {
+        ASSERT_TRUE(writer->append(itch::RawMessage{.bytes = payloads[r]}).has_value());
+    }
+    const auto failed = writer->append(itch::RawMessage{.bytes = payloads.back()});
+    ASSERT_FALSE(failed.has_value());
+    EXPECT_EQ(ops.count("write"), 1);
+    EXPECT_FALSE(std::filesystem::exists(dir / "store.tsc.partial"));
+
+    // The record after the failure is refused with the same error, and so is finish().
+    const auto after = writer->append(test::add(1, 1, 1));
+    ASSERT_FALSE(after.has_value()) << "an append after a failed segment write succeeded";
+    EXPECT_EQ(after.error(), failed.error());
+    const auto finished = writer->finish({});
+    ASSERT_FALSE(finished.has_value());
+    EXPECT_EQ(finished.error(), failed.error());
+    EXPECT_FALSE(std::filesystem::exists(path));
+    EXPECT_EQ(ops.count("rename"), 0);
 }
 
 TEST(ItchStoreWriter, TheCreateErrorNamesTheContainersFailure) {

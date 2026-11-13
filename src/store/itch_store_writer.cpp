@@ -155,6 +155,9 @@ std::expected<void, ItchStoreError> ItchStoreWriter::write_segment() {
 }
 
 std::expected<void, ItchStoreError> ItchStoreWriter::append(const itch::Message& message) {
+    if (failed_.has_value()) {
+        return std::unexpected(*failed_);
+    }
     if (finished_) {
         ItchStoreError error;
         error.kind = ItchStoreErrorKind::invalid_argument;
@@ -168,12 +171,25 @@ std::expected<void, ItchStoreError> ItchStoreWriter::append(const itch::Message&
     }
     ++records_;
     if (builder_.records() == options_.segment_records) {
-        return write_segment();
+        return latch(write_segment());
     }
     return {};
 }
 
+std::expected<void, ItchStoreError> ItchStoreWriter::latch(
+    std::expected<void, ItchStoreError> result) {
+    if (!result.has_value()) {
+        failed_ = result.error();
+        // Unlinks the partial file now rather than when the writer goes.
+        file_.reset();
+    }
+    return result;
+}
+
 std::expected<void, ItchStoreError> ItchStoreWriter::finish(std::span<const std::byte> tail) {
+    if (failed_.has_value()) {
+        return std::unexpected(*failed_);
+    }
     if (finished_) {
         ItchStoreError error;
         error.kind = ItchStoreErrorKind::invalid_argument;
@@ -181,6 +197,10 @@ std::expected<void, ItchStoreError> ItchStoreWriter::finish(std::span<const std:
         return std::unexpected(error);
     }
     finished_ = true;
+    return latch(write_last(tail));
+}
+
+std::expected<void, ItchStoreError> ItchStoreWriter::write_last(std::span<const std::byte> tail) {
     if (builder_.records() > 0) {
         if (auto written = write_segment(); !written.has_value()) {
             return written;
@@ -210,7 +230,7 @@ std::expected<void, ItchStoreError> ItchStoreWriter::finish(std::span<const std:
 }
 
 std::vector<std::byte> ItchStoreWriter::take_bytes() {
-    if (file_.has_value() || !finished_) {
+    if (file_.has_value() || !finished_ || failed_.has_value()) {
         return {};
     }
     return std::move(memory_);

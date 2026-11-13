@@ -55,13 +55,16 @@ public:
 
     // Adds the next record, writing a segment's blocks each time one fills. A refused record
     // (SegmentBuilder::add) changes nothing and is not fatal; a failed write is, as in
-    // ContainerWriter.
+    // ContainerWriter: every later append() and finish() returns the same error, and the
+    // partial file is removed.
     [[nodiscard]] std::expected<void, ItchStoreError> append(const itch::Message& message);
 
-    // Writes the last segment, then the store, symbols and tail sections, and commits.
+    // Writes the last segment, then the store, symbols and tail sections, and commits. A
+    // failure is fatal, as in append().
     [[nodiscard]] std::expected<void, ItchStoreError> finish(std::span<const std::byte> tail);
 
-    // The whole file, for an in-memory writer after finish(); empty otherwise.
+    // The whole file, for an in-memory writer after a finish() that succeeded; empty
+    // otherwise.
     [[nodiscard]] std::vector<std::byte> take_bytes();
 
     [[nodiscard]] std::uint64_t records() const noexcept { return records_; }
@@ -70,6 +73,11 @@ private:
     explicit ItchStoreWriter(ItchStoreOptions options);
 
     [[nodiscard]] std::expected<void, ItchStoreError> write_segment();
+    // finish()'s work after its checks.
+    [[nodiscard]] std::expected<void, ItchStoreError> write_last(std::span<const std::byte> tail);
+    // Keeps a failure, so every later call returns it, and drops the partial file.
+    [[nodiscard]] std::expected<void, ItchStoreError> latch(
+        std::expected<void, ItchStoreError> result);
     [[nodiscard]] std::expected<void, ItchStoreError> add_block(codec::CodecId codec,
                                                                 std::span<const std::byte> metadata,
                                                                 std::span<const std::byte> payload);
@@ -88,6 +96,7 @@ private:
     ContainerLayout layout_;
     std::vector<std::byte> memory_;
     bool finished_ = false;
+    std::optional<ItchStoreError> failed_;
 };
 
 }  // namespace tick_store::store
