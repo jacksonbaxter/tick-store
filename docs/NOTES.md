@@ -4026,6 +4026,11 @@ under `variant_selection`. The guard divided each swap delta by the nominal 2 s,
 sample comes 2 s after the last one ended, so the rate was overstated, in the safe direction but
 not as registered. It now divides by the time between the two samples: 1000 pages 2.5 s apart
 read 1,638,400 B/s, where the nominal interval gave 2,048,000.
+**RF-8, where a cold clock starts.** Confirmed by a test on a fake system with its open inside
+the cold clock and no reported open, as Parquet: with 0 pages resident before the open and 3
+before the query, the proof kept 0. It now keeps the reading before the open only where the open
+is added to the figure, tick-store's, and the one before the query otherwise. On the committed
+files the two are the same, since Parquet's `open()` reads no store file.
 
 ## Process notes
 
