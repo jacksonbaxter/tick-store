@@ -216,13 +216,25 @@ class StopPath(unittest.TestCase):
     @unittest.skipUnless(sys.platform.startswith("linux"), "the guard reads /proc: Linux only")
     def test_on_linux_a_real_breach_stops_the_whole_session(self):
         # Nothing faked: MemAvailable is under a floor of 100,000 GiB on any host. The command
-        # starts a second process in its session, and both must be gone.
+        # starts a second process in its session, and both must be gone. The guard's readings
+        # are the host's own, held back only until that second process exists: at debian's
+        # first run the guard fired before the command had started it.
         pids = self.directory / "pids"
         child = ("import os, subprocess, sys, time\n"
                  "p = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(600)'])\n"
-                 f"open({str(pids)!r}, 'w').write(f'{{os.getpid()}} {{p.pid}}')\n"
+                 f"open({str(pids)!r} + '.tmp', 'w').write(f'{{os.getpid()}} {{p.pid}}')\n"
+                 f"os.rename({str(pids)!r} + '.tmp', {str(pids)!r})\n"
                  "time.sleep(600)\n")
-        code, seconds, report = self.guard_run(child, 100_000)
+        real_read_host = guard.read_host
+
+        def read_host_once_started(watch):
+            deadline = time.monotonic() + 10
+            while not pids.exists() and time.monotonic() < deadline:
+                time.sleep(0.05)
+            return real_read_host(watch)
+
+        with mock.patch.object(guard, "read_host", read_host_once_started):
+            code, seconds, report = self.guard_run(child, 100_000)
         self.assert_stopped(code, seconds, report)
         session, _ = (int(pid) for pid in pids.read_text().split())
         deadline = time.monotonic() + 10
