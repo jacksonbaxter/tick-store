@@ -1,0 +1,13 @@
+diff --git a/scripts/check_compare.py b/scripts/check_compare.py
+--- a/scripts/check_compare.py
++++ b/scripts/check_compare.py
+@@ -375,8 +375,7 @@ def check_warm(where, warm, full_day=False, protocol=PROTOCOL_1):
+     pages = proof.get("pages")
+     if not pages or proof.get("resident_before") != pages or proof.get("resident_after") != pages:
+         return [f"{where}.warm: a warm number without residency proven before and after"]
+-    if protocol >= PROTOCOL_2 and (not is_count(proof.get("warm_up_runs"))
+-                                   or proof["warm_up_runs"] < 1):
++    if protocol >= PROTOCOL_2 and not is_count(proof.get("warm_up_runs")):
+         # Review F-3: as on a day, no timed repetition is the engine's first call.
+         return [f"{where}.warm: no untimed run before the repetitions"]
+     return [] if (warm.get("n") or 0) > 0 else [f"{where}.warm: no repetitions"]

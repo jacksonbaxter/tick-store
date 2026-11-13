@@ -559,6 +559,36 @@ FAULTS = (
           "tick-store-only full day from Linux, so a subset of the four-system day could pass "
           "as a full-day result", CHECK_FAILED,
           "FAIL: test_a_tickstore_only_day_on_linux (__main__.TickstoreOnly"),
+    # The comparison protocol 2 rules (docs/REVIEW.md, F-4 to F-11 and E-3).
+    Fault("compare-protocol-unknown-accepted", "py-scripts", "check_compare.py takes a file of "
+          "a protocol it does not know, protocol 3, as if it knew its rules", CHECK_FAILED,
+          "FAIL: test_an_unknown_protocol (__main__.Protocol2"),
+    Fault("compare-tail-name-unchecked", "py-scripts", "check_compare.py stops checking what a "
+          "protocol 2 tail figure is called, so the slowest of 30 could pass as a 99th "
+          "percentile", CHECK_FAILED,
+          "FAIL: test_the_slowest_of_n_called_a_99th_percentile (__main__.Protocol2"),
+    Fault("compare-repetitions-unchecked", "py-scripts", "check_compare.py stops recomputing a "
+          "latency block's figures from its repetitions", CHECK_FAILED,
+          "FAIL: test_a_tail_that_does_not_follow_from_the_repetitions (__main__.Protocol2"),
+    Fault("compare-second-sibling-unchecked", "py-scripts", "check_compare.py stops holding "
+          "cpu6's sibling to the 5% rule, so a busy cpu7 passes", CHECK_FAILED,
+          "FAIL: test_a_busy_second_sibling (__main__.Protocol2"),
+    Fault("compare-write-device-reads-unchecked", "py-scripts", "check_compare.py stops "
+          "requiring a write's device reads", CHECK_FAILED,
+          "FAIL: test_a_write_with_no_device_reads (__main__.Protocol2"),
+    Fault("compare-cold-open-resident-unchecked", "py-scripts", "check_compare.py stops "
+          "requiring 0 store bytes resident before a cold clock that holds the whole open",
+          CHECK_FAILED,
+          "FAIL: test_pages_resident_before_a_clock_that_holds_the_whole_open (__main__.Protocol2"),
+    Fault("compare-tickstore-cold-open-left-out", "py-scripts", "check_compare.py stops "
+          "requiring a tick-store cold figure to be its open plus its query", CHECK_FAILED,
+          "FAIL: test_a_tickstore_cold_figure_without_its_open (__main__.Protocol2"),
+    Fault("compare-slice-warm-up-unchecked", "py-scripts", "check_compare.py takes a slice warm "
+          "proof that records no untimed run before the repetitions", CHECK_FAILED,
+          "FAIL: test_a_slice_warm_figure_with_no_warm_up (__main__.Protocol2"),
+    Fault("compare-slice-input-not-resident", "py-scripts", "check_compare.py takes a slice "
+          "write whose export was partly resident when its clock started", CHECK_FAILED,
+          "FAIL: test_a_slice_write_from_an_export_not_resident (__main__.Protocol2"),
     Fault("targets-at-most-reversed", "py-scripts", "render_results.py judges an at-most "
           "target the wrong way round, so a latency above its target would read met in the "
           "README's targets block", CHECK_FAILED,

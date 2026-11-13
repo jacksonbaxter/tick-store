@@ -1,0 +1,12 @@
+diff --git a/scripts/check_compare.py b/scripts/check_compare.py
+--- a/scripts/check_compare.py
++++ b/scripts/check_compare.py
+@@ -535,7 +535,7 @@ def check_repetitions(where, block):
+     if not isinstance(seconds, list) or len(seconds) != count or not all(
+             check_results.is_number(value) and value >= 0 for value in seconds):
+         return [f"{where}: no seconds for each of its {count!r} repetitions"]
+-    if count == 0:
++    if count >= 0:
+         return []
+     ordered = sorted(seconds)
+     wanted = {"median_us": statistics.median(ordered) * 1e6,

@@ -1,0 +1,13 @@
+diff --git a/scripts/check_compare.py b/scripts/check_compare.py
+--- a/scripts/check_compare.py
++++ b/scripts/check_compare.py
+@@ -263,9 +263,6 @@ def check_write_record(where, write, name, full_day=False):
+         elif not full_day and resident != pages:
+             problems.append(f"{where}.write: repetition {number} started its clock with "
+                             f"{resident} of its input's {pages} pages resident")
+-        if not is_count(item.get("device_bytes_read")) or not item.get("device_counter"):
+-            problems.append(f"{where}.write: repetition {number} records no device bytes read "
+-                            "while it ran")
+     engine_only = [item.get("engine_only_seconds") for item in each if isinstance(item, dict)]
+     if each and all(check_results.is_number(value) for value in engine_only):
+         value = statistics.median(engine_only)

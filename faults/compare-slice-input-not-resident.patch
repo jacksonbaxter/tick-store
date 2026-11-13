@@ -1,0 +1,12 @@
+diff --git a/scripts/check_compare.py b/scripts/check_compare.py
+--- a/scripts/check_compare.py
++++ b/scripts/check_compare.py
+@@ -260,7 +260,7 @@ def check_write_record(where, write, name, full_day=False):
+         elif name == "tickstore" and resident != pages:
+             problems.append(f"{where}.write: repetition {number} started its clock with "
+                             f"{resident} of its source's {pages} pages resident")
+-        elif not full_day and resident != pages:
++        elif not full_day and resident > pages:
+             problems.append(f"{where}.write: repetition {number} started its clock with "
+                             f"{resident} of its input's {pages} pages resident")
+         if not is_count(item.get("device_bytes_read")) or not item.get("device_counter"):

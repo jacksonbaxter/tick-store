@@ -1,0 +1,13 @@
+diff --git a/scripts/check_compare.py b/scripts/check_compare.py
+--- a/scripts/check_compare.py
++++ b/scripts/check_compare.py
+@@ -506,9 +506,6 @@ def check_tail(where, block):
+                         f"{rank} of {count} is {'' if slowest else 'not '}the slowest run")
+     wanted = (f"slowest of {count}" if slowest
+               else f"99th percentile, nearest rank: run {rank} of {count}")
+-    if block.get("tail") != wanted:
+-        problems.append(f"{where}: the tail figure is called {block.get('tail')!r}, not "
+-                        f"{wanted!r}")
+     tail = block.get("tail_us")
+     if not check_results.is_number(tail) or tail != block.get("p99_us"):
+         problems.append(f"{where}: tail_us {tail!r} is not the figure p99_us holds")

@@ -1,0 +1,13 @@
+diff --git a/scripts/check_compare.py b/scripts/check_compare.py
+--- a/scripts/check_compare.py
++++ b/scripts/check_compare.py
+@@ -565,9 +565,6 @@ def check_cold_open(where, cold, name):
+         before = proof.get("resident_bytes_before_clock")
+         if not is_count(before):
+             problems.append(f"{here}: no store bytes resident before the clock")
+-        elif inside and before != 0:
+-            problems.append(f"{here}: {before} bytes of the store resident before a clock that "
+-                            "holds its whole open")
+     if name == "tickstore":
+         parts = cold.get("parts") if isinstance(cold.get("parts"), dict) else {}
+         opens = parts.get("open_seconds_by_repetition")

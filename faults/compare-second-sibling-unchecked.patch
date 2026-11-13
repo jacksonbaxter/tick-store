@@ -1,0 +1,13 @@
+diff --git a/scripts/check_compare.py b/scripts/check_compare.py
+--- a/scripts/check_compare.py
++++ b/scripts/check_compare.py
+@@ -821,8 +821,7 @@ def check_second_sibling(header, cases, protocol):
+         return []
+     block = header.get(SECOND_SIBLING)
+     if header.get("host") == "Linux":
+-        return check_results.check_sibling({SECOND_SIBLING: block}, cases, SECOND_SIBLING,
+-                                           SECOND_CPU)
++        return []
+     if block != check_results.NOT_AVAILABLE:
+         return [f"header.{SECOND_SIBLING}: macOS has no pinned core to measure"]
+     return []

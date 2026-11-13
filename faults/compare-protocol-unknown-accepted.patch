@@ -1,0 +1,12 @@
+diff --git a/scripts/check_compare.py b/scripts/check_compare.py
+--- a/scripts/check_compare.py
++++ b/scripts/check_compare.py
+@@ -937,7 +937,7 @@ def check_document(document, top_keys, path, pins, capacity, real_path=None):
+         problems.append("the file does not start with its header")
+     problems += [f"header: missing field '{field}'" for field in HEADER_FIELDS
+                  if field not in header]
+-    if protocol_of(document) not in PROTOCOLS:
++    if protocol_of(document) not in PROTOCOLS + (3,):
+         return [*problems, f"header.protocol: {protocol_of(document)!r}, and this validator "
+                            f"knows protocols {list(PROTOCOLS)}"]
+     systems = document.get("systems") or {}

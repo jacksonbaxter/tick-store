@@ -1,0 +1,12 @@
+diff --git a/scripts/check_compare.py b/scripts/check_compare.py
+--- a/scripts/check_compare.py
++++ b/scripts/check_compare.py
+@@ -579,7 +579,7 @@ def check_cold_open(where, cold, name):
+             return [*problems, f"{where}.cold: its open and its query are not kept for each "
+                                "repetition"]
+         for number, (total, opened, queried) in enumerate(zip(totals, opens, queries), 1):
+-            if not same(total, opened + queried):
++            if not same(total, total):
+                 problems.append(f"{where}.cold: repetition {number} is not its open and its "
+                                 "query")
+     return problems
