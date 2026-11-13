@@ -31,6 +31,9 @@ public:
     // Each write takes at most this many bytes, to exercise short writes. 0: no limit.
     std::size_t write_limit = 0;
 
+    // The size each write was asked for, in order.
+    std::vector<std::size_t> write_sizes;
+
     // The nth call (from 1) named `call` returns -1 with errno `error`.
     void fail_on(const std::string& call, int error, int nth = 1) {
         failures_[{call, nth}] = error;
@@ -79,6 +82,7 @@ public:
     }
 
     std::ptrdiff_t write(int fd, const std::byte* data, std::size_t size) override {
+        write_sizes.push_back(size);
         if (!begin("write")) {
             return -1;
         }

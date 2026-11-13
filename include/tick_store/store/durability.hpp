@@ -105,8 +105,8 @@ enum class SyncPolicy : std::uint8_t {
     FileOps& ops, const std::filesystem::path& directory,
     SyncPolicy policy = native_sync_policy());
 
-// Writes every byte, retrying a short write and EINTR, and returns an io error naming
-// "write" on any other failure.
+// Writes every byte, at most 1 GiB a call, retrying a short write and EINTR, and returns
+// an io error naming "write" on any other failure.
 [[nodiscard]] std::expected<void, StoreError> write_all(FileOps& ops, int fd,
                                                         std::span<const std::byte> bytes) noexcept;
 

@@ -10,6 +10,7 @@
 #include <gtest/gtest.h>
 
 #include <fcntl.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -17,6 +18,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <limits>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -210,6 +213,29 @@ TEST(WriteAll, FinishesShortWritesAndRetriesEintr) {
     struct stat info{};
     ASSERT_EQ(::fstat(file.fd(), &info), 0);
     EXPECT_EQ(info.st_size, 10);
+}
+
+// macOS's write(2) refuses a request of more than INT_MAX bytes with EINVAL, where Linux
+// writes part of it (review C-6), so write_all asks for at most 1 GiB a call. /dev/null
+// takes the bytes without reading them, and the mapping is never touched, so the test
+// costs neither memory nor disk.
+TEST(WriteAll, WritesMoreThanTwoGibibytesThroughTheRealKernel) {
+    constexpr std::size_t kSize = (std::size_t{1} << 31U) + 1;
+    void* mapping = ::mmap(nullptr, kSize, PROT_READ, MAP_PRIVATE | MAP_ANON, -1, 0);
+    // NOLINTNEXTLINE(performance-no-int-to-ptr): MAP_FAILED is defined as a cast of -1.
+    ASSERT_NE(mapping, MAP_FAILED);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg): the POSIX interface is variadic.
+    const int fd = ::open("/dev/null", O_WRONLY | O_CLOEXEC);
+    ASSERT_GE(fd, 0);
+    RecordingFileOps ops;
+    const auto written =
+        write_all(ops, fd, std::span{static_cast<const std::byte*>(mapping), kSize});
+    ::close(fd);
+    ::munmap(mapping, kSize);
+    EXPECT_TRUE(written.has_value()) << to_string(written.error());
+    for (const std::size_t size : ops.write_sizes) {
+        EXPECT_LE(size, static_cast<std::size_t>(std::numeric_limits<int>::max()));
+    }
 }
 
 TEST(WriteAll, ReportsAnyOtherError) {

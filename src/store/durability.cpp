@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <cerrno>
 #include <cstddef>
 #include <cstdint>
@@ -16,6 +17,10 @@
 
 namespace tick_store::store {
 namespace {
+
+// The most one write is asked for. macOS refuses a request over INT_MAX bytes with EINVAL,
+// where Linux writes part of it; both write this much whole.
+constexpr std::size_t kMaxWriteRequest = std::size_t{1} << 30U;
 
 [[gnu::cold, gnu::noinline]] StoreError io_error(std::string_view call) noexcept {
     return {.kind = StoreErrorKind::io,
@@ -144,7 +149,8 @@ std::expected<void, StoreError> sync_directory(FileOps& ops,
 std::expected<void, StoreError> write_all(FileOps& ops, int fd,
                                           std::span<const std::byte> bytes) noexcept {
     while (!bytes.empty()) {
-        const std::ptrdiff_t written = ops.write(fd, bytes.data(), bytes.size());
+        const std::ptrdiff_t written =
+            ops.write(fd, bytes.data(), std::min(bytes.size(), kMaxWriteRequest));
         if (written < 0) {
             if (errno == EINTR) {
                 continue;
