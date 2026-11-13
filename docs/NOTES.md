@@ -3822,6 +3822,27 @@ threaded path, `tick_roundtrip verify` with its hash worker, is the G-1 correctn
 a heavy job on cpu2, cpu6 and cpu7 (`results/roundtrip-12302019-linux.json`), and reports no
 speed figure.
 
+### The final review's comparison protocol
+
+The triage's "Comparison protocol" binds F-1, F-2, F-3, F-4, E-3 and F-14, with F-10 and F-11
+beside them. Raw logs are in `phase4-raw/fix-compare-protocol/`. New documents carry
+`"protocol": 2` in their header; the committed files carry none and count as protocol 1.
+`scripts/check_compare.py` holds a protocol 2 file to every rule below and keeps the committed
+files to the rules they were measured by, so `check.sh` stays green until the freeze rerun
+replaces them. No results file was regenerated or edited.
+
+**F-4, the tail figure.** Confirmed: `latency` takes the nearest rank, `ceil(0.99 n)`, which is
+`n` for every n below 100, so the "p99" of 30 warm and 7 cold repetitions is the slowest run. In
+the four committed comparison files `p99_us` equals `max_us` in all 440 warm and cold blocks.
+Repetitions stay 30 and 7. Each block now has `tail_us`, `tail_rank`, `tail_is_slowest` and
+`tail` ("slowest of 30"), and `p99_us` the same figure under its old name, which the generator and
+the variant rule still read; the generator's wording is another fixer's item in docs/TASKS.md.
+The method block's `tail`, `compare/README.md` and `compare/variant_rule.py` say what the figure
+is, and the rule's text changed with it, so a protocol 2 day must state the new text and a
+protocol 1 day the old (`RULE_PROTOCOL_1`). Failing first: `TailFigure` in
+`tests/compare/test_system_worker.py` (no `tail_rank`), and `Protocol2` in
+`tests/scripts/test_check_compare.py`, whose six faults passed with exit 0 (`f4-fail-before.log`).
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
