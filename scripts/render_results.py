@@ -37,7 +37,8 @@ named under the table with their verdicts. A headline with no missed target stop
 
 G-3's file, results/fuzz-g3-<commit>.json, must pass check_fuzz.py first, against the fuzz
 targets fuzz/CMakeLists.txt defines: one that leaves a target out, or holds a clean run under
-1,800 s, stops the render.
+1,800 s, stops the render. Each results/roundtrip-*.json, which G-1 and G-2 read, must pass
+check_roundtrip.py, so G-2's exit codes are the ones its runs exited with.
 """
 
 import argparse
@@ -54,6 +55,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 CHECK_RESULTS = REPO_ROOT / "scripts" / "check_results.py"
 CHECK_COMPARE = REPO_ROOT / "scripts" / "check_compare.py"
 CHECK_FUZZ = REPO_ROOT / "scripts" / "check_fuzz.py"
+CHECK_ROUNDTRIP = REPO_ROOT / "scripts" / "check_roundtrip.py"
 DEFAULT_README = REPO_ROOT / "README.md"
 DEFAULT_RESULTS_MD = REPO_ROOT / "RESULTS.md"
 DEFAULT_RESULTS = REPO_ROOT / "results" / "bench"
@@ -846,6 +848,10 @@ def main(argv=None):
     if not validate(fuzz_paths, None, CHECK_FUZZ,
                     ("--cmake", str(args.targets_root / "fuzz" / "CMakeLists.txt"))):
         print("render_results: a fuzzing results file failed validation", file=sys.stderr)
+        return EXIT_USAGE
+    roundtrip_paths = sorted((args.targets_root / "results").glob("roundtrip-*.json"))
+    if not validate(roundtrip_paths, None, CHECK_ROUNDTRIP):
+        print("render_results: a round-trip results file failed validation", file=sys.stderr)
         return EXIT_USAGE
     if not args.results_md.exists():
         print(f"render_results: there is no {args.results_md.name}", file=sys.stderr)

@@ -5,26 +5,31 @@
         --capacity results/fullday-capacity-12302019.json \\
         --roundtrip results/roundtrip-DAY.json --size results/store-size-DAY.json
 
-<raw-dir> holds what tick_roundtrip printed and what /usr/bin/time -l wrote, one run per pair:
+<raw-dir> holds what tick_roundtrip printed, what /usr/bin/time -l wrote, and the exit status
+the runner saw (`echo $? > <stem>.exit`), one run per stem:
 
-    ingest.json ingest.time      ingest, with --durability
-    layout.json                  layout of the ingested store
-    verify.json verify.time      G-1: verify against the pin
-    g2.json                      the flips: {"seed", "data": {...}, "footer": {...}}
-    g2-data-crc.json .err .time      verify, data block flipped, CRCs on
-    g2-data-nocrc.json .err .time    the same with --no-checksums
-    g2-footer-crc.json .err .time    verify, footer flipped, CRCs on
-    g2-footer-nocrc.json .err .time  the same with --no-checksums
-    g2-restored.json .time           verify after both flips are undone
+    ingest.json .time .exit          ingest, with --durability
+    layout.json                      layout of the ingested store
+    verify.json .time .exit          G-1: verify against the pin
+    g2.json                          the flips: {"seed", "data": {...}, "footer": {...}}
+    g2-data-crc.json .err .time .exit      verify, data block flipped, CRCs on
+    g2-data-nocrc.json .err .time .exit    the same with --no-checksums
+    g2-footer-crc.json .err .time .exit    verify, footer flipped, CRCs on
+    g2-footer-nocrc.json .err .time .exit  the same with --no-checksums
+    g2-restored.json .time .exit           verify after both flips are undone
 
-With --g1-only it needs ingest and verify alone (time files optional), and takes, if present,
-cross-verify.json, a store written on another host verified here, with cross-host.txt naming
-that host and store.sha256 and cross-store.sha256 holding the two stores' SHA-256.
+With --g1-only it needs ingest and verify alone (time files optional, exit files required), and
+takes, if present, cross-verify.json and its .exit, a store written on another host verified
+here, with cross-host.txt naming that host and store.sha256 and cross-store.sha256 holding the
+two stores' SHA-256.
 
-Every value comes from those files; nothing is estimated. It refuses, exit 1, a G-1 that did not
-pass, a G-2 run that did not exit 1 where the store was corrupt or did not pass once restored, a
-CRC failure that does not name the flipped block and its offset, and a layout whose parts do not
-add up to the file. CR-1 is judged on the day BENCHMARKS.md gives it (12302019); CR-2 against
+Every value comes from those files; nothing is estimated. Each run's exit_code is the one in its
+.exit file, and G-2's exit_code_corrupt and exit_code_restored are those of its runs. It refuses,
+exit 1, a run with no exit status, an ingest or a passing verify that did not exit 0, a G-1 that
+did not pass, a G-2 run that did not exit 1 where the store was corrupt (verify exits 1 on a
+mismatch, 2 on a usage or I/O error) or did not pass and exit 0 once restored, a CRC failure
+that does not name the flipped block and its offset, and a layout whose parts do not add up to
+the file. CR-1 is judged on the day BENCHMARKS.md gives it (12302019); CR-2 against
 the stored bytes of the comparison file, which holds that day only.
 
 Standard library only.
@@ -91,9 +96,18 @@ def parse_time(text):
     return None
 
 
+def exit_status(folder, stem):
+    """The exit status the runner saw, from <stem>.exit: one decimal number."""
+    text = read_text(folder, f"{stem}.exit").strip()
+    if not re.fullmatch(r"[0-9]+", text):
+        raise Refused(f"{stem}.exit holds no exit status: {text!r}")
+    return int(text)
+
+
 def run(folder, stem, timed=True):
     out = read_json(folder, f"{stem}.json")
     out.pop("tool", None)
+    out["exit_code"] = exit_status(folder, stem)
     if timed:
         figures = time_figures(folder, f"{stem}.time")
         out["real_seconds"] = figures["real_seconds"]
@@ -169,11 +183,16 @@ def g2_runs(folder, flips, pin):
     for name, result in corrupt.items():
         if result["verdict"] != "mismatch":
             raise Refused(f"G-2 {name}: verify passed on a corrupt store")
+        if result["exit_code"] != 1:
+            raise Refused(f"G-2 {name}: verify exited {result['exit_code']} on a corrupt store, "
+                          "not 1")
         stem = "g2-" + name.replace("_no_checksums", "-nocrc").replace("_crc", "-crc")
         result["stderr"] = read_text(folder, f"{stem}.err").strip()
     restored = run(folder, "g2-restored")
     if restored["verdict"] != "pass" or restored.get("stored_sha256") != pin:
         raise Refused("G-2: verify did not pass on the restored store")
+    if restored["exit_code"] != 0:
+        raise Refused(f"G-2: verify exited {restored['exit_code']} on the restored store, not 0")
     error = corrupt["data_crc"].get("store_error") or ""
     wanted = ("bad checksum: block", f"block {data['block']}",
               f"at offset {data['block_payload_offset']}")
@@ -187,8 +206,11 @@ def g2_runs(folder, flips, pin):
                f"column {data['column']}" in (unchecked.get("store_error") or ""))
     if not located:
         raise Refused("G-2: with CRCs off the data flip was located neither by record nor field")
+    # Every corrupt run exited 1, or it was refused above: the code is theirs, not a constant.
+    (exit_corrupt,) = {result["exit_code"] for result in corrupt.values()}
     return {"gate": "G-2", "seed": flips["seed"], "injected": {"data": data, "footer": footer},
-            "exit_code_corrupt": 1, "exit_code_restored": 0, **corrupt, "restored": restored}
+            "exit_code_corrupt": exit_corrupt, "exit_code_restored": restored["exit_code"],
+            **corrupt, "restored": restored}
 
 
 def g1(folder, timed=True):
@@ -197,6 +219,9 @@ def g1(folder, timed=True):
     pin = verify.get("expected_sha256")
     if verify["verdict"] != "pass" or not pin or verify.get("stored_sha256") != pin:
         raise Refused("G-1 did not pass against the pin")
+    for name, result in (("ingest", ingest), ("verify", verify)):
+        if result["exit_code"] != 0:
+            raise Refused(f"G-1: {name} exited {result['exit_code']}, not 0")
     return ingest, verify, pin
 
 
@@ -209,6 +234,9 @@ def cross_host(folder, pin):
     verify = run(folder, "cross-verify", timed=(Path(folder) / "cross-verify.time").is_file())
     if verify["verdict"] != "pass" or verify.get("stored_sha256") != pin:
         raise Refused("the store written on the other host did not pass here")
+    if verify["exit_code"] != 0:
+        raise Refused(f"the store written on the other host: verify exited "
+                      f"{verify['exit_code']}, not 0")
     here = read_text(folder, "store.sha256").strip()
     there = read_text(folder, "cross-store.sha256").strip()
     return {"written_on": read_text(folder, "cross-host.txt").strip(), "verify": verify,

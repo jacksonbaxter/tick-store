@@ -82,6 +82,11 @@ class StoreResults(unittest.TestCase):
             (self.dir / f"{stem}.time").write_text(TIME)
         for stem in ("g2-data-crc", "g2-data-nocrc", "g2-footer-crc", "g2-footer-nocrc"):
             (self.dir / f"{stem}.err").write_text("store error\n")
+        # What each run exited with, as the runner records it: verify exits 1 on a mismatch.
+        for stem, code in (("ingest", 0), ("verify", 0), ("g2-data-crc", 1),
+                           ("g2-data-nocrc", 1), ("g2-footer-crc", 1), ("g2-footer-nocrc", 1),
+                           ("g2-restored", 0)):
+            (self.dir / f"{stem}.exit").write_text(f"{code}\n")
 
     def tearDown(self):
         shutil.rmtree(self.dir)
@@ -190,6 +195,7 @@ class StoreResults(unittest.TestCase):
         self.write("verify.json", {**verify(), "store_format": "itch-store-v3"})
         self.write("cross-verify.json", verify())
         (self.dir / "cross-verify.time").write_text(TIME)
+        (self.dir / "cross-verify.exit").write_text("0\n")
         (self.dir / "cross-host.txt").write_text("macOS\n")
         (self.dir / "store.sha256").write_text("ee\n")
         (self.dir / "cross-store.sha256").write_text("ee\n")
@@ -214,6 +220,40 @@ class StoreResults(unittest.TestCase):
         (self.dir / "g2-restored.time").unlink()
         with self.assertRaises(results.Refused):
             self.assemble()
+
+    def test_each_exit_code_is_the_one_its_run_exited_with(self):
+        roundtrip, _ = self.assemble()
+        self.assertEqual(roundtrip["g1"]["ingest"]["exit_code"], 0)
+        self.assertEqual(roundtrip["g1"]["verify"]["exit_code"], 0)
+        for name in ("data_crc", "data_no_checksums", "footer_crc", "footer_no_checksums"):
+            self.assertEqual(roundtrip["g2"][name]["exit_code"], 1, name)
+        self.assertEqual(roundtrip["g2"]["restored"]["exit_code"], 0)
+        self.assertEqual(roundtrip["g2"]["exit_code_corrupt"], 1)
+        self.assertEqual(roundtrip["g2"]["exit_code_restored"], 0)
+
+    def test_a_run_that_exited_with_the_wrong_code_is_refused(self):
+        # verify exits 0 on a pass, 1 on a mismatch and 2 on a usage or I/O error: a corrupt
+        # store's mismatch printed by a run that exited 2 or 0 is not G-2's exit 1.
+        for stem, code in (("g2-data-crc", 2), ("g2-footer-nocrc", 0), ("g2-restored", 1),
+                           ("verify", 2), ("ingest", 1)):
+            with self.subTest(stem=stem, code=code):
+                original = (self.dir / f"{stem}.exit").read_text()
+                (self.dir / f"{stem}.exit").write_text(f"{code}\n")
+                with self.assertRaises(results.Refused):
+                    self.assemble()
+                (self.dir / f"{stem}.exit").write_text(original)
+
+    def test_a_run_with_no_exit_code_is_refused(self):
+        for text in (None, "", "one\n"):
+            with self.subTest(text=text):
+                path = self.dir / "g2-footer-crc.exit"
+                if text is None:
+                    path.unlink()
+                else:
+                    path.write_text(text)
+                with self.assertRaises(results.Refused):
+                    self.assemble()
+                path.write_text("1\n")
 
 
 if __name__ == "__main__":

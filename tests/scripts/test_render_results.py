@@ -316,6 +316,26 @@ class RenderTargetsTest(Scratch):
         self.assertIn("no 'seconds' on the path", result.stderr)
         self.assertEqual(self.results_md.read_text(encoding="utf-8"), WITH_TARGETS)
 
+    def test_a_roundtrip_file_whose_exit_codes_were_not_observed_is_refused(self):
+        # G-2 reads exit_code_corrupt: a file whose runs do not bear it out stops the render.
+        roundtrip = {"day": "12302019", "host": "macOS", "commit": "0123456789ab",
+                     "g1": {"ingest": {"exit_code": 0},
+                            "verify": {"verdict": "pass", "exit_code": 0}},
+                     "g2": {"exit_code_corrupt": 1, "exit_code_restored": 0,
+                            "restored": {"verdict": "pass", "exit_code": 0},
+                            **{name: {"verdict": "mismatch", "exit_code": 1}
+                               for name in ("data_crc", "data_no_checksums", "footer_crc",
+                                            "footer_no_checksums")}}}
+        path = self.tree / "results" / "roundtrip-12302019.json"
+        path.write_text(json.dumps(roundtrip), encoding="utf-8")
+        self.assertEqual(self.render().returncode, 0)
+        roundtrip["g2"]["data_crc"]["exit_code"] = 2
+        path.write_text(json.dumps(roundtrip), encoding="utf-8")
+        result = self.render("--check")
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("g2.exit_code_corrupt is 1, and g2.data_crc exited 2", result.stderr)
+        self.assertIn("a round-trip results file failed validation", result.stderr)
+
     def test_two_files_for_one_pattern_fail(self):
         (self.tree / "results" / "day-4567.json").write_text(json.dumps(TARGET_DOCUMENT),
                                                             encoding="utf-8")
