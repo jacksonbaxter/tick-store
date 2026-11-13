@@ -3695,6 +3695,21 @@ same reviewer also found that REVIEW's R-1 row said a nested
 block gets the same error as before in every case, which holds only for a well-formed nested
 block; the row now says so, as this file's R-1 paragraph already did.
 
+The closing check of this round. On the Mac, `scripts/check.sh` through `heavy.sh` at `898275c`
+ran the dev build and tests (682, the Linux-only test skipped), the oracle, the ASan and UBSan
+build and tests (682, the same skip), clang-tidy on all 122 files this host builds, the fuzz
+build, the 20-second runs of `fuzz_itch_frame`, `fuzz_itch_message` and `fuzz_itch_query`, the
+three targets that compile a changed oracle, the Python script tests (501, 4 skipped) and
+hygiene. Every step passed but clang-tidy, which found five things in RA-1's new test: three names
+of `frame.hpp` it took through another header, and two C arrays. `55cd337` fixes them; clang-tidy
+on that file then passed, and the frame tests passed again under ASan and UBSan. On the Linux
+host at `55cd337`, the last C++ commit, the dev build passed, clang-tidy passed on the signal
+test (RA-3's narrowed suppression, which CI's Linux run once found wanting), the page-cache test
+and the frame test, and ctest passed 680 of 682 with the two real-day tests skipped for want of
+the day's file, in 1,350.6 s; its slowest entries were the query oracle's cut-and-flip test
+(445.8 s) and the exact-path test's capped part (432.4 s). A first gate at `898275c` was stopped
+near its end once clang-tidy had found the test to fix (`phase4-raw/fix-second-pass/`).
+
 ### The final review: Phase 2 items closed
 
 The gate on the review found open items still under Phase 2 in docs/TASKS.md. Each below was
