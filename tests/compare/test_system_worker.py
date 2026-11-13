@@ -1527,6 +1527,10 @@ class ResumedRun(unittest.TestCase):
     def test_a_part_made_with_the_same_arguments_is_kept(self):
         self.assertFalse(self.resume(["--warm-repetitions", "5"], ["--warm-repetitions", "5"]))
 
+    def test_a_part_made_from_another_slice_runs_again(self):
+        # Review RV-10: the parts directory names the commit and the day, not the slice.
+        self.assertTrue(self.resume([], ["--slice", "t"]))
+
 
 class ArcticDBSettings(unittest.TestCase):
     """ArcticDB's settings as the engine reads them back, on fakes of its library and config."""

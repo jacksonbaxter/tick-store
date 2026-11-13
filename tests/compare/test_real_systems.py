@@ -254,8 +254,9 @@ class TickStoreReal(unittest.TestCase):
             self.write(system)
             found[state] = reads.delta()
         self.assertIn("ri_diskio_bytesread", found["resident"]["counter"])
-        # Not one page of the source. It reads 0 almost always, but once read 8,192 bytes, less
-        # than a page, so not a page of the source; what it was is not known (NOTES, RF-5).
+        # Less than one page. It reads 0 almost always, but once read 8,192 bytes, and what those
+        # were is not known (NOTES, RF-5): a page is a tolerance for that unexplained 8 KiB, not
+        # a proof that no byte of the source was read (review RV-10).
         page = os.sysconf("SC_PAGE_SIZE")
         self.assertLess(found["resident"]["bytes"], page, found["resident"])
         self.assertGreater(found["evicted"]["by_process"]["waited children"], page,

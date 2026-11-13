@@ -828,6 +828,10 @@ FAULTS = (
           "overrides, --variants or fewer --systems in a measured run, so a reported file can "
           "hold less than the protocol", CHECK_FAILED,
           "FAIL: test_a_measured_run_refuses_to_narrow_anything (__main__.MeasuredRun"),
+    # Review RV-10: the parts directory does not name the slice, so the arguments do.
+    Fault("compare-part-reused-across-slices", "py-compare", "run.py reuses a system's part made "
+          "from another slice", CHECK_FAILED,
+          "FAIL: test_a_part_made_from_another_slice_runs_again (__main__.ResumedRun"),
     Fault("compare-part-reused-across-arguments", "py-compare", "compare/run.py reuses a "
           "system's part made with other repetition arguments when a run is resumed",
           CHECK_FAILED, "FAIL: test_a_part_made_with_other_repetitions_runs_again "

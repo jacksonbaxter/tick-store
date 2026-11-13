@@ -106,7 +106,8 @@ A measured run, with `TICK_STORE_MEASURE` set, refuses all five: it is the whole
 `compare/repetitions.py`, which `compare/run_system.py` runs: 30 warm and 7 cold per query, and 3
 writes per class and variant on the slice or 1 on a day. tick-store alone on a day is asked for by
 name, `--tickstore-alone`. A system's finished part is reused, when a run is resumed, only if it
-was made with the same repetition arguments, variants, scope and measurement.
+was made from the same slice with the same repetition arguments, variants, scope and
+measurement.
 
 Afterwards:
 

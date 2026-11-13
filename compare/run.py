@@ -272,8 +272,9 @@ def system_command(system, args, layout, part, variants, guard):
 
 
 def part_arguments(args, variants, measure):
-    """What a system's part was made with, beyond the day or slice its directory names."""
-    return {"write_repetitions": args.write_repetitions,
+    """What a system's part was made with, beyond the commit and the day its directory names:
+    the slice too, which the directory does not name (review RV-10)."""
+    return {"slice": args.slice, "write_repetitions": args.write_repetitions,
             "warm_repetitions": args.warm_repetitions,
             "cold_repetitions": args.cold_repetitions,
             "variants": None if variants is None else list(variants),
