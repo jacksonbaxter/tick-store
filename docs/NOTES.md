@@ -3972,6 +3972,29 @@ after the freeze rerun (docs/TASKS.md).
 **RF-7, tick-store's engine time per repetition.** Confirmed by a test: a cold engine time of 80 and 100 us beside queries of 60 and 70 us passed, since the cold median it was held to holds the open too. Each repetition's engine time must now be within its own round trip warm and its query's cold. On the debian protocol 2 slice of the last round (`85a4912`, iteration-only) the engine's largest share of a round trip is 0.9995 warm and cold, so the rule holds on real runs; that file passes every rule of this round with the three wrapper-only header fields taken from the reported `67ae574` slice.
 
 **RF-5, a macOS write's device reads.** Confirmed: a macOS write's `device_bytes_read` was `iostat`'s `disk0` total, which counts the write's own output. What macOS offers a Python process without installing anything, by a probe on the Mac (`rf5-probe.log`): `proc_pid_rusage(pid, RUSAGE_INFO_V2)` through `ctypes`, whose `ri_diskio_bytesread` is the bytes the device read for that process. Reading a 64 MiB file just evicted counted 67,108,864 bytes, and reading it again resident 0; the same for a running child, a process of the same user that is not a child, and a child that has exited but is not yet reaped (`waitid` with `WNOWAIT`). After the child is reaped its reads are gone: macOS adds them to no parent, where Linux puts them in `ru_inblock`. `getrusage`'s `ru_inblock` counts operations, not bytes. So a macOS write now counts the reads of the processes that did it: the worker, QuestDB's server, and tick-store's `tick_roundtrip`, which the worker runs through `coldcache.run_counting_reads` and reads before reaping; Linux keeps the block device's machine-wide sectors read. On the real tools a 200,000-record tick-store write read 0 bytes from its resident slice and 9,175,040 bytes once the slice was evicted. A process's own executable counts when it is not cached: with `tick_roundtrip` evicted, a write from a resident slice read 1,310,720 bytes, so the test runs the tool once first, as a run's flush probe does. The cold proof keeps `iostat`, where only a shortfall counts. Nothing is left as a gap for the macOS files.
+**F-5 and RF-6, the protocol's repetitions, and tick-store alone on a Linux day.** Confirmed by
+tests. A protocol 2 slice of 5 warm and 3 cold repetitions passed `check_compare.py` with exit 0,
+as did one warm and one cold repetition, a slice written once and a day written three times; and
+under `TICK_STORE_MEASURE`, `compare/run.py` ran every system with `--warm-repetitions 5`,
+`--cold-repetitions 3`, `--write-repetitions 1`, `--variants plain` or two of the four
+`--systems`. The counts now live in `compare/repetitions.py`, which `run_system.py` runs and
+`check_compare.py` requires of every reported file: 30 warm and 7 cold per query, 3 writes per
+class and variant on the slice and 1 on a day. The four committed files meet them, so the rule
+holds for protocol 1 too. A measured run refuses all five narrowing arguments before anything
+runs. tick-store alone on a day was a side effect: off Linux any full day was alone, and on Linux
+the route `compare/README.md` gave, `--systems tickstore --variants v3-seg4Mi,v3-seg1Mi`, was
+validated as a four-system day, exited 1 and kept `Linux-12302019-full-<commit>.json.pending`
+(the fake-run test, `f5-run-fail-before.log`, showed it publishing under the four-system name). It
+is now asked for by `--tickstore-alone`, on either host, and nothing else gives it. On Linux it
+keeps the four-system day's proofs, the guard's peak memory and the warm proof by each process's
+storage reads, states that QuestDB did not run, and ends as the macOS run does: validated as
+tick-store alone, named `Linux-<day>-full-tickstore-<commit>.json`, exit 0. `check_compare.py`
+takes a tick-store-only day from Linux with those proofs and refuses one warm by residency or
+without the guard's memory, so fault `compare-tickstore-only-on-linux` gave way to
+`compare-tickstore-only-linux-warm-by-residency` and `-guard-memory-unchecked`. A resumed run
+reuses a system's part only if the `<system>.arguments.json` beside it, its repetition
+arguments, variants, scope and measurement, matches the run's; otherwise the system runs again.
+Tested with the harness's fakes; no day was run.
 
 ## Process notes
 
