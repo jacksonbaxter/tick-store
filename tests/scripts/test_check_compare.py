@@ -1288,9 +1288,16 @@ ENGINE_WARM_SECONDS = [9e-6, 8e-6, 11e-6]
 ENGINE_COLD_SECONDS = [80e-6, 100e-6]
 
 
+def second_sibling_block():
+    return {"core": 6, "sibling": 7, "topology": "thread_siblings_list", "method": "jiffies",
+            "cases": {"parquet": 0.4, "arcticdb": 0.2, "questdb": 1.5, "tickstore": 0.1}}
+
+
 def protocol_2(document):
     """The same document as protocol 2 writes it: every new field present and true."""
     document["header"]["protocol"] = 2
+    document["header"]["second_sibling_busy_percent"] = (
+        second_sibling_block() if document["header"]["host"] == "Linux" else "not-available")
     if "variant_selection" in document and \
             document["variant_selection"].get("rule") == variant_rule.RULE_PROTOCOL_1:
         document["variant_selection"]["rule"] = variant_rule.RULE
@@ -1402,6 +1409,38 @@ class Protocol2(Harness):
             b_of(document, "tickstore")["write"]["by_repetition"].pop()
         self.assert_fault_2(fault, "tickstore.v.B.write: by_repetition holds 2 repetitions, "
                                    "and the write ran 3")
+
+    # E-3: the second pinned CPU's sibling, held to the first one's rule.
+
+    def test_a_linux_file_with_no_reading_of_the_second_sibling(self):
+        def fault(document):
+            del document["header"]["second_sibling_busy_percent"]
+        self.assert_fault_2(fault, "header.second_sibling_busy_percent: Linux must measure it, "
+                                   "case by case", "Linux")
+
+    def test_a_busy_second_sibling(self):
+        def fault(document):
+            document["header"]["second_sibling_busy_percent"]["cases"]["questdb"] = 6.0
+        self.assert_fault_2(fault, "header.second_sibling_busy_percent: questdb reads 6.0%, "
+                                   "over the 5.0% limit", "Linux")
+
+    def test_a_system_with_no_reading_of_the_second_sibling(self):
+        def fault(document):
+            del document["header"]["second_sibling_busy_percent"]["cases"]["tickstore"]
+        self.assert_fault_2(fault, "header.second_sibling_busy_percent: no reading for "
+                                   "tickstore", "Linux")
+
+    def test_the_first_cpus_sibling_passed_off_as_the_seconds(self):
+        def fault(document):
+            document["header"]["second_sibling_busy_percent"].update(core=4, sibling=5)
+        self.assert_fault_2(fault, "header.second_sibling_busy_percent: core 4 is not the "
+                                   "pinned core 6", "Linux")
+
+    def test_a_macos_file_claiming_a_second_sibling(self):
+        def fault(document):
+            document["header"]["second_sibling_busy_percent"] = second_sibling_block()
+        self.assert_fault_2(fault, "header.second_sibling_busy_percent: macOS has no pinned "
+                                   "core to measure")
 
     def test_protocol_1_files_keep_the_rules_they_were_measured_by(self):
         result = self.run_on(valid_document("Linux"), "Linux")

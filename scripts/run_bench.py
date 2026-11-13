@@ -185,10 +185,12 @@ def cpu_jiffies(stat_text, cpu):
 
 
 class SiblingMeter:
-    """How busy the pinned core's SMT sibling was across a case. Nothing keeps it idle."""
+    """How busy the pinned core's SMT sibling was across a case. Nothing keeps it idle. `core`
+    is the pinned core, LINUX_CORE unless a run pins a second CPU and meters its sibling too."""
 
-    def __init__(self, sysfs=CPU_SYSFS, stat=PROC_STAT):
-        self.sibling, self.topology = linux_sibling(LINUX_CORE, sysfs)
+    def __init__(self, sysfs=CPU_SYSFS, stat=PROC_STAT, core=LINUX_CORE):
+        self.core = core
+        self.sibling, self.topology = linux_sibling(core, sysfs)
         self.stat = stat
 
     def snapshot_command(self, snapshot):
@@ -211,7 +213,7 @@ class SiblingMeter:
         return f"cpu{self.sibling} idle as stated, not enforced: see sibling_busy_percent"
 
     def block(self, cases):
-        return {"core": LINUX_CORE, "sibling": self.sibling, "topology": self.topology,
+        return {"core": self.core, "sibling": self.sibling, "topology": self.topology,
                 "method": SIBLING_METHOD, "cases": cases}
 
 

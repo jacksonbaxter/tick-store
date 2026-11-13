@@ -520,7 +520,7 @@ class Document(unittest.TestCase):
              "free_disk_lowest_bytes": 100, "guard_fired": False,
              "exit": {"code": 0, "signal": None}}
 
-    def build(self, host, meter, parts, day=None):
+    def build(self, host, meter, parts, day=None, second=None):
         systems = ("parquet", "questdb")
         for name in systems:
             classes = {"A": {"facts": {"runtime": self.RUNTIME}}} if name == "questdb" else {}
@@ -531,6 +531,7 @@ class Document(unittest.TestCase):
                                                           encoding="utf-8")
             (parts / f"{name}.json").write_text(json.dumps(part), encoding="utf-8")
             (parts / f"{name}.sibling").write_text("0.5", encoding="utf-8")
+            (parts / f"{name}.sibling-second").write_text("0.25", encoding="utf-8")
         args = SimpleNamespace(systems=systems, slice="s", day=day, full_day_smoke=False)
         pin = {"sha256": "ab", "message_count": 1, "size": 1}
         layout = SimpleNamespace(export_dir=lambda name: name)
@@ -540,7 +541,7 @@ class Document(unittest.TestCase):
               mock.patch.object(run_bench, "cpu_model", return_value="cpu"),
               mock.patch.object(run_bench, "linux_turbo", return_value="enabled")):
             return compare_run.build_document(host, args, layout, pin, "c" * 40, "wrapper", parts,
-                                              [[], []], meter)
+                                              [[], []], meter, second_meter=second)
 
     def test_each_host(self):
         with tempfile.TemporaryDirectory(dir=REPO_ROOT / "build") as scratch:
@@ -549,7 +550,12 @@ class Document(unittest.TestCase):
             topology.mkdir(parents=True)
             (topology / "thread_siblings_list").write_text("4-5\n", encoding="ascii")
             meter = compare_run.run_bench.SiblingMeter(parts / "cpu", parts / "stat")
-            linux = self.build("Linux", meter, parts)
+            second_topology = parts / "cpu" / "cpu6" / "topology"
+            second_topology.mkdir(parents=True)
+            (second_topology / "thread_siblings_list").write_text("6-7\n", encoding="ascii")
+            second = compare_run.run_bench.SiblingMeter(parts / "cpu", parts / "stat",
+                                                        core=compare_run.SECOND_CPU)
+            linux = self.build("Linux", meter, parts, second=second)
             macos = self.build("macOS", None, parts)
         for document in (linux, macos):
             self.assertEqual(document["header"]["questdb_runtime"], self.RUNTIME)
@@ -562,6 +568,13 @@ class Document(unittest.TestCase):
         self.assertEqual(check_compare.check_results.check_sibling(
             linux["header"], ["parquet", "questdb"]), [])
         self.assertEqual(macos["header"]["sibling_busy_percent"], "not-available")
+        block = linux["header"]["second_sibling_busy_percent"]
+        self.assertEqual((block["core"], block["sibling"], block["cases"]),
+                         (6, 7, {"parquet": 0.25, "questdb": 0.25}))
+        self.assertEqual(check_compare.check_results.check_sibling(
+            linux["header"], ["parquet", "questdb"], check_compare.SECOND_SIBLING,
+            compare_run.SECOND_CPU), [])
+        self.assertEqual(macos["header"]["second_sibling_busy_percent"], "not-available")
 
     def test_a_full_day_states_its_day_and_each_system_its_peak_memory(self):
         with tempfile.TemporaryDirectory(dir=REPO_ROOT / "build") as scratch:

@@ -92,8 +92,10 @@ Nothing keeps cpu4's SMT sibling idle, so the header's `sibling_busy_percent` re
 was, per system: the sibling is read from `thread_siblings_list`, or `core_cpus_list` failing that,
 and its busy and total jiffies from `/proc/stat` once the lock is held and when the wrapper exits.
 `scripts/check_compare.py` refuses a reported result where any system exceeds 5%, a limit that is
-our choice and not a measured threshold, and macOS records `not-available`. cpu6's own sibling is
-not measured.
+our choice and not a measured threshold, and macOS records `not-available`. cpu6's sibling, cpu7
+on debian, is measured the same way from the same first reading and recorded as
+`second_sibling_busy_percent`, held to the same 5% rule by the same check from protocol 2. The
+files measured before it, protocol 1, record cpu5 alone.
 
 Exit 75 means the wrapper did not get the machine: finished systems are kept, so run it again to
 go on. Exit 2 is usage or setup, and anything else is what failed. For iteration, `--systems`,

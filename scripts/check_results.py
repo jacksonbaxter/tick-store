@@ -266,32 +266,33 @@ def check_macos(document):
     return problems
 
 
-def check_sibling(header, cases):
-    """The SMT sibling, measured across every case and under the limit in each."""
-    if "sibling_busy_percent" not in header:
+def check_sibling(header, cases, field="sibling_busy_percent", core=LINUX_CORE):
+    """The SMT sibling, measured across every case and under the limit in each. `field` and
+    `core` name a second pinned CPU, whose sibling is held to the same rule."""
+    if field not in header:
         return []  # Named among the missing header fields.
-    block = header["sibling_busy_percent"]
+    block = header[field]
     if not isinstance(block, dict) or not isinstance(block.get("cases"), dict):
-        return ["header.sibling_busy_percent: Linux must measure it, case by case"]
+        return [f"header.{field}: Linux must measure it, case by case"]
     problems = []
     sibling = block.get("sibling")
-    if block.get("core") != LINUX_CORE:
-        problems.append(f"header.sibling_busy_percent: core {block.get('core')} is not the "
-                        f"pinned core {LINUX_CORE}")
-    if not is_number(sibling) or sibling == LINUX_CORE:
-        problems.append(f"header.sibling_busy_percent: {sibling} is not a sibling of the core")
+    if block.get("core") != core:
+        problems.append(f"header.{field}: core {block.get('core')} is not the "
+                        f"pinned core {core}")
+    if not is_number(sibling) or sibling == core:
+        problems.append(f"header.{field}: {sibling} is not a sibling of the core")
     if not block.get("method") or not block.get("topology"):
-        problems.append("header.sibling_busy_percent: no method, or no topology file")
+        problems.append(f"header.{field}: no method, or no topology file")
     measured = block["cases"]
     for case in cases:
         if case not in measured:
-            problems.append(f"header.sibling_busy_percent: no reading for {case}")
+            problems.append(f"header.{field}: no reading for {case}")
     for case, value in measured.items():
         if not is_number(value) or not 0 <= value <= 100:
-            problems.append(f"header.sibling_busy_percent: {case} reads {value!r}, which is not "
+            problems.append(f"header.{field}: {case} reads {value!r}, which is not "
                             "a percentage")
         elif value > SIBLING_BUSY_LIMIT_PERCENT:
-            problems.append(f"header.sibling_busy_percent: {case} reads {value}%, over the "
+            problems.append(f"header.{field}: {case} reads {value}%, over the "
                             f"{SIBLING_BUSY_LIMIT_PERCENT}% limit")
     return problems
 

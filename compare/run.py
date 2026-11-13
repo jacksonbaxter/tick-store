@@ -73,6 +73,8 @@ GUARD = REPO_ROOT / "compare" / "guard.py"
 DEFAULT_RESULTS_DIR = REPO_ROOT / "results" / "compare"
 DEFAULT_ITERATION_DIR = REPO_ROOT / "build" / "compare-iteration"
 LINUX_CORE = run_bench.LINUX_CORE
+# run_system.py widens each system's mask to cpu4 and this one, so its sibling is metered too.
+SECOND_CPU = 6
 LABEL = ("These numbers come from a five-minute slice and prove that the harness works. They "
          "are not claims about a full day, and no target changes because of them.")
 FULL_DAY_LABEL = ("A full day: every record of the pinned day in every system, every query as "
@@ -240,15 +242,16 @@ def system_command(system, args, layout, part, variants, guard):
             "--samples", str(guard["samples"]), "--watch", str(layout.work), "--", *command]
 
 
-def run_one(system, args, layout, measure, parts, meter, variants=None):
+def run_one(system, args, layout, measure, parts, meter, variants=None, second_meter=None):
     """Runs a system unless its part is already there. Returns its load lines."""
     part = parts / f"{system}.json"
     lines_path = parts / f"{system}.load"
     sibling_path = parts / f"{system}.sibling"
+    second_path = parts / f"{system}.sibling-second"
     time_path = parts / f"{system}.time.json"
     timed = is_tickstore_only(args, run_bench.host_label())
     if part.exists() and lines_path.exists() and (meter is None or sibling_path.exists()) and \
-            (not timed or time_path.exists()):
+            (second_meter is None or second_path.exists()) and (not timed or time_path.exists()):
         return json.loads(lines_path.read_text(encoding="utf-8"))
     snapshot = parts / f"{system}.stat"
     guard = None
@@ -279,6 +282,10 @@ def run_one(system, args, layout, measure, parts, meter, variants=None):
         raise run_bench.Failure(code, f"{system}: exited {code}, see {stderr_path.name}")
     if meter is not None:
         sibling_path.write_text(json.dumps(meter.busy_percent(snapshot)), encoding="utf-8")
+    if second_meter is not None:
+        # The same first reading, of every CPU, inside the lock: cpu6's sibling over the run.
+        second_path.write_text(json.dumps(second_meter.busy_percent(snapshot)),
+                               encoding="utf-8")
     if timed:
         figures = store_results.parse_time(text)
         if figures is None or not figures.get("peak_memory_footprint_bytes"):
@@ -300,11 +307,11 @@ def questdb_runtime(systems):
     return readings[0]
 
 
-def sibling_block(meter, parts, systems):
+def sibling_block(meter, parts, systems, suffix="sibling"):
     """Each system's run is one case. macOS has no pinned core to have a sibling."""
     if meter is None:
         return "not-available"
-    return meter.block({system: json.loads((parts / f"{system}.sibling").read_text(
+    return meter.block({system: json.loads((parts / f"{system}.{suffix}").read_text(
         encoding="utf-8")) for system in systems})
 
 
@@ -348,7 +355,7 @@ def peak_memory(report):
 
 
 def build_document(host, args, layout, pin, commit, measure, parts, load_lines, meter=None,
-                   selection=None):
+                   selection=None, second_meter=None):
     linux = host == "Linux"
     full_day = is_full_day(args)
     alone = is_tickstore_only(args, host)
@@ -383,6 +390,8 @@ def build_document(host, args, layout, pin, commit, measure, parts, load_lines, 
         "commit": commit,
         "core": LINUX_CORE if linux else "not-available",
         "sibling_busy_percent": sibling_block(meter, parts, args.systems),
+        "second_sibling_busy_percent": sibling_block(second_meter, parts, args.systems,
+                                                     "sibling-second"),
         "second_thread": "cpu6, used by every system" if linux else "not-available",
         "governor": run_bench.governor_of(host, runs),
         "turbo": run_bench.linux_turbo() if linux else "not-available",
@@ -527,6 +536,7 @@ def run(args):
     parts = layout.work / "parts" / tag
     parts.mkdir(parents=True, exist_ok=True)
     meter = run_bench.SiblingMeter() if host == "Linux" else None
+    second_meter = run_bench.SiblingMeter(core=SECOND_CPU) if host == "Linux" else None
     selection = None
     chosen = {}
     if alone:
@@ -537,10 +547,10 @@ def run(args):
         chosen = {system: entry["selected"] for system, entry in selection["systems"].items()}
     elif args.variants is not None:
         chosen = {system: args.variants.split(",") for system in args.systems}
-    load_lines = [run_one(system, args, layout, measure, parts, meter, chosen.get(system))
-                  for system in args.systems]
+    load_lines = [run_one(system, args, layout, measure, parts, meter, chosen.get(system),
+                          second_meter) for system in args.systems]
     document = build_document(host, args, layout, pin, commit, measure, parts, load_lines, meter,
-                              selection)
+                              selection, second_meter)
     directory = args.results_dir if measure else args.iteration_dir
     suffix = TICKSTORE_ONLY_SUFFIX if alone else FULL_DAY_SUFFIX
     name = f"{args.day}-{suffix}" if args.day else (

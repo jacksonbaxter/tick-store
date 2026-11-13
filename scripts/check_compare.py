@@ -37,7 +37,8 @@ before the final review's protocol state none and count as protocol 1, held to t
 A protocol 2 file is held to more: each latency block names its tail figure for what it is, the
 nearest-rank 99th percentile with n and the rank used, which below 100 runs is the slowest run
 and must say so; and every latency block and every write keeps each repetition's seconds, from
-which its median, its tail figure and its write medians are recomputed here.
+which its median, its tail figure and its write medians are recomputed here. On Linux the
+sibling of the second pinned CPU, cpu6, is measured and held to the first one's rule.
 
 Standard library only. tests/scripts/test_check_compare.py shows each rule failing on an
 injected fault.
@@ -86,6 +87,9 @@ RUNTIME_FIELDS = ("jvm_vendor", "jvm_version", "jvm_read_from", "jemalloc_read_f
 ORACLE_FIELDS = ("verdict", "exit_code", "records", "mismatched_records", "hashes_match",
                  "source_sha256", "stored_sha256")
 LINUX_CPUS = [4, 6]
+# The second pinned CPU's sibling, measured from protocol 2 and held to the first one's rule.
+SECOND_CPU = 6
+SECOND_SIBLING = "second_sibling_busy_percent"
 FULL_DAY = "full"
 TICKSTORE_ONLY_NAME = "full-tickstore"
 TICKSTORE_ONLY_HOSTS = ("macOS",)
@@ -709,6 +713,20 @@ def protocol_of(document):
     return (document.get("header") or {}).get("protocol", PROTOCOL_1)
 
 
+def check_second_sibling(header, cases, protocol):
+    """Protocol 2: the second pinned CPU's sibling, under the first one's rule on Linux, and
+    stated as not available on macOS, which pins nothing."""
+    if protocol < PROTOCOL_2:
+        return []
+    block = header.get(SECOND_SIBLING)
+    if header.get("host") == "Linux":
+        return check_results.check_sibling({SECOND_SIBLING: block}, cases, SECOND_SIBLING,
+                                           SECOND_CPU)
+    if block != check_results.NOT_AVAILABLE:
+        return [f"header.{SECOND_SIBLING}: macOS has no pinned core to measure"]
+    return []
+
+
 def check_variant_selection(document, path):
     """The variants each system ran are what the rule gives from the slice file named, which
     must sit beside this one: same host, same commit."""
@@ -842,6 +860,7 @@ def check_document(document, top_keys, path, pins, capacity, real_path=None):
         problems += check_results.check_linux({key: value for key, value in header.items()
                                                if key != "frequency"}, list(systems))
         problems += check_heap(document, "Linux", capacity)
+    problems += check_second_sibling(header, list(systems), protocol_of(document))
     label = str(document.get("label", ""))
     input_block = document.get("input") or {}
     full_day = "day" in input_block or f"-{FULL_DAY}-" in path.name
