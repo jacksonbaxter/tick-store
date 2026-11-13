@@ -940,9 +940,10 @@ def check_second_sibling(header, cases, protocol):
     return []
 
 
-def check_variant_selection(document, path):
+def check_variant_selection(document, path, pins, capacity):
     """The variants each system ran are what the rule gives from the slice file named, which
-    must sit beside this one: same host, same commit."""
+    must sit beside this one: same host, same commit, and itself a reported file that passes
+    every rule here (review F-15)."""
     selection = document.get("variant_selection")
     if not isinstance(selection, dict):
         return ["variant_selection: a full-day file must state how its variants were chosen"]
@@ -963,6 +964,10 @@ def check_variant_selection(document, path):
             slice_header.get("host") != header.get("host") or \
             "slice" not in (slice_document.get("input") or {}):
         problems.append("variant_selection: the slice file is not this host's at this commit")
+    if isinstance(slice_document, dict):
+        problems += [f"variant_selection: the slice file {source.name}: {problem}"
+                     for problem in check_document(slice_document, list(slice_document), source,
+                                                   pins, capacity)]
     try:
         chosen = variant_rule.select(slice_document)
     except (KeyError, TypeError) as error:
@@ -1098,7 +1103,7 @@ def check_document(document, top_keys, path, pins, capacity, real_path=None):
         if alone:
             problems += check_tickstore_only(document, path)
         else:
-            problems += check_variant_selection(document, real_path or path)
+            problems += check_variant_selection(document, real_path or path, pins, capacity)
     else:
         if alone:
             problems.append("scope: only a full day can be tick-store alone")

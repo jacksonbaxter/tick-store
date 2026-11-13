@@ -555,6 +555,10 @@ FAULTS = (
           "full-day file's query windows with BENCHMARKS.md's, so an hour clipped to the slice "
           "passes as a full day", CHECK_FAILED,
           "FAIL: test_a_clipped_hour_passing_as_a_full_day (__main__.FullDay"),
+    # Review F-15: a day's variant source is itself a reported, valid slice file.
+    Fault("compare-variant-source-unvalidated", "py-scripts", "check_compare.py ranks a full "
+          "day's variants from a slice file it never validates, an iteration-only one included",
+          CHECK_FAILED, "FAIL: test_a_slice_file_measured_iteration_only (__main__.FullDay"),
     # Review F-6: a class A claim needs its proof for every system, not tick-store's alone.
     Fault("compare-class-a-parquet-flush-unchecked", "py-scripts", "check_compare.py takes "
           "Parquet's class A as proven with the harness's flush made", CHECK_FAILED,

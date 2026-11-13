@@ -1104,6 +1104,21 @@ class FullDay(Harness):
             del document["variant_selection"]
         self.assert_full_fault(fault, "must state how its variants were chosen")
 
+    def test_a_slice_file_measured_iteration_only(self):
+        # Review F-15: the slice file a day's variants come from is itself a reported result.
+        def fault(document, source):
+            source["header"]["measurement"] = "iteration-only"
+        self.assert_full_fault(fault, "variant_selection: the slice file "
+                                      f"Linux-{SLICE}-{COMMIT[:12]}.json: header.measurement: "
+                                      "iteration-only, so this is not a reported result")
+
+    def test_a_slice_file_its_own_validation_refuses(self):
+        def fault(document, source):
+            source["systems"]["parquet"]["variants"]["v"]["classes"]["B"]["settings"][0][
+                "in_force"] = 3
+        self.assert_full_fault(fault, "variant_selection: the slice file "
+                                      f"Linux-{SLICE}-{COMMIT[:12]}.json: parquet.v.B")
+
 
 def tickstore_only_document():
     """tick-store alone on the day, on macOS: the full day's rules, every variant it has, warm
