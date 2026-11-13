@@ -748,15 +748,24 @@ def lowest_parts(row, document):
             theirs = {system: entry(system) for system in spec["others"]}
             met = all(ours[field] <= min(other[field] for other in theirs.values())
                       for field in spec["fields"])
+            # Per field, the lowest of the others and whose it is, so the figures shown are
+            # the ones the verdict compares with (review E-8).
             best = min(theirs, key=lambda system: theirs[system][spec["fields"][0]])
+            lowest = [min(theirs, key=lambda system, field=field: (theirs[system][field],
+                                                                    system != best))
+                      for field in spec["fields"]]
             values = " / ".join(shown(ours[field], row) for field in spec["fields"])
-            others = " / ".join(shown(theirs[best][field], row) for field in spec["fields"])
+            if all(system == best for system in lowest):
+                others = f"{SYSTEM_LABEL[best]}'s " + " / ".join(
+                    shown(theirs[best][field], row) for field in spec["fields"])
+            else:
+                others = " / ".join(f"{SYSTEM_LABEL[system]}'s {shown(theirs[system][field], row)}"
+                                    for system, field in zip(lowest, spec["fields"]))
             tail = one_tail([ours, *theirs.values()], f"{query} {kind}")
             names = " / ".join("median" if field == "median_us" else
                                tail if field in TAIL_FIELDS else field
                                for field in spec["fields"])
-            parts.append((f"{query} {kind}", f"{values} against {SYSTEM_LABEL[best]}'s {others} "
-                          f"({names})", met))
+            parts.append((f"{query} {kind}", f"{values} against {others} ({names})", met))
     return parts
 
 

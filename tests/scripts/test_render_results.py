@@ -541,6 +541,27 @@ class RenderLowestTest(Scratch):
         block = text[text.index(TARGETS_BEGIN):text.index(TARGETS_END)]
         return next(line for line in block.splitlines() if line.startswith("| T-7 | Linux |"))
 
+    def test_each_figure_shown_is_the_lowest_of_the_others_and_names_its_system(self):
+        # Review E-8: Parquet has the lowest median and ArcticDB the lowest tail, below
+        # tick-store's, so the miss is explained by ArcticDB's tail, not Parquet's.
+        document = lowest_document()
+        arcticdb = json.loads(json.dumps(document["systems"]["parquet"]))
+        arcticdb["variants"]["h"]["queries"]["Q1"]["warm"] = latency(3500.0, 1500.0, 30)
+        document["systems"]["arcticdb"] = arcticdb
+        (self.tree / "results" / "day-0123.json").write_text(json.dumps(document),
+                                                            encoding="utf-8")
+        row = dict(LOWEST_ROW, lowest_of={**LOWEST_ROW["lowest_of"],
+                                          "others": ["parquet", "arcticdb"]})
+        self.targets.write_text(json.dumps({"schema": "t", "rows": [row]}), encoding="utf-8")
+        result = self.render()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Q1 warm: 1.00 ms / 2.00 ms against Parquet's 3.00 ms / ArcticDB's 1.50 ms "
+                      "(median / slowest of 30)", self.row())
+        # One system lowest on both: named once, as before.
+        self.assertIn("Q1 cold: 5.00 ms / 9.00 ms against Parquet's 4.00 ms / 6.00 ms "
+                      "(median / slowest of 7)", self.row())
+        self.assertIn("| missed; p99 measured as", self.row())
+
     def test_each_pair_names_its_tail_figure_and_the_verdict_says_what_p99_was(self):
         result = self.render()
         self.assertEqual(result.returncode, 0, result.stderr)
