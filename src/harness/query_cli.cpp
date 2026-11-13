@@ -212,7 +212,9 @@ private:
     return out;
 }
 
-[[nodiscard]] std::optional<std::int64_t> integer(const JsonObject& request, std::string_view key) {
+// A request's integer field: nullopt if absent, an error if present as anything but an integer.
+[[nodiscard]] std::expected<std::optional<std::int64_t>, std::string> integer(
+    const JsonObject& request, std::string_view key) {
     const auto at = request.find(key);
     if (at == request.end()) {
         return std::nullopt;
@@ -220,7 +222,7 @@ private:
     if (const auto* value = std::get_if<std::int64_t>(&at->second)) {
         return *value;
     }
-    return std::nullopt;
+    return std::unexpected(std::format("{} must be an integer", key));
 }
 
 [[nodiscard]] std::string text(const JsonObject& request, std::string_view key) {
@@ -365,9 +367,21 @@ private:
                 << std::flush;
         }
     };
-    const auto start = integer(*request, "start_ns").value_or(0);
-    const auto end = integer(*request, "end_ns").value_or(0);
-    const auto locate = integer(*request, "locate").value_or(-1);
+    const auto start_field = integer(*request, "start_ns");
+    const auto end_field = integer(*request, "end_ns");
+    const auto locate_field = integer(*request, "locate");
+    for (const auto* field : {&start_field, &end_field, &locate_field}) {
+        if (!field->has_value()) {
+            return fail(field->error());
+        }
+    }
+    // Every kind but column_sum reads a window, and is not given one by default.
+    if (kind != "column_sum" && (!start_field->has_value() || !end_field->has_value())) {
+        return fail(std::format("{} needs start_ns and end_ns", kind));
+    }
+    const std::int64_t start = start_field->value_or(0);
+    const std::int64_t end = end_field->value_or(0);
+    const std::int64_t locate = locate_field->value_or(-1);
     if (start < 0 || end < 0) {
         return fail("start_ns and end_ns must not be negative");
     }

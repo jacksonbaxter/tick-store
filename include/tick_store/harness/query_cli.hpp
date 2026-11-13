@@ -10,7 +10,9 @@
 //
 //   {"name": "Q2", "kind": "rows", "start_ns": N, "end_ns": N, "locate": L}
 //       kind is rows, minute_aggregate or column_sum, as in compare/queries.py; locate -1
-//       or absent means every locate. start_ns and end_ns are nanoseconds from midnight.
+//       or absent means every locate. start_ns and end_ns are nanoseconds from midnight,
+//       required by every kind but column_sum. A field present as anything but an integer,
+//       null included, is an error, never a default.
 //   {"kind": "busiest_locate", "start_ns": N, "end_ns": N}
 //       The locate with most rows in the window, 0 excluded, the lowest on a tie: the
 //       parameter compare/queries.py's busiest_locate() picks.

@@ -968,6 +968,15 @@ TEST(QueryCli, RequestsOutOfRangeAnswerWithAnError) {
         "{\"kind\":\"histogram\"}\n"
         "{\"kind\":\"rows\",\"start_ns\":99999999999999999999}\n"
         "{\"kind\":\"rows\",\"start_ns\":5,\"end_ns\":6,\"locate\":1} trailing\n"
+        // A field present with the wrong type, or a window bound missing, is an error, never
+        // a default: 0 for a time, or -1, every locate.
+        "{\"kind\":\"rows\",\"start_ns\":\"34200000000000\",\"end_ns\":5}\n"
+        "{\"kind\":\"rows\",\"start_ns\":0,\"end_ns\":5,\"locate\":true}\n"
+        "{\"kind\":\"rows\",\"start_ns\":0,\"end_ns\":5,\"locate\":null}\n"
+        "{\"kind\":\"rows\",\"start_ns\":0,\"end_ns\":5,\"locate\":\"1\"}\n"
+        "{\"kind\":\"rows\",\"end_ns\":5}\n"
+        "{\"kind\":\"busiest_locate\",\"start_ns\":0}\n"
+        "{\"kind\":\"minute_aggregate\",\"start_ns\":0,\"locate\":1}\n"
         "{\"kind\":\"rows\",\"start_ns\":5,\"end_ns\":6,\"locate\":1,\"flag\":true,\"none\":null}\n"};
     std::ostringstream out;
     harness::CliOutput output;
@@ -979,11 +988,11 @@ TEST(QueryCli, RequestsOutOfRangeAnswerWithAnError) {
     for (std::string line; std::getline(answers, line);) {
         lines.push_back(line);
     }
-    ASSERT_EQ(lines.size(), 8U);
-    for (std::size_t i = 1; i <= 6; ++i) {
-        EXPECT_NE(json_field(lines[i], "error"), "") << lines[i];
+    ASSERT_EQ(lines.size(), 15U);
+    for (std::size_t i = 1; i <= 13; ++i) {
+        EXPECT_NE(json_field(lines[i], "error"), "") << i << ": " << lines[i];
     }
-    EXPECT_EQ(json_field(lines[7], "rows"), "1");
+    EXPECT_EQ(json_field(lines[14], "rows"), "1");
 }
 
 }  // namespace
