@@ -495,6 +495,30 @@ def check_engine_time(where, query):
     return problems
 
 
+def check_engine_repetitions(where, query):
+    """Protocol 2: each repetition's engine time within its own round trip, and a cold one
+    within its query's, since a cold figure holds tick-store's open too (review RF-7)."""
+    problems = []
+    for kind, holder, called in (("warm", None, "its round trip"),
+                                 ("cold", "parts", "its query's round trip")):
+        block = query.get(kind) if isinstance(query.get(kind), dict) else {}
+        engine = (block.get("engine") or {}).get("seconds_by_repetition")
+        source = block.get(holder) if holder else block
+        trips = (source if isinstance(source, dict) else {}).get(
+            "query_seconds_by_repetition" if holder else "seconds_by_repetition")
+        if not isinstance(engine, list) or not isinstance(trips, list) or \
+                len(engine) != len(trips):
+            problems.append(f"{where}.{kind}: no engine time beside each of {called}s")
+            continue
+        for number, (inside, trip) in enumerate(zip(engine, trips), 1):
+            if check_results.is_number(inside) and check_results.is_number(trip) and \
+                    inside > trip:
+                problems.append(f"{where}.{kind}: repetition {number}'s engine time "
+                                f"{figure(inside * 1e6)} us is longer than {called}, "
+                                f"{figure(trip * 1e6)} us")
+    return problems
+
+
 def nearest_rank(count):
     """The nearest rank of the 99th percentile among `count` runs, from 1."""
     return max(1, -(-99 * count // 100))
@@ -668,6 +692,8 @@ def check_queries(where, queries, truth, system_name=None, full_day=False, proto
             problems.append(f"{here}: no rows or bytes decoded, or a statement of why not")
         if system_name == "tickstore":
             problems += check_engine_time(here, query)
+            if protocol >= PROTOCOL_2:
+                problems += check_engine_repetitions(here, query)
     return problems
 
 

@@ -1290,7 +1290,8 @@ COLD_SECONDS = [90e-6, 110e-6]
 OPEN_INSIDE = {"parquet": True, "arcticdb": False, "questdb": False, "tickstore": True}
 TICKSTORE_OPEN_SECONDS = [30e-6, 40e-6]
 ENGINE_WARM_SECONDS = [9e-6, 8e-6, 11e-6]
-ENGINE_COLD_SECONDS = [80e-6, 100e-6]
+# Each no longer than its repetition's query, the cold figure less the open (review RF-7).
+ENGINE_COLD_SECONDS = [50e-6, 65e-6]
 
 
 def second_sibling_block():
@@ -1411,9 +1412,9 @@ class Protocol2(Harness):
 
     def test_a_tail_that_does_not_follow_from_the_repetitions(self):
         def fault(document):
-            q1_of(document, "tickstore")["cold"]["engine"]["seconds_by_repetition"][1] = 99e-6
-        self.assert_fault_2(fault, "Q1.cold.engine: tail_us 100.0 is not the slowest of 2 of "
-                                   "its repetitions, 99.0")
+            q1_of(document, "tickstore")["cold"]["engine"]["seconds_by_repetition"][1] = 64e-6
+        self.assert_fault_2(fault, "Q1.cold.engine: tail_us 65.0 is not the slowest of 2 of "
+                                   "its repetitions, 64.0")
 
     def test_a_write_median_that_does_not_follow_from_the_repetitions(self):
         def fault(document):
@@ -1569,6 +1570,21 @@ class Protocol2(Harness):
             del document["systems"]["questdb"]["variants"]["v"]["warm_worker_open"]
         self.assert_fault_2(fault, "questdb.v.warm_worker_open: the warm worker's open is not "
                                    "timed")
+
+    # Review RF-7: tick-store's engine time, repetition by repetition, within what holds it.
+
+    def test_a_cold_engine_time_longer_than_its_query(self):
+        # The cold figure holds the open too, so the median rule alone let this pass.
+        def fault(document):
+            q1_of(document, "tickstore")["cold"]["engine"] = latency_block([80e-6, 100e-6])
+        self.assert_fault_2(fault, "tickstore.v.queries.Q1.cold: repetition 1's engine time 80.0 "
+                                   "us is longer than its query's round trip, 60.0 us")
+
+    def test_a_warm_engine_time_longer_than_its_round_trip(self):
+        def fault(document):
+            q1_of(document, "tickstore")["warm"]["engine"] = latency_block([9e-6, 9.5e-6, 11e-6])
+        self.assert_fault_2(fault, "tickstore.v.queries.Q1.warm: repetition 2's engine time 9.5 "
+                                   "us is longer than its round trip, 9.0 us")
 
     # F-3: the slice's warm path warms up untimed first, as the day's does.
 

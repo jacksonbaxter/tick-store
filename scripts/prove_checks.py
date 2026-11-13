@@ -591,6 +591,11 @@ FAULTS = (
           "write repetition's engine-only seconds to its own total less its Python seconds, so "
           "any figure within the total passes (review RF-2)", CHECK_FAILED,
           "FAIL: test_an_engine_only_time_that_is_not_the_total_less_python (__main__.Protocol2"),
+    Fault("compare-engine-past-its-query", "py-scripts", "check_compare.py stops holding each "
+          "tick-store repetition's engine time within its round trip, cold within its query's, "
+          "so an engine ten times its cold query passes behind the open (review RF-7)",
+          CHECK_FAILED,
+          "FAIL: test_a_cold_engine_time_longer_than_its_query (__main__.Protocol2"),
     Fault("compare-cold-open-resident-unchecked", "py-scripts", "check_compare.py stops "
           "requiring 0 store bytes resident before a cold clock that holds the whole open",
           CHECK_FAILED,
