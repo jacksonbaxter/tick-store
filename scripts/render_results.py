@@ -88,9 +88,16 @@ SYSTEM_ORDER = ("parquet", "arcticdb", "questdb", "tickstore")
 SYSTEM_LABEL = {"parquet": "Parquet", "arcticdb": "ArcticDB", "questdb": "QuestDB",
                 "tickstore": "tick-store"}
 QUERY_NAMES = ("Q1", "Q2", "Q3", "Q4", "Q5")
-INGEST_COLUMNS = ("System", "Variant", "Write s, median", "M records/s", "Stored bytes",
-                  "Ratio", "Proof", "Like-for-like")
-VARIANT_COLUMNS = ("System", "Variant", "Stored bytes, B", "Ratio", "Write s, A / B",
+INGEST_COLUMNS = ("System", "Variant", "Total s, median", "Engine-only s, median", "M records/s",
+                  "Stored bytes", "Ratio", "Proof", "Like-for-like")
+# What a write's two times hold, as compare/README.md's "A write's two times" has it per system.
+WRITE_TIMES = ("\"Total s\" is the whole write clock; \"engine-only s\" is that less the time "
+               "reading the input and putting it in the form the system's call takes, as "
+               "\"A write's two times\" in compare/README.md sets out for each system. "
+               "tick-store's both hold its ITCH parsing. A write of several repetitions measured "
+               "before protocol 2 kept medians alone, so its engine-only seconds are not "
+               "recorded.")
+VARIANT_COLUMNS = ("System", "Variant", "Stored bytes, B", "Ratio", "Total write s, A / B",
                    *(f"{name} ms, warm / cold" for name in QUERY_NAMES))
 MEMORY_COLUMNS = ("System", "Largest VmHWM", "Peak RSS of its processes together",
                   "MemAvailable, lowest", "Swap in / out over the run, MiB")
@@ -361,6 +368,43 @@ def query_table(document):
     return lines
 
 
+class NoFigure(Exception):
+    """A value a condition has a target for and the file does not hold, with what is missing."""
+
+    def __init__(self, what, reason):
+        super().__init__(f"{what}: {reason}")
+        self.what = what
+        self.reason = reason
+
+
+class Unjudged:
+    """The verdict of a condition, or a part, with a target and no figure to judge it on."""
+
+    def __init__(self, what):
+        self.what = what
+
+
+def engine_only(write):
+    """A write's engine-only seconds, its seconds less its Python seconds (review RF-3): a
+    protocol 2 file's own median, or a single repetition's difference. Several repetitions with
+    medians alone give none, since the median of the differences is not the difference of the
+    medians."""
+    if "engine_only_seconds_median" in write:
+        return write["engine_only_seconds_median"]
+    repetitions = write.get("repetitions")
+    if repetitions == 1 and "seconds_median" in write and "python_seconds" in write:
+        return write["seconds_median"] - write["python_seconds"]
+    raise NoFigure("engine-only seconds", f"a write of {repetitions} repetitions that keeps no "
+                   "engine_only_seconds_median")
+
+
+def engine_only_cell(write):
+    try:
+        return f"{engine_only(write):.3f}"
+    except NoFigure:
+        return "not recorded"
+
+
 def ingest_table(document, class_name):
     lines = ["| " + " | ".join(INGEST_COLUMNS) + " |", "|" + "---|" * len(INGEST_COLUMNS)]
     source_bytes = document["input"]["bytes"]
@@ -372,6 +416,7 @@ def ingest_table(document, class_name):
         durability = result["durability"]
         label = SYSTEM_LABEL[name] + (" (parses ITCH)" if name == "tickstore" else "")
         cells = (label, f"`{variant}`", f"{write['seconds_median']:.3f}",
+                 engine_only_cell(write),
                  f"{write['records_per_second_median'] / 1e6:.2f}", f"{stored:,}",
                  f"{source_bytes / stored:.3f}", durability["status"],
                  "yes" if durability["like_for_like"] else "no")
@@ -488,8 +533,8 @@ def compare_for(document):
                                 ("B", "returns after a flush to the device")):
         unit = "day" if day else "slice"
         lines += ["", f"Ingest and size, class {class_name}: {meaning}. Stored bytes are "
-                      f"allocated at rest, and the ratio is the {unit}'s source bytes over them.",
-                  ""]
+                      f"allocated at rest, and the ratio is the {unit}'s source bytes over them. "
+                      f"{WRITE_TIMES}", ""]
         lines += ingest_table(document, class_name)
     lines += ["", document["input"]["ingest_input"]]
     if day:
@@ -605,6 +650,8 @@ def evaluate(expression, document):
         system, *path = expression["min_variant"]
         variants = walk(document, ["systems", system, "variants"])
         return min(walk(variant, path) for variant in variants.values())
+    if "engine_only" in expression:
+        return engine_only(walk(document, expression["engine_only"]))
     if "div" in expression:
         numerator, denominator = (evaluate(item, document) for item in expression["div"])
         return numerator / denominator
@@ -643,12 +690,20 @@ def judge(item, row, document):
     """(text, met or None) for one condition on one document. A condition may set its own
     digits, scale and unit, and a label shown before its value."""
     row = {**row, **{key: item[key] for key in DISPLAY if key in item}}
-    value = evaluate(item["value"], document)
     comparison = comparison_of(item, row)
+    try:
+        value = evaluate(item["value"], document)
+        if comparison is not None:
+            operand = comparison[1]
+            against = operand if not isinstance(operand, dict) else evaluate(operand, document)
+    except NoFigure as missing:
+        if comparison is None:
+            raise TargetError(str(missing)) from missing
+        label = f"{item['label']} " if item.get("label") and item is not row else ""
+        return f"{label}not judged on {missing.what}: {missing.reason}", Unjudged(missing.what)
     if comparison is None:
         return shown(value, row), None
     name, operand = comparison
-    against = operand if not isinstance(operand, dict) else evaluate(operand, document)
     if isinstance(against, bool) or not isinstance(against, (int, float)):
         met = COMPARATORS[name][0](value, against)
     elif isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -743,7 +798,11 @@ def judged_parts(row, root):
                                           if key != "label"}]
         judged = [judge(item, row, documents[path]) for item in conditions]
         verdicts = [met for _, met in judged]
-        met = None if None in verdicts else all(verdicts)
+        unjudged = [met for met in verdicts if isinstance(met, Unjudged)]
+        if unjudged:
+            met = unjudged[0]
+        else:
+            met = None if None in verdicts else all(verdicts)
         parts.append((spec["label"], ", ".join(text for text, _ in judged), met, path,
                       documents[path]))
     return parts, None
@@ -755,12 +814,28 @@ def measured_of(parts):
     return "; ".join(f"{label}: {text}" for label, text, *_ in parts)
 
 
+def verdict_word(met):
+    if isinstance(met, Unjudged):
+        return f"not judged on {met.what}"
+    return VERDICT_WORD[met]
+
+
 def verdict_of(parts):
     verdicts = [part[2] for part in parts]
     if all(met is None for met in verdicts):
         return "not judged: no published figure, reported as measured"
     if None in verdicts:
         raise TargetError("a row with a target on some parts and not on others")
+    unjudged = [part for part in parts if isinstance(part[2], Unjudged)]
+    if unjudged:
+        whats = ", ".join(dict.fromkeys(part[2].what for part in unjudged))
+        if len(unjudged) == len(parts):
+            return f"not judged on {whats}"
+        pieces = [f"{word} on " + ", ".join(f"({part[0]})" for part in parts if part[2] is met)
+                  for word, met in (("met", True), ("missed", False))
+                  if any(part[2] is met for part in parts)]
+        return "; ".join(pieces + [f"not judged on {whats} for " +
+                                   ", ".join(f"({part[0]})" for part in unjudged)])
     if all(verdicts):
         return "met"
     if not any(verdicts):
@@ -872,7 +947,7 @@ def render_headline(definitions_path, root):
         lines.append("| " + " | ".join(cells) + " |")
     if not missed:
         raise TargetError("headline: no row is a missed target, and the headline must show one")
-    left_out = [f"{ident} on {host}, " + ", ".join(f"{part[0]} {VERDICT_WORD[part[2]]}"
+    left_out = [f"{ident} on {host}, " + ", ".join(f"{part[0]} {verdict_word(part[2])}"
                                                    for part in every if part[0] not in labels)
                 for (ident, host), (every, labels) in shown_of.items()
                 if any(part[0] not in labels for part in every)]
