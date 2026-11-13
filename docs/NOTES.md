@@ -3398,6 +3398,11 @@ value has reached yet still compares with that head's empty owner, as before. No
 the head fields (`git grep` over `scripts/`, `compare/` and their tests). The committed
 `results/codec-eval-*.json` keep the old shares until the freeze rerun (TASKS).
 
+D-9. The mid-stream flush now passes `locate_of(stream)`, as the final flush did. Examples are
+diagnostics: the committed codec-eval files hold none from a file-order column on a non-zero
+locate unless a value failed, and every value on both days came back, so their numbers do not
+move.
+
 Raw: `phase4-raw/fix-harness/`: each finding's failing and passing logs.
 
 ## Process notes
