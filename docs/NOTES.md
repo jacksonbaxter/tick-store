@@ -4007,6 +4007,11 @@ read as `None or 0`. Before dropping the fallback, the real engine in the `.venv
 6.28.2, was asked in a fresh process per case: `ARCTICDB_LMDBStorage_ExtraFlags_int=0` reads back
 0, the class A flags 327680, and the key unset `None`. So an explicit 0 is 0, and `None` now
 fails the read-back as a setting not in force.
+**F-8, ArcticDB's one-symbol row count.** Confirmed by a test on a fake library: a description
+of 5 rows passed beside 4 rows read back, since the row count was compared with itself. It is now
+held to the rows read back, as the per-security path already was. `compare/fullday.py` asks for
+the stored settings without reading the store back, so there the check is left out rather than
+compared with nothing.
 
 ## Process notes
 
