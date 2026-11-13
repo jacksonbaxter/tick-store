@@ -4126,6 +4126,12 @@ building their input inside the clock; tick-store's
 source is resident before its clock, and its time is nearly all its own. `BENCHMARKS.md`'s
 hand-written status rows for WT-3 and WT-4 still give the old verdicts until the end of the phase.
 
+**A Linux tick-store-alone day (RV-1).** The generator now takes one: its comparison section
+has the guard's peak memory table, as the four-system day does, and no BSD time -l lines. A
+target row's pattern that does not contain `-full-tickstore-` never matches a tick-store-alone
+day, and each file a row reads must be of the kind its pattern names by its `scope` too. Shown
+on test documents; no Linux alone day is committed yet.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
