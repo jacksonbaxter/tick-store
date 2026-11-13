@@ -786,6 +786,26 @@ TEST(ItchStoreWriter, RefusesWhatNoFileHolds) {
     EXPECT_EQ(records->size(), 1U);
 }
 
+// The builder learns a segment's stocks into the writer's symbol table only when the
+// segment is written, so a writer moved between append() and finish() must still write
+// them into its own table (review C-1).
+TEST(ItchStoreWriter, AWriterMovedWithASegmentOpenWritesItsStocks) {
+    auto writer = ItchStoreWriter::in_memory({.segment_records = 8});
+    ASSERT_TRUE(writer.has_value());
+    ASSERT_TRUE(writer->append(test::add(7, 1, 100, "AAPL")).has_value());
+    ItchStoreWriter moved = std::move(*writer);
+    ASSERT_TRUE(moved.finish({}).has_value());
+    const Bytes file = moved.take_bytes();
+    auto reader = ItchStoreReader::open_bytes(file);
+    ASSERT_TRUE(reader.has_value()) << to_string(reader.error());
+    ASSERT_NE(reader->symbols().find(7), nullptr);
+    EXPECT_EQ(*reader->symbols().find(7), test::stock_of("AAPL"));
+    const auto records = test::all_payloads(file);
+    ASSERT_TRUE(records.has_value()) << to_string(records.error());
+    const std::vector<itch::Message> want{test::add(7, 1, 100, "AAPL")};
+    EXPECT_EQ(*records, payloads_of(want));
+}
+
 TEST(ItchStoreWriter, TheCreateErrorNamesTheContainersFailure) {
     const tick_store::test::ScratchDir dir;
     const auto refused =

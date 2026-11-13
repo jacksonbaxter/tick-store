@@ -161,7 +161,7 @@ std::expected<void, ItchStoreError> ItchStoreWriter::append(const itch::Message&
         error.field = "append after finish";
         return std::unexpected(error);
     }
-    if (auto added = builder_.add(message, symbols_); !added.has_value()) {
+    if (auto added = builder_.add(message, *symbols_); !added.has_value()) {
         ItchStoreError error = added.error();
         error.record = records_;
         return std::unexpected(error);
@@ -192,7 +192,7 @@ std::expected<void, ItchStoreError> ItchStoreWriter::finish(std::span<const std:
     if (auto added = add_section(kStoreSection, encode_store_header(header)); !added) {
         return added;
     }
-    if (auto added = add_section(kSymbolsSection, symbols_.encode()); !added) {
+    if (auto added = add_section(kSymbolsSection, symbols_->encode()); !added) {
         return added;
     }
     if (auto added = add_section(kTailSection, tail); !added) {

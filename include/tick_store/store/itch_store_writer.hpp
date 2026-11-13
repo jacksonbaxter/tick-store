@@ -24,6 +24,7 @@
 #include <cstdint>
 #include <expected>
 #include <filesystem>
+#include <memory>
 #include <optional>
 #include <span>
 #include <vector>
@@ -77,7 +78,9 @@ private:
 
     ItchStoreOptions options_;
     SegmentBuilder builder_;
-    SymbolTable symbols_;
+    // On the heap, so a move keeps its address: the builder holds it until the segment is
+    // written (SegmentBuilder::add).
+    std::unique_ptr<SymbolTable> symbols_ = std::make_unique<SymbolTable>();
     std::uint64_t records_ = 0;
     std::uint64_t segments_ = 0;
     std::optional<ContainerWriter> file_;

@@ -37,7 +37,9 @@ public:
     ~SegmentBuilder();
 
     // Adds the next record. `symbols` learns the first stock seen for each locate, which
-    // derived stocks are compared with. Refuses, changing nothing, a timestamp over 48 bits
+    // derived stocks are compared with. It learns them in finish(), so the builder keeps
+    // a pointer to it: it must stay at the same address until then. Refuses, changing
+    // nothing, a timestamp over 48 bits
     // and a RawMessage that is empty, over 65,535 bytes, or a conforming message that
     // decode() would never return raw: none of them is a frame of any file.
     [[nodiscard]] std::expected<void, ItchStoreError> add(const itch::Message& message,
