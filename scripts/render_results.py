@@ -718,7 +718,8 @@ def judge(item, row, document):
         label = f"{item['label']} " if item.get("label") and item is not row else ""
         return f"{label}not judged on {missing.what}: {missing.reason}", Unjudged(missing.what)
     if comparison is None:
-        return shown(value, row), None
+        text = shown(value, row)
+        return (f"{item['label']} {text}" if item.get("label") and item is not row else text), None
     name, operand = comparison
     if isinstance(against, bool) or not isinstance(against, (int, float)):
         met = COMPARATORS[name][0](value, against)
@@ -820,12 +821,20 @@ def judged_parts(row, root):
         conditions = spec.get("all") or [{key: value for key, value in spec.items()
                                           if key != "label"}]
         judged = [judge(item, row, documents[path]) for item in conditions]
-        verdicts = [met for _, met in judged]
+        # A part is judged on its conditions that have a target, and a condition with none is
+        # only shown, so it never hides a miss beside it (review E-7). A miss decides the part;
+        # then a condition with a target and no figure leaves it not judged.
+        verdicts = [met for item, (_, met) in zip(conditions, judged)
+                    if comparison_of(item, row) is not None]
         unjudged = [met for met in verdicts if isinstance(met, Unjudged)]
-        if unjudged:
+        if not verdicts:
+            met = None
+        elif False in verdicts:
+            met = False
+        elif unjudged:
             met = unjudged[0]
         else:
-            met = None if None in verdicts else all(verdicts)
+            met = True
         parts.append((spec["label"], ", ".join(text for text, _ in judged), met, path,
                       documents[path]))
     return parts, None
