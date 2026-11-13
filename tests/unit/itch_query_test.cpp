@@ -29,8 +29,10 @@
 #include <map>
 #include <optional>
 #include <random>
+#include <ostream>
 #include <span>
 #include <sstream>
+#include <streambuf>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -953,6 +955,29 @@ TEST(QueryCli, UsageAndStoresThatDoNotOpen) {
     EXPECT_EQ(run({"x.tsc", "y.tsc", "--day", "12302019"}), harness::kExitUsageOrIo);
     const std::string missing = (dir / "missing.tsc").string();
     EXPECT_EQ(run({missing, "--day", "12302019"}), harness::kExitMismatch);
+}
+
+// A stream every write to which fails, as a closed pipe or a full disk would.
+class FailingBuffer : public std::streambuf {
+protected:
+    int_type overflow(int_type /*c*/) override { return traits_type::eof(); }
+    std::streamsize xsputn(const char* /*s*/, std::streamsize /*n*/) override { return 0; }
+};
+
+// The worker's answers are its output: if they cannot be written, it must not exit 0.
+TEST(QueryCli, AnswersThatCannotBeWrittenAreAnError) {
+    const ::tick_store::test::ScratchDir dir;
+    const std::vector<itch::Message> messages{test::add(1, 5, 9, "AAPL")};
+    const auto path = dir / "one.tsc";
+    ::tick_store::test::write_file(path, test::store_of_messages(messages));
+    std::istringstream in{"{\"kind\":\"column_sum\"}\n{\"kind\":\"column_sum\"}\n"};
+    FailingBuffer failing;
+    std::ostream out{&failing};
+    harness::CliOutput output;
+    const std::string store_path = path.string();
+    const std::vector<std::string_view> arguments{store_path, "--day", "12302019"};
+    EXPECT_EQ(harness::run_query_cli(arguments, in, out, output), harness::kExitUsageOrIo);
+    EXPECT_TRUE(output.err.contains("cannot write")) << output.err;
 }
 
 TEST(QueryCli, RequestsOutOfRangeAnswerWithAnError) {

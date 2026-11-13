@@ -4,8 +4,6 @@
 #include "tick_store/harness/roundtrip_cli.hpp"
 
 #include <cstddef>
-#include <cstdio>
-#include <print>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -16,7 +14,5 @@ int main(int argc, char** argv) {
     const std::vector<std::string_view> arguments(args.begin() + 1, args.end());
     tick_store::harness::CliOutput output;
     const int code = tick_store::harness::run_export_cli(arguments, output);
-    std::print(stdout, "{}", output.out);
-    std::print(stderr, "{}", output.err);
-    return code;
+    return tick_store::harness::write_cli_output(output, code);
 }

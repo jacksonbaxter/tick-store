@@ -30,6 +30,7 @@
 // Exit codes: 0 pass; 1 mismatch, including a store its parser refuses; 2 usage or I/O
 // error. JSON on stdout holds no paths.
 
+#include <cstdio>
 #include <span>
 #include <string>
 #include <string_view>
@@ -47,5 +48,13 @@ struct CliOutput {
 
 // `arguments` excludes the program name. Returns the exit code.
 [[nodiscard]] int run_roundtrip_cli(std::span<const std::string_view> arguments, CliOutput& output);
+
+// What every tool's main does last: writes `output.out` to `out` and `output.err` to `err`, and
+// flushes both. Returns `code`, unless `output.out` could not be written whole, which would
+// otherwise pass unseen, since the flush at exit ignores errors and a full disk or closed pipe
+// would end in exit 0 with the JSON cut short. Then it says so on `err` and returns
+// kExitUsageOrIo, or `code` if that is already a failure.
+[[nodiscard]] int write_cli_output(const CliOutput& output, int code, std::FILE* out = stdout,
+                                   std::FILE* err = stderr);
 
 }  // namespace tick_store::harness

@@ -6,8 +6,6 @@
 #include "tick_store/harness/roundtrip_cli.hpp"
 
 #include <cstddef>
-#include <cstdio>
-#include <print>
 #include <span>
 #include <string>
 #include <string_view>
@@ -27,7 +25,5 @@ int main(int argc, char** argv) {
                                                          .sanitizers = build.sanitizers};
     tick_store::harness::CliOutput output;
     const int code = tick_store::harness::run_codec_eval_cli(arguments, provenance, output);
-    std::print(stdout, "{}", output.out);
-    std::print(stderr, "{}", output.err);
-    return code;
+    return tick_store::harness::write_cli_output(output, code);
 }

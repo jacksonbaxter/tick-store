@@ -2,6 +2,7 @@
 // and the failure report. No test starts a process, so each path runs under the
 // sanitizers.
 
+#include "file_size_limit.hpp"
 #include "scratch_dir.hpp"
 #include "stub_fixture.hpp"
 #include "test_bytes.hpp"
@@ -15,9 +16,13 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <filesystem>
 #include <format>
+#include <fstream>
 #include <initializer_list>
+#include <iterator>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -414,6 +419,40 @@ TEST_F(RoundTripCliStore, TheStubHasNoChecksumsToSkip) {
         run({"verify", source_path.string(), (dir / "stub").string(), "--no-checksums"});
     EXPECT_EQ(verify.code, kExitUsageOrIo);
     EXPECT_TRUE(contains(verify.output.err, "no checksums to skip"));
+}
+
+// Every tool ends in write_cli_output. Its output is JSON a caller parses, so one that does not
+// reach its file must not exit 0; the flush at exit would drop the error.
+TEST(WriteCliOutput, AnOutputThatCannotBeWrittenIsAnErrorAndAFailureKeepsItsCode) {
+    const test::ScratchDir dir;
+    const CliOutput output{.out = std::string(4096, 'x'), .err = "a line of its own\n"};
+    const auto run = [&](int code, const char* name, bool limited) {
+        std::FILE* const out = std::fopen((dir / name).c_str(), "w");
+        std::FILE* const err = std::fopen((dir / "err").c_str(), "w");
+        EXPECT_NE(out, nullptr);
+        EXPECT_NE(err, nullptr);
+        int result = -1;
+        {
+            const std::optional<test::FileSizeLimit> limit =
+                limited ? std::optional<test::FileSizeLimit>{std::in_place, 256} : std::nullopt;
+            result = write_cli_output(output, code, out, err);
+            // Closed under the limit too, or the close would write what the flush could not.
+            std::fclose(out);
+            std::fclose(err);
+        }
+        return result;
+    };
+    EXPECT_EQ(run(kExitPass, "whole", false), kExitPass);
+    EXPECT_EQ(std::filesystem::file_size(dir / "whole"), 4096U);
+    EXPECT_EQ(run(kExitPass, "cut", true), kExitUsageOrIo);
+    EXPECT_LE(std::filesystem::file_size(dir / "cut"), 256U);
+    const std::string said = [&] {
+        std::ifstream in{dir / "err"};
+        return std::string{std::istreambuf_iterator<char>{in}, {}};
+    }();
+    EXPECT_TRUE(said.contains("a line of its own")) << said;
+    EXPECT_TRUE(said.contains("cannot write the output")) << said;
+    EXPECT_EQ(run(kExitMismatch, "cut-mismatch", true), kExitMismatch);
 }
 
 }  // namespace

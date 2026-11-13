@@ -4,9 +4,7 @@
 #include "tick_store/harness/roundtrip_cli.hpp"
 
 #include <cstddef>
-#include <cstdio>
 #include <iostream>
-#include <print>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -19,7 +17,5 @@ int main(int argc, char** argv) {
     std::ios::sync_with_stdio(false);
     const int code = tick_store::harness::run_query_cli(arguments, std::cin, std::cout, output);
     std::cout.flush();
-    std::print(stdout, "{}", output.out);
-    std::print(stderr, "{}", output.err);
-    return code;
+    return tick_store::harness::write_cli_output(output, code);
 }

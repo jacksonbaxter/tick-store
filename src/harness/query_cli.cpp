@@ -555,11 +555,16 @@ int run_query_cli(std::span<const std::string_view> arguments, std::istream& in,
         << std::flush;
     std::string line;
     bool quit = false;
-    while (!quit && std::getline(in, line)) {
+    while (!quit && out && std::getline(in, line)) {
         if (line.find_first_not_of(" \t\r") == std::string::npos) {
             continue;
         }
         out << answer(query, line, *midnight, quit, out) << '\n' << std::flush;
+    }
+    // The answers are this tool's output: one that cannot be written ends the run.
+    if (!out) {
+        output.err += "tick_query: cannot write the answers\n";
+        return kExitUsageOrIo;
     }
     return kExitPass;
 }
