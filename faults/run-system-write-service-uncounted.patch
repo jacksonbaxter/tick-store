@@ -1,0 +1,13 @@
+diff --git a/compare/run_system.py b/compare/run_system.py
+--- a/compare/run_system.py
++++ b/compare/run_system.py
+@@ -216,8 +216,7 @@ class Runner:
+                 system.start_service()
+                 settings = system.service_settings()
+                 answer = self.worker(system, "ingest", columns=str(self.columns_dir),
+-                                     flush_report=last,
+-                                     service_processes=system.service_processes())
++                                     flush_report=last)
+                 settle = system.settle() if last else {}
+                 facts = system.service_facts() if last else {}
+                 facts["requested"] = system.requested()

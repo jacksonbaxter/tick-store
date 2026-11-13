@@ -337,6 +337,19 @@ class Ingest(unittest.TestCase):
         with self.assertRaisesRegex(ToolFailure, "gave none"):
             owner._source()
 
+    def test_the_write_runs_through_the_counter_of_its_childs_reads(self):
+        # Review RV-5: on macOS tick_roundtrip's device reads are read before it is reaped,
+        # which only coldcache.run_counting_reads does.
+        command = ["tick_roundtrip", "ingest", "in.itch", "out.tsc"]
+        ran = mock.Mock(return_value=SimpleNamespace(returncode=0, stdout='{"records": 9}',
+                                                     stderr=""))
+        with mock.patch.object(coldcache, "run_counting_reads", ran), \
+                mock.patch.object(tickstore.subprocess, "run",
+                                  side_effect=AssertionError("ran without the counter")):
+            self.assertEqual(system()._run_ingest(command), {"records": 9})
+        ran.assert_called_once()
+        self.assertEqual(ran.call_args.args[0], command)
+
 
 PAGES = 2_014_504
 EXPORT = Path("/nonexistent/data/export/12302019-full")

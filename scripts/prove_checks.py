@@ -705,6 +705,15 @@ FAULTS = (
     Fault("warm-up-runs-stated-not-counted", "py-compare", "the warm proof states the constant "
           "number of untimed runs, whatever ran", CHECK_FAILED,
           "FAIL: test_the_proof_states_the_untimed_runs_that_ran (__main__.ResidencyWarmOnADay"),
+    # Review RV-5: the two hooks that make a macOS write count the processes that did it.
+    Fault("run-system-write-service-uncounted", "py-compare", "run_class leaves the service's "
+          "processes out of the write's request, so a macOS write does not count the server's "
+          "reads", CHECK_FAILED, "FAIL: test_the_ingest_request_names_the_service_processes "
+          "(__main__.WriteCountsItsServer"),
+    Fault("tickstore-write-reads-uncounted", "py-compare", "tick-store's write runs "
+          "tick_roundtrip through subprocess.run, so on macOS its reads are lost when it is "
+          "reaped", CHECK_FAILED, "FAIL: test_the_write_runs_through_the_counter_of_its_childs_"
+          "reads (__main__.Ingest"),
     # Review RF-9: each protocol 2 rule and assembly step that had a test and no fault.
     Fault("compare-write-medians-unchecked", "py-scripts", "check_compare.py stops recomputing "
           "a protocol 2 write's medians from its repetitions", CHECK_FAILED,

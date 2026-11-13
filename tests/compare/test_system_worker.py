@@ -584,6 +584,40 @@ class Assembly(unittest.TestCase):
                          {"seconds": 0.01, "variant": "v3-seg4Mi"})
 
 
+class WriteCountsItsServer(unittest.TestCase):
+    """run_class hands the write's worker the processes of the system's service, so a macOS
+    write counts the server's device reads beside the worker's (review RV-5)."""
+
+    class Stop(Exception):
+        pass
+
+    def test_the_ingest_request_names_the_service_processes(self):
+        from compare import run_system
+
+        runner = run_system.Runner.__new__(run_system.Runner)
+        runner.note = lambda text: None
+        runner.stores = Path("stores")
+        runner.columns_dir = Path("export")
+        runner.write_repetitions = 1
+        runner.flush_probe = lambda variant, durability: {}
+        system = SimpleNamespace(start_service=lambda: None, service_settings=lambda: [],
+                                 stop_service=lambda: {},
+                                 service_processes=lambda: {"questdb": 42})
+        runner.fresh = lambda root, variant, durability: system
+        requests = []
+
+        def worker(system, step, **fields):
+            requests.append((step, fields))
+            raise self.Stop
+
+        runner.worker = worker
+        with mock.patch.object(run_system.swap, "Phase", Assembly.Phase), \
+                self.assertRaises(self.Stop):
+            runner.run_class("plain", CLASS_B, None)
+        self.assertEqual([step for step, _ in requests], ["ingest"])
+        self.assertEqual(requests[0][1].get("service_processes"), {"questdb": 42})
+
+
 class SecondSibling(unittest.TestCase):
     """run.py's run_one keeps cpu6's sibling reading beside cpu4's, and a part without it is
     run again (review RF-9)."""

@@ -1,0 +1,13 @@
+diff --git a/compare/systems/tickstore.py b/compare/systems/tickstore.py
+--- a/compare/systems/tickstore.py
++++ b/compare/systems/tickstore.py
+@@ -291,7 +291,8 @@ class TickStoreSystem(System):
+ 
+     def _run_ingest(self, command):
+         # On macOS the tool's device reads are read before it is reaped: see coldcache.
+-        run = coldcache.run_counting_reads(command, stdin=subprocess.DEVNULL)
++        run = subprocess.run(command, stdin=subprocess.DEVNULL, capture_output=True, text=True,
++                             check=False)
+         if run.returncode != 0:
+             raise ToolFailure(f"tick_roundtrip ingest exited {run.returncode}: "
+                               f"{run.stderr.strip()[:300]}")
