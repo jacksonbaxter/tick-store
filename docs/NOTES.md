@@ -4054,6 +4054,19 @@ test and no prover fault. `Assembly` now builds a part from fakes of the workers
 `SecondSibling` runs `run_one` twice with fake meters; a day test holds tick-store's source
 whole on a day. Each of the sixteen gaps has a fault in `scripts/prove_checks.py`, every one
 proven with `--only`.
+**RR-1 to RR-3, the same reviewer's notes on the RA and RD fixes.** Raw logs are in
+`phase4-raw/fix-leftovers/`. RR-1: two requests of an unknown kind, one with a negative start and
+one with a locate of the wrong type, were told about the field, as the reviewer said
+(`rr1-before.log`); the worker now refuses a kind it does not know before it reads a field. RR-2
+is a comment and no change to the count: a step to a head no value has reached can match only a
+value of locate 0, at most `kHeadDeltaHeads` times a stream. RR-3: the two demonstrations are now
+faults, `frame-short-stop-misstated` and `query-raw-row-type-zeroed`, both PROVEN with `--only`.
+The first needed a new test, because the one test holding the reviewer's input also checks that
+input with one more byte, whose whole stream ends in the misstated stop, so it failed with or
+without RA-2's check. That the new test is RA-2's alone is by reading: on the frame alone the
+whole stream ends cleanly, and only the shorter cursor stops at a truncated prefix. RD-3's decode
+error cannot be pinned by a test, since no frame holds the empty payload that alone fails
+`itch::decode`.
 
 ## Process notes
 
