@@ -3458,11 +3458,11 @@ new denominators, and `excludes_permutation` beside every verdict. `scripts/chec
 work on the committed files and on the new output alike; no script changed. TASKS lists the
 files.
 
-Checks. On the Mac at 036c534, `scripts/check.sh --only`: dev build, dev tests (659, one skipped:
+Checks. On the Mac at b61a020, `scripts/check.sh --only`: dev build, dev tests (659, one skipped:
 the Linux-only page-cache test), oracle, ASan/UBSan build and tests (659, the same skip),
 clang-tidy (122 files), the Python scripts and compare tests, check-results, render-check and
 hygiene all pass. The Mac does not build `page_cache_linux.cpp`, so clang-tidy ran on it on
-`debian`, where it asked for `sys/types.h` for `uid_t` (22c4422). On `debian` at 22c4422, the dev
+`debian`, where it asked for `sys/types.h` for `uid_t` (50b1cba). On `debian` at 50b1cba, the dev
 preset builds, ctest runs 659 tests with none failing and the two real-day tests skipped (no data there), the
 Linux-only page-cache test among the passes, and clang-tidy on `page_cache_linux.cpp` passes.
 
@@ -3500,7 +3500,7 @@ R-2. Fixed in code rather than by deleting the header's sentence: a default `Seg
 a value a caller can hold, and an empty segment is the answer the header gives. The check sits
 after the failure check, so a failed seek still gives its error (C-7's test passes unchanged).
 
-R-3. The parts were chosen from the Linux gate's ctest log at `22c4422`, where each test of the
+R-3. The parts were chosen from the Linux gate's ctest log at `50b1cba`, where each test of the
 capped filter also runs on its own, uncapped and three at a time: `FuzzOracles` took 1,093.5 s
 and `ItchQuery` 985.3 s of the 2,344.4 s those tests summed, the query oracle's cut-and-flip test
 626.7 s and `ItchQuery.SegmentsWithRawRowsTakeTheExactPath` 534.1 s, and every other suite under
@@ -3550,7 +3550,7 @@ now says that for "raw bytes" `expected` is the fewest allowed, not the largest.
 checked with the ITCH tests alone, and the closing check's full run found the one it missed:
 `StubWriter.RefusesARawMessageWithNoBytes` expected the stub writer's "empty record", which the
 encoder's refusal now pre-empts. That check could not be reached any more, so it was removed
-rather than kept as a second name for one error (`b499c50`).
+rather than kept as a second name for one error (`2258ff0`).
 
 A-6. The signal test cannot be sure the signal lands inside `poll`: the helper waits 50 ms after
 reading the command, which the gate writes just before it polls. A signal that came early would
@@ -3583,23 +3583,23 @@ test that clang-tidy's include check could not trace through the C library's pri
 on macOS and, as CI showed, on Linux. After
 those, every step passed, the unit runs at 678 tests with the one Linux-only test skipped
 (`phase4-raw/fix-itch-bench/check2`, `check3`). On the Linux host the dev build and ctest at
-`c7b7143` failed only the R-3 partition check: before CMake 4, script mode sets no policies, and
+`9ca302d` failed only the R-3 partition check: before CMake 4, script mode sets no policies, and
 `if(IN_LIST)` is not an operator without CMP0057, so the check failed on its first `if` there
-while it passed on the Mac's CMake 4. With the policy floor set (`b167c01`), the gate passed,
-and again at `13fb445`, the last C++ commit, whose change is the comment above the signal
+while it passed on the Mac's CMake 4. With the policy floor set (`d05f4e2`), the gate passed,
+and again at `74c3aa4`, the last C++ commit, whose change is the comment above the signal
 test's suppression, with clang-tidy run on that test there too: 676 entries passed, the two
-real-day tests skipped for want of the day's file, no entry near 900 s. At `13fb445` R-3's parts
+real-day tests skipped for want of the day's file, no entry near 900 s. At `74c3aa4` R-3's parts
 took 106.66 s (codecs), 124.32 s (store), 392.66 s (query), 436.90 s (the exact-path test),
 379.73 s (fuzz oracles), 214.47 s (the query oracle) and 0.28 s (the partition check), against
-1,613.25 s for the single entry at `22c4422`. The slowest entries of the run were the query
+1,613.25 s for the single entry at `50b1cba`. The slowest entries of the run were the query
 oracle's cut-and-flip test uncapped, 481.11 s, the exact-path test's capped part, 436.90 s, and
 `ItchQuery.SegmentsWithRawRowsTakeTheExactPath` uncapped, 428.56 s, three at a time on a host
 whose load average was 9 to 12 from other work (`phase4-raw/fix-itch-bench/debian-gate/`).
 
 ### The final review's second pass over the ITCH, bench and harness fixes
 
-Two more reviewers read the fixes: one the ITCH and bench round at `02d8dc6` (RA-1 to RA-6), the
-other the harness round and the query fuzz oracle at `1ae8242` (RD-1 to RD-6). Neither built or
+Two more reviewers read the fixes: one the ITCH and bench round at `381c738` (RA-1 to RA-6), the
+other the harness round and the query fuzz oracle at `c804d77` (RD-1 to RD-6). Neither built or
 ran anything. The record is `docs/REVIEW.md`; raw logs are in `phase4-raw/fix-second-pass/`.
 
 RA-1. Confirmed by running the reviewer's mutation, not only reading it: with the stop checks A-1
@@ -3636,7 +3636,7 @@ the denominator was added to count known sides only, and the header said so. `sa
 still compares a first step with the empty owner's locate 0, so a first step counts as the
 same locate only for an order on locate 0, which ITCH gives only to messages that name no
 stock; its denominator is every head step, as the header says. `tool_version`
-stays 4. It went to 4 for D-8 and D-10 at `d2df155`; the committed codec-eval files are both
+stays 4. It went to 4 for D-8 and D-10 at `ba7ae04`; the committed codec-eval files are both
 version 3, no file of version 4 has been published, and the freeze rerun replaces both, so a
 version 4 file can only ever be written by code that has this fix. Its comment now lists RD-2.
 No results file was regenerated.
@@ -3695,19 +3695,19 @@ same reviewer also found that REVIEW's R-1 row said a nested
 block gets the same error as before in every case, which holds only for a well-formed nested
 block; the row now says so, as this file's R-1 paragraph already did.
 
-The closing check of this round. On the Mac, `scripts/check.sh` through `heavy.sh` at `898275c`
+The closing check of this round. On the Mac, `scripts/check.sh` through `heavy.sh` at `d45f4a4`
 ran the dev build and tests (682, the Linux-only test skipped), the oracle, the ASan and UBSan
 build and tests (682, the same skip), clang-tidy on all 122 files this host builds, the fuzz
 build, the 20-second runs of `fuzz_itch_frame`, `fuzz_itch_message` and `fuzz_itch_query`, the
 three targets that compile a changed oracle, the Python script tests (501, 4 skipped) and
 hygiene. Every step passed but clang-tidy, which found five things in RA-1's new test: three names
-of `frame.hpp` it took through another header, and two C arrays. `55cd337` fixes them; clang-tidy
+of `frame.hpp` it took through another header, and two C arrays. `abd1b52` fixes them; clang-tidy
 on that file then passed, and the frame tests passed again under ASan and UBSan. On the Linux
-host at `55cd337`, the last C++ commit, the dev build passed, clang-tidy passed on the signal
+host at `abd1b52`, the last C++ commit, the dev build passed, clang-tidy passed on the signal
 test (RA-3's narrowed suppression, which CI's Linux run once found wanting), the page-cache test
 and the frame test, and ctest passed 680 of 682 with the two real-day tests skipped for want of
 the day's file, in 1,350.6 s; its slowest entries were the query oracle's cut-and-flip test
-(445.8 s) and the exact-path test's capped part (432.4 s). A first gate at `898275c` was stopped
+(445.8 s) and the exact-path test's capped part (432.4 s). A first gate at `d45f4a4` was stopped
 near its end once clang-tidy had found the test to fix (`phase4-raw/fix-second-pass/`).
 
 ### The final review: Phase 2 items closed
@@ -3920,7 +3920,7 @@ prover faults then take one rule of each group out of `check_compare.py` itself:
 protocol, the tail's name, the recomputed repetitions, the second sibling, a write's device
 reads, the bytes resident before a clock that holds the whole open, tick-store's cold figure as
 its open plus its query, the slice's warm-up and the slice's export resident. `prove_checks.py
---only` with the nine, on the Mac at `85a4912`: 9 of 9 PROVEN, each through `py-scripts`. Three
+--only` with the nine, on the Mac at `db72391`: 9 of 9 PROVEN, each through `py-scripts`. Three
 older patches no longer apply at this commit (`container-block-crc-skipped`,
 `fuzz-container-block-reserved`, `fuzz-dictionary-repeated-entry`), as before this round. At the
 same commit on debian the comparison tests pass with `heavy.sh` on cpus 2, 6 and 7, and
@@ -3928,7 +3928,7 @@ same commit on debian the comparison tests pass with `heavy.sh` on cpus 2, 6 and
 `_VENDOR`, `_WORK` and `_TOOLS` point at the folders beside the exported tree; without them it
 skips all 12.
 
-**A protocol 2 slice, iteration-only, on debian at `85a4912`.** All four systems, every variant,
+**A protocol 2 slice, iteration-only, on debian at `db72391`.** All four systems, every variant,
 end to end, with no `TICK_STORE_MEASURE`, so the file is iteration-only and stays out of
 `results/`. Since `run_system.py` pins every system to cpu4 and cpu6, the whole `compare/run.py`
 ran under the host's measurement wrapper, which alone may hold cpu4: 84 minutes. `check_compare.py`
