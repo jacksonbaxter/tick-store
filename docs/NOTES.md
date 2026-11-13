@@ -3915,6 +3915,19 @@ it stays recorded only, and `Protocol2FullDay` passes a day file whose others' e
 100 pages resident. The cold worker's stand-in `tick_coldcache` now answers a warm with every page
 resident. The real-systems tests passed on the Mac after the change (12 tests).
 
+**The protocol 2 rules, proven.** Each `Protocol2` test injects its fault into a valid file. Nine
+prover faults then take one rule of each group out of `check_compare.py` itself: the unknown
+protocol, the tail's name, the recomputed repetitions, the second sibling, a write's device
+reads, the bytes resident before a clock that holds the whole open, tick-store's cold figure as
+its open plus its query, the slice's warm-up and the slice's export resident. `prove_checks.py
+--only` with the nine, on the Mac at `85a4912`: 9 of 9 PROVEN, each through `py-scripts`. Three
+older patches no longer apply at this commit (`container-block-crc-skipped`,
+`fuzz-container-block-reserved`, `fuzz-dictionary-repeated-entry`), as before this round. At the
+same commit on debian the comparison tests pass with `heavy.sh` on cpus 2, 6 and 7, and
+`test_real_systems.py` runs all 12 of its tests, none skipped, once `TICK_STORE_COMPARE_DATA`,
+`_VENDOR`, `_WORK` and `_TOOLS` point at the folders beside the exported tree; without them it
+skips all 12.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
