@@ -336,7 +336,13 @@ with the write refused unless `mincore` then reads every page resident. The reco
 write's `input_at_clock_start.made_ready`, and `scripts/check_compare.py` requires
 `input_resident_pages_at_start` to equal `input_pages` for every system on a protocol 2 slice.
 The files before protocol 2 stated that the export was warm before every write and never checked
-it (review F-10). On a day the export is taken as the cache holds it and only recorded.
+it (review F-10). On a day the export is taken as the cache holds it and only recorded. The
+reading just before the clock is held to the same rule in the worker: tick-store's source on any
+run, and every input on the slice, must be whole there, or the write stops before its clock
+rather than when the file is validated (review RF-11). On Linux a write's device reads come from
+the stat file of the block device under its input, so an input on a file system with no block
+device of its own, such as tmpfs, overlayfs or a btrfs subvolume, stops the write with an error
+naming it.
 
 **A write target is met against another system only if tick-store is no slower on both times.**
 `BENCHMARKS.md`'s targets are not reworded; the rule is how they are judged, by

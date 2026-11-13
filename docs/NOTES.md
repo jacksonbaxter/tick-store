@@ -4031,6 +4031,14 @@ the cold clock and no reported open, as Parquet: with 0 pages resident before th
 before the query, the proof kept 0. It now keeps the reading before the open only where the open
 is added to the figure, tick-store's, and the one before the query otherwise. On the committed
 files the two are the same, since Parquet's `open()` reads no store file.
+**RF-11, an input not whole stops the write in the worker.** Confirmed by tests on the worker's
+fakes: a slice write, or tick-store's write on a day, with 7 of its input's 10 pages resident
+just before the clock ran to the end, to be refused only by `check_compare.py` at publish, hours
+later on a day. `step_ingest` now stops there, before the clock, for tick-store on any run and
+every system on the slice; a day's export for the others is still only recorded (F-2). On Linux
+a device under the input with no `/sys/dev/block/<major>:<minor>/stat`, as on tmpfs or
+overlayfs, now stops the write with the path and the device named, not a bare
+`FileNotFoundError`.
 
 ## Process notes
 
