@@ -23,6 +23,7 @@
 #include "tick_store/codec/price_double.hpp"
 #include "tick_store/codec/run_length.hpp"
 #include "tick_store/codec/stream_vbyte.hpp"
+#include "tick_store/itch/frame.hpp"
 #include "tick_store/itch/message.hpp"
 #include "tick_store/store/container.hpp"
 #include "tick_store/store/itch_store.hpp"
@@ -30,6 +31,7 @@
 
 #include <gtest/gtest.h>
 
+#include <array>
 #include <bit>
 #include <cstddef>
 #include <cstdint>
@@ -224,7 +226,7 @@ TEST(FuzzOracles, TheFrameOracleRefusesAStopTheBytesDoNotJustify) {
         const Bytes& tail;
         std::string refusal;
     };
-    const Case cases[] = {
+    const auto cases = std::to_array<Case>({
         {"zero-length on 01 01", {zero_length, 0, 0, 257}, whole,
          "a zero-length stop and a zero prefix do not go together"},
         {"body, wrong expected", {truncated_body, 0, 5, 3}, short_body,
@@ -250,17 +252,19 @@ TEST(FuzzOracles, TheFrameOracleRefusesAStopTheBytesDoNotJustify) {
          "an end stop states bytes needed or bytes left"},
         {"fault with no bytes", {zero_length, 0, 0, 0}, none,
          "the cursor reported a fault with no bytes left"},
-    };
+    });
     for (const Case& c : cases) {
         SCOPED_TRACE(c.label);
         EXPECT_EQ(text(oracle::check_stop(c.stop, c.tail)), c.refusal);
     }
 
-    const std::pair<FrameStop, const Bytes&> right[] = {
-        {{zero_length, 0, 0, 1}, zero},          {{truncated_body, 0, 4, 3}, short_body},
-        {{truncated_body, 0, 4, 0}, two},        {{truncated_prefix, 0, 2, 1}, one},
+    const auto right = std::to_array<std::pair<FrameStop, const Bytes&>>({
+        {{zero_length, 0, 0, 1}, zero},
+        {{truncated_body, 0, 4, 3}, short_body},
+        {{truncated_body, 0, 4, 0}, two},
+        {{truncated_prefix, 0, 2, 1}, one},
         {{end, 0, 0, 0}, none},
-    };
+    });
     for (const auto& [stop, tail] : right) {
         EXPECT_EQ(text(oracle::check_stop(stop, tail)), "") << to_string(stop);
     }
