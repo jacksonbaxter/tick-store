@@ -28,8 +28,8 @@ import sys
 from pathlib import Path
 
 # The committed round-trip files' commit, whose assembler typed G-2's two exit codes. The raw
-# folders of those runs hold .exit files with the same codes (docs/NOTES.md, The generator's
-# findings), but the files do not carry them.
+# folders of those runs hold .exit files with the same codes (docs/NOTES.md, The final
+# review's generator findings), but the files do not carry them.
 UNRECORDED_COMMITS = ("1669ae0",)
 VERDICT_EXIT = {"pass": 0, "mismatch": 1}
 G2_CORRUPT = ("data_crc", "data_no_checksums", "footer_crc", "footer_no_checksums")

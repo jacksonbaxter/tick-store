@@ -4071,6 +4071,26 @@ whole stream ends cleanly, and only the shorter cursor stops at a truncated pref
 error cannot be pinned by a test, since no frame holds the empty payload that alone fails
 `itch::decode`.
 
+### The final review's generator findings
+
+The review's findings on the scripts that turn results files into the published tables and
+judge them (E-1, E-2, E-4, E-7 to E-9), the tail figure's name (F-4's generator half, RF-4), the
+write targets on both clocks (RF-3), a Linux tick-store-alone day (RV-1) and D-10's caveat. Raw
+logs are in `phase4-raw/fix-generator/`.
+
+**E-1, G-2's exit codes.** `store_results.py` typed `exit_code_corrupt` 1 and
+`exit_code_restored` 0. The runner of the committed runs did keep each run's exit status, as
+`<stem>.exit` beside its output: on both days the four corrupt runs exited 1 and the restored run,
+the ingest and the verify 0, so the published G-2 conditions are what the runs did, though the
+files do not show it. The Linux G-1 folder has no `.exit` files. The assembler now requires a
+`.exit` file for every run, `--g1-only` and the store from the other host included, records each
+as the run's `exit_code`, refuses a code the gate does not allow, and writes the two summaries
+from the runs. `scripts/check_roundtrip.py` refuses a round-trip file whose runs do not bear its
+summaries out, or whose verify codes contradict their verdicts (the tool exits 0 on a pass, 1 on a
+mismatch, 2 on a usage or I/O error); `render_results.py` runs it before it renders. The committed
+files, from `1669ae0`, carry no per-run code and pass by their commit until the freeze rerun
+writes new ones; the runner must then write a `.exit` file per run.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
