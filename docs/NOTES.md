@@ -3575,6 +3575,24 @@ smaller honest change in each case. R-7's guard, an `invalid_argument` error fro
 table is gone, would add a branch to every `append` for a call no caller makes; a moved-from
 object that may only be destroyed is the usual C++ contract, now written down.
 
+The closing gate. On the Mac, `scripts/check.sh` ran the dev build and tests, the oracle,
+ASan/UBSan, TSan, clang-tidy, the fuzz build and the short run of all thirteen targets,
+`check-results`, `render-check` and hygiene. Two of its runs found what the per-finding tests had
+not: the stub writer's test of an empty RawMessage (A-5, above) and three names in the A-6 signal
+test that clang-tidy's include check could not trace through macOS's private headers. After
+those, every step passed, the unit runs at 678 tests with the one Linux-only test skipped
+(`phase4-raw/fix-itch-bench/check2`, `check3`). On the Linux host the dev build and ctest at
+`c7b7143` failed only the R-3 partition check: before CMake 4, script mode sets no policies, and
+`if(IN_LIST)` is not an operator without CMP0057, so the check failed on its first `if` there
+while it passed on the Mac's CMake 4. With the policy floor set (`b167c01`), the gate passed: 676
+entries, the two real-day tests skipped for want of the day's file, no entry near 900 s. R-3's
+parts took 104.96 s (codecs), 121.56 s (store), 390.14 s (query), 428.30 s (the exact-path test),
+379.00 s (fuzz oracles), 211.85 s (the query oracle) and 0.28 s (the partition check), against
+1,613.25 s for the single entry at `22c4422`. The slowest entries of the run were the query
+oracle's cut-and-flip test uncapped, 480.67 s, `ItchQuery.SegmentsWithRawRowsTakeTheExactPath`,
+432.69 s, and its capped part, 428.30 s, three at a time on a host whose load average was about
+11 from other work (`phase4-raw/fix-itch-bench/debian-gate/b167c01`).
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
