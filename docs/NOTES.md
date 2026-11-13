@@ -3537,6 +3537,13 @@ the loops became `write_all`. The test lives in `durability_test.cpp`, beside `w
 `columns_test.cpp` names its fixtures as `test::`, which `recording_file_ops.hpp`'s namespace
 would shadow. `tick_export` calls `create` with the default, so nothing else changed.
 
+R-5. Fixed in the test seam, as the reviewer proposed, not in the stub store: making its own
+call injectable would add a parameter to a tool-only writer for a header of 64 bytes. The
+mutation was built as for A-1, the scratch object linked first so the linker keeps it; the test
+file and `RecordingFileOps` from before the fix were compiled from `HEAD` beside it. The new
+test checks the file's bytes, not only the sizes asked for, so a write that went to the wrong
+place fails even where the sizes are right.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
