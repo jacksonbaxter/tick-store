@@ -198,6 +198,11 @@ TEST_F(RoundTripCli, BadUsageExitsTwoAndPrintsUsage) {
         {"ingest-stub", source_text},
         {"ingest-stub", source_text, store_text, "more"},
         {"verify", source_text, store_text, "--no-checksums", "--no-checksums"},
+        // A flag given twice is refused, never "the last one wins".
+        {"ingest", source_text, store_text, "--durability", "page_cache", "--durability",
+         "device_flush"},
+        {"ingest", source_text, store_text, "--durability", "page_cache", "--segment-records",
+         "4", "--segment-records", "8"},
         {"layout"},
         {"layout", store_text, "--other"},
         {"verify", source_text},

@@ -512,7 +512,12 @@ int run_reference_eval_cli(std::span<const std::string_view> arguments,
     }
     std::string_view day;
     ReferenceEvalOptions options;
+    FlagsSeen seen;
     for (std::size_t i = 2; i + 1 < arguments.size(); i += 2) {
+        if (!seen.first(arguments[i])) {
+            output.err += kUsage;
+            return kExitUsageOrIo;
+        }
         if (arguments[i] == "--day") {
             day = arguments[i + 1];
         } else if (arguments[i] == "--segment-records") {

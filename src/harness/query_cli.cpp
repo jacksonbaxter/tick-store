@@ -502,8 +502,13 @@ int run_query_cli(std::span<const std::string_view> arguments, std::istream& in,
     std::optional<std::string_view> path;
     std::optional<std::int64_t> midnight;
     store::QueryPath query_path = store::QueryPath::indexed;
+    FlagsSeen seen;
     for (std::size_t i = 0; i < arguments.size(); ++i) {
         const std::string_view arg = arguments[i];
+        if (arg.starts_with("--") && !seen.first(arg)) {
+            output.err += kUsage;
+            return kExitUsageOrIo;
+        }
         if (arg == "--day" && i + 1 < arguments.size()) {
             midnight = midnight_ns_of(arguments[++i]);
             if (!midnight.has_value()) {

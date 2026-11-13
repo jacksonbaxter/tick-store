@@ -288,6 +288,10 @@ TEST_F(SliceCli, BadUsageAndFailedIoExitTwo) {
     EXPECT_EQ(run({source_path, out_path, "--from", "10:00:00", "--to", "09:00:00"}),
               kExitUsageOrIo);
     EXPECT_EQ(run({source_path, out_path, "--frobnicate", "1"}), kExitUsageOrIo);
+    // A flag given twice is refused, never "the last one wins".
+    EXPECT_EQ(run({source_path, out_path, "--from", "00:00:00", "--from", "00:00:01"}),
+              kExitUsageOrIo);
+    EXPECT_EQ(run({source_path, out_path, "--to", "09:00:00", "--to", "10:00:00"}), kExitUsageOrIo);
     EXPECT_TRUE(output.err.contains("usage: tick_slice"));
     EXPECT_EQ(run({absent, out_path}), kExitUsageOrIo);
     EXPECT_EQ(run({source_path, (dir / "no" / "dir").string()}), kExitUsageOrIo);

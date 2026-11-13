@@ -2435,8 +2435,12 @@ constexpr std::string_view kUsage =
     CliOptions options;
     options.source = args[0];
     options.output = args[1];
+    FlagsSeen seen;
     for (std::size_t i = 2; i < args.size(); ++i) {
         const std::string_view flag = args[i];
+        if (!seen.first(flag)) {
+            return std::nullopt;
+        }
         if (flag == "--prove-all-price4") {
             options.prove_all_price4 = true;
             continue;

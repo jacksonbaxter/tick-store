@@ -1120,6 +1120,21 @@ TEST(CodecEvalCli, FailsWithExitTwo) {
     EXPECT_EQ(run({source, out, "--day", "D", "--columns", ""}), kExitUsageOrIo);
     EXPECT_EQ(run({source, out, "--day", "D", "--columns", "add_ref,"}), kExitUsageOrIo);
     EXPECT_EQ(run({source, out, "--day", "D", "--columns", "no_such_column"}), kExitUsageOrIo);
+    // A flag given twice is refused, never "the last one wins".
+    EXPECT_EQ(run({source, out, "--day", "D", "--day", "E"}), kExitUsageOrIo);
+    EXPECT_EQ(run({source, out, "--day", "D", "--block-values", "2", "--block-values", "4"}),
+              kExitUsageOrIo);
+    EXPECT_EQ(run({source, out, "--day", "D", "--columns", "add_ref", "--columns", "timestamp"}),
+              kExitUsageOrIo);
+    {
+        // An absent source, so a regression costs a refused open, not the exhaustive proof;
+        // the message tells a usage refusal from that.
+        CliOutput refused;
+        const std::vector<std::string_view> twice{absent, out, "--day", "D", "--prove-all-price4",
+                                                  "--prove-all-price4"};
+        EXPECT_EQ(run_codec_eval_cli(twice, kProvenance, refused), kExitUsageOrIo);
+        EXPECT_TRUE(refused.err.contains("usage")) << refused.err;
+    }
     EXPECT_EQ(run({absent, out, "--day", "D"}), kExitUsageOrIo);
     EXPECT_EQ(run({source, no_dir, "--day", "D"}), kExitUsageOrIo);
     EXPECT_EQ(run({source, out, "--day", "D"}), kExitPass);

@@ -28,12 +28,14 @@
 //       Flips one bit of a file in place. Bit 0 is the least significant bit.
 //
 // Exit codes: 0 pass; 1 mismatch, including a store its parser refuses; 2 usage or I/O
-// error. JSON on stdout holds no paths.
+// error, a flag given twice included, here and in every tool. JSON on stdout holds no paths.
 
+#include <algorithm>
 #include <cstdio>
 #include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace tick_store::harness {
 
@@ -44,6 +46,23 @@ inline constexpr int kExitUsageOrIo = 2;
 struct CliOutput {
     std::string out;
     std::string err;
+};
+
+// The flags a command line has given so far, so that each tool takes a flag once: a repeat is
+// a usage error, never "the last one wins". Every tool's parser uses it.
+class FlagsSeen {
+public:
+    // False if `flag` was given before.
+    [[nodiscard]] bool first(std::string_view flag) {
+        if (std::ranges::find(seen_, flag) != seen_.end()) {
+            return false;
+        }
+        seen_.push_back(flag);
+        return true;
+    }
+
+private:
+    std::vector<std::string_view> seen_;
 };
 
 // `arguments` excludes the program name. Returns the exit code.

@@ -955,6 +955,10 @@ TEST(QueryCli, UsageAndStoresThatDoNotOpen) {
     EXPECT_EQ(run({"x.tsc", "y.tsc", "--day", "12302019"}), harness::kExitUsageOrIo);
     const std::string missing = (dir / "missing.tsc").string();
     EXPECT_EQ(run({missing, "--day", "12302019"}), harness::kExitMismatch);
+    // A flag given twice is refused, never "the last one wins".
+    EXPECT_EQ(run({missing, "--day", "12302019", "--day", "10302019"}), harness::kExitUsageOrIo);
+    EXPECT_EQ(run({missing, "--day", "12302019", "--path", "exact", "--path", "indexed"}),
+              harness::kExitUsageOrIo);
 }
 
 // A stream every write to which fails, as a closed pipe or a full disk would.

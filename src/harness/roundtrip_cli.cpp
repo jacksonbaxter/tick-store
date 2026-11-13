@@ -591,8 +591,9 @@ int run_roundtrip_cli(std::span<const std::string_view> arguments, CliOutput& ou
         std::optional<store::Durability> durability;
         std::optional<std::uint64_t> first_records;
         store::ItchStoreOptions options;
+        FlagsSeen seen;
         for (std::size_t i = 2; i < rest.size(); i += 2) {
-            if (i + 1 >= rest.size()) {
+            if (i + 1 >= rest.size() || !seen.first(rest[i])) {
                 return usage(output);
             }
             if (rest[i] == "--durability" && rest[i + 1] == "page_cache") {

@@ -208,6 +208,12 @@ TEST(ReferenceEval, TheCommandLineWritesJsonWithoutPathsAndRefusesBadUsage) {
         {source_path, output_path, "--day", "T", "--segment-records", "2", "--other", "1"},
         {source_path, output_path, "--day", "T", "--segment-records", "2",
          "--checkpoint-segment-records", "x"},
+        // A flag given twice is refused, never "the last one wins".
+        {source_path, output_path, "--day", "T", "--day", "U", "--segment-records", "2"},
+        {source_path, output_path, "--day", "T", "--segment-records", "2", "--segment-records",
+         "4"},
+        {source_path, output_path, "--day", "T", "--segment-records", "2",
+         "--checkpoint-segment-records", "2", "--checkpoint-segment-records", "2"},
         // A checkpoint size that is not a segment size would measure nothing.
         {source_path, output_path, "--day", "T", "--segment-records", "2",
          "--checkpoint-segment-records", "100"},

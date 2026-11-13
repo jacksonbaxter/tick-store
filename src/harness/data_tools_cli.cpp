@@ -62,7 +62,11 @@ struct SliceOptions {
     if (flags.size() % 2 != 0) {
         return false;
     }
+    FlagsSeen seen;
     for (std::size_t i = 0; i < flags.size(); i += 2) {
+        if (!seen.first(flags[i])) {
+            return false;
+        }
         if (flags[i] == "--from") {
             options.from = flags[i + 1];
         } else if (flags[i] == "--to") {
