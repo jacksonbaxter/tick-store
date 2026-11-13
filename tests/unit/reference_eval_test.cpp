@@ -1,6 +1,7 @@
 // tick_reference_eval's accounting on a stream small enough to count by hand: references,
 // imports and resolutions per segment size, and the state each encoding needs.
 
+#include "file_size_limit.hpp"
 #include "itch_store_fixture.hpp"
 #include "scratch_dir.hpp"
 #include "stub_fixture.hpp"
@@ -15,6 +16,7 @@
 
 #include <array>
 #include <cstddef>
+#include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <stdexcept>
@@ -126,6 +128,28 @@ TEST(ReferenceEval, RefusesASourceWhoseFramesStopBeforeItsEnd) {
             EXPECT_TRUE(result.error().contains("stop before its end")) << result.error();
         }
     }
+}
+
+// The JSON is smaller than the stream's buffer, so its one write comes at close. A failure
+// there has to reach the exit code, not be lost in a destructor.
+TEST(ReferenceEval, AFailedWriteOfTheResultsIsAnError) {
+    const tick_store::test::ScratchDir dir;
+    tick_store::test::write_file(dir / "source", stream());
+    const std::string source_path = (dir / "source").string();
+    const std::string output_path = (dir / "out.json").string();
+    const EvalProvenance provenance{.commit = "0123456789abcdef", .tree_dirty = false,
+                                    .compiler = "test", .build_type = "Debug", .sanitizers = ""};
+    const std::vector<std::string_view> arguments{source_path, output_path, "--day", "T",
+                                                  "--segment-records", "2"};
+    CliOutput output;
+    int code = kExitPass;
+    {
+        const tick_store::test::FileSizeLimit limit{16};
+        code = run_reference_eval_cli(arguments, provenance, output);
+    }
+    EXPECT_EQ(code, kExitUsageOrIo);
+    EXPECT_TRUE(output.err.contains("cannot write the output")) << output.err;
+    EXPECT_LE(std::filesystem::file_size(dir / "out.json"), 16U);
 }
 
 TEST(ReferenceEval, TheCommandLineWritesJsonWithoutPathsAndRefusesBadUsage) {

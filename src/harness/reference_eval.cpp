@@ -575,6 +575,8 @@ int run_reference_eval_cli(std::span<const std::string_view> arguments,
     json.end_object();
     std::ofstream out{std::filesystem::path{arguments[1]}, std::ios::binary};
     out << json.finish();
+    // Closed before the check: a JSON this small is written only when the buffer is flushed.
+    out.close();
     if (!out) {
         output.err += "cannot write the output\n";
         return kExitUsageOrIo;
