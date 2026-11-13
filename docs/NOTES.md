@@ -3510,6 +3510,17 @@ partition check asks gtest to list it and each part, so a part's negative patter
 it means to gtest, and a renamed test that leaves a part empty fails too. Each part's time on
 the Linux host is in the closing gate below.
 
+A-3. The rule is the reviewer's stricter one, 10 batches above a percentile, not 1: with one
+above it, p99.99 of the ITCH cases would be the 7th slowest of 59,806, one stray batch from
+moving. Counted in hundredths of a percent, n x (10,000 - p) >= 100,000, because in doubles
+10,000 batches put 9.99999999999943 above p99.9. The whole-column cases are left with min and max
+only, and their batch count beside them; giving them more repetitions would lengthen the
+latency run, which is the freeze's to decide. Checked without running a benchmark: the rule
+applied by hand to copies of the five committed `results/bench` files passes
+`check_results.py`, and `render_results.render` gives the same tables from the copies as from
+the committed files (`phase4-raw/fix-itch-bench/a3-render-diff.log`). `run_bench.py` copies
+the latency block whole, so the new field reaches the results file. No script changed.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
