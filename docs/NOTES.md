@@ -3596,6 +3596,20 @@ oracle's cut-and-flip test uncapped, 481.11 s, the exact-path test's capped part
 `ItchQuery.SegmentsWithRawRowsTakeTheExactPath` uncapped, 428.56 s, three at a time on a host
 whose load average was 9 to 12 from other work (`phase4-raw/fix-itch-bench/debian-gate/`).
 
+### The final review's second pass over the ITCH, bench and harness fixes
+
+Two more reviewers read the fixes: one the ITCH and bench round at `02d8dc6` (RA-1 to RA-6), the
+other the harness round and the query fuzz oracle at `1ae8242` (RD-1 to RD-6). Neither built or
+ran anything. The record is `docs/REVIEW.md`; raw logs are in `phase4-raw/fix-second-pass/`.
+
+RA-1. Confirmed by running the reviewer's mutation, not only reading it: with the stop checks A-1
+added deleted, all 669 unit tests passed. The fix is the reviewer's: the checks moved unchanged
+into `check_stop`, and the new test hands it eleven wrong stops and six right ones. Each wrong
+stop expects the exact refusal text, so the test names the check that refused it; with the A-1
+lines deleted again, the seven stops only those lines refuse came back accepted, and the four the
+older checks refuse were still refused. A unit run of the whole suite takes about five minutes on the
+Mac; the two runs above were made directly, and every later full run goes through `heavy.sh`.
+
 ### The final review: Phase 2 items closed
 
 The gate on the review found open items still under Phase 2 in docs/TASKS.md. Each below was
