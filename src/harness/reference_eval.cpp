@@ -494,7 +494,8 @@ std::expected<ReferenceEvalResult, std::string> evaluate_references(
     for (; frame.has_value(); frame = cursor.next()) {
         const auto message = itch::decode(frame->payload);
         if (!message.has_value()) {
-            return std::unexpected(to_string(message.error()));
+            return std::unexpected(
+                std::format("the source did not decode: {}", to_string(message.error())));
         }
         walker.record(*message);
     }
@@ -558,7 +559,8 @@ int run_reference_eval_cli(std::span<const std::string_view> arguments,
     }
     const auto result = evaluate_references(source->bytes(), options);
     if (!result.has_value()) {
-        output.err += std::format("the source did not decode: {}\n", result.error());
+        // Each error says what failed, so it goes out as it is (review RD-3).
+        output.err += std::format("{}\n", result.error());
         return kExitUsageOrIo;
     }
     JsonWriter json;

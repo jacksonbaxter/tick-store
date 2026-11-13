@@ -130,6 +130,26 @@ TEST(ReferenceEval, RefusesASourceWhoseFramesStopBeforeItsEnd) {
     }
 }
 
+// The command line passes the library's error on as it is, since each says what failed: a
+// source cut short is not one that did not decode (review RD-3).
+TEST(ReferenceEval, TheCommandLineSaysWhatFailed) {
+    const tick_store::test::ScratchDir dir;
+    Bytes cut = stream();
+    cut.insert(cut.end(), {std::byte{0x00}, std::byte{0x30}, std::byte{'S'}});
+    tick_store::test::write_file(dir / "source", cut);
+    const std::string source_path = (dir / "source").string();
+    const std::string output_path = (dir / "out.json").string();
+    const EvalProvenance provenance{.commit = "0123456789abcdef", .tree_dirty = false,
+                                    .compiler = "test", .build_type = "Debug", .sanitizers = ""};
+    const std::vector<std::string_view> arguments{source_path, output_path, "--day", "T",
+                                                  "--segment-records", "2"};
+    CliOutput output;
+    EXPECT_EQ(run_reference_eval_cli(arguments, provenance, output), kExitUsageOrIo);
+    EXPECT_TRUE(output.err.contains("the source's frames stop before its end")) << output.err;
+    EXPECT_FALSE(output.err.contains("did not decode")) << output.err;
+    EXPECT_FALSE(std::filesystem::exists(dir / "out.json"));
+}
+
 TEST(ReferenceEval, RefusesACheckpointSizeThatIsNotASegmentSize) {
     const Bytes source = stream();
     const auto result =
