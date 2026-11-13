@@ -51,7 +51,9 @@ namespace tick_store::harness {
 
 namespace {
 
-constexpr std::string_view kToolVersion = "3";
+// 4: creation heads count a U by its replaced order's side, and each verdict says whether it
+// leaves out the permutation (review D-8, D-10).
+constexpr std::string_view kToolVersion = "4";
 constexpr std::size_t kLocates = std::size_t{1} << 16U;
 // Bytes a reader needs per stream beyond its blocks: the value count, and for a
 // per-locate stream the locate it belongs to.
