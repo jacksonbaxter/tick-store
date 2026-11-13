@@ -3641,6 +3641,11 @@ version 3, no file of version 4 has been published, and the freeze rerun replace
 version 4 file can only ever be written by code that has this fix. Its comment now lists RD-2.
 No results file was regenerated.
 
+RD-1. The reviewer's fix: the window check lists the three kinds that read a window, so an
+unknown kind reaches the error that names the kinds. A request that also has a field of the
+wrong type is still told about the field first, which is true of it either way. No caller in
+`compare/` sends an unknown kind.
+
 ### The final review: Phase 2 items closed
 
 The gate on the review found open items still under Phase 2 in docs/TASKS.md. Each below was
