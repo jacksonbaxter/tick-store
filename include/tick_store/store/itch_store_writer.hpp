@@ -49,6 +49,8 @@ public:
 
     ItchStoreWriter(const ItchStoreWriter&) = delete;
     ItchStoreWriter& operator=(const ItchStoreWriter&) = delete;
+    // A moved-from writer may only be destroyed: its symbol table went with the move, so
+    // append() or finish() on it would read through a null pointer (review R-7).
     ItchStoreWriter(ItchStoreWriter&&) noexcept;
     ItchStoreWriter& operator=(ItchStoreWriter&&) = delete;
     ~ItchStoreWriter();
