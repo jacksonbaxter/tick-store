@@ -4167,6 +4167,24 @@ names another system's variant the file shows with a lower median on that query.
 day ArcticDB's `rows100k-cols127-per-security` is faster on all four met Q2 and Q3 parts, as the
 README's pitch already said; Q5 cold has no faster variant.
 
+### The second review of the comparison validator
+
+A second reviewer read the validator round at `9b3cf94` (RV-1 to RV-11; RV-1 is under "The final
+review's generator findings"), and the first review's F-9 and F-12 are taken in the same round.
+Raw logs are in `phase4-raw/fix-compare-rest/`. No results file was regenerated or edited.
+
+**RV-3, a fault that left most of its rule on.** Confirmed by applying it: `False and A or B or
+C` is `(False and A) or B or C`, so four of the five cases of the test were still refused with
+the rule's own message, and the missing list made the validator crash rather than pass it. The
+fault is now `if False:`, and all five cases pass the validator under it.
+
+**RV-4, a protocol 2 day of tick-store alone.** Confirmed by reading: the alone fixtures were
+protocol 1. A test now validates a protocol 2 alone day on each host, from a commit outside
+`PROTOCOL_1_COMMITS`; it passed at once, so no rule refuses one. The Linux fixture reads the
+second sibling for tick-store alone, as a real alone run does; with all four systems' readings
+there, as `protocol_2` writes them, a mutation that asks the second sibling of all four systems
+went unseen, which is why the fixture says so and the mutation is now a fault.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
