@@ -402,6 +402,47 @@ class RuntimeReading(unittest.TestCase):
             compare_run.questdb_runtime(systems({"a": 1}, {"a": 2}))
 
 
+class TailFigure(unittest.TestCase):
+    """The nearest-rank 99th percentile of fewer than 100 runs is the slowest run, and every
+    latency block says so, with its n and the rank used (review F-4)."""
+
+    def test_the_slowest_of_7_is_named_the_slowest(self):
+        from compare import run_system
+
+        block = run_system.latency([1e-3] * 6 + [1.0])
+        self.assertEqual((block["n"], block["tail_rank"], block["tail_is_slowest"]), (7, 7, True))
+        self.assertEqual(block["tail"], "slowest of 7")
+        self.assertEqual(block["tail_us"], block["max_us"])
+        self.assertEqual(block["p99_us"], block["tail_us"])
+
+    def test_the_slowest_of_30_is_named_the_slowest(self):
+        from compare import run_system
+
+        block = run_system.latency([i / 1000 for i in range(30)])
+        self.assertEqual((block["tail_rank"], block["tail"]), (30, "slowest of 30"))
+
+    def test_from_100_runs_the_tail_is_not_the_slowest(self):
+        from compare import run_system
+
+        block = run_system.latency([i / 1000 for i in range(200)])
+        self.assertEqual((block["tail_rank"], block["tail_is_slowest"]), (198, False))
+        self.assertEqual(block["tail"], "99th percentile, nearest rank: run 198 of 200")
+        self.assertAlmostEqual(block["tail_us"], 197_000.0)
+
+    def test_what_the_producer_writes_passes_the_validator(self):
+        from compare import run_system
+
+        for count in (2, 7, 30, 150):
+            block = run_system.latency([i / 1000 + 0.001 for i in range(count)])
+            self.assertEqual(check_compare.check_tail("x", block), [])
+
+    def test_the_method_and_the_rule_name_the_slowest_run(self):
+        self.assertIn("slowest of 30", compare_run.TAIL_STATEMENT)
+        self.assertIn("slowest of 7", compare_run.TAIL_STATEMENT)
+        self.assertIn("slowest", variant_rule.RULE)
+        self.assertEqual(variant_rule.FIELDS, ("median_us", "p99_us"))
+
+
 class Statements(unittest.TestCase):
     """Every sentence compare/run.py writes must be safe to publish."""
 

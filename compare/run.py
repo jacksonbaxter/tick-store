@@ -136,6 +136,15 @@ TICKSTORE_ONLY_MEMORY = (
     "footprint. Each worker's and tool's own peak is in its step.")
 # Results files that carry swap per phase. scripts/check_compare.py requires it from schema 2.
 SCHEMA = 2
+# The comparison protocol of the final review: a document without one is protocol 1, measured
+# before it. scripts/check_compare.py holds a protocol 2 document to every rule added with it.
+PROTOCOL = 2
+TAIL_STATEMENT = (
+    "Each latency block's tail figure, tail_us, is the 99th percentile by nearest rank, so it "
+    "is a value that really occurred, with n and the rank used beside it. Below 100 runs the "
+    "nearest rank is the last, so with 30 warm and 7 cold repetitions the tail figure is the "
+    "slowest of 30 and the slowest of 7, never a 1% tail, and each block says so in "
+    "tail_is_slowest and tail. p99_us holds the same figure under its old name.")
 MACOS_STATEMENT = ("Unpinned. No hardware counters. macOS has no thread pinning, and no "
                    "unprivileged hardware counters. Each system gets the same thread budget.")
 LINUX_STATEMENT = (f"Each system ran under taskset -c {LINUX_CORE}, and the run then widened its "
@@ -364,6 +373,7 @@ def build_document(host, args, layout, pin, commit, measure, parts, load_lines, 
     runs = [{"load_lines": lines} for lines in load_lines]
     header = {
         "schema": SCHEMA,
+        "protocol": PROTOCOL,
         "host": host,
         "measurement": "reported" if measure else "iteration-only",
         "statement": LINUX_STATEMENT if linux else MACOS_STATEMENT,
@@ -398,7 +408,7 @@ def build_document(host, args, layout, pin, commit, measure, parts, load_lines, 
     method = {"warm": WARM_METHOD, "cold": COLD_METHOD[host], "cold_includes": COLD_INCLUDES,
               "one_system_at_a_time": True, "tickstore_queries": TICKSTORE_QUERIES,
               "input_cache": "the export's column files are warm before every write",
-              "p99": "nearest rank, so a small n gives a value that really occurred",
+              "tail": TAIL_STATEMENT,
               "swap": swap.method_block()}
     queries = {"parameters": query_sets[0], "truth": truths[0],
                "truth_method": "numpy over the exported columns, sharing no code with any system"}

@@ -545,8 +545,9 @@ on debian, and about 20 with three writes per class, against a guide of about 10
 
 So a full-day run takes, for every system alike, **its headline variant and every other variant
 of that system that won a query on the Linux slice at the same commit**: among that system's
-variants, both the lowest median and the lowest p99 of one query, warm or cold, the test the
-"Lowest" column and QL-4 use. `compare/variant_rule.py` applies it to the slice file named by
+variants, both the lowest median and the lowest tail figure of one query, warm or cold, the test
+the "Lowest" column and QL-4 use. At the slice's 30 warm and 7 cold repetitions the tail figure
+is the slowest run, the slowest of 30 or of 7: see "What the numbers are". `compare/variant_rule.py` applies it to the slice file named by
 `--variant-source`, which must be this host's slice results at this commit; the file records the
 rule, the slice file and each system's winners, and `scripts/check_compare.py` applies the rule
 again to that slice file and refuses a file whose variants differ. On the slice at `25a462b` the
@@ -655,7 +656,14 @@ Its numbers rank nothing: RESULTS.md marks its queries "not ranked: alone".
 
 The full-day file is the one the targets are judged on. Slice numbers prove that the harness
 works; they are not claims about a full day, and no target changes because of them. Every latency
-carries its median, nearest-rank p99 and mean. The slice is five minutes long, so Q2 and Q3 are
+carries its median, its tail figure and its mean. The tail figure, `tail_us`, is the 99th
+percentile by nearest rank, so it is a value that really occurred, and below 100 runs that rank is
+the last: with 30 warm and 7 cold repetitions it is the slowest of 30 and the slowest of 7, never
+a 1% tail. Each block records its `n`, the rank used (`tail_rank`), whether the figure is the
+slowest run (`tail_is_slowest`) and what it is (`tail`, such as "slowest of 7"). `p99_us` holds the
+same figure under its old name, which the files measured before the final review's protocol use;
+those files carry no `protocol` in their header and count as protocol 1, and every file since says
+`"protocol": 2`. The slice is five minutes long, so Q2 and Q3 are
 clipped from an hour to `[09:30:00, 09:34:30)`, and Q5 scans 6,125,294 rows and not a day's
 268,744,780. Every results file says which it is, and `scripts/render_results.py` never puts a
 full-day number and a slice number in one table. What the runs found is in "Comparison harness",

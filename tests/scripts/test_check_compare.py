@@ -878,7 +878,7 @@ def full_day_document():
                 full_day_warm(entry)
     source = valid_document("Linux")
     document["variant_selection"] = {
-        "rule": variant_rule.RULE, "source": f"Linux-{SLICE}-{COMMIT[:12]}.json",
+        "rule": variant_rule.RULE_PROTOCOL_1, "source": f"Linux-{SLICE}-{COMMIT[:12]}.json",
         "source_commit": COMMIT, "systems": variant_rule.select(source)}
     return document, source
 
@@ -1253,6 +1253,131 @@ class VariantRule(unittest.TestCase):
         # Every variant ties on the other nine measures, so each of them wins those.
         self.assertEqual(sorted(chosen["selected"]), ["b", "c", "h"])
         self.assertEqual(chosen["won"]["b"][0], "Q1 warm")
+
+
+# Protocol 2: the documents written since the final review's comparison protocol. The committed
+# files carry no protocol and count as 1, held to the rules they were measured by; everything
+# below applies to protocol 2 alone.
+
+SLOWEST = "slowest of {}"
+
+
+def nearest_rank(count):
+    return max(1, -(-99 * count // 100))
+
+
+def latency_block(seconds):
+    """A latency block as compare/run_system.py writes it, worked out here independently."""
+    ordered = sorted(seconds)
+    count = len(ordered)
+    rank = nearest_rank(count)
+    middle = count // 2
+    median = ordered[middle] if count % 2 else (ordered[middle - 1] + ordered[middle]) / 2
+    tail = ordered[rank - 1] * 1e6
+    return {"n": count, "median_us": median * 1e6, "p99_us": tail, "tail_us": tail,
+            "tail_rank": rank, "tail_is_slowest": rank == count,
+            "tail": (SLOWEST.format(count) if rank == count
+                     else f"99th percentile, nearest rank: run {rank} of {count}"),
+            "mean_us": sum(ordered) / count * 1e6, "min_us": ordered[0] * 1e6,
+            "max_us": ordered[-1] * 1e6}
+
+
+WARM_SECONDS = [10e-6, 9e-6, 12e-6]
+COLD_SECONDS = [90e-6, 110e-6]
+ENGINE_WARM_SECONDS = [9e-6, 8e-6, 11e-6]
+ENGINE_COLD_SECONDS = [80e-6, 100e-6]
+
+
+def protocol_2(document):
+    """The same document as protocol 2 writes it: every new field present and true."""
+    document["header"]["protocol"] = 2
+    if "variant_selection" in document and \
+            document["variant_selection"].get("rule") == variant_rule.RULE_PROTOCOL_1:
+        document["variant_selection"]["rule"] = variant_rule.RULE
+    for name, system in document["systems"].items():
+        for variant in system["variants"].values():
+            for entry in variant["queries"].values():
+                warm_extra = {key: value for key, value in entry["warm"].items()
+                              if key in ("proof", "swap_timed")}
+                cold_extra = {key: value for key, value in entry["cold"].items()
+                              if key in ("proofs", "swap_timed", "run_again_refilled_pages")}
+                entry["warm"] = {**latency_block(WARM_SECONDS), **warm_extra}
+                entry["cold"] = {**latency_block(COLD_SECONDS), **cold_extra}
+                if name == "tickstore":
+                    entry["warm"]["engine"] = latency_block(ENGINE_WARM_SECONDS)
+                    entry["cold"]["engine"] = latency_block(ENGINE_COLD_SECONDS)
+            variant["python_floor"] = {**latency_block([1e-6, 2e-6, 3e-6]), "what": "floor"}
+    return document
+
+
+class Protocol2(Harness):
+    def assert_fault_2(self, mutate, expected, host="macOS"):
+        document = protocol_2(copy.deepcopy(valid_document(host)))
+        mutate(document)
+        result = self.run_on(document, host)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn(expected, result.stderr)
+
+    def test_the_valid_protocol_2_files_pass(self):
+        for host in ("macOS", "Linux"):
+            result = self.run_on(protocol_2(valid_document(host)), host)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_an_unknown_protocol(self):
+        def fault(document):
+            document["header"]["protocol"] = 3
+        self.assert_fault_2(fault, "header.protocol: 3")
+
+    # F-4: the tail figure is named for what it is.
+
+    def test_the_slowest_of_n_not_called_the_slowest(self):
+        def fault(document):
+            q1_of(document)["cold"]["tail_is_slowest"] = False
+        self.assert_fault_2(fault, "Q1.cold: tail_is_slowest is False, and rank 2 of 2 is the "
+                                   "slowest run")
+
+    def test_the_slowest_of_n_called_a_99th_percentile(self):
+        def fault(document):
+            q1_of(document)["warm"]["tail"] = "99th percentile"
+        self.assert_fault_2(fault, "Q1.warm: the tail figure is called '99th percentile', "
+                                   "not 'slowest of 3'")
+
+    def test_a_tail_figure_with_no_rank(self):
+        def fault(document):
+            del q1_of(document, "tickstore")["warm"]["engine"]["tail_rank"]
+        self.assert_fault_2(fault, "Q1.warm.engine: the tail figure's rank is None")
+
+    def test_a_tail_figure_that_is_not_the_one_p99_holds(self):
+        def fault(document):
+            q1_of(document)["warm"]["tail_us"] = 11.0
+        self.assert_fault_2(fault, "Q1.warm: tail_us 11.0 is not the figure p99_us holds")
+
+    def test_a_floor_with_no_tail_figure(self):
+        def fault(document):
+            del document["systems"]["arcticdb"]["variants"]["v"]["python_floor"]["tail"]
+        self.assert_fault_2(fault, "arcticdb.v.python_floor: the tail figure is called None")
+
+    def test_protocol_1_files_keep_the_rules_they_were_measured_by(self):
+        result = self.run_on(valid_document("Linux"), "Linux")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+
+class Protocol2FullDay(Harness):
+    run_full = FullDay.run_full
+
+    def test_the_valid_protocol_2_full_day_passes(self):
+        document, source = full_day_document()
+        result = self.run_full(protocol_2(document), protocol_2(source))
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_the_rule_as_protocol_1_stated_it(self):
+        document, source = full_day_document()
+        protocol_2(document)
+        document["variant_selection"]["rule"] = variant_rule.RULE_PROTOCOL_1
+        result = self.run_full(document, protocol_2(source))
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("variant_selection: the rule is not compare/variant_rule.py's",
+                      result.stderr)
 
 
 if __name__ == "__main__":

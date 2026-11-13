@@ -32,6 +32,12 @@ the headline first; warm is the slice's residency proof, since the per-process p
 macOS only, so that a Linux subset can never stand in for the four-system day, and a four-system
 file can never carry its name, nor the reverse.
 
+Every file states the comparison protocol it was measured under. The committed files measured
+before the final review's protocol state none and count as protocol 1, held to the rules above.
+A protocol 2 file is held to more: each latency block names its tail figure for what it is, the
+nearest-rank 99th percentile with n and the rank used, which below 100 runs is the slowest run
+and must say so.
+
 Standard library only. tests/scripts/test_check_compare.py shows each rule failing on an
 injected fault.
 """
@@ -97,6 +103,10 @@ SWAP_SCHEMA = 2
 CLASS_PHASES = ("write", "read_back")
 QUERY_PHASES = ("warm_queries", "cold_queries")
 SWAP_FIELDS = ("pages_in", "pages_out")
+# A file with no protocol was measured before the final review's comparison protocol.
+PROTOCOL_1 = 1
+PROTOCOL_2 = 2
+PROTOCOLS = (PROTOCOL_1, PROTOCOL_2)
 
 
 def check_settings(where, settings, name, durability):
@@ -408,6 +418,50 @@ def check_engine_time(where, query):
     return problems
 
 
+def nearest_rank(count):
+    """The nearest rank of the 99th percentile among `count` runs, from 1."""
+    return max(1, -(-99 * count // 100))
+
+
+def check_tail(where, block):
+    """Protocol 2: the tail figure, with n and its rank, called the slowest run when it is."""
+    block = block if isinstance(block, dict) else {}
+    count = block.get("n")
+    if not is_count(count) or count == 0:
+        return [f"{where}: no n for the tail figure"]
+    rank = nearest_rank(count)
+    slowest = rank == count
+    problems = []
+    if block.get("tail_rank") != rank:
+        problems.append(f"{where}: the tail figure's rank is {block.get('tail_rank')!r}, and the "
+                        f"nearest rank of the 99th percentile of {count} runs is {rank}")
+    if block.get("tail_is_slowest") is not slowest:
+        problems.append(f"{where}: tail_is_slowest is {block.get('tail_is_slowest')!r}, and rank "
+                        f"{rank} of {count} is {'' if slowest else 'not '}the slowest run")
+    wanted = (f"slowest of {count}" if slowest
+              else f"99th percentile, nearest rank: run {rank} of {count}")
+    if block.get("tail") != wanted:
+        problems.append(f"{where}: the tail figure is called {block.get('tail')!r}, not "
+                        f"{wanted!r}")
+    tail = block.get("tail_us")
+    if not check_results.is_number(tail) or tail != block.get("p99_us"):
+        problems.append(f"{where}: tail_us {tail!r} is not the figure p99_us holds")
+    elif slowest and tail != block.get("max_us"):
+        problems.append(f"{where}: the slowest of {count} is not the largest run")
+    return problems
+
+
+def check_tails(where, query):
+    """Protocol 2: every latency block of a query, its engine's included."""
+    problems = []
+    for kind in ("warm", "cold"):
+        block = query.get(kind) or {}
+        problems += check_tail(f"{where}.{kind}", block)
+        if "engine" in block:
+            problems += check_tail(f"{where}.{kind}.engine", block["engine"])
+    return problems
+
+
 def check_latency(where, query):
     """The median and p99 RESULTS.md prints, each a number, the p99 no lower than the median."""
     problems = []
@@ -421,7 +475,7 @@ def check_latency(where, query):
     return problems
 
 
-def check_queries(where, queries, truth, system_name=None, full_day=False):
+def check_queries(where, queries, truth, system_name=None, full_day=False, protocol=PROTOCOL_1):
     problems = []
     for name in QUERY_NAMES:
         query = (queries or {}).get(name)
@@ -434,6 +488,8 @@ def check_queries(where, queries, truth, system_name=None, full_day=False):
         problems += check_warm(here, query.get("warm"), full_day)
         problems += check_cold(here, query.get("cold"))
         problems += check_latency(here, query)
+        if protocol >= PROTOCOL_2:
+            problems += check_tails(here, query)
         if not query.get("scan"):
             problems.append(f"{here}: no rows or bytes decoded, or a statement of why not")
         if system_name == "tickstore":
@@ -443,6 +499,7 @@ def check_queries(where, queries, truth, system_name=None, full_day=False):
 
 def check_system(name, system, document, pin):
     host = document["header"].get("host")
+    protocol = protocol_of(document)
     truth = (document.get("queries") or {}).get("truth") or {}
     problems = []
     if not system.get("versions"):
@@ -481,7 +538,9 @@ def check_system(name, system, document, pin):
             problems += check_durability(here, entry.get("durability"), name, class_name, control,
                                          host)
         problems += check_queries(where, variant.get("queries"), truth, name,
-                                  bool(pin.get("full_day")) and not pin.get("alone"))
+                                  bool(pin.get("full_day")) and not pin.get("alone"), protocol)
+        if protocol >= PROTOCOL_2:
+            problems += check_tail(f"{where}.python_floor", variant.get("python_floor"))
     problems += check_swap(name, system)
     if pin.get("full_day") and host == "Linux":
         problems += check_peak_memory(name, system.get("peak_memory"))
@@ -579,6 +638,11 @@ def check_tickstore_only(document, path):
     return problems
 
 
+def protocol_of(document):
+    """The protocol a file states, or 1 for a file measured before there was one."""
+    return (document.get("header") or {}).get("protocol", PROTOCOL_1)
+
+
 def check_variant_selection(document, path):
     """The variants each system ran are what the rule gives from the slice file named, which
     must sit beside this one: same host, same commit."""
@@ -586,7 +650,9 @@ def check_variant_selection(document, path):
     if not isinstance(selection, dict):
         return ["variant_selection: a full-day file must state how its variants were chosen"]
     problems = []
-    if selection.get("rule") != variant_rule.RULE:
+    rule = variant_rule.RULE if protocol_of(document) >= PROTOCOL_2 else \
+        variant_rule.RULE_PROTOCOL_1
+    if selection.get("rule") != rule:
         problems.append("variant_selection: the rule is not compare/variant_rule.py's")
     header = document["header"]
     source = path.parent / str(selection.get("source"))
@@ -686,6 +752,9 @@ def check_document(document, top_keys, path, pins, capacity, real_path=None):
         problems.append("the file does not start with its header")
     problems += [f"header: missing field '{field}'" for field in HEADER_FIELDS
                  if field not in header]
+    if protocol_of(document) not in PROTOCOLS:
+        return [*problems, f"header.protocol: {protocol_of(document)!r}, and this validator "
+                           f"knows protocols {list(PROTOCOLS)}"]
     systems = document.get("systems") or {}
     alone = document.get("scope") == variant_rule.TICKSTORE_ONLY
     named_alone = f"-{TICKSTORE_ONLY_NAME}-" in path.name

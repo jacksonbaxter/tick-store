@@ -495,12 +495,32 @@ def swap_by_phase(variants):
                                        for variant in variants.values()))}
 
 
+def tail_rank(count):
+    """The nearest rank of the 99th percentile among `count` runs, from 1."""
+    return max(1, -(-99 * count // 100))
+
+
+def tail_label(count, rank):
+    """What the tail figure is. Below 100 runs the nearest rank is the last run."""
+    if rank == count:
+        return f"slowest of {count}"
+    return f"99th percentile, nearest rank: run {rank} of {count}"
+
+
 def latency(seconds):
-    """Nearest-rank p99, so that a small n gives a value that really occurred."""
+    """The median and the tail figure, `tail_us`: the 99th percentile by nearest rank, so that
+    it is a value that really occurred. Below 100 runs that rank is the last, so the tail figure
+    is the slowest run, and the block says so, with n and the rank used: at 30 warm and 7 cold
+    repetitions it is the slowest of 30 and the slowest of 7, never a 1% tail. `p99_us` holds
+    the same figure under its old name, which the committed files and the generator use."""
     ordered = sorted(seconds)
-    rank = max(0, -(-99 * len(ordered) // 100) - 1)
-    return {"n": len(ordered), "median_us": statistics.median(ordered) * 1e6,
-            "p99_us": ordered[rank] * 1e6, "mean_us": statistics.fmean(ordered) * 1e6,
+    count = len(ordered)
+    rank = tail_rank(count)
+    tail = ordered[rank - 1] * 1e6
+    return {"n": count, "median_us": statistics.median(ordered) * 1e6,
+            "tail_us": tail, "tail_rank": rank, "tail_is_slowest": rank == count,
+            "tail": tail_label(count, rank), "p99_us": tail,
+            "mean_us": statistics.fmean(ordered) * 1e6,
             "min_us": ordered[0] * 1e6, "max_us": ordered[-1] * 1e6}
 
 
