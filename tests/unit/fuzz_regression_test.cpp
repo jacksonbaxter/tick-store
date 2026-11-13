@@ -36,7 +36,6 @@
 #include <fstream>
 #include <ios>
 #include <iterator>
-#include <memory>
 #include <span>
 #include <string>
 #include <utility>
@@ -219,8 +218,7 @@ TEST(FuzzOracles, PassEveryCutAndFlipOfAColumnDirectory) {
 // byte in a heap block of its own, so ASan sees a read past it.
 TEST(FuzzOracles, TheColumnsFrameCheckRefusesAFrameTooShortToStateItsSize) {
     EXPECT_FALSE(store::oracle::frame_states_its_size(std::span<const std::byte>{}));
-    const auto one = std::make_unique<std::byte[]>(1);
-    EXPECT_FALSE(store::oracle::frame_states_its_size(std::span<const std::byte>{one.get(), 1}));
+    EXPECT_FALSE(store::oracle::frame_states_its_size(exact_copy(Bytes(1, std::byte{0}))));
     EXPECT_FALSE(store::oracle::frame_states_its_size(exact_copy(Bytes(2, std::byte{0}))));
     EXPECT_TRUE(store::oracle::frame_states_its_size(
         exact_copy(Bytes{std::byte{0}, std::byte{1}, std::byte{0x41}})));
@@ -496,7 +494,8 @@ TEST(FuzzOracles, PassEveryCutAndFlipOfAnIntegerColumn) {
             const Bytes cut = exact_copy(std::span{column}.first(length));
             EXPECT_EQ(text(codec::oracle::check_pfor_column(cut)), "") << "length " << length;
         }
-        for (std::size_t bit = 0; bit < column.size() * 8; bit += bit < 24 * 8 ? 7 : 257) {
+        constexpr std::size_t kFieldBits = std::size_t{24} * 8U;
+        for (std::size_t bit = 0; bit < column.size() * 8; bit += bit < kFieldBits ? 7 : 257) {
             Bytes flipped = exact_copy(column);
             flipped[bit / 8] ^= static_cast<std::byte>(1U << (bit % 8));
             EXPECT_EQ(text(codec::oracle::check_pfor_column(flipped)), "") << "bit " << bit;
