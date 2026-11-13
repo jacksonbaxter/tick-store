@@ -1,0 +1,12 @@
+diff --git a/compare/worker.py b/compare/worker.py
+--- a/compare/worker.py
++++ b/compare/worker.py
+@@ -298,7 +298,7 @@
+             "resident_bytes_before_open": before_open,
+             "resident_bytes_before_query": resident_bytes(before_query),
+             # The open starts the clock only where it is added to the figure (review RF-8).
+-            "resident_bytes_before_clock": (before_open if opened is not None
++            "resident_bytes_before_clock": (before_open if system.open_inside_cold_clock
+                                             else resident_bytes(before_query)),
+             "digest": digest, "engine_seconds": engine_seconds(result),
+             "swap_timed": phase.counts}

@@ -129,8 +129,9 @@ class ColdWorker(unittest.TestCase):
                 self.assertEqual(self.cold(query)["imported_inside_the_clock"], [])
 
     def test_a_cold_answer_records_the_store_resident_before_its_clock(self):
-        """Review F-1: Parquet's whole open is inside each call, so its clock starts with the
-        worker's open, and what was resident then is recorded."""
+        """Review F-1: Parquet's whole open is inside each call, and its clock starts with the
+        query, after the worker's open, which touches no store file: what was resident then is
+        recorded (review RF-8)."""
         self.cold(QUERIES[0])
         answer = json.loads((self.base / "answer.json").read_text(encoding="utf-8"))
         self.assertIs(answer["open_inside_clock"], True)
@@ -138,6 +139,39 @@ class ColdWorker(unittest.TestCase):
         self.assertEqual(answer["resident_bytes_before_open"], 0)
         self.assertEqual(answer["seconds"], answer["query_seconds"])
         self.assertIsNone(answer["open_seconds"])
+
+
+class ColdClockStart(unittest.TestCase):
+    """The resident bytes a cold proof keeps are read where the figure's clock starts: before
+    the open when the open is added to the figure, before the query when it is not (RF-8)."""
+
+    def answer(self, reported_open):
+        from compare import worker
+
+        pages = iter([3])  # Resident just before the query: the open read the store.
+        system = SimpleNamespace(name="parquet", open_inside_cold_clock=True,
+                                 read_paths=lambda: [],
+                                 reported_open_seconds=lambda: reported_open)
+        request = {"query": "q", "truth": {}, "store_before_open": {"resident_pages": 0,
+                                                                    "page_size": 4096}}
+        with (mock.patch.object(worker, "query_from_json", return_value="q"),
+              mock.patch.object(worker.coldcache, "residency",
+                                lambda layout, paths: {"resident_pages": next(pages),
+                                                       "page_size": 4096}),
+              mock.patch.object(worker, "timed_query", return_value=(0.01, None)),
+              mock.patch.object(worker, "digest_result", return_value={}),
+              mock.patch.object(worker, "require_truth")):
+            return worker.step_cold_query(system, request, None)
+
+    def test_an_open_outside_the_figure_is_read_before_the_query(self):
+        answer = self.answer(reported_open=None)
+        self.assertEqual(answer["resident_bytes_before_clock"], 3 * 4096)
+        self.assertEqual(answer["seconds"], answer["query_seconds"])
+
+    def test_an_open_added_to_the_figure_is_read_before_the_open(self):
+        answer = self.answer(reported_open=0.002)
+        self.assertEqual(answer["resident_bytes_before_clock"], 0)
+        self.assertEqual(answer["seconds"], 0.012)
 
 
 class FullDayWarm(unittest.TestCase):

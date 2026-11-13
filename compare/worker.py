@@ -283,7 +283,8 @@ def step_cold_query(system, request, layout):
     system opens its store outside the query call and reports how long that took (tick-store):
     a fresh process's open and the query. The store's resident bytes are read before the open
     (by main) and again just before the query, both outside every clock, and the one read where
-    the clock starts is the proof's."""
+    the clock starts is the proof's: before the open when the open is added to the figure, and
+    before the query otherwise, Parquet's open included, which its clock does not hold."""
     query = query_from_json(request["query"])
     before_query = coldcache.residency(layout, system.read_paths())
     with swap.Phase() as phase:
@@ -296,7 +297,8 @@ def step_cold_query(system, request, layout):
             "open_seconds": opened, "open_inside_clock": system.open_inside_cold_clock,
             "resident_bytes_before_open": before_open,
             "resident_bytes_before_query": resident_bytes(before_query),
-            "resident_bytes_before_clock": (before_open if system.open_inside_cold_clock
+            # The open starts the clock only where it is added to the figure (review RF-8).
+            "resident_bytes_before_clock": (before_open if opened is not None
                                             else resident_bytes(before_query)),
             "digest": digest, "engine_seconds": engine_seconds(result),
             "swap_timed": phase.counts}

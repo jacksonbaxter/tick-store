@@ -656,6 +656,12 @@ FAULTS = (
           "passes on the harness's own assumption", CHECK_FAILED,
           "FAIL: test_class_b_flags_the_engine_does_not_have_are_not_read_as_0 "
           "(__main__.ArcticDBSettings"),
+    # Review RF-8: a cold proof's residency is read where the figure's clock starts.
+    Fault("cold-clock-start-before-the-open", "py-compare", "a cold proof records the store "
+          "resident before the worker's open for a system whose clock starts at the query, so "
+          "pages its open made resident go unseen", CHECK_FAILED,
+          "FAIL: test_an_open_outside_the_figure_is_read_before_the_query "
+          "(__main__.ColdClockStart"),
     # Review F-8: the one-symbol store's rows are held to the rows read back.
     Fault("arcticdb-rows-against-themselves", "py-compare", "ArcticDB's one-symbol stored "
           "settings compare the description's row count with itself, a check that cannot "
