@@ -217,7 +217,8 @@ class Runner:
                 system.start_service()
                 settings = system.service_settings()
                 answer = self.worker(system, "ingest", columns=str(self.columns_dir),
-                                     flush_report=last)
+                                     flush_report=last,
+                                     service_processes=system.service_processes())
                 settle = system.settle() if last else {}
                 facts = system.service_facts() if last else {}
                 facts["requested"] = system.requested()

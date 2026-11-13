@@ -1294,6 +1294,13 @@ ENGINE_WARM_SECONDS = [9e-6, 8e-6, 11e-6]
 ENGINE_COLD_SECONDS = [50e-6, 65e-6]
 
 
+WRITE_COUNTER = {
+    "Linux": "block device stat, sectors read, machine-wide",
+    "macOS": ("bytes the device read for the processes that did the write: proc_pid_rusage's "
+              "ri_diskio_bytesread of the worker, of each server process, and of each child the "
+              "worker ran, read before it was reaped")}
+
+
 def second_sibling_block():
     return {"core": 6, "sibling": 7, "topology": "thread_siblings_list", "method": "jiffies",
             "cases": {"parquet": 0.4, "arcticdb": 0.2, "questdb": 1.5, "tickstore": 0.1}}
@@ -1341,7 +1348,7 @@ def protocol_2(document):
                     {"seconds": total, "engine_seconds": engine, "python_seconds": 0.1,
                      "engine_only_seconds": round(total - 0.1, 9), "input_pages": 100,
                      "input_resident_pages_at_start": 100, "device_bytes_read": 0,
-                     "device_counter": "block device stat, sectors read, machine-wide"}
+                     "device_counter": WRITE_COUNTER[document["header"]["host"]]}
                     for total, engine in zip(write["seconds"], (2.0, 1.9, 1.8), strict=True)]
                 write["engine_only_seconds_median"] = 1.9
                 write["times"] = {"seconds": "the whole write", "engine_only_seconds": "less "
@@ -1509,6 +1516,17 @@ class Protocol2(Harness):
             del b_of(document, "arcticdb")["write"]["by_repetition"][1]["device_bytes_read"]
         self.assert_fault_2(fault, "arcticdb.v.B.write: repetition 2 records no device bytes "
                                    "read while it ran")
+
+    def test_a_macos_write_counting_disk0s_reads_and_writes(self):
+        # Review RF-5: iostat's disk0 total holds the write's own output, so it is no count of
+        # the reads; macOS counts the reads of the processes that did the write.
+        def fault(document):
+            b_of(document, "questdb")["write"]["by_repetition"][0]["device_counter"] = (
+                "iostat's total for disk0, MiB read and written, machine-wide")
+        self.assert_fault_2(fault, "questdb.v.B.write: repetition 1 counts its device reads by "
+                                   "\"iostat's total for disk0, MiB read and written, "
+                                   "machine-wide\", and a macOS write counts the reads of the "
+                                   "processes that did it, by ri_diskio_bytesread")
 
     def test_a_write_not_saying_what_its_times_hold(self):
         def fault(document):

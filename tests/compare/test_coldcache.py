@@ -19,6 +19,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from compare import coldcache  # noqa: E402
 from compare.coldcache import ProofFailed, allocated_bytes, proof_of_cold, proof_of_warm  # noqa: E402
+from compare.layout import Layout  # noqa: E402
 
 PAGE = 4096
 EVICTED = {"pages": 10, "resident_pages": 0, "passes": 1, "method": "m"}
@@ -265,6 +266,115 @@ class ProcessReadsOnLinux(unittest.TestCase):
         child.wait()
         with self.assertRaisesRegex(ProofFailed, "no I/O account"):
             coldcache.ProcessReads({"server": child.pid})
+
+
+class CountedChild(unittest.TestCase):
+    """macOS adds no reaped child's device reads to its parent's, so a write's child is read
+    once it has exited and before it is reaped (review RF-5). Any host, with the count faked."""
+
+    def test_a_child_is_read_before_it_is_reaped_and_its_output_kept(self):
+        seen = []
+
+        def disk_bytes_read(pid):
+            os.kill(pid, 0)  # Raises once the child is reaped.
+            seen.append(pid)
+            return 777
+
+        before = coldcache._REAPED_CHILDREN["bytes_read"]
+        with (mock.patch.object(coldcache.platform, "system", return_value="Darwin"),
+              mock.patch.object(coldcache, "disk_bytes_read", disk_bytes_read)):
+            run = coldcache.run_counting_reads(
+                [sys.executable, "-I", "-c", "import sys; print('out'); "
+                 "print('err', file=sys.stderr); sys.exit(3)"], stdin=subprocess.DEVNULL)
+        self.assertEqual((run.returncode, run.stdout, run.stderr), (3, "out\n", "err\n"))
+        self.assertEqual(len(seen), 1)
+        self.assertEqual(coldcache._REAPED_CHILDREN["bytes_read"] - before, 777)
+
+    def test_linux_runs_the_child_as_before(self):
+        before = coldcache._REAPED_CHILDREN["bytes_read"]
+        with (mock.patch.object(coldcache.platform, "system", return_value="Linux"),
+              mock.patch.object(coldcache, "disk_bytes_read", side_effect=AssertionError)):
+            run = coldcache.run_counting_reads([sys.executable, "-I", "-c", "print('out')"])
+        self.assertEqual((run.returncode, run.stdout), (0, "out\n"))
+        self.assertEqual(coldcache._REAPED_CHILDREN["bytes_read"], before)
+
+    def test_the_processes_and_the_waited_children_add_up(self):
+        counts = {os.getpid(): 10, 42: 20}
+        with mock.patch.object(coldcache, "disk_bytes_read", lambda pid: counts[pid]):
+            reads = coldcache.ProcessDiskReads({"questdb": 42})
+            counts[os.getpid()] += 100
+            counts[42] += 200
+            coldcache._REAPED_CHILDREN["bytes_read"] += 300
+            found = reads.delta()
+        self.assertEqual(found["by_process"], {"worker": 100, "questdb": 200,
+                                               "waited children": 300})
+        self.assertEqual(found["bytes"], 600)
+        self.assertIn("ri_diskio_bytesread", found["counter"])
+
+
+TOOLS_BUILT = Layout.default().tool("tick_coldcache").exists()
+
+
+@unittest.skipUnless(platform.system() == "Darwin" and TOOLS_BUILT,
+                     "macOS's own count, evicting with tick_coldcache")
+class ProcessDiskReadsOnMacos(unittest.TestCase):
+    """A write's device reads on macOS, on real reads of a file taken out of the page cache."""
+
+    def evicted_file(self, directory):
+        path = Path(directory) / "data"
+        path.write_bytes(os.urandom(1 << 20))
+        coldcache.evict(Layout.default(), [path])
+        return path
+
+    def test_own_reads_count_and_cached_reads_do_not(self):
+        (REPO_ROOT / "build").mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "build") as directory:
+            path = self.evicted_file(directory)
+            reads = coldcache.ProcessDiskReads({})
+            path.read_bytes()
+            first = reads.delta()
+            reads = coldcache.ProcessDiskReads({})
+            path.read_bytes()
+            second = reads.delta()
+        self.assertGreaterEqual(first["by_process"]["worker"], 1 << 20)
+        self.assertEqual(second["bytes"], 0)
+
+    def test_a_named_process_and_a_counted_child_count_and_a_reaped_one_would_not(self):
+        (REPO_ROOT / "build").mkdir(exist_ok=True)
+        read = [sys.executable, "-I", "-c", "import sys; open(sys.argv[1], 'rb').read()"]
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "build") as directory:
+            path = self.evicted_file(directory)
+            child = subprocess.Popen([sys.executable, "-I", "-c",
+                                      "import sys; sys.stdin.readline(); "
+                                      f"open({str(path)!r}, 'rb').read(); print(flush=True); "
+                                      "sys.stdin.readline()"],
+                                     stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+            reads = coldcache.ProcessDiskReads({"server": child.pid})
+            child.stdin.write("\n")
+            child.stdin.flush()
+            child.stdout.readline()
+            named = reads.delta()
+            child.stdin.write("\n")
+            child.stdin.close()
+            child.wait()
+            child.stdout.close()
+            path = self.evicted_file(directory)
+            reads = coldcache.ProcessDiskReads({})
+            coldcache.run_counting_reads([*read, str(path)])
+            counted = reads.delta()
+            path = self.evicted_file(directory)
+            reads = coldcache.ProcessDiskReads({})
+            subprocess.run([*read, str(path)], check=True)
+            reaped = reads.delta()
+        self.assertGreaterEqual(named["by_process"]["server"], 1 << 20)
+        self.assertGreaterEqual(counted["by_process"]["waited children"], 1 << 20)
+        self.assertEqual(reaped["bytes"], 0)
+
+    def test_a_process_gone_is_refused(self):
+        child = subprocess.Popen([sys.executable, "-I", "-c", "pass"])
+        child.wait()
+        with self.assertRaisesRegex(ProofFailed, "no I/O account"):
+            coldcache.ProcessDiskReads({"server": child.pid})
 
 
 if __name__ == "__main__":

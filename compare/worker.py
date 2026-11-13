@@ -52,7 +52,7 @@ def step_ingest(system, request, layout):
     made_ready = system.ready_input(columns)
     table = None if request.get("full_day") else arrow_table(columns, system.context.day)
     at_start = coldcache.residency(layout, inputs)
-    device = coldcache.DeviceCounter(inputs[0])
+    device = coldcache.write_counter(inputs[0], request.get("service_processes", {}))
     if table is None:
         # A whole day streams: no day-sized table is ever built.
         timings = system.ingest_day(columns)
@@ -69,6 +69,8 @@ def step_ingest(system, request, layout):
                 "write's clock", "made_ready": made_ready}
     timings["device_read"] = {"bytes": moved["bytes"], "counter": moved["counter"],
                               "slack": moved.get("slack", 0)}
+    if "by_process" in moved:
+        timings["device_read"]["by_process"] = moved["by_process"]
     answer = {"timings": timings, "rows": rows}
     if request.get("flush_report"):
         # Read before anything else runs (review F-11): tick-store's settings_after_ingest runs

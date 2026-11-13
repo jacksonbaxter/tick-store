@@ -35,19 +35,20 @@ file can never carry its name, nor the reverse.
 Every file states the comparison protocol it was measured under. The committed files measured
 before the final review's protocol state none and count as protocol 1, held to the rules above;
 only a file of one of their commits may state none, and any file that states one must state
-exactly the integer 2. A protocol 2 file is held to more: each latency block names its tail figure for what it is, the
-nearest-rank 99th percentile with n and the rank used, which below 100 runs is the slowest run
-and must say so; and every latency block and every write keeps each repetition's seconds, from
-which its median, its tail figure and its write medians are recomputed here. On Linux the
-sibling of the second pinned CPU, cpu6, is measured and held to the first one's rule. Every
-write records its total and its engine-only seconds, says what each holds, and records how much
-of its input was resident when its clock started and the device bytes read while it ran;
-tick-store's source must have been wholly resident. Every cold proof records the store's bytes
-resident just before its clock started, which must be 0 where the clock holds the system's
-whole open (Parquet's, which opens the file inside every call, and tick-store's, whose cold
-figure adds the open its query tool reports, both parts kept); and each warm worker's open is
-timed once. Warm repetitions follow an untimed, answer-checked run of each query, on the slice
-as on a day. On the slice every system's write starts its clock with its input wholly resident.
+exactly the integer 2. A protocol 2 file is held to more: each latency block names its tail
+figure for what it is, the nearest-rank 99th percentile with n and the rank used, which below
+100 runs is the slowest run and must say so; and every latency block and every write keeps each
+repetition's seconds, from which its median, its tail figure and its write medians are
+recomputed here. On Linux the sibling of the second pinned CPU, cpu6, is measured and held to
+the first one's rule. Every write records its total and its engine-only seconds, says what each
+holds, and records how much of its input was resident when its clock started and the device
+bytes read while it ran, on macOS for the processes that did it; tick-store's source must have
+been wholly resident. Every cold proof records the store's bytes resident just before its clock
+started, which must be 0 where the clock holds the system's whole open (Parquet's, which opens
+the file inside every call, and tick-store's, whose cold figure adds the open its query tool
+reports, both parts kept); and each warm worker's open is timed once. Warm repetitions follow an
+untimed, answer-checked run of each query, on the slice as on a day. On the slice every system's
+write starts its clock with its input wholly resident.
 
 Standard library only. tests/scripts/test_check_compare.py shows each rule failing on an
 injected fault.
@@ -100,6 +101,9 @@ LINUX_CPUS = [4, 6]
 # each. Where it does, nothing of the store may be resident when the clock starts.
 OPEN_INSIDE_COLD_CLOCK = {"parquet": True, "arcticdb": False, "questdb": False,
                           "tickstore": True}
+# What a protocol 2 macOS write counts its device reads by: the reads of the processes that did
+# it, never iostat's disk0 total, which holds the write's own output too (review RF-5).
+MACOS_WRITE_COUNTER = "ri_diskio_bytesread"
 # The second pinned CPU's sibling, measured from protocol 2 and held to the first one's rule.
 SECOND_CPU = 6
 SECOND_SIBLING = "second_sibling_busy_percent"
@@ -242,7 +246,7 @@ def check_write(where, write, pin):
     return problems
 
 
-def check_write_record(where, write, name, full_day=False):
+def check_write_record(where, write, name, full_day=False, host=None):
     """Protocol 2: each write repetition's engine-only seconds, its input's residency when the
     clock started and the device's reads while it ran; what the two times hold; tick-store's
     source wholly resident, its precondition; and on the slice every system's export wholly
@@ -277,6 +281,10 @@ def check_write_record(where, write, name, full_day=False):
         if not is_count(item.get("device_bytes_read")) or not item.get("device_counter"):
             problems.append(f"{where}.write: repetition {number} records no device bytes read "
                             "while it ran")
+        elif host == "macOS" and MACOS_WRITE_COUNTER not in str(item["device_counter"]):
+            problems.append(f"{where}.write: repetition {number} counts its device reads by "
+                            f"{item['device_counter']!r}, and a macOS write counts the reads of "
+                            f"the processes that did it, by {MACOS_WRITE_COUNTER}")
     engine_only = [item.get("engine_only_seconds") for item in each if isinstance(item, dict)]
     if each and all(check_results.is_number(value) for value in engine_only):
         value = statistics.median(engine_only)
@@ -735,7 +743,7 @@ def check_system(name, system, document, pin):
             if protocol >= PROTOCOL_2:
                 problems += check_write_repetitions(here, entry.get("write"))
                 problems += check_write_record(here, entry.get("write"), name,
-                                              bool(pin.get("full_day")))
+                                              bool(pin.get("full_day")), host)
             if name == "tickstore":
                 problems += check_tickstore_read_back(here, entry.get("read_back"))
                 problems += check_tickstore_write(here, entry.get("write"))

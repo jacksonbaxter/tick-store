@@ -6,11 +6,13 @@ functions raise rather than return a number they cannot back, so an unproven res
 reaches the results file.
 """
 
+import ctypes
 import json
 import os
 import platform
 import resource
 import subprocess
+import threading
 import time
 from pathlib import Path
 
@@ -209,6 +211,101 @@ class DeviceCounter:
                 "counter": (f"iostat's total for {IOSTAT_DEVICE}, MiB read and written, machine-wide"
                             if self.macos else "block device stat, sectors read, machine-wide"),
                 "slack": IOSTAT_SLACK_BYTES if self.macos else 0}
+
+
+class _RusageInfoV2(ctypes.Structure):
+    """<sys/resource.h>'s struct rusage_info_v2, which proc_pid_rusage fills."""
+
+    _fields_ = [("ri_uuid", ctypes.c_uint8 * 16)] + [
+        (name, ctypes.c_uint64) for name in (
+            "ri_user_time", "ri_system_time", "ri_pkg_idle_wkups", "ri_interrupt_wkups",
+            "ri_pageins", "ri_wired_size", "ri_resident_size", "ri_phys_footprint",
+            "ri_proc_start_abstime", "ri_proc_exit_abstime", "ri_child_user_time",
+            "ri_child_system_time", "ri_child_pkg_idle_wkups", "ri_child_interrupt_wkups",
+            "ri_child_pageins", "ri_child_elapsed_abstime", "ri_diskio_bytesread",
+            "ri_diskio_byteswritten")]
+
+
+RUSAGE_INFO_V2 = 2
+_LIBPROC = []
+
+
+def disk_bytes_read(pid):
+    """macOS: the bytes the device has read for process `pid`, ri_diskio_bytesread from
+    proc_pid_rusage, page-ins of a mapping and read-ahead included; a resident page reads
+    nothing. Any process of this user, and one that has exited but is not reaped yet."""
+    if not _LIBPROC:
+        library = ctypes.CDLL("/usr/lib/libproc.dylib", use_errno=True)
+        library.proc_pid_rusage.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_void_p]
+        _LIBPROC.append(library)
+    info = _RusageInfoV2()
+    if _LIBPROC[0].proc_pid_rusage(int(pid), RUSAGE_INFO_V2, ctypes.byref(info)) != 0:
+        raise ProofFailed(f"no I/O account for {pid}: proc_pid_rusage failed, errno "
+                          f"{ctypes.get_errno()}")
+    return info.ri_diskio_bytesread
+
+
+# macOS adds no reaped child's device reads to its parent's, so run_counting_reads keeps the sum
+# for the children it ran, each read once the child exited and before it was reaped.
+_REAPED_CHILDREN = {"bytes_read": 0}
+
+
+def run_counting_reads(command, **options):
+    """subprocess.run(command, capture_output=True, text=True, check=False, **options). On
+    macOS the child's device reads are read once it has exited, before it is reaped, and added
+    to the sum ProcessDiskReads counts as `waited children`: Linux counts those in ru_inblock,
+    and macOS nowhere. Linux runs it as before."""
+    if platform.system() != "Darwin":
+        return subprocess.run(command, capture_output=True, text=True, check=False, **options)
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                               text=True, **options)
+    errors = []
+    drain = threading.Thread(target=lambda: errors.append(process.stderr.read()))
+    drain.start()
+    output = process.stdout.read()
+    drain.join()
+    os.waitid(os.P_PID, process.pid, os.WEXITED | os.WNOWAIT)
+    try:
+        _REAPED_CHILDREN["bytes_read"] += disk_bytes_read(process.pid)
+    finally:
+        process.wait()
+        process.stdout.close()
+        process.stderr.close()
+    return subprocess.CompletedProcess(command, process.returncode, output, errors[0])
+
+
+class ProcessDiskReads:
+    """macOS: bytes the device read since this was made for the processes that did a write:
+    this worker, each process named in `processes` ({role: pid}, a server), and each child the
+    worker ran through run_counting_reads (review RF-5). iostat's disk0 total, the cold proof's
+    counter, also counts the write's own output, so it is no count of reads."""
+
+    COUNTER = ("bytes the device read for the processes that did the write: proc_pid_rusage's "
+               "ri_diskio_bytesread of the worker, of each server process, and of each child "
+               "the worker ran, read before it was reaped")
+
+    def __init__(self, processes):
+        self.processes = {"worker": os.getpid(), **processes}
+        self.start = self._read()
+
+    def _read(self):
+        found = {role: disk_bytes_read(pid) for role, pid in self.processes.items()}
+        found["waited children"] = _REAPED_CHILDREN["bytes_read"]
+        return found
+
+    def delta(self):
+        now = self._read()
+        by_process = {role: now[role] - self.start[role] for role in now}
+        return {"bytes": sum(by_process.values()), "by_process": by_process,
+                "counter": self.COUNTER, "slack": 0}
+
+
+def write_counter(path, processes):
+    """The device reads over a write: on Linux the block device's sectors read under `path`,
+    machine-wide, as before; on macOS the reads of the processes that did it."""
+    if platform.system() == "Darwin":
+        return ProcessDiskReads(processes)
+    return DeviceCounter(path)
 
 
 def _process_read_bytes(pid):

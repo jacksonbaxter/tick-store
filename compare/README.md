@@ -314,8 +314,14 @@ Parquet's leaves out the class B flush. Each repetition also records `input_page
 `input_resident_pages_at_start`, read by `mincore` on a fresh mapping of the input (the export's
 column files, or tick-store's ITCH file) once it is made ready and just before the clock, and
 `device_bytes_read` over the write: on Linux the block device's sectors read, machine-wide; on
-macOS `iostat`'s `disk0` total, which counts the write's own output too, so it only bounds the
-reads from above. Each write's `times` says what its two times hold, as the table does.
+macOS the bytes the device read for the processes that did the write, each one's own count
+(`proc_pid_rusage`'s `ri_diskio_bytesread`): the worker, QuestDB's server, and tick-store's
+`tick_roundtrip`, read once it has exited and before it is reaped, since macOS adds no reaped
+child's reads to its parent's. `iostat`'s `disk0` total, which the cold proof uses, counts the
+write's own output too, so `scripts/check_compare.py` refuses it for a protocol 2 macOS write
+(review RF-5). A process's own executable and libraries count when they are not cached; in a run
+the flush probe has run the same tool first. Each write's `times` says what its two times hold,
+as the table does.
 
 On the slice every system's input is made wholly resident before its clock: tick-store's ITCH
 slice, and the export's column files for the other three, read through by `tick_coldcache warm`,

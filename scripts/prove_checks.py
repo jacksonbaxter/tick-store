@@ -587,6 +587,10 @@ FAULTS = (
     Fault("compare-write-device-reads-unchecked", "py-scripts", "check_compare.py stops "
           "requiring a write's device reads", CHECK_FAILED,
           "FAIL: test_a_write_with_no_device_reads (__main__.Protocol2"),
+    Fault("compare-macos-write-counter-unchecked", "py-scripts", "check_compare.py takes a "
+          "macOS write whose device reads are iostat's disk0 total, which holds the write's own "
+          "output, as its count of reads (review RF-5)", CHECK_FAILED,
+          "FAIL: test_a_macos_write_counting_disk0s_reads_and_writes (__main__.Protocol2"),
     Fault("compare-engine-only-not-its-own", "py-scripts", "check_compare.py stops tying a "
           "write repetition's engine-only seconds to its own total less its Python seconds, so "
           "any figure within the total passes (review RF-2)", CHECK_FAILED,

@@ -290,8 +290,8 @@ class TickStoreSystem(System):
         return command
 
     def _run_ingest(self, command):
-        run = subprocess.run(command, stdin=subprocess.DEVNULL, capture_output=True, text=True,
-                             check=False)
+        # On macOS the tool's device reads are read before it is reaped: see coldcache.
+        run = coldcache.run_counting_reads(command, stdin=subprocess.DEVNULL)
         if run.returncode != 0:
             raise ToolFailure(f"tick_roundtrip ingest exited {run.returncode}: "
                               f"{run.stderr.strip()[:300]}")

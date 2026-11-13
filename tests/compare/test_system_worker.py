@@ -636,9 +636,11 @@ class WriteRecord(unittest.TestCase):
             ready_input=lambda columns: order.append("ready") or {"warms": 1},
             ingest=ingest, ingest_day=ingest)
         columns = SimpleNamespace(directory=Path("export"), records=9)
+        # Linux's counter, the block device's: macOS has its own (review RF-5), below.
         with (mock.patch.object(worker, "ColumnSet", return_value=columns),
               mock.patch.object(worker, "arrow_table", return_value=SimpleNamespace(num_rows=9)),
               mock.patch.object(coldcache, "residency", residency),
+              mock.patch.object(coldcache.platform, "system", return_value="Linux"),
               mock.patch.object(coldcache, "DeviceCounter", Counter)):
             answer = worker.step_ingest(system, {"columns": "export", "full_day": full_day}, None)
         return answer["timings"], order
@@ -656,6 +658,44 @@ class WriteRecord(unittest.TestCase):
         _, order = self.run_step()
         self.assertEqual(order, ["ready", ("residency", ["export"]), ("counter", "export"),
                                  "ingest", "delta"])
+
+    def test_a_macos_write_counts_the_reads_of_the_processes_that_did_it(self):
+        # Review RF-5: iostat's disk0 total counts the write's own output too, so it is no count
+        # of reads. macOS gives each process's own: the worker's, a server's and a child's.
+        import os
+
+        from compare import coldcache, worker
+
+        counts = {os.getpid(): 1000, 42: 5000}
+
+        def disk_bytes_read(pid):
+            return counts[pid]
+
+        def ingest(*args):
+            counts[os.getpid()] += 4096
+            counts[42] += 8192
+            return {"seconds": 3.0, "engine_seconds": 2.0, "python_seconds": 0.5,
+                    "python_note": "n"}
+
+        system = SimpleNamespace(
+            name="fake", context=SimpleNamespace(day=DAY), settings_in_force=lambda: [],
+            settings_after_ingest=lambda: [], input_paths=lambda columns: [Path("export")],
+            ready_input=lambda columns: {}, ingest=ingest, ingest_day=ingest)
+        columns = SimpleNamespace(directory=Path("export"), records=9)
+        with (mock.patch.object(worker, "ColumnSet", return_value=columns),
+              mock.patch.object(worker, "arrow_table", return_value=SimpleNamespace(num_rows=9)),
+              mock.patch.object(coldcache, "residency",
+                                lambda layout, paths: {"pages": 1, "resident_pages": 1}),
+              mock.patch.object(coldcache.platform, "system", return_value="Darwin"),
+              mock.patch.object(coldcache, "disk_bytes_read", disk_bytes_read, create=True)):
+            answer = worker.step_ingest(system, {"columns": "export",
+                                                 "service_processes": {"questdb": 42}}, None)
+        read = answer["timings"]["device_read"]
+        self.assertIn("ri_diskio_bytesread", read["counter"])
+        self.assertEqual(read["bytes"], 12288)
+        self.assertEqual(read["by_process"],
+                         {"worker": 4096, "questdb": 8192, "waited children": 0})
+        self.assertEqual(read["slack"], 0)
 
     def test_the_write_block_keeps_them_for_each_repetition(self):
         from compare import run_system
@@ -718,6 +758,7 @@ class WriteRecord(unittest.TestCase):
               mock.patch.object(worker, "arrow_table", return_value=SimpleNamespace(num_rows=9)),
               mock.patch.object(coldcache, "residency",
                                 lambda layout, paths: {"pages": 1, "resident_pages": 1}),
+              mock.patch.object(coldcache.platform, "system", return_value="Linux"),
               mock.patch.object(coldcache, "DeviceCounter", Counter),
               mock.patch.object(coldcache, "dirty_by_file", dirty_by_file)):
             answer = worker.step_ingest(system, {"columns": "export", "flush_report": True},

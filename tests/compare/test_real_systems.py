@@ -146,12 +146,12 @@ class TickStoreReal(unittest.TestCase):
         LAYOUT.scratch.mkdir(parents=True, exist_ok=True)
         self.source = LAYOUT.data / "slices" / f"{SLICE_NAME}.itch"
 
-    def system(self, durability):
+    def system(self, durability, name=None):
         from compare.schema import TradingDay
         from compare.systems.base import RunContext
         from compare.systems.tickstore import TickStoreSystem
 
-        root = Path(self.scratch.name) / f"root-{durability}"
+        root = Path(self.scratch.name) / f"root-{name or durability}"
         root.mkdir()
         context = RunContext(LAYOUT, root, "v3-seg4Mi", durability, TradingDay(2019, 12, 30),
                              source=self.source)
@@ -233,6 +233,27 @@ class TickStoreReal(unittest.TestCase):
         self.assertGreater(opened, 0)
         self.assertTrue(system.open_inside_cold_clock)
         self.assertGreater(reported, 0)
+
+    @unittest.skipUnless(platform.system() == "Darwin", "macOS's own count of a write's reads")
+    def test_a_macos_write_reads_nothing_from_a_resident_source_and_reads_an_evicted_one(self):
+        # Review RF-5: the device bytes read for the processes that did the write, the worker
+        # and tick_roundtrip, through the harness's own write counter.
+        from compare import coldcache
+        from compare.durability import CLASS_A
+
+        # The tool's own pages count too when they are not cached, 1,310,720 bytes once it was
+        # evicted, so it runs once first, as a run's flush probe runs it before every write.
+        self.write(self.system(CLASS_A, "first"))
+        found = {}
+        for state in ("resident", "evicted"):
+            system = self.system(CLASS_A, f"{CLASS_A}-{state}")
+            (coldcache.warm if state == "resident" else coldcache.evict)(LAYOUT, [self.source])
+            reads = coldcache.write_counter(self.source, {})
+            self.write(system)
+            found[state] = reads.delta()
+        self.assertIn("ri_diskio_bytesread", found["resident"]["counter"])
+        self.assertEqual(found["resident"]["bytes"], 0, found["resident"])
+        self.assertGreater(found["evicted"]["by_process"]["waited children"], 0, found["evicted"])
 
     def test_a_store_of_another_segment_size_is_refused(self):
         from compare.durability import CLASS_A
