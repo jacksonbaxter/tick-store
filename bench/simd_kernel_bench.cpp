@@ -100,7 +100,7 @@ constexpr unsigned kWidest = 64;
 constexpr unsigned kNarrowWidest = 21;
 
 // One kernel on one set: what it runs, how many values a call yields, and whether its
-// output matches the scalar set's.
+// output matches its reference, which `reference` names.
 struct Case {
     std::string name;
     std::uint64_t seed = 0;
@@ -474,7 +474,8 @@ void throughput(benchmark::State& state, Session& session) {
         return;
     }
     if (!session.c->verify()) {
-        state.SkipWithError("a timed pass did not match the scalar set");
+        // The case's own reference, not the scalar set for every case (review RA-4).
+        state.SkipWithError(std::format("a timed pass did not match {}", session.c->reference));
         return;
     }
     const std::uint64_t items = kPassCalls * session.c->values_per_call;
@@ -499,7 +500,8 @@ void batch_latency(benchmark::State& state, Session& session) {
         benchmark::ClobberMemory();
     }
     if (!session.c->verify()) {
-        state.SkipWithError("a timed pass did not match the scalar set");
+        // The case's own reference, not the scalar set for every case (review RA-4).
+        state.SkipWithError(std::format("a timed pass did not match {}", session.c->reference));
     }
 }
 
@@ -705,7 +707,7 @@ int fail(std::string_view message) {
     return kExitFailed;
 }
 
-// B2 before anything is timed: one call, then the scalar set's answer.
+// B2 before anything is timed: one call, then the check against its reference.
 [[nodiscard]] std::expected<void, std::string> verify_before(Case& c) {
     c.run(1);
     if (!c.verify()) {
@@ -726,7 +728,7 @@ int run_by_hand(std::vector<Case>& cases) {
                 c.run(1);
             }
             if (!c.verify()) {
-                state.SkipWithError("a timed call did not match the scalar set");
+                state.SkipWithError(std::format("a timed call did not match {}", c.reference));
                 return;
             }
             state.SetItemsProcessed(static_cast<std::int64_t>(c.values_per_call) * state.iterations());
