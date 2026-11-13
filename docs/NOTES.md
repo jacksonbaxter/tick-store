@@ -4203,6 +4203,12 @@ child has started a second process in its session; the session gets SIGTERM, the
 command died of. `GuardedRun` shows `run_one` refusing a system whose command exited 0 after the
 guard fired, and writing no `.load` file, so a resumed run makes the part again.
 `test_stream_guard.py`, which needs the `.venv`, is now in `check.sh`'s `py-compare` step.
+On debian at `3007499` the Linux test failed on its first run, with an error and no verdict:
+the guard read MemAvailable under its floor at its first sample and stopped the session before
+the command had started its second process or written their ids (`test_guard-fail-before.log`).
+At `a965524` the test holds the guard's first reading, the host's own, until that process
+exists; it then passed three runs out of three through `heavy.sh` on cpus 2, 6 and 7, with
+the session empty afterwards. No guard code changed.
 
 **F-12, QuestDB's version.** Confirmed: the part's `versions` gave QuestDB's server as the
 literal 10.1.0. It is now the version in each running server's `SELECT build` ("Build
