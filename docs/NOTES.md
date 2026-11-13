@@ -4412,6 +4412,48 @@ stated:
 - the tail figure is the slowest run in both, named so only in protocol 2;
 - the two files come from different commits.
 
+### DS-4: a longer kernel case, one trial, and the rule for the freeze
+
+**The order of events.** The window was chosen first. Five complete Linux kernel runs had been
+refused for cpu5 over 5% busy in 4 to 13 of 314 cases of about 1.1 s ("DS-4: three more
+refusals"). At that length, 6 jiffies on the sibling put a case over the limit. The open TASKS
+item asked for a case long enough that a stray jiffy is not 1% of its window, with the rule
+unchanged. `28c8269` made each pass of `simd_kernel_bench` whole rounds of 8,192 calls lasting at
+least 150 ms. A case then lasts about 10 s, so the same burst is about 0.6% of it. That length
+came from the TASKS reasoning, not from any result: it was committed before any run with it.
+
+One trial then ran once at `4af007f` (`28c8269`, records, and a one-line clang-tidy fix that changes no timing). It
+was synced to `debian` and run exactly as a reported run would be: `--verify-all` first (576
+cases match their reference), then `scripts/run_bench.py` under the host's `measure.sh`, pinned
+to cpu4, `perf_event_paranoid` at 2. The fixer that started it was cut off before it wrote
+anything down. The trial finished by itself, and this section was written from its files
+afterwards, with its figures already seen. The trial is not reported, and nothing from it is in
+`results/`.
+
+**What it showed about the sibling.** None of the 314 cases had cpu5 over 5% busy. The largest
+share was 2.81% (`pfor_delta_fused/w=49/avx2`), then 2.80% and 2.77%. The median was 0.30%.
+`check_results.py` accepts the document (`ok`, exit 0, run on a copy under its own file name).
+So one run at this window passed the sibling rule, where five at the old length did not. One
+run is not a rate, and the rule makes no allowance for a burst.
+
+**How long it took.** 5,004 s from the run's start to its end, 83 minutes. The 314 cases took
+3,142 s inside `measure.sh`, 8 to 12 s each, 10.0 s on average. 1,695 s went on waiting for the
+host to be quiet, which `measure.sh` does before its start line until the load is under 1.5:
+797 s before the first case, after the build had pushed the load to 9.65, and 898 s before
+case 110. The other 167 s were about 0.5 s between cases. On the Mac, the same 314 cases use
+the same pass rule, so a kernel run should take about 314 times 10 s, some 52 minutes, plus
+any wait for a quiet host. That is an estimate from the case count, not a run.
+
+**The rule for the freeze.** At the freeze commit, up to three complete Linux kernel runs, each
+made as the trial was. The first whose every case passes the unchanged sibling rule is the
+reported file. Every attempt is listed here with its count of refused cases, the passing one
+included. Nothing is estimated, and no figure from a refused run is reported. If none of the
+three passes, DS-4 stays "not judged", and the write-up says so with the attempts. The Mac's
+kernel file is measured at the same window, `28c8269`'s pass rule, at the freeze commit.
+
+Raw files, the trial's status, document and every case's `.stat` and `.report`:
+`phase4-raw/fix-prover-ci/ds4-trial/`.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
