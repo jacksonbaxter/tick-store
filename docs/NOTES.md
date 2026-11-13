@@ -4047,6 +4047,13 @@ names both siblings the `/proc/stat` copy measures, and `TICKSTORE_ONLY_WARM`, t
 the macOS tick-store day, says each query first runs once untimed. `compare/README.md` says a
 write's device window is the whole ingest call, wider than its clock by QuestDB's `CREATE TABLE`
 and its applied-rows check, and that only the device counter is read before the flush report.
+**RF-9, tests and faults for the protocol 2 code.** Confirmed by reading: reverting
+`run_system.py`'s assembly of the warm-up seconds, tick-store's cold parts or the warm worker's
+open, or `run.py`'s second-sibling file, failed no unit test, and twelve protocol 2 rules had a
+test and no prover fault. `Assembly` now builds a part from fakes of the workers' answers and
+`SecondSibling` runs `run_one` twice with fake meters; a day test holds tick-store's source
+whole on a day. Each of the sixteen gaps has a fault in `scripts/prove_checks.py`, every one
+proven with `--only`.
 
 ## Process notes
 
