@@ -54,7 +54,7 @@ def fake_report(commit, dirty, case):
         "case": case,
         "build": {"compiler": "Clang 23.1.4", "compile_flags": "-O3 -DNDEBUG -std=c++23",
                   "build_type": "Release", "sanitizers": "none", "commit": commit,
-                  "tree_dirty": dirty,
+                  "tree_dirty": dirty, "commit_source": "git",
                   "isa": ("arm64 baseline, neon kernels" if HOST == "macOS"
                           else "x86-64 baseline, avx2 kernels")},
         "pinning": {"status": "not-supported" if HOST == "macOS" else "pinned",
@@ -340,6 +340,13 @@ class RunBenchTest(unittest.TestCase):
         self.assertEqual(len(document["header"]["load_lines"]), 4)
         self.assertEqual([row["case"] for row in document["results"]],
                          ["itch_decode", "itch_decode_encode"])
+
+    def test_the_header_says_how_the_builds_commit_was_established(self):
+        """The build's commit_source reaches the published file, not only its report (RA-5)."""
+        self.run_bench(self.make_binary(), self.make_wrapper())
+        document = json.loads(self.result_path().read_text(encoding="utf-8"))
+        self.assertEqual(document["header"]["commit"], self.commit)
+        self.assertEqual(document["header"]["commit_source"], "git")
 
     def test_the_hostname_never_reaches_the_results_file(self):
         self.run_bench(self.make_binary(), self.make_wrapper())

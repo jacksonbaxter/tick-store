@@ -463,6 +463,9 @@ def build_document(host, benchmark, slice_name, pin, commit, measure, runs, mete
         # Each row carries the kernel set it ran. A file of several sets lists them all.
         "isa": "; ".join(dict.fromkeys(run["report"]["build"]["isa"] for run in runs)),
         "commit": commit,
+        # How the build established its commit, git or an export's COMMIT file, since a tree
+        # not compared with git is not known to be clean (review RA-5).
+        "commit_source": build["commit_source"],
         "core": LINUX_CORE if linux else "not-available",
         "sibling": meter.statement() if linux else "not-available",
         "sibling_busy_percent": (meter.block({run["case"]: run["sibling_busy_percent"]
