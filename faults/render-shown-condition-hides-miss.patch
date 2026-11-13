@@ -1,8 +1,8 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
-index c62f36c..83104b8 100644
+index c62f36c..48f4f5e 100644
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -824,8 +824,7 @@ def judged_parts(row, root):
+@@ -824,10 +824,9 @@ def judged_parts(row, root):
          # A part is judged on its conditions that have a target, and a condition with none is
          # only shown, so it never hides a miss beside it (review E-7). A miss decides the part;
          # then a condition with a target and no figure leaves it not judged.
@@ -10,5 +10,8 @@ index c62f36c..83104b8 100644
 -                    if comparison_of(item, row) is not None]
 +        verdicts = [met for _, met in judged]
          unjudged = [met for met in verdicts if isinstance(met, Unjudged)]
-         if not verdicts:
+-        if not verdicts:
++        if not verdicts or None in verdicts:
              met = None
+         elif False in verdicts:
+             met = False
