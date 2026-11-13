@@ -3331,6 +3331,10 @@ bytes with SIGXFSZ ignored (`tests/unit/file_size_limit.hpp`), which fails the w
 on both hosts. Before: exit 0 and a 16-byte file. The fix is the `close()` before the check that
 the other tools already make.
 
+D-2. Both the CLI and `evaluate_references` now check that every checkpoint size is a segment
+size; the CLI's refusal is a usage error, exit 2, with a line in the usage text saying so. Before,
+`--segment-records 2 --checkpoint-segment-records 100` exited 0 and measured no checkpoint.
+
 Raw: `phase4-raw/fix-harness/`: each finding's failing and passing logs.
 
 ## Process notes
