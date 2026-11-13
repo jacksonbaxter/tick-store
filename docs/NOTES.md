@@ -3662,6 +3662,13 @@ the default, so its output is unchanged; no reference-eval results file is commi
 revert first written for the demonstration did not compile (`errors` unused under `-Werror`),
 and the unit binary from before ran instead and passed; the run that counts kept `errors` used.
 
+RD-5. The reviewer's demonstration needs a system file on the Linux host and shows only the
+exit code, which is 2 before and after. The test shows the order instead, on both hosts: a file
+`warm` must refuse because it cannot be opened, a mode-000 file of the test's own, comes second,
+and the first file, evicted beforehand, must still have no resident page afterwards. That is the
+same up-front measure that refuses D-1's file, whose refusal `PageCache.AFileThisUserNeitherOwnsNorCanWriteIsRefusedOnLinux`
+already shows. The extra measure is one fresh mapping and `mincore` per file, which touches no page.
+
 ### The final review: Phase 2 items closed
 
 The gate on the review found open items still under Phase 2 in docs/TASKS.md. Each below was
