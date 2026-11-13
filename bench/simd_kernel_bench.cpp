@@ -12,8 +12,9 @@
 // Two ways to run it:
 //
 //   run_bench.py drives one process per case, --case=NAME --report=PATH, through the
-//   measurement wrapper: ten repetitions of one pass each, a pass kPassCalls calls, then
-//   the same passes timed in batches for the latency histogram.
+//   measurement wrapper: ten repetitions of one pass each, a pass the whole number of
+//   rounds of kPassCalls calls that lasts at least kMinPassTime, then the same passes
+//   timed in batches for the latency histogram.
 //
 //   By hand, with no --case: every case of every width 0 to 64, under Google Benchmark's
 //   own iteration counts, for iteration only. --benchmark_filter picks cases.
@@ -85,8 +86,14 @@ namespace simd = tick_store::codec::simd;
 
 using Vector = std::array<std::uint64_t, codec::kVectorValues>;
 
-// Calls per timed pass: about 8.4 M values, some milliseconds at any rate here.
+// Calls per round: about 8.4 M values, 1 to 20 ms at any rate here.
 constexpr std::size_t kPassCalls = 8192;
+// The least a pass lasts, so a case lasts about 10 s. At one round a pass, a case lasted
+// about a second, and on Linux a burst of 6 jiffies or more on the pinned core's SMT sibling
+// put 4 to 13 cases of 314 over check_results.py's 5% limit (DS-4, docs/NOTES.md). A pass
+// is whole rounds, so a value is measured as before, and a case's calls are sized once,
+// from an untimed round, before its warm-up.
+constexpr std::chrono::milliseconds kMinPassTime{150};
 // Calls per latency batch: microseconds, far above either host's timer floor.
 constexpr std::size_t kBatchCalls = 16;
 constexpr int kRepetitions = 10;
@@ -441,13 +448,15 @@ struct Session {
     std::uint64_t gated_items = 0;
     std::uint64_t gated_ticks = 0;
     std::vector<std::uint64_t> warmup_pass_ticks;
+    // A whole number of rounds of kPassCalls, at least kMinPassTime long.
+    std::size_t calls_per_pass = kPassCalls;
 };
 
 void warm_up(Session& session) {
     const bool record = session.warmup_pass_ticks.empty();
     for (int pass = 0; pass < kWarmupPasses; ++pass) {
         const std::uint64_t start = bs::read_ticks();
-        session.c->run(kPassCalls);
+        session.c->run(session.calls_per_pass);
         const std::uint64_t stop = bs::read_ticks();
         if (record) {
             session.warmup_pass_ticks.push_back(stop - start);
@@ -465,7 +474,7 @@ void throughput(benchmark::State& state, Session& session) {
     const std::uint64_t start = bs::read_ticks();
     for (const auto iteration : state) {
         static_cast<void>(iteration);
-        session.c->run(kPassCalls);
+        session.c->run(session.calls_per_pass);
         benchmark::ClobberMemory();
     }
     const std::uint64_t stop = bs::read_ticks();
@@ -478,7 +487,7 @@ void throughput(benchmark::State& state, Session& session) {
         state.SkipWithError(std::format("a timed pass did not match {}", session.c->reference));
         return;
     }
-    const std::uint64_t items = kPassCalls * session.c->values_per_call;
+    const std::uint64_t items = session.calls_per_pass * session.c->values_per_call;
     session.gated_items += items * static_cast<std::uint64_t>(state.iterations());
     session.gated_ticks += stop - start;
     state.SetItemsProcessed(static_cast<std::int64_t>(items) * state.iterations());
@@ -491,7 +500,7 @@ void batch_latency(benchmark::State& state, Session& session) {
     poison(*session.c);
     for (const auto iteration : state) {
         static_cast<void>(iteration);
-        for (std::size_t done = 0; done < kPassCalls; done += kBatchCalls) {
+        for (std::size_t done = 0; done < session.calls_per_pass; done += kBatchCalls) {
             const std::uint64_t start = bs::read_ticks();
             session.c->run(kBatchCalls);
             const std::uint64_t stop = bs::read_ticks();
@@ -641,7 +650,7 @@ struct ReportInputs {
     json.begin_object();
     json.field("input_seed", c.seed);
     json.field("items_per_call", static_cast<std::uint64_t>(c.values_per_call));
-    json.field("calls_per_pass", static_cast<std::uint64_t>(kPassCalls));
+    json.field("calls_per_pass", static_cast<std::uint64_t>(in.session.calls_per_pass));
     json.field("against", std::format("{}, memcmp, before timing and after the timed passes",
                                       c.reference));
     json.field("matched", true);
@@ -707,6 +716,22 @@ int fail(std::string_view message) {
     return kExitFailed;
 }
 
+// Whole rounds of kPassCalls, enough for a pass to last kMinPassTime by one untimed round,
+// timed after another has warmed the caches and the clock.
+[[nodiscard]] std::size_t sized_pass(Case& c) {
+    c.run(kPassCalls);
+    const auto start = std::chrono::steady_clock::now();
+    c.run(kPassCalls);
+    const std::int64_t one = std::max<std::int64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() -
+                                                              start)
+            .count(),
+        1);
+    const std::int64_t least = std::chrono::nanoseconds{kMinPassTime}.count();
+    const std::int64_t rounds = (least + one - 1) / one;
+    return kPassCalls * static_cast<std::size_t>(std::max<std::int64_t>(rounds, 1));
+}
+
 // B2 before anything is timed: one call, then the check against its reference.
 [[nodiscard]] std::expected<void, std::string> verify_before(Case& c) {
     c.run(1);
@@ -762,7 +787,7 @@ int run_case(const Options& options, Case& c) {
         return fail(recorder.error());
     }
     Session session{.c = &c, .gate = &*gate, .recorder = &*recorder, .gated_items = 0,
-                    .gated_ticks = 0, .warmup_pass_ticks = {}};
+                    .gated_ticks = 0, .warmup_pass_ticks = {}, .calls_per_pass = sized_pass(c)};
     const auto configure = [](benchmark::Benchmark* benchmark) {
         benchmark->Iterations(1)->Repetitions(kRepetitions)->UseRealTime()->Unit(
             benchmark::kMillisecond);
