@@ -243,7 +243,7 @@ TEST(ContainerCommit, AFailureAtAnyStepIsFatalAndNeverRetried) {
         const ScratchDir dir;
         test::write_bytes(dir / "file.tsc", old);
         RecordingFileOps ops;
-        const int error_number = static_cast<int>(step.error.actual);
+        const int error_number = static_cast<int>(step.error.actual.value_or(0));
         // The last write carries the commit record, so failing it fails the commit.
         const int nth = std::string{step.call} == "write" ? 3 : 1;
         ops.fail_on(step.call, error_number, nth);

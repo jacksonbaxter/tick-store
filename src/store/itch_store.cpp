@@ -57,6 +57,14 @@ void put(std::vector<std::byte>& out, std::uint64_t value, std::size_t width) {
     return error;
 }
 
+// An error whose numbers are its cause's, the codec error set beside it.
+[[nodiscard]] ItchStoreError caused(ItchStoreErrorKind kind, std::string_view field_name) {
+    ItchStoreError error;
+    error.kind = kind;
+    error.field = field_name;
+    return error;
+}
+
 [[nodiscard]] std::string_view kind_name(ItchStoreErrorKind kind) noexcept {
     switch (kind) {
         case ItchStoreErrorKind::container:
@@ -194,10 +202,12 @@ std::string to_string(const ItchStoreError& error) {
     if (error.index != kNoIndex) {
         text += std::format(", value {}", error.index);
     }
-    if (error.offset != kNoIndex) {
+    // A container error's offset is its own, which its text gives.
+    if (error.offset != kNoIndex &&
+        !(error.container.has_value() && error.container->offset == error.offset)) {
         text += std::format(", file byte {}", error.offset);
     }
-    text += std::format(": expected {}, have {}", error.expected, error.actual);
+    text += expected_and_have(error.expected, error.actual);
     if (error.container.has_value()) {
         text += std::format(" ({})", to_string(*error.container));
     }
@@ -479,8 +489,7 @@ std::expected<std::vector<ColumnChunk>, ItchStoreError> encode_column(
                            static_cast<std::size_t>(std::min(per_piece, values.size() - first)));
         auto coded = code_values(info.codec, part, info.dict_modes);
         if (!coded.has_value()) {
-            ItchStoreError error =
-                fail(ItchStoreErrorKind::invalid_argument, "column encoder", kNoIndex, 0, 0);
+            ItchStoreError error = caused(ItchStoreErrorKind::invalid_argument, "column encoder");
             error.column = info.name;
             error.codec = coded.error();
             return std::unexpected(error);
@@ -522,8 +531,7 @@ std::expected<ChunkBytes, ItchStoreError> unwrap_column(Column column, codec::Co
     if (codec_id == CodecId::zstd) {
         auto unwrapped = codec::decode_zstd_payload(payload, max_inner_bytes(column, count));
         if (!unwrapped.has_value()) {
-            ItchStoreError error =
-                fail(ItchStoreErrorKind::codec, unwrapped.error().field, kNoIndex, 0, 0);
+            ItchStoreError error = caused(ItchStoreErrorKind::codec, unwrapped.error().field);
             error.column = info.name;
             error.codec = unwrapped.error();
             return std::unexpected(error);
@@ -574,7 +582,7 @@ std::expected<std::vector<std::uint64_t>, ItchStoreError> decode_column(
     }
     if (auto decoded = codec::decode_column(bytes, count, values, block_decoder(primary));
         !decoded.has_value()) {
-        ItchStoreError error = fail(ItchStoreErrorKind::codec, decoded.error().field, kNoIndex, 0, 0);
+        ItchStoreError error = caused(ItchStoreErrorKind::codec, decoded.error().field);
         error.column = info.name;
         error.codec = decoded.error();
         return std::unexpected(error);

@@ -233,7 +233,12 @@ ties them together, decodes the records in stored order, and gives them back in 
 for the oracle, so `tick_roundtrip verify` reads the store through the whole path.
 
 Errors name what refused and where: the segment, the block, the column, the file byte, the record
-and the value's index in its column, whichever apply, with the expected and actual values.
+and the value's index in its column, whichever apply, with the expected and actual values where
+the check compared values. A container's or a codec's refusal is given in its own words, in
+parentheses, with its own values and offset, and the store's error adds only the place. A flipped
+bit in a payload reads `container: block, segment 32, column timestamp, block 56537 (bad checksum:
+block at offset 878190723: expected 2290514605, have 1031937585)`: the stored CRC, then the one
+computed.
 
 ### Queries
 

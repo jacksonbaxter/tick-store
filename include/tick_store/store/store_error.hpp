@@ -3,6 +3,7 @@
 // The typed error of the store's file layer: what went wrong and where.
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -54,7 +55,9 @@ enum class StoreErrorKind : std::uint8_t {
 };
 
 // Offsets are from the start of the file, and `expected` and `actual` are the
-// values in conflict:
+// values in conflict, each set only where the check has that value; the text prints
+// what is set. not_found and invalid_argument describe a call, not a place in a file, so
+// their offset is 0 and the text leaves it out:
 //
 //   file_too_small         expected = header size, actual = file size
 //   bad_magic              expected, actual = the 8 magic bytes as a little-endian value
@@ -85,25 +88,32 @@ enum class StoreErrorKind : std::uint8_t {
 //   unknown_codec          offset = the field; actual = the codec id
 //   bad_field              offset = the field; expected = the value or bound it must
 //                          meet, actual = the value found. For a section name
-//                          character outside the alphabet, expected = 0; for a
+//                          character outside the alphabet, actual alone; for a
 //                          repeated name, expected and actual are the two entries'
 //                          indexes
-//   not_found              `field` is "block index" (expected = the block count,
-//                          actual = the index) or "section" (the name is not kept)
+//   not_found              `field` is "block index" or "section index" (expected = the
+//                          count, actual = the index) or "section" (the name is not
+//                          kept, and no value is set)
 //   invalid_argument       `field` is what the writer refused; expected, actual = the
-//                          limit and the value, where there is one
+//                          limit and the value, where there is one, and for a codec id
+//                          actual alone
 //
 // `field` points at static storage, so an error outlives the file.
 struct StoreError {
     StoreErrorKind kind = StoreErrorKind::io;
     std::string_view field;
     std::uint64_t offset = 0;
-    std::uint64_t expected = 0;
-    std::uint64_t actual = 0;
+    std::optional<std::uint64_t> expected = std::nullopt;
+    std::optional<std::uint64_t> actual = std::nullopt;
 
     friend bool operator==(const StoreError&, const StoreError&) = default;
 };
 
 [[nodiscard]] std::string to_string(const StoreError& error);
+
+// ": expected E, have A", or the half of it that is set, or nothing: how every store error
+// prints the values its check compared.
+[[nodiscard]] std::string expected_and_have(const std::optional<std::uint64_t>& expected,
+                                            const std::optional<std::uint64_t>& actual);
 
 }  // namespace tick_store::store

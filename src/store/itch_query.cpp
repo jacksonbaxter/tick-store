@@ -317,6 +317,9 @@ private:
         if (!taken.has_value()) {
             ItchStoreError error =
                 refuse(ItchStoreErrorKind::codec, taken.error().field, kNoIndex, 0, 0);
+            // The codec error carries the numbers.
+            error.expected.reset();
+            error.actual.reset();
             error.codec = taken.error();
             error.block = piece.block;
             error.offset = piece.bytes.zstd

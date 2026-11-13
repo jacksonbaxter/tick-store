@@ -500,15 +500,22 @@ TEST(ColumnsRows, ARefusalAndTheEndBothRepeat) {
     EXPECT_EQ(first.error(), second.error());
 }
 
+// An error with no values set prints none (gate finding 3); one with both prints both.
 TEST(ColumnsErrors, EachNewKindHasAMessage) {
     EXPECT_EQ(to_string(StoreError{.kind = StoreErrorKind::bad_manifest, .field = "records"}),
-              "bad manifest: records at offset 0: expected 0, have 0");
+              "bad manifest: records at offset 0");
     EXPECT_EQ(to_string(StoreError{.kind = StoreErrorKind::bad_column_size, .field = "seq.bin"}),
-              "bad column size: seq.bin at offset 0: expected 0, have 0");
+              "bad column size: seq.bin at offset 0");
     EXPECT_EQ(to_string(StoreError{.kind = StoreErrorKind::bad_text_offsets, .field = "rest.off"}),
-              "bad text offsets: rest.off at offset 0: expected 0, have 0");
+              "bad text offsets: rest.off at offset 0");
     EXPECT_EQ(to_string(StoreError{.kind = StoreErrorKind::bad_row, .field = "seq.bin"}),
-              "bad row: seq.bin at offset 0: expected 0, have 0");
+              "bad row: seq.bin at offset 0");
+    EXPECT_EQ(to_string(StoreError{.kind = StoreErrorKind::bad_row,
+                                   .field = "seq.bin",
+                                   .offset = 3,
+                                   .expected = 0,
+                                   .actual = 1}),
+              "bad row: seq.bin at offset 3: expected 0, have 1");
 }
 
 }  // namespace

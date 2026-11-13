@@ -109,7 +109,8 @@ std::expected<std::uint64_t, StoreError> ContainerLayout::add_block(
     std::span<const std::byte> payload) {
     const auto id = static_cast<std::uint16_t>(codec);
     if (!codec::codec_writable(id)) {
-        return std::unexpected(fail(StoreErrorKind::invalid_argument, "codec id", 0, 0, id));
+        return std::unexpected(
+            StoreError{.kind = StoreErrorKind::invalid_argument, .field = "codec id", .actual = id});
     }
     if (payload.size() > kMaxU32) {
         return std::unexpected(
@@ -147,7 +148,7 @@ std::expected<void, StoreError> ContainerLayout::add_section(std::string_view na
     // the one that has to be fast.
     if (std::ranges::find(section_names_, name) != section_names_.end()) {
         return std::unexpected(
-            fail(StoreErrorKind::invalid_argument, "section name repeated", 0, 0, 0));
+            StoreError{.kind = StoreErrorKind::invalid_argument, .field = "section name repeated"});
     }
     if (bytes.size() > kMaxU64 - data_end_) {
         return std::unexpected(fail(StoreErrorKind::invalid_argument, "file size", 0,
@@ -348,8 +349,10 @@ std::expected<ContainerParser, StoreError> ContainerParser::open(std::span<const
             }
             const std::uint64_t codec_id = field<2>(block_entry, kBlockCodec);
             if (!codec::codec_readable(static_cast<std::uint16_t>(codec_id))) {
-                return std::unexpected(fail(StoreErrorKind::unknown_codec, "codec id",
-                                            at + kBlockCodec, 0, codec_id));
+                return std::unexpected(StoreError{.kind = StoreErrorKind::unknown_codec,
+                                                  .field = "codec id",
+                                                  .offset = at + kBlockCodec,
+                                                  .actual = codec_id});
             }
             const std::uint64_t metadata_offset = field<8>(block_entry, kBlockMetadataOffset);
             if (metadata_offset != metadata_cursor) {
@@ -384,8 +387,11 @@ std::expected<ContainerParser, StoreError> ContainerParser::open(std::span<const
             for (std::size_t i = 0; i < name.size(); ++i) {
                 const auto value = std::to_integer<std::uint64_t>(name[i]);
                 if (i < name_length && !name_character(name[i])) {
-                    return std::unexpected(fail(StoreErrorKind::bad_field, "section name",
-                                                at + kSectionName + i, 0, value));
+                    // No one value is expected: any character of the alphabet.
+                    return std::unexpected(StoreError{.kind = StoreErrorKind::bad_field,
+                                                      .field = "section name",
+                                                      .offset = at + kSectionName + i,
+                                                      .actual = value});
                 }
                 if (i >= name_length && value != 0) {
                     return std::unexpected(fail(StoreErrorKind::bad_field,
@@ -455,9 +461,11 @@ std::expected<BlockInfo, StoreError> ContainerParser::block_info(std::uint64_t i
     const auto metadata = checked_subspan(metadata_, field<8>(entry, kBlockMetadataOffset),
                                           field<4>(entry, kBlockMetadataSize));
     if (!metadata.has_value()) {
-        return std::unexpected(fail(StoreErrorKind::bad_extent, "block metadata offset",
-                                    footer_offset_ + kFooterFixedSize + (index * kBlockEntrySize),
-                                    0, field<8>(entry, kBlockMetadataOffset)));
+        return std::unexpected(StoreError{
+            .kind = StoreErrorKind::bad_extent,
+            .field = "block metadata offset",
+            .offset = footer_offset_ + kFooterFixedSize + (index * kBlockEntrySize),
+            .actual = field<8>(entry, kBlockMetadataOffset)});
     }
     return BlockInfo{
         .codec = static_cast<codec::CodecId>(field<2>(entry, kBlockCodec)),
@@ -477,9 +485,11 @@ std::expected<BlockView, StoreError> ContainerParser::block_with(std::uint64_t i
     const auto payload = checked_subspan(file_.first(static_cast<std::size_t>(footer_offset_)),
                                          info->payload_offset, info->payload_size);
     if (!payload.has_value()) {
-        return std::unexpected(fail(StoreErrorKind::bad_extent, "block offset",
-                                    footer_offset_ + kFooterFixedSize + (index * kBlockEntrySize),
-                                    0, info->payload_offset));
+        return std::unexpected(StoreError{
+            .kind = StoreErrorKind::bad_extent,
+            .field = "block offset",
+            .offset = footer_offset_ + kFooterFixedSize + (index * kBlockEntrySize),
+            .actual = info->payload_offset});
     }
     if (checksums == Checksums::verify) {
         const std::uint32_t computed = block_crc(info->codec, *payload);
@@ -543,7 +553,7 @@ std::expected<SectionView, StoreError> ContainerParser::section(std::string_view
         });
     if (found == sections_by_name_.end() ||
         section_info(*found).value_or(SectionInfo{}).name != name) {
-        return std::unexpected(fail(StoreErrorKind::not_found, "section", 0, section_count_, 0));
+        return std::unexpected(StoreError{.kind = StoreErrorKind::not_found, .field = "section"});
     }
     return section_at(*found, options_.checksums);
 }

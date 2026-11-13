@@ -9,12 +9,14 @@
 #include "itch_store_fixture.hpp"
 #include "stub_fixture.hpp"
 #include "test_bytes.hpp"
+#include "tick_store/codec/codec_error.hpp"
 #include "tick_store/codec/registry.hpp"
 #include "tick_store/codec/zstd_frame.hpp"
 #include "tick_store/harness/itch_store_record_reader.hpp"
 #include "tick_store/harness/roundtrip.hpp"
 #include "tick_store/itch/message.hpp"
 #include "tick_store/store/container.hpp"
+#include "tick_store/store/crc32c.hpp"
 #include "tick_store/store/itch_store.hpp"
 #include "tick_store/store/itch_store_reader.hpp"
 
@@ -25,6 +27,7 @@
 #include <cstdint>
 #include <expected>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <functional>
 #include <ios>
@@ -1070,6 +1073,125 @@ Bytes read_golden(std::string_view name = "itch-store-v3.tsc") {
 }
 
 // The golden file is the 26-record source and its tail at 8 records a segment.
+// --- The text of an error ------------------------------------------------------------
+
+// Gate finding 3: a store error names each place once and prints no number its check did
+// not compare. A flipped payload bit names the block, its segment and column, and the
+// container's CRC failure with the stored and the computed CRC; the outer error, which
+// compared nothing itself, once added ": expected 0, have 0" and the same offset again.
+TEST(ItchStoreErrorText, AFlippedBlockBitNamesTheBlockAndBothChecksums) {
+    Bytes file = base_file();
+    const std::size_t b = test::parts_of(file).block_index(1, Column::timestamp);
+    BlockInfo info;
+    {
+        const auto parser = ContainerParser::open(file);
+        ASSERT_TRUE(parser.has_value());
+        const auto found = parser->block_info(b);
+        ASSERT_TRUE(found.has_value());
+        info = *found;
+    }
+    const auto at = static_cast<std::size_t>(info.payload_offset);
+    file[at] ^= std::byte{0x02};
+    const std::uint32_t computed =
+        block_crc(info.codec, std::span<const std::byte>{file}.subspan(at, info.payload_size));
+    const auto error = first_error(file);
+    ASSERT_TRUE(error.has_value());
+    EXPECT_EQ(to_string(*error),
+              std::format("container: block, segment 1, column timestamp, block {} (bad checksum: "
+                          "block at offset {}: expected {}, have {})",
+                          b, info.payload_offset, info.crc, computed));
+}
+
+TEST(ItchStoreErrorText, AFlippedFooterBitNamesTheFootersChecksum) {
+    Bytes file = base_file();
+    std::uint64_t footer = 0;
+    {
+        const auto parser = ContainerParser::open(file);
+        ASSERT_TRUE(parser.has_value());
+        footer = parser->footer_offset();
+    }
+    file[static_cast<std::size_t>(footer)] ^= std::byte{0x02};
+    const std::size_t trailer = file.size() - kTrailerSize;
+    const std::uint64_t stored = get_field(file, trailer + kTrailerFooterCrc, 4);
+    const std::uint32_t computed = crc32c(std::span<const std::byte>{file}.subspan(
+        static_cast<std::size_t>(footer), trailer - static_cast<std::size_t>(footer)));
+    const auto error = first_error(file);
+    ASSERT_TRUE(error.has_value());
+    EXPECT_EQ(to_string(*error),
+              std::format("container: structure (bad checksum: footer at offset {}: expected {}, "
+                          "have {})",
+                          footer, stored, computed));
+}
+
+// The other errors built the same way, each with no pair where its check compares none.
+TEST(ItchStoreErrorText, AnErrorThatComparesNothingPrintsNoPair) {
+    StoreParts parts = test::parts_of(base_file());
+    for (ContainerPart& part : parts.sections) {
+        if (part.section_name == kTailSection) {
+            part.section_name = "other";
+        }
+    }
+    const auto missing = first_error(parts.build());
+    ASSERT_TRUE(missing.has_value());
+    EXPECT_EQ(to_string(*missing), "container: tail section (not found: section)");
+
+    auto writer = ItchStoreWriter::in_memory({.segment_records = 4});
+    ASSERT_TRUE(writer.has_value());
+    ASSERT_TRUE(writer->finish({}).has_value());
+    const auto late = writer->append(test::add(1, 1, 1));
+    ASSERT_FALSE(late.has_value());
+    EXPECT_EQ(to_string(late.error()), "invalid argument: append after finish");
+    const auto twice = writer->finish({});
+    ASSERT_FALSE(twice.has_value());
+    EXPECT_EQ(to_string(twice.error()), "invalid argument: finish twice");
+
+    // A codec's refusal: the codec error carries the numbers, the store error the place.
+    StoreParts cut = test::parts_of(base_file());
+    ContainerPart& block = cut.block(0, Column::timestamp);
+    ASSERT_NE(block.codec, codec::CodecId::zstd);
+    block.bytes.resize(block.bytes.size() - 1);
+    const Bytes file = cut.build();
+    const auto codec_error = first_error(file);
+    ASSERT_TRUE(codec_error.has_value());
+    ASSERT_EQ(codec_error->kind, ItchStoreErrorKind::codec);
+    ASSERT_TRUE(codec_error->codec.has_value());
+    EXPECT_EQ(to_string(*codec_error),
+              std::format("codec: {}, segment 0, column timestamp, block {}, file byte {} ({})",
+                          codec_error->field, cut.block_index(0, Column::timestamp),
+                          codec_error->offset, codec::to_string(*codec_error->codec)));
+}
+
+// Every cut of a file and a flipped byte every few bytes, with CRCs on and off, reach most
+// of the reader's refusals: none prints a pair its check did not set, or an offset twice.
+TEST(ItchStoreErrorText, NoRefusalOfACutOrFlippedFilePrintsAnUnsetPair) {
+    const Bytes file = base_file();
+    std::vector<Bytes> broken;
+    for (std::size_t size = 0; size < file.size(); size += 3) {
+        broken.emplace_back(file.begin(), file.begin() + static_cast<std::ptrdiff_t>(size));
+    }
+    for (std::size_t at = 0; at < file.size(); at += 5) {
+        Bytes flipped = file;
+        flipped[at] ^= std::byte{0x10};
+        broken.push_back(std::move(flipped));
+    }
+    std::size_t refusals = 0;
+    for (const Bytes& bad : broken) {
+        for (const Checksums checksums : {Checksums::verify, Checksums::skip}) {
+            const auto error = first_error(bad, {.checksums = checksums});
+            if (!error.has_value()) {
+                continue;
+            }
+            ++refusals;
+            const std::string text = to_string(*error);
+            EXPECT_EQ(text.find("expected 0, have 0"), std::string::npos) << text;
+            if (error->container.has_value() && error->offset == error->container->offset) {
+                EXPECT_EQ(text.find("file byte"), std::string::npos) << text;
+            }
+        }
+    }
+    EXPECT_GT(refusals, broken.size());
+}
+
 TEST(ItchStoreGolden, TheWriterProducesTheGoldenFileByteForByte) {
     const Bytes golden = read_golden();
     ASSERT_FALSE(golden.empty()) << golden_path();

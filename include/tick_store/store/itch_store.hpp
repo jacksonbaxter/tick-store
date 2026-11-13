@@ -581,7 +581,10 @@ enum class ItchStoreErrorKind : std::uint8_t {
 //   record    the record's index in the file, from 0
 //   index     the value's index in its column's chunk
 //
-// `expected` and `actual` are the values in conflict. `field` points at static storage.
+// `expected` and `actual` are the values in conflict, set only where the check compared
+// values: a container or codec error leaves them to `container` or `codec`, and a refused
+// call such as "finish twice" has none. The text prints what is set, and a container
+// error's offset once, in the container's own words. `field` points at static storage.
 struct ItchStoreError {
     ItchStoreErrorKind kind = ItchStoreErrorKind::bad_value;
     std::string_view field;
@@ -591,8 +594,8 @@ struct ItchStoreError {
     std::uint64_t offset = kNoIndex;
     std::uint64_t record = kNoIndex;
     std::uint64_t index = kNoIndex;
-    std::uint64_t expected = 0;
-    std::uint64_t actual = 0;
+    std::optional<std::uint64_t> expected = std::nullopt;
+    std::optional<std::uint64_t> actual = std::nullopt;
     std::optional<StoreError> container;
     std::optional<codec::CodecError> codec;
 

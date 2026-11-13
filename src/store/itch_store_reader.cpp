@@ -64,7 +64,7 @@ std::expected<ItchStoreReader, ItchStoreError> ItchStoreReader::build(
     ReadOptions options) {
     auto parser = ContainerParser::open(file, options);
     if (!parser.has_value()) {
-        return container_failure("container", parser.error());
+        return container_failure("structure", parser.error());
     }
     ItchStoreReader reader{std::move(mapping), file, std::move(*parser)};
     if (auto read = reader.read_sections(); !read.has_value()) {

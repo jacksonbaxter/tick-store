@@ -1,15 +1,36 @@
 #include "tick_store/store/store_error.hpp"
 
+#include <cstdint>
 #include <format>
+#include <optional>
 #include <string>
 #include <string_view>
 
 namespace tick_store::store {
 
+std::string expected_and_have(const std::optional<std::uint64_t>& expected,
+                              const std::optional<std::uint64_t>& actual) {
+    if (expected.has_value() && actual.has_value()) {
+        return std::format(": expected {}, have {}", *expected, *actual);
+    }
+    if (expected.has_value()) {
+        return std::format(": expected {}", *expected);
+    }
+    if (actual.has_value()) {
+        return std::format(": have {}", *actual);
+    }
+    return {};
+}
+
 std::string to_string(const StoreError& error) {
     const auto located = [&](std::string_view what) {
-        return std::format("{}: {} at offset {}: expected {}, have {}", what, error.field,
-                           error.offset, error.expected, error.actual);
+        return std::format("{}: {} at offset {}{}", what, error.field, error.offset,
+                           expected_and_have(error.expected, error.actual));
+    };
+    // A call refused, not a place in a file.
+    const auto unplaced = [&](std::string_view what) {
+        return std::format("{}: {}{}", what, error.field,
+                           expected_and_have(error.expected, error.actual));
     };
     switch (error.kind) {
         case StoreErrorKind::file_too_small:
@@ -39,7 +60,12 @@ std::string to_string(const StoreError& error) {
         case StoreErrorKind::bad_row:
             return located("bad row");
         case StoreErrorKind::io:
-            return std::format("I/O error: {} failed with errno {}", error.field, error.actual);
+            // A writer's own state ("writer already committed") is reported as io with no
+            // errno.
+            if (!error.actual.has_value()) {
+                return std::format("I/O error: {}", error.field);
+            }
+            return std::format("I/O error: {} failed with errno {}", error.field, *error.actual);
         case StoreErrorKind::bad_footer:
             return located("bad footer");
         case StoreErrorKind::bad_extent:
@@ -51,9 +77,9 @@ std::string to_string(const StoreError& error) {
         case StoreErrorKind::bad_field:
             return located("bad field");
         case StoreErrorKind::not_found:
-            return located("not found");
+            return unplaced("not found");
         case StoreErrorKind::invalid_argument:
-            return located("invalid argument");
+            return unplaced("invalid argument");
     }
     return "invalid store error";
 }

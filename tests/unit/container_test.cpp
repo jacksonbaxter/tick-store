@@ -266,7 +266,8 @@ TEST(ContainerLookup, OutOfRangeAndMissingAreNotFound) {
     EXPECT_EQ(parser->section_info(2).error(),
               error(StoreErrorKind::not_found, "section index", 0, 2, 2));
     for (const std::string_view name : {"", "dict", "dict.stocks", "emptz", "a"}) {
-        EXPECT_EQ(parser->section(name).error(), error(StoreErrorKind::not_found, "section", 0, 2, 0))
+        EXPECT_EQ(parser->section(name).error(),
+                  (StoreError{.kind = StoreErrorKind::not_found, .field = "section"}))
             << name;
     }
 }
@@ -483,8 +484,10 @@ TEST(ContainerOpen, RefusesAnUnknownOrReservedCodec) {
                                    std::uint64_t{0xFFFF}}) {
         EXPECT_EQ(open_error(with_footer_field(golden(), golden_block_entry(0) + kBlockCodec, 2,
                                                id)),
-                  error(StoreErrorKind::unknown_codec, "codec id",
-                        golden_block_entry(0) + kBlockCodec, 0, id));
+                  (StoreError{.kind = StoreErrorKind::unknown_codec,
+                              .field = "codec id",
+                              .offset = golden_block_entry(0) + kBlockCodec,
+                              .actual = id}));
     }
 }
 
@@ -590,8 +593,10 @@ TEST(ContainerOpen, RefusesASectionNameCharacterOutsideTheAlphabet) {
                                       std::uint64_t{0}, std::uint64_t{0xFF}}) {
         EXPECT_EQ(open_error(with_footer_field(golden(), golden_section_entry(0) + kSectionName + 4,
                                                1, value)),
-                  error(StoreErrorKind::bad_field, "section name",
-                        golden_section_entry(0) + kSectionName + 4, 0, value));
+                  (StoreError{.kind = StoreErrorKind::bad_field,
+                              .field = "section name",
+                              .offset = golden_section_entry(0) + kSectionName + 4,
+                              .actual = value}));
     }
 }
 
@@ -746,7 +751,8 @@ TEST(ContainerLayout, RefusesACodecAWriterMayNotUse) {
     for (const std::uint16_t id : {std::uint16_t{0}, static_cast<std::uint16_t>(codec::kCodecs.size()),
                                    std::uint16_t{0xFFFF}}) {
         EXPECT_EQ(layout.add_block(static_cast<CodecId>(id), {}, payload),
-                  std::unexpected(error(StoreErrorKind::invalid_argument, "codec id", 0, 0, id)));
+                  std::unexpected(StoreError{
+                      .kind = StoreErrorKind::invalid_argument, .field = "codec id", .actual = id}));
     }
     EXPECT_EQ(layout.block_count(), 0U);
     EXPECT_EQ(layout.data_end(), kContainerHeaderSize);
@@ -766,8 +772,8 @@ TEST(ContainerLayout, RefusesABadOrRepeatedSectionName) {
     EXPECT_TRUE(layout.add_section(longest, {}).has_value());
     EXPECT_TRUE(layout.add_section("0_.-z", {}).has_value());
     EXPECT_EQ(layout.add_section("0_.-z", {}),
-              std::unexpected(error(StoreErrorKind::invalid_argument, "section name repeated", 0,
-                                    0, 0)));
+              std::unexpected(StoreError{.kind = StoreErrorKind::invalid_argument,
+                                         .field = "section name repeated"}));
     EXPECT_TRUE(valid_section_name(longest));
     EXPECT_FALSE(valid_section_name(longest + "a"));
 }
@@ -914,10 +920,22 @@ TEST(StoreErrorText, NamesEveryContainerKind) {
               "unknown codec: x at offset 1: expected 2, have 3");
     EXPECT_EQ(to_string(error(StoreErrorKind::bad_field, "x", 1, 2, 3)),
               "bad field: x at offset 1: expected 2, have 3");
+    // A call refused, not a place in a file: no offset (gate finding 3).
     EXPECT_EQ(to_string(error(StoreErrorKind::not_found, "x", 1, 2, 3)),
-              "not found: x at offset 1: expected 2, have 3");
+              "not found: x: expected 2, have 3");
     EXPECT_EQ(to_string(error(StoreErrorKind::invalid_argument, "x", 1, 2, 3)),
-              "invalid argument: x at offset 1: expected 2, have 3");
+              "invalid argument: x: expected 2, have 3");
+    // Only what the check set: one value, none, and an io error with no errno.
+    EXPECT_EQ(to_string(StoreError{.kind = StoreErrorKind::invalid_argument,
+                                   .field = "codec id",
+                                   .actual = 7}),
+              "invalid argument: codec id: have 7");
+    EXPECT_EQ(to_string(StoreError{.kind = StoreErrorKind::not_found, .field = "section"}),
+              "not found: section");
+    EXPECT_EQ(to_string(StoreError{.kind = StoreErrorKind::io, .field = "writer already committed"}),
+              "I/O error: writer already committed");
+    EXPECT_EQ(to_string(StoreError{.kind = StoreErrorKind::io, .field = "open", .actual = 2}),
+              "I/O error: open failed with errno 2");
 }
 
 }  // namespace
