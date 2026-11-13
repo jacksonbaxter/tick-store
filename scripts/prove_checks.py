@@ -656,6 +656,16 @@ FAULTS = (
           "passes on the harness's own assumption", CHECK_FAILED,
           "FAIL: test_class_b_flags_the_engine_does_not_have_are_not_read_as_0 "
           "(__main__.ArcticDBSettings"),
+    # Review RF-11: a write's input whole where it must be, refused in the worker.
+    Fault("write-input-not-whole-accepted", "py-compare", "a write whose input is not wholly "
+          "resident when its clock starts, tick-store's source or any input on the slice, runs "
+          "on and is refused only when the file is validated", CHECK_FAILED,
+          "FAIL: test_an_input_not_whole_where_it_must_be_stops_the_write_before_its_clock "
+          "(__main__.WriteRecord"),
+    Fault("device-stat-missing-unnamed", "py-compare", "an input on a file system with no "
+          "block device of its own fails with a bare FileNotFoundError, not an error naming it",
+          CHECK_FAILED, "FAIL: test_an_input_on_no_block_device_of_its_own_is_named "
+          "(__main__.WriteRecord"),
     # Review RF-8: a cold proof's residency is read where the figure's clock starts.
     Fault("cold-clock-start-before-the-open", "py-compare", "a cold proof records the store "
           "resident before the worker's open for a system whose clock starts at the query, so "

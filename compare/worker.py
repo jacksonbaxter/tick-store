@@ -52,6 +52,13 @@ def step_ingest(system, request, layout):
     made_ready = system.ready_input(columns)
     table = None if request.get("full_day") else arrow_table(columns, system.context.day)
     at_start = coldcache.residency(layout, inputs)
+    if (system.name == "tickstore" or not request.get("full_day")) and \
+            at_start["resident_pages"] != at_start["pages"]:
+        # Review RF-11: tick-store's source on any run, and every input on the slice, is whole
+        # when the clock starts. Refused here, not hours later when the file is validated.
+        raise coldcache.ProofFailed(
+            f"{system.name}: {at_start['resident_pages']} of its input's {at_start['pages']} "
+            "pages were resident just before the write's clock, and all must be")
     device = coldcache.write_counter(inputs[0], request.get("service_processes", {}))
     if table is None:
         # A whole day streams: no day-sized table is ever built.

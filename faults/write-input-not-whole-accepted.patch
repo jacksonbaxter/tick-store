@@ -1,0 +1,12 @@
+diff --git a/compare/worker.py b/compare/worker.py
+--- a/compare/worker.py
++++ b/compare/worker.py
+@@ -53,7 +53,7 @@
+     table = None if request.get("full_day") else arrow_table(columns, system.context.day)
+     at_start = coldcache.residency(layout, inputs)
+     if (system.name == "tickstore" or not request.get("full_day")) and \
+-            at_start["resident_pages"] != at_start["pages"]:
++            False:
+         # Review RF-11: tick-store's source on any run, and every input on the slice, is whole
+         # when the clock starts. Refused here, not hours later when the file is validated.
+         raise coldcache.ProofFailed(

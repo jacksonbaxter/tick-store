@@ -184,8 +184,16 @@ def _iostat_megabytes():
 
 
 def _block_device_stat(path):
+    """The stat file of the block device under `path`. A file system with no block device of
+    its own, such as tmpfs, overlayfs or a btrfs subvolume, has none (review RF-11)."""
     device = os.stat(path).st_dev
-    return Path(f"/sys/dev/block/{os.major(device)}:{os.minor(device)}/stat")
+    number = f"{os.major(device)}:{os.minor(device)}"
+    stat = Path(f"/sys/dev/block/{number}/stat")
+    if not stat.exists():
+        raise ProofFailed(f"{path} is on device {number}, which has no {stat}, so its device "
+                          "reads cannot be counted: put it on a file system with a block "
+                          "device of its own")
+    return stat
 
 
 class DeviceCounter:

@@ -70,9 +70,11 @@ DAY_LABEL = "12302019"
 VARIANT = ParquetSystem.headline_variant
 # A stand-in for tools/tick_coldcache, which a worker's write and cold steps call around their
 # clocks: every file has 1 page, none of it resident or dirty.
+# Warmed files and the write's input, the export under in/, read resident: a write's input
+# must be whole when its clock starts (review RF-11). The store never is.
 FAKE_COLDCACHE = """
 import json, sys
-resident = 1 if sys.argv[1] == "warm" else 0
+resident = 1 if sys.argv[1] == "warm" or all("/in/" in arg + "/" for arg in sys.argv[2:]) else 0
 print(json.dumps({"pages": 1, "resident_pages": resident, "page_size": 4096, "dirty_pages": 0}))
 """
 QUERIES = (Query("rows", "rows", OPEN_NS, OPEN_NS + NANOS_PER_SECOND),
@@ -656,8 +658,11 @@ class WriteRecord(unittest.TestCase):
     """Every write records its total and engine-only seconds, how much of its input was
     resident when its clock started, and the device bytes read while it ran (review F-2)."""
 
-    def run_step(self, full_day=False):
+    def run_step(self, full_day=False, name="fake", resident=None):
         from compare import coldcache, worker
+
+        # Whole on the slice, as every input must be there; part of a day's export may be out.
+        resident = (7 if full_day else 10) if resident is None else resident
 
         order = []
 
@@ -671,7 +676,7 @@ class WriteRecord(unittest.TestCase):
 
         def residency(layout, paths):
             order.append(("residency", [str(path) for path in paths]))
-            return {"pages": 10, "resident_pages": 7, "page_size": 4096}
+            return {"pages": 10, "resident_pages": resident, "page_size": 4096}
 
         def ingest(*args):
             order.append("ingest")
@@ -679,7 +684,7 @@ class WriteRecord(unittest.TestCase):
                     "python_note": "n"}
 
         system = SimpleNamespace(
-            name="fake", context=SimpleNamespace(day=DAY), settings_in_force=lambda: [],
+            name=name, context=SimpleNamespace(day=DAY), settings_in_force=lambda: [],
             settings_after_ingest=lambda: [], input_paths=lambda columns: [Path("export")],
             ready_input=lambda columns: order.append("ready") or {"warms": 1},
             ingest=ingest, ingest_day=ingest)
@@ -690,7 +695,11 @@ class WriteRecord(unittest.TestCase):
               mock.patch.object(coldcache, "residency", residency),
               mock.patch.object(coldcache.platform, "system", return_value="Linux"),
               mock.patch.object(coldcache, "DeviceCounter", Counter)):
-            answer = worker.step_ingest(system, {"columns": "export", "full_day": full_day}, None)
+            try:
+                answer = worker.step_ingest(system, {"columns": "export", "full_day": full_day},
+                                            None)
+            except coldcache.ProofFailed as failure:
+                return failure, order
         return answer["timings"], order
 
     def test_each_write_records_both_times_its_input_and_its_device_reads(self):
@@ -698,9 +707,45 @@ class WriteRecord(unittest.TestCase):
             timings, order = self.run_step(full_day)
             self.assertEqual(timings["engine_only_seconds"], 2.5)
             self.assertEqual(timings["input_at_clock_start"]["pages"], 10)
-            self.assertEqual(timings["input_at_clock_start"]["resident_pages"], 7)
+            self.assertEqual(timings["input_at_clock_start"]["resident_pages"],
+                             7 if full_day else 10)
             self.assertEqual(timings["input_at_clock_start"]["made_ready"], {"warms": 1})
             self.assertEqual(timings["device_read"]["bytes"], 8192)
+
+    def test_an_input_not_whole_where_it_must_be_stops_the_write_before_its_clock(self):
+        # Review RF-11: refused in the worker, not hours later at publish.
+        from compare import coldcache
+
+        for full_day, name in ((False, "fake"), (False, "tickstore"), (True, "tickstore")):
+            with self.subTest(full_day=full_day, name=name):
+                failure, order = self.run_step(full_day, name, resident=7)
+                self.assertIsInstance(failure, coldcache.ProofFailed)
+                self.assertIn(f"{name}: 7 of its input's 10 pages were resident", str(failure))
+                self.assertNotIn("ingest", order)
+
+    def test_a_days_export_may_be_partly_out_of_the_cache(self):
+        # Review F-2: the others read a day's export as the cache holds it.
+        timings, _ = self.run_step(True, "fake", resident=7)
+        self.assertEqual(timings["input_at_clock_start"]["resident_pages"], 7)
+
+    def test_an_input_on_no_block_device_of_its_own_is_named(self):
+        # Review RF-11: tmpfs, overlayfs or a btrfs subvolume have major 0 and no stat file.
+        import os
+
+        from compare import coldcache
+
+        real_stat = os.stat
+
+        def stat(path, *args, **kwargs):
+            if str(path).startswith("input/"):
+                return SimpleNamespace(st_dev=os.makedev(0, 77))
+            return real_stat(path, *args, **kwargs)
+
+        with (mock.patch.object(coldcache.os, "stat", stat),
+              self.assertRaises(coldcache.ProofFailed) as caught):
+            coldcache._block_device_stat(Path("input/12302019.NASDAQ_ITCH50"))
+        self.assertIn("input/12302019.NASDAQ_ITCH50 is on device 0:77, which has no "
+                      "/sys/dev/block/0:77/stat", str(caught.exception))
 
     def test_the_input_is_made_ready_and_read_before_the_clock_and_the_device_after(self):
         _, order = self.run_step()
