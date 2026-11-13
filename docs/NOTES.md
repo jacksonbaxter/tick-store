@@ -3309,6 +3309,25 @@ and 644 of 644 tests passed, the two real-day tests skipped for want of the day'
 Raw: `phase4-raw/fix-store/`: each finding's failing and passing logs, the fault runs for C-5,
 C-9 and the seed (`tasks238-*`), and the check logs.
 
+### The final review's harness and tools findings
+
+Reviewer D read the harness and the tools at `ca96b36` and found seven SHOULD and eight NOTE
+findings (D-1 to D-15). Each is confirmed by reading the code and then by a test seen failing for
+the reason given, or shown wrong with the evidence. No file format changed. The record is
+`docs/REVIEW.md`.
+
+D-4. Before making `tick_slice` refuse a source whose walk does not stop at `end`, the two real
+days' stop kinds: both census files say `"stop": "end"` and `"tail_bytes": 0`, and both
+codec-eval files `end at offset <file size>`, so the real slice still builds with the same bytes.
+`write_slice` now returns a `SliceError` that says whether the source stopped early, so the CLI
+can exit 1 for a refused source, as it does for a slice that does not check out, and 2 for usage
+and I/O; the partial file is removed and nothing is published. `evaluate_references` refuses the
+same sources, rather than adding a `stop` field a reader would have to look for: a partial day
+cannot pass as a whole one either way, and refusing needs no change to the JSON. Before: a body
+cut after 1 of 48 bytes, a zero-length frame mid-file and a lone prefix byte were all accepted.
+
+Raw: `phase4-raw/fix-harness/`: each finding's failing and passing logs.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
