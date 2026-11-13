@@ -1062,21 +1062,6 @@ TEST(ItchStoreCorrupt, SeekIndexRulesParsedAlone) {
     EXPECT_EQ(refused.error().field, "seek count");
 }
 
-// --- The golden file ------------------------------------------------------------------
-
-std::filesystem::path golden_path(std::string_view name = "itch-store-v3.tsc") {
-    return std::filesystem::path{TICK_STORE_GOLDEN_DIR} / name;
-}
-
-Bytes read_golden(std::string_view name = "itch-store-v3.tsc") {
-    std::ifstream in{golden_path(name), std::ios::binary};
-    const std::vector<char> chars{std::istreambuf_iterator<char>{in}, {}};
-    Bytes out(chars.size());
-    std::ranges::transform(chars, out.begin(), [](char c) { return static_cast<std::byte>(c); });
-    return out;
-}
-
-// The golden file is the 26-record source and its tail at 8 records a segment.
 // --- The text of an error ------------------------------------------------------------
 
 // Gate finding 3: a store error names each place once and prints no number its check did
@@ -1196,6 +1181,21 @@ TEST(ItchStoreErrorText, NoRefusalOfACutOrFlippedFilePrintsAnUnsetPair) {
     EXPECT_GT(refusals, broken.size());
 }
 
+// --- The golden file ------------------------------------------------------------------
+
+std::filesystem::path golden_path(std::string_view name = "itch-store-v3.tsc") {
+    return std::filesystem::path{TICK_STORE_GOLDEN_DIR} / name;
+}
+
+Bytes read_golden(std::string_view name = "itch-store-v3.tsc") {
+    std::ifstream in{golden_path(name), std::ios::binary};
+    const std::vector<char> chars{std::istreambuf_iterator<char>{in}, {}};
+    Bytes out(chars.size());
+    std::ranges::transform(chars, out.begin(), [](char c) { return static_cast<std::byte>(c); });
+    return out;
+}
+
+// The golden file is the 26-record source and its tail at 8 records a segment.
 TEST(ItchStoreGolden, TheWriterProducesTheGoldenFileByteForByte) {
     const Bytes golden = read_golden();
     ASSERT_FALSE(golden.empty()) << golden_path();
