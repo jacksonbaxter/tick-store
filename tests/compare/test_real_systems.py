@@ -214,6 +214,26 @@ class TickStoreReal(unittest.TestCase):
         finally:
             system.close()
 
+    def test_the_open_reads_the_store_so_a_cold_figure_holds_it(self):
+        """Review F-1: with the store evicted, tick_query's open alone leaves its footer's pages
+        resident, so the open is part of the cold figure, and nothing is resident before it."""
+        from compare import coldcache
+        from compare.durability import CLASS_B
+
+        system = self.write(self.system(CLASS_B))
+        coldcache.evict(LAYOUT, [system.store_path])
+        before = coldcache.residency(LAYOUT, [system.store_path])["resident_pages"]
+        system.open()
+        try:
+            opened = coldcache.residency(LAYOUT, [system.store_path])["resident_pages"]
+            reported = system.reported_open_seconds()
+        finally:
+            system.close()
+        self.assertEqual(before, 0)
+        self.assertGreater(opened, 0)
+        self.assertTrue(system.open_inside_cold_clock)
+        self.assertGreater(reported, 0)
+
     def test_a_store_of_another_segment_size_is_refused(self):
         from compare.durability import CLASS_A
         from compare.settings import SettingsMismatch

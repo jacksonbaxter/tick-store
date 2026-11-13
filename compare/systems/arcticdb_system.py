@@ -106,6 +106,12 @@ class ArcticDBSystem(System):
         return {"context": "LMDB is not ArcticDB's highest-performance backend, by its own docs",
                 "class_a_flags": "marked in ArcticDB's docs as for throwaway data"}
 
+    # open() opens the LMDB environment and reads the library's config from it, and one symbol
+    # per security lists its symbols, all before the clock; lib.read then reads the version and
+    # index keys inside it. So part of the open is outside the cold clock, and its pages are
+    # resident when the clock starts.
+    open_inside_cold_clock = False
+
     def open(self):
         import arcticdb
         from arcticdb.options import LibraryOptions

@@ -113,6 +113,10 @@ class ParquetSystem(System):
                            "memory_map": False},
                 "threads": self.context.threads}
 
+    # open() holds no file: every pq.read_table opens the file and reads and parses its footer
+    # inside the timed call, so the whole open is inside every clock, cold and warm.
+    open_inside_cold_clock = True
+
     def open(self):
         # pq.read_table and Table.group_by import these on their first call, which would put the
         # imports on the clock.

@@ -599,6 +599,11 @@ class QuestDBSystem(System):
 
     # Worker side.
 
+    # The server starts before the worker, and opens the table's files as it starts and as the
+    # client connects, all before the clock. So a cold clock starts with whatever the server's
+    # open read resident, and the proof records it.
+    open_inside_cold_clock = False
+
     def open(self):
         import pyarrow as pa
         import questdb

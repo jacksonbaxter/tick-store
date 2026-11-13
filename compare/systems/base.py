@@ -61,6 +61,9 @@ class System(ABC):
     # Files a commit leaves dirty by design, as compiled patterns on their relative paths.
     # A result lists them by name. Everything else must be clean under class B.
     flush_exempt = ()
+    # Whether a cold figure holds the system's whole open of its store: each system's module
+    # says why. Where it does, no byte of the store may be resident when the clock starts.
+    open_inside_cold_clock = False
 
     def __init__(self, context):
         self.context = context
@@ -119,6 +122,11 @@ class System(ABC):
 
     def close(self):
         """Closes the client."""
+
+    def reported_open_seconds(self):
+        """The store's open as the engine timed it, where it opens the store outside its query
+        call and the cold clock adds that open to the query; None elsewhere."""
+        return None
 
     @abstractmethod
     def settings_in_force(self):

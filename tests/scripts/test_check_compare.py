@@ -1284,6 +1284,8 @@ def latency_block(seconds):
 
 WARM_SECONDS = [10e-6, 9e-6, 12e-6]
 COLD_SECONDS = [90e-6, 110e-6]
+OPEN_INSIDE = {"parquet": True, "arcticdb": False, "questdb": False, "tickstore": True}
+TICKSTORE_OPEN_SECONDS = [30e-6, 40e-6]
 ENGINE_WARM_SECONDS = [9e-6, 8e-6, 11e-6]
 ENGINE_COLD_SECONDS = [80e-6, 100e-6]
 
@@ -1310,9 +1312,20 @@ def protocol_2(document):
                               if key in ("proofs", "swap_timed", "run_again_refilled_pages")}
                 entry["warm"] = {**latency_block(WARM_SECONDS), **warm_extra}
                 entry["cold"] = {**latency_block(COLD_SECONDS), **cold_extra}
+                for proof in entry["cold"]["proofs"]:
+                    proof.update({"open_inside_clock": OPEN_INSIDE[name],
+                                  "resident_bytes_before_clock": 0 if OPEN_INSIDE[name] else 8192,
+                                  "resident_bytes_before_open": 0,
+                                  "resident_bytes_before_query": 8192})
                 if name == "tickstore":
                     entry["warm"]["engine"] = latency_block(ENGINE_WARM_SECONDS)
                     entry["cold"]["engine"] = latency_block(ENGINE_COLD_SECONDS)
+                    entry["cold"]["parts"] = {
+                        "open_seconds_by_repetition": list(TICKSTORE_OPEN_SECONDS),
+                        "query_seconds_by_repetition": [
+                            round(total - opened, 12) for total, opened in
+                            zip(COLD_SECONDS, TICKSTORE_OPEN_SECONDS, strict=True)]}
+            variant["warm_worker_open"] = {"seconds": 0.01}
             variant["python_floor"] = {**latency_block([1e-6, 2e-6, 3e-6]), "what": "floor"}
             for entry in variant["classes"].values():
                 write = entry["write"]
@@ -1493,6 +1506,46 @@ class Protocol2(Harness):
                 "input_resident_pages_at_start"] = 60
         self.assert_fault_2(fault, "tickstore.v.B.write: repetition 2 started its clock with 60 "
                                    "of its source's 100 pages resident")
+
+    # F-1: the cold clock's start, and what was resident when it started.
+
+    def test_a_cold_proof_with_no_residency_before_its_clock(self):
+        def fault(document):
+            del q1_of(document, "arcticdb")["cold"]["proofs"][1]["resident_bytes_before_clock"]
+        self.assert_fault_2(fault, "arcticdb.v.queries.Q1.cold[1]: no store bytes resident "
+                                   "before the clock")
+
+    def test_pages_resident_before_a_clock_that_holds_the_whole_open(self):
+        def fault(document):
+            q1_of(document, "parquet")["cold"]["proofs"][0]["resident_bytes_before_clock"] = 4096
+        self.assert_fault_2(fault, "parquet.v.queries.Q1.cold[0]: 4096 bytes of the store "
+                                   "resident before a clock that holds its whole open")
+
+    def test_a_system_claiming_its_open_is_where_it_is_not(self):
+        def fault(document):
+            for proof in q1_of(document, "tickstore")["cold"]["proofs"]:
+                proof["open_inside_clock"] = False
+        self.assert_fault_2(fault, "tickstore.v.queries.Q1.cold[0]: open_inside_clock is False, "
+                                   "and tickstore's whole open is inside its cold clock")
+
+    def test_a_tickstore_cold_figure_without_its_open(self):
+        def fault(document):
+            cold = q1_of(document, "tickstore")["cold"]
+            cold["seconds_by_repetition"][0] = cold["parts"]["query_seconds_by_repetition"][0]
+        self.assert_fault_2(fault, "tickstore.v.queries.Q1.cold: repetition 1 is not its open "
+                                   "and its query")
+
+    def test_a_tickstore_cold_block_without_its_parts(self):
+        def fault(document):
+            del q1_of(document, "tickstore")["cold"]["parts"]
+        self.assert_fault_2(fault, "tickstore.v.queries.Q1.cold: its open and its query are not "
+                                   "kept for each repetition")
+
+    def test_a_variant_with_no_open_time_for_its_warm_worker(self):
+        def fault(document):
+            del document["systems"]["questdb"]["variants"]["v"]["warm_worker_open"]
+        self.assert_fault_2(fault, "questdb.v.warm_worker_open: the warm worker's open is not "
+                                   "timed")
 
     def test_protocol_1_files_keep_the_rules_they_were_measured_by(self):
         result = self.run_on(valid_document("Linux"), "Linux")

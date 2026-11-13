@@ -359,12 +359,31 @@ The Linux counter is the block device's sectors read. The macOS counter is `iost
 it can only ever show a shortfall. An excess proves nothing on either host. File system metadata
 stays warm, because neither method reaches it.
 
-Each cold number is the query alone, in a fresh process. The server's start and the worker's
-imports fall before the clock, and pages they touched count as resident and as device reads.
-`pq.read_table` and `Table.group_by` import `pyarrow.dataset` and `pyarrow.acero` on their first
-call, so `ParquetSystem.open` imports both first, and `tests/compare/test_system_worker.py` fails
-if any module loads inside the timed call. The clock does hold what an engine sets up on its first
-call in a process: for Parquet on macOS, about 1 ms over a second call on warm pages.
+Each cold number is a fresh process's query, and as much of the store's open as each system
+lets the clock hold. The server's start and the worker's imports fall before the clock, and pages
+they touched count as resident and as device reads. `pq.read_table` and `Table.group_by` import
+`pyarrow.dataset` and `pyarrow.acero` on their first call, so `ParquetSystem.open` imports both
+first, and `tests/compare/test_system_worker.py` fails if any module loads inside the timed call.
+The clock does hold what an engine sets up on its first call in a process: for Parquet on macOS,
+about 1 ms over a second call on warm pages.
+
+Whether the clock holds the system's whole open of its store differs, and each system's module
+says so in `open_inside_cold_clock`:
+
+| System | Whole open inside the cold clock | Why |
+|---|---|---|
+| Parquet | Yes | Its client holds no file: every `pq.read_table` opens the file and reads and parses its footer inside the timed call |
+| tick-store | Yes | `tools/tick_query`'s open maps the store, reads and checks the footer, builds the segment directory and parses the symbols before its ready line, which reports how long that took; a cold figure is that open plus the query's round trip, and the cold block keeps both parts, repetition by repetition, in `parts` |
+| ArcticDB | No | The worker's `open` opens the LMDB environment and reads the library's config, and per security lists its symbols, before the clock; `lib.read` then reads the version and index keys inside it |
+| QuestDB | No | The server starts before the worker and opens the table's files as it starts and as the client connects |
+
+Every cold proof records the store's bytes resident just before its clock started,
+`resident_bytes_before_clock`, beside the bytes resident before the worker's open and just before
+the query. Where the clock holds the whole open, `scripts/check_compare.py` requires it to be 0,
+and it is the bytes read before the open; where it does not, it is what the open had made
+resident, and it counts in the device's reads, as before. The tick-store figures before protocol
+2 are the query alone, the open outside the clock: on the full day's store the footer it reads is
+about 5 MB (review F-1).
 
 ## tick-store
 
@@ -390,9 +409,12 @@ same name, before the layout experiments.
   through the store's whole read path and the ITCH encoder, and the harness then writes and judges
   them exactly as it does every other system's. G-1, `tick_roundtrip verify` of the store against
   the source byte for byte, is stronger, and runs as well: it is in `stored_settings.g1`.
-- **Queries.** One `tools/tick_query` per store, started in the worker before any clock, as every
-  other client is opened. Each query is one request line with `"ack": true`, timed from Python as a
-  round trip that stops on the worker's line saying the answer is in its memory. The worker then
+- **Queries.** One `tools/tick_query` per store, started in the worker. Its open is outside the warm
+  clock, as the other clients' are, and its time is recorded once per worker, in the variant's
+  `warm_worker_open`; a cold figure is a fresh process's open, as the ready line reports it, plus
+  the query (see "Warm and cold proof"). Not every client is opened before the clock: Parquet's
+  opens the file inside every call. Each query is one request line with `"ack": true`, timed from
+  Python as a round trip that stops on the worker's line saying the answer is in its memory. The worker then
   digests the answer by `compare/queries.py`'s rule, outside the clock, as the other systems'
   digests are made in Python: on the slice that digest of Q1's 527,644 rows takes longer than the
   engine. It returns no rows to Python, so a rows digest is the worker's own, and it must still

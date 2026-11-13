@@ -4,8 +4,12 @@ Its natural input is ITCH, so a write is tools/tick_roundtrip ingest on the slic
 from here like every other system's write, and that time holds the ITCH parsing the other systems
 never do, since they load the columns tools/tick_export already parsed. Nothing subtracts it.
 
-Queries go to one tools/tick_query worker per store, started in open(), so the store is opened
-before any clock, as every other system's client is. Each query is one request line with "ack",
+Queries go to one tools/tick_query worker per store, started in open(). Its open maps the store,
+reads and checks the footer, builds the segment directory and parses the symbols, and its ready
+line reports how long that took. A cold figure is a fresh process's open plus the query: the
+open the ready line reports is added to the query's round trip, and both parts are kept. Warm
+figures are the round trip alone, the open's time recorded once per worker. Each query is one
+request line with "ack",
 timed from here as a round trip: the clock stops on the line the worker sends once the answer is
 in its memory, and the digest it then makes, and its full answer line, fall outside the clock, as
 the other systems' digests do in Python. The worker's own engine time is recorded beside it.
@@ -269,8 +273,9 @@ class TickStoreSystem(System):
                 "hot_columns": HOT_COLUMNS,
                 "codecs": "each column's codec as docs/store.md lists it, zstd where the "
                           "writer finds it smaller",
-                "query_worker": f"tools/tick_query, one process per store, opened before the "
-                                f"clock, path {QUERY_PATH}, block CRCs checked",
+                "query_worker": f"tools/tick_query, one process per store, path {QUERY_PATH}, "
+                                "block CRCs checked; a cold figure adds the open its ready line "
+                                "reports to the query's round trip",
                 "kernel_level": self.kernel_level, "TICK_STORE_SIMD": self.kernel_level,
                 "threads": "one: the writer and the query worker each run on one thread"}
 
@@ -297,9 +302,16 @@ class TickStoreSystem(System):
             raise ToolFailure("tick-store ingests the ITCH slice, and the run gave none")
         return Path(self.context.source)
 
+    # A cold figure adds the open tick_query reports on its ready line to the query: review F-1.
+    open_inside_cold_clock = True
+
     def open(self):
         if self.store_path.exists():
             self._start_worker()
+
+    def reported_open_seconds(self):
+        """tick_query's own time for ItchStoreReader::open, from its ready line."""
+        return None if self.ready is None else self.ready["open_ns"] / 1e9
 
     def query_processes(self):
         return {"tick_query": self.worker.pid} if self.worker is not None else {}

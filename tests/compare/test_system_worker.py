@@ -127,6 +127,17 @@ class ColdWorker(unittest.TestCase):
             with self.subTest(query=query.kind):
                 self.assertEqual(self.cold(query)["imported_inside_the_clock"], [])
 
+    def test_a_cold_answer_records_the_store_resident_before_its_clock(self):
+        """Review F-1: Parquet's whole open is inside each call, so its clock starts with the
+        worker's open, and what was resident then is recorded."""
+        self.cold(QUERIES[0])
+        answer = json.loads((self.base / "answer.json").read_text(encoding="utf-8"))
+        self.assertIs(answer["open_inside_clock"], True)
+        self.assertEqual(answer["resident_bytes_before_clock"], 0)
+        self.assertEqual(answer["resident_bytes_before_open"], 0)
+        self.assertEqual(answer["seconds"], answer["query_seconds"])
+        self.assertIsNone(answer["open_seconds"])
+
 
 class FullDayWarm(unittest.TestCase):
     """Warm on a whole day: the device's own counter across the repetitions, query by query,
@@ -160,7 +171,8 @@ class FullDayWarm(unittest.TestCase):
         system = SimpleNamespace(name="fake", query_rows=lambda *args: [[1, 2]],
                                  query_column_sum=lambda column: [[1, 2]],
                                  scan_facts=lambda query: {"status": "unavailable"},
-                                 query_processes=lambda: {"tick_query": 7})
+                                 query_processes=lambda: {"tick_query": 7},
+                                 reported_open_seconds=lambda: None)
         query = Query("Q5", "column_sum", 0, 0)
         request = {"queries": [query_to_json(query)], "repetitions": 4, "paths": ["store"],
                    "truth": {"Q5": {"rows": 1, "sha256": "x"}},
@@ -215,7 +227,8 @@ class ResidencyWarmOnADay(unittest.TestCase):
 
         system = SimpleNamespace(name="fake", query_rows=lambda *args: [[1, 2]],
                                  query_column_sum=lambda column: [[1, 2]],
-                                 scan_facts=lambda query: {"status": "unavailable"})
+                                 scan_facts=lambda query: {"status": "unavailable"},
+                                 reported_open_seconds=lambda: None)
         query = Query("Q5", "column_sum", 0, 0)
         request = {"queries": [query_to_json(query)], "repetitions": 3, "paths": ["store"],
                    "truth": {"Q5": {"rows": 1, "sha256": "x"}}, "full_day": True,
@@ -335,7 +348,8 @@ class ColdRuns(unittest.TestCase):
 
         def repetition(system, root, paths, query, truth):
             seen.append(query.name)
-            answer = {"seconds": 0.5 + len(seen), "engine_seconds": None,
+            answer = {"seconds": 0.5 + len(seen), "engine_seconds": None, "open_seconds": None,
+                      "query_seconds": 0.5 + len(seen),
                       "swap_timed": {"pages_in": 0, "pages_out": 0}}
             return answer, {"resident_after_eviction": 0}, queue.pop(0) if queue else 0
 
@@ -346,12 +360,12 @@ class ColdRuns(unittest.TestCase):
         return found, seen
 
     def test_a_quiet_store_counts_every_repetition(self):
-        (cold, _, _, proofs, again), seen = self.runs([0, 0, 0])
+        (cold, _, _, proofs, again, _), seen = self.runs([0, 0, 0])
         self.assertEqual((len(cold["Q2"]), len(proofs["Q2"]), again["Q2"], len(seen)),
                          (3, 3, [], 3))
 
     def test_a_refilled_store_runs_the_repetition_again(self):
-        (cold, _, swaps, proofs, again), seen = self.runs([0, 13_643, 0, 0])
+        (cold, _, swaps, proofs, again, _), seen = self.runs([0, 13_643, 0, 0])
         self.assertEqual(len(seen), 4)
         self.assertEqual(again["Q2"], [13_643])
         self.assertEqual(cold["Q2"], [1.5, 3.5, 4.5])
@@ -469,6 +483,84 @@ class TailFigure(unittest.TestCase):
         self.assertIn("slowest of 7", compare_run.TAIL_STATEMENT)
         self.assertIn("slowest", variant_rule.RULE)
         self.assertEqual(variant_rule.FIELDS, ("median_us", "p99_us"))
+
+
+class ColdOpen(unittest.TestCase):
+    """Review F-1: a cold figure holds the store's open where the system opens its store
+    outside its query call, as tick-store does; and every cold answer records the store's
+    resident bytes just before its clock."""
+
+    def step(self, inside, reported):
+        from compare import coldcache, worker
+
+        readings = iter([{"pages": 9, "resident_pages": 2, "page_size": 4096}])
+
+        system = SimpleNamespace(
+            name="fake", open_inside_cold_clock=inside, read_paths=lambda: [Path("store")],
+            reported_open_seconds=lambda: reported,
+            query_column_sum=lambda column: [[1, 2]])
+        query = Query("Q5", "column_sum", 0, 0)
+        request = {"query": query_to_json(query), "truth": {"rows": 1, "sha256": "x"},
+                   "store_before_open": {"pages": 9, "resident_pages": 0, "page_size": 4096}}
+        with (mock.patch.object(coldcache, "residency", lambda layout, paths: next(readings)),
+              mock.patch.object(worker, "timed_query", return_value=(0.5, [[1, 2]])),
+              mock.patch.object(worker, "digest_result", return_value={"rows": 1, "sha256": "x"})):
+            return worker.step_cold_query(system, request, None)
+
+    def test_an_open_outside_the_query_call_is_added_to_the_figure(self):
+        answer = self.step(True, 0.25)
+        self.assertEqual((answer["seconds"], answer["open_seconds"], answer["query_seconds"]),
+                         (0.75, 0.25, 0.5))
+        self.assertEqual(answer["resident_bytes_before_clock"], 0)
+        self.assertEqual(answer["resident_bytes_before_query"], 2 * 4096)
+
+    def test_a_system_opened_before_its_clock_counts_what_its_open_read(self):
+        answer = self.step(False, None)
+        self.assertEqual((answer["seconds"], answer["open_seconds"]), (0.5, None))
+        self.assertEqual(answer["resident_bytes_before_clock"], 2 * 4096)
+        self.assertIs(answer["open_inside_clock"], False)
+
+    def test_the_proof_keeps_it(self):
+        from compare import coldcache, run_system
+
+        runner = run_system.Runner.__new__(run_system.Runner)
+        runner.layout = None
+        answer = {"resident_bytes_before_clock": 0, "resident_bytes_before_open": 0,
+                  "resident_bytes_before_query": 4096, "open_inside_clock": True}
+        runner.worker = lambda system, step, **fields: answer
+        system = SimpleNamespace(start_service=lambda: None, stop_service=lambda: None,
+                                 read_paths=lambda: [Path("store")])
+        evicted = {"pages": 9, "resident_pages": 0, "passes": 1, "method": "m"}
+        after = {"pages": 9, "resident_pages": 3, "page_size": 4096}
+
+        class Counter:
+            def __init__(self, path):
+                pass
+
+            def delta(self):
+                return {"bytes": 1 << 20, "counter": "c", "slack": 0}
+
+        with (mock.patch.object(run_system, "sync_tree"),
+              mock.patch.object(coldcache, "evict", return_value=evicted),
+              mock.patch.object(coldcache, "residency", return_value=after),
+              mock.patch.object(coldcache, "DeviceCounter", Counter),
+              mock.patch.object(coldcache, "refilled_pages", return_value=0)):
+            _, proof, _ = runner.cold_repetition(system, Path("store"), [Path("store")],
+                                                 Query("Q5", "column_sum", 0, 0), {})
+        self.assertEqual((proof["resident_bytes_before_clock"], proof["open_inside_clock"]),
+                         (0, True))
+        self.assertEqual(proof["resident_bytes_before_query"], 4096)
+
+    def test_each_system_says_whether_its_whole_open_is_inside_its_clock(self):
+        from compare.systems import system_class
+
+        self.assertEqual({name: system_class(name).open_inside_cold_clock
+                          for name in ("parquet", "arcticdb", "questdb", "tickstore")},
+                         {"parquet": True, "arcticdb": False, "questdb": False,
+                          "tickstore": True})
+        self.assertEqual(check_compare.OPEN_INSIDE_COLD_CLOCK,
+                         {"parquet": True, "arcticdb": False, "questdb": False,
+                          "tickstore": True})
 
 
 class WriteRecord(unittest.TestCase):

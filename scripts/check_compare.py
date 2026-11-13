@@ -41,7 +41,11 @@ which its median, its tail figure and its write medians are recomputed here. On 
 sibling of the second pinned CPU, cpu6, is measured and held to the first one's rule. Every
 write records its total and its engine-only seconds, says what each holds, and records how much
 of its input was resident when its clock started and the device bytes read while it ran;
-tick-store's source must have been wholly resident.
+tick-store's source must have been wholly resident. Every cold proof records the store's bytes
+resident just before its clock started, which must be 0 where the clock holds the system's
+whole open (Parquet's, which opens the file inside every call, and tick-store's, whose cold
+figure adds the open its query tool reports, both parts kept); and each warm worker's open is
+timed once.
 
 Standard library only. tests/scripts/test_check_compare.py shows each rule failing on an
 injected fault.
@@ -90,6 +94,10 @@ RUNTIME_FIELDS = ("jvm_vendor", "jvm_version", "jvm_read_from", "jemalloc_read_f
 ORACLE_FIELDS = ("verdict", "exit_code", "records", "mismatched_records", "hashes_match",
                  "source_sha256", "stored_sha256")
 LINUX_CPUS = [4, 6]
+# Whether a system's cold clock holds its whole open of the store: compare/systems says why for
+# each. Where it does, nothing of the store may be resident when the clock starts.
+OPEN_INSIDE_COLD_CLOCK = {"parquet": True, "arcticdb": False, "questdb": False,
+                          "tickstore": True}
 # The second pinned CPU's sibling, measured from protocol 2 and held to the first one's rule.
 SECOND_CPU = 6
 SECOND_SIBLING = "second_sibling_busy_percent"
@@ -531,6 +539,42 @@ def check_repetitions(where, block):
             for field, value in wanted.items() if not same(block.get(field), value)]
 
 
+def check_cold_open(where, cold, name):
+    """Protocol 2: the store's resident bytes when each cold clock started, 0 where the clock
+    holds the system's whole open; and tick-store's figure its open plus its query."""
+    cold = cold if isinstance(cold, dict) else {}
+    inside = OPEN_INSIDE_COLD_CLOCK.get(name)
+    problems = []
+    for index, proof in enumerate(cold.get("proofs") or []):
+        proof = proof if isinstance(proof, dict) else {}
+        here = f"{where}.cold[{index}]"
+        if proof.get("open_inside_clock") is not inside:
+            problems.append(f"{here}: open_inside_clock is {proof.get('open_inside_clock')!r}, "
+                            f"and {name}'s whole open is {'' if inside else 'not '}inside its "
+                            "cold clock")
+        before = proof.get("resident_bytes_before_clock")
+        if not is_count(before):
+            problems.append(f"{here}: no store bytes resident before the clock")
+        elif inside and before != 0:
+            problems.append(f"{here}: {before} bytes of the store resident before a clock that "
+                            "holds its whole open")
+    if name == "tickstore":
+        parts = cold.get("parts") if isinstance(cold.get("parts"), dict) else {}
+        opens = parts.get("open_seconds_by_repetition")
+        queries = parts.get("query_seconds_by_repetition")
+        totals = cold.get("seconds_by_repetition")
+        if not all(isinstance(item, list) and len(item) == cold.get("n")
+                   for item in (opens, queries, totals)) or not all(
+                check_results.is_number(value) and value > 0 for value in opens + queries):
+            return [*problems, f"{where}.cold: its open and its query are not kept for each "
+                               "repetition"]
+        for number, (total, opened, queried) in enumerate(zip(totals, opens, queries), 1):
+            if not same(total, opened + queried):
+                problems.append(f"{where}.cold: repetition {number} is not its open and its "
+                                "query")
+    return problems
+
+
 def check_tails(where, query):
     """Protocol 2: every latency block of a query, its engine's included."""
     problems = []
@@ -598,6 +642,7 @@ def check_queries(where, queries, truth, system_name=None, full_day=False, proto
         problems += check_latency(here, query)
         if protocol >= PROTOCOL_2:
             problems += check_tails(here, query)
+            problems += check_cold_open(here, query.get("cold"), system_name)
         if not query.get("scan"):
             problems.append(f"{here}: no rows or bytes decoded, or a statement of why not")
         if system_name == "tickstore":
@@ -651,6 +696,9 @@ def check_system(name, system, document, pin):
         problems += check_queries(where, variant.get("queries"), truth, name,
                                   bool(pin.get("full_day")) and not pin.get("alone"), protocol)
         if protocol >= PROTOCOL_2:
+            opened = (variant.get("warm_worker_open") or {}).get("seconds")
+            if not check_results.is_number(opened) or opened < 0:
+                problems.append(f"{where}.warm_worker_open: the warm worker's open is not timed")
             problems += check_tail(f"{where}.python_floor", variant.get("python_floor"))
             problems += check_repetitions(f"{where}.python_floor", variant.get("python_floor"))
     problems += check_swap(name, system)

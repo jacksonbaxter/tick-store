@@ -174,7 +174,16 @@ def step_warm_queries(system, request, layout):
     proof = coldcache.proof_of_warm(before, after)
     floor = python_floor(system)
     facts = {query.name: system.scan_facts(query) for query in queries}
-    return {"queries": answers, "proof": proof, "floor_seconds": floor, "scan_facts": facts}
+    return {"queries": answers, "proof": proof, "floor_seconds": floor, "scan_facts": facts,
+            "open": worker_open(system, request)}
+
+
+def worker_open(system, request):
+    """The warm worker's open, timed once, outside every warm clock."""
+    return {"seconds": request.get("open_seconds"),
+            "reported_open_seconds": system.reported_open_seconds(),
+            "what": "the worker's system.open(), timed from Python before any query, and the "
+                    "open the engine reports where it reports one; no warm figure holds it"}
 
 
 def timed_repetitions(system, query, truth, repetitions):
@@ -248,7 +257,8 @@ def warm_full_day(system, request, layout):
             "discarded": attempts[:-1]}
     floor = python_floor(system)
     facts = {query.name: system.scan_facts(query) for query in queries}
-    return {"queries": answers, "proofs": proofs, "floor_seconds": floor, "scan_facts": facts}
+    return {"queries": answers, "proofs": proofs, "floor_seconds": floor, "scan_facts": facts,
+            "open": worker_open(system, request)}
 
 
 def engine_seconds(result):
@@ -256,13 +266,31 @@ def engine_seconds(result):
     return getattr(result, "engine_seconds", None)
 
 
+def resident_bytes(report):
+    return report["resident_pages"] * report["page_size"]
+
+
 def step_cold_query(system, request, layout):
+    """One cold query. The figure is the query's own clock, plus the store's open where the
+    system opens its store outside the query call and reports how long that took (tick-store):
+    a fresh process's open and the query. The store's resident bytes are read before the open
+    (by main) and again just before the query, both outside every clock, and the one read where
+    the clock starts is the proof's."""
     query = query_from_json(request["query"])
+    before_query = coldcache.residency(layout, system.read_paths())
     with swap.Phase() as phase:
         elapsed, result = timed_query(system, query)
     digest = digest_result(query, result)
     require_truth(query, digest, request["truth"], system.name)
-    return {"seconds": elapsed, "digest": digest, "engine_seconds": engine_seconds(result),
+    opened = system.reported_open_seconds() if system.open_inside_cold_clock else None
+    before_open = resident_bytes(request["store_before_open"])
+    return {"seconds": elapsed + (opened or 0.0), "query_seconds": elapsed,
+            "open_seconds": opened, "open_inside_clock": system.open_inside_cold_clock,
+            "resident_bytes_before_open": before_open,
+            "resident_bytes_before_query": resident_bytes(before_query),
+            "resident_bytes_before_clock": (before_open if system.open_inside_cold_clock
+                                            else resident_bytes(before_query)),
+            "digest": digest, "engine_seconds": engine_seconds(result),
             "swap_timed": phase.counts}
 
 
@@ -281,7 +309,12 @@ def main(argv):
                          full_day=request.get("full_day", False),
                          source=Path(source) if source else None)
     system = system_class(request["system"])(context)
+    if request["step"] == "cold_query":
+        # Before the open, which on some systems is inside the cold clock.
+        request["store_before_open"] = coldcache.residency(layout, system.read_paths())
+    started = time.perf_counter()
     system.open()
+    request["open_seconds"] = time.perf_counter() - started
     try:
         answer = STEPS[request["step"]](system, request, layout)
     finally:

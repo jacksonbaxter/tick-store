@@ -287,7 +287,7 @@ class Runner:
         warm_phase.stop()
 
         cold_phase = swap.Phase().start()
-        cold, cold_engine, cold_swap, proofs, run_again = self.cold_runs(
+        cold, cold_engine, cold_swap, proofs, run_again, parts = self.cold_runs(
             variant, system, root, paths, queries, truth)
         cold_phase.stop()
 
@@ -313,8 +313,16 @@ class Runner:
                 results[query.name]["warm"]["engine"] = latency(warm_query["engine_seconds"])
             if None not in cold_engine[query.name]:
                 results[query.name]["cold"]["engine"] = latency(cold_engine[query.name])
+            opens = parts[query.name]["open_seconds_by_repetition"]
+            if opens and None not in opens:
+                # The store's open, added to the query: both parts, repetition by repetition.
+                results[query.name]["cold"]["parts"] = {
+                    **parts[query.name],
+                    "what": "each cold figure is the open the engine reported plus the query's "
+                            "round trip"}
         floor = latency(warm["floor_seconds"])
         phases = {"warm_queries": warm_phase.counts, "cold_queries": cold_phase.counts}
+        self.warm_open = warm["open"]
         return results, floor, warm["peak_rss_bytes"], self.after_queries(system), phases
 
     def cold_runs(self, variant, system, root, paths, queries, truth):
@@ -322,6 +330,8 @@ class Runner:
         not counted and runs again, at most COLD_RERUNS times per query; the pages each such
         run saw the store gain are kept."""
         cold = {query.name: [] for query in queries}
+        parts = {query.name: {"open_seconds_by_repetition": [],
+                              "query_seconds_by_repetition": []} for query in queries}
         cold_engine = {query.name: [] for query in queries}
         cold_swap = {query.name: [] for query in queries}
         proofs = {query.name: [] for query in queries}
@@ -342,8 +352,10 @@ class Runner:
                 proofs[query.name].append(proof)
                 cold[query.name].append(answer["seconds"])
                 cold_engine[query.name].append(answer.get("engine_seconds"))
+                parts[query.name]["open_seconds_by_repetition"].append(answer["open_seconds"])
+                parts[query.name]["query_seconds_by_repetition"].append(answer["query_seconds"])
                 cold_swap[query.name].append(answer["swap_timed"])
-        return cold, cold_engine, cold_swap, proofs, run_again
+        return cold, cold_engine, cold_swap, proofs, run_again, parts
 
     def cold_repetition(self, system, root, paths, query, truth):
         """One cold run: the store flushed and evicted, the service started, the query, the
@@ -361,6 +373,9 @@ class Runner:
         finally:
             system.stop_service()
         proof = coldcache.proof_of_cold(evicted, after, device.delta())
+        proof.update({key: answer[key] for key in (
+            "open_inside_clock", "resident_bytes_before_clock", "resident_bytes_before_open",
+            "resident_bytes_before_query")})
         return answer, proof, coldcache.refilled_pages(self.layout, paths)
 
     def clear_page_cache(self, root, paths):
@@ -461,6 +476,7 @@ class Runner:
             entry["query_store_class"] = CLASSES[-1]
             entry["python_floor"] = {**floor, "what": "the same Python call over an empty "
                                                       "window: the path's cost, with no data"}
+            entry["warm_worker_open"] = self.warm_open
             entry["query_worker_peak_rss_bytes"] = peak
             entry["swap"] = phases
             if extra is not None:
