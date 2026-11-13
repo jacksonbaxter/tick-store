@@ -3544,6 +3544,10 @@ file and `RecordingFileOps` from before the fix were compiled from `HEAD` beside
 test checks the file's bytes, not only the sizes asked for, so a write that went to the wrong
 place fails even where the sizes are right.
 
+A-5. Closed with the reviewer's code change rather than a note, since the change is three lines
+and a note would leave a caller able to end a stream by accident. `value_out_of_range`'s comment
+now says that for "raw bytes" `expected` is the fewest allowed, not the largest.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
