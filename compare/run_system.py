@@ -512,7 +512,9 @@ def latency(seconds):
     it is a value that really occurred. Below 100 runs that rank is the last, so the tail figure
     is the slowest run, and the block says so, with n and the rank used: at 30 warm and 7 cold
     repetitions it is the slowest of 30 and the slowest of 7, never a 1% tail. `p99_us` holds
-    the same figure under its old name, which the committed files and the generator use."""
+    the same figure under its old name, which the committed files and the generator use. Every
+    repetition's seconds are kept, in the order they ran, so that a validator can recompute
+    each figure."""
     ordered = sorted(seconds)
     count = len(ordered)
     rank = tail_rank(count)
@@ -521,15 +523,22 @@ def latency(seconds):
             "tail_us": tail, "tail_rank": rank, "tail_is_slowest": rank == count,
             "tail": tail_label(count, rank), "p99_us": tail,
             "mean_us": statistics.fmean(ordered) * 1e6,
-            "min_us": ordered[0] * 1e6, "max_us": ordered[-1] * 1e6}
+            "min_us": ordered[0] * 1e6, "max_us": ordered[-1] * 1e6,
+            "seconds_by_repetition": list(seconds)}
 
 
 def summarise_writes(repetitions, pin):
+    """The medians, and every repetition's own times beside them, so that each median can be
+    recomputed."""
     seconds = [item["timings"]["seconds"] for item in repetitions]
     median = statistics.median(seconds)
     field = {key: statistics.median(item["timings"][key] for item in repetitions)
              for key in ("engine_seconds", "python_seconds")}
+    by_repetition = [{key: item["timings"][key]
+                      for key in ("seconds", "engine_seconds", "python_seconds")}
+                     for item in repetitions]
     return {"repetitions": len(seconds), "seconds": seconds, "seconds_median": median,
+            "by_repetition": by_repetition,
             "records_per_second_median": pin["message_count"] / median,
             "bytes_per_second_median": pin["size"] / median, **field,
             "python_note": repetitions[0]["timings"]["python_note"],

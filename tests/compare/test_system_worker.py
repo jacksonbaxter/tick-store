@@ -436,6 +436,25 @@ class TailFigure(unittest.TestCase):
             block = run_system.latency([i / 1000 + 0.001 for i in range(count)])
             self.assertEqual(check_compare.check_tail("x", block), [])
 
+    def test_each_block_keeps_its_repetitions_in_the_order_they_ran(self):
+        from compare import run_system
+
+        seconds = [0.3, 0.1, 0.2]
+        self.assertEqual(run_system.latency(seconds)["seconds_by_repetition"], seconds)
+
+    def test_a_write_keeps_each_repetitions_times(self):
+        from compare import run_system
+
+        repetitions = [{"timings": {"seconds": total, "engine_seconds": engine,
+                                    "python_seconds": total - engine, "python_note": "n"},
+                        "peak_rss_bytes": 1, "service": {}}
+                       for total, engine in ((3.0, 2.5), (2.0, 1.5), (4.0, 3.0))]
+        write = run_system.summarise_writes(repetitions, {"message_count": 10, "size": 20})
+        self.assertEqual([item["engine_seconds"] for item in write["by_repetition"]],
+                         [2.5, 1.5, 3.0])
+        self.assertEqual(write["seconds"], [3.0, 2.0, 4.0])
+        self.assertEqual(check_compare.check_write_repetitions("w", write), [])
+
     def test_the_method_and_the_rule_name_the_slowest_run(self):
         self.assertIn("slowest of 30", compare_run.TAIL_STATEMENT)
         self.assertIn("slowest of 7", compare_run.TAIL_STATEMENT)

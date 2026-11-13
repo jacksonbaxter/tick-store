@@ -1279,7 +1279,7 @@ def latency_block(seconds):
             "tail": (SLOWEST.format(count) if rank == count
                      else f"99th percentile, nearest rank: run {rank} of {count}"),
             "mean_us": sum(ordered) / count * 1e6, "min_us": ordered[0] * 1e6,
-            "max_us": ordered[-1] * 1e6}
+            "max_us": ordered[-1] * 1e6, "seconds_by_repetition": list(seconds)}
 
 
 WARM_SECONDS = [10e-6, 9e-6, 12e-6]
@@ -1307,6 +1307,13 @@ def protocol_2(document):
                     entry["warm"]["engine"] = latency_block(ENGINE_WARM_SECONDS)
                     entry["cold"]["engine"] = latency_block(ENGINE_COLD_SECONDS)
             variant["python_floor"] = {**latency_block([1e-6, 2e-6, 3e-6]), "what": "floor"}
+            for entry in variant["classes"].values():
+                write = entry["write"]
+                write["repetitions"] = 3
+                write["seconds"] = [2.1, 2.0, 1.9]
+                write["by_repetition"] = [
+                    {"seconds": total, "engine_seconds": engine, "python_seconds": 0.1}
+                    for total, engine in zip(write["seconds"], (2.0, 1.9, 1.8), strict=True)]
     return document
 
 
@@ -1356,6 +1363,45 @@ class Protocol2(Harness):
         def fault(document):
             del document["systems"]["arcticdb"]["variants"]["v"]["python_floor"]["tail"]
         self.assert_fault_2(fault, "arcticdb.v.python_floor: the tail figure is called None")
+
+    # F-14: the repetitions themselves, and every summary recomputed from them.
+
+    def test_a_latency_block_with_no_repetitions(self):
+        def fault(document):
+            del q1_of(document, "questdb")["cold"]["seconds_by_repetition"]
+        self.assert_fault_2(fault, "questdb.v.queries.Q1.cold: no seconds for each of its 2 "
+                                   "repetitions")
+
+    def test_a_median_that_does_not_follow_from_the_repetitions(self):
+        def fault(document):
+            q1_of(document)["warm"]["seconds_by_repetition"][1] = 11e-6
+        self.assert_fault_2(fault, "Q1.warm: median_us 10.0 is not the median of its "
+                                   "repetitions, 11.0")
+
+    def test_a_tail_that_does_not_follow_from_the_repetitions(self):
+        def fault(document):
+            q1_of(document, "tickstore")["cold"]["engine"]["seconds_by_repetition"][1] = 99e-6
+        self.assert_fault_2(fault, "Q1.cold.engine: tail_us 100.0 is not the slowest of 2 of "
+                                   "its repetitions, 99.0")
+
+    def test_a_write_median_that_does_not_follow_from_the_repetitions(self):
+        def fault(document):
+            b_of(document, "parquet")["write"]["seconds"][0] = 1.0
+            b_of(document, "parquet")["write"]["by_repetition"][0]["seconds"] = 1.0
+        self.assert_fault_2(fault, "parquet.v.B.write: seconds_median 2.0 is not the median "
+                                   "of its repetitions, 1.9")
+
+    def test_a_write_engine_median_that_does_not_follow(self):
+        def fault(document):
+            b_of(document, "arcticdb")["write"]["by_repetition"][1]["engine_seconds"] = 1.95
+        self.assert_fault_2(fault, "arcticdb.v.B.write: engine_seconds 1.9 is not the median "
+                                   "of its repetitions, 1.95")
+
+    def test_a_write_with_no_repetition_kept(self):
+        def fault(document):
+            b_of(document, "tickstore")["write"]["by_repetition"].pop()
+        self.assert_fault_2(fault, "tickstore.v.B.write: by_repetition holds 2 repetitions, "
+                                   "and the write ran 3")
 
     def test_protocol_1_files_keep_the_rules_they_were_measured_by(self):
         result = self.run_on(valid_document("Linux"), "Linux")

@@ -36,7 +36,8 @@ Every file states the comparison protocol it was measured under. The committed f
 before the final review's protocol state none and count as protocol 1, held to the rules above.
 A protocol 2 file is held to more: each latency block names its tail figure for what it is, the
 nearest-rank 99th percentile with n and the rank used, which below 100 runs is the slowest run
-and must say so.
+and must say so; and every latency block and every write keeps each repetition's seconds, from
+which its median, its tail figure and its write medians are recomputed here.
 
 Standard library only. tests/scripts/test_check_compare.py shows each rule failing on an
 injected fault.
@@ -44,6 +45,8 @@ injected fault.
 
 import argparse
 import json
+import math
+import statistics
 import sys
 from pathlib import Path
 
@@ -451,14 +454,74 @@ def check_tail(where, block):
     return problems
 
 
+def figure(value):
+    """A figure as a message gives it."""
+    return round(value, 6) if check_results.is_number(value) else value
+
+
+def same(found, wanted):
+    return check_results.is_number(found) and math.isclose(found, wanted, rel_tol=1e-9,
+                                                           abs_tol=1e-9)
+
+
+def check_repetitions(where, block):
+    """Protocol 2: a latency block's figures, recomputed from the seconds of its repetitions."""
+    block = block if isinstance(block, dict) else {}
+    seconds = block.get("seconds_by_repetition")
+    count = block.get("n")
+    if not isinstance(seconds, list) or len(seconds) != count or not all(
+            check_results.is_number(value) and value >= 0 for value in seconds):
+        return [f"{where}: no seconds for each of its {count!r} repetitions"]
+    if count == 0:
+        return []
+    ordered = sorted(seconds)
+    wanted = {"median_us": statistics.median(ordered) * 1e6,
+              "tail_us": ordered[nearest_rank(count) - 1] * 1e6,
+              "min_us": ordered[0] * 1e6, "max_us": ordered[-1] * 1e6,
+              "mean_us": statistics.fmean(ordered) * 1e6}
+    names = {"median_us": "the median", "tail_us": f"the {block.get('tail')}",
+             "min_us": "the fastest", "max_us": "the slowest", "mean_us": "the mean"}
+    return [f"{where}: {field} {figure(block.get(field))} is not {names[field]} of its "
+            f"repetitions, {figure(value)}"
+            for field, value in wanted.items() if not same(block.get(field), value)]
+
+
 def check_tails(where, query):
     """Protocol 2: every latency block of a query, its engine's included."""
     problems = []
     for kind in ("warm", "cold"):
         block = query.get(kind) or {}
         problems += check_tail(f"{where}.{kind}", block)
+        problems += check_repetitions(f"{where}.{kind}", block)
         if "engine" in block:
             problems += check_tail(f"{where}.{kind}.engine", block["engine"])
+            problems += check_repetitions(f"{where}.{kind}.engine", block["engine"])
+    return problems
+
+
+def check_write_repetitions(where, write):
+    """Protocol 2: each write repetition's times kept, and every median recomputed from them."""
+    write = write if isinstance(write, dict) else {}
+    count = write.get("repetitions")
+    each = write.get("by_repetition")
+    seconds = write.get("seconds")
+    if not is_count(count) or count == 0 or not isinstance(each, list) or len(each) != count:
+        return [f"{where}.write: by_repetition holds "
+                f"{len(each) if isinstance(each, list) else 'no'} repetitions, and the write ran "
+                f"{count!r}"]
+    fields = ("seconds", "engine_seconds", "python_seconds")
+    if not all(isinstance(item, dict) and all(check_results.is_number(item.get(field))
+                                              for field in fields) for item in each):
+        return [f"{where}.write: a repetition without its {', '.join(fields)}"]
+    if seconds != [item["seconds"] for item in each]:
+        return [f"{where}.write: seconds {seconds!r} are not the repetitions' own"]
+    problems = []
+    for field, median in (("seconds_median", "seconds"), ("engine_seconds", "engine_seconds"),
+                          ("python_seconds", "python_seconds")):
+        value = statistics.median(item[median] for item in each)
+        if not same(write.get(field), value):
+            problems.append(f"{where}.write: {field} {figure(write.get(field))} is not the "
+                            f"median of its repetitions, {figure(value)}")
     return problems
 
 
@@ -532,6 +595,8 @@ def check_system(name, system, document, pin):
             problems += check_read_back(here, entry.get("read_back"), pin)
             problems += check_stored(here, entry.get("stored"), pin)
             problems += check_write(here, entry.get("write"), pin)
+            if protocol >= PROTOCOL_2:
+                problems += check_write_repetitions(here, entry.get("write"))
             if name == "tickstore":
                 problems += check_tickstore_read_back(here, entry.get("read_back"))
                 problems += check_tickstore_write(here, entry.get("write"))
@@ -541,6 +606,7 @@ def check_system(name, system, document, pin):
                                   bool(pin.get("full_day")) and not pin.get("alone"), protocol)
         if protocol >= PROTOCOL_2:
             problems += check_tail(f"{where}.python_floor", variant.get("python_floor"))
+            problems += check_repetitions(f"{where}.python_floor", variant.get("python_floor"))
     problems += check_swap(name, system)
     if pin.get("full_day") and host == "Linux":
         problems += check_peak_memory(name, system.get("peak_memory"))
