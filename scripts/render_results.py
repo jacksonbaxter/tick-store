@@ -620,6 +620,26 @@ def codec_column(document, name):
     return found[0]
 
 
+# A per-locate column's codec-eval bits leave out the locate sequence that rebuilds file order
+# (codec-eval's not_counted and permutation_estimate), so a verdict on them says so (D-10).
+PERMUTED_ORDERS = ("per_locate", "per_locate_side")
+PERMUTATION_CAVEAT = "leaving out the locate sequence that rebuilds file order"
+
+
+def excludes_permutation(document, name):
+    """Whether a codec-eval column's bits leave out the permutation to file order: the
+    comparison's excludes_permutation, which tick_codec_eval writes from version 4, or for an
+    earlier file the column's order, from which the tool sets that field."""
+    column = codec_column(document, name)
+    comparison = column.get("comparison") or {}
+    if "excludes_permutation" in comparison:
+        return comparison["excludes_permutation"] is True
+    version = document.get("tool_version")
+    if isinstance(version, int) and version >= 4 and "target" in comparison:
+        raise TargetError(f"{name}: a version 4 verdict with no excludes_permutation")
+    return column.get("order") in PERMUTED_ORDERS
+
+
 def bench_cases(document, pattern):
     found = [result for result in document.get("results", [])
              if fnmatch.fnmatchcase(result.get("case", ""), pattern)]
@@ -733,6 +753,9 @@ def judge(item, row, document):
     text = shown(value, row)
     if isinstance(operand, dict):
         text += f" against {shown(against, row)}"
+    if isinstance(item["value"], dict) and "best" in item["value"] and \
+            excludes_permutation(document, item["value"]["best"]):
+        text += f", {PERMUTATION_CAVEAT}"
     if item.get("label") and item is not row:
         text = f"{item['label']} {text}"
     return text, met

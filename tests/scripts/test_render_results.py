@@ -375,6 +375,52 @@ class RenderTargetsTest(Scratch):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn(f"| shown 2.0 s, judged 4.0 s | {verdict} |", self.row("T-12", "any"))
 
+    def eval_rows(self, version, file_comparison, locate_comparison):
+        def column(name, order, comparison):
+            return {"name": name, "order": order, "comparison": comparison,
+                    "codecs": [{"codec": "a", "family": "f", "bits_per_value": 3.0,
+                                "exact": True}]}
+        document = {"host": "macOS", "tool_version": version,
+                    "columns": [column("c", "file", file_comparison),
+                                column("c_per_locate", "per_locate", locate_comparison)]}
+        (self.tree / "results" / "eval-0123.json").write_text(json.dumps(document),
+                                                             encoding="utf-8")
+        self.write_targets([{"id": "T-13", "host": "any", "target": {"at_most": 5},
+                             "digits": 1, "unit": " bits",
+                             "parts": [{"label": "file order", "file": "results/eval-*.json",
+                                        "value": {"best": "c"}},
+                                       {"label": "per locate", "file": "results/eval-*.json",
+                                        "value": {"best": "c_per_locate"}}]}])
+        return self.render()
+
+    def test_a_per_locate_figure_says_it_leaves_out_the_permutation(self):
+        # D-10: a per-locate column's bits leave out the locate sequence that rebuilds file
+        # order. Version 3 files say so by the column's order, version 4 in its comparison.
+        caveat = "leaving out the locate sequence that rebuilds file order"
+        target = {"target": "CR-0", "met": True}
+        for version, file_side, locate_side in (
+                (3, target, target),
+                (4, {**target, "excludes_permutation": False},
+                 {**target, "excludes_permutation": True})):
+            with self.subTest(version=version):
+                result = self.eval_rows(version, file_side, locate_side)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(f"| file order: 3.0 bits; per locate: 3.0 bits, {caveat} | met |",
+                              self.row("T-13", "any"))
+        # Version 4's field is what the tool wrote, whatever the order says.
+        result = self.eval_rows(4, {**target, "excludes_permutation": True},
+                                {**target, "excludes_permutation": False})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(f"| file order: 3.0 bits, {caveat}; per locate: 3.0 bits | met |",
+                      self.row("T-13", "any"))
+
+    def test_a_version_4_verdict_without_its_permutation_field_is_refused(self):
+        result = self.eval_rows(4, {"target": "CR-0", "excludes_permutation": False},
+                                {"target": "CR-0"})
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("c_per_locate: a version 4 verdict with no excludes_permutation",
+                      result.stderr)
+
     def test_two_files_for_one_pattern_fail(self):
         (self.tree / "results" / "day-4567.json").write_text(json.dumps(TARGET_DOCUMENT),
                                                             encoding="utf-8")
