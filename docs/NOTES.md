@@ -3221,8 +3221,8 @@ Raw: `phase4-raw/fix-codecs/`: each finding's failing and passing logs, the help
 ### The final review's store findings
 
 Reviewer C read the container, the ITCH store and the queries at `ca96b36` and found one SHOULD
-and nine NOTE findings (C-1 to C-10); the orchestrator's gate added a tenth, G-3, the message that
-read "expected 0, have 0". Each was confirmed by reading the code, then by a test seen failing for
+and nine NOTE findings (C-1 to C-10); the orchestrator's gate added one more, G-3 (the review's id, not
+the fuzzing target), the message that read "expected 0, have 0". Each was confirmed by reading the code, then by a test seen failing for
 the reason given, except C-9, whose demonstration was wrong, and C-4, which needed no code. The
 file format did not change: no writer byte moved, and the golden tests passed unchanged after
 every commit. The record is `docs/REVIEW.md`.
@@ -3287,8 +3287,19 @@ what it read. The gate's message now reads "container: block, segment 32, column
 scripts' substring checks still match. `results/roundtrip-12302019.json` still holds the old text,
 since results are not regenerated in Phase 4; the freeze rerun will replace it.
 
-Raw: `phase4-raw/fix-store/`: each finding's failing and passing logs, the fault runs for C-5
-and C-9, and the check logs.
+The reference-distance seed (TASKS). `generate_seeds` now writes a store of one add and its
+execution with the execution's distance made 2 against a list of 1, re-encoded through
+`encode_column` and rebuilt so its CRCs hold; the reader refuses it with "bad value: ref distance,
+segment 0, column ref_distance, record 1, value 0: expected 1, have 2", and every other seed is
+unchanged. On debian at `7855a1f`, the target ran clean for 60 s with the bound in place (39,740
+runs). With `faults/store-ref-distance-bound.patch` applied and check.sh's arguments at seed 1, it
+stopped on its fifth input, the new seed itself before any mutation, with UBSan's pointer overflow
+in `SegmentAssembler::State::named`; the other seeds, each run once with the bound removed, passed.
+Before the seed, one run in four found it, at 43 s. G-3's 30-minute runs predate the seed, so TASKS
+carries running them again at the freeze.
+
+Raw: `phase4-raw/fix-store/`: each finding's failing and passing logs, the fault runs for C-5,
+C-9 and the seed (`tasks238-*`), and the check logs.
 
 ## Process notes
 
