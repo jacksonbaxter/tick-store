@@ -317,6 +317,14 @@ column files, or tick-store's ITCH file) once it is made ready and just before t
 macOS `iostat`'s `disk0` total, which counts the write's own output too, so it only bounds the
 reads from above. Each write's `times` says what its two times hold, as the table does.
 
+On the slice every system's input is made wholly resident before its clock: tick-store's ITCH
+slice, and the export's column files for the other three, read through by `tick_coldcache warm`,
+with the write refused unless `mincore` then reads every page resident. The record of it is the
+write's `input_at_clock_start.made_ready`, and `scripts/check_compare.py` requires
+`input_resident_pages_at_start` to equal `input_pages` for every system on a protocol 2 slice.
+The files before protocol 2 stated that the export was warm before every write and never checked
+it (review F-10). On a day the export is taken as the cache holds it and only recorded.
+
 **A write target is met against another system only if tick-store is no slower on both times.**
 `BENCHMARKS.md`'s targets are not reworded; the rule is how they are judged, by
 `scripts/render_results.py`, whose tables show both columns. The files measured before protocol 2

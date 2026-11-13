@@ -29,6 +29,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 
+from compare import coldcache
 from compare.durability import CLASS_B
 from compare.settings import durability_verdict
 
@@ -151,8 +152,19 @@ class System(ABC):
         return [Path(columns.directory)]
 
     def ready_input(self, columns):
-        """Before the write's clock: whatever its input needs. Returns the record of it."""
-        return {"what": "nothing: the input is taken as the cache holds it"}
+        """Before the write's clock: whatever its input needs. Returns the record of it. On the
+        slice the export is read through by tick_coldcache warm and must be wholly resident, as
+        tick-store's source is (review F-10); a day's export is taken as the cache holds it,
+        since the full day's write protocol stays as it was (review F-2)."""
+        if self.context.full_day:
+            return {"what": "nothing: the input is taken as the cache holds it"}
+        warmed = coldcache.warm(self.context.layout, [Path(columns.directory)])
+        if warmed["resident_pages"] != warmed["pages"]:
+            raise coldcache.ProofFailed(
+                f"the export was not made resident before the write: {warmed['resident_pages']} "
+                f"of its {warmed['pages']} pages after tick_coldcache warm")
+        return {"what": "the export's column files, read through by tick_coldcache warm",
+                "pages": warmed["pages"], "resident_pages": warmed["resident_pages"], "warms": 1}
 
     @classmethod
     def write_times(cls, full_day):

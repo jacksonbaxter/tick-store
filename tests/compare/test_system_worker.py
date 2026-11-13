@@ -71,8 +71,9 @@ VARIANT = ParquetSystem.headline_variant
 # A stand-in for tools/tick_coldcache, which a worker's write and cold steps call around their
 # clocks: every file has 1 page, none of it resident or dirty.
 FAKE_COLDCACHE = """
-import json
-print(json.dumps({"pages": 1, "resident_pages": 0, "page_size": 4096, "dirty_pages": 0}))
+import json, sys
+resident = 1 if sys.argv[1] == "warm" else 0
+print(json.dumps({"pages": 1, "resident_pages": resident, "page_size": 4096, "dirty_pages": 0}))
 """
 QUERIES = (Query("rows", "rows", OPEN_NS, OPEN_NS + NANOS_PER_SECOND),
            Query("minutes", "minute_aggregate", OPEN_NS, OPEN_NS + 300 * NANOS_PER_SECOND),
@@ -662,13 +663,13 @@ class WriteRecord(unittest.TestCase):
         repetitions = [{"timings": {"seconds": total, "engine_seconds": total - 1,
                                     "python_seconds": 0.5, "engine_only_seconds": total - 0.5,
                                     "python_note": "n",
-                                    "input_at_clock_start": {"pages": 10, "resident_pages": 7},
+                                    "input_at_clock_start": {"pages": 10, "resident_pages": 10},
                                     "device_read": {"bytes": 4096, "counter": "c"}},
                         "peak_rss_bytes": 1, "service": {}} for total in (3.0, 2.0, 4.0)]
         write = run_system.summarise_writes(repetitions, {"message_count": 10, "size": 20},
                                             {"seconds": "s", "engine_only_seconds": "e"})
         self.assertEqual(write["engine_only_seconds_median"], 2.5)
-        self.assertEqual(write["by_repetition"][2]["input_resident_pages_at_start"], 7)
+        self.assertEqual(write["by_repetition"][2]["input_resident_pages_at_start"], 10)
         self.assertEqual(write["by_repetition"][0]["device_bytes_read"], 4096)
         self.assertEqual(write["times"], {"seconds": "s", "engine_only_seconds": "e"})
         self.assertEqual(check_compare.check_write_record("w", write, "parquet"), [])
@@ -723,6 +724,42 @@ class WriteRecord(unittest.TestCase):
                                         None)
         self.assertEqual(order, ["ingest", "delta", "dirty", "settings_after_ingest"])
         self.assertEqual(answer["flush"]["data_dirty_pages"], 0)
+
+
+class SliceExportResident(unittest.TestCase):
+    """On the slice every system's write reads the export, which is read through and proven
+    wholly resident before the write's clock, as tick-store's source is (review F-10)."""
+
+    def ready(self, full_day, resident=4):
+        from compare import coldcache
+        from compare.systems.base import System
+
+        calls = []
+
+        def warm(layout, paths):
+            calls.append([str(path) for path in paths])
+            return {"pages": 4, "resident_pages": resident}
+
+        owner = SimpleNamespace(context=SimpleNamespace(layout="layout", full_day=full_day))
+        columns = SimpleNamespace(directory=Path("export"))
+        with mock.patch.object(coldcache, "warm", warm):
+            return System.ready_input(owner, columns), calls
+
+    def test_the_slice_export_is_read_through_and_recorded(self):
+        record, calls = self.ready(False)
+        self.assertEqual(calls, [["export"]])
+        self.assertEqual((record["pages"], record["resident_pages"], record["warms"]), (4, 4, 1))
+
+    def test_a_slice_export_left_short_stops_the_write(self):
+        from compare import coldcache
+
+        with self.assertRaisesRegex(coldcache.ProofFailed, "3 of its 4 pages"):
+            self.ready(False, resident=3)
+
+    def test_a_day_export_is_taken_as_the_cache_holds_it(self):
+        record, calls = self.ready(True)
+        self.assertEqual(calls, [])
+        self.assertIn("nothing", record["what"])
 
 
 class Statements(unittest.TestCase):

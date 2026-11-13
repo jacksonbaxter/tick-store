@@ -1509,6 +1509,14 @@ class Protocol2(Harness):
         self.assert_fault_2(fault, "tickstore.v.B.write: repetition 2 started its clock with 60 "
                                    "of its source's 100 pages resident")
 
+    def test_a_slice_write_from_an_export_not_resident(self):
+        # Review F-10: on the slice every system's export is read through before its write.
+        def fault(document):
+            b_of(document, "parquet")["write"]["by_repetition"][1][
+                "input_resident_pages_at_start"] = 60
+        self.assert_fault_2(fault, "parquet.v.B.write: repetition 2 started its clock with 60 "
+                                   "of its input's 100 pages resident")
+
     # F-1: the cold clock's start, and what was resident when it started.
 
     def test_a_cold_proof_with_no_residency_before_its_clock(self):
@@ -1568,6 +1576,18 @@ class Protocol2FullDay(Harness):
     def test_the_valid_protocol_2_full_day_passes(self):
         document, source = full_day_document()
         result = self.run_full(protocol_2(document), protocol_2(source))
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_a_day_write_may_start_with_its_export_partly_resident(self):
+        # The full day's write protocol is unchanged (review F-2): the others' export is taken
+        # as the cache holds it, and only recorded.
+        document, source = full_day_document()
+        protocol_2(document)
+        for system in ("parquet", "arcticdb", "questdb"):
+            for variant in document["systems"][system]["variants"].values():
+                for entry in variant["classes"].values():
+                    entry["write"]["by_repetition"][0]["input_resident_pages_at_start"] = 60
+        result = self.run_full(document, protocol_2(source))
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_the_rule_as_protocol_1_stated_it(self):

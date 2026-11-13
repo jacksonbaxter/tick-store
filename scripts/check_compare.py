@@ -46,7 +46,7 @@ resident just before its clock started, which must be 0 where the clock holds th
 whole open (Parquet's, which opens the file inside every call, and tick-store's, whose cold
 figure adds the open its query tool reports, both parts kept); and each warm worker's open is
 timed once. Warm repetitions follow an untimed, answer-checked run of each query, on the slice
-as on a day.
+as on a day. On the slice every system's write starts its clock with its input wholly resident.
 
 Standard library only. tests/scripts/test_check_compare.py shows each rule failing on an
 injected fault.
@@ -237,10 +237,12 @@ def check_write(where, write, pin):
     return problems
 
 
-def check_write_record(where, write, name):
+def check_write_record(where, write, name, full_day=False):
     """Protocol 2: each write repetition's engine-only seconds, its input's residency when the
-    clock started and the device's reads while it ran; what the two times hold; and tick-store's
-    source wholly resident, its precondition."""
+    clock started and the device's reads while it ran; what the two times hold; tick-store's
+    source wholly resident, its precondition; and on the slice every system's export wholly
+    resident too (review F-10). A day's export is only recorded: its write protocol is
+    unchanged (review F-2)."""
     write = write if isinstance(write, dict) else {}
     each = write.get("by_repetition") if isinstance(write.get("by_repetition"), list) else []
     problems = []
@@ -258,6 +260,9 @@ def check_write_record(where, write, name):
         elif name == "tickstore" and resident != pages:
             problems.append(f"{where}.write: repetition {number} started its clock with "
                             f"{resident} of its source's {pages} pages resident")
+        elif not full_day and resident != pages:
+            problems.append(f"{where}.write: repetition {number} started its clock with "
+                            f"{resident} of its input's {pages} pages resident")
         if not is_count(item.get("device_bytes_read")) or not item.get("device_counter"):
             problems.append(f"{where}.write: repetition {number} records no device bytes read "
                             "while it ran")
@@ -692,7 +697,8 @@ def check_system(name, system, document, pin):
             problems += check_write(here, entry.get("write"), pin)
             if protocol >= PROTOCOL_2:
                 problems += check_write_repetitions(here, entry.get("write"))
-                problems += check_write_record(here, entry.get("write"), name)
+                problems += check_write_record(here, entry.get("write"), name,
+                                              bool(pin.get("full_day")))
             if name == "tickstore":
                 problems += check_tickstore_read_back(here, entry.get("read_back"))
                 problems += check_tickstore_write(here, entry.get("write"))

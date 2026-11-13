@@ -427,7 +427,9 @@ def build_document(host, args, layout, pin, commit, measure, parts, load_lines, 
                        "ingest_input": INPUT_STATEMENT, "export": manifest}
     method = {"warm": WARM_METHOD, "cold": COLD_METHOD[host], "cold_includes": COLD_INCLUDES,
               "one_system_at_a_time": True, "tickstore_queries": TICKSTORE_QUERIES,
-              "input_cache": "the export's column files are warm before every write",
+              "input_cache": ("before every write its input is read through by tick_coldcache "
+                              "warm and proven wholly resident by mincore: the export's column "
+                              "files, or tick-store's ITCH slice"),
               "tail": TAIL_STATEMENT,
               "swap": swap.method_block()}
     queries = {"parameters": query_sets[0], "truth": truths[0],
