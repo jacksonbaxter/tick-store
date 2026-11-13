@@ -3548,6 +3548,12 @@ A-5. Closed with the reviewer's code change rather than a note, since the change
 and a note would leave a caller able to end a stream by accident. `value_out_of_range`'s comment
 now says that for "raw bytes" `expected` is the fewest allowed, not the largest.
 
+A-6. The signal test cannot be sure the signal lands inside `poll`: the helper waits 50 ms after
+reading the command, which the gate writes just before it polls. A signal that came early would
+make the test pass before the fix, never fail after it; it failed on each of three runs before.
+The handler has no `SA_RESTART`, so `poll` returns `EINTR` on both hosts. The pair check is on
+every platform, since a lone path is a mistyped command line wherever it is typed.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
