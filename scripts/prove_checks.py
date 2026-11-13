@@ -214,6 +214,13 @@ def edit_table_cells(path, prefix, cells):
     target.write_text("\n".join(lines))
 
 
+def roundtrip_exit_codes_typed():
+    """12302019's round-trip file as the assembler of 1669ae0 wrote it, G-2's two exit codes
+    typed and none recorded on a run, from any later commit: check_roundtrip.py takes that
+    form only from 1669ae0 (review E-1)."""
+    edit_json("results/roundtrip-12302019.json", lambda d: d.update(commit="0123456789ab"))
+
+
 def hand_edit_targets_value():
     """WT-1 on Linux in RESULTS.md's Targets block, its figure raised past the target and the
     verdict turned to met."""
@@ -808,6 +815,18 @@ FAULTS = (
           "shorter than 1,800 s, so a 20-second run could stand for G-3's 30 minutes",
           CHECK_FAILED, "FAIL: test_a_clean_run_under_1800_seconds_is_refused "
           "(__main__.CheckFuzzTest"),
+    # Review E-1: G-2's exit codes are the ones its runs exited with.
+    Fault("store-results-corrupt-exit-unchecked", "py-scripts", "store_results.py writes G-2's "
+          "corrupt exit code as the constant 1 and takes a corrupt run that exited 2 or 0",
+          CHECK_FAILED, "FAIL: test_a_run_that_exited_with_the_wrong_code_is_refused "
+          "(__main__.StoreResults"),
+    Fault("roundtrip-corrupt-summary-unchecked", "py-scripts", "check_roundtrip.py stops "
+          "holding G-2's exit_code_corrupt to each corrupt run's exit code", CHECK_FAILED,
+          "FAIL: test_a_summary_no_run_bears_out_is_refused (__main__.CheckRoundtrip"),
+    Fault("roundtrip-exit-codes-typed", "render-check", "a round-trip file from a later commit "
+          "with G-2's two exit codes typed and none observed on its runs, as the assembler "
+          "wrote them before review E-1", EXIT_RENDER_REFUSED,
+          "g2.data_crc: no exit_code observed", roundtrip_exit_codes_typed),
     Fault("results-md-hand-edit", "render-check", "a hand edit inside RESULTS.md's benchmark "
           "block, a host's heading changed", CHECK_FAILED,
           "the table in RESULTS.md is stale or was edited by hand", hand_edit_results_md),
