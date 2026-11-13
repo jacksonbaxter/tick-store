@@ -3906,6 +3906,15 @@ report is now read straight after the write's device counter, before `settings_a
 all four systems. The probe's report was already read at once. No validator rule follows: a file
 cannot show when its report was read, so the test holds the order.
 
+**F-10, the slice's export before each write.** Confirmed by reading: the claim was in every slice
+file's `method.input_cache` and nothing tested it. The base `ready_input`, which tick-store's own
+overrides, now warms the slice's export and refuses a write it leaves short; the worker then
+reads the residency the file keeps, after the Arrow table is mapped and just before the clock.
+A day's export is not warmed: on a day it is about 24 GB and the write protocol is unchanged, so
+it stays recorded only, and `Protocol2FullDay` passes a day file whose others' export was 60 of
+100 pages resident. The cold worker's stand-in `tick_coldcache` now answers a warm with every page
+resident. The real-systems tests passed on the Mac after the change (12 tests).
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
