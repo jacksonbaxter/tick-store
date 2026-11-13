@@ -3500,6 +3500,16 @@ R-2. Fixed in code rather than by deleting the header's sentence: a default `Seg
 a value a caller can hold, and an empty segment is the answer the header gives. The check sits
 after the failure check, so a failed seek still gives its error (C-7's test passes unchanged).
 
+R-3. The parts were chosen from the Linux gate's ctest log at `22c4422`, where each test of the
+capped filter also runs on its own, uncapped and three at a time: `FuzzOracles` took 1,093.5 s
+and `ItchQuery` 985.3 s of the 2,344.4 s those tests summed, the query oracle's cut-and-flip test
+626.7 s and `ItchQuery.SegmentsWithRawRowsTakeTheExactPath` 534.1 s, and every other suite under
+60 s. So those two tests run alone and the rest of their suites apart from the codecs and the
+store. The whole filter is kept as it was, as the definition of what the capped run covers; the
+partition check asks gtest to list it and each part, so a part's negative pattern means what
+it means to gtest, and a renamed test that leaves a part empty fails too. Each part's time on
+the Linux host is in the closing gate below.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
