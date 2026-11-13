@@ -4001,6 +4001,12 @@ pages in the probe while their class B was not proven. `check_compare.py` now ho
 class A to the proof that made it: no harness flush for Parquet, in both scopes, and dirty pages
 in the probe for ArcticDB and QuestDB, as `compare/settings.py` decides it. Every committed file
 meets it: the smallest class A probe is 120 dirty pages, ArcticDB's on macOS.
+**F-7, ArcticDB's LMDB flags.** Confirmed by a test on fakes of the engine: with
+`get_config_int` answering `None` for every key, class B's `LMDBStorage.ExtraFlags` passed as 0,
+read as `None or 0`. Before dropping the fallback, the real engine in the `.venv`, ArcticDB
+6.28.2, was asked in a fresh process per case: `ARCTICDB_LMDBStorage_ExtraFlags_int=0` reads back
+0, the class A flags 327680, and the key unset `None`. So an explicit 0 is 0, and `None` now
+fails the read-back as a setting not in force.
 
 ## Process notes
 
