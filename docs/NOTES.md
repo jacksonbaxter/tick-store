@@ -3390,6 +3390,14 @@ owned by anyone else, so the comparison's warm and cold proofs see what they saw
 `compare/coldcache.py`, a refusal is exit 2, which `_tool` raises as `ProofFailed` with the
 tool's message; the Python tests use stand-ins for the tool and pass unchanged.
 
+D-8. `LiveOrder` keeps the side and whether it is known, in padding it already had, so the book
+grows by nothing. The add heads are unchanged, since every add has a side; only
+`creation_ref_heads` moves. The two shares are now over the steps and pairs whose sides are both
+known, written beside them as `head_side_steps` and `consecutive_side_pairs`; a step to a head no
+value has reached yet still compares with that head's empty owner, as before. No script reads
+the head fields (`git grep` over `scripts/`, `compare/` and their tests). The committed
+`results/codec-eval-*.json` keep the old shares until the freeze rerun (TASKS).
+
 Raw: `phase4-raw/fix-harness/`: each finding's failing and passing logs.
 
 ## Process notes
