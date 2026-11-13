@@ -204,7 +204,7 @@ std::string to_string(const ItchStoreError& error) {
     }
     // A container error's offset is its own, which its text gives.
     if (error.offset != kNoIndex &&
-        !(error.container.has_value() && error.container->offset == error.offset)) {
+        (!error.container.has_value() || error.container->offset != error.offset)) {
         text += std::format(", file byte {}", error.offset);
     }
     text += expected_and_have(error.expected, error.actual);

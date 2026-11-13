@@ -19,6 +19,7 @@
 #include "tick_store/store/crc32c.hpp"
 #include "tick_store/store/itch_store.hpp"
 #include "tick_store/store/itch_store_reader.hpp"
+#include "tick_store/store/itch_store_writer.hpp"
 
 #include <gtest/gtest.h>
 
@@ -854,7 +855,9 @@ TEST(ItchStoreCorrupt, NextAfterAFailedSeekGivesTheFailure) {
         SegmentReader records;
         ASSERT_TRUE(records.seek(*reader, 0).has_value());
         const auto first = records.next();
-        ASSERT_TRUE(first.has_value() && first->has_value());
+        ASSERT_TRUE(first.has_value());
+        ASSERT_TRUE(first->has_value());
+        const Bytes first_payload = test::payload_of(**first);
         const auto failed = records.seek(*reader, 1);
         ASSERT_FALSE(failed.has_value());
         for (int twice = 0; twice < 2; ++twice) {
@@ -866,8 +869,9 @@ TEST(ItchStoreCorrupt, NextAfterAFailedSeekGivesTheFailure) {
         // A seek that succeeds clears it.
         ASSERT_TRUE(records.seek(*reader, 0).has_value());
         const auto again = records.next();
-        ASSERT_TRUE(again.has_value() && again->has_value());
-        EXPECT_EQ(test::payload_of(**again), test::payload_of(**first));
+        ASSERT_TRUE(again.has_value());
+        ASSERT_TRUE(again->has_value());
+        EXPECT_EQ(test::payload_of(**again), first_payload);
     }
 }
 

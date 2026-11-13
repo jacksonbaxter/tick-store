@@ -26,6 +26,7 @@
 #include "tick_store/itch/message.hpp"
 #include "tick_store/store/container.hpp"
 #include "tick_store/store/itch_store.hpp"
+#include "tick_store/store/itch_store_reader.hpp"
 
 #include <gtest/gtest.h>
 
@@ -325,6 +326,7 @@ TEST(FuzzOracles, PassEveryCutAndFlipThroughTheQueryOracle) {
 TEST(FuzzOracles, TheQueryOracleSeesASegmentBothPathsWouldSkip) {
     static const Bytes raw = test::bytes({'z', 1, 2, 3});
     std::vector<Message> messages;
+    messages.reserve(12);
     for (std::uint64_t i = 0; i < 4; ++i) {
         messages.emplace_back(AddOrder{MessageHeader{1, 0, 1'000 + i}, 10 + i, std::byte{'B'}, 100,
                                        store::test::stock_of("QRY"), Price4{100'000}});

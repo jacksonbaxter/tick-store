@@ -230,7 +230,7 @@ struct ColumnForm {
         };
         std::vector<QueryRow> rows;
         for (const QueryRow& row : all) {
-            if (in_window(row) && (!request.locate.has_value() || row.locate == *request.locate)) {
+            if (in_window(row) && (!request.locate.has_value() || request.locate == row.locate)) {
                 rows.push_back(row);
             }
         }
@@ -238,7 +238,7 @@ struct ColumnForm {
         if (request.locate.has_value()) {
             std::vector<MinuteBucket> minutes;
             for (const QueryRow& row : all) {
-                if (!in_window(row) || row.locate != *request.locate ||
+                if (!in_window(row) || request.locate != row.locate ||
                     (row.msg_type != 'A' && row.msg_type != 'F')) {
                     continue;
                 }

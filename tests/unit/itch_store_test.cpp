@@ -902,6 +902,7 @@ TEST(ItchStoreSizes, RawBytesAreBoundedByTheirRecordsNotByTheFile) {
     constexpr std::uint32_t kRecords = 16;
     const Bytes payload(itch::kMaxPayloadSize, std::byte{'z'});
     std::vector<itch::Message> messages;
+    messages.reserve(kRecords);
     for (std::uint32_t r = 0; r < kRecords; ++r) {
         messages.emplace_back(itch::RawMessage{.bytes = payload});
     }

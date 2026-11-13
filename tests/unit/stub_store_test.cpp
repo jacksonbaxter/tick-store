@@ -558,7 +558,7 @@ TEST(MappedFile, RefusesAFifoWithoutWaitingForAWriter) {
     if (opened.wait_for(std::chrono::seconds{10}) != std::future_status::ready) {
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg): the POSIX interface is variadic.
         const int writer = ::open(fifo.c_str(), O_WRONLY | O_NONBLOCK | O_CLOEXEC);
-        static_cast<void>(opened.get());
+        [[maybe_unused]] const auto released = opened.get();
         if (writer >= 0) {
             ::close(writer);
         }
