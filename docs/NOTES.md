@@ -4233,6 +4233,11 @@ warm proof stating one untimed run passed beside no seconds, none, two, a 0 or a
 day's per-process proof is now held to RF-10's rule, as the slice's residency proof is. The
 worker already wrote one figure per run it made, so no harness change was needed.
 
+**RV-9, a day as its own variant source.** Confirmed by a test: the validator recursed until the
+stack ran out, with a traceback and no verdict on the files after it. Only a slice is now
+validated as a variant source; a day there gets the one problem it always got, that the source is
+not this host's slice at this commit.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
