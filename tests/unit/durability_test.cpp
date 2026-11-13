@@ -219,6 +219,36 @@ TEST(WriteAll, FinishesShortWritesAndRetriesEintr) {
     EXPECT_EQ(info.st_size, 10);
 }
 
+// A short pwrite goes on from where it stopped, at the offset after the bytes it wrote
+// (review R-5): 3 bytes a call, at offset 5 of a file of 5 zero bytes.
+TEST(WriteAll, AShortWriteAtAnOffsetGoesOnWhereItStopped) {
+    const ScratchDir dir;
+    const OpenFile file{dir};
+    ASSERT_GE(file.fd(), 0);
+    const std::vector<std::byte> zeros(5);
+    ASSERT_TRUE(write_all(posix_file_ops(), file.fd(), zeros).has_value());
+    RecordingFileOps ops;
+    ops.write_limit = 3;
+    std::vector<std::byte> data(10);
+    for (std::size_t i = 0; i < data.size(); ++i) {
+        data[i] = static_cast<std::byte>(i + 1);
+    }
+    ASSERT_TRUE(write_all_at(ops, file.fd(), data, 5).has_value());
+    EXPECT_EQ(ops.write_sizes, (std::vector<std::size_t>{10, 7, 4, 1}));
+
+    std::vector<std::byte> want = zeros;
+    want.insert(want.end(), data.begin(), data.end());
+    std::vector<std::byte> have(want.size() + 1);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg): the POSIX interface is variadic.
+    const int reader = ::open((dir / "file").c_str(), O_RDONLY | O_CLOEXEC);
+    ASSERT_GE(reader, 0);
+    const auto read = ::pread(reader, have.data(), have.size(), 0);
+    ::close(reader);
+    ASSERT_EQ(read, static_cast<decltype(read)>(want.size()));
+    have.resize(want.size());
+    EXPECT_EQ(have, want);
+}
+
 // macOS's write(2) refuses a request of more than INT_MAX bytes with EINVAL, where Linux
 // writes part of it (review C-6), so write_all asks for at most 1 GiB a call. /dev/null
 // takes the bytes without reading them, and the mapping is never touched, so the test

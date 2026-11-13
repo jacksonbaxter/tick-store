@@ -29,10 +29,11 @@ public:
     // test can drive the other platform's policy, whose calls this OS may not have.
     bool forward_syncs = true;
 
-    // Each write takes at most this many bytes, to exercise short writes. 0: no limit.
+    // Each write and pwrite takes at most this many bytes, to exercise short writes.
+    // 0: no limit.
     std::size_t write_limit = 0;
 
-    // The size each write was asked for, in order.
+    // The size each write and pwrite was asked for, in order.
     std::vector<std::size_t> write_sizes;
 
     // This many writes and pwrites, the first ones, return 0 without writing, as a device
@@ -101,6 +102,7 @@ public:
 
     std::ptrdiff_t pwrite(int fd, const std::byte* data, std::size_t size,
                           std::int64_t offset) override {
+        write_sizes.push_back(size);
         if (!begin("pwrite")) {
             return -1;
         }
@@ -108,7 +110,8 @@ public:
             --zero_writes;
             return 0;
         }
-        return real().pwrite(fd, data, size, offset);
+        const std::size_t taken = write_limit == 0 || size < write_limit ? size : write_limit;
+        return real().pwrite(fd, data, taken, offset);
     }
 
     int full_fsync(int fd) override {
