@@ -4228,6 +4228,11 @@ which the validator imports from `compare/coldcache.py` (standard library only, 
 must name the worker and add up to the repetition's device reads. Linux writes are unchanged:
 their counter is the block device's, machine-wide, with no processes to break down.
 
+**RV-8, a day's untimed runs and their seconds.** Confirmed by a test: a protocol 2 day's
+warm proof stating one untimed run passed beside no seconds, none, two, a 0 or a string. The
+day's per-process proof is now held to RF-10's rule, as the slice's residency proof is. The
+worker already wrote one figure per run it made, so no harness change was needed.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
