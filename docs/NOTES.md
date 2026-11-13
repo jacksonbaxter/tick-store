@@ -3521,6 +3521,15 @@ applied by hand to copies of the five committed `results/bench` files passes
 the committed files (`phase4-raw/fix-itch-bench/a3-render-diff.log`). `run_bench.py` copies
 the latency block whole, so the new field reaches the results file. No script changed.
 
+A-4. The mutation was run, not only read: scratch copies of the two benchmarks, the committed
+file before the fix and the tree after it, each with the reviewer's mutation, compiled and linked
+with the bench build's commands, run through `heavy.sh` on the first 20,000 frames of the slice
+(881,091 bytes, cut into the raw folder) and on one kernel case, `pfor_unpack/w=13/neon`. These
+were iteration runs, not measurements, and no figure from them is reported. The poison sits after
+warm-up in each repetition, because Google Benchmark calls the case function once per repetition
+and warm-up writes the output again. `column_decode_bench` clears its output before each call
+and was left alone, as the reviewer found.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
