@@ -3566,6 +3566,11 @@ says it was not compared. `tick_codec_eval` and `tick_reference_eval` write `tre
 same build info, so they write `commit_source` too; the codec-eval files are rebuilt at the
 freeze anyway (TASKS), and no reference-eval file is committed.
 
+R-4 and R-7 are closed by correcting a comment and documenting the moved-from state, the
+smaller honest change in each case. R-7's guard, an `invalid_argument` error from a writer whose
+table is gone, would add a branch to every `append` for a call no caller makes; a moved-from
+object that may only be destroyed is the usual C++ contract, now written down.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
