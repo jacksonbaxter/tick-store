@@ -4143,6 +4143,10 @@ figure moved.
 none is shown with its label and decides nothing. A miss on any targeted condition decides the
 part, so a write slower in total is missed whether or not its engine-only seconds were kept.
 
+**E-8, the figures beside QL-4's verdict.** Each is now the lowest of the other systems for
+that field, named by its system; on the committed Linux day the lowest median and the lowest tail
+figure are the same system's in every part, so the text did not change.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from

@@ -1,0 +1,13 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+index 2f2a4e4..7df3854 100644
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -755,7 +755,7 @@ def lowest_parts(row, document):
+                                                                     system != best))
+                       for field in spec["fields"]]
+             values = " / ".join(shown(ours[field], row) for field in spec["fields"])
+-            if all(system == best for system in lowest):
++            if True:
+                 others = f"{SYSTEM_LABEL[best]}'s " + " / ".join(
+                     shown(theirs[best][field], row) for field in spec["fields"])
+             else:

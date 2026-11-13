@@ -889,6 +889,12 @@ FAULTS = (
           "beside it into not judged", CHECK_FAILED,
           "FAIL: test_a_shown_condition_beside_a_judged_one_hides_no_verdict "
           "(__main__.RenderTargetsTest"),
+    # Review E-8: the figures QL-4 shows are the ones its verdict compares with.
+    Fault("render-lowest-shows-one-system", "py-scripts", "render_results.py shows every field "
+          "of the system with the lowest median, so a tail figure that decides a miss is "
+          "another system's and is not shown", CHECK_FAILED,
+          "FAIL: test_each_figure_shown_is_the_lowest_of_the_others_and_names_its_system "
+          "(__main__.RenderLowestTest"),
     Fault("results-md-hand-edit", "render-check", "a hand edit inside RESULTS.md's benchmark "
           "block, a host's heading changed", CHECK_FAILED,
           "the table in RESULTS.md is stale or was edited by hand", hand_edit_results_md),
