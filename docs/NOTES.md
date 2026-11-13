@@ -3483,6 +3483,10 @@ built against the scratch header has to come first on the link line: the cursor 
 with the other objects first the linker kept their unmutated copy and every test passed. Linked
 first, the eight old `FrameCursor` tests pass the mutation and the new 257-byte one fails.
 
+A-2. Documentation only, as the reviewer proposed. The test was first written to the header's
+promise and failed (`decode_strict` returned an `AddOrder` with side `X`); it now asserts the
+decode, so a later field check would have to change the test and the header together.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
