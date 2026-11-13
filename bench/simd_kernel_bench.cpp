@@ -22,8 +22,11 @@
 //
 //   B1  Every input comes from a fixed seed owned by its case, so a new case changes
 //       nothing about another's data.
-//   B2  Before any timing each case's output is compared by memcmp with the scalar set's
-//       on the same input, and again after the timed passes. The output is filled with a
+//   B2  Before any timing each case's output is compared by memcmp with its reference,
+//       and again after the timed passes: the generated values for an unpack, the
+//       original sequence for the delta-of-delta reconstruct, its second differences for
+//       restore_copy, and the scalar set's output on the same input for the rest. Each
+//       case names its reference in the results (review A-7). The output is filled with a
 //       poison value after warm-up, outside every timed region, so the check after them
 //       sees a timed pass that wrote nothing (review A-4).
 //   B3  DoNotOptimize on the output after every call and ClobberMemory after every pass.
@@ -106,7 +109,12 @@ struct Case {
     std::function<bool()> verify;
     // Where run() writes, so poison() can overwrite what warm-up left there.
     std::shared_ptr<Vector> out;
+    // What verify() compares the output with, for the results.
+    std::string_view reference;
 };
+
+constexpr std::string_view kGenerated = "the generated values the input packs";
+constexpr std::string_view kScalarSet = "the scalar set's output on the same input";
 
 // No case's answer is this value in all 1,024 places.
 constexpr std::uint64_t kPoison = 0xA5A5'A5A5'A5A5'A5A5ULL;
@@ -160,6 +168,7 @@ Case unpack_case(const simd::Kernels& set, unsigned width) {
     const auto out = std::make_shared<Vector>();
     Case c = named(std::format("pfor_unpack/w={}/{}", width, level_name(set)), seed);
     c.out = out;
+    c.reference = kGenerated;
     c.run = [&set, in, out, width](std::size_t calls) {
         for (std::size_t i = 0; i < calls; ++i) {
             set.unpack_vector(in->bytes, width, *out);
@@ -185,6 +194,7 @@ Case linear_case(const simd::Kernels& set, unsigned width) {
     const auto out = std::make_shared<Vector>();
     Case c = named(std::format("linear_unpack/w={}/{}", width, level_name(set)), seed);
     c.out = out;
+    c.reference = kGenerated;
     c.run = [&set, in, out, width](std::size_t calls) {
         for (std::size_t i = 0; i < calls; ++i) {
             set.unpack_linear(in->bytes, width, *out);
@@ -217,6 +227,7 @@ Case delta_case(const simd::Kernels& set, unsigned width, DeltaForm form) {
     Case c = named(std::format("{}/w={}/{}", kNames[static_cast<std::size_t>(form)], width,
                                level_name(set)), seed);
     c.out = out;
+    c.reference = kScalarSet;
     c.run = [&set, in, out, width, form](std::size_t calls) {
         for (std::size_t i = 0; i < calls; ++i) {
             switch (form) {
@@ -250,6 +261,7 @@ Case prefix_case(const simd::Kernels& set, std::string_view form_name,
     (void)scalar().prefix_sum(*reference, 0);
     Case c = named(std::format("prefix_sum/{}/{}", form_name, level_name(set)), seed);
     c.out = out;
+    c.reference = kScalarSet;
     c.run = [in, out, form](std::size_t calls) {
         for (std::size_t i = 0; i < calls; ++i) {
             *out = in->values;
@@ -269,6 +281,7 @@ Case for_case(const simd::Kernels& set, bool zigzag) {
     scalar().add_base(*reference, 12345, zigzag);
     Case c = named(std::format("{}/{}", zigzag ? "for_add_zigzag" : "for_add", level_name(set)), seed);
     c.out = out;
+    c.reference = kScalarSet;
     c.run = [&set, in, out, zigzag](std::size_t calls) {
         for (std::size_t i = 0; i < calls; ++i) {
             *out = in->values;
@@ -322,6 +335,7 @@ Case svb_case(const simd::Kernels& set) {
     const auto ok = std::make_shared<bool>(true);
     Case c = named(std::format("svb_decode/{}", level_name(set)), seed);
     c.out = out;
+    c.reference = kGenerated;
     c.run = [&set, in, out, ok](std::size_t calls) {
         for (std::size_t i = 0; i < calls; ++i) {
             *ok = set.svb_decode(in->control, in->data, *out) && *ok;
@@ -357,6 +371,8 @@ Case dod_case(bool copy_only) {
     const auto out = std::make_shared<Vector>();
     Case c = named(copy_only ? "restore_copy/scalar" : "dod_reconstruct/scalar", seed);
     c.out = out;
+    c.reference = copy_only ? std::string_view{"the second differences it copies"}
+                            : std::string_view{"the sequence the second differences encode"};
     c.run = [second, out, copy_only](std::size_t calls) {
         for (std::size_t i = 0; i < calls; ++i) {
             *out = *second;
@@ -623,8 +639,8 @@ struct ReportInputs {
     json.field("input_seed", c.seed);
     json.field("items_per_call", static_cast<std::uint64_t>(c.values_per_call));
     json.field("calls_per_pass", static_cast<std::uint64_t>(kPassCalls));
-    json.field("against", std::string_view{"the scalar set's output on the same input, memcmp, "
-                                           "before timing and after the timed passes"});
+    json.field("against", std::format("{}, memcmp, before timing and after the timed passes",
+                                      c.reference));
     json.field("matched", true);
     json.end_object();
 
