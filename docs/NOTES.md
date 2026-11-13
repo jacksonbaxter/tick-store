@@ -4192,6 +4192,16 @@ what it counted. A test now runs `run_class` on a fake system and requires the r
 the service's processes, and another requires tick-store's write to go through
 `run_counting_reads`. Each revert is a fault.
 
+**F-9, the guard's stop path.** Confirmed by reading: no test ran `Guard.run`, `stop_job` or
+`run_one`'s refusal of a guarded run. `test_guard.py`'s `StopPath` now runs the guard on a real
+child in its own session, once with the host's readings faked, which runs on the Mac and CI too,
+and once on Linux with nothing faked, where MemAvailable is under a floor of 100,000 GiB and the
+child has started a second process in its session; the session gets SIGTERM, the guard exits
+70 within seconds, far inside its 90 s grace, and the report names the breach and the signal the
+command died of. `GuardedRun` shows `run_one` refusing a system whose command exited 0 after the
+guard fired, and writing no `.load` file, so a resumed run makes the part again.
+`test_stream_guard.py`, which needs the `.venv`, is now in `check.sh`'s `py-compare` step.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
