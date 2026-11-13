@@ -25,6 +25,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <format>
 #include <functional>
 #include <map>
 #include <optional>
@@ -1047,6 +1048,39 @@ TEST(CodecEvalCli, WritesJsonWithNoPathsAndExitsZero) {
     EXPECT_TRUE(text.contains(R"("price4_exhaustive_proofs": [])"));
     EXPECT_FALSE(text.contains(dir.path().string()));
     EXPECT_TRUE(output.out.contains("timestamp"));
+}
+
+// A per-locate column's bits leave out the locate sequence that rebuilds file order, so its
+// verdict against a target has to say so where it stands, not only in the top-level note.
+TEST(CodecEvalCli, APerLocateVerdictSaysItLeavesOutThePermutation) {
+    const test::ScratchDir dir;
+    test::write_file(dir / "day", small_day(310'000'000'000).bytes);
+    const std::string source = (dir / "day").string();
+    const std::string out = (dir / "eval.json").string();
+    const std::vector<std::string_view> arguments{source, out, "--day", "D1", "--block-values",
+                                                  "2"};
+    CliOutput output;
+    ASSERT_EQ(run_codec_eval_cli(arguments, kProvenance, output), kExitPass) << output.err;
+    const std::string text = read_text(out);
+    // One column's object: from its name to the next column's.
+    const auto column_text = [&](std::string_view name) {
+        const std::string key = std::format(R"("name": "{}",)", name);
+        const std::size_t from = text.find(key);
+        EXPECT_NE(from, std::string::npos) << name;
+        const std::size_t to = text.find(R"("name": ")", from + key.size());
+        return text.substr(from, to == std::string::npos ? std::string::npos : to - from);
+    };
+    for (const std::string_view name : {"timestamp_per_locate", "add_price_per_locate",
+                                        "add_price_per_locate_side"}) {
+        const std::string column = column_text(name);
+        EXPECT_TRUE(column.contains(R"("met": )")) << name;
+        EXPECT_TRUE(column.contains(R"("excludes_permutation": true)")) << name;
+    }
+    for (const std::string_view name : {"timestamp", "add_price"}) {
+        const std::string column = column_text(name);
+        EXPECT_TRUE(column.contains(R"("met": )")) << name;
+        EXPECT_TRUE(column.contains(R"("excludes_permutation": false)")) << name;
+    }
 }
 
 TEST(CodecEvalCli, ExitsOneWhenAValueDoesNotComeBack) {

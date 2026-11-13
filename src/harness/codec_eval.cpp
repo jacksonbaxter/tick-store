@@ -2218,6 +2218,10 @@ void write_comparison(JsonWriter& json, const ColumnResult& column) {
         json.field("target_bits_per_value_at_most", target->limit);
         json.field("met", bits_per_value(*best) <= target->limit);
         json.field("gap_bits_per_value", bits_per_value(*best) - target->limit);
+        // A per-locate column's bits leave out the locate sequence that rebuilds file
+        // order (not_counted, permutation_estimate), so its verdict does too.
+        json.field("excludes_permutation", column.spec->order == StreamOrder::per_locate ||
+                                               column.spec->order == StreamOrder::per_locate_side);
     }
     if (column.spec->kind == ValueKind::timestamp_ns) {
         json.field("census_ideal_delta_bits", column.ideal_delta_bits);
