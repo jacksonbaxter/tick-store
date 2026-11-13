@@ -3901,6 +3901,11 @@ the timed repetitions; the warm-up's reads fall between the two proofs, so a war
 or faulted anything would still fail the after-proof. tick-store's macOS day takes the same path
 and gets the same warm-up.
 
+**F-11, the flush report's moment.** Confirmed by reading the order of calls in `step_ingest`. The
+report is now read straight after the write's device counter, before `settings_after_ingest`, for
+all four systems. The probe's report was already read at once. No validator rule follows: a file
+cannot show when its report was read, so the test holds the order.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
