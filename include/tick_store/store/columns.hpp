@@ -46,6 +46,7 @@
 // call to next().
 
 #include "tick_store/itch/message.hpp"
+#include "tick_store/store/durability.hpp"
 #include "tick_store/store/store_error.hpp"
 
 #include <array>
@@ -202,10 +203,11 @@ private:
 // Writes a column directory. `directory` must not hold a manifest. The manifest goes
 // last, so a directory without one is incomplete and every reader refuses it. These
 // files can be regenerated from the source, so nothing here is flushed to the device.
+// Every file's bytes go through `ops`'s write, by write_all, which must outlive the writer.
 class ColumnsWriter {
 public:
     [[nodiscard]] static std::expected<ColumnsWriter, StoreError> create(
-        const std::filesystem::path& directory);
+        const std::filesystem::path& directory, FileOps& ops = posix_file_ops());
 
     ColumnsWriter(const ColumnsWriter&) = delete;
     ColumnsWriter& operator=(const ColumnsWriter&) = delete;
@@ -219,7 +221,8 @@ public:
     [[nodiscard]] std::expected<ColumnsSummary, StoreError> finish(std::span<const std::byte> tail);
 
 private:
-    ColumnsWriter(std::filesystem::path directory, std::array<int, kColumnFileCount> fds);
+    ColumnsWriter(std::filesystem::path directory, std::array<int, kColumnFileCount> fds,
+                  FileOps& ops);
 
     [[nodiscard]] std::expected<void, StoreError> drain(std::size_t threshold);
     void close_all() noexcept;
@@ -227,6 +230,7 @@ private:
     std::filesystem::path directory_;
     std::array<int, kColumnFileCount> fds_{};
     ColumnsEncoder encoder_;
+    FileOps* ops_;
 };
 
 // Rebuilds frames from columns held in memory.

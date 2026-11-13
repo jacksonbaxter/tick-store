@@ -3,6 +3,7 @@
 #include "tick_store/itch/codec.hpp"
 #include "tick_store/itch/frame.hpp"
 #include "tick_store/itch/message.hpp"
+#include "tick_store/store/durability.hpp"
 #include "tick_store/store/little_endian.hpp"
 #include "tick_store/store/store_error.hpp"
 
@@ -783,7 +784,7 @@ ColumnsManifest ColumnsEncoder::manifest(std::uint64_t tail_bytes) const noexcep
 }
 
 std::expected<ColumnsWriter, StoreError> ColumnsWriter::create(
-    const std::filesystem::path& directory) {
+    const std::filesystem::path& directory, FileOps& ops) {
     std::error_code error;
     std::filesystem::create_directories(directory, error);
     if (error) {
@@ -810,17 +811,18 @@ std::expected<ColumnsWriter, StoreError> ColumnsWriter::create(
             return std::unexpected(failed);
         }
     }
-    return ColumnsWriter{directory, fds};
+    return ColumnsWriter{directory, fds, ops};
 }
 
 ColumnsWriter::ColumnsWriter(std::filesystem::path directory,
-                             std::array<int, kColumnFileCount> fds)
-    : directory_(std::move(directory)), fds_(fds) {}
+                             std::array<int, kColumnFileCount> fds, FileOps& ops)
+    : directory_(std::move(directory)), fds_(fds), ops_(&ops) {}
 
 ColumnsWriter::ColumnsWriter(ColumnsWriter&& other) noexcept
     : directory_(std::move(other.directory_)),
       fds_(std::exchange(other.fds_, {})),
-      encoder_(std::move(other.encoder_)) {
+      encoder_(std::move(other.encoder_)),
+      ops_(other.ops_) {
     other.fds_.fill(-1);
 }
 
@@ -841,16 +843,9 @@ std::expected<void, StoreError> ColumnsWriter::drain(std::size_t threshold) {
         if (buffer.size() < threshold || buffer.empty()) {
             continue;
         }
-        std::span<const std::byte> left = buffer;
-        while (!left.empty()) {
-            const auto written = ::write(fds_[i], left.data(), left.size());
-            if (written < 0) {
-                if (errno == EINTR) {
-                    continue;
-                }
-                return std::unexpected(io_error("write"));
-            }
-            left = left.subspan(static_cast<std::size_t>(written));
+        // write_all takes a return of 0 as an error, where a loop of its own would spin (R-6).
+        if (auto written = write_all(*ops_, fds_[i], buffer); !written.has_value()) {
+            return written;
         }
         buffer.clear();
     }
@@ -879,18 +874,9 @@ std::expected<ColumnsSummary, StoreError> ColumnsWriter::finish(std::span<const 
     if (fd < 0) {
         return std::unexpected(io_error("open"));
     }
-    std::span<const std::byte> left = text_bytes(manifest);
-    while (!left.empty()) {
-        const auto written = ::write(fd, left.data(), left.size());
-        if (written < 0) {
-            if (errno == EINTR) {
-                continue;
-            }
-            const StoreError failed = io_error("write");
-            ::close(fd);
-            return std::unexpected(failed);
-        }
-        left = left.subspan(static_cast<std::size_t>(written));
+    if (auto written = write_all(*ops_, fd, text_bytes(manifest)); !written.has_value()) {
+        ::close(fd);
+        return std::unexpected(written.error());
     }
     if (::close(fd) != 0) {
         return std::unexpected(io_error("close"));

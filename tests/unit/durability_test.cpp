@@ -4,6 +4,9 @@
 
 #include "recording_file_ops.hpp"
 #include "scratch_dir.hpp"
+#include "stub_fixture.hpp"
+#include "tick_store/itch/frame.hpp"
+#include "tick_store/store/columns.hpp"
 #include "tick_store/store/durability.hpp"
 #include "tick_store/store/store_error.hpp"
 
@@ -18,6 +21,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <filesystem>
 #include <limits>
 #include <span>
 #include <string>
@@ -266,6 +270,56 @@ TEST(WriteAll, ReportsAnyOtherError) {
     const std::vector<std::byte> data(10);
     EXPECT_EQ(write_all(ops, file.fd(), data), std::unexpected(io("write", ENOSPC)));
     EXPECT_EQ(ops.count("write"), 1);
+}
+
+
+// One whole export through `ops`, returning finish()'s result.
+std::expected<ColumnsSummary, StoreError> export_through(FileOps& ops,
+                                                        const std::filesystem::path& directory,
+                                                        std::span<const std::byte> source) {
+    const auto [frames, tail] = ::tick_store::test::frames_of(source);
+    auto writer = ColumnsWriter::create(directory, ops);
+    if (!writer.has_value()) {
+        return std::unexpected(writer.error());
+    }
+    for (const itch::Frame& frame : frames) {
+        if (auto added = writer->append(frame.payload); !added.has_value()) {
+            return std::unexpected(added.error());
+        }
+    }
+    return writer->finish(tail);
+}
+
+// A file write that takes nothing is an I/O error, as write_all makes it, not a reason
+// to try again for ever (review R-6): first a column file's, then the manifest's, the
+// export's last write.
+TEST(ColumnsWriter, AWriteThatTakesNothingIsAnError) {
+    const std::vector<std::byte> source = ::tick_store::test::source_with_tail();
+    int writes = 0;
+    {
+        const ScratchDir dir;
+        RecordingFileOps ops;
+        const auto whole = export_through(ops, dir.path() / "columns", source);
+        ASSERT_TRUE(whole.has_value()) << to_string(whole.error());
+        writes = ops.count("write");
+    }
+    ASSERT_GE(writes, 2);
+    for (const int nth : {1, writes}) {
+        SCOPED_TRACE(nth);
+        const ScratchDir dir;
+        RecordingFileOps ops;
+        // From this write on, the next 1,000 take nothing; then writes go through again.
+        ops.on("write", [&ops] { ops.zero_writes = 1'000; }, nth);
+        const auto refused = export_through(ops, dir.path() / "columns", source);
+        if (refused.has_value()) {
+            ADD_FAILURE() << ops.count("write") << " writes, then success";
+            continue;
+        }
+        EXPECT_EQ(refused.error().kind, StoreErrorKind::io);
+        EXPECT_EQ(refused.error().field, "write");
+        EXPECT_EQ(refused.error().actual, std::uint64_t{EIO});
+        EXPECT_EQ(ops.count("write"), nth);
+    }
 }
 
 }  // namespace
