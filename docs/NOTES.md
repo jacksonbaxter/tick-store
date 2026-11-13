@@ -4039,6 +4039,14 @@ every system on the slice; a day's export for the others is still only recorded 
 a device under the input with no `/sys/dev/block/<major>:<minor>/stat`, as on tmpfs or
 overlayfs, now stops the write with the path and the device named, not a bare
 `FileNotFoundError`.
+**RF-10, statements and the code.** Confirmed. The warm proof's `warm_up_runs` was the constant:
+a test with the untimed runs made to run none still stated 1. It now states the fewest any query
+ran, and `check_compare.py` holds a protocol 2 slice's warm block to `warm_up_seconds`, one
+positive figure per stated run, which the debian `85a4912` slice meets. `run.py`'s docstring now
+names both siblings the `/proc/stat` copy measures, and `TICKSTORE_ONLY_WARM`, the warm method of
+the macOS tick-store day, says each query first runs once untimed. `compare/README.md` says a
+write's device window is the whole ingest call, wider than its clock by QuestDB's `CREATE TABLE`
+and its applied-rows check, and that only the device counter is read before the flush report.
 
 ## Process notes
 
