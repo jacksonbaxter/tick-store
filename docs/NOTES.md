@@ -3610,6 +3610,19 @@ lines deleted again, the seven stops only those lines refuse came back accepted,
 older checks refuse were still refused. A unit run of the whole suite takes about five minutes on the
 Mac; the two runs above were made directly, and every later full run goes through `heavy.sh`.
 
+RD-6. The reviewer suspected the blind spot by reading; it was run. With a raw row's type set to
+0 in `row_values`, nothing noticed: the whole unit suite, the oracle step, and `fuzz_itch_query`,
+`fuzz_itch_store` and `fuzz_columns` each run once over their seeds. The column export writes
+that byte for a raw row but rebuilds the record from its raw bytes, so its round trip does not
+read it back. The check added is the smallest independent one: the column form takes each
+record's type from the first byte of its re-encoded payload. With it, the same mutation failed
+two unit tests and the query fuzzer's seeds. What the column form still shares is said in its
+header and `fuzz/README.md`: which form a typed record takes and a hot or rare row's fields.
+For the fields, a hot row's share count made one more in `row_values` failed 12 `Columns`, `ColumnsFlip` and
+`ColumnsCli` tests, the round trip and golden export among them; which form a record takes was
+not tried. On macOS, libFuzzer's crash handler hung after reporting the oracle's failure on the
+first failing seed, and was stopped by hand once its message was in the log.
+
 ### The final review: Phase 2 items closed
 
 The gate on the review found open items still under Phase 2 in docs/TASKS.md. Each below was
