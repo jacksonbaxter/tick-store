@@ -1,12 +1,13 @@
 diff --git a/src/codec/dictionary.cpp b/src/codec/dictionary.cpp
+index 08e9479..bc7f310 100644
 --- a/src/codec/dictionary.cpp
 +++ b/src/codec/dictionary.cpp
-@@ -684,7 +684,7 @@
+@@ -670,7 +670,7 @@ std::expected<std::size_t, CodecError> decode_dict_block(std::span<const std::by
                                                     dictionary_at, i - 1, i));
              }
          }
--        if (repeats_an_entry(dictionary)) {
-+        if (false && repeats_an_entry(dictionary)) {
+-        if (scan_for_repeats(dictionary).repeated) {
++        if (false && scan_for_repeats(dictionary).repeated) {
              return std::unexpected(
                  codec_error(CodecErrorKind::bad_field, "dict entry repeated", dictionary_at, 0, 1));
          }
