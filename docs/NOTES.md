@@ -3530,6 +3530,13 @@ warm-up in each repetition, because Google Benchmark calls the case function onc
 and warm-up writes the output again. `column_decode_bench` clears its output before each call
 and was left alone, as the reviewer found.
 
+R-6. No test could reach the old loops, since they called the kernel's `write` directly, so the
+`FileOps` parameter went in first with the loops unchanged, the test was seen failing through it
+(`RecordingFileOps`'s `zero_writes`, as for C-10, set by a hook at the chosen write), and then
+the loops became `write_all`. The test lives in `durability_test.cpp`, beside `write_all`'s own:
+`columns_test.cpp` names its fixtures as `test::`, which `recording_file_ops.hpp`'s namespace
+would shadow. `tick_export` calls `create` with the default, so nothing else changed.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
