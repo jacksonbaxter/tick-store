@@ -18,6 +18,12 @@
 // the share sum from the indexed path must equal the exact path's. The indexed answers
 // must also be the same with the scalar kernel set forced on this thread.
 //
+// Both paths choose segments with the same summary test (may_hold) and seed a segment's
+// raw rows with the same seed_before, so comparing them cannot see either go wrong. Each
+// answer is therefore also checked against the column form itself, built here from the
+// whole decode with no segment skipped: every record re-encoded and mapped by row_values(),
+// a raw row taking the time of the row before it, and each request filtered from that.
+//
 // Requests come from the file: windows over its summaries' times, a one-nanosecond window
 // at a segment's first time, and a window and a locate read from the input's last bytes,
 // so the fuzzer can steer them; locates: every one, locate 0, the first locate of the
@@ -29,12 +35,15 @@
 
 #include "container_oracles.hpp"
 #include "tick_store/codec/simd.hpp"
+#include "tick_store/itch/codec.hpp"
+#include "tick_store/store/columns.hpp"
 #include "tick_store/store/container.hpp"
 #include "tick_store/store/itch_query.hpp"
 #include "tick_store/store/itch_store.hpp"
 #include "tick_store/store/itch_store_reader.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -146,24 +155,124 @@ struct Answers {
     return out;
 }
 
-// Whether SegmentReader accepts every segment of the file.
-[[nodiscard]] inline bool whole_decode_accepts(const ItchStoreReader& reader) {
+// What the whole decode makes of the file: nothing if SegmentReader refuses a segment,
+// else the column form of every record, or a record with no row.
+struct ColumnForm {
+    bool accepted = false;
+    bool every_record_has_a_row = true;
+    std::vector<QueryRow> rows;
+};
+
+// Every segment through SegmentReader, none skipped, each record mapped as tick_export
+// maps it, a raw row repeating the time of the row before it (0 for the file's first).
+[[nodiscard]] inline ColumnForm column_form(const ItchStoreReader& reader) {
+    ColumnForm out;
     SegmentReader records;
+    std::array<std::byte, itch::kMaxPayloadSize> scratch{};
+    std::uint64_t previous = 0;
     for (std::uint64_t k = 0; k < reader.segment_count(); ++k) {
         if (!records.seek(reader, k).has_value()) {
-            return false;
+            return {};
         }
         for (;;) {
             auto message = records.next();
             if (!message.has_value()) {
-                return false;
+                return {};
             }
             if (!message->has_value()) {
                 break;
             }
+            const auto size = itch::encode(**message, scratch);
+            const auto values = size.has_value()
+                                    ? row_values(std::span<const std::byte>{scratch.data(), *size})
+                                    : std::nullopt;
+            if (!values.has_value()) {
+                out.every_record_has_a_row = false;
+                continue;
+            }
+            QueryRow row;
+            row.seq = out.rows.size();
+            row.msg_type = values->msg_type;
+            if (values->form == RowForm::raw) {
+                row.ts_ns = previous;
+            } else {
+                row.ts_ns = values->ts_ns;
+                row.locate = values->locate;
+                if (values->form == RowForm::hot) {
+                    row.order_ref = values->order_ref;
+                    row.side = values->side;
+                    row.shares = static_cast<std::uint32_t>(values->shares);
+                    row.price = static_cast<std::uint32_t>(values->price);
+                    if (values->stock.size() == row.stock.size()) {
+                        row.has_stock = true;
+                        std::ranges::copy(values->stock, row.stock.begin());
+                    }
+                }
+            }
+            previous = row.ts_ns;
+            out.rows.push_back(row);
         }
     }
-    return true;
+    out.accepted = true;
+    return out;
+}
+
+// The answers the column form gives each request, as the query semantics define them
+// (itch_query.hpp): rows of a half-open window, a locate's add orders per minute, rows per
+// locate, and every record's shares summed.
+[[nodiscard]] inline Answers answer_from(const std::vector<QueryRow>& all,
+                                        const std::vector<Request>& requests) {
+    constexpr std::uint64_t kNanosPerMinute = 60ULL * 1'000'000'000ULL;
+    Answers out;
+    for (const Request& request : requests) {
+        const auto in_window = [&](const QueryRow& row) {
+            return row.ts_ns >= request.start && row.ts_ns < request.end;
+        };
+        std::vector<QueryRow> rows;
+        for (const QueryRow& row : all) {
+            if (in_window(row) && (!request.locate.has_value() || row.locate == *request.locate)) {
+                rows.push_back(row);
+            }
+        }
+        out.rows.emplace_back(std::move(rows));
+        if (request.locate.has_value()) {
+            std::vector<MinuteBucket> minutes;
+            for (const QueryRow& row : all) {
+                if (!in_window(row) || row.locate != *request.locate ||
+                    (row.msg_type != 'A' && row.msg_type != 'F')) {
+                    continue;
+                }
+                const std::uint64_t minute = (row.ts_ns / kNanosPerMinute) * kNanosPerMinute;
+                auto slot = std::ranges::lower_bound(minutes, minute, {}, &MinuteBucket::minute_ns);
+                if (slot == minutes.end() || slot->minute_ns != minute) {
+                    slot = minutes.insert(slot, MinuteBucket{.minute_ns = minute,
+                                                             .count = 0,
+                                                             .shares = 0,
+                                                             .min_price = row.price,
+                                                             .max_price = row.price});
+                }
+                ++slot->count;
+                slot->shares += row.shares;
+                slot->min_price = std::min<std::uint64_t>(slot->min_price, row.price);
+                slot->max_price = std::max<std::uint64_t>(slot->max_price, row.price);
+            }
+            out.minutes.emplace_back(std::move(minutes));
+        } else {
+            std::vector<std::uint64_t> counts(std::size_t{kMax16} + 1, 0);
+            for (const QueryRow& row : all) {
+                if (in_window(row)) {
+                    ++counts[row.locate];
+                }
+            }
+            out.counts.emplace_back(std::move(counts));
+        }
+    }
+    ColumnSum sum{.records = all.size(), .sum = 0};
+    for (const QueryRow& row : all) {
+        sum.sum += row.shares;
+    }
+    out.sum = sum;
+    return out;
 }
 
 template <class T>
@@ -194,14 +303,31 @@ template <class T>
             return "the kernel set and the scalar set answered the same queries differently";
         }
     }
-    if (!query_detail::whole_decode_accepts(*reader)) {
+    const query_detail::ColumnForm form = query_detail::column_form(*reader);
+    if (!form.accepted) {
         return nullptr;
+    }
+    if (!form.every_record_has_a_row) {
+        return "a record the whole decode accepts has no row in the column form";
     }
     const query_detail::Answers exact = query_detail::answer(*reader, QueryPath::exact, requests);
     if (!query_detail::all_answered(exact.rows) || !query_detail::all_answered(exact.minutes) ||
         !query_detail::all_answered(exact.counts) || !exact.sum.has_value() ||
         !exact.sum->has_value()) {
         return "the exact path refused a file the whole decode accepts";
+    }
+    const query_detail::Answers want = query_detail::answer_from(form.rows, requests);
+    if (exact.rows != want.rows) {
+        return "the exact path's rows differ from the column form of the whole decode";
+    }
+    if (exact.minutes != want.minutes) {
+        return "the exact path's minute aggregate differs from the column form's";
+    }
+    if (exact.counts != want.counts) {
+        return "the exact path's locate counts differ from the column form's";
+    }
+    if (exact.sum != want.sum) {
+        return "the exact path's share sum differs from the column form's";
     }
     if (indexed.rows != exact.rows) {
         return "the indexed path's rows differ from the exact path's on a file the whole decode accepts";

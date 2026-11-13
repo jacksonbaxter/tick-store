@@ -316,6 +316,34 @@ TEST(FuzzOracles, PassEveryCutAndFlipThroughTheQueryOracle) {
     }
 }
 
+// A segment of raw records alone, between two typed ones: no typed record of it is in any
+// window, so only the row before it, which its raw rows repeat the time of, says whether a
+// query must read it. Both query paths choose segments with the same may_hold and seed
+// them with the same seed_before, so comparing them cannot see either go wrong (review
+// C-5); the oracle's column form from the whole decode can. A fault that skips such a
+// segment (may_hold answering from its typed records alone) fails this test.
+TEST(FuzzOracles, TheQueryOracleSeesASegmentBothPathsWouldSkip) {
+    static const Bytes raw = test::bytes({'z', 1, 2, 3});
+    std::vector<Message> messages;
+    for (std::uint64_t i = 0; i < 4; ++i) {
+        messages.emplace_back(AddOrder{MessageHeader{1, 0, 1'000 + i}, 10 + i, std::byte{'B'}, 100,
+                                       store::test::stock_of("QRY"), Price4{100'000}});
+    }
+    for (std::uint64_t i = 0; i < 4; ++i) {
+        messages.emplace_back(RawMessage{.bytes = raw, .reason = RawReason::unknown_type});
+    }
+    for (std::uint64_t i = 0; i < 4; ++i) {
+        messages.emplace_back(AddOrder{MessageHeader{2, 0, 2'000 + i}, 20 + i, std::byte{'S'}, 100,
+                                       store::test::stock_of("QRY"), Price4{100'000}});
+    }
+    const Bytes file = store::test::store_of_messages(messages, 4);
+    const auto reader = store::ItchStoreReader::open_bytes(file);
+    ASSERT_TRUE(reader.has_value());
+    ASSERT_EQ(reader->segment_count(), 3U);
+    ASSERT_EQ(reader->segment(1).summary.typed_records, 0U);
+    EXPECT_EQ(text(store::oracle::check_itch_query(file)), "");
+}
+
 // A real store, cut at every length and with every bit flipped in turn.
 TEST(FuzzOracles, PassEveryCutAndFlipOfAStore) {
     const tick_store::test::ScratchDir dir;
