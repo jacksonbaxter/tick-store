@@ -4244,6 +4244,11 @@ one of the arguments a part must match. The real-systems test's comment no longe
 were no page of the source; the page is a tolerance for bytes nobody has explained. The
 generator's docstring had already been corrected with RV-1.
 
+**RV-11, faults for `run.py`'s alone day.** Confirmed by reading: its refusals and its
+per-host method had tests and no fault. `run-alone-linux-proven-as-macos` writes macOS's warm
+method and drops the guard for a Linux alone day, and `run-alone-narrowed` lets the alone day be
+narrowed; `TickstoreAloneDay` fails on each.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
