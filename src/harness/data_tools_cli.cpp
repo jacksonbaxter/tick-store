@@ -112,7 +112,12 @@ int run_slice_cli(std::span<const std::string_view> arguments, CliOutput& output
     const auto report =
         write_slice(source->bytes(), arguments[1], {.from_ns = *from, .to_ns = *to});
     if (!report.has_value()) {
-        return fail_io(output, report.error());
+        if (report.error().source_stops_early) {
+            output.err += report.error().message;
+            output.err += '\n';
+            return kExitMismatch;
+        }
+        return fail_io(output, report.error().message);
     }
 
     const auto written = store::MappedFile::open(arguments[1]);

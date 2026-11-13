@@ -108,6 +108,26 @@ TEST(ReferenceEval, AnEmptyStreamCostsNothing) {
     }
 }
 
+// A source whose frames stop before its end is part of a day, and its figures would read as
+// a whole day's.
+TEST(ReferenceEval, RefusesASourceWhoseFramesStopBeforeItsEnd) {
+    const Bytes clean = stream();
+    Bytes cut = clean;
+    cut.insert(cut.end(), {std::byte{0x00}, std::byte{0x30}, std::byte{'S'}});
+    Bytes zero = clean;
+    zero.insert(zero.end(), {std::byte{0x00}, std::byte{0x00}});
+    zero.insert(zero.end(), clean.begin(), clean.end());
+    Bytes one_byte = clean;
+    one_byte.push_back(std::byte{0x00});
+    for (const Bytes& source : {cut, zero, one_byte}) {
+        const auto result = evaluate_references(source, {.segment_records = {4}, .checkpoint_segment_records = {}});
+        EXPECT_FALSE(result.has_value());
+        if (!result.has_value()) {
+            EXPECT_TRUE(result.error().contains("stop before its end")) << result.error();
+        }
+    }
+}
+
 TEST(ReferenceEval, TheCommandLineWritesJsonWithoutPathsAndRefusesBadUsage) {
     const tick_store::test::ScratchDir dir;
     const Bytes source = stream();

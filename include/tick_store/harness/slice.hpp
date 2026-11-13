@@ -50,9 +50,18 @@ struct SliceReport {
     std::uint64_t raw_outside_window = 0;
 };
 
+// Why write_slice wrote nothing.
+struct SliceError {
+    // The source's frames stop before its end: cut mid-frame, or a zero-length frame. Such a
+    // source is part of a day, and a slice of it would claim the whole day's S and R.
+    bool source_stops_early = false;
+    std::string message;
+};
+
 // Writes the slice of `source` to `path`, through `<path>.partial` and a rename, so a
-// failure leaves no file that looks finished.
-[[nodiscard]] std::expected<SliceReport, std::string> write_slice(
+// failure leaves no file that looks finished. Refuses a source whose frames do not end
+// exactly at its end.
+[[nodiscard]] std::expected<SliceReport, SliceError> write_slice(
     std::span<const std::byte> source, const std::filesystem::path& path, SliceWindow window);
 
 struct SliceCheck {

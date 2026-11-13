@@ -137,25 +137,26 @@ std::optional<std::uint64_t> parse_time_of_day(std::string_view text) {
     return whole * kNanosecondsPerSecond;
 }
 
-std::expected<SliceReport, std::string> write_slice(std::span<const std::byte> source,
-                                                    const std::filesystem::path& path,
-                                                    SliceWindow window) {
+std::expected<SliceReport, SliceError> write_slice(std::span<const std::byte> source,
+                                                   const std::filesystem::path& path,
+                                                   SliceWindow window) {
     if (window.from_ns >= window.to_ns) {
-        return std::unexpected("the window is empty");
+        return std::unexpected(SliceError{.message = "the window is empty"});
     }
     std::filesystem::path partial = path;
     partial += ".partial";
 
     std::ofstream out{partial, std::ios::binary | std::ios::trunc};
     if (!out) {
-        return std::unexpected("cannot create the slice");
+        return std::unexpected(SliceError{.message = "cannot create the slice"});
     }
 
     Selector selector{window};
     itch::FrameCursor cursor{source};
     std::uint64_t messages = 0;
     std::uint64_t bytes = 0;
-    for (auto frame = cursor.next(); frame.has_value(); frame = cursor.next()) {
+    auto frame = cursor.next();
+    for (; frame.has_value(); frame = cursor.next()) {
         // The cursor returns no empty payload, and only that fails to decode.
         const auto message = itch::decode(frame->payload);
         if (!message.has_value() || !selector.take(*frame, *message)) {
@@ -177,14 +178,21 @@ std::expected<SliceReport, std::string> write_slice(std::span<const std::byte> s
 
     out.close();
     std::error_code error;
+    if (frame.error().kind != itch::FrameStopKind::end) {
+        std::filesystem::remove(partial, error);
+        return std::unexpected(
+            SliceError{.source_stops_early = true,
+                       .message = std::format("the source's frames stop before its end: {}",
+                                              to_string(frame.error()))});
+    }
     if (out.fail()) {
         std::filesystem::remove(partial, error);
-        return std::unexpected("cannot write the slice");
+        return std::unexpected(SliceError{.message = "cannot write the slice"});
     }
     std::filesystem::rename(partial, path, error);
     if (error) {
         std::filesystem::remove(partial, error);
-        return std::unexpected("cannot publish the slice");
+        return std::unexpected(SliceError{.message = "cannot publish the slice"});
     }
     return report;
 }

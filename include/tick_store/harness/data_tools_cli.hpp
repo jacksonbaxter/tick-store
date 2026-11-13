@@ -11,7 +11,8 @@
 //       and prints a JSON summary holding no paths.
 //
 // Exit codes are those of roundtrip_cli.hpp: 2 for usage or I/O, and 1 from tick_slice
-// if the slice it wrote does not check out.
+// if the source's frames stop before its end, which writes nothing, or if the slice it
+// wrote does not check out.
 
 #include "tick_store/harness/roundtrip_cli.hpp"
 

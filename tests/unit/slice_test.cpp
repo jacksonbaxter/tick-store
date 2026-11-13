@@ -107,7 +107,7 @@ protected:
 
 TEST_F(Slice, KeepsEverySAndRPlusTheWindowInFileOrder) {
     const auto report = write_slice(source_, path, {.from_ns = 10, .to_ns = 20});
-    ASSERT_TRUE(report.has_value()) << report.error();
+    ASSERT_TRUE(report.has_value()) << report.error().message;
 
     const Bytes written = test::read_file(path);
     EXPECT_EQ(timestamps_of(written), (std::vector<std::uint64_t>{1, 2, 10, 11, 19, 21, 40}));
@@ -173,6 +173,28 @@ TEST_F(Slice, CountsRecordsThatTimeOrderPutsOnTheWrongSideOfTheWindow) {
 TEST_F(Slice, RefusesAnEmptyWindowAndAPathItCannotWrite) {
     EXPECT_FALSE(write_slice(source_, path, {.from_ns = 20, .to_ns = 20}).has_value());
     EXPECT_FALSE(write_slice(source_, dir / "no" / "dir", {.from_ns = 1, .to_ns = 2}).has_value());
+}
+
+// A source whose frames stop before its end is part of a day: a slice of it would say it
+// holds every S and R of the day and the window, and hold only what came before the cut.
+TEST_F(Slice, RefusesASourceWhoseFramesStopBeforeItsEnd) {
+    Bytes cut = source_;
+    const Bytes promise = bytes({0x00, 0x30, 'S'});  // a prefix promising 48 bytes, then 1
+    cut.insert(cut.end(), promise.begin(), promise.end());
+    Bytes zero = source_;
+    const Bytes terminator = bytes({0x00, 0x00});
+    const auto second = static_cast<std::ptrdiff_t>(test::frames_of(source_).frames[1].offset);
+    zero.insert(zero.begin() + second, terminator.begin(), terminator.end());
+    for (const Bytes& source : {cut, zero, Bytes{source_.begin(), source_.end() - 1}}) {
+        const auto report = write_slice(source, path, {.from_ns = 10, .to_ns = 20});
+        ASSERT_FALSE(report.has_value());
+        EXPECT_TRUE(report.error().source_stops_early) << report.error().message;
+        EXPECT_TRUE(report.error().message.contains("stop before its end")) << report.error().message;
+        EXPECT_FALSE(std::filesystem::exists(path));
+        std::filesystem::path partial = path;
+        partial += ".partial";
+        EXPECT_FALSE(std::filesystem::exists(partial));
+    }
 }
 
 TEST_F(Slice, CheckCountsAndHashesACleanStream) {
@@ -243,6 +265,17 @@ TEST_F(SliceCli, ASourceThatIsNotCleanFailsTheCheckWithExitOne) {
     EXPECT_EQ(run({source_path, out_path, "--from", "00:00:00", "--to", "00:00:01"}),
               kExitMismatch);
     EXPECT_TRUE(output.err.contains("does not check out"));
+}
+
+TEST_F(SliceCli, ASourceCutMidFrameIsRefusedWithExitOne) {
+    Bytes cut = source_;
+    const Bytes promise = bytes({0x00, 0x30, 'S'});
+    cut.insert(cut.end(), promise.begin(), promise.end());
+    test::write_file(dir / "source", cut);
+    EXPECT_EQ(run({source_path, out_path}), kExitMismatch);
+    EXPECT_TRUE(output.err.contains("truncated")) << output.err;
+    EXPECT_TRUE(output.out.empty());
+    EXPECT_FALSE(std::filesystem::exists(path));
 }
 
 TEST_F(SliceCli, BadUsageAndFailedIoExitTwo) {

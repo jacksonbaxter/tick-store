@@ -77,6 +77,8 @@ struct ReferenceEvalResult {
     std::vector<SegmentSizeCost> sizes;
 };
 
+// Refuses a file whose frames stop before its end, cut mid-frame or at a zero-length frame:
+// that is part of a day, and its figures would read as a whole day's.
 [[nodiscard]] std::expected<ReferenceEvalResult, std::string> evaluate_references(
     std::span<const std::byte> file, const ReferenceEvalOptions& options);
 

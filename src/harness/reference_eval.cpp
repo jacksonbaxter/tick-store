@@ -463,12 +463,17 @@ std::expected<ReferenceEvalResult, std::string> evaluate_references(
     std::span<const std::byte> file, const ReferenceEvalOptions& options) {
     Walker walker{options};
     itch::FrameCursor cursor{file};
-    for (auto frame = cursor.next(); frame.has_value(); frame = cursor.next()) {
+    auto frame = cursor.next();
+    for (; frame.has_value(); frame = cursor.next()) {
         const auto message = itch::decode(frame->payload);
         if (!message.has_value()) {
             return std::unexpected(to_string(message.error()));
         }
         walker.record(*message);
+    }
+    if (frame.error().kind != itch::FrameStopKind::end) {
+        return std::unexpected(
+            std::format("the source's frames stop before its end: {}", to_string(frame.error())));
     }
     return walker.finish();
 }
