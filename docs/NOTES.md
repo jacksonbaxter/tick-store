@@ -3684,6 +3684,12 @@ benchmark, was not repeated: this round runs no benchmark, and the change is to 
 only when a case has already failed. No timed code changed, but it is a change to `bench/`, so
 it falls under the freeze rerun that TASKS already asks for the bench files.
 
+RA-3. The reviewer listed six lines; clang-tidy on macOS found a seventh once the block was
+narrowed, `quiet.sa_handler`, which is a macro over a member in both C libraries and so names a
+private header too. The probe for a hidden missing include had to compile, so it used a name
+the test's headers bring in without including `<algorithm>`; deleting `<thread>`, as the
+reviewer proposed, is a compile error in either form. The probe was never committed.
+
 ### The final review: Phase 2 items closed
 
 The gate on the review found open items still under Phase 2 in docs/TASKS.md. Each below was
