@@ -146,6 +146,14 @@ def mismatched_commit_mode():
     edit_json(macos_results("compare", benchmark=COMPARE_FAULT_SLICE), change)
 
 
+def load_lines_as_a_string():
+    """The macOS slice's load lines as one string, no list of a lock's start and end lines
+    (review E-2)."""
+    def change(document):
+        document["header"]["load_lines"] = " ".join(document["header"]["load_lines"])
+    edit_json(macos_results("compare", benchmark=COMPARE_FAULT_SLICE), change)
+
+
 def failed_read_back():
     def change(document):
         oracle = questdb_variant(document)["classes"]["B"]["read_back"]["oracle"]
@@ -864,6 +872,13 @@ FAULTS = (
           "-l's memory for a Linux tick-store-alone day, whose memory is the guard's",
           CHECK_FAILED, "FAIL: test_a_linux_tickstore_alone_day_renders_with_the_guards_memory "
           "(__main__.RenderCompareTest"),
+    # Review E-2: load lines that are not a list hold no lock proof.
+    Fault("load-lines-not-a-list-accepted", "py-scripts", "check_results.py takes load_lines "
+          "that are not a list as no problem, for a bench or a comparison file", CHECK_FAILED,
+          "FAIL: test_load_lines_that_are_not_a_list (__main__.Faults"),
+    Fault("compare-load-lines-a-string", "check-compare", "a comparison file whose load_lines "
+          "is one string, with no list of the lock's start and end lines", CHECK_FAILED,
+          "header.load_lines: not a list of measure.sh load lines", load_lines_as_a_string),
     Fault("results-md-hand-edit", "render-check", "a hand edit inside RESULTS.md's benchmark "
           "block, a host's heading changed", CHECK_FAILED,
           "the table in RESULTS.md is stale or was edited by hand", hand_edit_results_md),
