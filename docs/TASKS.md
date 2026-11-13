@@ -197,7 +197,7 @@ Measure on both hosts
 The final review (docs/REVIEW.md)
 - [x] The codec findings, B-1 to B-7: five fixed in code, each with a test seen failing first; B-3 closed by stating the bound in `docs/store.md`, with a test pinning the worst block; B-6 by correcting `simd.hpp` (docs/NOTES.md, The final review's codec findings)
 - [x] The store findings, C-1 to C-10, and the gate's message finding, G-3: eight fixed in code, each with a test seen failing first; C-4 closed by stating `raw_bytes`'s worst case in `docs/store.md`, with a test pinning it; C-9's demonstration refuted, and what no process-crash test can show stated in `docs/format.md` and beside the tests (docs/NOTES.md, The final review's store findings)
-- [ ] The harness and tools findings, D-1 to D-15 (docs/NOTES.md, The final review's harness and tools findings). Fixed so far, each with a test seen failing first: D-4, D-3, D-2
+- [ ] The harness and tools findings, D-1 to D-15 (docs/NOTES.md, The final review's harness and tools findings). Fixed so far, each with a test seen failing first: D-4, D-3, D-2, D-5
 - [ ] `results/roundtrip-12302019.json` still holds the store error text from before G-3 ("file byte ...: expected 0, have 0"). Results are not regenerated in the review; the freeze rerun replaces it
 - [ ] The write-up says which decode kernels the store calls on each instruction set: DS-3's fused NEON form, `unpack_delta_narrow` on every set and DS-8's delta-of-delta reconstruct are not on the store's decode path, which never writes delta of delta; DS-4's fused AVX2 form is (docs/NOTES.md, The final review's codec findings)
 

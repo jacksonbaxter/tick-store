@@ -3335,6 +3335,9 @@ D-2. Both the CLI and `evaluate_references` now check that every checkpoint size
 size; the CLI's refusal is a usage error, exit 2, with a line in the usage text saying so. Before,
 `--segment-records 2 --checkpoint-segment-records 100` exited 0 and measured no checkpoint.
 
+D-5. No script reads `tick_export`'s `source_bytes` (`git grep` over `compare/`, `scripts/` and
+their tests), so no reader changed. Before: 772 for the 768-byte fixture with its 4-byte tail.
+
 Raw: `phase4-raw/fix-harness/`: each finding's failing and passing logs.
 
 ## Process notes
