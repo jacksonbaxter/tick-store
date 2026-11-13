@@ -19,7 +19,9 @@ full-day number and a slice number never share a table. Each host has its own ta
 each durability class: ingest in class A and ingest in class B never share a table, and queries
 are on each system's class B store, as the harness runs them. Each system shows its headline
 variant; a full day also lists every variant it ran, and each system's peak memory and swap per
-phase. A timed number with any page swapped in while it ran carries "(swap-in)". A
+phase. Each latency's tail figure is named for what it is, from the file: at 30 warm and 7 cold
+runs the 99th percentile by nearest rank is the slowest run, so a column reads "slowest of 30",
+never p99, and a file whose figure is not what its n makes it stops the render. A timed number with any page swapped in while it ran carries "(swap-in)". A
 tick-store-only full day, the macOS figure for the targets whose host is Both, is labelled so,
 and ranks nothing, since no other system ran.
 
@@ -86,8 +88,6 @@ SYSTEM_ORDER = ("parquet", "arcticdb", "questdb", "tickstore")
 SYSTEM_LABEL = {"parquet": "Parquet", "arcticdb": "ArcticDB", "questdb": "QuestDB",
                 "tickstore": "tick-store"}
 QUERY_NAMES = ("Q1", "Q2", "Q3", "Q4", "Q5")
-QUERY_COLUMNS = ("Query", "System", "Variant", "Rows", "Warm median ms", "Warm p99 ms",
-                 "Cold median ms", "Cold p99 ms", "Lowest")
 INGEST_COLUMNS = ("System", "Variant", "Write s, median", "M records/s", "Stored bytes",
                   "Ratio", "Proof", "Like-for-like")
 VARIANT_COLUMNS = ("System", "Variant", "Stored bytes, B", "Ratio", "Write s, A / B",
@@ -269,8 +269,60 @@ def ordered_systems(document):
     return [name for name in SYSTEM_ORDER if name in document["systems"]]
 
 
+def nearest_rank(count):
+    """The nearest rank of the 99th percentile among `count` runs, from 1, as
+    check_compare.py has it."""
+    return max(1, -(-99 * count // 100))
+
+
+def tail_name(block):
+    """What a latency block's tail figure, its p99_us, is: the name a protocol 2 file gives it
+    in `tail`, or for a file before protocol 2 the same name worked out from its n. The 99th
+    percentile by nearest rank of 30 or of 7 runs is the slowest run, never a 1% tail."""
+    named = block.get("tail")
+    if named is not None:
+        return named
+    count = block.get("n")
+    if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+        raise TargetError(f"a latency block with no n to name its tail figure: n is {count!r}")
+    rank = nearest_rank(count)
+    if rank < count:
+        return f"99th percentile, nearest rank: run {rank} of {count}"
+    if "max_us" in block and block.get("p99_us") != block["max_us"]:
+        raise TargetError(f"the tail figure of {count} runs is the slowest by nearest rank, and "
+                          f"p99_us {block.get('p99_us')} is not max_us {block['max_us']}")
+    return f"slowest of {count}"
+
+
+def one_tail(blocks, what):
+    """The one tail figure name a set of blocks shares, so a column or a comparison never
+    mixes two."""
+    names = {tail_name(block) for block in blocks}
+    if len(names) != 1:
+        raise TargetError(f"{what}: tail figures of different kinds, {sorted(names)}")
+    return names.pop()
+
+
+def tail_phrase(name):
+    return f"the {name} runs" if name.startswith("slowest of ") else f"the {name}"
+
+
+def measured_as(tails):
+    """'the slowest of 30 runs warm and the slowest of 7 runs cold', from (kind, name) pairs."""
+    return " and ".join(f"{tail_phrase(name)} {kind}" for kind, name in tails)
+
+
+def query_tails(document):
+    """(kind, tail figure name) for warm and cold over every headline query of the file."""
+    return [(kind, one_tail([headline(document, name)[1]["queries"][query][kind]
+                             for name in ordered_systems(document) for query in QUERY_NAMES],
+                            f"the {kind} queries"))
+            for kind in ("warm", "cold")]
+
+
 def lowest_mark(values, name):
-    """"warm, cold" for the measures on which this system had the lowest median and p99."""
+    """"warm, cold" for the measures on which this system had the lowest median and the lowest
+    tail figure."""
     marks = []
     for kind in ("warm", "cold"):
         if all(values[name][kind][field] == min(item[kind][field] for item in values.values())
@@ -292,7 +344,10 @@ def is_alone(document):
 def query_table(document):
     names = ordered_systems(document)
     alone = is_alone(document)
-    lines = ["| " + " | ".join(QUERY_COLUMNS) + " |", "|" + "---|" * len(QUERY_COLUMNS)]
+    (_, warm), (_, cold) = query_tails(document)
+    columns = ("Query", "System", "Variant", "Rows", "Warm median ms", f"Warm {warm} ms",
+               "Cold median ms", f"Cold {cold} ms", "Lowest")
+    lines = ["| " + " | ".join(columns) + " |", "|" + "---|" * len(columns)]
     for query in QUERY_NAMES:
         values = {name: headline(document, name)[1]["queries"][query] for name in names}
         for name in names:
@@ -422,10 +477,12 @@ def compare_for(document):
         "slice only"
     ranking = ("No other system ran, so nothing is ranked." if alone else
                "\"Lowest\" names the measures, warm or cold, on which a system had both the "
-               "lowest median and the lowest p99 of the four.")
+               "lowest median and the lowest tail figure of the four.")
     lines = [f"**{host}, {scope}.** {header['cpu_model']}, commit `{header['commit'][:12]}`. "
              f"{header['statement']} {document['label']}", "",
-             f"Queries, on each system's class B store, in milliseconds. {ranking}", ""]
+             "Queries, on each system's class B store, in milliseconds. Each latency is the "
+             "median of its runs and its tail figure, the 99th percentile by nearest rank, which "
+             f"is {measured_as(query_tails(document))}. {ranking}", ""]
     lines += query_table(document)
     for class_name, meaning in (("A", "returns once data is in the OS page cache"),
                                 ("B", "returns after a flush to the device")):
@@ -622,9 +679,39 @@ def lowest_parts(row, document):
             best = min(theirs, key=lambda system: theirs[system][spec["fields"][0]])
             values = " / ".join(shown(ours[field], row) for field in spec["fields"])
             others = " / ".join(shown(theirs[best][field], row) for field in spec["fields"])
-            parts.append((f"{query} {kind}", f"{values} against {SYSTEM_LABEL[best]}'s {others}",
-                          met))
+            tail = one_tail([ours, *theirs.values()], f"{query} {kind}")
+            names = " / ".join("median" if field == "median_us" else
+                               tail if field in TAIL_FIELDS else field
+                               for field in spec["fields"])
+            parts.append((f"{query} {kind}", f"{values} against {SYSTEM_LABEL[best]}'s {others} "
+                          f"({names})", met))
     return parts
+
+
+# The fields that hold a latency block's tail figure: p99_us under its old name.
+TAIL_FIELDS = ("p99_us", "tail_us")
+
+
+def lowest_tails(row, document):
+    """For a row judged on tail figures, what they are: "p99 measured as the slowest of 30
+    runs warm and ...", so a target that says p99 keeps its words and the verdict says what
+    was measured. None for any other row."""
+    spec = row.get("lowest_of")
+    if not spec or not any(field in TAIL_FIELDS for field in spec["fields"]):
+        return None
+    systems = [spec["ours"], *spec["others"]]
+    tails = [(kind, one_tail([walk(document, ["systems", system, "variants", "@headline",
+                                              "queries", query, kind])
+                              for system in systems for query in spec["queries"]],
+                             f"the {kind} queries"))
+             for kind in spec["kinds"]]
+    return f"p99 measured as {measured_as(tails)}"
+
+
+def verdict_text(row, parts):
+    """The verdict, and beside it what a tail figure judged against a p99 target is."""
+    tails = lowest_tails(row, parts[0][4])
+    return verdict_of(parts) + (f"; {tails}" if tails else "")
 
 
 def target_text_of(row):
@@ -693,7 +780,7 @@ def target_row(row, root):
     parts, reason = judged_parts(row, root)
     if parts is None:
         return target_text, "no figure", reason, "none"
-    return target_text, measured_of(parts), verdict_of(parts), files_of(parts, root)
+    return target_text, measured_of(parts), verdict_text(row, parts), files_of(parts, root)
 
 
 def render_targets(definitions_path, root):
@@ -748,8 +835,9 @@ def render_headline(definitions_path, root):
     lines = ["Generated by `scripts/render_results.py` from `scripts/targets.json` and the "
              "committed results files. Each figure and verdict is the same as in the Targets "
              f"table of [RESULTS.md]({TARGETS_ANCHOR}), which names each row's results file. "
-             "A pair of latencies is the median / p99. Linux is the pinned host; macOS figures "
-             "are unpinned, with no counters.", "",
+             "A pair of latencies is the median / the tail figure, which the pair names with "
+             "its number of runs. Linux is the pinned host; macOS figures are unpinned, with no "
+             "counters.", "",
              "| " + " | ".join(HEADLINE_COLUMNS) + " |", "|" + "---|" * len(HEADLINE_COLUMNS)]
     # Per target row, its parts and the labels some headline row shows, so the parts no
     # headline row shows can be named below the table.
@@ -774,7 +862,7 @@ def render_headline(definitions_path, root):
             if wanted:
                 parts = [part for part in parts if part[0] in wanted]
             labels.update(part[0] for part in parts)
-            verdict = verdict_of(parts)
+            verdict = verdict_text(row, parts)
             host = row["host"] if row["host"] != "any" else hosts_of(part[4] for part in parts)
         except (TargetError, KeyError, TypeError, ZeroDivisionError) as error:
             raise TargetError(f"headline {name}: {error}") from error
@@ -863,7 +951,11 @@ def main(argv=None):
         return EXIT_USAGE
     blocks = [(BEGIN, END, render(args.results))]
     if block_of(text, COMPARE_BEGIN, COMPARE_END) is not None:
-        blocks.append((COMPARE_BEGIN, COMPARE_END, render_compare(args.compare_results)))
+        try:
+            blocks.append((COMPARE_BEGIN, COMPARE_END, render_compare(args.compare_results)))
+        except TargetError as error:
+            print(f"render_results: comparison: {error}", file=sys.stderr)
+            return EXIT_USAGE
     elif compare_paths:
         print(f"render_results: the comparison markers are not in {md_name}", file=sys.stderr)
         return EXIT_USAGE
