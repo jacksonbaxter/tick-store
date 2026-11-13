@@ -3892,6 +3892,15 @@ starts. Warm figures are unchanged, and `warm_worker_open` keeps the open's time
 The cold worker's new fields sit after the lines `cold-refilled-run-counted`'s patch reads, so it
 still applies and still fails `ColdRuns`.
 
+**F-3, the slice's warm-up.** Confirmed by reading and by a test: `warm_full_day` runs each query
+once untimed and checks its answer before the timed repetitions, `step_warm_queries` did not, so
+the slice's first timed repetition was each engine's first call of the query in that worker
+(`f3-fail-before.log`: a fake engine whose first call is 0.05 s slower had a 0.059 s repetition).
+The slice now runs the same `WARM_UP_RUNS`, answer-checked, after the residency read and before
+the timed repetitions; the warm-up's reads fall between the two proofs, so a warm-up that evicted
+or faulted anything would still fail the after-proof. tick-store's macOS day takes the same path
+and gets the same warm-up.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
