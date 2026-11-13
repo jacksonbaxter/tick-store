@@ -3995,6 +3995,12 @@ without the guard's memory, so fault `compare-tickstore-only-on-linux` gave way 
 reuses a system's part only if the `<system>.arguments.json` beside it, its repetition
 arguments, variants, scope and measurement, matches the run's; otherwise the system runs again.
 Tested with the harness's fakes; no day was run.
+**F-6, class A's proof.** Confirmed by tests: Parquet's class A, `proven` with 2 harness flushes
+in its probe or its full ingest, passed, and so did ArcticDB's and QuestDB's with 0 or no dirty
+pages in the probe while their class B was not proven. `check_compare.py` now holds a proven
+class A to the proof that made it: no harness flush for Parquet, in both scopes, and dirty pages
+in the probe for ArcticDB and QuestDB, as `compare/settings.py` decides it. Every committed file
+meets it: the smallest class A probe is 120 dirty pages, ArcticDB's on macOS.
 
 ## Process notes
 
