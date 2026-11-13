@@ -728,6 +728,11 @@ FAULTS = (
           "2 slice's stated untimed runs without the seconds of those runs beside them",
           CHECK_FAILED, "FAIL: test_untimed_runs_stated_with_other_seconds_beside_them "
           "(__main__.Protocol2"),
+    # Review RV-8: a day's per-process warm proof, held to its untimed runs' seconds too.
+    Fault("compare-day-warm-up-seconds-unchecked", "py-scripts", "check_compare.py takes a "
+          "protocol 2 day's stated untimed runs without the seconds of those runs beside them",
+          CHECK_FAILED, "FAIL: test_a_day_warm_up_stated_with_other_seconds_beside_it "
+          "(__main__.Protocol2FullDay"),
     Fault("warm-up-runs-stated-not-counted", "py-compare", "the warm proof states the constant "
           "number of untimed runs, whatever ran", CHECK_FAILED,
           "FAIL: test_the_proof_states_the_untimed_runs_that_ran (__main__.ResidencyWarmOnADay"),

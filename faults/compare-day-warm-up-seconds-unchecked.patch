@@ -1,0 +1,12 @@
+diff --git a/scripts/check_compare.py b/scripts/check_compare.py
+--- a/scripts/check_compare.py
++++ b/scripts/check_compare.py
+@@ -411,7 +411,7 @@ def check_warm_full_day(where, warm, protocol=PROTOCOL_1):
+                         "bytes across the timed repetitions")
+     if not check_results.is_number(accepted.get("warm_up_runs")) or accepted["warm_up_runs"] < 1:
+         problems.append(f"{where}.warm: no untimed run before the repetitions")
+-    elif protocol >= PROTOCOL_2:
++    elif False:
+         seconds = accepted.get("warm_up_seconds")
+         if not isinstance(seconds, list) or len(seconds) != accepted["warm_up_runs"] or not all(
+                 check_results.is_number(value) and value > 0 for value in seconds):

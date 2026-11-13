@@ -1482,6 +1482,8 @@ def protocol_2(document):
                 if "pages" in warm_extra["proof"]:
                     warm_extra["proof"]["warm_up_runs"] = 1
                     warm_extra["warm_up_seconds"] = [50e-6]
+                if "accepted" in warm_extra["proof"]:
+                    warm_extra["proof"]["accepted"]["warm_up_seconds"] = [50e-6]
                 cold_extra = {key: value for key, value in entry["cold"].items()
                               if key in ("proofs", "swap_timed", "run_again_refilled_pages")}
                 entry["warm"] = {**latency_block(WARM_SECONDS), **warm_extra}
@@ -1934,6 +1936,23 @@ class Protocol2FullDay(Harness):
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn("variant_selection: the rule is not compare/variant_rule.py's",
                       result.stderr)
+
+    def test_a_day_warm_up_stated_with_other_seconds_beside_it(self):
+        # Review RV-8: a day's per-process warm proof holds its untimed runs to their seconds,
+        # as the slice's residency proof does (RF-10).
+        for seconds in (None, [], [50e-6, 60e-6], [0.0], ["x"]):
+            with self.subTest(seconds=seconds):
+                document, source = full_day_document()
+                protocol_2(document)
+                accepted = q1_of(document, "questdb")["warm"]["proof"]["accepted"]
+                if seconds is None:
+                    del accepted["warm_up_seconds"]
+                else:
+                    accepted["warm_up_seconds"] = seconds
+                result = self.run_full(document, protocol_2(source))
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn("questdb.v.queries.Q1.warm: 1 untimed runs stated, and their "
+                              f"seconds are {seconds!r}", result.stderr)
 
     def test_a_tickstore_alone_day_passes(self):
         # Review RV-4: a protocol 2 day of tick-store alone, the only kind the harness writes

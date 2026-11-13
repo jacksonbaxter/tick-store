@@ -398,10 +398,11 @@ def check_durability(where, durability, name, class_name, control, host):
     return problems
 
 
-def check_warm_full_day(where, warm):
+def check_warm_full_day(where, warm, protocol=PROTOCOL_1):
     """On a whole day: untimed runs first, then not one byte read from storage across every
     timed repetition by the processes that answer the query, each counted, with the block
-    device's machine-wide count kept beside them."""
+    device's machine-wide count kept beside them. From protocol 2 the untimed runs stated are
+    borne out by their own seconds, as on the slice (review RV-8)."""
     proof = (warm or {}).get("proof") or {}
     accepted = proof.get("accepted") or {}
     problems = []
@@ -410,6 +411,12 @@ def check_warm_full_day(where, warm):
                         "bytes across the timed repetitions")
     if not check_results.is_number(accepted.get("warm_up_runs")) or accepted["warm_up_runs"] < 1:
         problems.append(f"{where}.warm: no untimed run before the repetitions")
+    elif protocol >= PROTOCOL_2:
+        seconds = accepted.get("warm_up_seconds")
+        if not isinstance(seconds, list) or len(seconds) != accepted["warm_up_runs"] or not all(
+                check_results.is_number(value) and value > 0 for value in seconds):
+            problems.append(f"{where}.warm: {accepted['warm_up_runs']} untimed runs stated, and "
+                            f"their seconds are {seconds!r}")
     if not accepted.get("device_counter") or not proof.get("method"):
         problems.append(f"{where}.warm: the counter or the method is not named")
     by_process = accepted.get("by_process")
@@ -428,7 +435,7 @@ def check_warm_full_day(where, warm):
 
 def check_warm(where, warm, full_day=False, protocol=PROTOCOL_1):
     if full_day:
-        return check_warm_full_day(where, warm)
+        return check_warm_full_day(where, warm, protocol)
     proof = (warm or {}).get("proof") or {}
     pages = proof.get("pages")
     if not pages or proof.get("resident_before") != pages or proof.get("resident_after") != pages:
