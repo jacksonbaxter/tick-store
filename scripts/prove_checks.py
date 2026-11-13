@@ -827,6 +827,19 @@ FAULTS = (
           "with G-2's two exit codes typed and none observed on its runs, as the assembler "
           "wrote them before review E-1", EXIT_RENDER_REFUSED,
           "g2.data_crc: no exit_code observed", roundtrip_exit_codes_typed),
+    # Review F-4 and RF-4: the tail figure is named for what it is.
+    Fault("render-tail-called-p99", "py-scripts", "render_results.py heads the warm tail "
+          "column \"Warm p99 ms\" again, the slowest of 30 presented as a 99th percentile",
+          CHECK_FAILED, "FAIL: test_the_tail_figure_is_named_for_what_it_is_with_its_n "
+          "(__main__.RenderCompareTest"),
+    Fault("render-tail-name-unchecked", "py-scripts", "render_results.py calls a protocol 1 "
+          "tail figure the slowest of n without holding it to the block's slowest run",
+          CHECK_FAILED, "FAIL: test_a_block_whose_figure_is_not_what_its_n_makes_it_is_refused "
+          "(__main__.TailNameTest"),
+    Fault("render-ql4-p99-unexplained", "py-scripts", "render_results.py gives QL-4's verdict "
+          "with no word that its p99 was measured as the slowest of 30 and of 7", CHECK_FAILED,
+          "FAIL: test_each_pair_names_its_tail_figure_and_the_verdict_says_what_p99_was "
+          "(__main__.RenderLowestTest"),
     Fault("results-md-hand-edit", "render-check", "a hand edit inside RESULTS.md's benchmark "
           "block, a host's heading changed", CHECK_FAILED,
           "the table in RESULTS.md is stale or was edited by hand", hand_edit_results_md),

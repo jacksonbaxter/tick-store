@@ -1,0 +1,13 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+index 4f31ac8..408bc8e 100644
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -711,7 +711,7 @@ def lowest_tails(row, document):
+ def verdict_text(row, parts):
+     """The verdict, and beside it what a tail figure judged against a p99 target is."""
+     tails = lowest_tails(row, parts[0][4])
+-    return verdict_of(parts) + (f"; {tails}" if tails else "")
++    return verdict_of(parts)
+ 
+ 
+ def target_text_of(row):

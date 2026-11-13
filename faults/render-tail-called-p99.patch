@@ -1,0 +1,13 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+index 4f31ac8..e88824c 100644
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -345,7 +345,7 @@ def query_table(document):
+     names = ordered_systems(document)
+     alone = is_alone(document)
+     (_, warm), (_, cold) = query_tails(document)
+-    columns = ("Query", "System", "Variant", "Rows", "Warm median ms", f"Warm {warm} ms",
++    columns = ("Query", "System", "Variant", "Rows", "Warm median ms", "Warm p99 ms",
+                "Cold median ms", f"Cold {cold} ms", "Lowest")
+     lines = ["| " + " | ".join(columns) + " |", "|" + "---|" * len(columns)]
+     for query in QUERY_NAMES:
