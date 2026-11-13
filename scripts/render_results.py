@@ -38,10 +38,11 @@ render rather than leave a gap.
 The headline block is the rows scripts/targets.json lists under "headline", each a target row of
 the targets block, or some of its parts, judged by the same code, so every figure and verdict
 in it is the targets block's own. A row may show some of its parts; the parts it leaves out are
-named under the table with their verdicts. A headline with no missed target stops the render. The prose
-above the headline, the pitch, is written by hand: every figure it states is one scripts/targets.json
-lists under "pitch" and is checked against the results, or a text listed there with its reason
-for being no result, so --check stops on a pitch figure the results no longer give.
+named under the table with their verdicts. A headline with no missed target stops the render.
+The prose above the headline, the pitch, is written by hand: every figure it states is one
+scripts/targets.json lists under "pitch" and is checked against the results, or a text listed
+there with its reason for being no result, so --check stops on a pitch figure the results no
+longer give.
 
 G-3's file, results/fuzz-g3-<commit>.json, must pass check_fuzz.py first, against the fuzz
 targets fuzz/CMakeLists.txt defines: one that leaves a target out, or holds a clean run under
@@ -742,7 +743,8 @@ def judge(item, row, document):
         return f"{label}not judged on {missing.what}: {missing.reason}", Unjudged(missing.what)
     if comparison is None:
         text = shown(value, row)
-        return (f"{item['label']} {text}" if item.get("label") and item is not row else text), None
+        labelled = item.get("label") and item is not row
+        return (f"{item['label']} {text}" if labelled else text), None
     name, operand = comparison
     if isinstance(against, bool) or not isinstance(against, (int, float)):
         met = COMPARATORS[name][0](value, against)

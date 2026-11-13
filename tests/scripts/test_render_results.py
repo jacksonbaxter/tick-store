@@ -488,7 +488,8 @@ class TailNameTest(unittest.TestCase):
 
 LOWEST_ROW = {"id": "T-7", "host": "Linux",
               "target_text": "lowest median and p99 of the two, each query, warm and cold",
-              "lowest_of": {"file": "results/day-*.json", "ours": "tickstore", "others": ["parquet"],
+              "lowest_of": {"file": "results/day-*.json", "ours": "tickstore",
+                            "others": ["parquet"],
                             "queries": ["Q1"], "kinds": ["warm", "cold"],
                             "fields": ["median_us", "p99_us"]},
               "digits": 2, "scale": 0.001, "unit": " ms"}
@@ -511,7 +512,8 @@ DAY_ROW = {"id": "T-9", "host": "Linux", "target": {"at_most": 5}, "digits": 2, 
            "parts": [{"label": "q", "file": "results/compare/Linux-12302019-full-*.json",
                       "value": {"path": ["ms"]}}]}
 ALONE_ROW = {"id": "T-10", "host": "macOS", "target": {"at_most": 5}, "digits": 2, "unit": " ms",
-             "parts": [{"label": "q", "file": "results/compare/macOS-12302019-full-tickstore-*.json",
+             "parts": [{"label": "q",
+                        "file": "results/compare/macOS-12302019-full-tickstore-*.json",
                         "value": {"path": ["ms"]}}]}
 
 
@@ -739,8 +741,8 @@ PITCH = {"figures": [
      "values": [{"path": ["systems", "s", "variants", "@headline", "ms"]}], "scale": 1,
      "format": "{:.2f} ms"}],
     "not_results": [{"text": "C++23", "why": "the language"}]}
-PITCH_README = ("# Title\n\nWritten in C++23, it keeps 2.0 and\n4.0 bits, and answers in 7.25 ms.\n\n"
-                "More.\n")
+PITCH_README = ("# Title\n\nWritten in C++23, it keeps 2.0 and\n4.0 bits, and answers in "
+                "7.25 ms.\n\nMore.\n")
 
 
 class RenderPitchTest(Scratch):
@@ -1078,7 +1080,8 @@ class RenderCompareTest(Scratch):
                               "Lowest |", block)
                 self.assertNotIn("p99", block)
                 self.assertIn("the lowest median and the lowest tail figure of the four", block)
-                self.assertIn("which is the slowest of 30 runs warm and the slowest of 7 runs cold", block)
+                self.assertIn("which is the slowest of 30 runs warm and the slowest of 7 runs "
+                              "cold", block)
 
     def test_a_tail_figure_its_n_does_not_make_the_slowest_stops_the_render(self):
         document = COMPARE.valid_document("Linux")
