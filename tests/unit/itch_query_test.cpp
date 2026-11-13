@@ -996,6 +996,7 @@ TEST(QueryCli, RequestsOutOfRangeAnswerWithAnError) {
         "{\"kind\":\"rows\",\"start_ns\":0,\"end_ns\":5,\"locate\":70000}\n"
         "{\"kind\":\"minute_aggregate\",\"start_ns\":0,\"end_ns\":5}\n"
         "{\"kind\":\"histogram\"}\n"
+        "{\"name\":\"Q9\"}\n"
         "{\"kind\":\"rows\",\"start_ns\":99999999999999999999}\n"
         "{\"kind\":\"rows\",\"start_ns\":5,\"end_ns\":6,\"locate\":1} trailing\n"
         // A field present with the wrong type, or a window bound missing, is an error, never
@@ -1018,11 +1019,17 @@ TEST(QueryCli, RequestsOutOfRangeAnswerWithAnError) {
     for (std::string line; std::getline(answers, line);) {
         lines.push_back(line);
     }
-    ASSERT_EQ(lines.size(), 15U);
-    for (std::size_t i = 1; i <= 13; ++i) {
+    ASSERT_EQ(lines.size(), 16U);
+    for (std::size_t i = 1; i <= 14; ++i) {
         EXPECT_NE(json_field(lines[i], "error"), "") << i << ": " << lines[i];
     }
-    EXPECT_EQ(json_field(lines[14], "rows"), "1");
+    // An unknown kind, and no kind, are told so, not that they lack a window (review RD-1).
+    for (const std::size_t i : {4U, 5U}) {
+        EXPECT_TRUE(lines[i].contains("kind must be rows, minute_aggregate, column_sum, "
+                                      "busiest_locate or quit"))
+            << lines[i];
+    }
+    EXPECT_EQ(json_field(lines[15], "rows"), "1");
 }
 
 }  // namespace

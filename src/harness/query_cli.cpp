@@ -375,8 +375,10 @@ private:
             return fail(field->error());
         }
     }
-    // Every kind but column_sum reads a window, and is not given one by default.
-    if (kind != "column_sum" && (!start_field->has_value() || !end_field->has_value())) {
+    // Each kind that reads a window is not given one by default. An unknown kind falls
+    // through to the error that names the kinds (review RD-1).
+    const bool windowed = kind == "rows" || kind == "minute_aggregate" || kind == "busiest_locate";
+    if (windowed && (!start_field->has_value() || !end_field->has_value())) {
         return fail(std::format("{} needs start_ns and end_ns", kind));
     }
     const std::int64_t start = start_field->value_or(0);
