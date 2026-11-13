@@ -3876,6 +3876,22 @@ applies, and `SourcePrecondition` still fails on it. On macOS the device counter
 `disk0` total, reads and writes, so a write's own output is in it. The cold worker test now
 gives its scratch layout a stand-in `tick_coldcache`, since the write step reads residency.
 
+**F-1, the cold clock and the store's open.** Confirmed by reading and on the Mac
+(`f1_probe.py`, `f1-probe-mac-before.log`): a whole slice store, written by `tick_roundtrip
+ingest` and evicted, held 0 of its 2,641 pages; `tick_query`'s open alone, before any query,
+left 15 pages, 245,760 bytes, resident, and its ready line reported `open_ns` 2,224,500. The
+reviewer's footer sizes for the day's store, about 5 MB, are larger. `tick_query` already reports
+`open_ns`, so no C++ changed. A cold tick-store figure is that open plus the round trip,
+`parts` keeping both per repetition; the open is in `ItchStoreReader::open` alone, not the tool's
+process start. Each system now states whether its cold clock holds its whole open:
+Parquet's does, since its client holds no file; ArcticDB's does not (the worker's open opens the
+LMDB environment and reads the library's config); QuestDB's does not (the server opens the
+table's files before the worker starts). The worker reads the store's residency before the open
+and again before the query, both outside the clock, and the proof keeps the one where its clock
+starts. Warm figures are unchanged, and `warm_worker_open` keeps the open's time once per worker.
+The cold worker's new fields sit after the lines `cold-refilled-run-counted`'s patch reads, so it
+still applies and still fails `ColdRuns`.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
