@@ -384,12 +384,18 @@ void ignore_signal(int /*signal*/) {}
 
 // A signal while the gate waits for perf interrupts poll(); the wait goes on for the time
 // left, and an acknowledgement after it is taken (review A-6).
-// NOLINTBEGIN(misc-include-cleaner): <csignal> and <pthread.h> declare these on the platforms
-// we build for; both C libraries define them in private headers
+// The include check is off on the seven lines that name sigaction, its sa_handler, SIGUSR1
+// or the pthread calls: <csignal> and <pthread.h> declare them on the platforms we build
+// for, but both C libraries define them in private headers the check cannot trace. Line by line, so a
+// missing include for any other name here is still reported (review RA-3).
 TEST(CounterGate, ASignalWhileWaitingDoesNotEndTheWait) {
+    // NOLINTNEXTLINE(misc-include-cleaner)
     struct sigaction quiet{};
+    // NOLINTNEXTLINE(misc-include-cleaner)
     quiet.sa_handler = ignore_signal;  // no SA_RESTART, so poll() returns EINTR
+    // NOLINTNEXTLINE(misc-include-cleaner)
     struct sigaction before{};
+    // NOLINTNEXTLINE(misc-include-cleaner)
     ASSERT_EQ(::sigaction(SIGUSR1, &quiet, &before), 0);
 
     const test::ScratchDir scratch;
@@ -400,12 +406,14 @@ TEST(CounterGate, ASignalWhileWaitingDoesNotEndTheWait) {
     const int in = ::open(perf.control().c_str(), O_RDWR | O_CLOEXEC);
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg): open is variadic
     const int out = ::open(perf.acknowledge().c_str(), O_RDWR | O_CLOEXEC);
+    // NOLINTNEXTLINE(misc-include-cleaner)
     const pthread_t waiting = ::pthread_self();
     std::thread perf_side{[in, out, waiting] {
         std::array<char, 32> buffer{};
         EXPECT_GT(::read(in, buffer.data(), buffer.size()), 0);
         // The command is written just before the wait starts, so give it time to start.
         std::this_thread::sleep_for(std::chrono::milliseconds{50});
+        // NOLINTNEXTLINE(misc-include-cleaner)
         EXPECT_EQ(::pthread_kill(waiting, SIGUSR1), 0);
         std::this_thread::sleep_for(std::chrono::milliseconds{50});
         EXPECT_EQ(::write(out, "ack\n", 4), 4);
@@ -414,10 +422,10 @@ TEST(CounterGate, ASignalWhileWaitingDoesNotEndTheWait) {
     perf_side.join();
     ::close(in);
     ::close(out);
+    // NOLINTNEXTLINE(misc-include-cleaner)
     ASSERT_EQ(::sigaction(SIGUSR1, &before, nullptr), 0);
     EXPECT_TRUE(enabled.has_value()) << enabled.error();
 }
-// NOLINTEND(misc-include-cleaner)
 
 class StreamCheckTest : public ::testing::Test {
 protected:
