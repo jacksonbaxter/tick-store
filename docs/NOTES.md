@@ -3692,6 +3692,22 @@ they are not wholly free of it; by how much is not measured. BENCHMARKS.md's Lin
 says that boost stays on and no run used a fixed clock. The write-up's statement of this is an
 open Phase 4 item.
 
+**cpu6 for the second thread: ticked, as a shared two-CPU mask.** The reported measurements
+with more than one thread are the comparison runs. `compare/run.py` starts each system under
+the wrapper with `taskset -c 4`, and `pin_threads` in `compare/run_system.py` then sets the
+run's own mask to cpu4 and cpu6 (`LINUX_CPUS`) and reads it back, before the runner starts any
+server, worker or tool, so every child inherits it; nothing in `compare/systems/` changes it.
+That is not a thread pinned to cpu6 by itself: every thread of every system, client and server,
+may run on either CPU, and the results say so. Both Linux comparison files,
+`results/compare/Linux-12302019-full-67ae574f5666.json` and the slice's at the same commit,
+record for each of the four systems `pinning` as verified, started on cpu4, running on cpu4
+and cpu6, with `threads` 2, and in the header "cpu6, used by every system" and the statement
+that every thread shares those two CPUs. The bench files record "cpu6 reserved, unused: every
+case is single-threaded", which holds: no benchmark in `bench/` starts a thread. The one other
+threaded path, `tick_roundtrip verify` with its hash worker, is the G-1 correctness gate, run as
+a heavy job on cpu2, cpu6 and cpu7 (`results/roundtrip-12302019-linux.json`), and reports no
+speed figure.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
