@@ -30,6 +30,7 @@ add_executable(tick_store_unit_tests
     itch_store_corrupt_test.cpp
     itch_store_test.cpp
     itch_truncation_test.cpp
+    json_writer_test.cpp
     oracle_broken_store_test.cpp
     oracle_flip_test.cpp
     oracle_test.cpp

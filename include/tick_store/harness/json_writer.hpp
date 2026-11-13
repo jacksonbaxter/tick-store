@@ -1,6 +1,13 @@
 #pragma once
 
 // A small JSON writer for the tools' summaries. Nothing here reads JSON.
+//
+// Strings are bytes, and the output is always valid UTF-8. A well-formed UTF-8 sequence is
+// written as it is, so a path with non-ASCII names reads back as the same path. A byte that
+// is not part of one, as a corrupt store's type byte or a path in another encoding can be, is
+// written as \udcXX: the lone low surrogate Python's surrogateescape gives that byte, so
+// json.loads holds the same string os.listdir would, and os.fsencode gives the byte back.
+// `"`, `\` and bytes below 0x20 are escaped as JSON requires.
 
 #include <concepts>
 #include <cstddef>
@@ -112,23 +119,64 @@ private:
         text_.append(depth_ * 2, ' ');
     }
 
+    // The length of the well-formed UTF-8 sequence starting at `at`, or 0 if none does
+    // (Unicode's table 3-7: no overlong form, no surrogate, nothing past U+10FFFF).
+    [[nodiscard]] static std::size_t utf8_length(std::string_view text, std::size_t at) noexcept {
+        const auto byte = [&](std::size_t i) -> unsigned {
+            return at + i < text.size() ? static_cast<unsigned char>(text[at + i]) : 0x100U;
+        };
+        const auto in = [](unsigned b, unsigned low, unsigned high) { return b >= low && b <= high; };
+        const unsigned lead = byte(0);
+        std::size_t length = 0;
+        unsigned low = 0x80U;  // the second byte's range, which the lead narrows
+        unsigned high = 0xBFU;
+        if (lead < 0x80U) {
+            return 1;
+        }
+        if (in(lead, 0xC2U, 0xDFU)) {
+            length = 2;
+        } else if (in(lead, 0xE0U, 0xEFU)) {
+            length = 3;
+            low = lead == 0xE0U ? 0xA0U : low;
+            high = lead == 0xEDU ? 0x9FU : high;
+        } else if (in(lead, 0xF0U, 0xF4U)) {
+            length = 4;
+            low = lead == 0xF0U ? 0x90U : low;
+            high = lead == 0xF4U ? 0x8FU : high;
+        } else {
+            return 0;
+        }
+        if (!in(byte(1), low, high)) {
+            return 0;
+        }
+        for (std::size_t i = 2; i < length; ++i) {
+            if (!in(byte(i), 0x80U, 0xBFU)) {
+                return 0;
+            }
+        }
+        return length;
+    }
+
     void quote(std::string_view text) {
         text_ += '"';
-        for (const char c : text) {
-            switch (c) {
-                case '"':
-                    text_ += "\\\"";
-                    break;
-                case '\\':
-                    text_ += "\\\\";
-                    break;
-                default:
-                    if (static_cast<unsigned char>(c) < 0x20U) {
-                        text_ += std::format("\\u{:04x}", static_cast<unsigned>(c));
-                    } else {
-                        text_ += c;
-                    }
+        for (std::size_t at = 0; at < text.size();) {
+            const auto code = static_cast<unsigned char>(text[at]);
+            std::size_t length = 1;
+            if (code == '"') {
+                text_ += "\\\"";
+            } else if (code == '\\') {
+                text_ += "\\\\";
+            } else if (code < 0x20U) {
+                text_ += std::format("\\u{:04x}", static_cast<unsigned>(code));
+            } else if (code < 0x80U) {
+                text_ += text[at];
+            } else if (length = utf8_length(text, at); length != 0) {
+                text_ += text.substr(at, length);
+            } else {
+                text_ += std::format("\\udc{:02x}", static_cast<unsigned>(code));
+                length = 1;
             }
+            at += length;
         }
         text_ += '"';
     }
