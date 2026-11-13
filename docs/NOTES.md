@@ -3420,6 +3420,10 @@ round trips the codec and store tests prove, and a decode pass would lengthen a 
 no figure. No script reads this tool's JSON and no reference-eval results file is committed, so
 the nulls change no reader.
 
+D-12. Documentation only. `first_frames` stops at N whole frames and cuts there, so a source of
+exactly N records loses its tail, and only a source with fewer than N is returned whole; the
+header now says that.
+
 Raw: `phase4-raw/fix-harness/`: each finding's failing and passing logs.
 
 ## Process notes
