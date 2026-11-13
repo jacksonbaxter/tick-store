@@ -154,9 +154,7 @@ TEST(BatchLatency, PublishesBatchUnitAndResolutionWithThePercentiles) {
     EXPECT_GE(report->max_ns, report->percentiles.back().value_ns);
 }
 
-// Ten batches and one slower: p99, p99.9 and p99.99 would each be the slowest batch, and
-// p50 and p90 rest on fewer than 10 batches above them (review A-3).
-// The published percentiles, as "p99=1000000 " pairs, for a failure message.
+// The published percentiles, as "p99=500000 " pairs in nanoseconds, for a failure message.
 std::string published(const LatencyReport& report) {
     std::string out;
     for (const PublishedPercentile& point : report.percentiles) {
@@ -165,6 +163,8 @@ std::string published(const LatencyReport& report) {
     return out;
 }
 
+// Ten batches and one slower: p99, p99.9 and p99.99 would each be the slowest batch, and
+// p50 and p90 rest on fewer than 10 batches above them (review A-3).
 TEST(BatchLatency, LeavesOutAPercentileTooFewBatchesLieAbove) {
     auto recorder = make_recorder();
     for (int i = 0; i < 10; ++i) {
