@@ -10,9 +10,12 @@
 //                  byte, and encode() reproduces it exactly. It fails only on an
 //                  empty payload, which has no bytes to preserve. Use this on a
 //                  file: an unknown type or an unexpected length is data.
-//   decode_strict  "Is this a conforming message?" Any departure from the
-//                  specification is a typed DecodeError naming the field. Use
-//                  this to diagnose a payload, for example a RawMessage's bytes.
+//   decode_strict  "Is this payload a known type, at exactly that type's
+//                  length?" A payload that is not is a typed DecodeError naming
+//                  where it departs. Field values are not checked (see
+//                  message.hpp): a price above the specification's maximum or
+//                  an alpha value outside its lists decodes. Use this to
+//                  diagnose a payload, for example a RawMessage's bytes.
 //
 // Over-read contract: decoders read only inside [payload.data(), payload.data() +
 // payload.size()), and encoders write only inside `out`. Neither needs padding.

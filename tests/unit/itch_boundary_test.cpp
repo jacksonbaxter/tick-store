@@ -168,6 +168,17 @@ TEST(ItchBoundary, BytesAboveAsciiInAlphaFieldsSurvive) {
     EXPECT_EQ(m.reason[3], std::byte{0x00});
 }
 
+// codec.hpp once said strict decode reports "any departure from the specification"
+// (review A-2). It checks the type and the length only: a Buy/Sell Indicator of 'X'
+// is data, as message.hpp says of every alpha field.
+TEST(ItchBoundary, StrictDecodeChecksTypeAndLengthNotFieldValues) {
+    Bytes bytes = fixture('A').bytes;
+    bytes[19] = std::byte{'X'};
+    const auto decoded = decode_strict(exact_copy(bytes));
+    ASSERT_TRUE(decoded.has_value());
+    EXPECT_EQ(std::get<AddOrder>(*decoded).buy_sell_indicator, std::byte{'X'});
+}
+
 TEST(ItchEncode, RefusesEveryBufferShorterThanTheMessage) {
     for (const auto& f : fixtures()) {
         const auto message = decode_strict(f.bytes);
