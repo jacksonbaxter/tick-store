@@ -1,0 +1,13 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+index 983d123..a3e9bc0 100644
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -592,7 +592,7 @@ def target_file(root, pattern):
+     not name a tick-store-alone day never matches one, so Linux-<day>-full-*.json is the
+     four-system day even with tick-store's alone day beside it (review RV-1)."""
+     found = sorted(path for path in root.glob(pattern)
+-                   if names_alone(pattern) or ALONE_NAME not in path.name)
++                   if True)
+     if len(found) > 1:
+         raise TargetError(f"{pattern} matches {len(found)} files: {[path.name for path in found]}")
+     return found[0] if found else None

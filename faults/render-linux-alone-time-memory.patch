@@ -1,0 +1,13 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+index 983d123..8ea6b4a 100644
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -550,7 +550,7 @@ def compare_for(document):
+             lines += ["", "Peak memory per system, from compare/guard.py across the system's "
+                           "whole run.", ""]
+             lines += memory_table(document)
+-        if alone and host != "Linux":
++        if alone:
+             lines += [""] + time_memory_lines(document)
+         guard = ("No guard ran beside tick-store alone. " if alone and host != "Linux" else
+                  "Swap-out alone does not stop a run. ")

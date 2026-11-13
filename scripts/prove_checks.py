@@ -850,6 +850,20 @@ FAULTS = (
           "on the total seconds twice, the engine-only condition dropped", CHECK_FAILED,
           "FAIL: test_the_repos_own_write_targets_are_judged_on_both_clocks "
           "(__main__.RenderWriteTest"),
+    # Review RV-1: a tick-store-alone day and the four-system day never stand in for each other.
+    Fault("render-alone-day-in-four-system-glob", "py-scripts", "render_results.py lets the "
+          "four-system day's pattern match a tick-store-alone day, so Linux-<day>-full-*.json "
+          "reads tick-store alone, or two files", CHECK_FAILED,
+          "FAIL: test_a_linux_alone_day_beside_the_four_system_day_is_not_read_for_it "
+          "(__main__.RenderDayKindsTest"),
+    Fault("render-alone-scope-unchecked", "py-scripts", "render_results.py reads a file named "
+          "as tick-store alone without holding it to tick-store alone's scope", CHECK_FAILED,
+          "FAIL: test_a_four_system_day_never_stands_in_for_tickstore_alone "
+          "(__main__.RenderDayKindsTest"),
+    Fault("render-linux-alone-time-memory", "py-scripts", "render_results.py reads BSD time "
+          "-l's memory for a Linux tick-store-alone day, whose memory is the guard's",
+          CHECK_FAILED, "FAIL: test_a_linux_tickstore_alone_day_renders_with_the_guards_memory "
+          "(__main__.RenderCompareTest"),
     Fault("results-md-hand-edit", "render-check", "a hand edit inside RESULTS.md's benchmark "
           "block, a host's heading changed", CHECK_FAILED,
           "the table in RESULTS.md is stale or was edited by hand", hand_edit_results_md),
