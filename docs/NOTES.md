@@ -3631,6 +3631,16 @@ so it was shown with a driver in the raw folder built against a mutated copy of 
 first on its include path (`phase4-raw/fix-second-pass/ra2-driver/`), as for A-1. The unit
 suite's `check_stop` test covers what the shorter stop goes through.
 
+RD-2. Fixed in code, the reviewer's option (a), not by describing the empty owner in the header:
+the denominator was added to count known sides only, and the header said so. `same_locate`
+still compares a first step with the empty owner's locate 0, so a first step counts as the
+same locate only for an order on locate 0, which ITCH gives only to messages that name no
+stock; its denominator is every head step, as the header says. `tool_version`
+stays 4. It went to 4 for D-8 and D-10 at `d2df155`; the committed codec-eval files are both
+version 3, no file of version 4 has been published, and the freeze rerun replaces both, so a
+version 4 file can only ever be written by code that has this fix. Its comment now lists RD-2.
+No results file was regenerated.
+
 ### The final review: Phase 2 items closed
 
 The gate on the review found open items still under Phase 2 in docs/TASKS.md. Each below was
