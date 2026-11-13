@@ -664,6 +664,57 @@ FAULTS = (
     Fault("warm-up-runs-stated-not-counted", "py-compare", "the warm proof states the constant "
           "number of untimed runs, whatever ran", CHECK_FAILED,
           "FAIL: test_the_proof_states_the_untimed_runs_that_ran (__main__.ResidencyWarmOnADay"),
+    # Review RF-9: each protocol 2 rule and assembly step that had a test and no fault.
+    Fault("compare-write-medians-unchecked", "py-scripts", "check_compare.py stops recomputing "
+          "a protocol 2 write's medians from its repetitions", CHECK_FAILED,
+          "FAIL: test_a_write_median_that_does_not_follow_from_the_repetitions "
+          "(__main__.Protocol2"),
+    Fault("compare-engine-only-past-its-total", "py-scripts", "check_compare.py takes a write "
+          "repetition's engine-only seconds longer than its total", CHECK_FAILED,
+          "FAIL: test_an_engine_only_time_longer_than_the_total (__main__.Protocol2"),
+    Fault("compare-engine-only-median-unchecked", "py-scripts", "check_compare.py stops "
+          "recomputing a write's engine-only median from its repetitions", CHECK_FAILED,
+          "FAIL: test_an_engine_only_median_that_does_not_follow (__main__.Protocol2"),
+    Fault("compare-write-times-unstated", "py-scripts", "check_compare.py takes a protocol 2 "
+          "write that does not say what its two times hold", CHECK_FAILED,
+          "FAIL: test_a_write_not_saying_what_its_times_hold (__main__.Protocol2"),
+    Fault("compare-tickstore-day-source-not-resident", "py-scripts", "check_compare.py takes "
+          "tick-store's write on a day from a source not wholly resident", CHECK_FAILED,
+          "FAIL: test_a_tickstore_day_write_from_a_source_not_resident "
+          "(__main__.Protocol2FullDay"),
+    Fault("compare-cold-open-inside-unchecked", "py-scripts", "check_compare.py takes a cold "
+          "proof's open_inside_clock without matching it to the system", CHECK_FAILED,
+          "FAIL: test_a_system_claiming_its_open_is_where_it_is_not (__main__.Protocol2"),
+    Fault("compare-tickstore-cold-parts-unchecked", "py-scripts", "check_compare.py takes a "
+          "tick-store cold block without its open and query kept per repetition", CHECK_FAILED,
+          "FAIL: test_a_tickstore_cold_block_without_its_parts (__main__.Protocol2"),
+    Fault("compare-warm-worker-open-untimed", "py-scripts", "check_compare.py takes a variant "
+          "whose warm worker's open is not timed", CHECK_FAILED,
+          "FAIL: test_a_variant_with_no_open_time_for_its_warm_worker (__main__.Protocol2"),
+    Fault("compare-tail-rank-unchecked", "py-scripts", "check_compare.py takes a tail figure "
+          "without its nearest rank", CHECK_FAILED,
+          "FAIL: test_a_tail_figure_with_no_rank (__main__.Protocol2"),
+    Fault("compare-tail-slowest-unchecked", "py-scripts", "check_compare.py takes a "
+          "slowest-of-n tail figure not flagged as the slowest", CHECK_FAILED,
+          "FAIL: test_the_slowest_of_n_not_called_the_slowest (__main__.Protocol2"),
+    Fault("compare-macos-second-sibling-claimed", "py-scripts", "check_compare.py takes a "
+          "macOS file claiming a reading of a second sibling", CHECK_FAILED,
+          "FAIL: test_a_macos_file_claiming_a_second_sibling (__main__.Protocol2"),
+    Fault("compare-protocol-1-rule-on-protocol-2", "py-scripts", "check_compare.py takes the "
+          "variant rule as protocol 1 stated it in a protocol 2 full day", CHECK_FAILED,
+          "FAIL: test_the_rule_as_protocol_1_stated_it (__main__.Protocol2FullDay"),
+    Fault("run-system-warm-up-seconds-dropped", "py-compare", "run_system.py drops each "
+          "query's warm-up seconds from the part", CHECK_FAILED,
+          "ERROR: test_a_query_keeps_its_warm_up_and_its_cold_parts (__main__.Assembly"),
+    Fault("run-system-cold-parts-dropped", "py-compare", "run_system.py drops tick-store's "
+          "cold open and query parts from the part", CHECK_FAILED,
+          "ERROR: test_a_query_keeps_its_warm_up_and_its_cold_parts (__main__.Assembly"),
+    Fault("run-system-warm-worker-open-dropped", "py-compare", "run_system.py drops the warm "
+          "worker's open from each variant", CHECK_FAILED,
+          "FAIL: test_each_variant_keeps_its_warm_workers_open (__main__.Assembly"),
+    Fault("run-one-second-sibling-unrequired", "py-compare", "compare/run.py reuses a part "
+          "with no reading of cpu6's sibling", CHECK_FAILED,
+          "FAIL: test_the_second_siblings_reading_is_kept (__main__.SecondSibling"),
     # Review RF-11: a write's input whole where it must be, refused in the worker.
     Fault("write-input-not-whole-accepted", "py-compare", "a write whose input is not wholly "
           "resident when its clock starts, tick-store's source or any input on the slice, runs "

@@ -1,0 +1,12 @@
+diff --git a/scripts/check_compare.py b/scripts/check_compare.py
+--- a/scripts/check_compare.py
++++ b/scripts/check_compare.py
+@@ -589,7 +589,7 @@
+     rank = nearest_rank(count)
+     slowest = rank == count
+     problems = []
+-    if block.get("tail_rank") != rank:
++    if False:
+         problems.append(f"{where}: the tail figure's rank is {block.get('tail_rank')!r}, and the "
+                         f"nearest rank of the 99th percentile of {count} runs is {rank}")
+     if block.get("tail_is_slowest") is not slowest:

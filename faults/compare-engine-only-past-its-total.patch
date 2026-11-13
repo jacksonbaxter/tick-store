@@ -1,0 +1,12 @@
+diff --git a/scripts/check_compare.py b/scripts/check_compare.py
+--- a/scripts/check_compare.py
++++ b/scripts/check_compare.py
+@@ -263,7 +263,7 @@
+         item = item if isinstance(item, dict) else {}
+         total, engine_only = item.get("seconds"), item.get("engine_only_seconds")
+         if not check_results.is_number(engine_only) or not check_results.is_number(total) or \
+-                not 0 <= engine_only <= total * (1 + 1e-9):
++                not 0 <= engine_only:
+             problems.append(f"{where}.write: repetition {number} has no engine-only seconds "
+                             "within its total")
+         elif check_results.is_number(item.get("python_seconds")) and not same(

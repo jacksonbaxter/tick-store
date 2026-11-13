@@ -1,0 +1,12 @@
+diff --git a/compare/run.py b/compare/run.py
+--- a/compare/run.py
++++ b/compare/run.py
+@@ -299,7 +299,7 @@
+     arguments = part_arguments(args, variants, measure)
+     timed = is_tickstore_only(args) and run_bench.host_label() != "Linux"
+     if part.exists() and lines_path.exists() and (meter is None or sibling_path.exists()) and \
+-            (second_meter is None or second_path.exists()) and \
++            True and \
+             (not timed or time_path.exists()) and made_with(arguments_path, arguments):
+         return json.loads(lines_path.read_text(encoding="utf-8"))
+     # A part from other arguments is never reused: it is made again, whole.

@@ -1,0 +1,12 @@
+diff --git a/compare/run_system.py b/compare/run_system.py
+--- a/compare/run_system.py
++++ b/compare/run_system.py
+@@ -298,8 +298,6 @@
+                 "digest": warm_query["digest"], "matches_ground_truth": True,
+                 "scan": warm["scan_facts"][query.name],
+                 "warm": {**latency(warm_query["seconds"]),
+-                         **({"warm_up_seconds": warm_query["warm_up_seconds"]}
+-                            if "warm_up_seconds" in warm_query else {}),
+                          "proof": (warm["proofs"][query.name]
+                                    if self.warm_proof == PROCESS_READS else warm["proof"]),
+                          "swap_timed": swap.timed([warm_query["swap_timed"]])},

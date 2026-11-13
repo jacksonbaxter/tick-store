@@ -1,0 +1,12 @@
+diff --git a/compare/run_system.py b/compare/run_system.py
+--- a/compare/run_system.py
++++ b/compare/run_system.py
+@@ -478,7 +478,7 @@
+             entry["query_store_class"] = CLASSES[-1]
+             entry["python_floor"] = {**floor, "what": "the same Python call over an empty "
+                                                       "window: the path's cost, with no data"}
+-            entry["warm_worker_open"] = self.warm_open
++            entry["warm_worker_open"] = {}
+             entry["query_worker_peak_rss_bytes"] = peak
+             entry["swap"] = phases
+             if extra is not None:

@@ -1822,6 +1822,17 @@ class Protocol2FullDay(Harness):
         result = self.run_full(document, protocol_2(source))
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_a_tickstore_day_write_from_a_source_not_resident(self):
+        # tick-store's source is whole on a day too, unlike the others' export (review RF-9).
+        document, source = full_day_document()
+        protocol_2(document)
+        b_of(document, "tickstore")["write"]["by_repetition"][0][
+            "input_resident_pages_at_start"] = 60
+        result = self.run_full(document, protocol_2(source))
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("tickstore.v.B.write: repetition 1 started its clock with 60 of its "
+                      "source's 100 pages resident", result.stderr)
+
     def test_the_rule_as_protocol_1_stated_it(self):
         document, source = full_day_document()
         protocol_2(document)

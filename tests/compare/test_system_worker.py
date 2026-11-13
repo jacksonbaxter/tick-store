@@ -482,6 +482,150 @@ class ColdRuns(unittest.TestCase):
             self.runs([1] * (run_system.COLD_RERUNS + 1))
 
 
+class Assembly(unittest.TestCase):
+    """run_system.py's part as it is put together from the workers' answers: the slice's
+    warm-up seconds, tick-store's cold parts and the warm worker's open (review RF-9)."""
+
+    class Phase:
+        counts = {"pages_in": 0, "pages_out": 0}
+
+        def start(self):
+            return self
+
+        def stop(self):
+            return self
+
+    WARM = {"queries": {"Q1": {"seconds": [1e-5, 2e-5], "digest": {"rows": 1},
+                               "swap_timed": {"pages_in": 0, "pages_out": 0},
+                               "warm_up_runs": 1, "warm_up_seconds": [5e-5],
+                               "engine_seconds": [0.9e-5, 1.9e-5]}},
+            "proof": {"pages": 8, "resident_before": 8, "resident_after": 8, "warm_up_runs": 1},
+            "scan_facts": {"Q1": {}}, "floor_seconds": [1e-6, 1e-6], "peak_rss_bytes": 1,
+            "open": {"seconds": 0.01, "reported_open_seconds": 0.002}}
+    PARTS = {"Q1": {"open_seconds_by_repetition": [0.002, 0.003],
+                    "query_seconds_by_repetition": [0.01, 0.02]}}
+
+    def runner(self):
+        from compare import run_system
+
+        runner = run_system.Runner.__new__(run_system.Runner)
+        runner.args = SimpleNamespace(system="tickstore", warm_repetitions=2,
+                                      cold_repetitions=2, variants="v3-seg4Mi")
+        runner.full_day = False
+        runner.warm_proof = run_system.RESIDENCY
+        runner.stores = Path("stores")
+        runner.note = lambda text: None
+        system = SimpleNamespace(data_paths=lambda: [Path("store")], start_service=lambda: None,
+                                 stop_service=lambda: None, service_processes=lambda: {})
+        runner.system_class = lambda context: system
+        runner.context = lambda root, variant, durability: None
+        runner.worker = lambda system, step, **fields: json.loads(json.dumps(self.WARM))
+        swap_timed = {"pages_in": 0, "pages_out": 0}
+        runner.cold_runs = lambda *args: (
+            {"Q1": [0.012, 0.023]}, {"Q1": [0.008, 0.015]}, {"Q1": [swap_timed, swap_timed]},
+            {"Q1": [{}, {}]}, {"Q1": []}, json.loads(json.dumps(self.PARTS)))
+        runner.after_queries = lambda system: None
+        return runner
+
+    def test_a_query_keeps_its_warm_up_and_its_cold_parts(self):
+        from compare import run_system
+
+        runner = self.runner()
+        with mock.patch.object(run_system.swap, "Phase", self.Phase):
+            results, *_ = runner.run_queries("v3-seg4Mi", CLASS_B,
+                                             [Query("Q1", "rows", 0, 1)], {})
+        self.assertEqual(results["Q1"]["warm"]["warm_up_seconds"], [5e-5])
+        parts = results["Q1"]["cold"]["parts"]
+        self.assertEqual(parts["open_seconds_by_repetition"], [0.002, 0.003])
+        self.assertEqual(parts["query_seconds_by_repetition"], [0.01, 0.02])
+        self.assertEqual(runner.warm_open, self.WARM["open"])
+
+    def test_a_cold_query_with_no_reported_open_has_no_parts(self):
+        from compare import run_system
+
+        runner = self.runner()
+        self.PARTS = {"Q1": {"open_seconds_by_repetition": [None, None],
+                             "query_seconds_by_repetition": [0.01, 0.02]}}
+        with mock.patch.object(run_system.swap, "Phase", self.Phase):
+            results, *_ = runner.run_queries("v3-seg4Mi", CLASS_B,
+                                             [Query("Q1", "rows", 0, 1)], {})
+        self.assertNotIn("parts", results["Q1"]["cold"])
+
+    def test_each_variant_keeps_its_warm_workers_open(self):
+        from compare import run_system
+
+        runner = self.runner()
+        runner.pin = {"message_count": 9}
+        runner.memory_seen = []
+        runner.sample_memory = lambda: None
+        runner.verify_slice = lambda: None
+        runner.columns_dir = Path("export")
+        runner.window_end_ns = lambda: 1
+        runner.system_class = SimpleNamespace(variants={"v3-seg4Mi": {}}, versions=lambda: {},
+                                              headline_variant="v3-seg4Mi")
+        swap_counts = {"pages_in": 0, "pages_out": 0}
+
+        def run_class(variant, durability, control):
+            return {"swap": {"write": swap_counts, "read_back": swap_counts}}, {
+                "data_dirty_pages": 1}
+
+        def run_queries(variant, durability, queries, truth):
+            runner.warm_open = {"seconds": 0.01, "variant": variant}
+            return {}, {}, 1, None, {"warm_queries": swap_counts, "cold_queries": swap_counts}
+
+        runner.run_class = run_class
+        runner.run_queries = run_queries
+        columns = SimpleNamespace(manifest={"tail_bytes": 0}, records=9)
+        with (mock.patch.object(run_system, "ColumnSet", return_value=columns),
+              mock.patch.object(run_system, "build_queries", return_value=[]),
+              mock.patch.object(run_system.shutil, "rmtree")):
+            out = runner.run()
+        self.assertEqual(out["variants"]["v3-seg4Mi"]["warm_worker_open"],
+                         {"seconds": 0.01, "variant": "v3-seg4Mi"})
+
+
+class SecondSibling(unittest.TestCase):
+    """run.py's run_one keeps cpu6's sibling reading beside cpu4's, and a part without it is
+    run again (review RF-9)."""
+
+    class Meter:
+        def __init__(self, busy):
+            self.busy = busy
+
+        def snapshot_command(self, snapshot):
+            return []
+
+        def busy_percent(self, snapshot):
+            return self.busy
+
+    def run_one(self, parts, ran):
+        args = compare_run.parse_arguments(["--slice", "s"])
+        layout = SimpleNamespace(work=parts, as_arguments=lambda: [])
+
+        def system(*args, **kwargs):
+            # run_system.py writes the part.
+            ran.append(1)
+            (parts / "parquet.json").write_text("{}", encoding="utf-8")
+            return SimpleNamespace(returncode=0)
+
+        with (mock.patch.object(compare_run.run_bench, "host_label", return_value="Linux"),
+              mock.patch.object(compare_run.subprocess, "run", system)):
+            compare_run.run_one("parquet", args, layout, None, parts, self.Meter(0.5), None,
+                                self.Meter(1.5))
+
+    def test_the_second_siblings_reading_is_kept(self):
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "build") as scratch:
+            parts, ran = Path(scratch), []
+            self.run_one(parts, ran)
+            self.assertEqual(json.loads((parts / "parquet.sibling-second").read_text()), 1.5)
+            self.assertEqual(json.loads((parts / "parquet.sibling").read_text()), 0.5)
+            self.run_one(parts, ran)
+            self.assertEqual(len(ran), 1)  # Whole, so kept.
+            (parts / "parquet.sibling-second").unlink()
+            self.run_one(parts, ran)
+            self.assertEqual(len(ran), 2)  # No second reading, so run again.
+
+
 class RuntimeReading(unittest.TestCase):
     """The reading on both hosts' output, whichever host runs this."""
 

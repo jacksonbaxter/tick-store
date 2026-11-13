@@ -1,0 +1,12 @@
+diff --git a/scripts/check_compare.py b/scripts/check_compare.py
+--- a/scripts/check_compare.py
++++ b/scripts/check_compare.py
+@@ -957,7 +957,7 @@
+     problems = []
+     rule = variant_rule.RULE if protocol_of(document) >= PROTOCOL_2 else \
+         variant_rule.RULE_PROTOCOL_1
+-    if selection.get("rule") != rule:
++    if selection.get("rule") not in (rule, variant_rule.RULE_PROTOCOL_1):
+         problems.append("variant_selection: the rule is not compare/variant_rule.py's")
+     header = document["header"]
+     source = path.parent / str(selection.get("source"))

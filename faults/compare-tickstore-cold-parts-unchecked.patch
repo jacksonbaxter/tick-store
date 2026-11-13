@@ -1,0 +1,13 @@
+diff --git a/scripts/check_compare.py b/scripts/check_compare.py
+--- a/scripts/check_compare.py
++++ b/scripts/check_compare.py
+@@ -667,8 +667,7 @@
+         if not all(isinstance(item, list) and len(item) == cold.get("n")
+                    for item in (opens, queries, totals)) or not all(
+                 check_results.is_number(value) and value > 0 for value in opens + queries):
+-            return [*problems, f"{where}.cold: its open and its query are not kept for each "
+-                               "repetition"]
++            return problems
+         for number, (total, opened, queried) in enumerate(zip(totals, opens, queries), 1):
+             if not same(total, opened + queried):
+                 problems.append(f"{where}.cold: repetition {number} is not its open and its "

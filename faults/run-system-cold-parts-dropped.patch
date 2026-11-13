@@ -1,0 +1,12 @@
+diff --git a/compare/run_system.py b/compare/run_system.py
+--- a/compare/run_system.py
++++ b/compare/run_system.py
+@@ -316,7 +316,7 @@
+             if None not in cold_engine[query.name]:
+                 results[query.name]["cold"]["engine"] = latency(cold_engine[query.name])
+             opens = parts[query.name]["open_seconds_by_repetition"]
+-            if opens and None not in opens:
++            if False:
+                 # The store's open, added to the query: both parts, repetition by repetition.
+                 results[query.name]["cold"]["parts"] = {
+                     **parts[query.name],
