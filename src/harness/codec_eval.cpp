@@ -1358,6 +1358,9 @@ struct LiveOrder {
     std::uint32_t locate_ordinal = 0;
     std::uint32_t shares = 0;
     std::uint16_t locate = 0;
+    // Its side: an add's own, or for U's new reference the replaced order's, if known.
+    bool sell = false;
+    bool side_known = false;
     bool used = false;
 };
 
@@ -1510,10 +1513,12 @@ private:
     std::uint32_t now_ = 0;
 };
 
-// Who last touched a head: the add's locate, side and MPID, if it had one.
+// Who last touched a head: the creation's locate, side and MPID, if it had one. A U's new
+// order has the side of the order it replaces, unknown if that is not on the book.
 struct HeadOwner {
     std::uint16_t locate = 0;
     bool sell = false;
+    bool side_known = true;
     bool has_mpid = false;
     std::uint32_t mpid = 0;
 };
@@ -1540,7 +1545,10 @@ public:
             ++m.head_steps;
             const HeadOwner& before = owners_[token];
             m.same_locate += before.locate == owner.locate ? 1U : 0U;
-            m.same_side += before.sell == owner.sell ? 1U : 0U;
+            if (before.side_known && owner.side_known) {
+                ++m.side_steps;
+                m.same_side += before.sell == owner.sell ? 1U : 0U;
+            }
             if (before.has_mpid && owner.has_mpid) {
                 ++m.mpid_steps;
                 m.same_mpid += before.mpid == owner.mpid ? 1U : 0U;
@@ -1557,7 +1565,10 @@ public:
         if (seen_) {
             ++m.consecutive;
             m.consecutive_same_locate += previous_.locate == owner.locate ? 1U : 0U;
-            m.consecutive_same_side += previous_.sell == owner.sell ? 1U : 0U;
+            if (previous_.side_known && owner.side_known) {
+                ++m.consecutive_side_pairs;
+                m.consecutive_same_side += previous_.sell == owner.sell ? 1U : 0U;
+            }
             if (previous_.has_mpid && owner.has_mpid) {
                 ++m.consecutive_mpid;
                 m.consecutive_same_mpid += previous_.mpid == owner.mpid ? 1U : 0U;
@@ -1811,6 +1822,8 @@ private:
                               .locate_ordinal = static_cast<std::uint32_t>(locate_creations_[locate]),
                               .shares = shares,
                               .locate = locate,
+                              .sell = owner.sell,
+                              .side_known = owner.side_known,
                               .used = true};
         if (!book_.insert(order)) {
             ++duplicate_creations_;
@@ -1898,7 +1911,8 @@ private:
                 }
                 put(kColumnMpid, locate, mpid);
             }
-            const HeadOwner owner{.locate = locate, .sell = sell, .has_mpid = kHasMpid, .mpid = mpid};
+            const HeadOwner owner{
+                .locate = locate, .sell = sell, .side_known = true, .has_mpid = kHasMpid, .mpid = mpid};
             add_heads_.observe(ref, owner);
             create(ref, locate, timestamp, typed.shares, owner);
         } else if constexpr (std::same_as<M, itch::OrderExecuted>) {
@@ -1928,8 +1942,12 @@ private:
         } else if constexpr (std::same_as<M, itch::OrderReplace>) {
             const std::uint64_t original = typed.original_order_reference_number;
             const std::uint64_t replacement = typed.new_order_reference_number;
-            const HeadOwner owner{.locate = locate, .sell = false, .has_mpid = false, .mpid = 0};
+            // U carries no side: the new order keeps the replaced order's, if it is known.
+            HeadOwner owner{
+                .locate = locate, .sell = false, .side_known = false, .has_mpid = false, .mpid = 0};
             if (LiveOrder* order = name(Naming::replace, original, slot, locate, timestamp)) {
+                owner.sell = order->sell;
+                owner.side_known = order->side_known;
                 book_.erase(order);
             }
             put(kColumnReplacePrice, locate, price(typed.price));
@@ -2294,12 +2312,15 @@ void write_heads(JsonWriter& json, std::string_view key, const HeadModes& m) {
     json.field("distinct_gaps", m.distinct_gaps);
     json.field("head_steps", m.head_steps);
     json.field("head_same_locate_share", share_of(m.same_locate, m.head_steps));
-    json.field("head_same_side_share", share_of(m.same_side, m.head_steps));
+    json.field("head_side_steps", m.side_steps);
+    json.field("head_same_side_share", share_of(m.same_side, m.side_steps));
     json.field("head_mpid_steps", m.mpid_steps);
     json.field("head_same_mpid_share", share_of(m.same_mpid, m.mpid_steps));
     json.field("consecutive_pairs", m.consecutive);
     json.field("consecutive_same_locate_share", share_of(m.consecutive_same_locate, m.consecutive));
-    json.field("consecutive_same_side_share", share_of(m.consecutive_same_side, m.consecutive));
+    json.field("consecutive_side_pairs", m.consecutive_side_pairs);
+    json.field("consecutive_same_side_share",
+               share_of(m.consecutive_same_side, m.consecutive_side_pairs));
     json.field("consecutive_mpid_pairs", m.consecutive_mpid);
     json.field("consecutive_same_mpid_share",
                share_of(m.consecutive_same_mpid, m.consecutive_mpid));

@@ -839,6 +839,11 @@ TEST(CodecEval, AnalysisCountsTheBookAndTheDerivableFields) {
     EXPECT_EQ(tokens, 3U);
     EXPECT_EQ(a.add_heads.consecutive, 2U);
     EXPECT_EQ(a.creation_heads.values, 4U);
+    // Creations 100 B, 104 S, 103 S, then U's 110, which keeps 103's side, S: two of the
+    // three consecutive pairs are on one side. A U carries no side of its own.
+    EXPECT_EQ(a.creation_heads.consecutive, 3U);
+    EXPECT_EQ(a.creation_heads.consecutive_side_pairs, 3U);
+    EXPECT_EQ(a.creation_heads.consecutive_same_side, 2U);
     // Plain deltas 104 - 100 = 4 and 103 - 104 = -1.
     EXPECT_EQ(a.add_heads.small_deltas[16 + 4], 1U);
     EXPECT_EQ(a.add_heads.small_deltas[16 - 1], 1U);
@@ -858,6 +863,43 @@ TEST(CodecEval, AnalysisCountsTheBookAndTheDerivableFields) {
     EXPECT_EQ(a.stock_mismatches[10], 0U);
     EXPECT_EQ(a.stock_mismatches[11], 1U);
     EXPECT_EQ(a.stock_mismatches[17], 1U);
+}
+
+// A U whose original is not on the book has no known side, so its steps are left out of
+// the side counts, and so are the steps of a U that replaces it in turn.
+TEST(CodecEval, AReplaceOfAnOrderNotOnTheBookHasNoSide) {
+    Bytes bytes;
+    itch::AddOrder add;
+    add.header = header(7, 100);
+    add.order_reference_number = 100;
+    add.buy_sell_indicator = std::byte{'S'};
+    add.shares = 10;
+    add.price = itch::Price4{1'000};
+    append(bytes, add);
+    const auto replace = [&](std::uint64_t original, std::uint64_t replacement) {
+        itch::OrderReplace message;
+        message.header = header(7, 200);
+        message.original_order_reference_number = original;
+        message.new_order_reference_number = replacement;
+        message.shares = 10;
+        message.price = itch::Price4{1'000};
+        append(bytes, message);
+    };
+    replace(100, 101);  // keeps S
+    replace(500, 102);  // 500 was never added: no side
+    replace(102, 103);  // 102's side is still unknown
+    const auto result = evaluate_codecs(bytes, options_of(kBlock));
+    ASSERT_TRUE(result.has_value()) << result.error();
+    const HeadModes& heads = result->analysis.creation_heads;
+    EXPECT_EQ(heads.values, 4U);
+    EXPECT_EQ(heads.consecutive, 3U);
+    EXPECT_EQ(heads.consecutive_side_pairs, 1U);
+    EXPECT_EQ(heads.consecutive_same_side, 1U);
+    // Each value extends head 0: 100 against the empty head's owner, 101 against 100's, both
+    // with sides; 102 and 103 have none.
+    EXPECT_EQ(heads.head_steps, 4U);
+    EXPECT_EQ(heads.side_steps, 2U);
+    EXPECT_EQ(heads.same_side, 1U);
 }
 
 // More messages than the recency ranks have use times, so they renumber several times,

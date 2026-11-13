@@ -250,12 +250,17 @@ struct HeadModes {
     // Steps that extend a head, tokens 0 to 6.
     std::uint64_t head_steps = 0;
     std::uint64_t same_locate = 0;
+    // Among head steps where both sides are known. A U carries no side: its new order keeps
+    // the side of the order it replaces, unknown if that order is not on the book.
+    std::uint64_t side_steps = 0;
     std::uint64_t same_side = 0;
     // Among steps where both messages are F, so both carry an MPID.
     std::uint64_t mpid_steps = 0;
     std::uint64_t same_mpid = 0;
     std::uint64_t consecutive = 0;
     std::uint64_t consecutive_same_locate = 0;
+    // Among consecutive pairs where both sides are known.
+    std::uint64_t consecutive_side_pairs = 0;
     std::uint64_t consecutive_same_side = 0;
     std::uint64_t consecutive_mpid = 0;
     std::uint64_t consecutive_same_mpid = 0;
