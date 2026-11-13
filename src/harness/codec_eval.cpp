@@ -2615,6 +2615,7 @@ int run_codec_eval_cli(std::span<const std::string_view> arguments,
     json.field("commit",
                provenance.commit.substr(0, std::min<std::size_t>(12, provenance.commit.size())));
     json.field("tree_dirty", provenance.tree_dirty);
+    json.field("commit_source", provenance.commit_source);
     json.field("compiler", provenance.compiler);
     json.field("build_type", provenance.build_type);
     json.field("sanitizers", provenance.sanitizers);

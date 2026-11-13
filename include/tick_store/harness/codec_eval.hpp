@@ -363,7 +363,10 @@ struct Price4Proof {
 // Where a result came from, which the tool fills from its build.
 struct EvalProvenance {
     std::string_view commit;
+    // As BuildInfo's: compared with `commit` only when commit_source is "git" (A-8).
     bool tree_dirty = true;
+    // "git", "export" or "unknown", as BuildInfo's.
+    std::string_view commit_source = "unknown";
     std::string_view compiler;
     std::string_view build_type;
     std::string_view sanitizers;

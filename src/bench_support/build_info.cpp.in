@@ -28,6 +28,7 @@ const BuildInfo& build_info() noexcept {
         .sanitizers = "@TICK_STORE_SANITIZER_SET@",
         .commit = "@TICK_STORE_COMMIT@",
         .tree_dirty = @TICK_STORE_TREE_DIRTY@,
+        .commit_source = "@TICK_STORE_COMMIT_SOURCE@",
         .isa = kIsa,
     };
     return kInfo;

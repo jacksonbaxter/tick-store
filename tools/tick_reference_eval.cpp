@@ -21,6 +21,7 @@ int main(int argc, char** argv) {
         std::string{build.compiler_id} + " " + std::string{build.compiler_version};
     const tick_store::harness::EvalProvenance provenance{.commit = build.commit,
                                                          .tree_dirty = build.tree_dirty,
+                                                         .commit_source = build.commit_source,
                                                          .compiler = compiler,
                                                          .build_type = build.build_type,
                                                          .sanitizers = build.sanitizers};

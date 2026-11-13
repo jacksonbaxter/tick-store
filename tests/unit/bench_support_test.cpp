@@ -466,6 +466,20 @@ TEST_F(StreamCheckTest, ATruncatedTailStopsIt) {
     EXPECT_NE(check.error().find("does not end cleanly"), std::string::npos);
 }
 
+// tree_dirty is compared only in a git checkout, so the build says how its commit was
+// established (review A-8).
+TEST(BuildInfo, SaysHowItsCommitWasEstablished) {
+    const BuildInfo& info = build_info();
+    if (info.commit_source == "unknown") {
+        EXPECT_EQ(info.commit, "unknown");
+        EXPECT_TRUE(info.tree_dirty);
+    } else {
+        EXPECT_TRUE(info.commit_source == "git" || info.commit_source == "export")
+            << info.commit_source;
+        EXPECT_NE(info.commit, "unknown");
+    }
+}
+
 TEST(BuildInfo, NamesTheCompilerAndCarriesNoPath) {
     const BuildInfo& info = build_info();
     EXPECT_FALSE(info.compiler_id.empty());

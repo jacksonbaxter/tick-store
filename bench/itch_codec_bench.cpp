@@ -414,6 +414,7 @@ struct ReportInputs {
     json.field("sanitizers", build.sanitizers);
     json.field("commit", build.commit);
     json.field("tree_dirty", build.tree_dirty);
+    json.field("commit_source", build.commit_source);
     // The decode kernel set this process dispatched to, after any TICK_STORE_SIMD cap.
     json.field("isa", std::format("{}, {} kernels", build.isa,
                                   tick_store::codec::simd::to_string(

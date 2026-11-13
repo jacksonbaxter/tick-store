@@ -618,6 +618,7 @@ struct ReportInputs {
     json.field("sanitizers", build.sanitizers);
     json.field("commit", build.commit);
     json.field("tree_dirty", build.tree_dirty);
+    json.field("commit_source", build.commit_source);
     // Each case names the kernel set it ran last, as in pfor_unpack/w=13/neon.
     json.field("isa", std::format("{}, {} kernels", build.isa,
                                   std::string_view{c.name}.substr(c.name.rfind('/') + 1)));
