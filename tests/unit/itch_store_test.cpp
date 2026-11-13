@@ -892,5 +892,30 @@ TEST(ItchStoreSizes, EveryByteOfTheFileIsCountedOnce) {
     EXPECT_EQ(sizes.store_section_bytes, kStoreSectionSize);
 }
 
+// The one column whose count the records do not hold to a constant a record (review C-4):
+// raw_bytes takes up to 65,535 bytes a raw record, and zstd can store a run of one byte at
+// thousands to one. Every other column's count is fixed by the type column, a fixed
+// number of values a record. Sixteen raw records of 65,535 bytes of one value make a file of 666
+// bytes whose raw_bytes column the reader holds as 16 x 65,535 values of 8 bytes, 8,388,480
+// bytes, 12,595 to 1: what the records allow, and what docs/store.md's worst case counts.
+TEST(ItchStoreSizes, RawBytesAreBoundedByTheirRecordsNotByTheFile) {
+    constexpr std::uint32_t kRecords = 16;
+    const Bytes payload(itch::kMaxPayloadSize, std::byte{'z'});
+    std::vector<itch::Message> messages;
+    for (std::uint32_t r = 0; r < kRecords; ++r) {
+        messages.emplace_back(itch::RawMessage{.bytes = payload});
+    }
+    const Bytes file = test::store_of_messages(messages, kRecords);
+    auto reader = ItchStoreReader::open_bytes(file);
+    ASSERT_TRUE(reader.has_value());
+    const auto columns = reader->read_columns(0);
+    ASSERT_TRUE(columns.has_value());
+    const std::uint64_t raw_values = (*columns)[Column::raw_bytes].size();
+    EXPECT_EQ(raw_values, std::uint64_t{kRecords} * itch::kMaxPayloadSize);
+    const std::uint64_t held = raw_values * sizeof(std::uint64_t);
+    EXPECT_LT(file.size(), 1024U);
+    EXPECT_GT(held / file.size(), 10'000U) << file.size() << " bytes hold " << held;
+}
+
 }  // namespace
 }  // namespace tick_store::store

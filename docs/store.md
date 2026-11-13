@@ -304,6 +304,24 @@ which in mode 2 is at most 67 MB of moves. For an untrusted file, then, assume a
 costs up to 2,047 16-bit moves a value and every other column O(1) a value, on top of what this
 section lists (B-1, B-3 and B-4 in `docs/REVIEW.md`).
 
+Memory is bounded by the records, not by the file. The reader checks every column's count against
+what the segment's own records need before it inflates or allocates anything: the type column's
+count is the summary's, every typed column's count follows from the types, a fixed number a
+record (the counts listed above), the import list is held to the references, the run directory and
+the stock exceptions to the typed records and the records,
+and a zstd payload's inner size to the bytes its count needs. One column has no tighter bound than
+that: `raw_bytes` holds each raw record's own bytes, up to 65,535 a record, so a segment of R raw
+records may need R x 65,535 values, and a column holds at most 2^32 - 1. The reader keeps each value
+as 8 bytes, beside the inflated bytes while it decodes and a byte a value for the records it
+gives back, about 9 bytes a raw byte at the peak. A zstd RLE block stores up to 128 KiB of one byte
+in 4 bytes, so the file can be far smaller than that: 16 raw records of 65,535 equal bytes make a 666-byte
+file whose `raw_bytes` the reader holds in 8,388,480 bytes
+(`ItchStoreSizes.RawBytesAreBoundedByTheirRecordsNotByTheFile`). At the limit, 65,537 such records,
+2^32 - 1 raw bytes, the file is about 130 KiB by that ratio (a calculation, not measured) and
+reading the segment asks for about 36 GiB. The real writer makes the same file from a 4 GiB source,
+so it is a valid file, not a format violation; a reader of files it did not write should cap the
+memory it gives one segment (review C-4).
+
 ## Writing
 
 `ItchStoreWriter` takes one message at a time and writes each segment as it fills, so its private
