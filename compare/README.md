@@ -703,19 +703,34 @@ TICK_STORE_MEASURE=<wrapper> <venv>/bin/python -I compare/run.py --day 12302019 
 ```
 
 On disk first: the decompressed day at `<data>/12302019.NASDAQ_ITCH50` from
-`scripts/fetch_data.py --day 12302019`, 8.25 GB, which the run checks against its pin; its export
-at `<data>/export/12302019-full`, 23.9 GB, from `<tools>/tick_export <data>/12302019.NASDAQ_ITCH50
-<data>/export/12302019-full`, which the oracle proves before anything is loaded; the `bench`
-build's tools in `<tools>`; the environment `compare/setup.py` makes; and at least 50 GiB free
-on the work folder's disk, the guard's floor. One variant took 32 minutes on debian at `4c049c7`,
-the checks before it included, so the pair takes a little over an hour. The run measures
-tick-store exactly as the four-system day did, with the guard and the warm proof by each
-process's storage reads, and ends as the macOS day of tick-store alone does: it validates the
-document as tick-store alone and writes `<results>/Linux-12302019-full-tickstore-<commit>.json`,
-exit 0. Read tick-store's figures from it beside its block in
-`results/compare/Linux-12302019-full-67ae574f5666.json`. Before the review's F-5 the same run
-took `--systems tickstore --variants v3-seg4Mi,v3-seg1Mi`, was validated as a four-system day,
-exited 1 and kept a `.pending` file; a measured run now refuses those arguments.
+`scripts/fetch_data.py --day 12302019 --data-dir <data>`, 8.25 GB, which the run checks against its
+pin; its export at `<data>/export/12302019-full`, 23.9 GB, from `<tools>/tick_export
+<data>/12302019.NASDAQ_ITCH50 <data>/export/12302019-full`, which the oracle proves before anything
+is loaded; the `bench` build's tools in `<tools>`; the environment `compare/setup.py` makes; and a
+clean tree at the commit, or an exported tree with its `COMMIT` file. The host: Linux, with
+`/proc`, `taskset` and CPUs 4 and 6, which the run pins tick-store to, their siblings idle enough
+for the 5% rule above; a wrapper that takes the machine and prints load lines; at least 50 GiB
+free on the work folder's disk and 3 GiB of `MemAvailable` throughout, the guard's floors, below
+which it stops the run, as it does on sustained swap-in. One variant took 32 minutes on debian at `4c049c7`, the checks before it
+included, so the pair takes a little over an hour. Exit 75 means the wrapper did not get the
+machine: run the same command again.
+
+The run measures tick-store exactly as the four-system day did, with the guard and the warm proof
+by each process's storage reads, and ends as the macOS day of tick-store alone does: it writes
+the document as `<results>/Linux-12302019-full-tickstore-<commit>.json.pending`, runs
+`scripts/check_compare.py --pending-as` on it as tick-store alone, and only on that check's exit 0
+renames it to `<results>/Linux-12302019-full-tickstore-<commit>.json` and exits 0. `<results>` is
+`--results-dir`, `results/compare/` unless given. A refused document stays `.pending` and the run
+exits 1. Check a published one again with `<venv>/bin/python -I scripts/check_compare.py <file>`.
+Without `TICK_STORE_MEASURE` the same command is iteration: the document goes to
+`--iteration-dir`, `build/compare-iteration/` unless given, unchecked, and `check_compare.py`
+refuses it as iteration-only. Read tick-store's figures from it beside its block in
+`results/compare/Linux-12302019-full-67ae574f5666.json`, a protocol 1 file: the new one is
+protocol 2, where tick-store's cold figures hold the store's open and each write states its
+engine-only seconds (see "The final review's comparison protocol" in `docs/NOTES.md`). Before the
+review's F-5 the same run took `--systems tickstore --variants v3-seg4Mi,v3-seg1Mi`, was validated
+as a four-system day, exited 1 and kept a `.pending` file; a measured run now refuses those
+arguments.
 
 ## Full day of tick-store alone
 
