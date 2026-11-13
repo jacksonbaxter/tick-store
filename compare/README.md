@@ -226,7 +226,8 @@ by call. LMDB's and QuestDB's are stated from what is known of them, and are not
 
 **How a class is proven.** Each run makes a small commit of 65,536 rows in a store of its own, and
 reads each file's dirty pages straight after the commit returns. The last full write is read the
-same way, before anything else runs in its worker, for every system. Before protocol 2,
+same way, for every system, with only the write's device counter read before it in its worker:
+on Linux a read of a stat file, on macOS of each process's count (review RF-10). Before protocol 2,
 tick-store's was read only after its worker had run the tools that report its settings, time in
 which writeback could clean pages (review F-11). `compare/settings.py` gives the verdict:
 
@@ -320,7 +321,9 @@ repetition keeps both:
 Parquet's leaves out the class B flush. Each repetition also records `input_pages` and
 `input_resident_pages_at_start`, read by `mincore` on a fresh mapping of the input (the export's
 column files, or tick-store's ITCH file) once it is made ready and just before the clock, and
-`device_bytes_read` over the write: on Linux the block device's sectors read, machine-wide; on
+`device_bytes_read` over the write. Its window is the whole ingest call, a little wider than the
+clock: QuestDB's `CREATE TABLE` before the clock and its check that the rows are applied after it
+fall inside (review RF-10). On Linux the block device's sectors read, machine-wide; on
 macOS the bytes the device read for the processes that did the write, each one's own count
 (`proc_pid_rusage`'s `ri_diskio_bytesread`): the worker, QuestDB's server, and tick-store's
 `tick_roundtrip`, read once it has exited and before it is reaped, since macOS adds no reaped

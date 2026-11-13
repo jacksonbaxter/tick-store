@@ -325,6 +325,33 @@ class ResidencyWarmOnADay(unittest.TestCase):
         self.assertEqual(answer["proof"]["warm_up_runs"], worker.WARM_UP_RUNS)
         self.assertEqual(answer["queries"]["Q5"]["warm_up_runs"], worker.WARM_UP_RUNS)
 
+    def test_the_proof_states_the_untimed_runs_that_ran(self):
+        # Review RF-10: the proof's warm_up_runs was the constant, whatever ran.
+        from compare import coldcache, worker
+
+        real = worker.timed_repetitions
+
+        def none_untimed(system, query, truth, repetitions):
+            if repetitions == worker.WARM_UP_RUNS:
+                return [], [], None
+            return real(system, query, truth, repetitions)
+
+        system = SimpleNamespace(name="fake", query_column_sum=lambda column: [[1, 2]],
+                                 scan_facts=lambda query: {}, reported_open_seconds=lambda: None)
+        query = Query("Q5", "column_sum", 0, 0)
+        request = {"queries": [query_to_json(query)], "repetitions": 2, "paths": ["store"],
+                   "truth": {"Q5": {"rows": 1, "sha256": "x"}}}
+        residency = {"pages": 8, "resident_pages": 8, "page_size": 4096}
+        with (mock.patch.object(coldcache, "warm", return_value=residency),
+              mock.patch.object(coldcache, "residency", return_value=residency),
+              mock.patch.object(worker, "timed_repetitions", none_untimed),
+              mock.patch.object(worker, "digest_result",
+                                return_value={"rows": 1, "sha256": "x"}),
+              mock.patch.object(worker, "python_floor", return_value=[0.0])):
+            answer = worker.step_warm_queries(system, request, None)
+        self.assertEqual(answer["queries"]["Q5"]["warm_up_runs"], 0)
+        self.assertEqual(answer["proof"]["warm_up_runs"], 0)
+
     def test_a_linux_day_keeps_the_per_process_proof(self):
         from compare import run_system
 

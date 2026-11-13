@@ -656,6 +656,14 @@ FAULTS = (
           "passes on the harness's own assumption", CHECK_FAILED,
           "FAIL: test_class_b_flags_the_engine_does_not_have_are_not_read_as_0 "
           "(__main__.ArcticDBSettings"),
+    # Review RF-10: the slice's untimed runs, counted as they ran and borne out by their seconds.
+    Fault("compare-warm-up-seconds-unchecked", "py-scripts", "check_compare.py takes a protocol "
+          "2 slice's stated untimed runs without the seconds of those runs beside them",
+          CHECK_FAILED, "FAIL: test_untimed_runs_stated_with_other_seconds_beside_them "
+          "(__main__.Protocol2"),
+    Fault("warm-up-runs-stated-not-counted", "py-compare", "the warm proof states the constant "
+          "number of untimed runs, whatever ran", CHECK_FAILED,
+          "FAIL: test_the_proof_states_the_untimed_runs_that_ran (__main__.ResidencyWarmOnADay"),
     # Review RF-11: a write's input whole where it must be, refused in the worker.
     Fault("write-input-not-whole-accepted", "py-compare", "a write whose input is not wholly "
           "resident when its clock starts, tick-store's source or any input on the slice, runs "

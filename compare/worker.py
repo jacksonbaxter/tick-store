@@ -186,7 +186,9 @@ def step_warm_queries(system, request, layout):
         if None not in engine:
             answers[query.name]["engine_seconds"] = engine
     after = coldcache.residency(layout, paths)
-    proof = {**coldcache.proof_of_warm(before, after), "warm_up_runs": WARM_UP_RUNS}
+    # The untimed runs that ran, the fewest of any query, not the constant (review RF-10).
+    proof = {**coldcache.proof_of_warm(before, after),
+             "warm_up_runs": min(answer["warm_up_runs"] for answer in answers.values())}
     floor = python_floor(system)
     facts = {query.name: system.scan_facts(query) for query in queries}
     return {"queries": answers, "proof": proof, "floor_seconds": floor, "scan_facts": facts,

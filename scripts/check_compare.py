@@ -418,6 +418,13 @@ def check_warm(where, warm, full_day=False, protocol=PROTOCOL_1):
                                    or proof["warm_up_runs"] < 1):
         # Review F-3: as on a day, no timed repetition is the engine's first call.
         return [f"{where}.warm: no untimed run before the repetitions"]
+    if protocol >= PROTOCOL_2:
+        # Review RF-10: the stated count is borne out by the untimed runs' own seconds.
+        seconds = warm.get("warm_up_seconds")
+        if not isinstance(seconds, list) or len(seconds) != proof["warm_up_runs"] or not all(
+                check_results.is_number(value) and value > 0 for value in seconds):
+            return [f"{where}.warm: {proof['warm_up_runs']} untimed runs stated, and their "
+                    f"seconds are {seconds!r}"]
     return [] if (warm.get("n") or 0) > 0 else [f"{where}.warm: no repetitions"]
 
 

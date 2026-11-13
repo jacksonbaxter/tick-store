@@ -1,0 +1,12 @@
+diff --git a/compare/worker.py b/compare/worker.py
+--- a/compare/worker.py
++++ b/compare/worker.py
+@@ -188,7 +188,7 @@
+     after = coldcache.residency(layout, paths)
+     # The untimed runs that ran, the fewest of any query, not the constant (review RF-10).
+     proof = {**coldcache.proof_of_warm(before, after),
+-             "warm_up_runs": min(answer["warm_up_runs"] for answer in answers.values())}
++             "warm_up_runs": WARM_UP_RUNS}
+     floor = python_floor(system)
+     facts = {query.name: system.scan_facts(query) for query in queries}
+     return {"queries": answers, "proof": proof, "floor_seconds": floor, "scan_facts": facts,

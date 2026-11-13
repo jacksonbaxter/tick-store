@@ -10,10 +10,11 @@ it. On Linux each system runs as
 
     <wrapper> taskset -c 4 sh -c <copy /proc/stat, then exec> python3 -I compare/run_system.py ...
 
-and run_system.py adds cpu6 as the run's second CPU. The copy is how busy the sibling of cpu4 was
-across the system's run, read against /proc/stat when the wrapper exits. Output goes to files, so
-nothing depends on a terminal or an SSH connection. The results file appears only when every
-system has finished and check_compare.py has passed it, so a file that exists is complete.
+and run_system.py adds cpu6 as the run's second CPU. The copy gives how busy the siblings of cpu4
+and of cpu6 were across the system's run, each read against /proc/stat when the wrapper exits.
+Output goes to files, so nothing depends on a terminal or an SSH connection. The results file
+appears only when every system has finished and check_compare.py has passed it, so a file that
+exists is complete.
 
 A full-day run, Linux only, is
 
@@ -146,9 +147,10 @@ TICKSTORE_ONLY_WARM = (
     "Before the warm queries the day's ITCH file, its export and every store file are evicted "
     "from the page cache, each proven at 0 resident, as on Linux. Then every store file is read "
     "through by tick_coldcache warm, and mincore on a fresh mapping must read 100% of its pages "
-    "resident before and after all repetitions of every query: the slice's proof, which holds "
-    "on the day because tick-store's day store fits this host's memory many times over. The "
-    "per-process proof of the four-system day reads /proc, which this host does not have.")
+    "resident before and after all repetitions of every query, each query first run once "
+    "untimed, its answer checked: the slice's proof, which holds on the day because "
+    "tick-store's day store fits this host's memory many times over. The per-process proof of "
+    "the four-system day reads /proc, which this host does not have.")
 TIME_TOOL = ("/usr/bin/time", "-l")
 TICKSTORE_ONLY_MEMORY = (
     "BSD time -l around the system's whole run, inside the measured command: the largest "

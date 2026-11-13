@@ -1440,6 +1440,7 @@ def protocol_2(document):
                               if key in ("proof", "swap_timed")}
                 if "pages" in warm_extra["proof"]:
                     warm_extra["proof"]["warm_up_runs"] = 1
+                    warm_extra["warm_up_seconds"] = [50e-6]
                 cold_extra = {key: value for key, value in entry["cold"].items()
                               if key in ("proofs", "swap_timed", "run_again_refilled_pages")}
                 entry["warm"] = {**latency_block(WARM_SECONDS), **warm_extra}
@@ -1749,6 +1750,19 @@ class Protocol2(Harness):
             q1_of(document, "questdb")["warm"]["proof"]["warm_up_runs"] = 0
         self.assert_fault_2(fault, "questdb.v.queries.Q1.warm: no untimed run before the "
                                    "repetitions")
+
+    def test_untimed_runs_stated_with_other_seconds_beside_them(self):
+        # Review RF-10: the stated count is borne out by the untimed runs' own seconds.
+        for seconds in (None, [], [50e-6, 60e-6], [0.0], ["x"]):
+            with self.subTest(seconds=seconds):
+                def fault(document, seconds=seconds):
+                    warm = q1_of(document, "questdb")["warm"]
+                    if seconds is None:
+                        del warm["warm_up_seconds"]
+                    else:
+                        warm["warm_up_seconds"] = seconds
+                self.assert_fault_2(fault, "questdb.v.queries.Q1.warm: 1 untimed runs stated, "
+                                           f"and their seconds are {seconds!r}")
 
     def test_protocol_1_files_keep_the_rules_they_were_measured_by(self):
         result = self.run_on(valid_document("Linux"), "Linux")
