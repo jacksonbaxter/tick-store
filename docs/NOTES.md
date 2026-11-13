@@ -3928,6 +3928,30 @@ same commit on debian the comparison tests pass with `heavy.sh` on cpus 2, 6 and
 `_VENDOR`, `_WORK` and `_TOOLS` point at the folders beside the exported tree; without them it
 skips all 12.
 
+**A protocol 2 slice, iteration-only, on debian at `85a4912`.** All four systems, every variant,
+end to end, with no `TICK_STORE_MEASURE`, so the file is iteration-only and stays out of
+`results/`. Since `run_system.py` pins every system to cpu4 and cpu6, the whole `compare/run.py`
+ran under the host's measurement wrapper, which alone may hold cpu4: 84 minutes. `check_compare.py`
+refuses the file for three header fields only the per-system wrapper writes, `measurement`
+(iteration-only), `governor` and `load_lines`; with those three taken from the reported `67ae574`
+file every other rule passes, the protocol 2 rules included. What the new fields held:
+
+- Tail figures: every warm block "slowest of 30", every cold one "slowest of 7", with n and rank.
+- Siblings: cpu5 at 0.52 to 1.50% and cpu7 at 0.24 to 1.31% across the four systems.
+- Writes: every system's input wholly resident at every clock start, 137,741 of 137,741 pages of
+  the export and tick-store's 50,327 of its ITCH slice; device reads 0 for Parquet and tick-store,
+  at most 131,072 bytes for ArcticDB and 155,648 for QuestDB, on a machine-wide counter. On the
+  slice Parquet's engine-only time is its total and tick-store's within 0.04 s of it; in the
+  headline variants ArcticDB's is 0.26 s below the total, QuestDB's 0.23 to 0.25 s.
+- Cold clocks: Parquet and tick-store, whose clocks hold the whole open, had 0 store bytes resident
+  at every clock start. ArcticDB's open, outside its clock, left 147,456 to 729,088 bytes resident
+  before it, by variant; QuestDB's server held 24,576 bytes before the worker opened. tick-store's
+  open, inside its cold clock now, had a median of 2.9 ms over 35 repetitions in each variant, and
+  left 413,696 or 421,888 bytes resident before the query, by variant; warm, the open it
+  reported took 0.44 and 0.49 ms.
+- Every slice warm proof records one untimed warm-up per query; class B's flush reports read 0
+  dirty pages for every system.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
