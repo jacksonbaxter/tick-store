@@ -92,9 +92,11 @@ BENCH_FAULT_BENCHMARK = "itch_codec"
 COMPARE_FAULT_SLICE = "12302019-open"
 
 
-def host_results(host, folder, root=TREE, benchmark=None):
+def host_results(host, folder, root=None, benchmark=None):
     """The one results file of a host in results/<folder>, by pattern, so a re-measure cannot
-    strand the faults that edit it. In a folder of several benchmarks, name the benchmark."""
+    strand the faults that edit it. In a folder of several benchmarks, name the benchmark.
+    The tree is the clone unless named, read when called, so a test can point it elsewhere."""
+    root = TREE if root is None else root
     pattern = f"{host}-{benchmark}-*.json" if benchmark else f"{host}-*.json"
     found = sorted((root / "results" / folder).glob(pattern))
     if len(found) != 1:
@@ -103,11 +105,11 @@ def host_results(host, folder, root=TREE, benchmark=None):
     return found[0]
 
 
-def macos_results(folder, root=TREE, benchmark=None):
+def macos_results(folder, root=None, benchmark=None):
     return host_results("macOS", folder, root, benchmark)
 
 
-def linux_results(folder, root=TREE, benchmark=None):
+def linux_results(folder, root=None, benchmark=None):
     """From the pinned host."""
     return host_results("Linux", folder, root, benchmark)
 

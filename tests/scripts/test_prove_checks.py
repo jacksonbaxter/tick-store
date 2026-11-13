@@ -162,6 +162,66 @@ class Fingerprint(unittest.TestCase):
         self.assertEqual(one, two)
 
 
+class EveryFaultApplies(unittest.TestCase):
+    """Each listed fault breaks what it says on the committed tree: its patch applies, its
+    mutation changes a file. Three patches once stopped applying, and nothing saw it until a
+    full re-proof reported them."""
+
+    @classmethod
+    def setUpClass(cls):
+        SCRATCH_ROOT.mkdir(parents=True, exist_ok=True)
+        cls.root = Path(tempfile.mkdtemp(dir=SCRATCH_ROOT))
+        cls.tree = cls.root / "tree"
+        subprocess.run(["git", "clone", "--quiet", "--shared", str(REPO_ROOT), str(cls.tree)],
+                       check=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.root)
+
+    def git(self, *arguments, root=None):
+        return subprocess.run(["git", "-C", str(root or self.tree), *arguments],
+                              capture_output=True, text=True, check=False)
+
+    def test_every_listed_patch_applies_to_the_committed_tree(self):
+        # A fetched source is outside git; the prover copies it into its clone, so it is
+        # checked where it was fetched, when it was.
+        fetched = (REPO_ROOT / "build" / "_deps").is_dir()
+        for fault in prove.FAULTS:
+            patch = prove.patch_of(fault)
+            if patch is None:
+                continue
+            with self.subTest(fault=fault.id):
+                done = self.git("apply", "--check", "--whitespace=nowarn",
+                                "--exclude=build/_deps/*", str(patch))
+                self.assertEqual(done.returncode, 0, done.stderr)
+                if fetched and "build/_deps/" in patch.read_text():
+                    done = self.git("apply", "--check", "--whitespace=nowarn",
+                                    "--include=build/_deps/*", str(patch), root=REPO_ROOT)
+                    self.assertEqual(done.returncode, 0, done.stderr)
+
+    def test_every_listed_mutation_changes_the_committed_tree(self):
+        original = prove.TREE
+        self.addCleanup(setattr, prove, "TREE", original)
+        prove.TREE = self.tree
+        for fault in prove.FAULTS:
+            if fault.mutate is None or prove.patch_of(fault) is not None:
+                continue
+            with self.subTest(fault=fault.id):
+                try:
+                    fault.mutate()
+                    changed = self.git("status", "--porcelain").stdout
+                finally:
+                    self.git("reset", "--quiet", "--hard")
+                    self.git("clean", "--quiet", "-fd")
+                self.assertTrue(changed.strip(), f"{fault.mutate.__name__} changed nothing")
+
+    def test_every_fault_breaks_something(self):
+        for fault in prove.FAULTS:
+            with self.subTest(fault=fault.id):
+                self.assertTrue(prove.patch_of(fault) or fault.mutate or fault.fault_arguments)
+
+
 class MacosResults(unittest.TestCase):
     """The faults that edit a macOS results file find it by pattern, since its name carries the
     commit it was measured at and changes on every re-measure."""
