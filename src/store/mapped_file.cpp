@@ -30,8 +30,10 @@ namespace {
 
 std::expected<MappedFile, StoreError> MappedFile::open(const std::filesystem::path& path,
                                                      Access access) {
+    // O_NONBLOCK: a FIFO with no writer would otherwise block the open until one came, before
+    // the regular-file check below could refuse it. It changes nothing for a regular file.
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg): the POSIX interface is variadic.
-    const int fd = ::open(path.c_str(), O_RDONLY | O_CLOEXEC);
+    const int fd = ::open(path.c_str(), O_RDONLY | O_CLOEXEC | O_NONBLOCK);
     if (fd < 0) {
         return io_error("open");
     }

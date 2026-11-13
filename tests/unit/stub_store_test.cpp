@@ -13,13 +13,19 @@
 
 #include <gtest/gtest.h>
 
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include <algorithm>
 #include <array>
 #include <cerrno>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
 #include <filesystem>
+#include <future>
 #include <limits>
 #include <optional>
 #include <span>
@@ -536,6 +542,29 @@ TEST(MappedFile, ReportsAMissingFile) {
 TEST(MappedFile, RefusesADirectory) {
     const ScratchDir dir;
     const auto mapped = MappedFile::open(dir.path());
+    ASSERT_FALSE(mapped.has_value());
+    EXPECT_EQ(mapped.error().field, "not a regular file");
+}
+
+// A FIFO with no writer is refused at once (review C-3): open(2) without O_NONBLOCK would
+// wait for a writer before the regular-file check ran. A blocked open cannot be bounded by
+// counting work, so if it has not returned after a wait far past any open's cost, the test
+// opens the write end itself, which releases it, and fails rather than hang the suite.
+TEST(MappedFile, RefusesAFifoWithoutWaitingForAWriter) {
+    const ScratchDir dir;
+    const std::filesystem::path fifo = dir / "fifo";
+    ASSERT_EQ(::mkfifo(fifo.c_str(), 0600), 0);
+    auto opened = std::async(std::launch::async, [&fifo] { return MappedFile::open(fifo); });
+    if (opened.wait_for(std::chrono::seconds{10}) != std::future_status::ready) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg): the POSIX interface is variadic.
+        const int writer = ::open(fifo.c_str(), O_WRONLY | O_NONBLOCK | O_CLOEXEC);
+        static_cast<void>(opened.get());
+        if (writer >= 0) {
+            ::close(writer);
+        }
+        FAIL() << "MappedFile::open waited for a writer on a FIFO";
+    }
+    const auto mapped = opened.get();
     ASSERT_FALSE(mapped.has_value());
     EXPECT_EQ(mapped.error().field, "not a regular file");
 }
