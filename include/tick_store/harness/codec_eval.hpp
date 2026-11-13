@@ -249,6 +249,10 @@ struct HeadModes {
     std::uint64_t distinct_gaps = 0;
     // Steps that extend a head, tokens 0 to 6.
     std::uint64_t head_steps = 0;
+    // Among all head steps. A step to a head no value has reached yet stays in head_steps, as
+    // it does not in side_steps, and is compared with the default owner's locate, 0, so it
+    // counts as the same locate only for a value of locate 0. That is at most
+    // codec::kHeadDeltaHeads steps in a stream (review RR-2).
     std::uint64_t same_locate = 0;
     // Among head steps where both sides are known. A U carries no side: its new order keeps
     // the side of the order it replaces, unknown if that order is not on the book. A step to

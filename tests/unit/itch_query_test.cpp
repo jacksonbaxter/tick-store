@@ -1008,6 +1008,8 @@ TEST(QueryCli, RequestsOutOfRangeAnswerWithAnError) {
         "{\"kind\":\"rows\",\"end_ns\":5}\n"
         "{\"kind\":\"busiest_locate\",\"start_ns\":0}\n"
         "{\"kind\":\"minute_aggregate\",\"start_ns\":0,\"locate\":1}\n"
+        "{\"kind\":\"histogram\",\"start_ns\":-1}\n"
+        "{\"kind\":\"histogram\",\"locate\":\"x\"}\n"
         "{\"kind\":\"rows\",\"start_ns\":5,\"end_ns\":6,\"locate\":1,\"flag\":true,\"none\":null}\n"};
     std::ostringstream out;
     harness::CliOutput output;
@@ -1019,17 +1021,18 @@ TEST(QueryCli, RequestsOutOfRangeAnswerWithAnError) {
     for (std::string line; std::getline(answers, line);) {
         lines.push_back(line);
     }
-    ASSERT_EQ(lines.size(), 16U);
-    for (std::size_t i = 1; i <= 14; ++i) {
+    ASSERT_EQ(lines.size(), 18U);
+    for (std::size_t i = 1; i <= 16; ++i) {
         EXPECT_NE(json_field(lines[i], "error"), "") << i << ": " << lines[i];
     }
-    // An unknown kind, and no kind, are told so, not that they lack a window (review RD-1).
-    for (const std::size_t i : {4U, 5U}) {
+    // An unknown kind, and no kind, are told so, not that they lack a window (review RD-1),
+    // nor about a field they were given (review RR-1).
+    for (const std::size_t i : {4U, 5U, 15U, 16U}) {
         EXPECT_TRUE(lines[i].contains("kind must be rows, minute_aggregate, column_sum, "
                                       "busiest_locate or quit"))
             << lines[i];
     }
-    EXPECT_EQ(json_field(lines[15], "rows"), "1");
+    EXPECT_EQ(json_field(lines[17], "rows"), "1");
 }
 
 }  // namespace

@@ -353,6 +353,14 @@ private:
         quit = true;
         return head + "}";
     }
+    // An unknown or missing kind is told the kinds before anything about its fields (review
+    // RD-1, RR-1).
+    constexpr std::string_view kKinds =
+        "kind must be rows, minute_aggregate, column_sum, busiest_locate or quit";
+    if (kind != "rows" && kind != "minute_aggregate" && kind != "column_sum" &&
+        kind != "busiest_locate") {
+        return fail(kKinds);
+    }
     // With "ack": true, a line goes out as soon as the engine has the answer in memory, before
     // the digest is made, so a caller can stop its clock where the other systems' clocks stop:
     // with the answer in hand, and its digest still to make.
@@ -375,8 +383,7 @@ private:
             return fail(field->error());
         }
     }
-    // Each kind that reads a window is not given one by default. An unknown kind falls
-    // through to the error that names the kinds (review RD-1).
+    // Each kind that reads a window is not given one by default.
     const bool windowed = kind == "rows" || kind == "minute_aggregate" || kind == "busiest_locate";
     if (windowed && (!start_field->has_value() || !end_field->has_value())) {
         return fail(std::format("{} needs start_ns and end_ns", kind));
@@ -469,7 +476,7 @@ private:
         return std::format(R"({},"locate":{},"locate_rows":{},"engine_ns":{},{}}})", head, best,
                            most, engine, stats_json(query.stats()));
     }
-    return fail("kind must be rows, minute_aggregate, column_sum, busiest_locate or quit");
+    return fail(kKinds);
 }
 
 }  // namespace
