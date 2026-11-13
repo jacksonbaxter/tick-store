@@ -77,6 +77,11 @@ TEST_F(ColumnsCli, ExportWritesEveryFileAndProvesThem) {
     EXPECT_TRUE(exported.output.out.contains("\"hot_rows\": 8"));
     EXPECT_TRUE(exported.output.out.contains("\"rare_rows\": 15"));
     EXPECT_TRUE(exported.output.out.contains("\"timestamps_sorted\":"));
+    // The whole source, tail included, counted once.
+    EXPECT_TRUE(exported.output.out.contains(std::format("\"source_bytes\": {},", source.size())))
+        << exported.output.out;
+    EXPECT_TRUE(exported.output.out.contains(
+        std::format("\"tail_bytes\": {},", test::truncated_tail().size())));
     EXPECT_FALSE(exported.output.out.contains(scratch.path().string()));
     for (const std::string_view name : store::kColumnFileNames) {
         EXPECT_TRUE(std::filesystem::exists(directory / name)) << name;

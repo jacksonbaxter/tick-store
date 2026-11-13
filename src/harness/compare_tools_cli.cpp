@@ -74,7 +74,7 @@ std::string export_summary_json(const store::ColumnsSummary& summary, const Veri
     json.field("tool", std::string_view{"tick_export"});
     json.field("verdict", std::string_view{report.passed() ? "pass" : "mismatch"});
     json.field("records", summary.records);
-    json.field("source_bytes", report.source_bytes + report.source_tail_bytes);
+    json.field("source_bytes", report.source_bytes);  // records and tail
     json.field("tail_bytes", summary.tail_bytes);
     json.field("source_sha256", to_hex(report.source_sha256));
     json.field("hot_rows", summary.hot_rows);
