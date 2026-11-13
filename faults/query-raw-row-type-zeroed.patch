@@ -1,0 +1,11 @@
+diff --git a/src/store/columns.cpp b/src/store/columns.cpp
+--- a/src/store/columns.cpp
++++ b/src/store/columns.cpp
+@@ -665,6 +665,7 @@ std::optional<RowValues> row_values(std::span<const std::byte> payload) {
+     const auto* raw = std::get_if<itch::RawMessage>(&*message);
+     if (raw != nullptr || (hot.has_value() && !fits_columns(hot->second))) {
+         row.form = RowForm::raw;
++        row.msg_type = 0;
+         return row;
+     }
+     MessageHeader header{};

@@ -206,6 +206,15 @@ TEST(FuzzOracles, PassAFrameOf257Bytes) {
     EXPECT_EQ(text(oracle::check_stream(exact_copy(stream))), "");
 }
 
+// That frame alone: the input ends cleanly, and its first byte, 0x01, cuts the shorter input
+// to 1 byte, so only the shorter cursor stops early, at a truncated prefix. A cursor that
+// misstated that stop is seen here by the shorter input's checks alone (review RA-2, RR-3).
+TEST(FuzzOracles, TheFrameOracleChecksTheShorterInputsStop) {
+    const Bytes stream = test::framed(0x0101, Bytes(257, std::byte{0x41}));
+    ASSERT_EQ(std::to_integer<std::size_t>(stream.front()) % stream.size(), 1U);
+    EXPECT_EQ(text(oracle::check_stream(exact_copy(stream))), "");
+}
+
 // Stops no correct cursor makes, each over the tail it claims to describe: every one must
 // be refused, by the check named, and the right stop over the same tail accepted. The
 // cursor is inline and constexpr, so only check_stop can be handed a wrong stop (review

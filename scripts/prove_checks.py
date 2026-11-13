@@ -339,6 +339,12 @@ FAULTS = (
           "trailing bytes", EXIT_LIBFUZZER, "check_message:", arguments=FUZZ_ARGUMENTS),
     Fault("fuzz-itch-frame-lost-byte", "fuzz-itch-frame", "the cursor reports a clean end with "
           "one byte left", EXIT_LIBFUZZER, "check_stream:", arguments=FUZZ_ARGUMENTS),
+    # Review RR-3: the frame oracle's check of a shorter input's stop (RA-2), on an input whose
+    # whole stream ends cleanly, so no other check sees the misstated stop.
+    Fault("frame-short-stop-misstated", "dev-test", "the cursor states a truncated prefix with "
+          "one byte more left than there is", EXIT_CTEST,
+          "FuzzOracles.TheFrameOracleChecksTheShorterInputsStop",
+          arguments=("--test-regex", "FuzzOracles")),
     Fault("fuzz-stub-store-record-count", "fuzz-stub-store", "the parser stops comparing the "
           "record count with the records it read", EXIT_LIBFUZZER, "check_store:",
           arguments=FUZZ_ARGUMENTS),
@@ -539,6 +545,11 @@ FAULTS = (
     Fault("fuzz-itch-query-first-run-skipped", "fuzz-itch-query", "the symbol filter skips a "
           "locate's run when it is the segment's first, so its rows go missing", EXIT_LIBFUZZER,
           "check_itch_query:", arguments=FUZZ_ARGUMENTS),
+    # Review RR-3: the query oracle's column form reads the type byte itself (RD-6), so a raw
+    # row mapped wrong by row_values() no longer moves all three answers alike.
+    Fault("query-raw-row-type-zeroed", "dev-test", "row_values() gives a raw row the type byte "
+          "0", EXIT_CTEST, "FuzzOracles.TheQueryOracleSeesASegmentBothPathsWouldSkip",
+          arguments=("--test-regex", "FuzzOracles")),
     Fault("g2-weakened-compare", "dev-test", "the oracle's compare ignores bit 0 and stops "
           "requiring the hashes to match", EXIT_CTEST, "Value of: report.passed()",
           arguments=("--test-regex", "OracleExhaustiveFlip")),
