@@ -21,7 +21,9 @@ weakened to get a pass: the gap gets fixed, and the fault stays.
 
 Results go to results/check-proofs.json after every fault, so a stopped run resumes where it
 stopped. A fault already PROVEN for this code is skipped unless --force. The key is the last
-commit that changed code, not prose or the summaries, plus a fingerprint of the fault itself.
+commit that changed code, not prose or the summaries, plus a fingerprint of the fault itself:
+its fields and patch, the code of its mutation and of this script's verdict path, and the
+committed content of each file it edits, prose included.
 Raw logs go to --raw-logs or CHECK_PROOF_LOGS, by default build/fault-proofs/logs. The
 toolchain comes from the environment.
 
@@ -29,13 +31,16 @@ Standard library only.
 """
 
 import argparse
+import functools
 import hashlib
+import inspect
 import json
 import os
 import platform
 import shutil
 import subprocess
 import sys
+import types
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -1045,14 +1050,94 @@ FAULTS = (
 )
 
 
-def fingerprint(fault):
-    """Changes when the fault does, so an edited fault cannot keep an old verdict."""
+def fingerprint(fault, blob_of=None):
+    """Changes when the fault does, so an edited fault cannot keep an old verdict: its fields,
+    its patch, the code of its mutation and of this script's verdict path, and the committed
+    content of each file it edits. Prose and this script are outside source_commit, so a
+    fault's own key must hold what of them made its verdict (review E-5)."""
+    blob_of = blob_of or head_blobs().get
     patch = patch_of(fault)
+    texts, strings = code_of(prove)[0], set()
+    if fault.mutate is not None:
+        mutation, strings = code_of(fault.mutate)
+        texts += mutation
+    if patch is not None:
+        strings = strings | patched_paths(patch.read_text())
+    edited = sorted((path, blob) for path in strings if (blob := blob_of(path)) is not None)
     described = repr((fault.check, fault.arguments, fault.fault_arguments, fault.expected_exit,
                       fault.expected_string, fault.later_step,
                       getattr(fault.mutate, "__name__", None),
-                      patch.read_text() if patch else None))
+                      patch.read_text() if patch else None, texts, edited))
     return hashlib.sha256(described.encode()).hexdigest()[:12]
+
+
+def code_of(function):
+    """The text of a function and of every function and class of its module it reaches, with
+    the plain values it reads there, and the string constants among them that may name a file.
+    Source text where Python has it, which line numbers do not change, else the bytecode."""
+    texts, strings, seen = [], set(), set()
+    pending = [function]
+    while pending:
+        current = pending.pop()
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+        try:
+            texts.append(inspect.getsource(current))
+        except (OSError, TypeError):
+            texts.append(bytecode_of(current.__code__))
+        if inspect.isclass(current):
+            continue
+        codes = [current.__code__]
+        while codes:
+            code = codes.pop()
+            for constant in code.co_consts:
+                if isinstance(constant, types.CodeType):
+                    codes.append(constant)
+                elif isinstance(constant, str) and " " not in constant:
+                    strings.add(constant)
+            for name in code.co_names:
+                value = current.__globals__.get(name)
+                if inspect.isfunction(value) and value.__globals__ is current.__globals__:
+                    pending.append(value)
+                elif inspect.isclass(value) and value.__module__ == current.__module__:
+                    pending.append(value)
+                elif plain(value):
+                    texts.append(f"{name} = {value!r}")
+    return sorted(texts), strings
+
+
+def bytecode_of(code):
+    """A function's code where Python has no source text for it: instructions, constants and
+    names, nested functions included."""
+    constants = tuple(bytecode_of(constant) if isinstance(constant, types.CodeType)
+                      else repr(constant) for constant in code.co_consts)
+    return repr((code.co_code, constants, code.co_names))
+
+
+def plain(value):
+    """A value whose repr is the same on every machine: no paths, objects or modules."""
+    if isinstance(value, (str, int, float, bool)):
+        return True
+    return isinstance(value, tuple) and all(plain(item) for item in value)
+
+
+def patched_paths(patch_text):
+    """The files a patch edits, from its headers."""
+    return {line.split(" b/", 1)[1] for line in patch_text.splitlines()
+            if line.startswith("diff --git a/") and " b/" in line}
+
+
+@functools.cache
+def head_blobs():
+    """Every committed file's blob id at HEAD."""
+    listing = git_in(REPO_ROOT, "ls-tree", "-r", "-z", "HEAD")
+    blobs = {}
+    for entry in listing.split("\0"):
+        if "\t" in entry:
+            meta, path = entry.split("\t", 1)
+            blobs[path] = meta.split()[2]
+    return blobs
 
 
 def patch_of(fault):

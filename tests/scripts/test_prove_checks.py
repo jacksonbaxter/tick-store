@@ -99,6 +99,69 @@ class FaultList(unittest.TestCase):
         self.assertNotEqual(prove.fingerprint(FAULT), prove.fingerprint(other))
 
 
+def mutation_named_alike(argument, helper_value="one"):
+    """A mutation called `mutate` that calls a helper with `argument`, as the prover's own
+    mutations call edit_json and edit_text; the helper returns `helper_value`."""
+    namespace = {}
+    exec(compile(f"def helper(argument):\n    return {helper_value!r}\n\n"
+                 f"def mutate():\n    return helper({argument!r})\n", "<test mutation>",
+                 "exec"), namespace)
+    return namespace["mutate"]
+
+
+class Fingerprint(unittest.TestCase):
+    """Review E-5: the key that keeps a proof must change when anything that made the verdict
+    changes, the mutation's code, the prover's verdict path, and the prose a fault edits,
+    which is outside the code commit the key also holds."""
+
+    def setUp(self):
+        SCRATCH_ROOT.mkdir(parents=True, exist_ok=True)
+        self.root = Path(tempfile.mkdtemp(dir=SCRATCH_ROOT))
+        self.addCleanup(shutil.rmtree, self.root)
+
+    def test_a_mutation_with_another_body_has_another_fingerprint(self):
+        a = prove.Fault("example", "render-check", "x", 1, "s", mutation_named_alike("a"))
+        b = prove.Fault("example", "render-check", "x", 1, "s", mutation_named_alike("b"))
+        self.assertEqual(a.mutate.__name__, b.mutate.__name__)
+        self.assertNotEqual(prove.fingerprint(a), prove.fingerprint(b))
+
+    def test_a_mutation_whose_helper_changed_has_another_fingerprint(self):
+        a = prove.Fault("example", "render-check", "x", 1, "s", mutation_named_alike("a", "one"))
+        b = prove.Fault("example", "render-check", "x", 1, "s", mutation_named_alike("a", "two"))
+        self.assertNotEqual(prove.fingerprint(a), prove.fingerprint(b))
+
+    def test_an_edited_verdict_changes_every_fingerprint(self):
+        before = prove.fingerprint(FAULT)
+        original = prove.judge
+        self.addCleanup(setattr, prove, "judge", original)
+        # An edit to judge() in the script itself: a new body in the script's own globals.
+        exec("def judge(fault, result):\n    return 'PROVEN'\n", vars(prove))
+        self.assertNotEqual(prove.fingerprint(FAULT), before)
+
+    def test_the_prose_a_patch_edits_is_in_its_fingerprint(self):
+        patch = self.root / "example.patch"
+        patch.write_text("diff --git a/README.md b/README.md\n--- a/README.md\n"
+                         "+++ b/README.md\n@@ -1 +1 @@\n-a\n+b\n")
+        original = prove.FAULTS_DIR
+        self.addCleanup(setattr, prove, "FAULTS_DIR", original)
+        prove.FAULTS_DIR = self.root
+        fault = prove.Fault("example", "render-check", "x", 1, "s")
+        one = prove.fingerprint(fault, blob_of={"README.md": "1" * 40}.get)
+        two = prove.fingerprint(fault, blob_of={"README.md": "2" * 40}.get)
+        self.assertNotEqual(one, two)
+
+    def test_the_prose_a_mutation_edits_is_in_its_fingerprint(self):
+        fault = next(fault for fault in prove.FAULTS if fault.id == "readme-pitch-figure-edited")
+        one = prove.fingerprint(fault, blob_of={"README.md": "1" * 40}.get)
+        two = prove.fingerprint(fault, blob_of={"README.md": "2" * 40}.get)
+        self.assertNotEqual(one, two)
+
+    def test_prose_a_fault_does_not_touch_leaves_it_alone(self):
+        one = prove.fingerprint(FAULT, blob_of={"README.md": "1" * 40}.get)
+        two = prove.fingerprint(FAULT, blob_of={"README.md": "2" * 40}.get)
+        self.assertEqual(one, two)
+
+
 class MacosResults(unittest.TestCase):
     """The faults that edit a macOS results file find it by pattern, since its name carries the
     commit it was measured at and changes on every re-measure."""
