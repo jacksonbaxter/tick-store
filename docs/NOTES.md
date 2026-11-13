@@ -3338,6 +3338,11 @@ size; the CLI's refusal is a usage error, exit 2, with a line in the usage text 
 D-5. No script reads `tick_export`'s `source_bytes` (`git grep` over `compare/`, `scripts/` and
 their tests), so no reader changed. Before: 772 for the 768-byte fixture with its 4-byte tail.
 
+D-6. The walk now advances with `increment(error)` and returns "cannot walk" when the error is
+set. An entry whose status cannot be read is still skipped, as before, under its own error code,
+so it no longer shares one with the walk. Before: the test caught the `filesystem_error`; in the
+tool, nothing does.
+
 Raw: `phase4-raw/fix-harness/`: each finding's failing and passing logs.
 
 ## Process notes
