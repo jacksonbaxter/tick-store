@@ -3468,6 +3468,21 @@ Linux-only page-cache test among the passes, and clang-tidy on `page_cache_linux
 
 Raw: `phase4-raw/fix-harness/`: each finding's failing and passing logs, and the checks.
 
+### The final review's ITCH, bench and second-pass findings
+
+Reviewer A read the ITCH decoder, the bench support and the benchmarks at `ca96b36` (A-1 to
+A-8), and a second reviewer read the codec and store fixes at `eac0adc` (R-1 to R-8). Neither
+built or ran anything, so each finding is a claim until a test shows it. The record is
+`docs/REVIEW.md`.
+
+A-1. The reviewer's mutation was run on a scratch copy of `frame.hpp`, never in the tree: a
+driver built with the scratch header first on its include path, once with the old
+`check_stream` and once with the new. The old oracle accepted the mutated cursor's stop on a
+257-byte frame; the new one refuses it, and both accept the real cursor. The unit test object
+built against the scratch header has to come first on the link line: the cursor is inline, and
+with the other objects first the linker kept their unmutated copy and every test passed. Linked
+first, the eight old `FrameCursor` tests pass the mutation and the new 257-byte one fails.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
