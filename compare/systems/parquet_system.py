@@ -149,6 +149,22 @@ class ParquetSystem(System):
                 "python_note": "the Arrow table is a zero-copy view of the mapped columns, and "
                                "the engine call is the whole write"}
 
+    @classmethod
+    def write_times(cls, full_day):
+        if full_day:
+            seconds = ("reading each chunk of the day's export into an Arrow table, "
+                       "pq.ParquetWriter writing each chunk, and under class B the harness's "
+                       "flush of the file and then its directory")
+            reading = "the reading of the chunks"
+        else:
+            seconds = ("pq.ParquetWriter writing the zero-copy Arrow view of the mapped "
+                       "export, and under class B the harness's flush of the file and then its "
+                       "directory")
+            reading = "0 on the slice"
+        return {"seconds": seconds,
+                "engine_only_seconds": f"the total less python_seconds, {reading}: the writer "
+                                       "and, under class B, the flush"}
+
     def stream_chunk_rows(self):
         return self.tuning["row_group_rows"] * CHUNK_ROW_GROUPS
 

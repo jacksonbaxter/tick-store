@@ -245,6 +245,7 @@ class TickStoreSystem(System):
         self.export_dir = None
         self.layout_report = None
         self.codecs_found = None
+        self.input_ready = None
         self.segment_records = self.tuning["segment_records"]
 
     @property
@@ -311,9 +312,29 @@ class TickStoreSystem(System):
         and no table is built."""
         return self.ingest(columns, None)
 
+    def input_paths(self, columns):
+        return [self._source()]
+
+    def ready_input(self, columns):
+        """The write's precondition, before its clock: see `warm_source`."""
+        self.input_ready = self.warm_source(self._source(), columns)
+        return self.input_ready
+
+    @classmethod
+    def write_times(cls, full_day):
+        source = "the day's ITCH file" if full_day else "the ITCH slice"
+        return {"seconds": f"tools/tick_roundtrip ingest as a process, from its start to its "
+                           f"exit: mapping {source}, which is resident before the clock, "
+                           "parsing it, coding and writing the store, its commit and, under "
+                           "class B, its flushes",
+                "engine_only_seconds": "the total less python_seconds, the process's start and "
+                                       "exit: tick_roundtrip's own wall time"}
+
     def warm_source(self, source, columns):
         """The write's precondition, before its clock: the source wholly resident, read through
-        by tick_coldcache warm. Returns the record kept with the write.
+        by tick_coldcache warm. Returns the record kept with the write. The worker calls it,
+        through `ready_input`, before it reads the source's residency and starts the device's
+        counter, so neither the warm nor its reads are in the write's figures.
 
         On a day, a short first warm gets one more: the day's export, which tick-store's write
         never reads and which the oracle and the ground truth have just read, is evicted, proven
@@ -347,7 +368,10 @@ class TickStoreSystem(System):
 
     def ingest(self, columns, table):
         source = self._source()
-        warmed = self.warm_source(source, columns)
+        warmed = self.input_ready
+        if warmed is None:
+            raise ToolFailure("the source was not made resident before the write: ready_input "
+                              "comes first")
         self.expected_records = columns.records
         command = self.ingest_command(source, self.store_path, self.mode)
         started = time.perf_counter()

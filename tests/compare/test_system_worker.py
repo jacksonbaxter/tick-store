@@ -68,6 +68,12 @@ sys.exit(code)
 """
 DAY_LABEL = "12302019"
 VARIANT = ParquetSystem.headline_variant
+# A stand-in for tools/tick_coldcache, which a worker's write and cold steps call around their
+# clocks: every file has 1 page, none of it resident or dirty.
+FAKE_COLDCACHE = """
+import json
+print(json.dumps({"pages": 1, "resident_pages": 0, "page_size": 4096, "dirty_pages": 0}))
+"""
 QUERIES = (Query("rows", "rows", OPEN_NS, OPEN_NS + NANOS_PER_SECOND),
            Query("minutes", "minute_aggregate", OPEN_NS, OPEN_NS + 300 * NANOS_PER_SECOND),
            Query("sum", "column_sum", 0, 0))
@@ -83,6 +89,9 @@ class ColdWorker(unittest.TestCase):
         (cls.base / "in").mkdir()
         write_fixture(cls.base / "in")
         cls.columns = ColumnSet(cls.base / "in")
+        tool = cls.base / "tick_coldcache"
+        tool.write_text(f"#!{sys.executable} -I\n{FAKE_COLDCACHE}", encoding="utf-8")
+        tool.chmod(0o755)
         layout = Layout(cls.base, cls.base, cls.base, cls.base)
         cls.root = cls.base / "store"
         ParquetSystem(RunContext(layout, cls.root, VARIANT, CLASS_B, DAY)).prepare()
@@ -449,7 +458,7 @@ class TailFigure(unittest.TestCase):
                                     "python_seconds": total - engine, "python_note": "n"},
                         "peak_rss_bytes": 1, "service": {}}
                        for total, engine in ((3.0, 2.5), (2.0, 1.5), (4.0, 3.0))]
-        write = run_system.summarise_writes(repetitions, {"message_count": 10, "size": 20})
+        write = run_system.summarise_writes(repetitions, {"message_count": 10, "size": 20}, {})
         self.assertEqual([item["engine_seconds"] for item in write["by_repetition"]],
                          [2.5, 1.5, 3.0])
         self.assertEqual(write["seconds"], [3.0, 2.0, 4.0])
@@ -460,6 +469,86 @@ class TailFigure(unittest.TestCase):
         self.assertIn("slowest of 7", compare_run.TAIL_STATEMENT)
         self.assertIn("slowest", variant_rule.RULE)
         self.assertEqual(variant_rule.FIELDS, ("median_us", "p99_us"))
+
+
+class WriteRecord(unittest.TestCase):
+    """Every write records its total and engine-only seconds, how much of its input was
+    resident when its clock started, and the device bytes read while it ran (review F-2)."""
+
+    def run_step(self, full_day=False):
+        from compare import coldcache, worker
+
+        order = []
+
+        class Counter:
+            def __init__(self, path):
+                order.append(("counter", str(path)))
+
+            def delta(self):
+                order.append("delta")
+                return {"bytes": 8192, "counter": "sectors read", "slack": 0}
+
+        def residency(layout, paths):
+            order.append(("residency", [str(path) for path in paths]))
+            return {"pages": 10, "resident_pages": 7, "page_size": 4096}
+
+        def ingest(*args):
+            order.append("ingest")
+            return {"seconds": 3.0, "engine_seconds": 2.0, "python_seconds": 0.5,
+                    "python_note": "n"}
+
+        system = SimpleNamespace(
+            name="fake", context=SimpleNamespace(day=DAY), settings_in_force=lambda: [],
+            settings_after_ingest=lambda: [], input_paths=lambda columns: [Path("export")],
+            ready_input=lambda columns: order.append("ready") or {"warms": 1},
+            ingest=ingest, ingest_day=ingest)
+        columns = SimpleNamespace(directory=Path("export"), records=9)
+        with (mock.patch.object(worker, "ColumnSet", return_value=columns),
+              mock.patch.object(worker, "arrow_table", return_value=SimpleNamespace(num_rows=9)),
+              mock.patch.object(coldcache, "residency", residency),
+              mock.patch.object(coldcache, "DeviceCounter", Counter)):
+            answer = worker.step_ingest(system, {"columns": "export", "full_day": full_day}, None)
+        return answer["timings"], order
+
+    def test_each_write_records_both_times_its_input_and_its_device_reads(self):
+        for full_day in (False, True):
+            timings, order = self.run_step(full_day)
+            self.assertEqual(timings["engine_only_seconds"], 2.5)
+            self.assertEqual(timings["input_at_clock_start"]["pages"], 10)
+            self.assertEqual(timings["input_at_clock_start"]["resident_pages"], 7)
+            self.assertEqual(timings["input_at_clock_start"]["made_ready"], {"warms": 1})
+            self.assertEqual(timings["device_read"]["bytes"], 8192)
+
+    def test_the_input_is_made_ready_and_read_before_the_clock_and_the_device_after(self):
+        _, order = self.run_step()
+        self.assertEqual(order, ["ready", ("residency", ["export"]), ("counter", "export"),
+                                 "ingest", "delta"])
+
+    def test_the_write_block_keeps_them_for_each_repetition(self):
+        from compare import run_system
+
+        repetitions = [{"timings": {"seconds": total, "engine_seconds": total - 1,
+                                    "python_seconds": 0.5, "engine_only_seconds": total - 0.5,
+                                    "python_note": "n",
+                                    "input_at_clock_start": {"pages": 10, "resident_pages": 7},
+                                    "device_read": {"bytes": 4096, "counter": "c"}},
+                        "peak_rss_bytes": 1, "service": {}} for total in (3.0, 2.0, 4.0)]
+        write = run_system.summarise_writes(repetitions, {"message_count": 10, "size": 20},
+                                            {"seconds": "s", "engine_only_seconds": "e"})
+        self.assertEqual(write["engine_only_seconds_median"], 2.5)
+        self.assertEqual(write["by_repetition"][2]["input_resident_pages_at_start"], 7)
+        self.assertEqual(write["by_repetition"][0]["device_bytes_read"], 4096)
+        self.assertEqual(write["times"], {"seconds": "s", "engine_only_seconds": "e"})
+        self.assertEqual(check_compare.check_write_record("w", write, "parquet"), [])
+
+    def test_every_system_says_what_its_two_times_hold(self):
+        from compare.systems import SYSTEM_NAMES, system_class
+
+        for name in SYSTEM_NAMES:
+            times = system_class(name).write_times(False)
+            self.assertEqual(sorted(times), ["engine_only_seconds", "seconds"], name)
+            self.assertEqual(sorted(system_class(name).write_times(True)),
+                             ["engine_only_seconds", "seconds"], name)
 
 
 class Statements(unittest.TestCase):

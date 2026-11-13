@@ -288,6 +288,39 @@ encoding, the format version, the sort order and each row group's rows, and the 
 in the file gives the data page version. The compression level cannot be read, since the footer
 has no level, so a result records it as requested and says so.
 
+## A write's two times
+
+The write protocol is the same for every run: tick-store's source is read through and wholly
+resident before its clock, on the slice and on the day, and the other systems read the export
+inside theirs, on a day chunk by chunk and partly from the device. The input's cache state is
+therefore not the same for all, so every write records two times, and from protocol 2 each
+repetition keeps both:
+
+- `seconds`, the whole clock, the headline write time;
+- `engine_only_seconds`, `seconds` less `python_seconds`: the clock without reading the input
+  or putting it in the form the system's call takes.
+
+| System | `seconds` holds | `engine_only_seconds` holds |
+|---|---|---|
+| Parquet | `pq.ParquetWriter` writing the zero-copy Arrow view of the mapped export (on a day, reading each chunk of the export into Arrow first), and under class B the harness's flush of the file and then its directory | The writer and, under class B, the flush: on the slice the total, since `python_seconds` is 0; on a day the total less reading the chunks |
+| ArcticDB | Building the pandas frame `lib.write` takes (one symbol per security: the stable sort by locate and a frame per locate; on a day, reading each chunk, and for per security spreading the day by locate into bucket files), then `lib.write`, `lib.append` or `write_batch` and `list_symbols`, each storage key an LMDB commit | ArcticDB's write, append, `write_batch` and `list_symbols` calls and LMDB's commits, without the reading, the frames or the partitioning |
+| QuestDB | Dictionary-encoding the SYMBOL columns (on a day, after reading each chunk), sending the rows through the client, and waiting until the WAL is applied and every row is visible | The client's send, the server's WAL apply and the wait until every row is visible, without the reading or the dictionary encoding |
+| tick-store | `tools/tick_roundtrip ingest` as a process, from its start to its exit: mapping the ITCH source, parsing it, coding and writing the store, its commit and, under class B, its flushes | `tick_roundtrip`'s own wall time: the same less the process's start and exit. The ITCH parsing stays in it |
+
+`engine_seconds`, kept beside them, is each system's own split and is not the same thing for all:
+Parquet's leaves out the class B flush. Each repetition also records `input_pages` and
+`input_resident_pages_at_start`, read by `mincore` on a fresh mapping of the input (the export's
+column files, or tick-store's ITCH file) once it is made ready and just before the clock, and
+`device_bytes_read` over the write: on Linux the block device's sectors read, machine-wide; on
+macOS `iostat`'s `disk0` total, which counts the write's own output too, so it only bounds the
+reads from above. Each write's `times` says what its two times hold, as the table does.
+
+**A write target is met against another system only if tick-store is no slower on both times.**
+`BENCHMARKS.md`'s targets are not reworded; the rule is how they are judged, by
+`scripts/render_results.py`, whose tables show both columns. The files measured before protocol 2
+keep the total, the medians of `engine_seconds` and `python_seconds`, and tick-store's
+`input_resident`, but no engine-only seconds, residency of the others' input or device reads.
+
 ## Warm and cold proof
 
 Neither kind of number can reach a results file without its proof: `compare/coldcache.py` raises
@@ -477,7 +510,9 @@ TICK_STORE_MEASURE=<wrapper> <venv>/bin/python -I compare/run.py --day 12302019 
   kept about 5.1 GB of the export the oracle and the ground truth had just read and dropped the
   file's own pages ("The full day's source precondition" in `docs/NOTES.md`). The other systems'
   writes read the export inside their clocks and have no such precondition, so nothing is evicted
-  before them. ArcticDB's per-security layout spreads the day by locate into bucket files of
+  before them. Every write records both its total and its engine-only seconds, its input's
+  residency when its clock started and the device's reads while it ran: see "A write's two
+  times". ArcticDB's per-security layout spreads the day by locate into bucket files of
   about one chunk each, then writes each bucket's securities whole in one `write_batch`, so each
   security is still written once, in file order; that partitioning is inside its clock, as the
   slice's sort is.

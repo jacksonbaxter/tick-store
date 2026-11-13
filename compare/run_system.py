@@ -227,6 +227,7 @@ class Runner:
                                 "peak_rss_bytes": answer["peak_rss_bytes"],
                                 "service": service})
         settings = settings + answer["settings"]
+        times = self.system_class.write_times(self.full_day)
         sync_tree(root)
         stored = coldcache.allocated_bytes(system.data_paths())
         stored["store_root_allocated_bytes"] = coldcache.allocated_bytes(
@@ -259,7 +260,7 @@ class Runner:
             verdict = whole if whole["status"] != PROVEN else verdict
         facts_of_class = system.flush_findings(system.durability_facts(), answer["flush"])
         return {"durability": {"class": durability, **facts_of_class, **verdict, "flush": flush},
-                "settings": settings, "write": summarise_writes(repetitions, self.pin),
+                "settings": settings, "write": summarise_writes(repetitions, self.pin, times),
                 "facts": facts, "stored": stored, "read_back": read_back,
                 "swap": {"write": write_phase.counts, "read_back": read_phase.counts}}, probe
 
@@ -527,9 +528,11 @@ def latency(seconds):
             "seconds_by_repetition": list(seconds)}
 
 
-def summarise_writes(repetitions, pin):
+def summarise_writes(repetitions, pin, times):
     """The medians, and every repetition's own times beside them, so that each median can be
-    recomputed."""
+    recomputed. Each repetition also keeps its engine-only seconds, how much of its input was
+    resident when its clock started and the device bytes read while it ran (review F-2), and
+    `times` says what the total and the engine-only seconds hold on this system."""
     seconds = [item["timings"]["seconds"] for item in repetitions]
     median = statistics.median(seconds)
     field = {key: statistics.median(item["timings"][key] for item in repetitions)
@@ -537,8 +540,21 @@ def summarise_writes(repetitions, pin):
     by_repetition = [{key: item["timings"][key]
                       for key in ("seconds", "engine_seconds", "python_seconds")}
                      for item in repetitions]
+    for entry, item in zip(by_repetition, repetitions, strict=True):
+        timings = item["timings"]
+        if "engine_only_seconds" in timings:
+            entry.update({"engine_only_seconds": timings["engine_only_seconds"],
+                          "input_pages": timings["input_at_clock_start"]["pages"],
+                          "input_resident_pages_at_start":
+                              timings["input_at_clock_start"]["resident_pages"],
+                          "device_bytes_read": timings["device_read"]["bytes"],
+                          "device_counter": timings["device_read"]["counter"]})
+    engine_only = [entry["engine_only_seconds"] for entry in by_repetition
+                   if "engine_only_seconds" in entry]
+    if len(engine_only) == len(by_repetition):
+        field["engine_only_seconds_median"] = statistics.median(engine_only)
     return {"repetitions": len(seconds), "seconds": seconds, "seconds_median": median,
-            "by_repetition": by_repetition,
+            "by_repetition": by_repetition, "times": times,
             "records_per_second_median": pin["message_count"] / median,
             "bytes_per_second_median": pin["size"] / median, **field,
             "python_note": repetitions[0]["timings"]["python_note"],

@@ -44,16 +44,31 @@ def flush_report(system, layout):
 
 
 def step_ingest(system, request, layout):
+    """One write. Its input is made ready first, then its residency is read and the device's
+    counter started, all before the write's clock, and the counter is read once it returns."""
     columns = ColumnSet(request["columns"])
     settings = system.settings_in_force()
-    if request.get("full_day"):
+    inputs = system.input_paths(columns)
+    made_ready = system.ready_input(columns)
+    table = None if request.get("full_day") else arrow_table(columns, system.context.day)
+    at_start = coldcache.residency(layout, inputs)
+    device = coldcache.DeviceCounter(inputs[0])
+    if table is None:
         # A whole day streams: no day-sized table is ever built.
         timings = system.ingest_day(columns)
         rows = columns.records
     else:
-        table = arrow_table(columns, system.context.day)
         timings = system.ingest(columns, table)
         rows = table.num_rows
+    moved = device.delta()
+    timings["engine_only_seconds"] = timings["seconds"] - timings["python_seconds"]
+    timings["input_at_clock_start"] = {
+        "files": [path.name for path in inputs], "pages": at_start["pages"],
+        "resident_pages": at_start["resident_pages"], "page_size": at_start.get("page_size"),
+        "read": "mincore on a fresh mapping, after the input was made ready and just before the "
+                "write's clock", "made_ready": made_ready}
+    timings["device_read"] = {"bytes": moved["bytes"], "counter": moved["counter"],
+                              "slack": moved.get("slack", 0)}
     settings = settings + system.settings_after_ingest()
     answer = {"timings": timings, "settings": settings, "rows": rows}
     if request.get("flush_report"):

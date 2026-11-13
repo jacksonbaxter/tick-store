@@ -381,6 +381,7 @@ class SourcePrecondition(unittest.TestCase):
                 mock.patch.object(coldcache, "cache_holders", holders), \
                 mock.patch.object(coldcache, "meminfo_bytes", MEMORY.get):
             try:
+                owner.ready_input(columns)
                 return owner.ingest(columns, None), calls
             except ToolFailure as failure:
                 return failure, calls
@@ -423,6 +424,15 @@ class SourcePrecondition(unittest.TestCase):
         self.assertEqual([call[0] for call in calls], ["warm", "holders"])
         self.assertIn("10 of 2014504 pages of /nonexistent/slice.itch resident after 1 read "
                       "through. Memory:", str(failure))
+
+    def test_the_source_is_the_writes_input(self):
+        self.assertEqual(system().input_paths(None), [Path("/nonexistent/slice.itch")])
+
+    def test_a_write_whose_source_was_not_made_ready_is_refused(self):
+        owner = system(CLASS_A)
+        owner._run_ingest = lambda command: self.fail("the write ran")
+        with self.assertRaisesRegex(ToolFailure, "not made resident before the write"):
+            owner.ingest(SimpleNamespace(directory=EXPORT, records=9), None)
 
     def test_memory_a_host_cannot_read_is_said(self):
         message = tickstore.not_resident_message(

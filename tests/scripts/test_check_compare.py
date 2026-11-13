@@ -1319,8 +1319,14 @@ def protocol_2(document):
                 write["repetitions"] = 3
                 write["seconds"] = [2.1, 2.0, 1.9]
                 write["by_repetition"] = [
-                    {"seconds": total, "engine_seconds": engine, "python_seconds": 0.1}
+                    {"seconds": total, "engine_seconds": engine, "python_seconds": 0.1,
+                     "engine_only_seconds": round(total - 0.1, 9), "input_pages": 100,
+                     "input_resident_pages_at_start": 100, "device_bytes_read": 0,
+                     "device_counter": "block device stat, sectors read, machine-wide"}
                     for total, engine in zip(write["seconds"], (2.0, 1.9, 1.8), strict=True)]
+                write["engine_only_seconds_median"] = 1.9
+                write["times"] = {"seconds": "the whole write", "engine_only_seconds": "less "
+                                  "reading and preparing the input"}
     return document
 
 
@@ -1441,6 +1447,52 @@ class Protocol2(Harness):
             document["header"]["second_sibling_busy_percent"] = second_sibling_block()
         self.assert_fault_2(fault, "header.second_sibling_busy_percent: macOS has no pinned "
                                    "core to measure")
+
+    # F-2, recording only: both times, the input's residency at the start, the device's reads.
+
+    def test_a_write_with_no_engine_only_time(self):
+        def fault(document):
+            del b_of(document, "questdb")["write"]["by_repetition"][2]["engine_only_seconds"]
+        self.assert_fault_2(fault, "questdb.v.B.write: repetition 3 has no engine-only seconds "
+                                   "within its total")
+
+    def test_an_engine_only_time_longer_than_the_total(self):
+        def fault(document):
+            b_of(document, "parquet")["write"]["by_repetition"][0]["engine_only_seconds"] = 2.2
+        self.assert_fault_2(fault, "parquet.v.B.write: repetition 1 has no engine-only seconds "
+                                   "within its total")
+
+    def test_an_engine_only_median_that_does_not_follow(self):
+        def fault(document):
+            b_of(document, "arcticdb")["write"]["engine_only_seconds_median"] = 1.8
+        self.assert_fault_2(fault, "arcticdb.v.B.write: engine_only_seconds_median 1.8 is not "
+                                   "the median of its repetitions, 1.9")
+
+    def test_a_write_not_saying_how_much_input_was_resident(self):
+        def fault(document):
+            del b_of(document, "questdb")["write"]["by_repetition"][0][
+                "input_resident_pages_at_start"]
+        self.assert_fault_2(fault, "questdb.v.B.write: repetition 1 does not say how much of "
+                                   "its input was resident when its clock started")
+
+    def test_a_write_with_no_device_reads(self):
+        def fault(document):
+            del b_of(document, "arcticdb")["write"]["by_repetition"][1]["device_bytes_read"]
+        self.assert_fault_2(fault, "arcticdb.v.B.write: repetition 2 records no device bytes "
+                                   "read while it ran")
+
+    def test_a_write_not_saying_what_its_times_hold(self):
+        def fault(document):
+            del b_of(document, "parquet")["write"]["times"]["engine_only_seconds"]
+        self.assert_fault_2(fault, "parquet.v.B.write: does not say what its total and "
+                                   "engine-only seconds hold")
+
+    def test_a_tickstore_write_from_a_source_not_resident(self):
+        def fault(document):
+            b_of(document, "tickstore")["write"]["by_repetition"][1][
+                "input_resident_pages_at_start"] = 60
+        self.assert_fault_2(fault, "tickstore.v.B.write: repetition 2 started its clock with 60 "
+                                   "of its source's 100 pages resident")
 
     def test_protocol_1_files_keep_the_rules_they_were_measured_by(self):
         result = self.run_on(valid_document("Linux"), "Linux")

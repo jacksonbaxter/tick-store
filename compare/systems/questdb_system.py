@@ -666,6 +666,16 @@ class QuestDBSystem(System):
         timings = self._send(TABLE, table)
         return self._require_applied(timings, table.num_rows)
 
+    @classmethod
+    def write_times(cls, full_day):
+        reading = "reading each chunk of the day's export, " if full_day else ""
+        return {"seconds": f"{reading}dictionary-encoding the SYMBOL columns, sending the rows "
+                           "through the client, and waiting until the WAL is applied and every "
+                           "row is visible",
+                "engine_only_seconds": "the total less python_seconds, the reading and the "
+                                       "dictionary encoding: the client's send, the server's "
+                                       "WAL apply and the wait until every row is visible"}
+
     def stream_chunk_rows(self):
         return STREAM_CHUNK_ROWS
 

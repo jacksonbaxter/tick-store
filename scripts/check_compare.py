@@ -38,7 +38,10 @@ A protocol 2 file is held to more: each latency block names its tail figure for 
 nearest-rank 99th percentile with n and the rank used, which below 100 runs is the slowest run
 and must say so; and every latency block and every write keeps each repetition's seconds, from
 which its median, its tail figure and its write medians are recomputed here. On Linux the
-sibling of the second pinned CPU, cpu6, is measured and held to the first one's rule.
+sibling of the second pinned CPU, cpu6, is measured and held to the first one's rule. Every
+write records its total and its engine-only seconds, says what each holds, and records how much
+of its input was resident when its clock started and the device bytes read while it ran;
+tick-store's source must have been wholly resident.
 
 Standard library only. tests/scripts/test_check_compare.py shows each rule failing on an
 injected fault.
@@ -222,6 +225,44 @@ def check_write(where, write, pin):
     for field in ("python_seconds", "engine_seconds", "python_note", "peak_rss_bytes_client"):
         if field not in write:
             problems.append(f"{where}.write: no {field}")
+    return problems
+
+
+def check_write_record(where, write, name):
+    """Protocol 2: each write repetition's engine-only seconds, its input's residency when the
+    clock started and the device's reads while it ran; what the two times hold; and tick-store's
+    source wholly resident, its precondition."""
+    write = write if isinstance(write, dict) else {}
+    each = write.get("by_repetition") if isinstance(write.get("by_repetition"), list) else []
+    problems = []
+    for number, item in enumerate(each, 1):
+        item = item if isinstance(item, dict) else {}
+        total, engine_only = item.get("seconds"), item.get("engine_only_seconds")
+        if not check_results.is_number(engine_only) or not check_results.is_number(total) or \
+                not 0 <= engine_only <= total * (1 + 1e-9):
+            problems.append(f"{where}.write: repetition {number} has no engine-only seconds "
+                            "within its total")
+        pages, resident = item.get("input_pages"), item.get("input_resident_pages_at_start")
+        if not is_count(pages) or pages == 0 or not is_count(resident) or resident > pages:
+            problems.append(f"{where}.write: repetition {number} does not say how much of its "
+                            "input was resident when its clock started")
+        elif name == "tickstore" and resident != pages:
+            problems.append(f"{where}.write: repetition {number} started its clock with "
+                            f"{resident} of its source's {pages} pages resident")
+        if not is_count(item.get("device_bytes_read")) or not item.get("device_counter"):
+            problems.append(f"{where}.write: repetition {number} records no device bytes read "
+                            "while it ran")
+    engine_only = [item.get("engine_only_seconds") for item in each if isinstance(item, dict)]
+    if each and all(check_results.is_number(value) for value in engine_only):
+        value = statistics.median(engine_only)
+        if not same(write.get("engine_only_seconds_median"), value):
+            problems.append(f"{where}.write: engine_only_seconds_median "
+                            f"{figure(write.get('engine_only_seconds_median'))} is not the "
+                            f"median of its repetitions, {figure(value)}")
+    times = write.get("times") if isinstance(write.get("times"), dict) else {}
+    if not times.get("seconds") or not times.get("engine_only_seconds"):
+        problems.append(f"{where}.write: does not say what its total and engine-only seconds "
+                        "hold")
     return problems
 
 
@@ -601,6 +642,7 @@ def check_system(name, system, document, pin):
             problems += check_write(here, entry.get("write"), pin)
             if protocol >= PROTOCOL_2:
                 problems += check_write_repetitions(here, entry.get("write"))
+                problems += check_write_record(here, entry.get("write"), name)
             if name == "tickstore":
                 problems += check_tickstore_read_back(here, entry.get("read_back"))
                 problems += check_tickstore_write(here, entry.get("write"))

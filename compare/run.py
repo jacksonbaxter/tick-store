@@ -88,7 +88,10 @@ FULL_DAY_INPUT_CACHE = (
     "The others' writes read the day's export, 24 GB of column files, chunk by chunk inside "
     "the clock, and this host's page cache cannot hold it, so part of each read comes from the "
     "device. tick-store's write reads the day's ITCH file, 8.25 GB, which is read through "
-    "first and must be resident, as on the slice.")
+    "first and must be resident, as on the slice. So every write records its total seconds and "
+    "its engine-only seconds, the total less reading and preparing its input, how much of its "
+    "input was resident when its clock started and the device bytes read while it ran, and a "
+    "write target is met against a system only if tick-store is no slower on both times.")
 FULL_DAY_WARM = ("Query by query, since QuestDB's store is larger than this host's memory: one "
                  "untimed run first, answer checked, then the processes that answer it, the "
                  "worker, tick-store's query tool or QuestDB's server, must cause 0 bytes of "

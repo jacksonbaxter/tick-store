@@ -9,6 +9,8 @@ memory is that step's alone.
     start_service()      server up. Fails if its ports are not free
     open()               the client, in the worker
     settings_in_force()  everything requested against what the engine says. Raises
+    input_paths(columns) the files a write reads
+    ready_input(columns) before the write's clock: what its input needs, and the record of it
     ingest(columns, table)  everything, durable under the class. Returns timings
     settings_after_ingest()  what only the stored form can show. Raises
     probe_flush(table)   a small commit. dirty_paths() are read straight after it returns
@@ -134,6 +136,21 @@ class System(ABC):
     @abstractmethod
     def ingest(self, columns, table):
         """Stores every row, durably for the class, and returns when it is readable."""
+
+    def input_paths(self, columns):
+        """The files a write reads: the export's column files, unless the system's natural
+        input is another. Their residency is read just before the write's clock starts."""
+        return [Path(columns.directory)]
+
+    def ready_input(self, columns):
+        """Before the write's clock: whatever its input needs. Returns the record of it."""
+        return {"what": "nothing: the input is taken as the cache holds it"}
+
+    @classmethod
+    def write_times(cls, full_day):
+        """{"seconds", "engine_only_seconds"}: what a write's total and engine-only seconds hold
+        on this system. engine_only_seconds is the total less python_seconds."""
+        raise NotImplementedError
 
     def stream_chunk_rows(self):
         """Rows per chunk for ingest_stream: a multiple of the stored unit, so a chunk's end

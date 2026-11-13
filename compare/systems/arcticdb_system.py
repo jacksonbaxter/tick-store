@@ -209,6 +209,24 @@ class ArcticDBSystem(System):
                 "python_note": "lib.write takes pandas and not Arrow, so the frame is built "
                                "first, with a Python str per text value"}
 
+    @classmethod
+    def write_times(cls, full_day):
+        if full_day:
+            seconds = ("reading each chunk of the day's export and building the pandas frame "
+                       "ArcticDB takes, then lib.write and lib.append, each storage key an LMDB "
+                       "commit; one symbol per security spreads the day by locate into bucket "
+                       "files first, then gives each bucket to write_batch")
+        else:
+            seconds = ("building the pandas frame lib.write takes from the Arrow table (one "
+                       "symbol per security: the stable sort by locate and a frame per locate), "
+                       "then lib.write (write_batch and list_symbols), each storage key an LMDB "
+                       "commit")
+        return {"seconds": seconds,
+                "engine_only_seconds": "the total less python_seconds, the reading, the frames "
+                                       "and the partitioning by locate: ArcticDB's write, "
+                                       "append, write_batch and list_symbols calls, and LMDB's "
+                                       "commits"}
+
     def stream_chunk_rows(self):
         """Whole segments, about STREAM_CHUNK_ROWS rows, and one segment where a segment is
         larger: `rows10M-cols127` once took the whole day as one chunk, and its frame passed
