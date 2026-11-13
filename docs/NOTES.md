@@ -3360,6 +3360,36 @@ and `compare/coldcache.py` need no change: they decode with `text=True`, which n
 and neither reads `message_type` or a census `type`; `coldcache.py` prints the resident files'
 list by its repr, which escapes a surrogate.
 
+D-1. The reviewer's demonstration needs `sudo`, which the host rules forbid, so it was shown read
+only on debian (kernel 6.12.116, uid 1000), with `tick_coldcache` built at `1acd288`, whose
+`page_cache_linux.cpp` is `ca96b36`'s. For each file, a probe asked `tick_coldcache residency`,
+then asked `cachestat(2)` directly, then read the file once and took the device bytes from
+`/proc/self/io` `read_bytes`. Control, a 64 MiB file of the user's own, evicted by the tool: 0 of
+16,384 pages resident, `cachestat` 0, and the read cost 67,108,864 device bytes. Three large files
+owned by root, mode 0644 or 0755, which the user cannot write, chosen as unlikely to be cached
+(an old copy of a system tool's binary, a Rust `libcore` rlib and apt's source list): `tick_coldcache` said
+20,914 of 20,914, 14,405 of 14,405 and 14,012 of 14,012 pages resident, and the reads cost
+85,667,840, 59,002,880 and 57,397,248 device bytes, each the whole file. `cachestat` refused all
+three with `EPERM`, so this kernel hides them from it too; the tool took that as "no
+cachestat", a null `dirty_pages`. The rule is `can_do_mincore()` in `mm/mincore.c` ("make
+mincore() more conservative", Linux 5.2): unless the caller owns the inode, has CAP_FOWNER, or
+`file_permission(MAY_WRITE)` passes, `do_mincore` fills the vector with 1. A file on a read-only
+mount that the user does not own falls under it too, since the write check fails there with
+`EROFS`.
+
+The fix checks the same thing before `mincore` and before an eviction: root, or the file's owner,
+or `faccessat(W_OK, AT_EACCESS)`; otherwise an error naming the file and the rule. A non-root
+caller holding CAP_FOWNER would be refused where the kernel would answer, which fails closed. The
+test asks only for residency: before the fix, `evict_file` on a system file would have evicted its
+pages, which nothing here may do, so the eviction refusal shares the check but has no test of its
+own. The test was seen failing on debian from a local probe branch holding the test alone, which
+was deleted unpushed, so no commit on `jb-build` fails. After: the test passes on debian and skips
+on macOS, and the rebuilt tool refuses `/etc/passwd` and the old binary with exit 2 while
+reading a file of the user's own as before. On debian no file under `build/compare` or `data` is
+owned by anyone else, so the comparison's warm and cold proofs see what they saw. In
+`compare/coldcache.py`, a refusal is exit 2, which `_tool` raises as `ProofFailed` with the
+tool's message; the Python tests use stand-ins for the tool and pass unchanged.
+
 Raw: `phase4-raw/fix-harness/`: each finding's failing and passing logs.
 
 ## Process notes
