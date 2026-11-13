@@ -4185,6 +4185,13 @@ second sibling for tick-store alone, as a real alone run does; with all four sys
 there, as `protocol_2` writes them, a mutation that asks the second sibling of all four systems
 went unseen, which is why the fixture says so and the mutation is now a fault.
 
+**RV-5, the hooks of a macOS write's count.** Confirmed by reverting each: with the server's
+processes left out of the write's request, or `tick_roundtrip` run by `subprocess.run`, every
+test `check.sh` runs passed, and so would the validator, which reads the counter's name and not
+what it counted. A test now runs `run_class` on a fake system and requires the request to name
+the service's processes, and another requires tick-store's write to go through
+`run_counting_reads`. Each revert is a fault.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
