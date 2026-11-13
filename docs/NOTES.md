@@ -3843,6 +3843,15 @@ protocol 1 day the old (`RULE_PROTOCOL_1`). Failing first: `TailFigure` in
 `tests/compare/test_system_worker.py` (no `tail_rank`), and `Protocol2` in
 `tests/scripts/test_check_compare.py`, whose six faults passed with exit 0 (`f4-fail-before.log`).
 
+**F-14, raw repetitions.** Confirmed: the committed files keep a latency block's summary only,
+and a write's total seconds per repetition with its engine and Python seconds as medians (the
+`67ae574` slice's QuestDB `plain` class B write: seconds 27.03, 22.97 and 23.75, engine 23.51
+alone). Every latency block now keeps `seconds_by_repetition`, in the order run, and every write
+`by_repetition`. For a protocol 2 file `check_compare.py` recomputes each block's median, tail
+figure, fastest, slowest and mean, and each write's three medians, to 1 part in 10^9. Six faults
+in `Protocol2` passed with exit 0 before (`f14-fail-before.log`). The raw seconds add 30 floats
+a warm block, 7 a cold one and 100 a floor.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
