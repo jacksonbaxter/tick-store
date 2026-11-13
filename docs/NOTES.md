@@ -365,6 +365,7 @@ and QuestDB would silently run nosync". All 22 classes read `proven` on both hos
   against 33.65 bytes a record at source. Converting the partition to Parquet gives a file of 128,174,106 bytes on both hosts, 0.621787 of
   the source, and 128,555,797 bytes with the index. The converted ratios above are computed here from the file's `allocated_bytes_after`,
   which covers the whole table directory. The read-back was not repeated on the converted form, so no converted size is oracle-proven.
+  At the final review it was, on the macOS slice, and passed: see "macOS st_blocks and QuestDB's converted partition".
 - **macOS's Parquet ratios are not the files' sizes.** `apparent_bytes` is the same on both hosts: 70,478,425 for `zstd1-rg1Mi`, 0.341899
   of the source. macOS's `st_blocks` total is 17.43% to 23.90% above that on all six variants, and on four of them it differs between
   classes for the same bytes. At `53a3317` the sixth, `zstd1-rg1Mi-delta-price`, matched its apparent size, and it is now 20.35% above
@@ -372,6 +373,7 @@ and QuestDB would silently run nosync". All 22 classes read `proven` on both hos
   (84,045,824 against 84,086,784 in class A), while the apparent sizes give 67,854,290 against 70,478,425. Read Parquet's sweep from
   Linux. ArcticDB shows the same in class B, where its class A matches: `rows100k-cols1` at 520,101,888 allocated over 510,394,624
   apparent, and `rows10M-cols127` at 154,771,456 over 138,100,992, 12.07% above. The cause is not established.
+  The final review found it: APFS allocation past the end of a slowly grown file ("macOS st_blocks and QuestDB's converted partition").
 
 **Cold proof.** All 385 cold proofs on each host passed. Every eviction took one pass but one, a macOS QuestDB `locate-index` Q2 proof
 that took 4. On Linux it is tight, with no shortfall: device reads equal the resident bytes exactly in 273 proofs, and exceed them by
@@ -4248,6 +4250,72 @@ generator's docstring had already been corrected with RV-1.
 per-host method had tests and no fault. `run-alone-linux-proven-as-macos` writes macOS's warm
 method and drops the guard for a Linux alone day, and `run-alone-narrowed` lets the alone day be
 narrowed; `TickstoreAloneDay` fails on each.
+
+### macOS st_blocks and QuestDB's converted partition
+
+The two open Phase 2 items, each looked into on the slice on the Mac with the harness's own
+steps, iteration only, the stores under `build/`. Probes and their output are in
+`phase4-raw/fix-compare-rest/phase2/`.
+
+**macOS `st_blocks`: settled.** The cause is APFS allocating blocks past the end of a file that
+grows in many writes spread over time, not the bytes the file holds.
+
+- *The harness's numbers reproduce.* `Runner.run_class` wrote Parquet `zstd1-rg1Mi` and
+  `zstd9-rg1Mi` in both classes, read each back and passed the oracle. It then sized each store
+  with `coldcache.allocated_bytes` after `sync_tree`, at 0, 15, 60 and 180 s. `zstd1-rg1Mi` held
+  70,478,425 bytes and was allocated 84,471,808 in class A and 83,968,000 in class B, 19.9% and
+  19.1% over. `zstd9-rg1Mi` held 67,854,290 and was allocated 84,553,728 and 83,976,192, 24.6%
+  and 23.8% over. No figure moved over the 180 s.
+- *The same bytes written fast allocate nothing extra.* Each file's bytes were written again
+  beside it, then flushed: in one write, in 64 KiB or 1 MiB appends, in 1,000, 4,000, 4,097 or
+  10,007-byte appends. Each was allocated exactly its size rounded up to the 4 KiB block. Writing
+  in 100-byte appends left 14,041,088 bytes over.
+- *What the excess follows is the time the writes take.* The harness's writer
+  (`ParquetSystem._writer`, on the slice's Arrow table) wrote into a Python sink that recorded
+  each write: 9,414 writes, 6,706 under 4 KiB, the same bytes as a write to a path. Replaying
+  those writes back to back left 0 over. Replaying them with a 100 µs pause after each, 1.5 s in
+  all, left 14,209,024 over, the writer's own figure. Flushing the file at half, every 8 MiB,
+  every 1 MiB or every 1,000,003 bytes left 0 over, so a flush part-way does not cause it. A
+  truncate to the file's own size did not release it.
+- *ArcticDB.* `rows10M-cols127` this time was 12.07% over in both classes, 154,771,456 allocated
+  for 138,100,992. The excess was all in LMDB's `data.mdb`, the file that grows by many writes.
+  At `67ae574` the same variant's class A matched its size, so whether it shows depends on the
+  run. Its write pattern was not replayed, so for ArcticDB the cause is likely, not shown.
+
+What the tables may claim: a macOS stored figure is what APFS allocated at rest, which the
+generator says. It is not the size of the format, and it is not comparable across hosts or
+variants: in the Phase 2 table above it made zstd level 9 look no smaller than level 1.
+Apparent bytes are the same on both hosts, and Linux's allocated bytes are within a block of
+them. The generator now adds one sentence below each macOS ingest table (test
+`test_macos_stored_bytes_say_they_can_exceed_the_files_own`, fault
+`render-macos-allocation-unqualified`), and `RESULTS.md` was regenerated from the same files.
+`compare/README.md` makes no size claim.
+
+**QuestDB's converted partition: read back and proven, on the macOS slice.** The probe ran the
+run's own order. `Runner.run_class` wrote the class B store of `plain` and of `locate-index`; the
+read-back of the native form passed. `Runner.after_queries` then converted the partition, applied
+in 2.02 s, and `table_partitions` reported it as Parquet. `Runner.read_back` read the converted
+table whole through QuestDB, and `tick_roundtrip verify-columns` passed it against the slice's
+pin: 6,125,294 records, 0 mismatched, in 1.00 s for `plain` and 1.33 s for `locate-index`.
+
+| | `plain` | `locate-index` |
+|---|---|---|
+| Native table's allocated bytes | 537,772,032 | 597,344,256 |
+| `data.parquet` | 128,174,106 | 128,555,797 |
+| Converted table's allocated bytes | 129,220,608 | 189,173,760 |
+
+The Parquet file sizes are the ones in the stored-size table above, to the byte. The whole table
+directory there came to 139,776,000 and 200,302,592. The difference from this run lies outside
+`data.parquet`. In the converted partition, the native column files are gone. `locate-index` keeps its symbol index,
+`locate.v` at 58,605,568 bytes, beside the Parquet file, and that index is where its extra 60 MB
+comes from.
+
+What the tables may claim: no generated table or README shows a converted size, so nothing
+changes. A converted size may be quoted as proven on macOS, on the slice, at this QuestDB
+(10.1.0). Linux's converted file is the same size to the byte, but its read-back was not
+repeated there. A day file's `after_queries` still says it was not repeated, which is true of
+the run that wrote it. The harness does not repeat it: on the day, QuestDB's read-back takes
+about 38 minutes a variant.
 
 ## Process notes
 
