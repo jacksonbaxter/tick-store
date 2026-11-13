@@ -4139,6 +4139,10 @@ and a comparison file alike; before, a string held no lock proof and passed both
 codec, as the store estimate has it; the committed codec-eval files hold exact codecs only, so no
 figure moved.
 
+**E-7, a shown condition.** A part is judged on its conditions that have a target; one with
+none is shown with its label and decides nothing. A miss on any targeted condition decides the
+part, so a write slower in total is missed whether or not its engine-only seconds were kept.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from

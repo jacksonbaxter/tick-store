@@ -883,6 +883,12 @@ FAULTS = (
     Fault("render-best-codec-lossy", "py-scripts", "render_results.py takes the fewest bits of "
           "any codec on a column, a lossy one included, as its best", CHECK_FAILED,
           "FAIL: test_the_best_codec_is_the_best_exact_one (__main__.RenderTargetsTest"),
+    # Review E-7: a condition only shown never hides a miss.
+    Fault("render-shown-condition-hides-miss", "py-scripts", "render_results.py judges a part "
+          "on every condition, one with no target included, so a shown figure turns a miss "
+          "beside it into not judged", CHECK_FAILED,
+          "FAIL: test_a_shown_condition_beside_a_judged_one_hides_no_verdict "
+          "(__main__.RenderTargetsTest"),
     Fault("results-md-hand-edit", "render-check", "a hand edit inside RESULTS.md's benchmark "
           "block, a host's heading changed", CHECK_FAILED,
           "the table in RESULTS.md is stale or was edited by hand", hand_edit_results_md),
