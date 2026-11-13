@@ -1,0 +1,13 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+index d1b697a..c93ff78 100644
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -392,7 +392,7 @@ def engine_only(write):
+     if "engine_only_seconds_median" in write:
+         return write["engine_only_seconds_median"]
+     repetitions = write.get("repetitions")
+-    if repetitions == 1 and "seconds_median" in write and "python_seconds" in write:
++    if "seconds_median" in write and "python_seconds" in write:
+         return write["seconds_median"] - write["python_seconds"]
+     raise NoFigure("engine-only seconds", f"a write of {repetitions} repetitions that keeps no "
+                    "engine_only_seconds_median")

@@ -513,6 +513,21 @@ class RenderWriteTest(Scratch):
         self.assertIn("engine-only 9.9 s against 9.5 s | missed |",
                       self.row((10.0, 0.1), theirs))
 
+    def test_the_repos_own_write_targets_are_judged_on_both_clocks(self):
+        rows = json.loads((REPO_ROOT / "scripts" / "targets.json").read_text(encoding="utf-8"))
+        writes = [row for row in rows["rows"]
+                  if row["id"] in ("WT-3", "WT-4") and "parts" in row]
+        self.assertEqual(len(writes), 2)
+        for row in writes:
+            for part in row["parts"]:
+                with self.subTest(row=row["id"], part=part["label"]):
+                    conditions = {item["label"]: item for item in part["all"]}
+                    self.assertEqual(sorted(conditions), ["engine-only", "total"])
+                    self.assertEqual(conditions["total"]["value"]["path"][-1], "seconds_median")
+                    self.assertIn("at_most", conditions["total"])
+                    self.assertIn("engine_only", conditions["engine-only"]["value"])
+                    self.assertIn("engine_only", conditions["engine-only"]["at_most"])
+
     def test_a_write_with_no_engine_only_figure_is_not_judged_on_it(self):
         # Three repetitions and only medians kept: the median of the differences is not the
         # difference of the medians, so nothing is guessed.

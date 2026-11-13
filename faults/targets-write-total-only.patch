@@ -1,0 +1,15 @@
+diff --git a/scripts/targets.json b/scripts/targets.json
+index a700bd1..bff52fc 100644
+--- a/scripts/targets.json
++++ b/scripts/targets.json
+@@ -255,8 +255,8 @@
+      "all": [
+       {"label": "total", "value": {"path": ["systems", "tickstore", "variants", "@headline", "classes", "B", "write", "seconds_median"]},
+        "at_most": {"path": ["systems", "parquet", "variants", "@headline", "classes", "B", "write", "seconds_median"]}},
+-      {"label": "engine-only", "value": {"engine_only": ["systems", "tickstore", "variants", "@headline", "classes", "B", "write"]},
+-       "at_most": {"engine_only": ["systems", "parquet", "variants", "@headline", "classes", "B", "write"]}}]},
++      {"label": "engine-only", "value": {"path": ["systems", "tickstore", "variants", "@headline", "classes", "B", "write", "seconds_median"]},
++       "at_most": {"path": ["systems", "parquet", "variants", "@headline", "classes", "B", "write", "seconds_median"]}}]},
+     {"label": "against ArcticDB", "file": "results/compare/Linux-12302019-full-*.json",
+      "all": [
+       {"label": "total", "value": {"path": ["systems", "tickstore", "variants", "@headline", "classes", "B", "write", "seconds_median"]},

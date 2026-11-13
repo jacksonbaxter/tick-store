@@ -840,6 +840,16 @@ FAULTS = (
           "with no word that its p99 was measured as the slowest of 30 and of 7", CHECK_FAILED,
           "FAIL: test_each_pair_names_its_tail_figure_and_the_verdict_says_what_p99_was "
           "(__main__.RenderLowestTest"),
+    # Review RF-3: write targets judged on both clocks.
+    Fault("render-write-engine-only-guessed", "py-scripts", "render_results.py takes a write's "
+          "median seconds less its median Python seconds as its engine-only seconds over several "
+          "repetitions, a guess where the file keeps no engine-only figure", CHECK_FAILED,
+          "FAIL: test_a_write_with_no_engine_only_figure_is_not_judged_on_it "
+          "(__main__.RenderWriteTest"),
+    Fault("targets-write-total-only", "py-scripts", "targets.json judges WT-4 against Parquet "
+          "on the total seconds twice, the engine-only condition dropped", CHECK_FAILED,
+          "FAIL: test_the_repos_own_write_targets_are_judged_on_both_clocks "
+          "(__main__.RenderWriteTest"),
     Fault("results-md-hand-edit", "render-check", "a hand edit inside RESULTS.md's benchmark "
           "block, a host's heading changed", CHECK_FAILED,
           "the table in RESULTS.md is stale or was edited by hand", hand_edit_results_md),
