@@ -3326,6 +3326,11 @@ same sources, rather than adding a `stop` field a reader would have to look for:
 cannot pass as a whole one either way, and refusing needs no change to the JSON. Before: a body
 cut after 1 of 48 bytes, a zero-length frame mid-file and a lone prefix byte were all accepted.
 
+D-3. The reviewer's `/dev/full` exists only on Linux, so the test holds `RLIMIT_FSIZE` at 16
+bytes with SIGXFSZ ignored (`tests/unit/file_size_limit.hpp`), which fails the write with `EFBIG`
+on both hosts. Before: exit 0 and a 16-byte file. The fix is the `close()` before the check that
+the other tools already make.
+
 Raw: `phase4-raw/fix-harness/`: each finding's failing and passing logs.
 
 ## Process notes
