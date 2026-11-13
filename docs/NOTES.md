@@ -4220,6 +4220,14 @@ file whose bytes match one of them may state no protocol. The same document writ
 another indent is refused. The committed files pass unchanged. The tests' protocol 1 fixtures
 are pinned in their own pins file as they are written, since they stand for those files.
 
+**RV-7, a macOS write's counter and its processes.** Confirmed by tests: a counter text that
+merely named `ri_diskio_bytesread` passed, and the per-process reads were neither kept per
+repetition nor checked. The counter must now be `ProcessDiskReads.COUNTER`'s statement exactly,
+which the validator imports from `compare/coldcache.py` (standard library only, as
+`repetitions.py` is), each repetition keeps `device_read_by_process`, and on macOS those counts
+must name the worker and add up to the repetition's device reads. Linux writes are unchanged:
+their counter is the block device's, machine-wide, with no processes to break down.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
