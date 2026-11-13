@@ -770,10 +770,12 @@ RepeatScan scan_for_repeats(std::span<const std::uint64_t> entries) {
     const std::uint64_t budget = (kRepeatStepsPerEntry * entries.size()) + 16U;
     const std::size_t mask = slots - 1U;
     for (const std::uint64_t value : entries) {
-        // The product's bits from 32 up, which differ for values that differ anywhere in
-        // their low 32 + log2(slots) bits; values that agree there all share a slot. Taking
-        // the top bits instead spread regular steps no better (docs/NOTES.md, "The final
-        // review's codec findings").
+        // The product's bits from 32 up, which depend only on the value's low 32 +
+        // log2(slots) bits, so values that agree there share a slot, and others can too:
+        // multiples of the multiplier's inverse differ low down and all land in slot 0
+        // (Dictionary.RepeatScanWorkIsBoundedOnEntriesInOneHashSlot, review R-4). Taking the
+        // top bits instead spread regular steps no better (docs/NOTES.md, "The final review's
+        // codec findings").
         std::size_t at = static_cast<std::size_t>((value * 0x9E3779B97F4A7C15ULL) >> 32U) & mask;
         ++scan.steps;
         while (stamps[at] == stamp) {
