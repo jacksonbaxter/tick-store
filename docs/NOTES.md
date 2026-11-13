@@ -4317,6 +4317,95 @@ repeated there. A day file's `after_queries` still says it was not repeated, whi
 the run that wrote it. The harness does not repeat it: on the day, QuestDB's read-back takes
 about 38 minutes a variant.
 
+### Pre-registration of the freeze comparison
+
+Written at the final review, before any measured run of protocol 2. Every protocol 2 run so far is
+iteration-only. The spread below comes from `spread.py` in `phase4-raw/fix-compare-rest/prereg/`,
+over three sources: the repetitions inside the committed files; the protocol 2 Linux slice at
+`85a4912` (`phase4-raw/fix-compare-protocol/`), against the `67ae574` Linux slice; and the
+iteration day's tick-store part at `4c049c7` (`phase4-raw/fullday-precondition/`), against
+tick-store's `v3-seg4Mi` block in the `67ae574` Linux day. The first comparison is the only
+second run of the three other systems. Neither has a second run on macOS.
+
+**What is measured at the freeze.** Four documents, all at the freeze commit, each under its
+host's wrapper with `TICK_STORE_MEASURE` set, so `check_compare.py` passes each one before it is
+written:
+
+- the slice on Linux and on macOS, every system and every variant;
+- the Linux full day with all four systems, variants by the rule from that Linux slice;
+- tick-store alone on the macOS full day, every variant.
+
+The new files replace the three `67ae574` files. The macOS day replaces
+`macOS-12302019-full-tickstore-2503d1e7c5f6.json`. `protocol_1_comparison_files` then leaves
+`scripts/data_pins.json`, as the open item in docs/TASKS.md says. Each figure is compared with
+the same host, scope, system, variant, class and query in the file it replaces.
+
+**The families, and what changed.**
+
+| Family | Protocol 2 against protocol 1 | Investigate past |
+|---|---|---|
+| Stored bytes, allocated at rest | Unchanged: the same sum after the same flush of every file | Apparent bytes not equal to the byte for Parquet, QuestDB and tick-store, with the same writer code and library versions. ArcticDB more than 2% apart. On Linux, allocated more than 4 KiB a file from the old figure when apparent is equal. On macOS allocated is not compared; see the next section |
+| Write, total seconds | The clock is unchanged. The slice now refuses a write whose export is not wholly resident (F-10), which the method only claimed before | 15% for class A in every scope, and for class B on macOS and on the Linux day. 75% for class B on the Linux slice |
+| Write, engine-only seconds | Changed: defined for every system, per repetition, as the total less `python_seconds` (RF-2). Protocol 1 slice files kept medians alone | None: first measurement |
+| Warm medians | Changed on the slice and on the macOS day, which now run each query once untimed, its answer checked, before timing (F-3). Unchanged on the Linux day, which already did | 10%, on the Linux day |
+| Warm slowest of 30 | As warm medians. The figure is the old `p99_us`, now named for what it is (F-4) | 50%, on the Linux day |
+| Cold medians | Changed for tick-store, whose clock now holds the store's open (F-1). Unchanged for Parquet, ArcticDB and QuestDB, which now state whether their clock holds their open | Parquet, ArcticDB and QuestDB: 25% on the Linux day, 55% on the slice |
+| Cold slowest of 7 | As cold medians | The same three: 50% on the Linux day, 100% on the slice |
+
+A changed family has no threshold. Its first protocol 2 figure is reported as measured, and
+wherever it appears beside a protocol 1 figure, the change is named.
+
+**The spread the thresholds rest on.**
+
+- *Stored bytes.* Between the two Linux slices, apparent bytes were equal to the byte in 28 of 32
+  variant-class pairs. Those were every Parquet, QuestDB and tick-store pair. ArcticDB's LMDB
+  file is not byte-stable: the per-security variant moved 1.5% in class A and 0.6% in class B,
+  and `rows100k-cols1` moved 4 and 8 KiB. Allocated bytes on Linux were 4,096 lower in 18 pairs
+  whose apparent bytes were equal, one block of the file system. The day's tick-store store
+  was equal to the byte in both classes.
+- *Write seconds.* Linux slice, run to run, class A: median 1.1%, largest 6.5% (16 pairs). Class
+  B: median 12.6%, 90th percentile 61.6%, largest 74.0% (ArcticDB `rows10M-cols127`); class B's
+  flush to the device is the spread. Within one file, max over min of the three repetitions: up
+  to 8.4% (Linux) and 12.9% (macOS) in class A; up to 279.7% on Linux and 8.3% on macOS in class
+  B. Day, tick-store: 6.8% in class A, 2.8% in class B.
+- *Warm.* Day, tick-store: medians at most 0.41% apart, slowest of 30 at most 9.2% (5 queries).
+  The slice is the nearest evidence for the other three, though F-3 changed it. Their medians:
+  median 2.3%, 90th percentile 8.1%, 4 of 70 past 10%, largest 22.7% (QuestDB `plain` Q3). Their
+  slowest of 30: 90th percentile 50.5%.
+- *Cold, the three others.* Linux slice, run to run: medians, median 6.0%, 90th percentile
+  37.6%, largest 51.6% (ArcticDB `rows10M-cols127` Q5), 16 of 70 past 25%. Slowest of 7: 90th
+  percentile 46.6%, largest 217.7% (QuestDB `locate-index` Q5, 160 to 509 ms). Within one file,
+  slowest over median: 90th percentile 31.7% on the `67ae574` Linux slice and 5.4% on macOS. No
+  second day exists for these three. The day's thresholds are the starting points, untested
+  against a second day, and they may well be crossed.
+
+**What "investigated" means.** A figure past its threshold holds back its file. The cause is
+found and written down in this file before the file is accepted, with the evidence from that
+run: its load lines, sibling busy figures, swap per phase, residency and device reads, and the
+guard's report. A cause may be a code change between the two commits, a host condition the
+logs show, or the spread of the file's own repetitions. A file is never dropped, rerun or
+replaced because a figure is slower or faster. A rerun needs a cause that voids the run itself,
+written down first. The voided file is then listed with that cause.
+
+**Write targets** are judged on both clocks. WT-3 and WT-4 are met against a system only if
+tick-store is no slower on its total seconds and on its engine-only seconds
+(`scripts/targets.json`). WT-1 and WT-2 are rates from the total clock. For tick-store the two
+clocks differ by its tool's start and exit, 0.3 and 0.4 s of a day's write of about 190 s at
+`67ae574`. Both clocks are shown beside each other. **A run the validator refuses is not
+reported.** It stays `.pending`, and it is listed here with the validator's reason.
+
+**Fallback.** The Linux four-system day might not produce a file the validator accepts: the
+guard stops a system, the host is not available, or a refusal cannot be fixed without changing
+a rule. Linux then reports tick-store alone on the day (`--tickstore-alone`, as in
+compare/README.md). It is read beside the other three systems' figures from
+`Linux-12302019-full-67ae574f5666.json`. Wherever both appear, the protocol differences are
+stated:
+
+- tick-store's cold figures hold its store's open in protocol 2 and did not in protocol 1;
+- engine-only seconds are per repetition in protocol 2;
+- the tail figure is the slowest run in both, named so only in protocol 2;
+- the two files come from different commits.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
