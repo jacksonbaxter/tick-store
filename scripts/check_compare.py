@@ -327,11 +327,27 @@ def check_durability(where, durability, name, class_name, control, host):
         problems.append(f"{where}.durability: no reason")
     flush = block.get("flush") or {}
     if class_name != "B":
-        if name == "tickstore" and status == PROVEN:
+        if status != PROVEN:
+            return problems
+        if name == "tickstore":
             for scope in ("probe", "full_ingest"):
                 if (flush.get(scope) or {}).get("engine_flushes") != []:
                     problems.append(f"{where}.durability: class A claimed with the writer's "
                                     f"flushes in {scope}")
+        elif name == "parquet":
+            # Review F-6: the harness's flush is Parquet's only one, so class A is none made.
+            for scope in ("probe", "full_ingest"):
+                made = (flush.get(scope) or {}).get("harness_flushes")
+                if made != 0:
+                    problems.append(f"{where}.durability: class A claimed with {made} harness "
+                                    f"flushes in {scope}")
+        else:
+            # Review F-6: the others prove class A as compare/settings.py does, by dirty pages
+            # still there when the probe's commit returned, whatever their class B says.
+            dirty = (flush.get("probe") or {}).get("data_dirty_pages")
+            if not is_count(dirty) or dirty <= 0:
+                problems.append(f"{where}.durability: class A claimed with {dirty} dirty pages "
+                                "in its probe")
         return problems
     if host == "macOS" and name == "questdb" and block.get("like_for_like") is not False:
         problems.append(f"{where}.durability: macOS QuestDB class B must not be like-for-like")

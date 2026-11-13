@@ -292,7 +292,33 @@ class Valid(Harness):
         self.assertEqual(result.returncode, 0, result.stderr)
 
 
+def a_of(document, system="questdb"):
+    return document["systems"][system]["variants"]["v"]["classes"]["A"]
+
+
 class Faults(Harness):
+    # Class A's proof (review F-6).
+
+    def test_a_parquet_class_a_proven_with_the_harness_flush_made(self):
+        for scope in ("probe", "full_ingest"):
+            with self.subTest(scope=scope):
+                def fault(document, scope=scope):
+                    a_of(document, "parquet")["durability"]["flush"][scope]["harness_flushes"] = 2
+                self.assert_fault(fault, "parquet.v.A.durability: class A claimed with 2 harness "
+                                         f"flushes in {scope}")
+
+    def test_a_class_a_proven_with_no_dirty_page_in_its_probe(self):
+        # Class B NOT PROVEN, so the control rule, which reads the same probe, does not fire.
+        for system in ("arcticdb", "questdb"):
+            for dirty in (0, None):
+                with self.subTest(system=system, dirty=dirty):
+                    def fault(document, system=system, dirty=dirty):
+                        a_of(document, system)["durability"]["flush"]["probe"][
+                            "data_dirty_pages"] = dirty
+                        b_of(document, system)["durability"]["status"] = "NOT PROVEN"
+                    self.assert_fault(fault, f"{system}.v.A.durability: class A claimed with "
+                                             f"{dirty} dirty pages in its probe")
+
     # Settings.
 
     def test_a_setting_that_differs(self):

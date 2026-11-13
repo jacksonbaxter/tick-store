@@ -1,0 +1,12 @@
+diff --git a/scripts/check_compare.py b/scripts/check_compare.py
+--- a/scripts/check_compare.py
++++ b/scripts/check_compare.py
+@@ -345,7 +345,7 @@
+             # Review F-6: the others prove class A as compare/settings.py does, by dirty pages
+             # still there when the probe's commit returned, whatever their class B says.
+             dirty = (flush.get("probe") or {}).get("data_dirty_pages")
+-            if not is_count(dirty) or dirty <= 0:
++            if False:
+                 problems.append(f"{where}.durability: class A claimed with {dirty} dirty pages "
+                                 "in its probe")
+         return problems

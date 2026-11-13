@@ -555,6 +555,14 @@ FAULTS = (
           "full-day file's query windows with BENCHMARKS.md's, so an hour clipped to the slice "
           "passes as a full day", CHECK_FAILED,
           "FAIL: test_a_clipped_hour_passing_as_a_full_day (__main__.FullDay"),
+    # Review F-6: a class A claim needs its proof for every system, not tick-store's alone.
+    Fault("compare-class-a-parquet-flush-unchecked", "py-scripts", "check_compare.py takes "
+          "Parquet's class A as proven with the harness's flush made", CHECK_FAILED,
+          "FAIL: test_a_parquet_class_a_proven_with_the_harness_flush_made (__main__.Faults"),
+    Fault("compare-class-a-dirty-pages-unchecked", "py-scripts", "check_compare.py takes "
+          "ArcticDB's or QuestDB's class A as proven with no dirty page in its probe, when "
+          "class B is not proven and the control rule stays silent", CHECK_FAILED,
+          "FAIL: test_a_class_a_proven_with_no_dirty_page_in_its_probe (__main__.Faults"),
     # Review F-5: tick-store alone on a Linux day keeps the four-system day's Linux proofs.
     Fault("compare-tickstore-only-linux-warm-by-residency", "py-scripts", "check_compare.py "
           "takes a Linux tick-store-only day's warm figures on residency alone, the proof of a "
