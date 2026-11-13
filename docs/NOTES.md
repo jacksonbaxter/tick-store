@@ -3852,6 +3852,16 @@ figure, fastest, slowest and mean, and each write's three medians, to 1 part in 
 in `Protocol2` passed with exit 0 before (`f14-fail-before.log`). The raw seconds add 30 floats
 a warm block, 7 a cold one and 100 a floor.
 
+**E-3, the second CPU's sibling.** Confirmed: both committed Linux comparison files record every
+system on cpu4 and cpu6 and a `sibling_busy_percent` block for cpu5 alone (the slice at
+`67ae574`: 0.70 to 2.09% across the four systems). `run_bench.SiblingMeter` takes the pinned core,
+so `compare/run.py` keeps a second meter for cpu6 and reads it from the same first snapshot of
+`/proc/stat`, which holds every CPU, when the system's wrapper exits; a resumed run needs the
+second reading too. `check_results.check_sibling` takes the field and the core, its messages for
+the bench files unchanged, and `check_compare.py` applies it to `second_sibling_busy_percent` with
+core 6 for a protocol 2 Linux file. Five faults in `Protocol2` passed with exit 0 before
+(`e3-fail-before.log`).
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
