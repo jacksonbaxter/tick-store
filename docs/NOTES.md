@@ -3554,6 +3554,10 @@ make the test pass before the fix, never fail after it; it failed on each of thr
 The handler has no `SA_RESTART`, so `poll` returns `EINTR` on both hosts. The pair check is on
 every platform, since a lone path is a mistyped command line wherever it is typed.
 
+A-7. Fixed in code: each `Case` carries the text of its reference, so the text and `verify()`
+sit in the same builder. No script reads `verification.against`. The iteration runs that show
+the new text are in `phase4-raw/fix-itch-bench/a7.log`; no figure from them is reported.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
