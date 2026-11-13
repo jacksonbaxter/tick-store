@@ -4091,6 +4091,16 @@ mismatch, 2 on a usage or I/O error); `render_results.py` runs it before it rend
 files, from `1669ae0`, carry no per-run code and pass by their commit until the freeze rerun
 writes new ones; the runner must then write a `.exit` file per run.
 
+**The tail figure in the generated text (F-4's generator half, RF-4).** Every latency the
+comparison reports is the median and the 99th percentile by nearest rank, which at 30 warm and 7
+cold runs is the slowest run: in the committed files `p99_us` equals `max_us` in every block. The
+generator now names it from the file, from a protocol 2 block's `tail`, or from a protocol 1
+block's `n` with `p99_us` held to `max_us`, and stops on a block whose figure is not what its n
+makes it. The query columns, each comparison's preamble, QL-4's pairs and verdict, the README's
+headline preamble and its pitch changed wording only; regenerating moved no figure and no verdict
+(the word diff is in `phase4-raw/fix-generator/`). `BENCHMARKS.md` keeps QL-4's "lowest median and
+p99": the verdict says beside it what p99 was measured as.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
