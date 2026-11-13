@@ -5,8 +5,6 @@ of the results. Needs the repo's .venv. The guard's own rule is tested in test_g
     .venv/bin/python -I tests/compare/test_stream_guard.py
 """
 
-import json
-import subprocess
 import sys
 import tempfile
 import unittest
@@ -15,6 +13,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(REPO_ROOT / "tests" / "scripts"))
 
 try:
     import pyarrow  # noqa: F401
@@ -30,7 +29,7 @@ from compare.schema import ColumnSet, arrow_table, read_windows, table_chunks  #
 from compare.systems import system_class  # noqa: E402
 from compare.systems.base import RunContext  # noqa: E402
 
-CHECK_COMPARE = REPO_ROOT / "scripts" / "check_compare.py"
+import test_check_compare as fixtures  # noqa: E402
 
 
 class StaysOutOfResults(unittest.TestCase):
@@ -40,18 +39,25 @@ class StaysOutOfResults(unittest.TestCase):
                 refuse_results_folder(path)
         refuse_results_folder("/x/build/compare")
 
-    def test_the_validator_refuses_a_report(self):
-        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "build") as scratch:
-            path = Path(scratch) / "report.json"
-            path.write_text(json.dumps({"measurement": MEASUREMENT, "label": LABEL}),
-                            encoding="utf-8")
-            run = subprocess.run([sys.executable, "-I", str(CHECK_COMPARE), str(path)],
-                                 check=False, capture_output=True, text=True)
-        self.assertEqual(run.returncode, 1, run.stderr)
-
     def test_the_label_says_what_it_is(self):
         self.assertEqual(MEASUREMENT, "iteration-only")
         self.assertIn("not a benchmark", LABEL)
+
+
+class TheValidatorRefusesAReport(fixtures.Harness):
+    """A capacity run's measurement, on a document the validator otherwise passes, is refused
+    for that alone (review F-13: a bare report was refused only for having no header)."""
+
+    def test_a_valid_document_measured_as_a_capacity_run_is_refused(self):
+        document = fixtures.valid_document("macOS")
+        passed = self.run_on(document)
+        self.assertEqual(passed.returncode, 0, passed.stderr)
+        document["header"]["measurement"] = MEASUREMENT
+        refused = self.run_on(document)
+        self.assertEqual(refused.returncode, 1, refused.stderr)
+        self.assertEqual([line.split(": ", 1)[1] for line in refused.stderr.splitlines()],
+                         ["header.measurement: iteration-only, so this is not a reported "
+                          "result"])
 
 
 class StreamedIngest(unittest.TestCase):
