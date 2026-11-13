@@ -1048,6 +1048,16 @@ FAULTS = (
           "pass with no tests run", EXIT_CTEST, "No tests were found",
           arguments=("--test-regex", "OracleExhaustiveFlip"),
           fault_arguments=("--test-regex", "NoSuchTestAnywhere")),
+    # Review E-6: CI runs every step it names, py-compare included.
+    Fault("check-sh-no-skips-ignored", "py-scripts", "check.sh takes --no-skips and still "
+          "passes a step that skips", CHECK_FAILED,
+          "FAIL: test_no_skips_turns_a_skip_into_a_failure (__main__.CheckScript"),
+    Fault("ci-compare-venv-not-made", "py-scripts", "the workflow no longer makes the .venv, so "
+          "py-compare cannot run on CI", CHECK_FAILED,
+          "FAIL: test_the_workflow_makes_the_environment_py_compare_needs (__main__.CheckScript"),
+    Fault("ci-skips-allowed", "py-scripts", "the workflow runs check.sh without --no-skips, so a "
+          "step it names may skip and the job still pass", CHECK_FAILED,
+          "FAIL: test_the_workflow_runs_every_step_it_names (__main__.CheckScript"),
     # Review E-5: a proof's key holds the code and prose that made its verdict.
     Fault("prover-key-names-only", "py-scripts", "the prover's key for a proof holds a "
           "mutation's name and no code or prose, so an edited mutation keeps its old proof",

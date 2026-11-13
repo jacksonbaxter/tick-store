@@ -1,0 +1,13 @@
+diff --git a/scripts/check.sh b/scripts/check.sh
+index 5fa9104..7e8a9d0 100755
+--- a/scripts/check.sh
++++ b/scripts/check.sh
+@@ -215,7 +215,7 @@ run_step() {
+     start=$SECONDS
+     "step_${name//-/_}" "$log" >"$log" 2>&1
+     code=$?
+-    if [[ -n $SKIP_REASON && $NO_SKIPS -eq 1 ]]; then
++    if [[ -n $SKIP_REASON && $NO_SKIPS -eq 2 ]]; then
+         echo "--no-skips: $SKIP_REASON" >>"$log"
+         record "$name" FAIL 1 $((SECONDS - start)) "--no-skips: $SKIP_REASON"
+     elif [[ -n $SKIP_REASON ]]; then
