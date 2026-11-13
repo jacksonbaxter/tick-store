@@ -69,13 +69,15 @@ def step_ingest(system, request, layout):
                 "write's clock", "made_ready": made_ready}
     timings["device_read"] = {"bytes": moved["bytes"], "counter": moved["counter"],
                               "slack": moved.get("slack", 0)}
-    settings = settings + system.settings_after_ingest()
-    answer = {"timings": timings, "settings": settings, "rows": rows}
+    answer = {"timings": timings, "rows": rows}
     if request.get("flush_report"):
+        # Read before anything else runs (review F-11): tick-store's settings_after_ingest runs
+        # its tools, time in which writeback would clean pages the report should see.
         saved = system.dirty_paths
         system.dirty_paths = system.data_paths
         answer["flush"] = {**flush_report(system, layout), **system.flush_facts()}
         system.dirty_paths = saved
+    answer["settings"] = settings + system.settings_after_ingest()
     return answer
 
 

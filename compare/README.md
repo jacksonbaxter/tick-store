@@ -219,7 +219,9 @@ by call. LMDB's and QuestDB's are stated from what is known of them, and are not
 
 **How a class is proven.** Each run makes a small commit of 65,536 rows in a store of its own, and
 reads each file's dirty pages straight after the commit returns. The last full write is read the
-same way. `compare/settings.py` gives the verdict:
+same way, before anything else runs in its worker, for every system. Before protocol 2,
+tick-store's was read only after its worker had run the tools that report its settings, time in
+which writeback could clean pages (review F-11). `compare/settings.py` gives the verdict:
 
 - Class A is proven only if pages are still dirty, since that shows no flush ran.
 - Class B is proven only if no data page is dirty, and class A on the same system and host saw

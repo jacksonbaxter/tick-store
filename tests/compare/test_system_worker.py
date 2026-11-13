@@ -682,6 +682,48 @@ class WriteRecord(unittest.TestCase):
             self.assertEqual(sorted(system_class(name).write_times(True)),
                              ["engine_only_seconds", "seconds"], name)
 
+    def test_the_flush_report_is_read_before_anything_else_runs(self):
+        # Review F-11: tick-store's settings_after_ingest runs its tools for seconds, time in
+        # which writeback cleans pages, so the dirty pages are read first, for every system.
+        from compare import coldcache, worker
+
+        order = []
+
+        def ingest(*args):
+            order.append("ingest")
+            return {"seconds": 3.0, "engine_seconds": 2.0, "python_seconds": 0.5,
+                    "python_note": "n"}
+
+        def dirty_by_file(layout, paths):
+            order.append("dirty")
+            return {"store": 0}
+
+        class Counter:
+            def __init__(self, path):
+                pass
+
+            def delta(self):
+                order.append("delta")
+                return {"bytes": 0, "counter": "c"}
+
+        system = SimpleNamespace(
+            name="fake", context=SimpleNamespace(day=DAY), settings_in_force=lambda: [],
+            settings_after_ingest=lambda: order.append("settings_after_ingest") or [],
+            input_paths=lambda columns: [Path("export")], ready_input=lambda columns: {},
+            ingest=ingest, ingest_day=ingest, dirty_paths=lambda: [Path("store")],
+            data_paths=lambda: [Path("store")], flush_exempt=(), flush_facts=lambda: {})
+        columns = SimpleNamespace(directory=Path("export"), records=9)
+        with (mock.patch.object(worker, "ColumnSet", return_value=columns),
+              mock.patch.object(worker, "arrow_table", return_value=SimpleNamespace(num_rows=9)),
+              mock.patch.object(coldcache, "residency",
+                                lambda layout, paths: {"pages": 1, "resident_pages": 1}),
+              mock.patch.object(coldcache, "DeviceCounter", Counter),
+              mock.patch.object(coldcache, "dirty_by_file", dirty_by_file)):
+            answer = worker.step_ingest(system, {"columns": "export", "flush_report": True},
+                                        None)
+        self.assertEqual(order, ["ingest", "delta", "dirty", "settings_after_ingest"])
+        self.assertEqual(answer["flush"]["data_dirty_pages"], 0)
+
 
 class Statements(unittest.TestCase):
     """Every sentence compare/run.py writes must be safe to publish."""
