@@ -193,6 +193,17 @@ TEST(FuzzOracles, PassEveryWayAStreamCanEnd) {
     EXPECT_EQ(text(oracle::check_stream(exact_copy(ended))), "");
 }
 
+// A frame whose prefix has both bytes set, 0x0101, and so both halves of the length
+// read (review A-1): a cursor that stopped on it as zero-length would drop a whole
+// frame, and the oracle must say so rather than accept the stop.
+TEST(FuzzOracles, PassAFrameOf257Bytes) {
+    const Bytes payload(257, std::byte{0x41});
+    Bytes stream = test::framed(0x0101, payload);
+    EXPECT_EQ(text(oracle::check_stream(exact_copy(stream))), "");
+    stream.push_back(std::byte{0x01});
+    EXPECT_EQ(text(oracle::check_stream(exact_copy(stream))), "");
+}
+
 // A real export, as fuzz_columns' sections, cut at every length of the whole input and
 // with every bit flipped in turn.
 TEST(FuzzOracles, PassEveryCutAndFlipOfAColumnDirectory) {

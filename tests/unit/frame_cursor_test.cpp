@@ -151,6 +151,19 @@ TEST(FrameCursor, TheLargestLengthIsReadAsUnsigned) {
               (FrameStop{FrameStopKind::truncated_body, 0, 65'535, 998}));
 }
 
+// Both prefix bytes set, 0x0101: the frames elsewhere here have lengths whose
+// high byte is 0 or 0xFF (review A-1).
+TEST(FrameCursor, AFrameOf257BytesIsAWholeFrame) {
+    const Bytes payload(257, std::byte{0x41});
+    const Bytes stream = exact_copy(framed(0x0101, payload));
+    FrameCursor cursor{stream};
+    const auto frame = cursor.next();
+    ASSERT_TRUE(frame.has_value());
+    EXPECT_EQ(frame->offset, 0U);
+    EXPECT_TRUE(same(frame->payload, payload));
+    EXPECT_EQ(cursor.next().error(), (FrameStop{FrameStopKind::end, 259, 0, 0}));
+}
+
 TEST(FrameStop, DescribesItselfExactly) {
     EXPECT_EQ(to_string(FrameStop{FrameStopKind::end, 12, 0, 0}),
               "end at offset 12: expected 0 bytes, have 0");
