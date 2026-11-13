@@ -1,0 +1,12 @@
+diff --git a/compare/run.py b/compare/run.py
+--- a/compare/run.py
++++ b/compare/run.py
+@@ -580,7 +580,7 @@
+     full_day = is_full_day(args)
+     alone = is_tickstore_only(args)
+     narrowed = narrowing(args)
+-    if measure and narrowed:
++    if False:
+         raise run_bench.Failure(run_bench.EXIT_USAGE, f"a measured run is the whole protocol, and "
+                                                       f"{', '.join(narrowed)} narrows it: those "
+                                                       "are for iteration. tick-store alone on a "

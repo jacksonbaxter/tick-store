@@ -887,7 +887,8 @@ class Document(unittest.TestCase):
             (parts / f"{name}.json").write_text(json.dumps(part), encoding="utf-8")
             (parts / f"{name}.sibling").write_text("0.5", encoding="utf-8")
             (parts / f"{name}.sibling-second").write_text("0.25", encoding="utf-8")
-        args = SimpleNamespace(systems=systems, slice="s", day=day, full_day_smoke=False)
+        args = SimpleNamespace(systems=systems, slice="s", day=day, full_day_smoke=False,
+                               tickstore_alone=False)
         pin = {"sha256": "ab", "message_count": 1, "size": 1}
         layout = SimpleNamespace(export_dir=lambda name: name)
         run_bench = compare_run.run_bench
@@ -949,7 +950,7 @@ class Document(unittest.TestCase):
 
 
 class TickstoreOnlyDocument(unittest.TestCase):
-    """A full day off Linux: tick-store alone, labelled so, with its peak memory from time -l."""
+    """tick-store alone on a day off Linux, labelled so, with its peak memory from time -l."""
 
     TIME = ("     1800.25 real      1500.00 user       200.00 sys\n"
             "  12884901888  maximum resident set size\n"
@@ -962,7 +963,7 @@ class TickstoreOnlyDocument(unittest.TestCase):
         (parts / "tickstore.time.json").write_text(
             json.dumps(store_results.parse_time(self.TIME)), encoding="utf-8")
         args = SimpleNamespace(systems=["tickstore"], slice="s", day="12302019",
-                               full_day_smoke=False)
+                               full_day_smoke=False, tickstore_alone=True)
         pin = {"sha256": "ab", "message_count": 1, "size": 1}
         layout = SimpleNamespace(export_dir=lambda name: name)
         run_bench = compare_run.run_bench
@@ -988,18 +989,174 @@ class TickstoreOnlyDocument(unittest.TestCase):
         self.assertEqual(check_compare.check_time_memory("tickstore", memory), [])
         self.assertEqual(check_compare.check_tickstore_only(document, Path("x.json")), [])
 
-    def test_a_full_day_off_linux_is_tickstore_alone(self):
-        args = compare_run.parse_arguments(["--day", "12302019", "--systems", "parquet"])
-        self.assertTrue(compare_run.is_tickstore_only(args, "macOS"))
-        self.assertFalse(compare_run.is_tickstore_only(args, "Linux"))
-        with self.assertRaises(compare_run.run_bench.Failure):
-            compare_run.run(args)
+    def test_tickstore_alone_is_asked_for_and_never_a_side_effect(self):
+        # Review F-5: no longer the host and two flags, on either host.
+        args = compare_run.parse_arguments(["--day", "12302019", "--systems", "tickstore"])
+        self.assertFalse(compare_run.is_tickstore_only(args))
+        args = compare_run.parse_arguments(["--day", "12302019", "--tickstore-alone"])
+        self.assertTrue(compare_run.is_tickstore_only(args))
 
     def test_no_statement_trips_the_leak_check(self):
         for text in (compare_run.TICKSTORE_ONLY_LABEL, compare_run.TICKSTORE_ONLY_HEAP,
                      compare_run.TICKSTORE_ONLY_WARM, compare_run.TICKSTORE_ONLY_MEMORY,
                      compare_run.TICKSTORE_ONLY_INPUT_CACHE, variant_rule.tickstore_only()):
             self.assertEqual(check_compare.check_results.check_leaks({"text": text}), [])
+
+
+class FakeDay:
+    """compare/run.py's run() on a day, every system's run faked as its part file, and the
+    document it would publish kept: the harness's own fakes, no system runs (review F-5)."""
+
+    GUARD = Document.GUARD
+    TIME = TickstoreOnlyDocument.TIME
+
+    class Meter:
+        def __init__(self, core=4):
+            self.core = core
+
+        def block(self, cases):
+            return {"core": self.core, "sibling": self.core + 1, "cases": cases}
+
+    def __init__(self, case, scratch, host, measure="wrapper"):
+        self.case, self.scratch, self.host, self.measure = case, Path(scratch), host, measure
+        self.ran = []
+        self.published = []
+
+    def run_one(self, system, args, layout, measure, parts, meter, variants=None,
+                second_meter=None):
+        self.ran.append((system, variants))
+        part = {"truth": {}, "queries": [], "full_day": {"clipped": False},
+                "headline_variant": "v3-seg4Mi",
+                "variants": {name: {} for name in variants or ["v"]}}
+        (parts / f"{system}.json").write_text(json.dumps(part), encoding="utf-8")
+        if self.host == "Linux":
+            (parts / f"{system}.guard.json").write_text(json.dumps(self.GUARD), encoding="utf-8")
+            for suffix in ("sibling", "sibling-second"):
+                (parts / f"{system}.{suffix}").write_text("0.5", encoding="utf-8")
+        else:
+            (parts / f"{system}.time.json").write_text(
+                json.dumps(store_results.parse_time(self.TIME)), encoding="utf-8")
+        return []
+
+    def run(self, argv):
+        run_bench = compare_run.run_bench
+        layout = SimpleNamespace(work=self.scratch, export_dir=lambda name: name)
+        environment = {run_bench.MEASURE_ENV: self.measure} if self.measure else {}
+        with (mock.patch.dict(compare_run.os.environ, environment, clear=False),
+              mock.patch.object(run_bench, "host_label", return_value=self.host),
+              mock.patch.object(run_bench, "current_commit", return_value="c" * 40),
+              mock.patch.object(run_bench, "SiblingMeter", self.Meter),
+              mock.patch.object(run_bench, "cpu_model", return_value="cpu"),
+              mock.patch.object(run_bench, "linux_turbo", return_value="enabled"),
+              mock.patch.object(run_bench, "governor_of", return_value="performance"),
+              mock.patch.object(compare_run, "require_clean_tree"),
+              mock.patch.object(compare_run.Layout, "from_arguments", return_value=layout),
+              mock.patch.object(compare_run, "compiler_facts", return_value={}),
+              mock.patch.object(compare_run, "read_manifest", return_value={}),
+              mock.patch.object(compare_run, "run_one", self.run_one),
+              mock.patch.object(compare_run, "publish",
+                                lambda document, output, measure:
+                                self.published.append((document, output)))):
+            if not self.measure:
+                compare_run.os.environ.pop(run_bench.MEASURE_ENV, None)
+            return compare_run.main(argv)
+
+
+class MeasuredRun(unittest.TestCase):
+    """A measured run runs the protocol whole: it narrows nothing (review F-5)."""
+
+    def test_a_measured_run_refuses_to_narrow_anything(self):
+        for argv in (["--warm-repetitions", "5"], ["--cold-repetitions", "3"],
+                     ["--write-repetitions", "1"], ["--variants", "plain"],
+                     ["--systems", "parquet", "questdb"],
+                     ["--day", "12302019", "--systems", "tickstore", "--variants",
+                      "v3-seg4Mi,v3-seg1Mi"]):
+            with self.subTest(argv=argv), tempfile.TemporaryDirectory(
+                    dir=REPO_ROOT / "build") as scratch:
+                day = FakeDay(self, scratch, "Linux")
+                self.assertEqual(day.run(argv), compare_run.run_bench.EXIT_USAGE)
+                self.assertEqual((day.ran, day.published), ([], []))
+
+    def test_an_iteration_run_may_narrow(self):
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "build") as scratch:
+            day = FakeDay(self, scratch, "Linux", measure=None)
+            day.run(["--warm-repetitions", "5", "--systems", "parquet", "--variants", "v"])
+        self.assertEqual(day.ran, [("parquet", ["v"])])
+
+
+class TickstoreAloneDay(unittest.TestCase):
+    """tick-store alone on a day, asked for by --tickstore-alone, on either host: its own kind
+    of document, named and validated as such, and exit 0 (review F-5)."""
+
+    def run_day(self, host, argv=("--day", "12302019", "--tickstore-alone")):
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "build") as scratch:
+            day = FakeDay(self, scratch, host)
+            code = day.run(list(argv))
+        return code, day
+
+    def test_each_host_ends_with_a_tickstore_alone_document(self):
+        for host in ("Linux", "macOS"):
+            with self.subTest(host=host):
+                code, day = self.run_day(host)
+                self.assertEqual(code, 0)
+                self.assertEqual(day.ran, [("tickstore", list(variant_rule.TICKSTORE_VARIANTS))])
+                (document, output), = day.published
+                self.assertEqual(output.name, f"{host}-12302019-full-tickstore-cccccccccccc.json")
+                self.assertEqual(document["scope"], variant_rule.TICKSTORE_ONLY)
+                self.assertEqual(document["input"]["systems_run"], ["tickstore"])
+                self.assertEqual(check_compare.check_tickstore_only(document, output), [])
+                memory = document["systems"]["tickstore"]["peak_memory"]
+                if host == "Linux":
+                    # The guard ran, as on the four-system day, and warm is proven per process.
+                    self.assertEqual(check_compare.check_peak_memory("tickstore", memory), [])
+                    self.assertEqual(document["method"]["warm"], compare_run.FULL_DAY_WARM)
+                    self.assertIn("guard", document["method"])
+                else:
+                    self.assertEqual(check_compare.check_time_memory("tickstore", memory), [])
+                    self.assertEqual(document["method"]["warm"], compare_run.TICKSTORE_ONLY_WARM)
+                self.assertEqual(check_compare.check_results.check_leaks(document), [])
+
+    def test_a_day_off_linux_must_ask_for_tickstore_alone(self):
+        code, day = self.run_day("macOS", ("--day", "12302019", "--systems", "tickstore"))
+        self.assertEqual(code, compare_run.run_bench.EXIT_USAGE)
+        self.assertEqual(day.ran, [])
+
+    def test_tickstore_alone_is_a_day_of_tickstore_and_every_variant(self):
+        for argv in (["--tickstore-alone"], ["--day", "12302019", "--tickstore-alone",
+                                             "--systems", "parquet"],
+                     ["--day", "12302019", "--tickstore-alone", "--variants", "v3-seg4Mi"],
+                     ["--day", "12302019", "--tickstore-alone", "--variant-source", "x.json"]):
+            with self.subTest(argv=argv):
+                code, day = self.run_day("Linux", argv)
+                self.assertEqual(code, compare_run.run_bench.EXIT_USAGE)
+                self.assertEqual(day.ran, [])
+
+
+class ResumedRun(unittest.TestCase):
+    """A part is reused only if it was made with the same arguments (review F-5)."""
+
+    def resume(self, made_with, now):
+        args = compare_run.parse_arguments(["--slice", "s", *now])
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "build") as scratch:
+            parts = Path(scratch)
+            first = compare_run.parse_arguments(["--slice", "s", *made_with])
+            (parts / "parquet.json").write_text("{}", encoding="utf-8")
+            (parts / "parquet.load").write_text("[]", encoding="utf-8")
+            (parts / "parquet.arguments.json").write_text(
+                json.dumps(compare_run.part_arguments(first, None, None)), encoding="utf-8")
+            layout = SimpleNamespace(work=parts, as_arguments=lambda: [])
+            with (mock.patch.object(compare_run.run_bench, "host_label", return_value="macOS"),
+                  mock.patch.object(compare_run.subprocess, "run",
+                                    return_value=SimpleNamespace(returncode=0)) as ran):
+                compare_run.run_one("parquet", args, layout, None, parts, None)
+            return ran.called
+
+    def test_a_part_made_with_other_repetitions_runs_again(self):
+        self.assertTrue(self.resume(["--warm-repetitions", "5"], []))
+        self.assertTrue(self.resume([], ["--cold-repetitions", "3"]))
+
+    def test_a_part_made_with_the_same_arguments_is_kept(self):
+        self.assertFalse(self.resume(["--warm-repetitions", "5"], ["--warm-repetitions", "5"]))
 
 
 class HeapStatements(unittest.TestCase):

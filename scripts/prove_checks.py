@@ -555,10 +555,16 @@ FAULTS = (
           "full-day file's query windows with BENCHMARKS.md's, so an hour clipped to the slice "
           "passes as a full day", CHECK_FAILED,
           "FAIL: test_a_clipped_hour_passing_as_a_full_day (__main__.FullDay"),
-    Fault("compare-tickstore-only-on-linux", "py-scripts", "check_compare.py stops refusing a "
-          "tick-store-only full day from Linux, so a subset of the four-system day could pass "
-          "as a full-day result", CHECK_FAILED,
-          "FAIL: test_a_tickstore_only_day_on_linux (__main__.TickstoreOnly"),
+    # Review F-5: tick-store alone on a Linux day keeps the four-system day's Linux proofs.
+    Fault("compare-tickstore-only-linux-warm-by-residency", "py-scripts", "check_compare.py "
+          "takes a Linux tick-store-only day's warm figures on residency alone, the proof of a "
+          "host without /proc, instead of each process's storage reads", CHECK_FAILED,
+          "FAIL: test_a_linux_tickstore_only_day_warm_by_residency (__main__.TickstoreOnly"),
+    Fault("compare-tickstore-only-linux-guard-memory-unchecked", "py-scripts",
+          "check_compare.py stops requiring the guard's peak memory of a Linux tick-store-only "
+          "day, so one that ran without the guard passes", CHECK_FAILED,
+          "FAIL: test_a_linux_tickstore_only_day_without_the_guards_memory "
+          "(__main__.TickstoreOnly"),
     # The comparison protocol 2 rules (docs/REVIEW.md, F-4 to F-11 and E-3).
     Fault("compare-protocol-unknown-accepted", "py-scripts", "check_compare.py takes a file of "
           "a protocol it does not know, protocol 3, as if it knew its rules", CHECK_FAILED,
@@ -628,6 +634,15 @@ FAULTS = (
     Fault("guard-swap-in-stop-disabled", "py-scripts", "compare/guard.py stops firing on "
           "sustained swap-in, so a host thrashing through swap is no longer stopped",
           CHECK_FAILED, "FAIL: test_sustained_swap_in_stops (__main__.Breach"),
+    # Review F-5: a measured run is the whole protocol, and a resumed one never mixes parts.
+    Fault("compare-measured-run-narrowed", "py-compare", "compare/run.py takes repetition "
+          "overrides, --variants or fewer --systems in a measured run, so a reported file can "
+          "hold less than the protocol", CHECK_FAILED,
+          "FAIL: test_a_measured_run_refuses_to_narrow_anything (__main__.MeasuredRun"),
+    Fault("compare-part-reused-across-arguments", "py-compare", "compare/run.py reuses a "
+          "system's part made with other repetition arguments when a run is resumed",
+          CHECK_FAILED, "FAIL: test_a_part_made_with_other_repetitions_runs_again "
+          "(__main__.ResumedRun"),
     Fault("coldcache-refill-unchecked", "py-compare", "an eviction counts as proven without "
           "checking that the store stays empty, so a store something else is reading passes",
           CHECK_FAILED, "FAIL: test_a_store_refilling_after_eviction_is_not_proven "

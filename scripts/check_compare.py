@@ -111,7 +111,9 @@ SECOND_CPU = 6
 SECOND_SIBLING = "second_sibling_busy_percent"
 FULL_DAY = "full"
 TICKSTORE_ONLY_NAME = "full-tickstore"
-TICKSTORE_ONLY_HOSTS = ("macOS",)
+# tick-store alone on a day: macOS's figures for the targets marked Both, and tick-store's own
+# Linux figures at a later commit, each with its host's proofs (review F-5).
+TICKSTORE_ONLY_HOSTS = ("Linux", "macOS")
 # The BSD time in /usr/bin, named without its path, which no results file may hold.
 TIME_SOURCE = "time -l"
 NANOS_PER_SECOND = 1_000_000_000
@@ -776,7 +778,7 @@ def check_system(name, system, document, pin):
             problems += check_durability(here, entry.get("durability"), name, class_name, control,
                                          host)
         problems += check_queries(where, variant.get("queries"), truth, name,
-                                  bool(pin.get("full_day")) and not pin.get("alone"), protocol)
+                                  per_process_warm(pin, host), protocol)
         if protocol >= PROTOCOL_2:
             opened = (variant.get("warm_worker_open") or {}).get("seconds")
             if not check_results.is_number(opened) or opened < 0:
@@ -786,9 +788,16 @@ def check_system(name, system, document, pin):
     problems += check_swap(name, system)
     if pin.get("full_day") and host == "Linux":
         problems += check_peak_memory(name, system.get("peak_memory"))
-    if pin.get("alone"):
+    if pin.get("alone") and host != "Linux":
         problems += check_time_memory(name, system.get("peak_memory"))
     return problems
+
+
+def per_process_warm(pin, host):
+    """A day's warm figure is proven by each process's storage reads, which Linux reads from
+    /proc. tick-store alone off Linux is proven warm by residency instead: its day store fits
+    the host's memory. A Linux day, tick-store alone or not, has the per-process proof."""
+    return bool(pin.get("full_day")) and not (pin.get("alone") and host != "Linux")
 
 
 def check_time_memory(name, memory):
@@ -852,8 +861,8 @@ def check_tickstore_only(document, path):
     problems = []
     if header.get("host") not in TICKSTORE_ONLY_HOSTS:
         problems.append(f"scope: a tick-store-only full day runs on "
-                        f"{', '.join(TICKSTORE_ONLY_HOSTS)} alone, and this is "
-                        f"{header.get('host')!r}: Linux runs the four-system day")
+                        f"{' or '.join(TICKSTORE_ONLY_HOSTS)}, and this is "
+                        f"{header.get('host')!r}")
     if list(systems) != ["tickstore"] or \
             (document.get("input") or {}).get("systems_run") != ["tickstore"]:
         problems.append(f"systems: a tick-store-only full day holds tick-store alone, and this "
@@ -1047,7 +1056,8 @@ def check_document(document, top_keys, path, pins, capacity, real_path=None):
     elif header.get("host") == "Linux":
         problems += check_results.check_linux({key: value for key, value in header.items()
                                                if key != "frequency"}, list(systems))
-        problems += check_heap(document, "Linux", capacity)
+        if not alone:
+            problems += check_heap(document, "Linux", capacity)
     problems += check_second_sibling(header, list(systems), protocol_of(document))
     label = str(document.get("label", ""))
     input_block = document.get("input") or {}

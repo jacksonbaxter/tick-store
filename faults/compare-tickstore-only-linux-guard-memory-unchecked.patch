@@ -1,0 +1,12 @@
+diff --git a/scripts/check_compare.py b/scripts/check_compare.py
+--- a/scripts/check_compare.py
++++ b/scripts/check_compare.py
+@@ -786,7 +786,7 @@
+             problems += check_tail(f"{where}.python_floor", variant.get("python_floor"))
+             problems += check_repetitions(f"{where}.python_floor", variant.get("python_floor"))
+     problems += check_swap(name, system)
+-    if pin.get("full_day") and host == "Linux":
++    if pin.get("full_day") and host == "Linux" and not pin.get("alone"):
+         problems += check_peak_memory(name, system.get("peak_memory"))
+     if pin.get("alone") and host != "Linux":
+         problems += check_time_memory(name, system.get("peak_memory"))

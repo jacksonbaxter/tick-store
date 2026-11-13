@@ -1,0 +1,12 @@
+diff --git a/scripts/check_compare.py b/scripts/check_compare.py
+--- a/scripts/check_compare.py
++++ b/scripts/check_compare.py
+@@ -797,7 +797,7 @@
+     """A day's warm figure is proven by each process's storage reads, which Linux reads from
+     /proc. tick-store alone off Linux is proven warm by residency instead: its day store fits
+     the host's memory. A Linux day, tick-store alone or not, has the per-process proof."""
+-    return bool(pin.get("full_day")) and not (pin.get("alone") and host != "Linux")
++    return bool(pin.get("full_day")) and not pin.get("alone")
+ 
+ 
+ def check_time_memory(name, memory):

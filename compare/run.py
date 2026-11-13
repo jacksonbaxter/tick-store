@@ -28,16 +28,25 @@ picks each system's variants. Each system then runs as
 so the guard watches the host as in the capacity check, and its report gives each system's peak
 memory. The results file is <host>-<day>-full-<commit>.json.
 
-Off Linux, a full day is tick-store alone, every variant it has:
+tick-store alone on a full day, every variant it has, is its own kind of run, asked for by name
+on either host:
 
-    TICK_STORE_MEASURE=... python3 -I compare/run.py --day 12302019 --systems tickstore
+    TICK_STORE_MEASURE=... python3 -I compare/run.py --day 12302019 --tickstore-alone
 
-The four-system day needs Linux, because its warm proof reads each process's storage reads
-from /proc. tick-store's day store fits a Mac's memory many times over, so its warm proof is the
-slice's: every store file resident before and after the repetitions. Everything else is the
-full day as on Linux. There is no guard, which reads /proc, so peak memory comes from
-/usr/bin/time -l around the system's run, inside the measured command. The results file is
-<host>-<day>-full-tickstore-<commit>.json.
+Off Linux it is the only full day, because the four-system day's warm proof reads each
+process's storage reads from /proc. tick-store's day store fits a Mac's memory many times over,
+so there its warm proof is the slice's: every store file resident before and after the
+repetitions. There is no guard, which reads /proc, so peak memory comes from /usr/bin/time -l
+around the system's run, inside the measured command. On Linux it reproduces tick-store's own
+figures at a later commit with the four-system day's proofs, the guard and the warm proof by
+each process's storage reads. Everything else is the full day. The results file is
+<host>-<day>-full-tickstore-<commit>.json, which check_compare.py validates as that kind.
+
+A measured run runs the whole protocol: with TICK_STORE_MEASURE set, run.py refuses
+--write-repetitions, --warm-repetitions, --cold-repetitions, --variants and a narrower
+--systems, and check_compare.py requires the protocol's repetitions of every reported file. They
+are for iteration only. A part already on disk is reused only if it was made with the same
+arguments, so a resumed run never mixes repetition counts.
 
 Exit codes: 0 done, 75 the wrapper says retry later (finished systems are kept, and run it
 again to go on), 2 usage or setup, anything else what failed.
@@ -122,6 +131,13 @@ TICKSTORE_ONLY_LABEL = ("A full day of tick-store alone: every record of the pin
 TICKSTORE_ONLY_HEAP = {"setting": "not-run", "full_day_check": "Linux only",
                        "statement": "QuestDB did not run: tick-store ran alone. The full-day "
                                     "capacity check is Linux only."}
+TICKSTORE_ONLY_LINUX_LABEL = (
+    "A full day of tick-store alone: every record of the pinned day, every query as "
+    "BENCHMARKS.md defines it with nothing clipped, and no other system, with the four-system "
+    "day's proofs. It gives tick-store's own Linux figures at this commit. No figure here is "
+    "compared with another system's.")
+TICKSTORE_ONLY_LINUX_HEAP = {"setting": "not-run", "full_day_check": "not-run",
+                             "statement": "QuestDB did not run: tick-store ran alone."}
 TICKSTORE_ONLY_INPUT_CACHE = (
     "tick-store's write reads the day's ITCH file, 8.25 GB, which is read through first and "
     "must be resident, as on the slice. No other system ran, so no export is read inside a "
@@ -253,17 +269,39 @@ def system_command(system, args, layout, part, variants, guard):
             "--samples", str(guard["samples"]), "--watch", str(layout.work), "--", *command]
 
 
+def part_arguments(args, variants, measure):
+    """What a system's part was made with, beyond the day or slice its directory names."""
+    return {"write_repetitions": args.write_repetitions,
+            "warm_repetitions": args.warm_repetitions,
+            "cold_repetitions": args.cold_repetitions,
+            "variants": None if variants is None else list(variants),
+            "tickstore_alone": is_tickstore_only(args), "measured": bool(measure)}
+
+
+def made_with(path, arguments):
+    try:
+        return json.loads(path.read_text(encoding="utf-8")) == arguments
+    except (OSError, json.JSONDecodeError):
+        return False
+
+
 def run_one(system, args, layout, measure, parts, meter, variants=None, second_meter=None):
-    """Runs a system unless its part is already there. Returns its load lines."""
+    """Runs a system unless its part is already there, made with the same arguments. Returns
+    its load lines."""
     part = parts / f"{system}.json"
     lines_path = parts / f"{system}.load"
     sibling_path = parts / f"{system}.sibling"
     second_path = parts / f"{system}.sibling-second"
     time_path = parts / f"{system}.time.json"
-    timed = is_tickstore_only(args, run_bench.host_label())
+    arguments_path = parts / f"{system}.arguments.json"
+    arguments = part_arguments(args, variants, measure)
+    timed = is_tickstore_only(args) and run_bench.host_label() != "Linux"
     if part.exists() and lines_path.exists() and (meter is None or sibling_path.exists()) and \
-            (second_meter is None or second_path.exists()) and (not timed or time_path.exists()):
+            (second_meter is None or second_path.exists()) and \
+            (not timed or time_path.exists()) and made_with(arguments_path, arguments):
         return json.loads(lines_path.read_text(encoding="utf-8"))
+    # A part from other arguments is never reused: it is made again, whole.
+    lines_path.unlink(missing_ok=True)
     snapshot = parts / f"{system}.stat"
     guard = None
     if is_full_day(args) and run_bench.host_label() == "Linux":
@@ -303,6 +341,7 @@ def run_one(system, args, layout, measure, parts, meter, variants=None, second_m
             raise run_bench.Failure(1, f"{system}: /usr/bin/time -l printed no peak memory")
         time_path.write_text(json.dumps(figures), encoding="utf-8")
     lines = run_bench.clean_load_lines(text) if measure else []
+    arguments_path.write_text(json.dumps(arguments), encoding="utf-8")
     lines_path.write_text(json.dumps(lines), encoding="utf-8")
     return lines
 
@@ -330,9 +369,9 @@ def is_full_day(args):
     return bool(args.day or args.full_day_smoke)
 
 
-def is_tickstore_only(args, host):
-    """A full day off Linux: tick-store alone. See the module's docstring."""
-    return is_full_day(args) and host != "Linux"
+def is_tickstore_only(args):
+    """tick-store alone on a day, asked for by --tickstore-alone. See the module's docstring."""
+    return bool(args.tickstore_alone)
 
 
 def time_memory(figures):
@@ -369,7 +408,7 @@ def build_document(host, args, layout, pin, commit, measure, parts, load_lines, 
                    selection=None, second_meter=None):
     linux = host == "Linux"
     full_day = is_full_day(args)
-    alone = is_tickstore_only(args, host)
+    alone = is_tickstore_only(args)
     systems = {system: json.loads((parts / f"{system}.json").read_text(encoding="utf-8"))
                for system in args.systems}
     truths = [part.pop("truth") for part in systems.values()]
@@ -384,7 +423,7 @@ def build_document(host, args, layout, pin, commit, measure, parts, load_lines, 
         for system, part in systems.items():
             part["peak_memory"] = peak_memory(json.loads(
                 (parts / f"{system}.guard.json").read_text(encoding="utf-8")))
-    if alone:
+    if alone and not linux:
         for system, part in systems.items():
             part["peak_memory"] = time_memory(json.loads(
                 (parts / f"{system}.time.json").read_text(encoding="utf-8")))
@@ -442,17 +481,20 @@ def build_document(host, args, layout, pin, commit, measure, parts, load_lines, 
                                     "tick_roundtrip verify-columns judges against the day"})
         queries["full_day"] = day_facts[0]
     if alone:
-        method.update({"warm": TICKSTORE_ONLY_WARM, "input_cache": TICKSTORE_ONLY_INPUT_CACHE,
-                       "peak_memory": TICKSTORE_ONLY_MEMORY})
+        method["input_cache"] = TICKSTORE_ONLY_INPUT_CACHE
+    if alone and not linux:
+        method.update({"warm": TICKSTORE_ONLY_WARM, "peak_memory": TICKSTORE_ONLY_MEMORY})
         del method["guard"]
+    alone_label = TICKSTORE_ONLY_LINUX_LABEL if linux else TICKSTORE_ONLY_LABEL
     document = {
         "header": header,
-        "label": (TICKSTORE_ONLY_LABEL if alone else FULL_DAY_LABEL) if full_day else LABEL,
+        "label": (alone_label if alone else FULL_DAY_LABEL) if full_day else LABEL,
     }
     if alone:
         document["scope"] = variant_rule.TICKSTORE_ONLY
     document.update({
-        "heap": TICKSTORE_ONLY_HEAP if alone else LINUX_HEAP if linux else MACOS_HEAP,
+        "heap": ((TICKSTORE_ONLY_LINUX_HEAP if linux else TICKSTORE_ONLY_HEAP) if alone
+                 else LINUX_HEAP if linux else MACOS_HEAP),
         "input": input_block,
         "method": method,
         "queries": queries,
@@ -499,35 +541,64 @@ def variant_selection(args, commit, host):
 def parse_arguments(argv):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--slice", default=SLICE_NAME)
-    parser.add_argument("--day", help="a full-day run on this pinned day: every system on "
-                                      "Linux, tick-store alone elsewhere")
+    parser.add_argument("--day", help="a full-day run on this pinned day: every system, on "
+                                      "Linux only, or tick-store alone with --tickstore-alone")
     parser.add_argument("--full-day-smoke", action="store_true",
                         help="the full-day path on the slice, iteration only")
     parser.add_argument("--variant-source", type=Path,
                         help="for a full-day run: the slice results of this host and commit")
-    parser.add_argument("--systems", nargs="+", default=list(SYSTEM_NAMES),
-                        choices=SYSTEM_NAMES)
+    parser.add_argument("--tickstore-alone", action="store_true",
+                        help="with --day or --full-day-smoke: tick-store alone, every variant, "
+                             "its own kind of results file, on either host")
+    parser.add_argument("--systems", nargs="+", choices=SYSTEM_NAMES,
+                        help="every system unless given, for iteration")
     parser.add_argument("--results-dir", type=Path, default=DEFAULT_RESULTS_DIR)
     parser.add_argument("--iteration-dir", type=Path, default=DEFAULT_ITERATION_DIR)
     parser.add_argument("--variants", help="comma-separated, for iteration")
     for name in ("write-repetitions", "warm-repetitions", "cold-repetitions"):
-        parser.add_argument(f"--{name}", type=int)
+        parser.add_argument(f"--{name}", type=int, help="for iteration")
     for name in ("data", "vendor", "work", "tools"):
         parser.add_argument(f"--{name}", type=Path)
     return parser.parse_args(argv)
 
 
+def narrowing(args):
+    """The arguments that would make a run less than the protocol, which a measured run
+    refuses (review F-5)."""
+    found = [f"--{option.replace('_', '-')}" for option in
+             ("write_repetitions", "warm_repetitions", "cold_repetitions", "variants")
+             if getattr(args, option) is not None]
+    if args.systems is not None and not is_tickstore_only(args) and \
+            sorted(args.systems) != sorted(SYSTEM_NAMES):
+        found.append("--systems")
+    return found
+
+
 def run(args):
     measure = os.environ.get(run_bench.MEASURE_ENV)
     host = run_bench.host_label()
-    pins = json.loads(PINS_PATH.read_text(encoding="utf-8"))
     full_day = is_full_day(args)
-    alone = is_tickstore_only(args, host)
-    if alone and (args.systems != ["tickstore"] or args.variant_source is not None or
-                  args.variants is not None):
-        raise run_bench.Failure(run_bench.EXIT_USAGE, "a full day off Linux is tick-store alone, "
-                                                      "every variant: --systems tickstore, and "
-                                                      "no --variant-source or --variants")
+    alone = is_tickstore_only(args)
+    narrowed = narrowing(args)
+    if measure and narrowed:
+        raise run_bench.Failure(run_bench.EXIT_USAGE, f"a measured run is the whole protocol, and "
+                                                      f"{', '.join(narrowed)} narrows it: those "
+                                                      "are for iteration. tick-store alone on a "
+                                                      "day is --tickstore-alone")
+    if alone and not full_day:
+        raise run_bench.Failure(run_bench.EXIT_USAGE, "--tickstore-alone is a full day: give "
+                                                      "--day or --full-day-smoke")
+    if alone and (args.systems not in (None, ["tickstore"]) or args.variant_source is not None
+                  or args.variants is not None):
+        raise run_bench.Failure(run_bench.EXIT_USAGE, "tick-store alone runs every variant: no "
+                                                      "other --systems, --variant-source or "
+                                                      "--variants")
+    if full_day and not alone and host != "Linux":
+        raise run_bench.Failure(run_bench.EXIT_USAGE, "off Linux a full day is tick-store alone: "
+                                                      "--tickstore-alone")
+    if args.systems is None:
+        args.systems = ["tickstore"] if alone else list(SYSTEM_NAMES)
+    pins = json.loads(PINS_PATH.read_text(encoding="utf-8"))
     if args.full_day_smoke and measure:
         raise run_bench.Failure(run_bench.EXIT_USAGE, "the smoke run is iteration only")
     if full_day and not alone and args.variant_source is None and args.variants is None:

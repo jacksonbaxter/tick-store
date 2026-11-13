@@ -23,7 +23,8 @@ One system runs at a time, each as one process. `compare/run.py` writes
 `scripts/check_compare.py` has passed the file, so a file that exists is complete. A full-day
 run, Linux only, does the same on a whole pinned day and writes
 `results/compare/<host>-<day>-full-<commit>.json`: see "Full-day comparison" below. On macOS a
-full day is tick-store alone: see "Full day of tick-store alone".
+full day is tick-store alone, which on Linux is a run of its own: see "Full day of tick-store
+alone".
 
 | Path | Job |
 |---|---|
@@ -100,6 +101,12 @@ files measured before it, protocol 1, record cpu5 alone.
 Exit 75 means the wrapper did not get the machine: finished systems are kept, so run it again to
 go on. Exit 2 is usage or setup, and anything else is what failed. For iteration, `--systems`,
 `--variants` and `--write-repetitions`, `--warm-repetitions` and `--cold-repetitions` narrow a run.
+A measured run, with `TICK_STORE_MEASURE` set, refuses all five: it is the whole protocol, and
+`scripts/check_compare.py` requires of every reported file exactly the repetitions in
+`compare/repetitions.py`, which `compare/run_system.py` runs: 30 warm and 7 cold per query, and 3
+writes per class and variant on the slice or 1 on a day. tick-store alone on a day is asked for by
+name, `--tickstore-alone`. A system's finished part is reused, when a run is resumed, only if it
+was made with the same repetition arguments, variants, scope and measurement.
 
 Afterwards:
 
@@ -674,12 +681,12 @@ none of this, because swap was already full when it started. See "Full-day compa
 
 **Reproducing tick-store's Linux figures at a later commit.** `--variant-source` wants Linux slice
 results of the same commit, and the only ones committed are `67ae574`'s, so at any other commit
-name tick-store's variants instead: the headline `v3-seg4Mi` and `v3-seg1Mi`, the pair the rule
-chose at `67ae574`. `--variants` applies to every system named, so run tick-store alone:
+run tick-store alone, which runs both its variants, the headline `v3-seg4Mi` and `v3-seg1Mi`, the
+pair the rule chose at `67ae574`:
 
 ```sh
 TICK_STORE_MEASURE=<wrapper> <venv>/bin/python -I compare/run.py --day 12302019 \
-    --systems tickstore --variants v3-seg4Mi,v3-seg1Mi \
+    --tickstore-alone \
     --data <dir> --vendor <dir> --work <dir> --tools <dir> --results-dir <dir>
 ```
 
@@ -689,14 +696,14 @@ at `<data>/export/12302019-full`, 23.9 GB, from `<tools>/tick_export <data>/1230
 <data>/export/12302019-full`, which the oracle proves before anything is loaded; the `bench`
 build's tools in `<tools>`; the environment `compare/setup.py` makes; and at least 50 GiB free
 on the work folder's disk, the guard's floor. One variant took 32 minutes on debian at `4c049c7`,
-the checks before it included, so the pair takes a little over an hour. The run measures tick-store exactly as the four-system day did, but
-`compare/run.py` validates the document as a four-system day and refuses it, since the other
-three systems and the variant selection are missing: it exits 1 and keeps
-`<results>/Linux-12302019-full-<commit>.json.pending`, and the system's own part is
-`<work>/parts/<commit>-12302019-full/tickstore.json`. Read tick-store's figures from either,
-beside its block in `results/compare/Linux-12302019-full-67ae574f5666.json`. That file is not a
-result: `scripts/check_compare.py` refuses it, and a tick-store-only day from Linux is refused by
-design ("Full day of tick-store alone" below).
+the checks before it included, so the pair takes a little over an hour. The run measures
+tick-store exactly as the four-system day did, with the guard and the warm proof by each
+process's storage reads, and ends as the macOS day of tick-store alone does: it validates the
+document as tick-store alone and writes `<results>/Linux-12302019-full-tickstore-<commit>.json`,
+exit 0. Read tick-store's figures from it beside its block in
+`results/compare/Linux-12302019-full-67ae574f5666.json`. Before the review's F-5 the same run
+took `--systems tickstore --variants v3-seg4Mi,v3-seg1Mi`, was validated as a four-system day,
+exited 1 and kept a `.pending` file; a measured run now refuses those arguments.
 
 ## Full day of tick-store alone
 
@@ -705,7 +712,7 @@ runs on Linux only: its warm proof and its guard read `/proc`. On macOS the same
 tick-store by itself:
 
 ```sh
-TICK_STORE_MEASURE=<wrapper> .venv/bin/python -I compare/run.py --day 12302019 --systems tickstore
+TICK_STORE_MEASURE=<wrapper> .venv/bin/python -I compare/run.py --day 12302019 --tickstore-alone
 ```
 
 It writes `results/compare/<host>-<day>-full-tickstore-<commit>.json`. Everything is the full day
@@ -726,10 +733,13 @@ things differ, and the file states each:
   whole run under BSD `time -l`, inside the measured command, and records its maximum resident set
   and the runner's peak memory footprint.
 
-It runs on macOS only. `scripts/check_compare.py` refuses one from Linux, any other system in it,
-a variant left out, the four-system rule stated, the per-process warm proof, peak memory without
-`time -l`, a heap claimed for a QuestDB that did not run, and either kind under the other's name.
-Its numbers rank nothing: RESULTS.md marks its queries "not ranked: alone".
+The same flag runs it on Linux, where nothing differs from the four-system day but the other three
+systems: every variant, the warm proof by each process's storage reads and peak memory from the
+guard, as above. `scripts/check_compare.py` refuses any other system in it, a variant left out, the
+four-system rule stated, on macOS the per-process warm proof or peak memory without `time -l`, on
+Linux the warm proof by residency or peak memory without the guard, a heap claimed for a QuestDB
+that did not run, and either kind under the other's name. Its numbers rank nothing: RESULTS.md
+marks its queries "not ranked: alone".
 
 ## What the numbers are
 

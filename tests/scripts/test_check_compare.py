@@ -1116,10 +1116,33 @@ def tickstore_only_document():
 
 
 ALONE_NAME = f"macOS-{DAY}-full-tickstore-{COMMIT[:12]}.json"
+LINUX_ALONE_NAME = f"Linux-{DAY}-full-tickstore-{COMMIT[:12]}.json"
+
+
+def linux_tickstore_only_document():
+    """tick-store alone on the day, on Linux (review F-5): tick-store alone as on macOS, with
+    Linux's own proofs, warm by each process's storage reads and peak memory from the guard."""
+    document = tickstore_only_document()
+    linux, _ = full_day_document()
+    document["header"] = linux["header"]
+    document["header"]["questdb_runtime"] = "not-run"
+    document["header"]["load_lines"] = LOAD_LINUX
+    document["header"]["sibling_busy_percent"] = {**sibling_block(), "cases": {"tickstore": 0.2}}
+    document["method"]["swap"] = linux["method"]["swap"]
+    document["heap"] = {"setting": "not-run", "full_day_check": "not-run",
+                        "statement": "QuestDB did not run: tick-store ran alone."}
+    system = document["systems"]["tickstore"]
+    ran = linux["systems"]["tickstore"]
+    for field in ("pinning", "mem_available_bytes", "peak_memory"):
+        system[field] = ran[field]
+    for name in variant_rule.TICKSTORE_VARIANTS:
+        system["variants"][name]["queries"] = copy.deepcopy(ran["variants"]["v"]["queries"])
+    return document
 
 
 class TickstoreOnly(Harness):
-    """The macOS full day of tick-store alone: never a subset passing for the four-system day."""
+    """A full day of tick-store alone, on either host: never a subset passing for the
+    four-system day."""
 
     def run_alone(self, document, name=ALONE_NAME):
         path = self.directory / name
@@ -1139,18 +1162,32 @@ class TickstoreOnly(Harness):
         result = self.run_alone(tickstore_only_document())
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_a_tickstore_only_day_on_linux(self):
+    def test_a_tickstore_only_day_on_linux_passes(self):
+        # Review F-5: tick-store's Linux figures at a later commit, without the other three.
+        result = self.run_alone(linux_tickstore_only_document(), LINUX_ALONE_NAME)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_a_linux_tickstore_only_day_warm_by_residency(self):
+        document = linux_tickstore_only_document()
+        for variant in document["systems"]["tickstore"]["variants"].values():
+            for entry in variant["queries"].values():
+                entry["warm"]["proof"] = {"pages": 8, "resident_before": 8, "resident_after": 8}
+        result = self.run_alone(document, LINUX_ALONE_NAME)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("bytes across the timed repetitions", result.stderr)
+
+    def test_a_linux_tickstore_only_day_without_the_guards_memory(self):
+        document = linux_tickstore_only_document()
+        document["systems"]["tickstore"]["peak_memory"] = \
+            tickstore_only_document()["systems"]["tickstore"]["peak_memory"]
+        result = self.run_alone(document, LINUX_ALONE_NAME)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("tickstore.peak_memory: no vmhwm_bytes_largest", result.stderr)
+
+    def test_a_macos_tickstore_only_day_without_time_memory(self):
         def fault(document):
-            linux = valid_document("Linux")["header"]
-            linux["questdb_runtime"] = "not-run"
-            linux["load_lines"] = LOAD_LINUX
-            linux["sibling_busy_percent"] = {**sibling_block(), "cases": {"tickstore": 0.2}}
-            document["header"] = linux
-            document["systems"]["tickstore"]["pinning"] = {"status": "verified", "cpus": [4, 6]}
-            document["systems"]["tickstore"]["mem_available_bytes"] = {"lowest": 1, "highest": 2,
-                                                                       "samples": 2}
-        self.assert_alone_fault(fault, "Linux runs the four-system day",
-                                f"Linux-{DAY}-full-tickstore-{COMMIT[:12]}.json")
+            del document["systems"]["tickstore"]["peak_memory"]["peak_memory_footprint_bytes"]
+        self.assert_alone_fault(fault, "no peak_memory_footprint_bytes from")
 
     def test_another_system_beside_it(self):
         def fault(document):
