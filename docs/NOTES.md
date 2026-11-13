@@ -3654,6 +3654,9 @@ holds, so the decode error that keeps the old words is not reachable from a file
 `tick_codec_eval` has the same line: given `--columns bogus` it says "the source did not decode:
 no column is named bogus" (`phase4-raw/fix-second-pass/codec-eval-sibling/`). It is outside this
 finding and is left for a TASKS item.
+That item is done: `tick_codec_eval` writes the error as it is, and its decode error carries the
+words itself, as `tick_reference_eval`'s does. `CodecEvalCli.TheCommandLineSaysWhatFailed` read
+the old words before the change (`phase4-raw/fix-leftovers/item2-before.log`).
 
 RD-4. Closed with the reviewer's optional guard rather than left as a note, because a note cannot
 make a revert of D-11 fail. The block size rides in `EncodeErrors`, which every encoder helper
