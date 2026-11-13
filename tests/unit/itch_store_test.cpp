@@ -734,6 +734,16 @@ TEST(ItchStoreSegments, RandomAccessToAnySegmentGivesWhatTheSequentialReadGives)
     EXPECT_FALSE(records.seek(*reader, reader->segment_count()).has_value());
 }
 
+// The header says a reader before any seek is a segment of no records (review R-2).
+TEST(ItchStoreSegments, AReaderBeforeAnySeekIsASegmentOfNoRecords) {
+    SegmentReader records;
+    for (int twice = 0; twice < 2; ++twice) {
+        const auto next = records.next();
+        ASSERT_TRUE(next.has_value()) << to_string(next.error());
+        EXPECT_FALSE(next->has_value());
+    }
+}
+
 TEST(ItchStoreSegments, AddPriceIsGroupedByLocateAndSideAndAddSharesByLocate) {
     const std::vector<itch::Message> messages{
         test::add(2, 1, 1, "B", 'S', 30, 3), test::add(1, 2, 2, "A", 'B', 10, 1),

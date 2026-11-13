@@ -1300,6 +1300,10 @@ std::expected<std::optional<itch::Message>, ItchStoreError> SegmentAssembler::ne
     if (s.failure.has_value()) {
         return std::unexpected(*s.failure);
     }
+    // Nothing loaded yet: a segment of no records, as SegmentReader's header says (R-2).
+    if (s.summary == nullptr) {
+        return std::optional<itch::Message>{};
+    }
     const auto fail = [&s](ItchStoreError error) {
         s.failure = error;
         return std::unexpected(error);
