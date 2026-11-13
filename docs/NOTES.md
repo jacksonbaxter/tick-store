@@ -3218,6 +3218,78 @@ Raw: `phase4-raw/fix-codecs/`: each finding's failing and passing logs, the help
 (the hostile block, the corpus scan, the hash patterns, the worst move-to-front block),
 `kernels-in-use.md` and the check logs.
 
+### The final review's store findings
+
+Reviewer C read the container, the ITCH store and the queries at `ca96b36` and found one SHOULD
+and nine NOTE findings (C-1 to C-10); the orchestrator's gate added a tenth, G-3, the message that
+read "expected 0, have 0". Each was confirmed by reading the code, then by a test seen failing for
+the reason given, except C-9, whose demonstration was wrong, and C-4, which needed no code. The
+file format did not change: no writer byte moved, and the golden tests passed unchanged after
+every commit. The record is `docs/REVIEW.md`.
+
+C-1. Deleting the moves, the smaller fix the triage preferred, was not possible: `create` and
+`open_at` return the writer inside `std::expected` by value. The symbol table moved to the heap, so
+the pointer `SegmentBuilder` keeps stays good across a move. Before: SIGSEGV in `finish()`.
+
+C-2. A failed segment write now latches: the writer keeps the error, drops its file and returns
+the error from every later `append` and `finish`, and `take_bytes` gives nothing. The test needs a
+segment big enough to reach `write_all` mid-stream, 20 raw records of 65,535 random bytes, with
+`RecordingFileOps` failing `write` with `EIO`.
+
+C-3. `O_NONBLOCK` on the reader's `open` makes a FIFO open return at once, and the regular-file
+check refuses it. A blocked `open(2)` has no count to bound, so the test bounds its wait at 10 s and
+then opens the write end itself, so a failing test ends instead of hanging; before the fix it
+waited the 10 s. The harness's own opens without `O_NONBLOCK` are area D's.
+
+C-4. Confirmed as stated and closed without a format change: the reader bounds every column by
+the record count already, and `raw_bytes` legitimately holds up to 65,535 bytes a raw record. The
+true worst case is now in `docs/store.md`: about 9 bytes held a raw byte, a 666-byte file held in
+8,388,480 bytes (12,595 to 1, pinned by a test), and at the limit about 130 KiB of file for about
+36 GiB held, a calculation, not a run.
+
+C-5. The oracle now builds the column form from the whole decode, every segment through
+`SegmentReader` with none skipped, and compares the exact path's rows, minutes, counts and sum
+with it. With `may_hold` made to skip a raw-only segment, the old oracle passed both its tests and
+only `ItchQuery.SegmentsWithRawRowsTakeTheExactPath` caught it; the new oracle failed the new
+test and 96 cuts and flips.
+
+C-6. macOS refuses a `write(2)` of more than `INT_MAX` bytes with `EINVAL`; Linux writes up to
+about 2 GiB and returns short. Requests are capped at 1 GiB on both. The test writes 2^31 + 1 bytes
+of an anonymous mapping to `/dev/null`, so it costs no disk.
+
+C-7. `seek()` now marks the assembler failed when it cannot read or load a segment, and `next()`
+returns that error until a load succeeds. Before: on the column-read route, a record of the
+segment before; on the load route, a clean empty segment.
+
+C-8. An empty span has no address in the file, so its offset is now 0 only when its pointer is
+null, and an empty metadata is reported at its place in the footer (2,549 in the test, not 0). A
+header of no segments is reported as its count against the footer's, not as a segment index
+against a count less one, which wrapped to 18,446,744,073,709,551,615.
+
+C-9. Refuted as demonstrated: with both `device_flush` branches deleted from `publish`,
+`ContainerTornWrite.ACrashAtAnyStepLeavesTheOldFileOrTheWholeNewOne` failed with exit status 3 at
+the full-fsync crash points, and two `ContainerCommit` tests failed. The gap is narrower: a process
+crash keeps the page cache, so with every flush in `PosixFileOps` doing nothing and returning 0,
+all 166 store and durability tests passed. Only a power-cut test could show a missing flush, so
+`docs/format.md` and the comments beside the tests now say so.
+
+C-10. The stub store's `write_all_at` called `pwrite` directly and spun on a return of 0. It is now
+in durability behind a new `FileOps::pwrite`, with the 1 GiB cap and 0 as `EIO`. `pwrite` has a
+default body, so the harness's own `RecordingFileOps` still compiles. Before: 1,001 calls, then
+success.
+
+G-3. The store's errors carried `expected` and `actual` whether or not they compared anything, and
+`to_string` always printed them. They are optional now. A checksum failure keeps its numbers and
+offset in its container cause, so the store error no longer repeats the offset; lookups,
+`append after finish` and other refusals of no value print no pair; an unknown codec prints only
+what it read. The gate's message now reads "container: block, segment 32, column timestamp, block
+56537 (bad checksum: block at offset 878190723: expected 2290514605, have 1031937585)". The
+scripts' substring checks still match. `results/roundtrip-12302019.json` still holds the old text,
+since results are not regenerated in Phase 4; the freeze rerun will replace it.
+
+Raw: `phase4-raw/fix-store/`: each finding's failing and passing logs, the fault runs for C-5
+and C-9, and the check logs.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
