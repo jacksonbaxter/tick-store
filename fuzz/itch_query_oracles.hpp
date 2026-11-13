@@ -24,6 +24,18 @@
 // whole decode with no segment skipped: every record re-encoded and mapped by row_values(),
 // a raw row taking the time of the row before it, and each request filtered from that.
 //
+// What that column form shares with the paths it checks (review RD-6): SegmentReader and
+// the decoders below it, itch::encode, and row_values() with hot_fields() and
+// fits_columns(), which the exact path maps through everywhere and the indexed path in
+// every segment that is not plain. Only the type byte is read here from the payload
+// itself, and a raw row's time from the row before it. So a fault in which form a typed
+// record takes, or in a hot or rare row's fields, that shows only in segments that are not
+// plain moves every answer alike and passes here; in a plain segment the indexed path
+// reads its own columns and sees it. The store fuzzer's decode, re-encode and compare
+// covers the decoders, and the column export's round-trip and golden tests rebuild typed
+// records from a hot or rare row's fields; a raw row's type byte is not read back there,
+// so it is read here.
+//
 // Requests come from the file: windows over its summaries' times, a one-nanosecond window
 // at a segment's first time, and a window and a locate read from the input's last bytes,
 // so the fuzzer can steer them; locates: every one, locate 0, the first locate of the
@@ -192,7 +204,9 @@ struct ColumnForm {
             }
             QueryRow row;
             row.seq = out.rows.size();
-            row.msg_type = values->msg_type;
+            // The type byte as sent, read here rather than from row_values(), which every
+            // path maps through in a segment that is not plain (review RD-6).
+            row.msg_type = std::to_integer<std::uint16_t>(scratch.front());
             if (values->form == RowForm::raw) {
                 row.ts_ns = previous;
             } else {
