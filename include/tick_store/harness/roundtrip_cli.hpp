@@ -9,7 +9,8 @@
 //       durability mode named: it is never a default. Prints a JSON summary, which lists in
 //       `flushes` every flush the writer made, through the real system calls, with what it was
 //       called on, the file or its directory, and its result. --first-records stores only the
-//       source's first N records, with no tail: the comparison harness's small commit.
+//       source's first N records, with no tail: the comparison harness's small commit. A source
+//       of fewer than N records is stored whole, its tail included.
 //   tick_roundtrip ingest-stub <source> <store>
 //       The same through the Phase 2 stub store, which the stub's own tests still use.
 //   tick_roundtrip verify <source> <store> [--expect-sha256 HEX] [--no-checksums]
