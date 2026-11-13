@@ -38,7 +38,10 @@ render rather than leave a gap.
 The headline block is the rows scripts/targets.json lists under "headline", each a target row of
 the targets block, or some of its parts, judged by the same code, so every figure and verdict
 in it is the targets block's own. A row may show some of its parts; the parts it leaves out are
-named under the table with their verdicts. A headline with no missed target stops the render.
+named under the table with their verdicts. A headline with no missed target stops the render. The prose
+above the headline, the pitch, is written by hand: every figure it states is one scripts/targets.json
+lists under "pitch" and is checked against the results, or a text listed there with its reason
+for being no result, so --check stops on a pitch figure the results no longer give.
 
 G-3's file, results/fuzz-g3-<commit>.json, must pass check_fuzz.py first, against the fuzz
 targets fuzz/CMakeLists.txt defines: one that leaves a target out, or holds a clean run under
@@ -999,6 +1002,43 @@ def render_headline(definitions_path, root):
     return lines
 
 
+# A figure as prose writes it: digits, with thousands commas or a decimal point between them.
+NUMBER = re.compile(r"\d+(?:[.,]\d+)*")
+
+
+def check_pitch(definitions_path, root, readme):
+    """The README's pitch, the prose above its headline, states figures by hand. Each one
+    scripts/targets.json lists under "pitch" must appear in it as the results give it now, and
+    every other number in it must be a text listed with the reason it is no result, such as a
+    language version or a target's own value, so no figure there goes stale unseen (review
+    E-9)."""
+    pitch = json.loads(definitions_path.read_text(encoding="utf-8")).get("pitch")
+    if not pitch:
+        return
+    text = " ".join(readme.split(HEADLINE_BEGIN)[0].split())
+    remaining = text
+    for figure in pitch["figures"]:
+        path = target_file(root, figure["file"])
+        if path is None:
+            raise TargetError(f"pitch: no results file matches {figure['file']}")
+        document = json.loads(path.read_text(encoding="utf-8"))
+        values = [evaluate(value, document) * figure.get("scale", 1)
+                  for value in figure["values"]]
+        stated = figure["format"].format(*values)
+        if stated not in text:
+            raise TargetError(f"the README's pitch does not state {stated!r}, which "
+                              f"{path.relative_to(root)} gives")
+        remaining = remaining.replace(stated, " ")
+    for item in pitch.get("not_results", []):
+        if not item.get("why"):
+            raise TargetError(f"pitch: {item.get('text')!r} is kept out of the check with no "
+                              "reason")
+        remaining = remaining.replace(item["text"], " ")
+    left = NUMBER.findall(remaining)
+    if left:
+        raise TargetError(f"a figure in the README's pitch that nothing checks: {left[0]!r}")
+
+
 def block_of(text, begin=BEGIN, end=END):
     """(before, block, after) around the markers, or None if they are not both there."""
     first = text.find(begin)
@@ -1106,6 +1146,8 @@ def main(argv=None):
         if wants_headline:
             headline.append((HEADLINE_BEGIN, HEADLINE_END,
                              render_headline(args.targets, args.targets_root)))
+        if has_targets and readme is not None:
+            check_pitch(args.targets, args.targets_root, readme)
     except (OSError, json.JSONDecodeError, TargetError) as error:
         print(f"render_results: targets: {error}", file=sys.stderr)
         return EXIT_USAGE

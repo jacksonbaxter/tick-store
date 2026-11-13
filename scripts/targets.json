@@ -13,6 +13,31 @@
    {"id": "G-3", "host": "any", "name": "fuzzing"}
   ]
  },
+ "pitch": {
+  "what": "The README's pitch, the prose above its headline, written by hand. render_results.py requires each figure below to appear in it as the results give it now, each value times scale put through format, and every other number in it to be one of not_results, each with the reason it is no result.",
+  "figures": [
+   {"file": "results/store-size-12302019.json", "values": [{"path": ["records"]}], "format": "{:,} messages"},
+   {"file": "results/store-size-12302019.json", "values": [{"path": ["source_bytes"]}], "scale": 1e-9, "format": "{:.2f} GB"},
+   {"file": "results/store-size-12302019.json", "values": [{"path": ["stored_bytes"]}], "scale": 1e-9, "format": "{:.2f} GB"},
+   {"file": "results/store-size-12302019.json", "values": [{"path": ["ratio"]}], "format": "{:.2f} times smaller"},
+   {"file": "results/compare/Linux-12302019-full-*.json", "values": [{"path": ["systems", "tickstore", "variants", "@headline", "queries", "Q2", "warm", "n"]}, {"path": ["systems", "tickstore", "variants", "@headline", "queries", "Q2", "cold", "n"]}], "format": "of {} warm runs and of {} cold"},
+   {"file": "results/compare/Linux-12302019-full-*.json", "values": [{"path": ["systems", "arcticdb", "variants", "rows100k-cols127-per-security", "queries", "Q2", "warm", "median_us"]}, {"path": ["systems", "arcticdb", "variants", "rows100k-cols127-per-security", "queries", "Q3", "warm", "median_us"]}, {"path": ["systems", "tickstore", "variants", "@headline", "queries", "Q2", "warm", "median_us"]}, {"path": ["systems", "tickstore", "variants", "@headline", "queries", "Q3", "warm", "median_us"]}], "scale": 0.001, "format": "{:.2f} and {:.2f} ms warm against {:.2f} and {:.2f} ms"},
+   {"file": "results/compare/Linux-12302019-full-*.json", "values": [{"path": ["systems", "arcticdb", "variants", "rows100k-cols127-per-security", "queries", "Q1", "warm", "median_us"]}], "scale": 1e-6, "format": "{:.1f} s on Q1 warm"},
+   {"file": "results/compare/Linux-12302019-full-*.json", "values": [{"path": ["systems", "tickstore", "variants", "@headline", "classes", "A", "write", "records_per_second_median"]}], "scale": 1e-6, "format": "{:.3f} M records/s"}
+  ],
+  "not_results": [
+   {"text": "C++23", "why": "the language standard"},
+   {"text": "ITCH 5.0", "why": "the feed's version"},
+   {"text": "SHA-256", "why": "the hash's name"},
+   {"text": "(Q1)", "why": "a query's name"},
+   {"text": "(Q2)", "why": "a query's name"},
+   {"text": "(Q3)", "why": "a query's name"},
+   {"text": "(Q4)", "why": "a query's name"},
+   {"text": "8.59 M", "why": "WT-1's target value, from BENCHMARKS.md"},
+   {"text": "32 workers on 32 vCPUs", "why": "the setup of the published figure WT-1 is taken from, from BENCHMARKS.md"},
+   {"text": "WT-1", "why": "a target's id"}
+  ]
+ },
  "rows": [
   {"id": "G-1", "host": "any", "target_text": "every record bit-exact, both stream hashes equal",
    "judged": "the full pinned day, on each host it ran, and the second day",
