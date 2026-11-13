@@ -4212,6 +4212,14 @@ says the day runs on either host, with residency and BSD time -l on macOS and th
 day's proofs on Linux, and that the name and the scope together keep it from standing in for the
 four-system day.
 
+**RV-6, the committed protocol 1 files known by their bytes.** Confirmed by a test: a protocol
+2 document with its protocol and a warm-up count deleted, stating `67ae574`'s commit, passed with
+exit 0. The exemption is now the file's own SHA-256: `scripts/data_pins.json` lists the four
+committed comparison files under `protocol_1_comparison_files`, by name and digest, and only a
+file whose bytes match one of them may state no protocol. The same document written again with
+another indent is refused. The committed files pass unchanged. The tests' protocol 1 fixtures
+are pinned in their own pins file as they are written, since they stand for those files.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
