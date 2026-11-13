@@ -4202,6 +4202,11 @@ command died of. `GuardedRun` shows `run_one` refusing a system whose command ex
 guard fired, and writing no `.load` file, so a resumed run makes the part again.
 `test_stream_guard.py`, which needs the `.venv`, is now in `check.sh`'s `py-compare` step.
 
+**F-12, QuestDB's version.** Confirmed: the part's `versions` gave QuestDB's server as the
+literal 10.1.0. It is now the version in each running server's `SELECT build` ("Build
+Information: QuestDB 10.1.0, JDK 25.0.2, Commit Hash ..." in every committed file), one version
+for every class of the part, or the part fails. The committed files are unchanged and right.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
