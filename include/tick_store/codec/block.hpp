@@ -17,6 +17,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -54,6 +55,12 @@ struct BlockHeader {
 [[nodiscard]] std::expected<BlockHeader, CodecError> read_block_header(
     std::span<const std::byte> block, std::uint64_t first_bits, std::uint64_t min_bits_per_value);
 
+// The count a block's header states, read without decoding the block, when it is one
+// a block may hold (1 to kMaxBlockValues); otherwise nothing, and the count is the block
+// decoder's to refuse. A caller that knows the count it needs refuses a block stating
+// another before paying for its decode.
+[[nodiscard]] std::optional<std::uint32_t> stated_block_count(std::span<const std::byte> block);
+
 // Appends a header with a zero payload size, to be filled in by patch_block_header.
 // Returns its offset in `out`.
 [[nodiscard]] std::size_t begin_block(std::vector<std::byte>& out, std::uint32_t count);
@@ -79,8 +86,11 @@ using BlockDecoder = std::expected<std::size_t, CodecError> (*)(std::span<const 
 // `out` keeps what it held before. For a column short of `count`, the error is
 // truncated with expected = `count` and actual = the values found; for one with more,
 // bad_count with the same two values, or trailing_bits for bytes after the last value. A
-// block whose stated count would pass `count` is refused before it is decoded, so a column
-// costs at most the work of `count` values, whatever its blocks claim.
+// block whose stated count would pass `count` is refused before it is decoded, and the
+// dictionary and run-length decoders refuse a nested block stating a count other than
+// the one they need before decoding it too, so a column costs at most the work of
+// `count` values, whatever its blocks or their nested blocks claim. (A dictionary's
+// entries and a run-length block's runs are each at most its count.)
 [[nodiscard]] std::expected<void, CodecError> decode_column(std::span<const std::byte> column,
                                                             std::uint64_t count,
                                                             std::vector<std::uint64_t>& out,

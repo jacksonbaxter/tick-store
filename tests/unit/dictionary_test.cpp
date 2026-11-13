@@ -450,6 +450,33 @@ TEST(Dictionary, EachHeaderCorruptionHasItsError) {
               std::unexpected(error_of(CodecErrorKind::bad_count, "dict dictionary count", 104, 2, 3)));
 }
 
+// `block`, one nested PFOR block, with a spare byte after its payload that its header
+// counts: the PFOR decoder refuses that byte only after decoding every value before it.
+Bytes with_spare_byte(Bytes block) {
+    const auto payload = static_cast<std::uint32_t>(block.size() - kBlockHeaderSize);
+    patch_block_header(block, 0, payload + 1U);
+    block.push_back(std::byte{0});
+    return block;
+}
+
+// A nested block's count is checked before the block is decoded, so a piece of one value
+// does not cost a nested block of 2^20 (review R-1). The well-formed block gets the
+// same error as before the check; the one with a spare byte would get the PFOR decoder's
+// trailing-byte error, 2^20 values in, if it were decoded first.
+TEST(Dictionary, ANestedBlockPastItsCountIsRefusedBeforeItIsDecoded) {
+    const Bytes big = pfor_of(Values(kMaxBlockValues, 5));
+    const Bytes spare = with_spare_byte(big);
+    for (const Bytes* nested : {&big, &spare}) {
+        EXPECT_EQ(decoded_block(dict_block(1, 0, 1, *nested, pfor_of({0}))),
+                  std::unexpected(error_of(CodecErrorKind::bad_count, "dict dictionary count", 104,
+                                           1, kMaxBlockValues)));
+        const Bytes dictionary = pfor_of({5});
+        EXPECT_EQ(decoded_block(dict_block(1, 0, 1, dictionary, *nested)),
+                  std::unexpected(error_of(CodecErrorKind::bad_count, "dict index count",
+                                           104 + (8 * dictionary.size()), 1, kMaxBlockValues)));
+    }
+}
+
 TEST(Dictionary, EachIndexCorruptionHasItsError) {
     const Bytes dictionary = pfor_of({3, 5});
     const std::uint64_t indices_at = 104 + (8 * dictionary.size());

@@ -330,6 +330,33 @@ TEST(RunLength, EachCorruptionHasItsError) {
               std::unexpected(error_of(CodecErrorKind::bad_count, "rle run lengths", lengths_at, 3, 2)));
 }
 
+// `block`, one nested PFOR block, with a spare byte after its payload that its header
+// counts: the PFOR decoder refuses that byte only after decoding every value before it.
+Bytes with_spare_byte(Bytes block) {
+    const auto payload = static_cast<std::uint32_t>(block.size() - kBlockHeaderSize);
+    patch_block_header(block, 0, payload + 1U);
+    block.push_back(std::byte{0});
+    return block;
+}
+
+// A nested block's count is checked before the block is decoded, so a piece of one value
+// does not cost a nested block of 2^20 (review R-1). The well-formed block gets the
+// same error as before the check; the one with a spare byte would get the PFOR decoder's
+// trailing-byte error, 2^20 values in, if it were decoded first.
+TEST(RunLength, ANestedBlockPastItsCountIsRefusedBeforeItIsDecoded) {
+    const Bytes big = pfor_of(Values(kMaxBlockValues, 0));
+    const Bytes spare = with_spare_byte(big);
+    for (const Bytes* nested : {&big, &spare}) {
+        EXPECT_EQ(decoded_block(rle_block(1, 1, *nested, pfor_of({0}))),
+                  std::unexpected(error_of(CodecErrorKind::bad_count, "rle value count", 96, 1,
+                                           kMaxBlockValues)));
+        const Bytes run_values = pfor_of({5});
+        EXPECT_EQ(decoded_block(rle_block(1, 1, run_values, *nested)),
+                  std::unexpected(error_of(CodecErrorKind::bad_count, "rle length count",
+                                           96 + (8 * run_values.size()), 1, kMaxBlockValues)));
+    }
+}
+
 TEST(RunLength, ColumnCountMustMatchExactly) {
     const Values values{1, 1, 2, 2, 3, 3, 4, 4, 5, 5};
     const Bytes column = encoded(values, 4);  // blocks of 4, 4 and 2

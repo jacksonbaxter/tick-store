@@ -299,10 +299,12 @@ over a dictionary of 0 to 2,047 is 7,342 bytes and asks for 2^20 x 2,047 x 2 = 4
 moves. A block in modes 0 or 1 checks its K entries for a repeat by a hash set that sorts a copy
 when entries crowd one slot, O(K log K) at worst, K at most the block's count. The column
 decoder reads each block's count before decoding it and refuses one that would pass the piece's
-count, so neither cost reaches past the values a piece declares: at most 16,384 values a piece,
+count, and the dictionary and run-length decoders read each nested block's count before decoding
+it and refuse one other than the entries, values or runs they need, so neither cost, nor a nested
+block's own decode, reaches past the values a piece declares: at most 16,384 values a piece,
 which in mode 2 is at most 67 MB of moves. For an untrusted file, then, assume a dictionary column
 costs up to 2,047 16-bit moves a value and every other column O(1) a value, on top of what this
-section lists (B-1, B-3 and B-4 in `docs/REVIEW.md`).
+section lists (B-1, B-3, B-4 and R-1 in `docs/REVIEW.md`).
 
 Memory is bounded by the records, not by the file. The reader checks every column's count against
 what the segment's own records need before it inflates or allocates anything: the type column's

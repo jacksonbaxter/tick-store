@@ -554,6 +554,13 @@ std::expected<std::size_t, CodecError> decode_dict_block(std::span<const std::by
     dictionary.clear();
     const std::uint64_t dictionary_at = kPayloadStart + (at * 8U);
     {
+        // Each nested count is checked before its block is decoded, with the error the
+        // check after it gives, so a block of one value cannot cost a nested 2^20 (R-1).
+        if (const auto stated = stated_block_count(payload.subspan(at));
+            stated.has_value() && *stated != entry_count) {
+            return std::unexpected(codec_error(CodecErrorKind::bad_count, "dict dictionary count",
+                                               dictionary_at, entry_count, *stated));
+        }
         const auto taken = decode_pfor_block(payload.subspan(at), dictionary);
         if (!taken.has_value()) {
             return std::unexpected(rebased(taken.error(), dictionary_at));
@@ -574,6 +581,11 @@ std::expected<std::size_t, CodecError> decode_dict_block(std::span<const std::by
             return std::unexpected(read.error());
         }
     } else {
+        if (const auto stated = stated_block_count(payload.subspan(at));
+            stated.has_value() && *stated != count) {
+            return std::unexpected(codec_error(CodecErrorKind::bad_count, "dict index count",
+                                               indices_at, count, *stated));
+        }
         const auto taken = decode_pfor_block(payload.subspan(at), indices);
         if (!taken.has_value()) {
             return std::unexpected(rebased(taken.error(), indices_at));

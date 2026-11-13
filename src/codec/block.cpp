@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -58,6 +59,14 @@ std::expected<BlockHeader, CodecError> read_block_header(std::span<const std::by
                        .payload_bytes = static_cast<std::uint32_t>(*payload)};
 }
 
+std::optional<std::uint32_t> stated_block_count(std::span<const std::byte> block) {
+    const auto count = store::read_le<4>(block, kCountOffset);
+    if (!count.has_value() || *count == 0 || *count > kMaxBlockValues) {
+        return std::nullopt;
+    }
+    return static_cast<std::uint32_t>(*count);
+}
+
 std::size_t begin_block(std::vector<std::byte>& out, std::uint32_t count) {
     const std::size_t at = out.size();
     out.resize(at + kBlockHeaderSize);
@@ -107,9 +116,8 @@ std::expected<void, CodecError> decode_column(std::span<const std::byte> column,
         // Every block states its count first, so one that would pass `count` is refused
         // before it is decoded: a short column costs its own count, not a block's cap. A
         // count of 0 or past the cap is the block decoder's to refuse.
-        if (const auto stated = store::read_le<4>(column, offset + kCountOffset);
-            stated.has_value() && *stated >= 1 && *stated <= kMaxBlockValues &&
-            decoded + *stated > count) {
+        if (const auto stated = stated_block_count(column.subspan(offset));
+            stated.has_value() && decoded + *stated > count) {
             return fail(codec_error(CodecErrorKind::bad_count, "column count", offset * 8U, count,
                                     decoded + *stated));
         }

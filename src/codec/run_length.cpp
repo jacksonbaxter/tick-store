@@ -104,6 +104,13 @@ std::expected<std::size_t, CodecError> decode_rle_block(std::span<const std::byt
     std::vector<std::uint64_t> run_values;
     const std::uint64_t values_at = kPayloadStart + (at * 8U);
     {
+        // Each nested count is checked before its block is decoded, with the error the
+        // check after it gives, so a block of one value cannot cost a nested 2^20 (R-1).
+        if (const auto stated = stated_block_count(payload.subspan(at));
+            stated.has_value() && *stated != run_count) {
+            return std::unexpected(codec_error(CodecErrorKind::bad_count, "rle value count",
+                                               values_at, run_count, *stated));
+        }
         const auto taken = decode_pfor_block(payload.subspan(at), run_values);
         if (!taken.has_value()) {
             return std::unexpected(rebased(taken.error(), values_at));
@@ -117,6 +124,11 @@ std::expected<std::size_t, CodecError> decode_rle_block(std::span<const std::byt
     std::vector<std::uint64_t> run_lengths;
     const std::uint64_t lengths_at = kPayloadStart + (at * 8U);
     {
+        if (const auto stated = stated_block_count(payload.subspan(at));
+            stated.has_value() && *stated != run_count) {
+            return std::unexpected(codec_error(CodecErrorKind::bad_count, "rle length count",
+                                               lengths_at, run_count, *stated));
+        }
         const auto taken = decode_pfor_block(payload.subspan(at), run_lengths);
         if (!taken.has_value()) {
             return std::unexpected(rebased(taken.error(), lengths_at));
