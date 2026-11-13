@@ -162,7 +162,9 @@ and an undetected fault is a bug in the check.
 `.github/workflows/ci.yml` runs `scripts/check.sh` on Linux x86-64 and macOS arm64, one job per
 step group, on a pinned LLVM. The steps are the same as a local run, and
 `tests/scripts/test_check_sh.py` fails if one of them is missing from the workflow. The data is
-absent on CI, so `ItchRealDay` skips visibly, and with no `.venv`, `py-compare` shows as `SKIP`.
+absent on CI, so `ItchRealDay` skips visibly. The repo job makes the comparison's `.venv` from
+`compare/requirements.lock`, by hash, so `py-compare` runs its fast tests, and CI passes
+`--no-skips`, which fails any step that would skip.
 
 It is validated locally by actionlint with shellcheck. On GitHub, the first run failed 10 of
 its 14 jobs; the causes and fixes are in `docs/NOTES.md`, "The first runs on GitHub Actions". All

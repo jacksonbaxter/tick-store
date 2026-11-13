@@ -84,9 +84,50 @@ class CheckScript(unittest.TestCase):
         self.assertRegex(done.stdout, r"QUICK RUN: .* did NOT run")
         self.assertRegex(done.stdout, r"pass 1, fail 0, blocked 0, skipped 3 \(a skip is not a pass")
 
+    def test_no_skips_turns_a_skip_into_a_failure(self):
+        # Review E-6: CI named py-compare, which skipped there for want of a .venv.
+        env = dict(self.env, CHECK_VENV=str(self.logs / "no-such-venv"))
+        done = self.run_script("--only", "py-compare", env=env)
+        self.assertEqual(done.returncode, 0, done.stdout)
+        self.assertEqual(self.summary(), {"py-compare": "SKIP"})
+        done = self.run_script("--no-skips", "--only", "py-compare", env=env)
+        self.assertEqual(done.returncode, 1, done.stdout)
+        self.assertEqual(self.summary(), {"py-compare": "FAIL"})
+        self.assertIn("--no-skips: no .venv and no CHECK_VENV", done.stdout)
+
+    def test_no_skips_refuses_quick(self):
+        done = self.run_script("--no-skips", "--quick", "--only", "render-check")
+        self.assertEqual(done.returncode, 2)
+        self.assertIn("--no-skips and --quick", done.stderr)
+
+    def workflow_runs(self):
+        """The workflow's check.sh command lines."""
+        return [line.strip() for line in WORKFLOW.read_text().splitlines()
+                if "scripts/check.sh" in line and line.strip().startswith(("run:", "scripts/"))]
+
+    def test_the_workflow_runs_every_step_it_names(self):
+        runs = self.workflow_runs()
+        self.assertTrue(runs)
+        for run in runs:
+            self.assertIn("--no-skips", run)
+            self.assertNotIn("--quick", run)
+
+    def test_the_workflow_makes_the_environment_py_compare_needs(self):
+        text = WORKFLOW.read_text()
+        step = re.search(r"- name: [^\n]*\n\s+if: matrix\.check\.name == 'repo'\n"
+                         r"\s+run: \|\n((?:\s{10,}\S[^\n]*\n)+)", text)
+        self.assertIsNotNone(step, "no step of the repo job makes the .venv")
+        commands = step[1]
+        self.assertIn("-m venv .venv", commands)
+        self.assertIn("--require-hashes", commands)
+        self.assertIn("-r compare/requirements.lock", commands)
+
     def test_every_step_is_run_by_the_workflow(self):
-        steps = subprocess.run([str(SCRIPT), "--list"], capture_output=True, text=True,
-                               env=self.env).stdout.split()
+        listed = subprocess.run([str(SCRIPT), "--list"], capture_output=True, text=True,
+                                env=self.env)
+        self.assertEqual(listed.returncode, 0, listed.stderr)
+        steps = listed.stdout.split()
+        self.assertTrue(steps)
         named = set()
         for listed in re.findall(r'only: "([a-z0-9,-]+)"', WORKFLOW.read_text()):
             named.update(listed.split(","))

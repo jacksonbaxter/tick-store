@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs every check of the project, one step at a time, then prints a summary table.
 #
-#     scripts/check.sh [--quick] [--fuzz-seconds N] [--log-dir DIR] [--only a,b,c]
+#     scripts/check.sh [--quick | --no-skips] [--fuzz-seconds N] [--log-dir DIR] [--only a,b,c]
 #     scripts/check.sh --list
 #
 # The toolchain comes from the environment: CXX and CC, clang-tidy, llvm-cov and the rest
@@ -14,6 +14,8 @@
 #
 # Options:
 #   --quick           skip the sanitizers, fuzzing and coverage, and say so in the summary
+#   --no-skips        every step must run: one that would skip fails with its reason. CI
+#                     passes it, so a step it names cannot pass there by not running
 #   --fuzz-seconds N  each fuzz target's budget, 20 by default
 #   --fuzz-seed N     a fixed libFuzzer seed, for a repeatable run
 #   --fresh-corpus    drop the saved fuzz corpus first, so a run starts from the seeds
@@ -49,6 +51,7 @@ JOBS=6
 TEST_TIMEOUT=900
 
 QUICK=0
+NO_SKIPS=0
 FUZZ_SECONDS=20
 FUZZ_SEED=
 FRESH_CORPUS=0
@@ -70,6 +73,7 @@ value_of() {
 while [[ $# -gt 0 ]]; do
     case $1 in
         --quick) QUICK=1 ;;
+        --no-skips) NO_SKIPS=1 ;;
         --fresh-corpus) FRESH_CORPUS=1 ;;
         --fuzz-seconds) FUZZ_SECONDS=$(value_of "$@") || exit 2; shift ;;
         --fuzz-seed) FUZZ_SEED=$(value_of "$@") || exit 2; shift ;;
@@ -83,6 +87,11 @@ while [[ $# -gt 0 ]]; do
     esac
     shift
 done
+
+if [[ $QUICK -eq 1 && $NO_SKIPS -eq 1 ]]; then
+    echo "check.sh: --no-skips and --quick contradict each other: --quick skips steps" >&2
+    exit 2
+fi
 
 if ! [[ $FUZZ_SECONDS =~ ^[1-9][0-9]*$ ]]; then
     echo "check.sh: --fuzz-seconds needs a positive whole number, not '$FUZZ_SECONDS'" >&2
@@ -206,7 +215,10 @@ run_step() {
     start=$SECONDS
     "step_${name//-/_}" "$log" >"$log" 2>&1
     code=$?
-    if [[ -n $SKIP_REASON ]]; then
+    if [[ -n $SKIP_REASON && $NO_SKIPS -eq 1 ]]; then
+        echo "--no-skips: $SKIP_REASON" >>"$log"
+        record "$name" FAIL 1 $((SECONDS - start)) "--no-skips: $SKIP_REASON"
+    elif [[ -n $SKIP_REASON ]]; then
         record "$name" SKIP - $((SECONDS - start)) "$SKIP_REASON"
     elif [[ $code -eq 0 ]]; then
         record "$name" PASS 0 $((SECONDS - start)) "$NOTE"

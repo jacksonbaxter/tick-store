@@ -6,8 +6,10 @@
 # a preset, and so its compile flags, or a different tool.
 #
 # The market data is not available here, so tests that need it skip visibly: ItchRealDay shows
-# as skipped in the summary table, and is not a pass. There is no .venv either, so py-compare
-# shows as SKIP. No job uses a secret.
+# as skipped in the summary table, and is not a pass. The repo job makes the comparison's
+# .venv from compare/requirements.lock, by hash, so py-compare runs its fast tests here, and
+# --no-skips fails any step that would skip, so a named step cannot pass by not running. No
+# job uses a secret.
 #
 # It is validated locally by actionlint. Its first run on GitHub failed 10 of the 14 jobs;
 # docs/NOTES.md, "The first runs on GitHub Actions", has the causes and fixes. All 14 passed at
@@ -71,10 +73,16 @@ jobs:
       - name: Confirm the runner is the host this job names
         run: test "$(uname -m)" = "${{ matrix.host.machine }}"
 
+      - name: Make the comparison's Python environment, for py-compare
+        if: matrix.check.name == 'repo'
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --require-hashes --no-deps -r compare/requirements.lock
+
       - name: Run the checks
         env:
           ONLY: ${{ matrix.check.only }}
-        run: scripts/check.sh --fuzz-seconds "$FUZZ_SECONDS" --only "$ONLY"
+        run: scripts/check.sh --no-skips --fuzz-seconds "$FUZZ_SECONDS" --only "$ONLY"
 
       - name: Keep logs and crashers
         if: failure()
