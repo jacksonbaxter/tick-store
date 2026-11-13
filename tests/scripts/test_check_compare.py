@@ -129,7 +129,8 @@ def class_entry(system, name, host):
         "settings": settings_of(system, name),
         "write": {"seconds_median": 2.0, "records_per_second_median": MESSAGES / 2.0,
                   "python_seconds": 0.1, "engine_seconds": 1.9, "python_note": "n",
-                  "peak_rss_bytes_client": 1000},
+                  "peak_rss_bytes_client": 1000, "repetitions": WRITE_RUNS,
+                  "seconds": [2.1, 2.0, 1.9]},
         "stored": {"allocated_bytes": 10000, "ratio_stored_over_source": 10000 / BYTES,
                    "method": "st_blocks", "denominator": "the slice's source bytes",
                    "measured": "at rest"},
@@ -146,21 +147,28 @@ def class_entry(system, name, host):
     return entry
 
 
+# The harness's repetitions, which every reported file holds (review F-5).
+WARM_RUNS = 30
+COLD_RUNS = 7
+WRITE_RUNS = 3
+FULL_DAY_WRITE_RUNS = 1
+
+
 def query_entry(name, system=None):
     cold_proof = {"resident_after_eviction": 0, "evicted_pages": 10, "method": "m",
                   "resident_bytes_after_run": 4096, "device_bytes_read": 8192, "device_slack": 0}
     entry = {"digest": digest(name), "matches_ground_truth": True,
              "scan": {"rows_decoded": 5},
-             "warm": {"n": 3, "median_us": 10.0, "p99_us": 12.0,
+             "warm": {"n": WARM_RUNS, "median_us": 10.0, "p99_us": 12.0,
                       "proof": {"pages": 8, "resident_before": 8, "resident_after": 8},
                       "swap_timed": {**swap_counts(0, 4), "flagged": False}},
-             "cold": {"n": 2, "median_us": 100.0, "p99_us": 110.0,
-                      "proofs": [cold_proof, dict(cold_proof)],
+             "cold": {"n": COLD_RUNS, "median_us": 100.0, "p99_us": 110.0,
+                      "proofs": [dict(cold_proof) for _ in range(COLD_RUNS)],
                       "swap_timed": {**swap_counts(2, 0), "flagged": True,
-                                     "pages_in_by_repetition": [0, 2]}}}
+                                     "pages_in_by_repetition": [0] * (COLD_RUNS - 1) + [2]}}}
     if system == "tickstore":
-        entry["warm"]["engine"] = {"n": 3, "median_us": 9.0}
-        entry["cold"]["engine"] = {"n": 2, "median_us": 90.0}
+        entry["warm"]["engine"] = {"n": WARM_RUNS, "median_us": 9.0}
+        entry["cold"]["engine"] = {"n": COLD_RUNS, "median_us": 90.0}
     return entry
 
 
@@ -508,6 +516,30 @@ class Faults(Harness):
         def fault(document):
             q1_of(document)["cold"]["proofs"][1]["device_bytes_read"] = 1
         self.assert_fault(fault, "the device read 1 bytes")
+
+    # Review F-5: a reported file holds the harness's own repetitions, never fewer.
+
+    def test_a_reported_file_with_one_warm_and_one_cold_repetition(self):
+        def fault(document):
+            for system in document["systems"].values():
+                for query in system["variants"]["v"]["queries"].values():
+                    query["warm"]["n"] = query["cold"]["n"] = 1
+                    query["cold"]["proofs"] = query["cold"]["proofs"][:1]
+                    query["cold"]["swap_timed"]["pages_in_by_repetition"] = [2]
+                    for kind in ("warm", "cold"):
+                        if "engine" in query[kind]:
+                            query[kind]["engine"]["n"] = 1
+        self.assert_fault(fault, "parquet.v.queries.Q1.warm: 1 repetitions, and a reported file "
+                                 "runs 30")
+        self.assert_fault(fault, "tickstore.v.queries.Q5.cold: 1 repetitions, and a reported "
+                                 "file runs 7")
+
+    def test_a_slice_written_once(self):
+        def fault(document):
+            write = b_of(document, "arcticdb")["write"]
+            write["repetitions"], write["seconds"] = 1, [2.0]
+        self.assert_fault(fault, "arcticdb.v.B.write: 1 repetitions, and a reported slice file "
+                                 "writes 3")
 
     # Class B.
 
@@ -870,6 +902,8 @@ def full_day_document():
         for variant in system["variants"].values():
             for entry in variant["classes"].values():
                 entry["write"]["records_per_second_median"] = DAY_MESSAGES / 2.0
+                entry["write"]["repetitions"] = FULL_DAY_WRITE_RUNS
+                entry["write"]["seconds"] = [2.0]
                 entry["stored"]["ratio_stored_over_source"] = 10000 / DAY_BYTES
                 entry["stored"]["denominator"] = "the day's source bytes"
                 for field in ("records",):
@@ -951,6 +985,13 @@ class FullDay(Harness):
         def fault(document, source):
             b_of(document, "parquet")["stored"]["ratio_stored_over_source"] = 10000 / BYTES
         self.assert_full_fault(fault, "the ratio is not over")
+
+    def test_a_full_day_written_three_times(self):
+        def fault(document, source):
+            write = b_of(document, "parquet")["write"]
+            write["repetitions"], write["seconds"] = 3, [2.1, 2.0, 1.9]
+        self.assert_full_fault(fault, "parquet.v.B.write: 3 repetitions, and a reported full-day "
+                                      "file writes 1")
 
     def test_a_store_not_read_back_whole(self):
         def fault(document, source):
@@ -1285,13 +1326,13 @@ def latency_block(seconds):
             "max_us": ordered[-1] * 1e6, "seconds_by_repetition": list(seconds)}
 
 
-WARM_SECONDS = [10e-6, 9e-6, 12e-6]
-COLD_SECONDS = [90e-6, 110e-6]
+WARM_SECONDS = [10e-6, 9e-6, 12e-6] * 10
+COLD_SECONDS = [90e-6, 110e-6] + [100e-6] * 5
 OPEN_INSIDE = {"parquet": True, "arcticdb": False, "questdb": False, "tickstore": True}
-TICKSTORE_OPEN_SECONDS = [30e-6, 40e-6]
-ENGINE_WARM_SECONDS = [9e-6, 8e-6, 11e-6]
+TICKSTORE_OPEN_SECONDS = [30e-6, 40e-6] + [35e-6] * 5
+ENGINE_WARM_SECONDS = [9e-6, 8e-6, 11e-6] * 10
 # Each no longer than its repetition's query, the cold figure less the open (review RF-7).
-ENGINE_COLD_SECONDS = [50e-6, 65e-6]
+ENGINE_COLD_SECONDS = [50e-6, 65e-6] + [60e-6] * 5
 
 
 WRITE_COUNTER = {
@@ -1342,14 +1383,16 @@ def protocol_2(document):
             variant["python_floor"] = {**latency_block([1e-6, 2e-6, 3e-6]), "what": "floor"}
             for entry in variant["classes"].values():
                 write = entry["write"]
-                write["repetitions"] = 3
-                write["seconds"] = [2.1, 2.0, 1.9]
+                day = "day" in document["input"]
+                write["repetitions"] = FULL_DAY_WRITE_RUNS if day else WRITE_RUNS
+                write["seconds"] = [2.0] if day else [2.1, 2.0, 1.9]
                 write["by_repetition"] = [
                     {"seconds": total, "engine_seconds": engine, "python_seconds": 0.1,
                      "engine_only_seconds": round(total - 0.1, 9), "input_pages": 100,
                      "input_resident_pages_at_start": 100, "device_bytes_read": 0,
                      "device_counter": WRITE_COUNTER[document["header"]["host"]]}
-                    for total, engine in zip(write["seconds"], (2.0, 1.9, 1.8), strict=True)]
+                    for total, engine in zip(write["seconds"], (1.9,) if day else (2.0, 1.9, 1.8),
+                                             strict=True)]
                 write["engine_only_seconds_median"] = 1.9
                 write["times"] = {"seconds": "the whole write", "engine_only_seconds": "less "
                                   "reading and preparing the input"}
@@ -1379,14 +1422,14 @@ class Protocol2(Harness):
     def test_the_slowest_of_n_not_called_the_slowest(self):
         def fault(document):
             q1_of(document)["cold"]["tail_is_slowest"] = False
-        self.assert_fault_2(fault, "Q1.cold: tail_is_slowest is False, and rank 2 of 2 is the "
+        self.assert_fault_2(fault, "Q1.cold: tail_is_slowest is False, and rank 7 of 7 is the "
                                    "slowest run")
 
     def test_the_slowest_of_n_called_a_99th_percentile(self):
         def fault(document):
             q1_of(document)["warm"]["tail"] = "99th percentile"
         self.assert_fault_2(fault, "Q1.warm: the tail figure is called '99th percentile', "
-                                   "not 'slowest of 3'")
+                                   "not 'slowest of 30'")
 
     def test_a_tail_figure_with_no_rank(self):
         def fault(document):
@@ -1408,19 +1451,20 @@ class Protocol2(Harness):
     def test_a_latency_block_with_no_repetitions(self):
         def fault(document):
             del q1_of(document, "questdb")["cold"]["seconds_by_repetition"]
-        self.assert_fault_2(fault, "questdb.v.queries.Q1.cold: no seconds for each of its 2 "
+        self.assert_fault_2(fault, "questdb.v.queries.Q1.cold: no seconds for each of its 7 "
                                    "repetitions")
 
     def test_a_median_that_does_not_follow_from_the_repetitions(self):
         def fault(document):
-            q1_of(document)["warm"]["seconds_by_repetition"][1] = 11e-6
+            seconds = q1_of(document)["warm"]["seconds_by_repetition"]
+            seconds[:] = [11e-6 if value == 10e-6 else value for value in seconds]
         self.assert_fault_2(fault, "Q1.warm: median_us 10.0 is not the median of its "
                                    "repetitions, 11.0")
 
     def test_a_tail_that_does_not_follow_from_the_repetitions(self):
         def fault(document):
             q1_of(document, "tickstore")["cold"]["engine"]["seconds_by_repetition"][1] = 64e-6
-        self.assert_fault_2(fault, "Q1.cold.engine: tail_us 65.0 is not the slowest of 2 of "
+        self.assert_fault_2(fault, "Q1.cold.engine: tail_us 65.0 is not the slowest of 7 of "
                                    "its repetitions, 64.0")
 
     def test_a_write_median_that_does_not_follow_from_the_repetitions(self):
@@ -1441,6 +1485,19 @@ class Protocol2(Harness):
             b_of(document, "tickstore")["write"]["by_repetition"].pop()
         self.assert_fault_2(fault, "tickstore.v.B.write: by_repetition holds 2 repetitions, "
                                    "and the write ran 3")
+
+    def test_a_protocol_2_file_of_5_warm_and_3_cold_repetitions(self):
+        # Review RF-6: its tail honestly says "slowest of 5", and it is still not the protocol.
+        def fault(document):
+            query = q1_of(document, "questdb")
+            query["warm"].update(latency_block(WARM_SECONDS[:5]))
+            query["cold"].update(latency_block(COLD_SECONDS[:3]))
+            query["cold"]["proofs"] = query["cold"]["proofs"][:3]
+            query["cold"]["swap_timed"]["pages_in_by_repetition"] = [0, 0, 2]
+        self.assert_fault_2(fault, "questdb.v.queries.Q1.warm: 5 repetitions, and a reported "
+                                   "file runs 30")
+        self.assert_fault_2(fault, "questdb.v.queries.Q1.cold: 3 repetitions, and a reported "
+                                   "file runs 7")
 
     # E-3: the second pinned CPU's sibling, held to the first one's rule.
 
@@ -1594,13 +1651,16 @@ class Protocol2(Harness):
     def test_a_cold_engine_time_longer_than_its_query(self):
         # The cold figure holds the open too, so the median rule alone let this pass.
         def fault(document):
-            q1_of(document, "tickstore")["cold"]["engine"] = latency_block([80e-6, 100e-6])
+            q1_of(document, "tickstore")["cold"]["engine"] = latency_block(
+                [80e-6, 100e-6] + [60e-6] * 5)
         self.assert_fault_2(fault, "tickstore.v.queries.Q1.cold: repetition 1's engine time 80.0 "
                                    "us is longer than its query's round trip, 60.0 us")
 
     def test_a_warm_engine_time_longer_than_its_round_trip(self):
         def fault(document):
-            q1_of(document, "tickstore")["warm"]["engine"] = latency_block([9e-6, 9.5e-6, 11e-6])
+            seconds = list(ENGINE_WARM_SECONDS)
+            seconds[1] = 9.5e-6
+            q1_of(document, "tickstore")["warm"]["engine"] = latency_block(seconds)
         self.assert_fault_2(fault, "tickstore.v.queries.Q1.warm: repetition 2's engine time 9.5 "
                                    "us is longer than its round trip, 9.0 us")
 

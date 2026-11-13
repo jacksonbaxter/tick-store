@@ -587,6 +587,13 @@ FAULTS = (
     Fault("compare-write-device-reads-unchecked", "py-scripts", "check_compare.py stops "
           "requiring a write's device reads", CHECK_FAILED,
           "FAIL: test_a_write_with_no_device_reads (__main__.Protocol2"),
+    Fault("compare-repetition-counts-unchecked", "py-scripts", "check_compare.py takes a "
+          "reported file whose queries ran once warm and once cold, the harness's 30 and 7 "
+          "narrowed (review F-5)", CHECK_FAILED,
+          "FAIL: test_a_reported_file_with_one_warm_and_one_cold_repetition (__main__.Faults"),
+    Fault("compare-write-count-unchecked", "py-scripts", "check_compare.py takes a reported "
+          "slice whose classes were written once, not the harness's three (review F-5)",
+          CHECK_FAILED, "FAIL: test_a_slice_written_once (__main__.Faults"),
     Fault("compare-macos-write-counter-unchecked", "py-scripts", "check_compare.py takes a "
           "macOS write whose device reads are iostat's disk0 total, which holds the write's own "
           "output, as its count of reads (review RF-5)", CHECK_FAILED,

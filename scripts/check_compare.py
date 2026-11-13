@@ -3,14 +3,16 @@
 
     python3 -I scripts/check_compare.py results/compare/*.json
 
-A comparison result claims that four systems held the same records under stated settings
-and gave the same answers. This checks that the file can back each claim: a requested setting
-must equal the one in force, every store must have rebuilt the source through the oracle,
-every answer must equal the ground truth, every warm and cold number must carry its proof, a
-class B result its flush proof, the run its measurement lock, and a Linux heap the setting that
-the full-day capacity check found adequate. It also checks that the file is safe to publish. A
-system that could not prove something says so in the file, and the file is valid, as long as it
-does not claim the proof.
+A comparison result claims that four systems held the same records under stated settings and
+gave the same answers. This checks that the file can back each claim: a requested setting must
+equal the one in force, every store must have rebuilt the source through the oracle, every
+answer must equal the ground truth, every warm and cold number must carry its proof and the
+harness's own repetitions (30 warm and 7 cold, each class written 3 times on the slice and once
+on a day, compare/repetitions.py, which compare/run_system.py runs), a class B result its flush
+proof, the run its measurement lock, and a Linux heap the setting that the full-day capacity
+check found adequate. It also checks that the file is safe to publish. A system that could not
+prove something says so in the file, and the file is valid, as long as it does not claim the
+proof.
 
 Every file also counts the host's swap: pages swapped in and out over each phase, write,
 read-back, warm queries and cold queries, for each variant and class, and over each query's
@@ -67,7 +69,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 import check_results  # noqa: E402
 
 sys.path.insert(0, str(REPO_ROOT))
-from compare import variant_rule  # noqa: E402
+from compare import repetitions, variant_rule  # noqa: E402
 
 DEFAULT_PINS = REPO_ROOT / "scripts" / "data_pins.json"
 DEFAULT_CAPACITY = REPO_ROOT / "results" / "fullday-capacity-12302019.json"
@@ -401,6 +403,27 @@ def check_warm(where, warm, full_day=False, protocol=PROTOCOL_1):
     return [] if (warm.get("n") or 0) > 0 else [f"{where}.warm: no repetitions"]
 
 
+def check_runs(where, block, wanted, what="a reported file runs"):
+    """Review F-5: the harness's own count of repetitions, which a reported file may not
+    narrow: compare/repetitions.py, shared with compare/run_system.py."""
+    count = (block if isinstance(block, dict) else {}).get("n")
+    if count != wanted:
+        return [f"{where}: {count} repetitions, and {what} {wanted}"]
+    return []
+
+
+def check_write_runs(where, write, full_day):
+    """Review F-5: a slice writes each class three times, a full day once."""
+    write = write if isinstance(write, dict) else {}
+    wanted = repetitions.FULL_DAY_WRITE if full_day else repetitions.WRITE
+    count = write.get("repetitions")
+    seconds = write.get("seconds")
+    if count != wanted or not isinstance(seconds, list) or len(seconds) != wanted:
+        kind = "full-day" if full_day else "slice"
+        return [f"{where}.write: {count} repetitions, and a reported {kind} file writes {wanted}"]
+    return []
+
+
 def check_cold(where, cold):
     cold = cold or {}
     proofs = cold.get("proofs")
@@ -692,6 +715,8 @@ def check_queries(where, queries, truth, system_name=None, full_day=False, proto
             problems.append(f"{here}: differs from the ground truth")
         problems += check_warm(here, query.get("warm"), full_day, protocol)
         problems += check_cold(here, query.get("cold"))
+        problems += check_runs(f"{here}.warm", query.get("warm"), repetitions.WARM)
+        problems += check_runs(f"{here}.cold", query.get("cold"), repetitions.COLD)
         problems += check_latency(here, query)
         if protocol >= PROTOCOL_2:
             problems += check_tails(here, query)
@@ -740,6 +765,7 @@ def check_system(name, system, document, pin):
             problems += check_read_back(here, entry.get("read_back"), pin)
             problems += check_stored(here, entry.get("stored"), pin)
             problems += check_write(here, entry.get("write"), pin)
+            problems += check_write_runs(here, entry.get("write"), bool(pin.get("full_day")))
             if protocol >= PROTOCOL_2:
                 problems += check_write_repetitions(here, entry.get("write"))
                 problems += check_write_record(here, entry.get("write"), name,

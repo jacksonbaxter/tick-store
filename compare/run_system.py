@@ -33,7 +33,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from compare import coldcache, swap  # noqa: E402
+from compare import coldcache, repetitions, swap  # noqa: E402
 from compare.durability import CLASS_A, CLASSES, sync_tree  # noqa: E402
 from compare.layout import PINS_PATH, Layout, child_environment  # noqa: E402
 from compare.queries import (build_queries, full_day_facts, ground_truth,  # noqa: E402
@@ -47,14 +47,13 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKER = REPO_ROOT / "compare" / "worker.py"
 LINUX_CPUS = {4, 6}
 THREADS = 2
-WRITE_REPETITIONS = 3
-# A full-day write is one sustained run of minutes, and three of each class for every variant
-# would not fit the run: see "Full-day comparison" in compare/README.md.
-FULL_DAY_WRITE_REPETITIONS = 1
+# compare/repetitions.py holds them, so that the validator requires the same counts.
+WRITE_REPETITIONS = repetitions.WRITE
+FULL_DAY_WRITE_REPETITIONS = repetitions.FULL_DAY_WRITE
 # Rows per window of a full-day read-back: about 600 MB of Arrow at a time.
 READ_WINDOW_ROWS = 1 << 22
-WARM_REPETITIONS = 30
-COLD_REPETITIONS = 7
+WARM_REPETITIONS = repetitions.WARM
+COLD_REPETITIONS = repetitions.COLD
 # A cold repetition beside something else reading the store is run again, this many times at
 # most per query.
 COLD_RERUNS = 10

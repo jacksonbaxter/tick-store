@@ -526,6 +526,20 @@ class TailFigure(unittest.TestCase):
         self.assertEqual(variant_rule.FIELDS, ("median_us", "p99_us"))
 
 
+class SharedRepetitions(unittest.TestCase):
+    """The runner runs the counts the validator requires, from one module (review F-5)."""
+
+    def test_the_runner_and_the_validator_count_from_one_place(self):
+        from compare import repetitions, run_system
+
+        args = run_system.parse_arguments(["--system", "parquet", "--part", "p"])
+        self.assertEqual((args.warm_repetitions, args.cold_repetitions),
+                         (repetitions.WARM, repetitions.COLD))
+        self.assertEqual((run_system.WRITE_REPETITIONS, run_system.FULL_DAY_WRITE_REPETITIONS),
+                         (repetitions.WRITE, repetitions.FULL_DAY_WRITE))
+        self.assertIs(check_compare.repetitions, repetitions)
+
+
 class ColdOpen(unittest.TestCase):
     """Review F-1: a cold figure holds the store's open where the system opens its store
     outside its query call, as tick-store does; and every cold answer records the store's
