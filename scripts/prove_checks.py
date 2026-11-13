@@ -1117,10 +1117,7 @@ def code_of(function):
         if id(current) in seen:
             continue
         seen.add(id(current))
-        try:
-            texts.append(inspect.getsource(current))
-        except (OSError, TypeError):
-            texts.append(bytecode_of(current.__code__))
+        texts.append(source_of(current))
         if inspect.isclass(current):
             continue
         codes = [current.__code__]
@@ -1140,6 +1137,24 @@ def code_of(function):
                 elif plain(value):
                     texts.append(f"{name} = {value!r}")
     return sorted(texts), strings
+
+
+# This script's text as it was loaded, so a key is of the code that runs: a commit to this
+# file during a run moves its lines on disk, where inspect would read them.
+LOADED_LINES = Path(__file__).read_text(encoding="utf-8").splitlines(keepends=True)
+
+
+def source_of(item):
+    """A function's or class's source text: from this script as loaded, from its file for
+    another module's, and its bytecode where Python has no source."""
+    if getattr(item, "__module__", None) == __name__:
+        first = (item.__code__.co_firstlineno if inspect.isfunction(item)
+                 else item.__firstlineno__)
+        return "".join(inspect.getblock(LOADED_LINES[first - 1:]))
+    try:
+        return inspect.getsource(item)
+    except (OSError, TypeError):
+        return bytecode_of(item.__code__)
 
 
 def bytecode_of(code):

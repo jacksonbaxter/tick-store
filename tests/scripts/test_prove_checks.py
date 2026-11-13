@@ -156,6 +156,19 @@ class Fingerprint(unittest.TestCase):
         two = prove.fingerprint(fault, blob_of={"README.md": "2" * 40}.get)
         self.assertNotEqual(one, two)
 
+    def test_the_key_is_of_the_code_loaded_not_the_file_on_disk(self):
+        # A commit to the prover while it ran moved its lines on disk, and the key, read from
+        # the file, read the wrong lines and stopped the run.
+        copy = self.root / "prove_checks.py"
+        copy.write_text((REPO_ROOT / "scripts" / "prove_checks.py").read_text())
+        spec = importlib.util.spec_from_file_location("prove_checks_copy", copy)
+        loaded = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(loaded)
+        fault = next(fault for fault in loaded.FAULTS if fault.mutate is not None)
+        before = loaded.fingerprint(fault, blob_of={}.get)
+        copy.write_text('"""A docstring moved down."""\n\n\n' + copy.read_text())
+        self.assertEqual(loaded.fingerprint(fault, blob_of={}.get), before)
+
     def test_prose_a_fault_does_not_touch_leaves_it_alone(self):
         one = prove.fingerprint(FAULT, blob_of={"README.md": "1" * 40}.get)
         two = prove.fingerprint(FAULT, blob_of={"README.md": "2" * 40}.get)
