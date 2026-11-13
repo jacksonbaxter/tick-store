@@ -3451,6 +3451,13 @@ and `fuzz-container-block-reserved` (`src/store/container.cpp`) apply only with 
 and `fuzz-dictionary-repeated-entry` (`src/codec/dictionary.cpp`) not at all. Those files are the
 store and codec rounds', so the patches are left for the prover's fixer (TASKS).
 
+Results. Only the two codec-eval files change when they are regenerated, at the freeze:
+`tool_version` 4 (from 3, so a file says which it is), the creation-head side shares and their
+new denominators, and `excludes_permutation` beside every verdict. `scripts/check_results.py`,
+`render_results.py`, `targets.json` and `store_results.py` read none of these fields, so they
+work on the committed files and on the new output alike; no script changed. TASKS lists the
+files.
+
 Raw: `phase4-raw/fix-harness/`: each finding's failing and passing logs.
 
 ## Process notes
