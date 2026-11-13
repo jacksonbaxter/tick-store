@@ -251,7 +251,8 @@ struct HeadModes {
     std::uint64_t head_steps = 0;
     std::uint64_t same_locate = 0;
     // Among head steps where both sides are known. A U carries no side: its new order keeps
-    // the side of the order it replaces, unknown if that order is not on the book.
+    // the side of the order it replaces, unknown if that order is not on the book. A step to
+    // a head no value has reached yet has no side to compare with, so it is not counted.
     std::uint64_t side_steps = 0;
     std::uint64_t same_side = 0;
     // Among steps where both messages are F, so both carry an MPID.

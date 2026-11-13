@@ -51,8 +51,9 @@ namespace tick_store::harness {
 
 namespace {
 
-// 4: creation heads count a U by its replaced order's side, and each verdict says whether it
-// leaves out the permutation (review D-8, D-10).
+// 4: creation heads count a U by its replaced order's side and a step to a head no value
+// has reached by none, and each verdict says whether it leaves out the permutation (review
+// D-8, D-10, RD-2). No file of version 4 was published before RD-2, so it needed no 5.
 constexpr std::string_view kToolVersion = "4";
 constexpr std::size_t kLocates = std::size_t{1} << 16U;
 // Bytes a reader needs per stream beyond its blocks: the value count, and for a
@@ -1516,11 +1517,12 @@ private:
 };
 
 // Who last touched a head: the creation's locate, side and MPID, if it had one. A U's new
-// order has the side of the order it replaces, unknown if that is not on the book.
+// order has the side of the order it replaces, unknown if that is not on the book. A head
+// no value has reached yet has this default owner, whose side is unknown too (review RD-2).
 struct HeadOwner {
     std::uint16_t locate = 0;
     bool sell = false;
-    bool side_known = true;
+    bool side_known = false;
     bool has_mpid = false;
     std::uint32_t mpid = 0;
 };

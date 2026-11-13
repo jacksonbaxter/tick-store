@@ -912,10 +912,10 @@ TEST(CodecEval, AReplaceOfAnOrderNotOnTheBookHasNoSide) {
     EXPECT_EQ(heads.consecutive, 3U);
     EXPECT_EQ(heads.consecutive_side_pairs, 1U);
     EXPECT_EQ(heads.consecutive_same_side, 1U);
-    // Each value extends head 0: 100 against the empty head's owner, 101 against 100's, both
-    // with sides; 102 and 103 have none.
+    // Each value extends head 0: 100 the empty head, which no value has reached and so has
+    // no side (review RD-2); 101 against 100's, both with sides; 102 and 103 have none.
     EXPECT_EQ(heads.head_steps, 4U);
-    EXPECT_EQ(heads.side_steps, 2U);
+    EXPECT_EQ(heads.side_steps, 1U);
     EXPECT_EQ(heads.same_side, 1U);
 }
 
