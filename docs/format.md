@@ -167,6 +167,17 @@ returned once and never retried, the writer is failed, and before the rename the
 was (M3). The system calls go through one seam, `FileOps`, so the tests record them and inject a
 failure or a crash at each.
 
+What the tests show and what they cannot. The call-sequence tests (`ContainerCommit` in
+`container_writer_test.cpp`, `SyncFile` and `SyncDirectory` in `durability_test.cpp`) show each
+mode makes its flushes, on the right kind of descriptor, in the order above. The crash tests
+(`ContainerTornWrite`) end the process at each call, which models a process crash: the page cache
+outlives the process, so every byte written before the crash survives whether it was flushed or
+not. They fail if a flush call is missing, since two of their crash points are the flushes, but not
+if a flush is made and does nothing: with every `PosixFileOps` flush made a no-op that returns 0,
+all 166 store and durability tests pass. That a flush reaches the device, so class B survives power
+loss, rests on the operating system's documented semantics of those calls; showing it would take a
+power-cut test (dm-flakey on Linux, for one), which no unit test is (review C-9).
+
 ## SIGBUS stance (M7)
 
 The reader maps the whole file read-only at its `fstat` size and proves every stored offset and size

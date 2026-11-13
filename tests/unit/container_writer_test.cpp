@@ -303,7 +303,12 @@ TEST(ContainerCommit, FallsBackToFsyncOnlyWhereFullFsyncIsUnsupported) {
 // --- Torn writes ------------------------------------------------------------------
 
 // The process ends at the start of `call`, its nth time, while replacing the old file,
-// with no destructor run and nothing cleaned up: what a crash leaves.
+// with no destructor run and nothing cleaned up: what a process crash leaves. Not a power
+// loss: the page cache outlives the process, so these tests cannot tell a flush that
+// reaches the device from one that does nothing (review C-9). They fail if a flush call is
+// missing, since two crash points are the flushes; that each mode makes its flushes in
+// order is ContainerCommit.EachModeMakesItsCallsInOrder's to show, and docs/format.md
+// says what no in-process test shows.
 void crash_at(const std::filesystem::path& path, const char* call, int nth) {
     RecordingFileOps ops;
     ops.on(call, [] { std::_Exit(0); }, nth);
@@ -336,8 +341,9 @@ std::vector<CrashPoint> crash_points() {
     };
 }
 
-// M6: a crash at each step of a commit leaves the old file whole at the path, or after
-// the rename the new one whole, never a mix; a torn partial file is refused at open.
+// M6: a process crash at each step of a commit leaves the old file whole at the path, or
+// after the rename the new one whole, never a mix; a torn partial file is refused at open.
+// A power loss is outside it (crash_at).
 TEST(ContainerTornWrite, ACrashAtAnyStepLeavesTheOldFileOrTheWholeNewOne) {
     const Bytes old = build_container(test::golden_parts()).value();
     const Bytes fresh = build_container(several_parts()).value();
