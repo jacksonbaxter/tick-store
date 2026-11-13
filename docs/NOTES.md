@@ -4135,6 +4135,10 @@ on test documents; no Linux alone day is committed yet.
 **E-2, load lines that are not a list.** `check_load_lines` now refuses them, for a bench file
 and a comparison file alike; before, a string held no lock proof and passed both validators.
 
+**E-4, the best codec.** A compression target's `best` is now the fewest bits of an exact
+codec, as the store estimate has it; the committed codec-eval files hold exact codecs only, so no
+figure moved.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from

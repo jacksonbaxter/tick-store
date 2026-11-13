@@ -879,6 +879,10 @@ FAULTS = (
     Fault("compare-load-lines-a-string", "check-compare", "a comparison file whose load_lines "
           "is one string, with no list of the lock's start and end lines", CHECK_FAILED,
           "header.load_lines: not a list of measure.sh load lines", load_lines_as_a_string),
+    # Review E-4: only an exact codec meets a compression target.
+    Fault("render-best-codec-lossy", "py-scripts", "render_results.py takes the fewest bits of "
+          "any codec on a column, a lossy one included, as its best", CHECK_FAILED,
+          "FAIL: test_the_best_codec_is_the_best_exact_one (__main__.RenderTargetsTest"),
     Fault("results-md-hand-edit", "render-check", "a hand edit inside RESULTS.md's benchmark "
           "block, a host's heading changed", CHECK_FAILED,
           "the table in RESULTS.md is stale or was edited by hand", hand_edit_results_md),

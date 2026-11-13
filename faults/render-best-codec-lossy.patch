@@ -1,0 +1,14 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+index 379d33f..1094eb8 100644
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -646,8 +646,7 @@ def evaluate(expression, document):
+         # Only a codec that gave every value back counts, as in store_estimate.py (review E-4).
+         codecs = [codec for codec in codec_column(document, expression["best"])["codecs"]
+                   if codec.get("family") == expression.get("family", codec.get("family"))
+-                  and codec.get("family") != expression.get("not_family")
+-                  and codec.get("exact") is True]
++                  and codec.get("family") != expression.get("not_family")]
+         if not codecs:
+             raise TargetError(f"no exact codec of that family on {expression['best']!r}")
+         return min(codec["bits_per_value"] for codec in codecs)
