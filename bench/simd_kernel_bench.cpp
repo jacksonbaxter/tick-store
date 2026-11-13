@@ -646,6 +646,16 @@ struct ReportInputs {
         json.end_object();
     }
     json.end_array();
+    // The percentiles the batch count cannot support, each with why (review A-3).
+    json.key("omitted_percentiles");
+    json.begin_array();
+    for (const bs::OmittedPercentile& point : in.latency.omitted) {
+        json.begin_object();
+        json.field("percentile", point.percentile);
+        json.field("reason", point.reason);
+        json.end_object();
+    }
+    json.end_array();
     json.end_object();
 
     json.end_object();

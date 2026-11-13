@@ -23,6 +23,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <format>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -128,25 +129,82 @@ BatchLatencyRecorder make_recorder() {
 
 TEST(BatchLatency, PublishesBatchUnitAndResolutionWithThePercentiles) {
     auto recorder = make_recorder();
-    for (std::uint64_t ticks = 10'000; ticks < 20'000; ++ticks) {
+    // 100,000 batches, the fewest that put 10 above p99.99, so all five are published.
+    for (std::uint64_t ticks = 10'000; ticks < 110'000; ++ticks) {
         recorder.record(ticks);
     }
     const auto report = recorder.report(linux_like_timer(), kBatch);
     ASSERT_TRUE(report.has_value()) << report.error();
     EXPECT_EQ(report->unit, "ns per batch");
     EXPECT_EQ(report->batch_messages, kBatch);
-    EXPECT_EQ(report->batches, 10'000U);
+    EXPECT_EQ(report->batches, 100'000U);
     EXPECT_DOUBLE_EQ(report->timer_resolution_ns, kLinuxStepNs);
     EXPECT_DOUBLE_EQ(report->floor_ns, 100.0);
     ASSERT_EQ(report->percentiles.size(), 5U);
+    EXPECT_TRUE(report->omitted.empty());
     EXPECT_DOUBLE_EQ(report->percentiles.front().percentile, 50.0);
-    // 3 significant figures of the 15,000 tick median, at 2 ticks a ns.
-    EXPECT_NEAR(report->percentiles.front().value_ns, 7500.0, 15.0);
+    // 3 significant figures of the 60,000 tick median, at 2 ticks a ns.
+    EXPECT_NEAR(report->percentiles.front().value_ns, 30'000.0, 60.0);
     for (std::size_t i = 1; i < report->percentiles.size(); ++i) {
         EXPECT_GE(report->percentiles[i].value_ns, report->percentiles[i - 1].value_ns);
     }
     EXPECT_LE(report->min_ns, report->percentiles.front().value_ns);
     EXPECT_GE(report->max_ns, report->percentiles.back().value_ns);
+}
+
+// Ten batches and one slower: p99, p99.9 and p99.99 would each be the slowest batch, and
+// p50 and p90 rest on fewer than 10 batches above them (review A-3).
+// The published percentiles, as "p99=1000000 " pairs, for a failure message.
+std::string published(const LatencyReport& report) {
+    std::string out;
+    for (const PublishedPercentile& point : report.percentiles) {
+        out += std::format("p{}={} ", point.percentile, point.value_ns);
+    }
+    return out;
+}
+
+TEST(BatchLatency, LeavesOutAPercentileTooFewBatchesLieAbove) {
+    auto recorder = make_recorder();
+    for (int i = 0; i < 10; ++i) {
+        recorder.record(1'000'000);
+    }
+    recorder.record(2'000'000);
+    const auto report = recorder.report(linux_like_timer(), 1);
+    ASSERT_TRUE(report.has_value()) << report.error();
+    EXPECT_EQ(report->batches, 11U);
+    EXPECT_TRUE(report->percentiles.empty()) << published(*report);
+    ASSERT_EQ(report->omitted.size(), 5U);
+    EXPECT_DOUBLE_EQ(report->omitted[2].percentile, 99.0);
+    EXPECT_EQ(report->omitted[2].reason, "0.11 of 11 batches lie above it, and publishing needs 10");
+    EXPECT_NEAR(report->min_ns, 500'000.0, 1'000.0);
+    EXPECT_GE(report->max_ns, 1'000'000.0);
+}
+
+// The count of batches above each percentile is exact at the boundary: 20 batches put 10
+// above p50 and 2 above p90, and 99,999 put 9.9999 above p99.99.
+TEST(BatchLatency, PublishesAPercentileWithTenBatchesAboveItAndNotOneFewer) {
+    auto twenty = make_recorder();
+    for (int i = 0; i < 20; ++i) {
+        twenty.record(1'000'000);
+    }
+    const auto small = twenty.report(linux_like_timer(), 1);
+    ASSERT_TRUE(small.has_value()) << small.error();
+    ASSERT_EQ(small->percentiles.size(), 1U) << published(*small);
+    EXPECT_DOUBLE_EQ(small->percentiles[0].percentile, 50.0);
+    ASSERT_EQ(small->omitted.size(), 4U);
+    EXPECT_EQ(small->omitted[0].reason, "2 of 20 batches lie above it, and publishing needs 10");
+
+    auto almost = make_recorder();
+    for (int i = 0; i < 99'999; ++i) {
+        almost.record(1'000'000);
+    }
+    const auto large = almost.report(linux_like_timer(), 1);
+    ASSERT_TRUE(large.has_value()) << large.error();
+    EXPECT_EQ(large->percentiles.size(), 4U) << published(*large);
+    ASSERT_EQ(large->omitted.size(), 1U);
+    EXPECT_DOUBLE_EQ(large->omitted[0].percentile, 99.99);
+    EXPECT_EQ(large->omitted[0].reason,
+              "9.9999 of 99999 batches lie above it, and publishing needs 10");
 }
 
 TEST(BatchLatency, RefusesASubResolutionPercentile) {

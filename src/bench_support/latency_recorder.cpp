@@ -6,6 +6,7 @@
 #include <hdr/hdr_histogram.h>
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <expected>
 #include <format>
@@ -16,6 +17,10 @@ namespace tick_store::bench_support {
 namespace {
 
 constexpr std::array<double, 5> kPercentiles{50.0, 90.0, 99.0, 99.9, 99.99};
+// The same percentiles in hundredths of a percent, so the batches above each are counted
+// exactly: n x (10,000 - p) / 10,000 >= the minimum, with no rounding at the boundary.
+constexpr std::array<std::uint64_t, 5> kPercentileHundredths{5'000, 9'000, 9'900, 9'990, 9'999};
+constexpr std::uint64_t kHundredthsWhole = 10'000;
 
 }  // namespace
 
@@ -64,13 +69,27 @@ std::expected<LatencyReport, std::string> BatchLatencyRecorder::report(
                          .significant_figures = kHistogramSignificantFigures,
                          .min_ns = 0.0,
                          .max_ns = 0.0,
-                         .percentiles = {}};
+                         .percentiles = {},
+                         .omitted = {}};
     const auto min_ns = publish(hdr_min(histogram), "the fastest batch");
     if (!min_ns.has_value()) {
         return std::unexpected(min_ns.error());
     }
     report.min_ns = *min_ns;
-    for (const double percentile : kPercentiles) {
+    const auto batches = static_cast<std::uint64_t>(histogram->total_count);
+    for (std::size_t i = 0; i < kPercentiles.size(); ++i) {
+        const double percentile = kPercentiles.at(i);
+        const std::uint64_t above_scaled =
+            batches * (kHundredthsWhole - kPercentileHundredths.at(i));
+        if (above_scaled < kMinBatchesAbovePercentile * kHundredthsWhole) {
+            report.omitted.push_back(
+                {.percentile = percentile,
+                 .reason = std::format("{} of {} batches lie above it, and publishing needs {}",
+                                       static_cast<double>(above_scaled) /
+                                           static_cast<double>(kHundredthsWhole),
+                                       batches, kMinBatchesAbovePercentile)});
+            continue;
+        }
         const auto value = publish(hdr_value_at_percentile(histogram, percentile),
                                    std::format("p{}", percentile));
         if (!value.has_value()) {
