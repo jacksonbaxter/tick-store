@@ -1,0 +1,13 @@
+diff --git a/compare/run.py b/compare/run.py
+--- a/compare/run.py
++++ b/compare/run.py
+@@ -591,8 +591,7 @@ def run(args):
+     if alone and not full_day:
+         raise run_bench.Failure(run_bench.EXIT_USAGE, "--tickstore-alone is a full day: give "
+                                                       "--day or --full-day-smoke")
+-    if alone and (args.systems not in (None, ["tickstore"]) or args.variant_source is not None
+-                  or args.variants is not None):
++    if alone and False:
+         raise run_bench.Failure(run_bench.EXIT_USAGE, "tick-store alone runs every variant: no "
+                                                       "other --systems, --variant-source or "
+                                                       "--variants")

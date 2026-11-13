@@ -1,0 +1,12 @@
+diff --git a/compare/run.py b/compare/run.py
+--- a/compare/run.py
++++ b/compare/run.py
+@@ -485,7 +485,7 @@ def build_document(host, args, layout, pin, commit, measure, parts, load_lines,
+         queries["full_day"] = day_facts[0]
+     if alone:
+         method["input_cache"] = TICKSTORE_ONLY_INPUT_CACHE
+-    if alone and not linux:
++    if alone:
+         method.update({"warm": TICKSTORE_ONLY_WARM, "peak_memory": TICKSTORE_ONLY_MEMORY})
+         del method["guard"]
+     alone_label = TICKSTORE_ONLY_LINUX_LABEL if linux else TICKSTORE_ONLY_LABEL

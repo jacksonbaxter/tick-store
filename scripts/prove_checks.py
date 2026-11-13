@@ -828,6 +828,15 @@ FAULTS = (
           "overrides, --variants or fewer --systems in a measured run, so a reported file can "
           "hold less than the protocol", CHECK_FAILED,
           "FAIL: test_a_measured_run_refuses_to_narrow_anything (__main__.MeasuredRun"),
+    # Review RV-11: run.py's own refusals and proofs for tick-store alone.
+    Fault("run-alone-linux-proven-as-macos", "py-compare", "run.py writes a Linux tick-store-"
+          "alone day's method as macOS's, warm by residency and with no guard", CHECK_FAILED,
+          "FAIL: test_each_host_ends_with_a_tickstore_alone_document "
+          "(__main__.TickstoreAloneDay"),
+    Fault("run-alone-narrowed", "py-compare", "run.py lets tick-store alone run beside other "
+          "--systems, from a --variant-source or with --variants", CHECK_FAILED,
+          "FAIL: test_tickstore_alone_is_a_day_of_tickstore_and_every_variant "
+          "(__main__.TickstoreAloneDay"),
     # Review RV-10: the parts directory does not name the slice, so the arguments do.
     Fault("compare-part-reused-across-slices", "py-compare", "run.py reuses a system's part made "
           "from another slice", CHECK_FAILED,
