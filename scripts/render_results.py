@@ -21,9 +21,12 @@ are on each system's class B store, as the harness runs them. Each system shows 
 variant; a full day also lists every variant it ran, and each system's peak memory and swap per
 phase. Each latency's tail figure is named for what it is, from the file: at 30 warm and 7 cold
 runs the 99th percentile by nearest rank is the slowest run, so a column reads "slowest of 30",
-never p99, and a file whose figure is not what its n makes it stops the render. A timed number with any page swapped in while it ran carries "(swap-in)". A
-tick-store-only full day, the macOS figure for the targets whose host is Both, is labelled so,
-and ranks nothing, since no other system ran.
+never p99, and a file whose figure is not what its n makes it stops the render. A timed
+number with any page swapped in while it ran carries "(swap-in)". A tick-store-only full day,
+on either host, is labelled so, and ranks nothing, since no other system ran; its peak memory is
+BSD time -l's on macOS and the guard's on Linux, where the guard watched it. A target row never
+reads a tick-store-only day for the four-system day, or the reverse, by its name
+("-full-tickstore-") and its scope alike.
 
 The targets block has one row for every target of BENCHMARKS.md on each host it states: the
 target, the measured value read from a committed results file, met, missed or not judged, and the
@@ -547,9 +550,9 @@ def compare_for(document):
             lines += ["", "Peak memory per system, from compare/guard.py across the system's "
                           "whole run.", ""]
             lines += memory_table(document)
-        if alone:
+        if alone and host != "Linux":
             lines += [""] + time_memory_lines(document)
-        guard = ("No guard ran beside tick-store alone. " if alone else
+        guard = ("No guard ran beside tick-store alone. " if alone and host != "Linux" else
                  "Swap-out alone does not stop a run. ")
         lines += ["", "Swap per phase, host-wide, over every variant and class each system ran. "
                       f"{guard}A timed query with any page swapped in is kept and "
@@ -576,9 +579,20 @@ class TargetError(Exception):
     """A row of scripts/targets.json that the results files cannot back."""
 
 
+# The name every tick-store-alone full day carries, <host>-<day>-full-tickstore-<commit>.json.
+ALONE_NAME = "-full-tickstore-"
+
+
+def names_alone(pattern):
+    return ALONE_NAME in pattern
+
+
 def target_file(root, pattern):
-    """The one committed file a pattern names, or None if there is none."""
-    found = sorted(root.glob(pattern))
+    """The one committed file a pattern names, or None if there is none. A pattern that does
+    not name a tick-store-alone day never matches one, so Linux-<day>-full-*.json is the
+    four-system day even with tick-store's alone day beside it (review RV-1)."""
+    found = sorted(path for path in root.glob(pattern)
+                   if names_alone(pattern) or ALONE_NAME not in path.name)
     if len(found) > 1:
         raise TargetError(f"{pattern} matches {len(found)} files: {[path.name for path in found]}")
     return found[0] if found else None
@@ -789,6 +803,13 @@ def judged_parts(row, root):
             raise TargetError(f"no results file matches {spec['file']}")
         files.append(path)
     documents = {path: json.loads(path.read_text(encoding="utf-8")) for path in files}
+    for spec, path in zip(specs, files):
+        if names_alone(spec["file"]) and not is_alone(documents[path]):
+            raise TargetError(f"{path.name} is not a tick-store-alone day, and {spec['file']} "
+                              "names one")
+        if not names_alone(spec["file"]) and is_alone(documents[path]):
+            raise TargetError(f"{path.name} is a tick-store-alone day, and {spec['file']} names "
+                              "the four-system day")
     if "lowest_of" in row:
         document = documents[files[0]]
         return [(*part, files[0], document) for part in lowest_parts(row, document)], None

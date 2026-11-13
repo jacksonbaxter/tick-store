@@ -425,6 +425,69 @@ def lowest_document():
                         "parquet": system((3000.0, 4000.0), (4000.0, 6000.0))}}
 
 
+DAY_ROW = {"id": "T-9", "host": "Linux", "target": {"at_most": 5}, "digits": 2, "unit": " ms",
+           "parts": [{"label": "q", "file": "results/compare/Linux-12302019-full-*.json",
+                      "value": {"path": ["ms"]}}]}
+ALONE_ROW = {"id": "T-10", "host": "macOS", "target": {"at_most": 5}, "digits": 2, "unit": " ms",
+             "parts": [{"label": "q", "file": "results/compare/macOS-12302019-full-tickstore-*.json",
+                        "value": {"path": ["ms"]}}]}
+
+
+class RenderDayKindsTest(Scratch):
+    """Review RV-1: a row for the four-system day never reads a tick-store-alone day, and a row
+    for tick-store alone never reads a four-system day, whichever files are committed."""
+
+    def setUp(self):
+        super().setUp()
+        self.results_md.write_text(WITH_TARGETS, encoding="utf-8")
+        self.folder = self.tree / "results" / "compare"
+        self.folder.mkdir(parents=True)
+
+    def add(self, name, ms, alone):
+        document = {"host": name.split("-")[0], "ms": ms}
+        if alone:
+            document["scope"] = "tickstore-only"
+        (self.folder / name).write_text(json.dumps(document), encoding="utf-8")
+
+    def render_rows(self, *rows):
+        self.targets.write_text(json.dumps({"schema": "t", "rows": list(rows)}), encoding="utf-8")
+        return self.render()
+
+    def test_a_linux_alone_day_beside_the_four_system_day_is_not_read_for_it(self):
+        self.add("Linux-12302019-full-0123456789ab.json", 4.0, alone=False)
+        self.add("Linux-12302019-full-tickstore-0123456789ab.json", 9.0, alone=True)
+        result = self.render_rows(DAY_ROW)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("| 4.00 ms | met | `results/compare/Linux-12302019-full-0123456789ab.json` |",
+                      self.results_md.read_text(encoding="utf-8"))
+
+    def test_a_linux_alone_day_alone_never_stands_in_for_the_four_system_day(self):
+        self.add("Linux-12302019-full-tickstore-0123456789ab.json", 4.0, alone=True)
+        result = self.render_rows(DAY_ROW)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("no results file matches results/compare/Linux-12302019-full-*.json",
+                      result.stderr)
+
+    def test_a_four_system_day_never_stands_in_for_tickstore_alone(self):
+        self.add("macOS-12302019-full-0123456789ab.json", 4.0, alone=False)
+        result = self.render_rows(ALONE_ROW)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("no results file matches", result.stderr)
+        # Named as tick-store alone and holding the four systems' day.
+        self.add("macOS-12302019-full-tickstore-0123456789ab.json", 4.0, alone=False)
+        result = self.render_rows(ALONE_ROW)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("macOS-12302019-full-tickstore-0123456789ab.json is not a tick-store-alone "
+                      "day", result.stderr)
+
+    def test_an_alone_day_named_as_the_four_system_day_is_refused(self):
+        self.add("Linux-12302019-full-0123456789ab.json", 4.0, alone=True)
+        result = self.render_rows(DAY_ROW)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("is a tick-store-alone day, and results/compare/Linux-12302019-full-*.json "
+                      "names the four-system day", result.stderr)
+
+
 class RenderLowestTest(Scratch):
     """QL-4's form: the target's own words kept, and what was measured said beside them."""
 
@@ -860,6 +923,26 @@ class RenderCompareTest(Scratch):
         self.assertIn("| Parquet | `v` | 2.000 | 1.900 |", full)
         sliced = block[block.index("**Linux, slice only.**"):]
         self.assertIn("| Parquet | `v` | 2.000 | not recorded |", sliced)
+
+    def test_a_linux_tickstore_alone_day_renders_with_the_guards_memory(self):
+        # Review RV-1: on Linux the guard watched tick-store alone, and its peak memory is the
+        # guard's, not BSD time -l's.
+        document = COMPARE.linux_tickstore_only_document()
+        document["systems"]["tickstore"]["peak_memory"].setdefault("vmhwm_bytes_by_process",
+                                                                   {"tick_roundtrip": 10})
+        _, source = COMPARE.full_day_document()
+        self.add_compare("Linux", source)
+        (self.compare / COMPARE.LINUX_ALONE_NAME).write_text(json.dumps(document),
+                                                             encoding="utf-8")
+        result = self.render()
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        block = self.block()
+        alone = block[block.index(f"**Linux, full day {COMPARE.DAY}, tick-store alone.**"):
+                      block.index("**Linux, slice only.**")]
+        self.assertIn("Peak memory per system, from compare/guard.py", alone)
+        self.assertIn("| tick-store | ", alone[alone.index("Peak memory per system"):])
+        self.assertNotIn("BSD time -l", alone)
+        self.assertNotIn("No guard ran", alone)
 
     def test_comparison_files_need_their_markers(self):
         self.results_md.write_text(RESULTS_MD, encoding="utf-8")
