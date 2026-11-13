@@ -594,6 +594,10 @@ FAULTS = (
           "a case's busy jiffies by every jiffy since boot, so a busy sibling reads near 0% and "
           "passes the validator's 5% rule", CHECK_FAILED,
           "FAIL: test_a_linux_document_meets_the_validators_sibling_rule (__main__.RunBenchTest"),
+    # Review E-10: boost is stated only if it read the same before and after the run.
+    Fault("turbo-read-after-the-run-only", "py-scripts", "run_bench.py states the boost it "
+          "reads after the last case, though it read another before the first", CHECK_FAILED,
+          "FAIL: test_turbo_that_changed_across_the_run_is_not_stated (__main__.RunBenchTest"),
     Fault("compare-full-day-clipped-window", "py-scripts", "check_compare.py stops comparing a "
           "full-day file's query windows with BENCHMARKS.md's, so an hour clipped to the slice "
           "passes as a full day", CHECK_FAILED,
