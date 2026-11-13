@@ -4238,6 +4238,12 @@ stack ran out, with a traceback and no verdict on the files after it. Only a sli
 validated as a variant source; a day there gets the one problem it always got, that the source is
 not this host's slice at this commit.
 
+**RV-10, three statements.** A resumed run kept a part made from another slice, since the parts
+directory names the commit and the day but not the slice: shown by a test, and the slice is now
+one of the arguments a part must match. The real-systems test's comment no longer claims its 8 KiB
+were no page of the source; the page is a tolerance for bytes nobody has explained. The
+generator's docstring had already been corrected with RV-1.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
