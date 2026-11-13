@@ -1049,6 +1049,15 @@ FAULTS = (
           "mutation's name and no code or prose, so an edited mutation keeps its old proof",
           CHECK_FAILED, "FAIL: test_a_mutation_with_another_body_has_another_fingerprint "
           "(__main__.Fingerprint"),
+    # Every listed fault breaks what it says on the committed tree.
+    Fault("prover-patch-stale", "py-scripts", "a listed patch as it was before the code it "
+          "edits moved, so it no longer applies", CHECK_FAILED,
+          "FAIL: test_every_listed_patch_applies_to_the_committed_tree "
+          "(__main__.EveryFaultApplies"),
+    Fault("prover-mutation-changes-nothing", "py-scripts", "a listed mutation that writes back "
+          "what it read, so its fault changes nothing", CHECK_FAILED,
+          "FAIL: test_every_listed_mutation_changes_the_committed_tree "
+          "(__main__.EveryFaultApplies"),
     Fault("coverage-required-removed", "coverage", "bench_support_test.cpp dropped from the "
           "tests, so the guard and the round-trip check lose their only callers", CHECK_FAILED,
           "REQUIRED FUNCTION NOT REACHED: verify_round_trip"),

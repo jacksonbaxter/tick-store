@@ -1,0 +1,19 @@
+diff --git a/faults/container-block-crc-skipped.patch b/faults/container-block-crc-skipped.patch
+index 71dd8fe..00df909 100644
+--- a/faults/container-block-crc-skipped.patch
++++ b/faults/container-block-crc-skipped.patch
+@@ -1,10 +1,10 @@
+ diff --git a/src/store/container.cpp b/src/store/container.cpp
+-index aefe859..5a238ec 100644
++index 4d27414..1882fc1 100644
+ --- a/src/store/container.cpp
+ +++ b/src/store/container.cpp
+-@@ -491,13 +491,7 @@ std::expected<BlockView, StoreError> ContainerParser::block_with(std::uint64_t i
+-             .offset = footer_offset_ + kFooterFixedSize + (index * kBlockEntrySize),
+-             .actual = info->payload_offset});
++@@ -481,13 +481,7 @@ std::expected<BlockView, StoreError> ContainerParser::block_with(std::uint64_t i
++                                     footer_offset_ + kFooterFixedSize + (index * kBlockEntrySize),
++                                     0, info->payload_offset));
+      }
+ -    if (checksums == Checksums::verify) {
+ -        const std::uint32_t computed = block_crc(info->codec, *payload);

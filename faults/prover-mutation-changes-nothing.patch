@@ -1,0 +1,13 @@
+diff --git a/scripts/prove_checks.py b/scripts/prove_checks.py
+index ea3e203..37b8cb8 100644
+--- a/scripts/prove_checks.py
++++ b/scripts/prove_checks.py
+@@ -209,7 +209,7 @@ def fuzz_g3_crc_target_missing():
+ 
+ 
+ def hand_edit_results_md():
+-    edit_text("RESULTS.md", "**macOS.**", "**macOS, hand edited.**")
++    edit_text("RESULTS.md", "**macOS.**", "**macOS.**")
+ 
+ 
+ def edit_table_cells(path, prefix, cells):
