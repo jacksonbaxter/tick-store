@@ -130,6 +130,14 @@ TEST(ReferenceEval, RefusesASourceWhoseFramesStopBeforeItsEnd) {
     }
 }
 
+TEST(ReferenceEval, RefusesACheckpointSizeThatIsNotASegmentSize) {
+    const Bytes source = stream();
+    const auto result =
+        evaluate_references(source, {.segment_records = {2}, .checkpoint_segment_records = {2, 100}});
+    ASSERT_FALSE(result.has_value());
+    EXPECT_TRUE(result.error().contains("100")) << result.error();
+}
+
 // The JSON is smaller than the stream's buffer, so its one write comes at close. A failure
 // there has to reach the exit code, not be lost in a destructor.
 TEST(ReferenceEval, AFailedWriteOfTheResultsIsAnError) {
@@ -190,6 +198,9 @@ TEST(ReferenceEval, TheCommandLineWritesJsonWithoutPathsAndRefusesBadUsage) {
         {source_path, output_path, "--day", "T", "--segment-records", "2", "--other", "1"},
         {source_path, output_path, "--day", "T", "--segment-records", "2",
          "--checkpoint-segment-records", "x"},
+        // A checkpoint size that is not a segment size would measure nothing.
+        {source_path, output_path, "--day", "T", "--segment-records", "2",
+         "--checkpoint-segment-records", "100"},
         {absent_path, output_path, "--day", "T", "--segment-records", "2"},
         {source_path, no_dir_path, "--day", "T", "--segment-records", "2"},
     };

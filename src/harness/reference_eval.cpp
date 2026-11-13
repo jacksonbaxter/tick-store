@@ -420,7 +420,8 @@ private:
 
 constexpr std::string_view kUsage =
     "usage: tick_reference_eval <source> <output.json> --day LABEL --segment-records N[,N...]\n"
-    "                           [--checkpoint-segment-records N[,N...]]\n";
+    "                           [--checkpoint-segment-records N[,N...]]\n"
+    "each checkpoint size must be one of the segment sizes\n";
 
 [[nodiscard]] std::optional<std::vector<std::uint32_t>> parse_list(std::string_view text) {
     std::vector<std::uint32_t> out;
@@ -461,6 +462,12 @@ constexpr std::string_view kUsage =
 
 std::expected<ReferenceEvalResult, std::string> evaluate_references(
     std::span<const std::byte> file, const ReferenceEvalOptions& options) {
+    for (const std::uint32_t n : options.checkpoint_segment_records) {
+        if (std::ranges::find(options.segment_records, n) == options.segment_records.end()) {
+            return std::unexpected(
+                std::format("checkpoint segment size {} is not a segment size", n));
+        }
+    }
     Walker walker{options};
     itch::FrameCursor cursor{file};
     auto frame = cursor.next();
@@ -508,7 +515,12 @@ int run_reference_eval_cli(std::span<const std::string_view> arguments,
             return kExitUsageOrIo;
         }
     }
-    if (day.empty() || options.segment_records.empty()) {
+    // A checkpoint size is measured only as one of the segment sizes.
+    const bool checkpoints_are_sizes =
+        std::ranges::all_of(options.checkpoint_segment_records, [&](std::uint32_t n) {
+            return std::ranges::find(options.segment_records, n) != options.segment_records.end();
+        });
+    if (day.empty() || options.segment_records.empty() || !checkpoints_are_sizes) {
         output.err += kUsage;
         return kExitUsageOrIo;
     }
