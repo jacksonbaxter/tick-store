@@ -718,7 +718,7 @@ int fail(std::string_view message) {
 
 // Whole rounds of kPassCalls, enough for a pass to last kMinPassTime by one untimed round,
 // timed after another has warmed the caches and the clock.
-[[nodiscard]] std::size_t sized_pass(Case& c) {
+[[nodiscard]] std::size_t sized_pass(const Case& c) {
     c.run(kPassCalls);
     const auto start = std::chrono::steady_clock::now();
     c.run(kPassCalls);
