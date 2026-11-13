@@ -384,6 +384,8 @@ void ignore_signal(int /*signal*/) {}
 
 // A signal while the gate waits for perf interrupts poll(); the wait goes on for the time
 // left, and an acknowledgement after it is taken (review A-6).
+// NOLINTBEGIN(misc-include-cleaner): <csignal> and <pthread.h> declare these on the platforms
+// we build for; macOS defines them in private headers
 TEST(CounterGate, ASignalWhileWaitingDoesNotEndTheWait) {
     struct sigaction quiet{};
     quiet.sa_handler = ignore_signal;  // no SA_RESTART, so poll() returns EINTR
@@ -415,6 +417,7 @@ TEST(CounterGate, ASignalWhileWaitingDoesNotEndTheWait) {
     ASSERT_EQ(::sigaction(SIGUSR1, &before, nullptr), 0);
     EXPECT_TRUE(enabled.has_value()) << enabled.error();
 }
+// NOLINTEND(misc-include-cleaner)
 
 class StreamCheckTest : public ::testing::Test {
 protected:
