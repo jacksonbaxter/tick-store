@@ -383,6 +383,14 @@ class CheckResultsTest(unittest.TestCase):
         self.assert_fails("Linux", lambda d: set_value(d, [], "header", "load_lines"),
                           "no load lines")
 
+    def test_load_lines_that_are_not_a_list(self):
+        # Review E-2: a string or an object held no lock proof and passed.
+        for value in ("measure.sh: start load1=0.10", {"start": "load1=0.10"}):
+            with self.subTest(value=value):
+                self.assert_fails("Linux", lambda d, v=value: set_value(d, v, "header",
+                                                                        "load_lines"),
+                                  "header.load_lines: not a list")
+
     def test_marked_iteration_only(self):
         self.assert_fails("macOS",
                           lambda d: set_value(d, "iteration-only", "header", "measurement"),

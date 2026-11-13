@@ -633,6 +633,15 @@ class Faults(Harness):
             document["header"]["load_lines"] = []
         self.assert_fault(fault, "no load lines")
 
+    def test_load_lines_that_are_not_a_list(self):
+        # Review E-2: nothing else in a comparison file reads the load lines, so a string held
+        # no proof that the run held the lock, and passed check-compare and render-check.
+        for value in ("measure.sh: start load1=0.10", {"start": "load1=0.10"}):
+            with self.subTest(value=value):
+                def fault(document, value=value):
+                    document["header"]["load_lines"] = value
+                self.assert_fault(fault, "header.load_lines: not a list")
+
     def test_a_load_line_short(self):
         def fault(document):
             document["header"]["load_lines"].pop()

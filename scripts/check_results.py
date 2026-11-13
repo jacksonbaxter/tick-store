@@ -185,6 +185,8 @@ def check_load_lines(header, case_count):
     if "load_lines" in header and not lines:
         return ["header.load_lines: no load lines, so this is iteration-only, "
                 "not a reported result"]
+    if "load_lines" in header and not isinstance(lines, list):
+        return [f"header.load_lines: not a list of measure.sh load lines: {lines!r}"]
     if not isinstance(lines, list):
         return []
     problems = []
