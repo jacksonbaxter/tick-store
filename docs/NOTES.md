@@ -4012,6 +4012,12 @@ of 5 rows passed beside 4 rows read back, since the row count was compared with 
 held to the rows read back, as the per-security path already was. `compare/fullday.py` asks for
 the stored settings without reading the store back, so there the check is left out rather than
 compared with nothing.
+**F-13, a test that passed for the wrong reason.** Confirmed: the bare capacity report the test
+wrote is refused only as "the file does not start with its header". The test now takes a
+document the validator passes and sets its measurement to `compare/fullday.py`'s `MEASUREMENT`,
+and requires exactly the iteration-only problem. With that refusal removed from
+`check_results.py` the old test still passed and the new one failed. The file still runs only by
+hand under the `.venv`, since `scripts/check.sh` does not list it (F-9, outside this round).
 
 ## Process notes
 
