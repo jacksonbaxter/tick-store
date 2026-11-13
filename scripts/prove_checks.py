@@ -1042,6 +1042,11 @@ FAULTS = (
           "pass with no tests run", EXIT_CTEST, "No tests were found",
           arguments=("--test-regex", "OracleExhaustiveFlip"),
           fault_arguments=("--test-regex", "NoSuchTestAnywhere")),
+    # Review E-5: a proof's key holds the code and prose that made its verdict.
+    Fault("prover-key-names-only", "py-scripts", "the prover's key for a proof holds a "
+          "mutation's name and no code or prose, so an edited mutation keeps its old proof",
+          CHECK_FAILED, "FAIL: test_a_mutation_with_another_body_has_another_fingerprint "
+          "(__main__.Fingerprint"),
     Fault("coverage-required-removed", "coverage", "bench_support_test.cpp dropped from the "
           "tests, so the guard and the round-trip check lose their only callers", CHECK_FAILED,
           "REQUIRED FUNCTION NOT REACHED: verify_round_trip"),
