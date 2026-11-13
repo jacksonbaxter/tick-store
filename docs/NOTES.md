@@ -3438,6 +3438,19 @@ file-size limit at 256 bytes for a 4,096-byte output, and closes the file under 
 closed after the limit is lifted, the stream wrote out what its flush could not, and the file
 reached 4,096 bytes.
 
+D-15. `FlagsSeen`, beside `CliOutput` in `roundtrip_cli.hpp`, holds the flags a command line has
+given, and each parser asks it before reading a flag. The Python callers (`compare/`,
+`scripts/check_oracle.py`) give each flag once. The first test run took 286 s, since a doubled
+`--prove-all-price4` ran the exhaustive proof of every Price4 before nothing refused it; that case
+now names an absent source and checks for the usage text, so a regression costs a refused open,
+not the proof.
+
+Fault patches. Every patch in `faults/` that touches a file changed here still applies with
+`git apply --check`. Three others do not, at this commit and before it: `container-block-crc-skipped`
+and `fuzz-container-block-reserved` (`src/store/container.cpp`) apply only with reduced context,
+and `fuzz-dictionary-repeated-entry` (`src/codec/dictionary.cpp`) not at all. Those files are the
+store and codec rounds', so the patches are left for the prover's fixer (TASKS).
+
 Raw: `phase4-raw/fix-harness/`: each finding's failing and passing logs.
 
 ## Process notes
