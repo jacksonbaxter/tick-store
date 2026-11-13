@@ -3424,6 +3424,11 @@ D-12. Documentation only. `first_frames` stops at N whole frames and cuts there,
 exactly N records loses its tail, and only a source with fewer than N is returned whole; the
 header now says that.
 
+D-13. The harness's requests are unaffected: `compare/systems/tickstore.py` sends both bounds and
+an integer locate for `rows` and `minute_aggregate`, and nothing but the kind for `column_sum`,
+which still needs no window. `locate` may still be absent, meaning every locate, as the header
+says.
+
 Raw: `phase4-raw/fix-harness/`: each finding's failing and passing logs.
 
 ## Process notes
