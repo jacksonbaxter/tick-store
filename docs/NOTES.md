@@ -3496,6 +3496,10 @@ after it with `bad_count` at the nested block's start. The check is `stated_bloc
 is still the PFOR decoder's to refuse, as for the outer blocks. Huffman indices are not a
 nested block and are read to the block's count. No error text changes for a well-formed block.
 
+R-2. Fixed in code rather than by deleting the header's sentence: a default `SegmentReader` is
+a value a caller can hold, and an empty segment is the answer the header gives. The check sits
+after the failure check, so a failed seek still gives its error (C-7's test passes unchanged).
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
