@@ -3669,6 +3669,15 @@ and the first file, evicted beforehand, must still have no resident page afterwa
 same up-front measure that refuses D-1's file, whose refusal `PageCache.AFileThisUserNeitherOwnsNorCanWriteIsRefusedOnLinux`
 already shows. The extra measure is one fresh mapping and `mincore` per file, which touches no page.
 
+RA-5. Fixed in the script, the reviewer's first option, rather than by narrowing A-8's row: the
+row's claim is now true of the published file too. `tree_dirty` stays out of the header, since
+`check_builds_match` refuses a measured run whose build says true, so every published file
+would carry false. Nothing reads the new key: `check_results.py` and `render_results.py` ignore
+header keys they do not know, and the script's own validator test still passes. The five
+committed bench files predate the key and are replaced at the freeze, so no validator requires
+it yet; TASKS has the item to make `check_results.py` require it once they are. No results file
+was regenerated.
+
 ### The final review: Phase 2 items closed
 
 The gate on the review found open items still under Phase 2 in docs/TASKS.md. Each below was
