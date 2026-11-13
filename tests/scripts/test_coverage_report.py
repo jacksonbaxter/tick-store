@@ -101,6 +101,27 @@ class RequiredList(unittest.TestCase):
             self.assertIn("svb_decode_scalar", names[machine])
             self.assertIn("ScalarKernelsOnThisThread", names[machine])
 
+    def test_the_kernel_statement_is_the_kernel_sets_required(self):
+        # The summary said no SIMD kernel existed after the kernels joined the list.
+        types = report.message_types(REPO_ROOT)
+        for machine, built in (("arm64", "NEON"), ("x86_64", "AVX2"), ("riscv64", None)):
+            with self.subTest(machine=machine):
+                statement = report.simd_statement(machine)
+                self.assertNotIn("exist yet", statement)
+                self.assertIn(report.SIMD_SCALAR, statement)
+                files = {item[1] for item in report.required_functions(types, machine)
+                         if item[0] == "kernel"}
+                for file in files:
+                    self.assertIn(file, statement)
+                if built:
+                    self.assertIn(built, statement)
+                else:
+                    self.assertIn("no SIMD set", statement)
+
+    def test_the_docstring_does_not_say_the_kernels_are_missing(self):
+        self.assertNotIn("none exists yet", report.__doc__)
+        self.assertIn("kernel", report.__doc__.split("Standard library only")[0])
+
     def test_a_header_with_a_missing_type_stops_the_report(self):
         with tempfile.TemporaryDirectory(dir=REPO_ROOT / "build") as root:
             header = Path(root) / report.MESSAGE_HEADER

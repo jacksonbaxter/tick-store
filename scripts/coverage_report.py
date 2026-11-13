@@ -11,7 +11,9 @@ calls, CRC32C in software and in this processor's hardware kernel, the fuzz orac
 oracle's compare path. A name that stops matching fails too, so the list cannot go stale in
 silence.
 
-The list holds no SIMD kernel because none exists yet. The Phase 3 kernels add theirs here.
+Every processor's list holds the SIMD kernels' dispatch and their scalar set, and this
+processor's SIMD set: NEON on arm64, AVX2 with its CPUID check on x86-64. The other processor's
+set is not built here, so it is neither required nor measured, as with CRC32C.
 llvm-cov sees only C++. scripts/check_results.py and scripts/check_compare.py are shown failing
 rule by rule in tests/scripts/, not measured here.
 
@@ -30,7 +32,6 @@ MESSAGE_HEADER = "include/tick_store/itch/message.hpp"
 MESSAGE_TYPES = 23
 SCHEMA = "tick-store-coverage-1"
 REPORTED = ("src/", "include/")
-SIMD_STATEMENT = "No SIMD kernels exist yet, so none are reported and none are claimed."
 PYTHON_STATEMENT = ("llvm-cov measures the C++ only. The Python validators are shown failing "
                     "rule by rule in tests/scripts/ instead.")
 RUN_STATEMENT = "tests/unit, with ItchRealDay left out so the report needs no data file."
@@ -332,6 +333,23 @@ SIMD_KERNELS = {"arm64": NEON_KERNELS, "aarch64": NEON_KERNELS, "x86_64": AVX2_K
                 "AMD64": AVX2_KERNELS}
 
 
+SIMD_SET_NAMES = {SIMD_NEON: "NEON", SIMD_AVX2: "AVX2, with its CPUID check"}
+
+
+def simd_statement(machine=None):
+    """What the summary says of the SIMD kernels, from the list the gate holds them to."""
+    machine = platform.machine() if machine is None else machine
+    statement = (f"The kernels' dispatch, {SIMD_DISPATCH}, and their scalar set, {SIMD_SCALAR}, "
+                 "are required on every processor.")
+    kernels = SIMD_KERNELS.get(machine)
+    if not kernels:
+        return statement + f" {machine} builds no SIMD set, so none is required here."
+    file = kernels[0][1]
+    return (statement + f" This processor's set, {SIMD_SET_NAMES[file]}, in {file}, is required "
+            f"too, {len(kernels)} functions. The other processor's set is not built here, so it "
+            "is neither required nor measured, and is listed among the sources not built.")
+
+
 def required_functions(types, machine=None):
     required = []
     for name in types:
@@ -479,7 +497,7 @@ def report_of(export, root):
         "commit": commit_of(root),
         "platform": f"{platform.system()} {platform.machine()}",
         "run": RUN_STATEMENT,
-        "simd_kernels": SIMD_STATEMENT,
+        "simd_kernels": simd_statement(),
         "python_validators": PYTHON_STATEMENT,
         "totals": totals_of(rows),
         "required": {"total": len(results), "reached": len(results) - len(unreached(results)),
