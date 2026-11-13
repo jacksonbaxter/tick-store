@@ -574,6 +574,9 @@ def summarise_writes(repetitions, pin, times):
                               timings["input_at_clock_start"]["resident_pages"],
                           "device_bytes_read": timings["device_read"]["bytes"],
                           "device_counter": timings["device_read"]["counter"]})
+            if "by_process" in timings["device_read"]:
+                # Review RV-7: on macOS, each process's reads, for every repetition.
+                entry["device_read_by_process"] = timings["device_read"]["by_process"]
     engine_only = [entry["engine_only_seconds"] for entry in by_repetition
                    if "engine_only_seconds" in entry]
     if len(engine_only) == len(by_repetition):

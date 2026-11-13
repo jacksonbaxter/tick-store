@@ -1,0 +1,13 @@
+diff --git a/scripts/check_compare.py b/scripts/check_compare.py
+--- a/scripts/check_compare.py
++++ b/scripts/check_compare.py
+@@ -302,8 +302,7 @@ def check_write_record(where, write, name, full_day=False, host=None):
+             problems.append(f"{where}.write: repetition {number} counts its device reads by "
+                             f"{item['device_counter']!r}, and a macOS write counts the reads of "
+                             f"the processes that did it, by ri_diskio_bytesread")
+-        elif host == "macOS" and not reads_add_up(item.get("device_read_by_process"),
+-                                                  item["device_bytes_read"]):
++        elif False:
+             # Review RV-7: each process's reads, the worker's among them, make up the count.
+             problems.append(f"{where}.write: repetition {number}'s device reads by process do "
+                             f"not hold the worker and add up to its {item['device_bytes_read']} "

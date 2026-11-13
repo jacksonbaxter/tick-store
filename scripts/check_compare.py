@@ -73,7 +73,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 import check_results  # noqa: E402
 
 sys.path.insert(0, str(REPO_ROOT))
-from compare import repetitions, variant_rule  # noqa: E402
+from compare import coldcache, repetitions, variant_rule  # noqa: E402
 
 DEFAULT_PINS = REPO_ROOT / "scripts" / "data_pins.json"
 DEFAULT_CAPACITY = REPO_ROOT / "results" / "fullday-capacity-12302019.json"
@@ -108,8 +108,9 @@ LINUX_CPUS = [4, 6]
 OPEN_INSIDE_COLD_CLOCK = {"parquet": True, "arcticdb": False, "questdb": False,
                           "tickstore": True}
 # What a protocol 2 macOS write counts its device reads by: the reads of the processes that did
-# it, never iostat's disk0 total, which holds the write's own output too (review RF-5).
-MACOS_WRITE_COUNTER = "ri_diskio_bytesread"
+# it, never iostat's disk0 total, which holds the write's own output too (review RF-5). The
+# statement coldcache.py writes, exactly, not any text that mentions the counter (review RV-7).
+MACOS_WRITE_COUNTER = coldcache.ProcessDiskReads.COUNTER
 # The second pinned CPU's sibling, measured from protocol 2 and held to the first one's rule.
 SECOND_CPU = 6
 SECOND_SIBLING = "second_sibling_busy_percent"
@@ -254,6 +255,14 @@ def check_write(where, write, pin):
     return problems
 
 
+def reads_add_up(by_process, total):
+    """A macOS write's reads by process: the worker's among them, each a count, summing to the
+    write's device reads."""
+    return isinstance(by_process, dict) and "worker" in by_process and \
+        all(is_count(value) for value in by_process.values()) and \
+        sum(by_process.values()) == total
+
+
 def check_write_record(where, write, name, full_day=False, host=None):
     """Protocol 2: each write repetition's engine-only seconds, its input's residency when the
     clock started and the device's reads while it ran; what the two times hold; tick-store's
@@ -289,10 +298,16 @@ def check_write_record(where, write, name, full_day=False, host=None):
         if not is_count(item.get("device_bytes_read")) or not item.get("device_counter"):
             problems.append(f"{where}.write: repetition {number} records no device bytes read "
                             "while it ran")
-        elif host == "macOS" and MACOS_WRITE_COUNTER not in str(item["device_counter"]):
+        elif host == "macOS" and item["device_counter"] != MACOS_WRITE_COUNTER:
             problems.append(f"{where}.write: repetition {number} counts its device reads by "
                             f"{item['device_counter']!r}, and a macOS write counts the reads of "
-                            f"the processes that did it, by {MACOS_WRITE_COUNTER}")
+                            f"the processes that did it, by ri_diskio_bytesread")
+        elif host == "macOS" and not reads_add_up(item.get("device_read_by_process"),
+                                                  item["device_bytes_read"]):
+            # Review RV-7: each process's reads, the worker's among them, make up the count.
+            problems.append(f"{where}.write: repetition {number}'s device reads by process do "
+                            f"not hold the worker and add up to its {item['device_bytes_read']} "
+                            "bytes")
     engine_only = [item.get("engine_only_seconds") for item in each if isinstance(item, dict)]
     if each and all(check_results.is_number(value) for value in engine_only):
         value = statistics.median(engine_only)

@@ -1076,6 +1076,27 @@ class WriteRecord(unittest.TestCase):
         self.assertEqual(write["times"], {"seconds": "s", "engine_only_seconds": "e"})
         self.assertEqual(check_compare.check_write_record("w", write, "parquet"), [])
 
+    def test_a_macos_write_keeps_each_repetitions_reads_by_process(self):
+        # Review RV-7: the reads of each process that did the write, repetition by repetition,
+        # as the validator holds them, and the counter by its exact statement.
+        from compare import coldcache, run_system
+
+        counted = [{"worker": 4096, "waited children": 8192}, {"worker": 0,
+                                                               "waited children": 4096}]
+        repetitions = [{"timings": {"seconds": 2.0, "engine_seconds": 1.0, "python_seconds": 0.5,
+                                    "engine_only_seconds": 1.5, "python_note": "n",
+                                    "input_at_clock_start": {"pages": 10, "resident_pages": 10},
+                                    "device_read": {"bytes": sum(by.values()), "by_process": by,
+                                                    "counter": coldcache.ProcessDiskReads.COUNTER}},
+                        "peak_rss_bytes": 1, "service": {}} for by in counted]
+        write = run_system.summarise_writes(repetitions, {"message_count": 10, "size": 20},
+                                            {"seconds": "s", "engine_only_seconds": "e"})
+        self.assertEqual([item["device_read_by_process"] for item in write["by_repetition"]],
+                         counted)
+        self.assertEqual(check_compare.check_write_record("w", write, "parquet", host="macOS"),
+                         [])
+        self.assertEqual(check_compare.MACOS_WRITE_COUNTER, coldcache.ProcessDiskReads.COUNTER)
+
     def test_every_system_says_what_its_two_times_hold(self):
         from compare.systems import SYSTEM_NAMES, system_class
 

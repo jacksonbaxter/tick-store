@@ -329,7 +329,9 @@ macOS the bytes the device read for the processes that did the write, each one's
 `tick_roundtrip`, read once it has exited and before it is reaped, since macOS adds no reaped
 child's reads to its parent's. `iostat`'s `disk0` total, which the cold proof uses, counts the
 write's own output too, so `scripts/check_compare.py` refuses it for a protocol 2 macOS write
-(review RF-5). A process's own executable and libraries count when they are not cached; in a run
+(review RF-5), and takes only the counter's own statement. Each macOS repetition keeps each
+process's count, `device_read_by_process`, which must hold the worker's and add up to the
+write's (review RV-7). A process's own executable and libraries count when they are not cached; in a run
 the flush probe has run the same tool first. Each write's `times` says what its two times hold,
 as the table does.
 

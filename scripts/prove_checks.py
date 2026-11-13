@@ -678,6 +678,15 @@ FAULTS = (
           "macOS write whose device reads are iostat's disk0 total, which holds the write's own "
           "output, as its count of reads (review RF-5)", CHECK_FAILED,
           "FAIL: test_a_macos_write_counting_disk0s_reads_and_writes (__main__.Protocol2"),
+    # Review RV-7: the counter by its statement, and the reads of each process that did it.
+    Fault("compare-macos-write-reads-by-process-unchecked", "py-scripts", "check_compare.py "
+          "takes a macOS write whose reads by process leave out the worker or do not add up to "
+          "its device reads", CHECK_FAILED,
+          "FAIL: test_a_macos_write_whose_reads_by_process_are_not_its_reads (__main__.Protocol2"),
+    Fault("run-system-write-reads-by-process-dropped", "py-compare", "run_system.py keeps a "
+          "macOS write's reads by process for its last repetition alone", CHECK_FAILED,
+          "ERROR: test_a_macos_write_keeps_each_repetitions_reads_by_process "
+          "(__main__.WriteRecord"),
     Fault("compare-engine-only-not-its-own", "py-scripts", "check_compare.py stops tying a "
           "write repetition's engine-only seconds to its own total less its Python seconds, so "
           "any figure within the total passes (review RF-2)", CHECK_FAILED,

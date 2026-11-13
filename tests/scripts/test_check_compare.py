@@ -1510,7 +1510,9 @@ def protocol_2(document):
                     {"seconds": total, "engine_seconds": engine, "python_seconds": 0.1,
                      "engine_only_seconds": round(total - 0.1, 9), "input_pages": 100,
                      "input_resident_pages_at_start": 100, "device_bytes_read": 0,
-                     "device_counter": WRITE_COUNTER[document["header"]["host"]]}
+                     "device_counter": WRITE_COUNTER[document["header"]["host"]],
+                     **({"device_read_by_process": {"worker": 0, "waited children": 0}}
+                        if document["header"]["host"] == "macOS" else {})}
                     for total, engine in zip(write["seconds"], (1.9,) if day else (2.0, 1.9, 1.8),
                                              strict=True)]
                 write["engine_only_seconds_median"] = 1.9
@@ -1704,6 +1706,30 @@ class Protocol2(Harness):
                                    "\"iostat's total for disk0, MiB read and written, "
                                    "machine-wide\", and a macOS write counts the reads of the "
                                    "processes that did it, by ri_diskio_bytesread")
+
+    def test_a_macos_write_counter_that_only_mentions_the_counter(self):
+        # Review RV-7: the counter is the one statement, not any text that names it.
+        def fault(document):
+            b_of(document, "questdb")["write"]["by_repetition"][0]["device_counter"] = (
+                "iostat disk0 total; ri_diskio_bytesread unavailable")
+        self.assert_fault_2(fault, "questdb.v.B.write: repetition 1 counts its device reads by "
+                                   "'iostat disk0 total; ri_diskio_bytesread unavailable'")
+
+    def test_a_macos_write_whose_reads_by_process_are_not_its_reads(self):
+        # Review RV-7: the reads of each process that did the write, the worker among them, add
+        # up to the write's device reads.
+        for by_process in (None, {"questdb": 0}, {"worker": 4096}, {"worker": -1, "x": 1},
+                           "worker"):
+            def fault(document, by_process=by_process):
+                item = b_of(document, "questdb")["write"]["by_repetition"][0]
+                if by_process is None:
+                    del item["device_read_by_process"]
+                else:
+                    item["device_read_by_process"] = by_process
+            with self.subTest(by_process=by_process):
+                self.assert_fault_2(fault, "questdb.v.B.write: repetition 1's device reads by "
+                                           "process do not hold the worker and add up to its "
+                                           "0 bytes")
 
     def test_a_write_not_saying_what_its_times_hold(self):
         def fault(document):
