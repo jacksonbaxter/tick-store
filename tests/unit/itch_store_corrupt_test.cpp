@@ -402,7 +402,7 @@ TEST(ItchStoreCorrupt, DirectoryFields) {
         StoreParts parts = test::parts_of(base_file());
         put_field(parts.section(kStoreSection).bytes, kStoreRecordCountOffset, 8, 24);
         put_field(parts.section(kStoreSection).bytes, kStoreSegmentCountOffset, 8, 3);
-        expect_refused(parts.build(), "segment index", ItchStoreErrorKind::bad_metadata);
+        expect_refused(parts.build(), "segment count", ItchStoreErrorKind::bad_metadata);
     }
     {
         // A block under a codec its column does not take.
@@ -422,6 +422,37 @@ TEST(ItchStoreCorrupt, DirectoryFields) {
         block.bytes = std::move(wrapped);
         expect_refused(parts.build(), "column codec", ItchStoreErrorKind::bad_segment);
     }
+}
+
+// Where the two directory refusals point (review C-8). An empty block metadata, which the
+// container allows, is refused where the block's metadata would be, in the footer, not at
+// byte 0, the container's magic.
+TEST(ItchStoreCorrupt, AnEmptyBlockMetadataIsReportedInTheFooter) {
+    StoreParts parts = test::parts_of(base_file());
+    const std::size_t b = parts.block_index(0, Column::timestamp);
+    parts.blocks[b].metadata.clear();
+    const Bytes file = parts.build();
+    const auto error = first_error(file);
+    ASSERT_TRUE(error.has_value());
+    EXPECT_EQ(error->field, "metadata size");
+    EXPECT_EQ(error->block, b);
+    const auto parser = ContainerParser::open(file);
+    ASSERT_TRUE(parser.has_value());
+    EXPECT_GE(error->offset, parser->footer_offset()) << to_string(*error);
+    EXPECT_LT(error->offset, file.size()) << to_string(*error);
+}
+
+// A header of no segments over a file that has them: the refusal names the header's count,
+// not a count less one that wraps to 2^64 - 1.
+TEST(ItchStoreCorrupt, AHeaderOfNoSegmentsNamesItsCount) {
+    StoreParts parts = test::parts_of(base_file());
+    put_field(parts.section(kStoreSection).bytes, kStoreRecordCountOffset, 8, 0);
+    put_field(parts.section(kStoreSection).bytes, kStoreSegmentCountOffset, 8, 0);
+    const auto error = first_error(parts.build());
+    ASSERT_TRUE(error.has_value());
+    EXPECT_EQ(error->field, "segment count") << to_string(*error);
+    EXPECT_EQ(error->expected, 0U) << to_string(*error);
+    EXPECT_EQ(error->actual, 1U) << to_string(*error);
 }
 
 // --- A segment's columns ----------------------------------------------------------------

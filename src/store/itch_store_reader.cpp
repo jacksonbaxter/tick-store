@@ -32,9 +32,11 @@ namespace {
     return std::unexpected(error);
 }
 
+// Where `part`, a span the parser took from `file`, starts in it. An empty part still has
+// its place: an empty block metadata is where its entry says it is.
 [[nodiscard]] std::uint64_t offset_in(std::span<const std::byte> file,
                                       std::span<const std::byte> part) noexcept {
-    return part.empty() ? 0 : static_cast<std::uint64_t>(part.data() - file.data());
+    return part.data() == nullptr ? 0 : static_cast<std::uint64_t>(part.data() - file.data());
 }
 
 constexpr std::size_t kStoreSections = 3;
@@ -173,8 +175,9 @@ std::expected<void, ItchStoreError> ItchStoreReader::read_directory() {
                 return refuse("segment index", kMetaSegmentOffset, segment, metadata->segment);
             }
             if (segment >= header_.segment_count) {
-                return refuse("segment index", kMetaSegmentOffset, header_.segment_count - 1,
-                              segment);
+                // The footer has at least segment + 1 segments.
+                return refuse("segment count", kMetaSegmentOffset, header_.segment_count,
+                              segment + 1);
             }
             const SegmentSummary& summary = *metadata->summary;
             if (summary.first_record != records) {
