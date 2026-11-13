@@ -190,6 +190,25 @@ TEST(ColdcacheCli, WalksADirectoryAndCountsEveryFile) {
         std::format("\"bytes\": {}", 2 * kFilePages * page_size())));
 }
 
+// A subdirectory the walk cannot open is an error with exit 2, not an exception out of the
+// tool. Root can open any directory, so the case cannot be made there.
+TEST(ColdcacheCli, ASubdirectoryItCannotOpenIsAnErrorNotACrash) {
+    if (::geteuid() == 0) {
+        GTEST_SKIP() << "root opens every directory";
+    }
+    const ScratchDir scratch;
+    const std::filesystem::path locked = scratch / "d/locked";
+    std::filesystem::create_directories(locked);
+    write_file(scratch / "d/file", file_bytes());
+    std::filesystem::permissions(locked, std::filesystem::perms::none);
+    CliRun reported;
+    EXPECT_NO_THROW(reported = run({"residency", (scratch / "d").string()}));
+    std::filesystem::permissions(locked, std::filesystem::perms::owner_all);
+    EXPECT_EQ(reported.code, kExitUsageOrIo);
+    EXPECT_TRUE(reported.output.err.contains("cannot walk")) << reported.output.err;
+    EXPECT_TRUE(reported.output.out.empty());
+}
+
 TEST(ColdcacheCli, RefusesBadUsageAndAMissingPath) {
     EXPECT_EQ(run({}).code, kExitUsageOrIo);
     EXPECT_EQ(run({"evict"}).code, kExitUsageOrIo);

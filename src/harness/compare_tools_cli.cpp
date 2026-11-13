@@ -113,14 +113,18 @@ std::expected<std::vector<std::filesystem::path>, std::string> regular_files(
         if (!std::filesystem::is_directory(status)) {
             return std::unexpected(std::format("not a file or directory: {}", text));
         }
-        const auto walker = std::filesystem::recursive_directory_iterator{path, error};
+        // Advanced with increment(error), never ++, which throws on a subdirectory it
+        // cannot open.
+        for (auto walker = std::filesystem::recursive_directory_iterator{path, error};
+             !error && walker != std::filesystem::recursive_directory_iterator{};
+             walker.increment(error)) {
+            std::error_code ignored;
+            if (walker->is_regular_file(ignored) && !walker->is_symlink(ignored)) {
+                files.push_back(walker->path());
+            }
+        }
         if (error) {
             return std::unexpected(std::format("cannot walk {}: {}", text, error.message()));
-        }
-        for (const auto& entry : walker) {
-            if (entry.is_regular_file(error) && !entry.is_symlink(error)) {
-                files.push_back(entry.path());
-            }
         }
     }
     return files;
