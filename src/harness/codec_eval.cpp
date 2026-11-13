@@ -1129,7 +1129,7 @@ public:
         }
         ++values_;
         if (into.pending.size() == options_->block_values) {
-            flush(into, stream, locate);
+            flush(into, stream, locate_of(stream));
         }
     }
 

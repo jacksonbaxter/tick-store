@@ -556,6 +556,22 @@ TEST(CodecEval, KeepsOnlyTheFirstFewExamples) {
     EXPECT_EQ(failed.examples.size(), 3U);
 }
 
+// An example in a file-order column carries locate 0, as documented, whichever message's
+// locate happened to fill the block; here the block fills mid-stream on locate 5.
+TEST(CodecEval, AFileOrderExampleCarriesLocateZero) {
+    Bytes bytes;
+    itch::MwcbDeclineLevel message;
+    message.header = header(5, 100);
+    message.level_1 = itch::Price8{(std::uint64_t{1} << 60U) + 1};
+    append(bytes, message);
+    const auto result = evaluate_codecs(bytes, options_of(kBlock));
+    ASSERT_TRUE(result.has_value());
+    const CodecResult& failed = codec(column(*result, "mwcb_level"), "gorilla-xor-f64-integer");
+    ASSERT_EQ(failed.examples.size(), 1U);
+    EXPECT_EQ(failed.examples[0].index, 0U);
+    EXPECT_EQ(failed.examples[0].locate, 0U);
+}
+
 TEST(CodecEval, RefusesABlockSizeTheFormatCannotHold) {
     const Day day = small_day(1);
     EXPECT_FALSE(evaluate_codecs(day.bytes, options_of(0)).has_value());
