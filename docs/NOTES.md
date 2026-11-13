@@ -3626,6 +3626,36 @@ the 7 AVX2 or CRC32C path targets on Linux at AVX2, 1,801 to 1,804 s each, every
 no finding. Code has changed since `ea1dde4`; the rerun at the freeze is the open G-3 item under
 Phase 4.
 
+**What `cache-misses` counts on Zen 1: closed.** The pinned host's processor, the V1605B, is
+family 17h model 11h. In Linux 6.12, `arch/x86/kernel/cpu/amd.c` marks family 17h models 00h to
+2Fh as Zen 1, and `amd_pmu_event_map` in `arch/x86/events/amd/core.c` then takes the generic
+events from the table `amd_zen1_perfmon_event_map`. There `cache-misses` is raw 0x0964, event
+0x64 with unit mask 0x09, and `cache-references` is 0xff60, event 0x60 with unit mask 0xFF. The
+same table entries are in the 6.12.116 stable tag, the kernel the Linux results files name. The
+kernel commit that added the miss entry, 25d387287cf0 (2020), gives AMD's bit names as its reason.
+AMD's own documents: no public reference was found for model 11h itself, but the Open-Source
+Register Reference 56255 Rev 3.03 (July 2018), which covers family 17h models 00h to 2Fh, defines
+both events in its L2 cache events section (2.1.11.3.6), and the Processor Programming Reference
+55570-B1 Rev 3.16 (April 2021), for the sibling model 18h, gives the clearer bit names in its own
+(2.1.14.3.6). PMCx064 counts the outcome of the core's cacheable L2 requests, not counting the L2
+prefetcher's: bit 3 is a data cache request that missed the L2, bit 0 an instruction cache
+request that missed it. PMCx060 with every bit set counts all requests to the L2, the L2
+prefetcher's and software prefetches among them. So on this host `cache-misses` is L2 demand
+misses from the L1 caches, not last-level misses: some of them hit the 4 MB L3, which has its
+own counters outside the core's. And the two events have different scopes, so `cache-misses`
+over `cache-references` is not an L2 miss rate; it reads low by however much prefetching there
+was. perf's own event list for Zen 1 agrees: `l2_cache_req_stat.ic_dc_miss_in_l2` is event 0x64,
+unit mask 0x09.
+
+No committed figure uses the event. `scripts/run_bench.py` asks perf for `cycles:u`,
+`instructions:u` and `branch-misses:u` only. Every `cache_misses` field in `results/bench/` is
+`unavailable`: 8 cases in the two Linux files, which give the reason "not collected until what the
+event counts on Zen 1 is confirmed", and 322 in the three macOS files, which have no counters. The
+comparison files hold no counters, and neither README.md, RESULTS.md nor BENCHMARKS.md quotes it.
+The reason string stays as it is in the committed files; the rule for the future is that a figure
+from this event on this host is called "L2 misses", with the event code (PMCx064, unit mask 0x09)
+beside it, never "cache misses" or "LLC misses", and is never divided by `cache-references`.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
