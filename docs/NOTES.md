@@ -3678,6 +3678,12 @@ committed bench files predate the key and are replaced at the freeze, so no vali
 it yet; TASKS has the item to make `check_results.py` require it once they are. No results file
 was regenerated.
 
+RA-4. The reviewer's fix, `std::format` of the case's `reference` in the three messages and the
+two comments corrected. The reviewer's way of showing it, A-4's mutation run through the
+benchmark, was not repeated: this round runs no benchmark, and the change is to text written
+only when a case has already failed. No timed code changed, but it is a change to `bench/`, so
+it falls under the freeze rerun that TASKS already asks for the bench files.
+
 ### The final review: Phase 2 items closed
 
 The gate on the review found open items still under Phase 2 in docs/TASKS.md. Each below was
