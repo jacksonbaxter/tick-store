@@ -187,6 +187,16 @@ TEST(ReferenceEval, TheCommandLineWritesJsonWithoutPathsAndRefusesBadUsage) {
     EXPECT_TRUE(json.contains(R"("name": "within_stock_imports")"));
     EXPECT_FALSE(json.contains(dir.path().string()));
     EXPECT_TRUE(output.out.contains("N=2 within_stock_imports"));
+    // At N = 100 the checkpoint was not asked for: its column alone is no cost, so neither a
+    // total nor bits per reference is given for it.
+    const std::size_t whole = json.find(R"("segment_records": 100,)");
+    ASSERT_NE(whole, std::string::npos);
+    const std::size_t unmeasured = json.find(R"("name": "day_distance_checkpoint")", whole);
+    ASSERT_NE(unmeasured, std::string::npos);
+    const std::string row = json.substr(unmeasured, json.find('}', unmeasured) - unmeasured);
+    EXPECT_TRUE(row.contains(R"("measured": false)")) << row;
+    EXPECT_TRUE(row.contains(R"("total_bytes": null)")) << row;
+    EXPECT_TRUE(row.contains(R"("bits_per_reference": null)")) << row;
 
     const std::vector<std::vector<std::string_view>> bad{
         {source_path, output_path},

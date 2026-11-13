@@ -58,46 +58,61 @@ constexpr std::array<std::string_view, kEncodings> kEncodingNames{
     "within_stock_imports", "all_creations_imports", "values_pfor_delta", "values_head_delta",
     "values_svb_delta",     "day_distance_checkpoint", "day_distance_index"};
 
+// The first encoder error of a run. Every figure is the real codecs' output, so an encoding
+// that fails fails the run rather than count short. The encoders refuse only a bad block size
+// or transform, and both are constants here.
+struct EncodeErrors {
+    std::optional<std::string> first;
+
+    void note(const std::expected<void, codec::CodecError>& result) {
+        if (!result.has_value() && !first.has_value()) {
+            first = codec::to_string(result.error());
+        }
+    }
+};
+
 [[nodiscard]] std::uint64_t pfor_bytes(std::span<const std::uint64_t> values,
-                                       codec::IntTransform transform) {
+                                       codec::IntTransform transform, EncodeErrors& errors) {
     if (values.empty()) {
         return 0;
     }
     std::vector<std::byte> out;
-    std::ignore = codec::encode_pfor(values, kBlock, {.transform = transform}, out);
+    errors.note(codec::encode_pfor(values, kBlock, {.transform = transform}, out));
     return out.size();
 }
 
-[[nodiscard]] std::uint64_t dict_bytes(std::span<const std::uint64_t> values) {
+[[nodiscard]] std::uint64_t dict_bytes(std::span<const std::uint64_t> values, EncodeErrors& errors) {
     if (values.empty()) {
         return 0;
     }
     std::vector<std::byte> out;
-    std::ignore = codec::encode_dict(values, kBlock, out);
+    errors.note(codec::encode_dict(values, kBlock, out));
     return out.size();
 }
 
-[[nodiscard]] std::uint64_t svb_bytes(std::span<const std::uint64_t> values) {
+[[nodiscard]] std::uint64_t svb_bytes(std::span<const std::uint64_t> values, EncodeErrors& errors) {
     if (values.empty()) {
         return 0;
     }
     std::vector<std::byte> out;
-    std::ignore = codec::encode_svb(values, kBlock, true, out);
+    errors.note(codec::encode_svb(values, kBlock, true, out));
     return out.size();
 }
 
 // The store's own coding of an import list: the smaller of PFOR delta and head delta.
-[[nodiscard]] std::uint64_t import_bytes(std::span<const std::uint64_t> values) {
+[[nodiscard]] std::uint64_t import_bytes(std::span<const std::uint64_t> values,
+                                         EncodeErrors& errors) {
     if (values.empty()) {
         return 0;
     }
-    return std::min(pfor_bytes(values, codec::IntTransform::delta),
-                    pfor_bytes(values, codec::IntTransform::head_delta));
+    return std::min(pfor_bytes(values, codec::IntTransform::delta, errors),
+                    pfor_bytes(values, codec::IntTransform::head_delta, errors));
 }
 
 // Distances grouped by message type, stably, as the store keeps them.
 [[nodiscard]] std::uint64_t grouped_dict_bytes(const std::vector<std::uint64_t>& values,
-                                               const std::vector<std::uint8_t>& types) {
+                                               const std::vector<std::uint8_t>& types,
+                                               EncodeErrors& errors) {
     std::array<std::vector<std::uint64_t>, 256> groups;
     for (std::size_t i = 0; i < values.size(); ++i) {
         groups[types[i]].push_back(values[i]);
@@ -107,7 +122,7 @@ constexpr std::array<std::string_view, kEncodings> kEncodingNames{
     for (const auto& group : groups) {
         grouped.insert(grouped.end(), group.begin(), group.end());
     }
-    return dict_bytes(grouped);
+    return dict_bytes(grouped, errors);
 }
 
 // A segment's lists of known orders, by reference: per locate or all in one.
@@ -204,7 +219,7 @@ struct DayBook {
     // encodings: locates (PFOR delta), live counts and creation counts (PFOR), and per order
     // the gap from the locate's creation count back to its ordinal (PFOR) and its reference in
     // creation order (the smaller of delta and head delta).
-    [[nodiscard]] std::pair<std::uint64_t, std::uint64_t> checkpoint_bytes() const {
+    [[nodiscard]] std::pair<std::uint64_t, std::uint64_t> checkpoint_bytes(EncodeErrors& errors) const {
         std::vector<std::tuple<std::uint16_t, std::uint64_t, std::uint64_t>> orders;
         orders.reserve(live.size());
         for (const auto& [reference, order] : live) {
@@ -229,17 +244,17 @@ struct DayBook {
             gaps.push_back(created[locate] - ordinal);
             references.push_back(reference);
         }
-        const std::uint64_t bytes = pfor_bytes(locates, codec::IntTransform::delta) +
-                                    pfor_bytes(counts, codec::IntTransform::none) +
-                                    pfor_bytes(creations, codec::IntTransform::none) +
-                                    pfor_bytes(gaps, codec::IntTransform::none) +
-                                    import_bytes(references);
+        const std::uint64_t bytes = pfor_bytes(locates, codec::IntTransform::delta, errors) +
+                                    pfor_bytes(counts, codec::IntTransform::none, errors) +
+                                    pfor_bytes(creations, codec::IntTransform::none, errors) +
+                                    pfor_bytes(gaps, codec::IntTransform::none, errors) +
+                                    import_bytes(references, errors);
         return {bytes, orders.size()};
     }
 
     // Each locate's creation count so far, for the locates with any: locates by PFOR delta,
     // counts by PFOR.
-    [[nodiscard]] std::pair<std::uint64_t, std::uint64_t> index_bytes() const {
+    [[nodiscard]] std::pair<std::uint64_t, std::uint64_t> index_bytes(EncodeErrors& errors) const {
         std::vector<std::uint64_t> locates;
         std::vector<std::uint64_t> counts;
         for (std::size_t locate = 0; locate < created.size(); ++locate) {
@@ -248,8 +263,8 @@ struct DayBook {
                 counts.push_back(created[locate]);
             }
         }
-        return {pfor_bytes(locates, codec::IntTransform::delta) +
-                    pfor_bytes(counts, codec::IntTransform::none),
+        return {pfor_bytes(locates, codec::IntTransform::delta, errors) +
+                    pfor_bytes(counts, codec::IntTransform::none, errors),
                 locates.size()};
     }
 };
@@ -284,26 +299,26 @@ struct SizeState {
     }
 
     // At a segment's start: the state the day-wide encodings need there.
-    void open_segment(const DayBook& book) {
+    void open_segment(const DayBook& book, EncodeErrors& errors) {
         ++cost.segments;
         if (checkpoints) {
-            const auto [bytes, orders] = book.checkpoint_bytes();
+            const auto [bytes, orders] = book.checkpoint_bytes(errors);
             add_state(day_distance_checkpoint, bytes, orders);
         }
-        const auto [bytes, entries] = book.index_bytes();
+        const auto [bytes, entries] = book.index_bytes(errors);
         add_state(day_distance_index, bytes, entries);
     }
 
-    void close_segment() {
+    void close_segment(EncodeErrors& errors) {
         auto& e = cost.encodings;
-        e[within_stock_imports].column_bytes += grouped_dict_bytes(within_distance, types);
-        add_state(within_stock_imports, import_bytes(within.imports()), within.imports().size());
-        e[all_creations_imports].column_bytes += grouped_dict_bytes(all_distance, types);
-        add_state(all_creations_imports, import_bytes(all.imports()), all.imports().size());
-        e[values_pfor_delta].column_bytes += pfor_bytes(values, codec::IntTransform::delta);
-        e[values_head_delta].column_bytes += pfor_bytes(values, codec::IntTransform::head_delta);
-        e[values_svb_delta].column_bytes += svb_bytes(values);
-        const std::uint64_t day = grouped_dict_bytes(day_distance, types);
+        e[within_stock_imports].column_bytes += grouped_dict_bytes(within_distance, types, errors);
+        add_state(within_stock_imports, import_bytes(within.imports(), errors), within.imports().size());
+        e[all_creations_imports].column_bytes += grouped_dict_bytes(all_distance, types, errors);
+        add_state(all_creations_imports, import_bytes(all.imports(), errors), all.imports().size());
+        e[values_pfor_delta].column_bytes += pfor_bytes(values, codec::IntTransform::delta, errors);
+        e[values_head_delta].column_bytes += pfor_bytes(values, codec::IntTransform::head_delta, errors);
+        e[values_svb_delta].column_bytes += svb_bytes(values, errors);
+        const std::uint64_t day = grouped_dict_bytes(day_distance, types, errors);
         e[day_distance_checkpoint].column_bytes += day;
         e[day_distance_index].column_bytes += day;
         cost.imports += within.imports().size();
@@ -331,23 +346,26 @@ public:
         for (SizeState& size : sizes_) {
             if (records_ % size.segment_records == 0) {
                 if (records_ != 0) {
-                    size.close_segment();
+                    size.close_segment(errors_);
                 }
-                size.open_segment(book_);
+                size.open_segment(book_, errors_);
             }
         }
         ++records_;
         std::visit([this](const auto& m) { on(m); }, message);
     }
 
-    ReferenceEvalResult finish() {
+    std::expected<ReferenceEvalResult, std::string> finish() {
         ReferenceEvalResult result;
         for (SizeState& size : sizes_) {
             // The last segment, full or not, is still open.
             if (records_ != 0) {
-                size.close_segment();
+                size.close_segment(errors_);
             }
             result.sizes.push_back(std::move(size.cost));
+        }
+        if (errors_.first.has_value()) {
+            return std::unexpected(std::format("an encoding failed: {}", *errors_.first));
         }
         result.records = records_;
         result.references = references_;
@@ -413,6 +431,7 @@ private:
 
     std::vector<SizeState> sizes_;
     DayBook book_;
+    EncodeErrors errors_;
     std::uint64_t records_ = 0;
     std::uint64_t references_ = 0;
     std::uint64_t unresolved_ = 0;
@@ -569,14 +588,17 @@ int run_reference_eval_cli(std::span<const std::string_view> arguments,
             json.field("measured", cost.measured);
             json.field("column_bytes", cost.column_bytes);
             json.field("state_bytes", cost.state_bytes);
-            json.field("total_bytes", cost.column_bytes + cost.state_bytes);
+            // An encoding not measured has its column alone, which is no cost.
+            json.field("total_bytes", cost.measured ? std::optional{cost.column_bytes + cost.state_bytes}
+                                                    : std::nullopt);
             json.field("state_values", cost.state_values);
             json.field("max_segment_state_values", cost.max_segment_state_values);
             json.field("bits_per_reference",
-                       result->references == 0
-                           ? 0.0
-                           : static_cast<double>(cost.column_bytes + cost.state_bytes) * 8.0 /
-                                 static_cast<double>(result->references));
+                       !cost.measured ? std::nullopt
+                       : result->references == 0
+                           ? std::optional{0.0}
+                           : std::optional{static_cast<double>(cost.column_bytes + cost.state_bytes) *
+                                           8.0 / static_cast<double>(result->references)});
             json.end_object();
         }
         json.end_array();
