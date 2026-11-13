@@ -1118,6 +1118,23 @@ class RenderCompareTest(Scratch):
         sliced = block[block.index("**Linux, slice only.**"):]
         self.assertIn("| Parquet | `v` | 2.000 | not recorded |", sliced)
 
+    def test_macos_stored_bytes_say_they_can_exceed_the_files_own(self):
+        # The Phase 2 st_blocks item: on macOS the same Parquet bytes, written as the harness
+        # writes them, allocate about a fifth more than written back to back, so a macOS stored
+        # figure is not the file's size. Linux's figures carry no such sentence.
+        self.add_compare("Linux")
+        self.add_compare("macOS")
+        result = self.render()
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        block = self.block()
+        linux = block[:block.index("**macOS, slice only.**")]
+        macos = block[block.index("**macOS, slice only.**"):]
+        sentence = ("On macOS, APFS can keep blocks allocated past the end of a file that grew "
+                    "in many small writes over time, so a stored figure here can exceed the "
+                    "file's own bytes: compare stored sizes from Linux.")
+        self.assertEqual(macos.count(sentence), 2)
+        self.assertNotIn("APFS", linux)
+
     def test_a_linux_tickstore_alone_day_renders_with_the_guards_memory(self):
         # Review RV-1: on Linux the guard watched tick-store alone, and its peak memory is the
         # guard's, not BSD time -l's.

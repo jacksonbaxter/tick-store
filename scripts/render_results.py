@@ -104,6 +104,11 @@ WRITE_TIMES = ("\"Total s\" is the whole write clock; \"engine-only s\" is that 
                "tick-store's both hold its ITCH parsing. A write of several repetitions measured "
                "before protocol 2 kept medians alone, so its engine-only seconds are not "
                "recorded.")
+# docs/NOTES.md, "macOS st_blocks and QuestDB's converted partition": the same Parquet bytes
+# allocate about a fifth more on APFS when written as the harness writes them.
+MACOS_ALLOCATION = ("On macOS, APFS can keep blocks allocated past the end of a file that grew "
+                    "in many small writes over time, so a stored figure here can exceed the "
+                    "file's own bytes: compare stored sizes from Linux.")
 VARIANT_COLUMNS = ("System", "Variant", "Stored bytes, B", "Ratio", "Total write s, A / B",
                    *(f"{name} ms, warm / cold" for name in QUERY_NAMES))
 MEMORY_COLUMNS = ("System", "Largest VmHWM", "Peak RSS of its processes together",
@@ -541,7 +546,8 @@ def compare_for(document):
         unit = "day" if day else "slice"
         lines += ["", f"Ingest and size, class {class_name}: {meaning}. Stored bytes are "
                       f"allocated at rest, and the ratio is the {unit}'s source bytes over them. "
-                      f"{WRITE_TIMES}", ""]
+                      + (f"{MACOS_ALLOCATION} " if host == "macOS" else "")
+                      + f"{WRITE_TIMES}", ""]
         lines += ingest_table(document, class_name)
     lines += ["", document["input"]["ingest_input"]]
     if day:

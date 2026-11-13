@@ -990,6 +990,11 @@ FAULTS = (
           "variant", CHECK_FAILED,
           "FAIL: test_a_met_part_says_it_is_among_the_headlines_and_names_a_faster_variant "
           "(__main__.RenderLowestTest"),
+    # The Phase 2 st_blocks item: APFS allocates past a slowly grown file's end.
+    Fault("render-macos-allocation-unqualified", "py-scripts", "render_results.py shows macOS "
+          "stored bytes with no word that APFS can allocate past a file's end", CHECK_FAILED,
+          "FAIL: test_macos_stored_bytes_say_they_can_exceed_the_files_own "
+          "(__main__.RenderCompareTest"),
     Fault("results-md-hand-edit", "render-check", "a hand edit inside RESULTS.md's benchmark "
           "block, a host's heading changed", CHECK_FAILED,
           "the table in RESULTS.md is stale or was edited by hand", hand_edit_results_md),

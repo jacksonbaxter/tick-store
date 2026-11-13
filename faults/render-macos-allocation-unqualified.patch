@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -546,7 +546,7 @@ def compare_for(document):
+         unit = "day" if day else "slice"
+         lines += ["", f"Ingest and size, class {class_name}: {meaning}. Stored bytes are "
+                       f"allocated at rest, and the ratio is the {unit}'s source bytes over them. "
+-                      + (f"{MACOS_ALLOCATION} " if host == "macOS" else "")
++                      + (f"{MACOS_ALLOCATION} " if False else "")
+                       + f"{WRITE_TIMES}", ""]
+         lines += ingest_table(document, class_name)
+     lines += ["", document["input"]["ingest_input"]]

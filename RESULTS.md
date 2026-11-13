@@ -174,13 +174,13 @@ Queries, on each system's class B store, in milliseconds. Each latency is the me
 | Q4 | tick-store | `v3-seg4Mi` | 338 | 78.92 | 79.62 | 133.21 | 134.60 | not ranked: alone |
 | Q5 | tick-store | `v3-seg4Mi` | 1 | 282.88 | 288.40 | 410.52 | 411.24 | not ranked: alone |
 
-Ingest and size, class A: returns once data is in the OS page cache. Stored bytes are allocated at rest, and the ratio is the day's source bytes over them. "Total s" is the whole write clock; "engine-only s" is that less the time reading the input and putting it in the form the system's call takes, as "A write's two times" in compare/README.md sets out for each system. tick-store's both hold its ITCH parsing. A write of several repetitions measured before protocol 2 kept medians alone, so its engine-only seconds are not recorded.
+Ingest and size, class A: returns once data is in the OS page cache. Stored bytes are allocated at rest, and the ratio is the day's source bytes over them. On macOS, APFS can keep blocks allocated past the end of a file that grew in many small writes over time, so a stored figure here can exceed the file's own bytes: compare stored sizes from Linux. "Total s" is the whole write clock; "engine-only s" is that less the time reading the input and putting it in the form the system's call takes, as "A write's two times" in compare/README.md sets out for each system. tick-store's both hold its ITCH parsing. A write of several repetitions measured before protocol 2 kept medians alone, so its engine-only seconds are not recorded.
 
 | System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Like-for-like |
 |---|---|---|---|---|---|---|---|---|
 | tick-store (parses ITCH) | `v3-seg4Mi` | 83.596 | 83.565 | 3.21 | 1,762,254,848 | 4.682 | proven | yes |
 
-Ingest and size, class B: returns after a flush to the device. Stored bytes are allocated at rest, and the ratio is the day's source bytes over them. "Total s" is the whole write clock; "engine-only s" is that less the time reading the input and putting it in the form the system's call takes, as "A write's two times" in compare/README.md sets out for each system. tick-store's both hold its ITCH parsing. A write of several repetitions measured before protocol 2 kept medians alone, so its engine-only seconds are not recorded.
+Ingest and size, class B: returns after a flush to the device. Stored bytes are allocated at rest, and the ratio is the day's source bytes over them. On macOS, APFS can keep blocks allocated past the end of a file that grew in many small writes over time, so a stored figure here can exceed the file's own bytes: compare stored sizes from Linux. "Total s" is the whole write clock; "engine-only s" is that less the time reading the input and putting it in the form the system's call takes, as "A write's two times" in compare/README.md sets out for each system. tick-store's both hold its ITCH parsing. A write of several repetitions measured before protocol 2 kept medians alone, so its engine-only seconds are not recorded.
 
 | System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Like-for-like |
 |---|---|---|---|---|---|---|---|---|
@@ -277,7 +277,7 @@ Queries, on each system's class B store, in milliseconds. Each latency is the me
 | Q5 | QuestDB | `plain` | 1 | 0.99 | 6.45 | 23.65 | 24.19 | warm |
 | Q5 | tick-store | `v3-seg4Mi` | 1 | 7.13 | 7.63 | 12.27 | 12.89 | no |
 
-Ingest and size, class A: returns once data is in the OS page cache. Stored bytes are allocated at rest, and the ratio is the slice's source bytes over them. "Total s" is the whole write clock; "engine-only s" is that less the time reading the input and putting it in the form the system's call takes, as "A write's two times" in compare/README.md sets out for each system. tick-store's both hold its ITCH parsing. A write of several repetitions measured before protocol 2 kept medians alone, so its engine-only seconds are not recorded.
+Ingest and size, class A: returns once data is in the OS page cache. Stored bytes are allocated at rest, and the ratio is the slice's source bytes over them. On macOS, APFS can keep blocks allocated past the end of a file that grew in many small writes over time, so a stored figure here can exceed the file's own bytes: compare stored sizes from Linux. "Total s" is the whole write clock; "engine-only s" is that less the time reading the input and putting it in the form the system's call takes, as "A write's two times" in compare/README.md sets out for each system. tick-store's both hold its ITCH parsing. A write of several repetitions measured before protocol 2 kept medians alone, so its engine-only seconds are not recorded.
 
 | System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Like-for-like |
 |---|---|---|---|---|---|---|---|---|
@@ -286,7 +286,7 @@ Ingest and size, class A: returns once data is in the OS page cache. Stored byte
 | QuestDB | `plain` | 0.860 | not recorded | 7.12 | 537,772,032 | 0.383 | proven | yes |
 | tick-store (parses ITCH) | `v3-seg4Mi` | 1.995 | not recorded | 3.07 | 43,638,784 | 4.724 | proven | yes |
 
-Ingest and size, class B: returns after a flush to the device. Stored bytes are allocated at rest, and the ratio is the slice's source bytes over them. "Total s" is the whole write clock; "engine-only s" is that less the time reading the input and putting it in the form the system's call takes, as "A write's two times" in compare/README.md sets out for each system. tick-store's both hold its ITCH parsing. A write of several repetitions measured before protocol 2 kept medians alone, so its engine-only seconds are not recorded.
+Ingest and size, class B: returns after a flush to the device. Stored bytes are allocated at rest, and the ratio is the slice's source bytes over them. On macOS, APFS can keep blocks allocated past the end of a file that grew in many small writes over time, so a stored figure here can exceed the file's own bytes: compare stored sizes from Linux. "Total s" is the whole write clock; "engine-only s" is that less the time reading the input and putting it in the form the system's call takes, as "A write's two times" in compare/README.md sets out for each system. tick-store's both hold its ITCH parsing. A write of several repetitions measured before protocol 2 kept medians alone, so its engine-only seconds are not recorded.
 
 | System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Like-for-like |
 |---|---|---|---|---|---|---|---|---|
