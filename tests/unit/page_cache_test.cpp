@@ -161,6 +161,30 @@ TEST(PageCache, WarmFillsEvictEmptiesAndAFreshReadFillsOnlyWhatItRead) {
     EXPECT_TRUE(reported.output.out.contains("\"resident_pages\": 0"));
 }
 
+// warm measures every file before it reads any, so a file it must refuse, here one it
+// cannot open, is refused before the others are read whole (review RD-5). On Linux a file
+// this user neither owns nor can write is refused at the same point, by the same measure.
+TEST(PageCache, WarmRefusesAFileBeforeReadingAny) {
+    if (::geteuid() == 0) {
+        GTEST_SKIP() << "root may open a file of mode 000";
+    }
+    const ScratchDir scratch;
+    const auto first = scratch / "first";
+    const auto locked = scratch / "locked";
+    write_file(first, file_bytes());
+    write_file(locked, file_bytes());
+    const CliRun evicted = run({"evict", first.string()});
+    ASSERT_EQ(evicted.code, kExitPass) << evicted.output.err;
+    std::filesystem::permissions(locked, std::filesystem::perms::none);
+    const CliRun warmed = run({"warm", first.string(), locked.string()});
+    std::filesystem::permissions(locked, std::filesystem::perms::owner_all);
+    EXPECT_EQ(warmed.code, kExitUsageOrIo);
+    EXPECT_TRUE(warmed.output.out.empty());
+    const auto residency = file_residency(first);
+    ASSERT_TRUE(residency.has_value()) << residency.error();
+    EXPECT_EQ(residency->resident_pages, 0U) << "the first file was read before the refusal";
+}
+
 TEST(PageCache, DirtyPagesAreSeenAndAFlushClearsThem) {
     const ScratchDir scratch;
     const auto path = scratch / "file";

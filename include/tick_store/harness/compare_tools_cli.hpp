@@ -19,7 +19,8 @@
 //   tick_coldcache residency <paths...>
 //       Reports resident and, where the platform can say, unflushed pages.
 //   tick_coldcache warm <paths...>
-//       Reads every file through, then reports as residency does.
+//       Measures every file, then reads every file through and reports as residency does.
+//       A file it cannot measure is refused before any file is read.
 //
 // Exit codes are those of roundtrip_cli.hpp. `evict` exits 1 if any page stayed resident
 // after its last pass, and `tick_export` exits 1 if the oracle refused what it wrote.

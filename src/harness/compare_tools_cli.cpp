@@ -376,6 +376,13 @@ int run_coldcache_cli(std::span<const std::string_view> arguments, CliOutput& ou
         return run_residency(command, *files, output);
     }
     if (command == "warm") {
+        // Measured first, as evict does, so a file whose pages cannot be seen is refused
+        // before any file is read whole (review RD-5).
+        for (const std::filesystem::path& path : *files) {
+            if (const auto measured = file_residency(path); !measured.has_value()) {
+                return fail(output, measured.error());
+            }
+        }
         for (const std::filesystem::path& path : *files) {
             if (const auto read = read_through(path); !read.has_value()) {
                 return fail(output, read.error());
