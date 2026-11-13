@@ -559,6 +559,10 @@ FAULTS = (
     Fault("compare-variant-source-unvalidated", "py-scripts", "check_compare.py ranks a full "
           "day's variants from a slice file it never validates, an iteration-only one included",
           CHECK_FAILED, "FAIL: test_a_slice_file_measured_iteration_only (__main__.FullDay"),
+    Fault("guard-rate-over-nominal-interval", "py-scripts", "compare/guard.py divides swap "
+          "pages by the nominal 2 s, not the time between its samples, and overstates the rate",
+          CHECK_FAILED, "FAIL: test_the_rate_is_over_the_time_between_the_samples "
+          "(__main__.Breach"),
     # Review F-6: a class A claim needs its proof for every system, not tick-store's alone.
     Fault("compare-class-a-parquet-flush-unchecked", "py-scripts", "check_compare.py takes "
           "Parquet's class A as proven with the harness's flush made", CHECK_FAILED,

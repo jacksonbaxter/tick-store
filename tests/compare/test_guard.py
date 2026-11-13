@@ -8,15 +8,18 @@ Each stop condition is shown firing, and swap-out alone, however fast and howeve
 swap device, is shown not stopping a run: "The guard's swap rule" in docs/NOTES.md.
 """
 
+import io
 import signal
 import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
-from compare import swap  # noqa: E402
+from compare import guard, swap  # noqa: E402
 from compare.guard import (GIB, PAGE_BYTES, SAMPLE_SECONDS, SWAP_EXHAUSTED_FRACTION,  # noqa: E402
                            SWAP_STRIKES, HostSample, Limits, breach, exhausted_floor_bytes,
                            parse_meminfo, parse_status, rates, session_of, swap_exhausted,
@@ -42,7 +45,7 @@ def replay(samples):
     strikes = 0
     last = None
     for index, sample in enumerate(samples):
-        swap_in, _ = rates(sample, last)
+        swap_in, _ = rates(sample, last, SAMPLE_SECONDS)
         last = sample
         reason, strikes = breach(sample, swap_in, strikes, LIMITS)
         if reason:
@@ -140,9 +143,22 @@ class Breach(unittest.TestCase):
     def test_the_rate_splits_in_from_out(self):
         before = host(swap_in=10, swap_out=100)
         after = host(swap_in=12, swap_out=600)
-        self.assertEqual(rates(after, before),
+        self.assertEqual(rates(after, before, SAMPLE_SECONDS),
                          (2 * PAGE_BYTES / SAMPLE_SECONDS, 500 * PAGE_BYTES / SAMPLE_SECONDS))
-        self.assertEqual(rates(after, None), (0.0, 0.0))
+        self.assertEqual(rates(after, None, None), (0.0, 0.0))
+
+    def test_the_rate_is_over_the_time_between_the_samples(self):
+        # Review F-15: a sample comes SAMPLE_SECONDS after the last one's end, so the time
+        # between two is longer, and a rate over the nominal 2 s overstates it.
+        args = SimpleNamespace(min_available_gib=3, min_free_disk_gib=50, command=["true"],
+                               watch="unused")
+        watcher = guard.Guard(args)
+        samples = iter([host(swap_in=0), host(swap_in=1000)])
+        with (mock.patch.object(guard, "read_host", lambda watch: next(samples)),
+              mock.patch.object(watcher, "note_processes", return_value=0)):
+            watcher.take_sample(1, io.StringIO(), 10.0)
+            watcher.take_sample(1, io.StringIO(), 12.5)
+        self.assertEqual(watcher.swap_in_peak, 1000 * PAGE_BYTES / 2.5)
 
 
 class ProcFiles(unittest.TestCase):

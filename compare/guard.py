@@ -129,12 +129,13 @@ def read_host(watch):
                       swap_out, disk.f_bavail * disk.f_frsize)
 
 
-def rates(sample, last):
-    """Swap-in and swap-out since the last sample, in bytes per second."""
+def rates(sample, last, seconds):
+    """Swap-in and swap-out since the last sample, in bytes per second over the seconds between
+    the two: a sample comes SAMPLE_SECONDS after the last one ended, so more than that apart."""
     if last is None:
         return 0.0, 0.0
-    return ((sample.swap_in_pages - last.swap_in_pages) * PAGE_BYTES / SAMPLE_SECONDS,
-            (sample.swap_out_pages - last.swap_out_pages) * PAGE_BYTES / SAMPLE_SECONDS)
+    return ((sample.swap_in_pages - last.swap_in_pages) * PAGE_BYTES / seconds,
+            (sample.swap_out_pages - last.swap_out_pages) * PAGE_BYTES / seconds)
 
 
 def session_members(session):
@@ -175,6 +176,7 @@ class Guard:
         self.lowest_disk = None
         self.first = None
         self.last = None
+        self.last_elapsed = None
         self.strikes = 0
         self.fired_at = None
         self.asked_to_stop = None
@@ -203,7 +205,9 @@ class Guard:
 
     def take_sample(self, session, samples, elapsed):
         sample = read_host(self.args.watch)
-        swap_in, swap_out = rates(sample, self.last)
+        swap_in, swap_out = rates(sample, self.last, elapsed - self.last_elapsed
+                                  if self.last is not None else None)
+        self.last_elapsed = elapsed
         self.swap_in_peak = max(self.swap_in_peak, swap_in)
         self.swap_out_peak = max(self.swap_out_peak, swap_out)
         self.first = self.first or sample

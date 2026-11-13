@@ -1,0 +1,13 @@
+diff --git a/compare/guard.py b/compare/guard.py
+--- a/compare/guard.py
++++ b/compare/guard.py
+@@ -205,8 +205,7 @@
+ 
+     def take_sample(self, session, samples, elapsed):
+         sample = read_host(self.args.watch)
+-        swap_in, swap_out = rates(sample, self.last, elapsed - self.last_elapsed
+-                                  if self.last is not None else None)
++        swap_in, swap_out = rates(sample, self.last, SAMPLE_SECONDS)
+         self.last_elapsed = elapsed
+         self.swap_in_peak = max(self.swap_in_peak, swap_in)
+         self.swap_out_peak = max(self.swap_out_peak, swap_out)
