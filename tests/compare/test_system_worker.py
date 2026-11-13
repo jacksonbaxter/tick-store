@@ -1159,6 +1159,48 @@ class ResumedRun(unittest.TestCase):
         self.assertFalse(self.resume(["--warm-repetitions", "5"], ["--warm-repetitions", "5"]))
 
 
+class ArcticDBSettings(unittest.TestCase):
+    """ArcticDB's settings as the engine reads them back, on fakes of its library and config."""
+
+    def system(self, durability, config):
+        from compare.systems.arcticdb_system import ArcticDBSystem
+
+        system = ArcticDBSystem(RunContext(layout=None, root=Path("unused"),
+                                           variant="rows100k-cols127", durability=durability,
+                                           day=None))
+        options = SimpleNamespace(rows_per_segment=100_000, columns_per_segment=127,
+                                  dynamic_schema=False, dedup=False, encoding_version=0)
+        write_options = SimpleNamespace(segment_row_size=100_000, column_group_size=127)
+        config_of = SimpleNamespace(lib_desc=SimpleNamespace(
+            version=SimpleNamespace(write_options=write_options)))
+        system.library = SimpleNamespace(options=lambda: options,
+                                         _nvs=SimpleNamespace(lib_cfg=lambda: config_of))
+        engine = SimpleNamespace(get_config_int=lambda key: config.get(key))
+        return system, mock.patch.dict(sys.modules, {"arcticdb_ext": engine})
+
+    def config(self, flags):
+        return {"LMDBStorage.ExtraFlags": flags, "VersionStore.NumCPUThreads": 2,
+                "VersionStore.NumIOThreads": 2}
+
+    def test_class_b_flags_the_engine_does_not_have_are_not_read_as_0(self):
+        # Review F-7: the engine's None was read as 0, class B's request, so the check
+        # passed on the harness's own assumption.
+        from compare.settings import SettingsMismatch
+
+        system, engine = self.system(CLASS_B, self.config(None))
+        with engine, self.assertRaises(SettingsMismatch) as caught:
+            system.settings_in_force()
+        self.assertIn("LMDBStorage.ExtraFlags: requested 0, in force None", str(caught.exception))
+
+    def test_class_b_flags_set_to_0_are_read_as_0(self):
+        # The real engine reads an explicit 0 as 0 and an unset key as None (f7-probe.log).
+        system, engine = self.system(CLASS_B, self.config(0))
+        with engine:
+            checked = system.settings_in_force()
+        self.assertIn({"name": "LMDBStorage.ExtraFlags", "requested": 0, "in_force": 0,
+                       "read_from": "ArcticDB's config, as the engine sees it"}, checked)
+
+
 class HeapStatements(unittest.TestCase):
     """What compare/run.py writes, against the validator and the real capacity file."""
 

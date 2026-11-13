@@ -1,0 +1,12 @@
+diff --git a/compare/systems/arcticdb_system.py b/compare/systems/arcticdb_system.py
+--- a/compare/systems/arcticdb_system.py
++++ b/compare/systems/arcticdb_system.py
+@@ -159,7 +159,7 @@
+             Setting("column_group_size", self.tuning["columns_per_segment"],
+                     write_options.column_group_size, "library config in storage"),
+             # None is a key the engine does not have, never 0: an explicit 0 reads as 0.
+-            Setting("LMDBStorage.ExtraFlags", flags, config("LMDBStorage.ExtraFlags"),
++            Setting("LMDBStorage.ExtraFlags", flags, config("LMDBStorage.ExtraFlags") or 0,
+                     "ArcticDB's config, as the engine sees it"),
+             Setting("VersionStore.NumCPUThreads", self.context.threads,
+                     config("VersionStore.NumCPUThreads"), "ArcticDB's config"),

@@ -158,7 +158,8 @@ class ArcticDBSystem(System):
                     write_options.segment_row_size, "library config in storage"),
             Setting("column_group_size", self.tuning["columns_per_segment"],
                     write_options.column_group_size, "library config in storage"),
-            Setting("LMDBStorage.ExtraFlags", flags, config("LMDBStorage.ExtraFlags") or 0,
+            # None is a key the engine does not have, never 0: an explicit 0 reads as 0.
+            Setting("LMDBStorage.ExtraFlags", flags, config("LMDBStorage.ExtraFlags"),
                     "ArcticDB's config, as the engine sees it"),
             Setting("VersionStore.NumCPUThreads", self.context.threads,
                     config("VersionStore.NumCPUThreads"), "ArcticDB's config"),

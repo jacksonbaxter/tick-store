@@ -642,6 +642,12 @@ FAULTS = (
     Fault("guard-swap-in-stop-disabled", "py-scripts", "compare/guard.py stops firing on "
           "sustained swap-in, so a host thrashing through swap is no longer stopped",
           CHECK_FAILED, "FAIL: test_sustained_swap_in_stops (__main__.Breach"),
+    # Review F-7: a setting the engine does not have is not the value requested.
+    Fault("arcticdb-flags-read-as-requested", "py-compare", "ArcticDB's LMDB flags read back "
+          "as 0 when the engine has no such key, which is class B's request, so the check "
+          "passes on the harness's own assumption", CHECK_FAILED,
+          "FAIL: test_class_b_flags_the_engine_does_not_have_are_not_read_as_0 "
+          "(__main__.ArcticDBSettings"),
     # Review F-5: a measured run is the whole protocol, and a resumed one never mixes parts.
     Fault("compare-measured-run-narrowed", "py-compare", "compare/run.py takes repetition "
           "overrides, --variants or fewer --systems in a measured run, so a reported file can "
