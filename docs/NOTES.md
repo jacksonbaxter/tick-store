@@ -3343,6 +3343,23 @@ set. An entry whose status cannot be read is still skipped, as before, under its
 so it no longer shares one with the walk. Before: the test caught the `filesystem_error`; in the
 tool, nothing does.
 
+D-7. The finding's fix, `\u00XX` for every byte from 0x80, would corrupt text that is already
+UTF-8: a path holding `é` as C3 A9 would read back as `Ã©`. So the writer now checks each
+sequence against Unicode's table 3-7 (no overlong form, no surrogate, nothing past U+10FFFF) and
+writes a well-formed one as it is. A byte outside one is written as `\udcXX`, the lone low
+surrogate that Python's surrogateescape, and so `os.listdir` and `os.fsdecode`, give that byte:
+`json.loads` then holds the very string Python would use for such a path, and `os.fsencode`
+gives the byte back. A lone surrogate escape is valid JSON syntax, and Python reads it; a reader
+that wants strict Unicode would see U+FFFD there, and the escaped output is ASCII either way, so
+the document is valid UTF-8 whatever the input. Escaping byte by byte gives the same result as
+Python's decoder, which replaces each byte of an ill-formed subsequence, since the bytes after a
+lead byte are continuation bytes, which can never start a sequence. Before:
+`tick_census` on a source of one frame of type 0x80 wrote a file `json.loads` could not decode;
+after, its `type` reads `'\udc80'` and `os.fsencode` gives `b'\x80'`. `scripts/check_oracle.py`
+and `compare/coldcache.py` need no change: they decode with `text=True`, which now always works,
+and neither reads `message_type` or a census `type`; `coldcache.py` prints the resident files'
+list by its repr, which escapes a surrogate.
+
 Raw: `phase4-raw/fix-harness/`: each finding's failing and passing logs.
 
 ## Process notes
