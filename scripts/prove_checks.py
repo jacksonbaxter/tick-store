@@ -246,6 +246,16 @@ def hand_edit_headline_value():
                                                                    3: "met"})
 
 
+def hand_edit_pitch_figure():
+    """The README's pitch, its one-thread ingest raised by hand (review E-9)."""
+    edit_text("README.md", "reaches 1.376 M records/s", "reaches 2.376 M records/s")
+
+
+def type_an_unchecked_pitch_figure():
+    """A figure typed into the README's pitch that no row of its check covers (review E-9)."""
+    edit_text("README.md", "It misses targets too.", "It is 42 times faster. It misses targets too.")
+
+
 def drop_headline_markers():
     target = TREE / "README.md"
     lines = target.read_text().split("\n")
@@ -895,6 +905,15 @@ FAULTS = (
           "another system's and is not shown", CHECK_FAILED,
           "FAIL: test_each_figure_shown_is_the_lowest_of_the_others_and_names_its_system "
           "(__main__.RenderLowestTest"),
+    # Review E-9: the README's pitch figures are checked against the results.
+    Fault("readme-pitch-figure-edited", "render-check", "a hand edit of a figure in the "
+          "README's pitch: tick-store's one-thread ingest shown as 2.376 M records/s",
+          EXIT_RENDER_REFUSED, "the README's pitch does not state '1.376 M records/s'",
+          hand_edit_pitch_figure),
+    Fault("readme-pitch-unchecked-figure", "render-check", "a figure typed into the README's "
+          "pitch that nothing checks", EXIT_RENDER_REFUSED,
+          "a figure in the README's pitch that nothing checks: '42'",
+          type_an_unchecked_pitch_figure),
     Fault("results-md-hand-edit", "render-check", "a hand edit inside RESULTS.md's benchmark "
           "block, a host's heading changed", CHECK_FAILED,
           "the table in RESULTS.md is stale or was edited by hand", hand_edit_results_md),

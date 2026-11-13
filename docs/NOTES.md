@@ -4147,6 +4147,12 @@ part, so a write slower in total is missed whether or not its engine-only second
 that field, named by its system; on the committed Linux day the lowest median and the lowest tail
 figure are the same system's in every part, so the text did not change.
 
+**E-9, the README's pitch.** Its figures stay prose, written by hand, and `--check` now holds
+each to the results: `scripts/targets.json`'s "pitch" names the file, the value and the format of
+each, and any other number in the pitch must be a listed text with its reason for being no
+result. The store's size figures come from `results/store-size-12302019.json`, the latencies and
+ingest from the Linux day.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
