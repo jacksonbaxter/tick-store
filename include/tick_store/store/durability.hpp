@@ -60,6 +60,11 @@ public:
     // write(fd, data, size). ssize_t is long on every host we build for, as std::ptrdiff_t
     // is, and naming it would need a header glibc and macOS each define it in differently.
     [[nodiscard]] virtual std::ptrdiff_t write(int fd, const std::byte* data, std::size_t size) = 0;
+    // pwrite(fd, data, size, offset). The offset is off_t, spelled std::int64_t as in
+    // flip_bit.cpp: a narrower off_t would fail -Wconversion at the call. The real call by
+    // default, so a FileOps that only records the other calls need not forward it.
+    [[nodiscard]] virtual std::ptrdiff_t pwrite(int fd, const std::byte* data, std::size_t size,
+                                                std::int64_t offset);
     // fcntl(fd, F_FULLFSYNC), or -1 with errno ENOTSUP where the OS has no such call.
     [[nodiscard]] virtual int full_fsync(int fd) = 0;
     [[nodiscard]] virtual int fsync(int fd) = 0;
@@ -109,5 +114,10 @@ enum class SyncPolicy : std::uint8_t {
 // an io error naming "write" on any other failure.
 [[nodiscard]] std::expected<void, StoreError> write_all(FileOps& ops, int fd,
                                                         std::span<const std::byte> bytes) noexcept;
+
+// write_all at `offset`, through pwrite, returning an io error naming "pwrite".
+[[nodiscard]] std::expected<void, StoreError> write_all_at(FileOps& ops, int fd,
+                                                           std::span<const std::byte> bytes,
+                                                           std::int64_t offset) noexcept;
 
 }  // namespace tick_store::store

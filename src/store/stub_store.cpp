@@ -62,25 +62,6 @@ static_assert(kLargestFrame < kWriteBufferSize);
             .actual = static_cast<std::uint64_t>(errno)};
 }
 
-// The offset is pwrite's off_t, spelled std::int64_t as in flip_bit.cpp, and a narrower off_t
-// would fail -Wconversion at the call.
-[[nodiscard]] std::expected<void, StoreError> write_all_at(int fd,
-                                                           std::span<const std::byte> bytes,
-                                                           std::int64_t offset) noexcept {
-    while (!bytes.empty()) {
-        const auto written = ::pwrite(fd, bytes.data(), bytes.size(), offset);
-        if (written < 0) {
-            if (errno == EINTR) {
-                continue;
-            }
-            return std::unexpected(io_error("pwrite"));
-        }
-        bytes = bytes.subspan(static_cast<std::size_t>(written));
-        offset += written;
-    }
-    return {};
-}
-
 }  // namespace
 
 std::array<std::byte, kStubHeaderSize> encode_stub_header(const StubHeader& header) noexcept {
@@ -190,7 +171,7 @@ std::expected<void, StoreError> StubWriter::commit(std::span<const std::byte> ta
 
     // Step 2: the header, which until now was all zeros.
     const auto header = encode_stub_header(header_);
-    if (auto written = write_all_at(fd_, header, 0); !written.has_value()) {
+    if (auto written = write_all_at(posix_file_ops(), fd_, header, 0); !written.has_value()) {
         return written;
     }
 

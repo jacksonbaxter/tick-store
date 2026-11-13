@@ -103,6 +103,11 @@ std::string_view to_string(Durability durability) noexcept {
     return "invalid";
 }
 
+std::ptrdiff_t FileOps::pwrite(int fd, const std::byte* data, std::size_t size,
+                               std::int64_t offset) {
+    return ::pwrite(fd, data, size, offset);
+}
+
 FileOps& posix_file_ops() noexcept {
     static PosixFileOps ops;
     return ops;
@@ -164,6 +169,29 @@ std::expected<void, StoreError> write_all(FileOps& ops, int fd,
             return std::unexpected(io_error("write"));
         }
         bytes = bytes.subspan(static_cast<std::size_t>(written));
+    }
+    return {};
+}
+
+std::expected<void, StoreError> write_all_at(FileOps& ops, int fd,
+                                             std::span<const std::byte> bytes,
+                                             std::int64_t offset) noexcept {
+    while (!bytes.empty()) {
+        const std::ptrdiff_t written =
+            ops.pwrite(fd, bytes.data(), std::min(bytes.size(), kMaxWriteRequest), offset);
+        if (written < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            return std::unexpected(io_error("pwrite"));
+        }
+        if (written == 0) {
+            // As in write_all: a device that accepts nothing, not a reason to loop for ever.
+            errno = EIO;
+            return std::unexpected(io_error("pwrite"));
+        }
+        bytes = bytes.subspan(static_cast<std::size_t>(written));
+        offset += written;
     }
     return {};
 }

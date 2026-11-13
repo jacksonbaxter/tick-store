@@ -238,6 +238,26 @@ TEST(WriteAll, WritesMoreThanTwoGibibytesThroughTheRealKernel) {
     }
 }
 
+// A write of 0 bytes for a nonzero request is a device that accepts nothing: an error,
+// not a retry (review C-10, the stub store's header write). 1,000 zero returns bound the
+// loop if it ever retries again.
+TEST(WriteAll, AZeroWriteIsAnErrorAtAnOffsetToo) {
+    const ScratchDir dir;
+    const OpenFile file{dir};
+    ASSERT_GE(file.fd(), 0);
+    const std::vector<std::byte> data(10);
+    {
+        RecordingFileOps ops;
+        ops.zero_writes = 1000;
+        EXPECT_EQ(write_all(ops, file.fd(), data), std::unexpected(io("write", EIO)));
+        EXPECT_EQ(ops.count("write"), 1);
+    }
+    RecordingFileOps ops;
+    ops.zero_writes = 1000;
+    EXPECT_EQ(write_all_at(ops, file.fd(), data, 0), std::unexpected(io("pwrite", EIO)));
+    EXPECT_EQ(ops.count("pwrite"), 1);
+}
+
 TEST(WriteAll, ReportsAnyOtherError) {
     const ScratchDir dir;
     const OpenFile file{dir};

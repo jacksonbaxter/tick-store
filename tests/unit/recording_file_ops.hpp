@@ -8,6 +8,7 @@
 
 #include <cerrno>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <set>
@@ -34,6 +35,10 @@ public:
     // The size each write was asked for, in order.
     std::vector<std::size_t> write_sizes;
 
+    // This many writes and pwrites, the first ones, return 0 without writing, as a device
+    // that accepts nothing would; then each goes on as usual.
+    int zero_writes = 0;
+
     // The nth call (from 1) named `call` returns -1 with errno `error`.
     void fail_on(const std::string& call, int error, int nth = 1) {
         failures_[{call, nth}] = error;
@@ -48,7 +53,7 @@ public:
     [[nodiscard]] std::vector<std::string> calls_without_writes() const {
         std::vector<std::string> out;
         for (const std::string& call : calls) {
-            if (call != "write") {
+            if (call != "write" && call != "pwrite") {
                 out.push_back(call);
             }
         }
@@ -86,8 +91,24 @@ public:
         if (!begin("write")) {
             return -1;
         }
+        if (zero_writes > 0) {
+            --zero_writes;
+            return 0;
+        }
         const std::size_t taken = write_limit == 0 || size < write_limit ? size : write_limit;
         return real().write(fd, data, taken);
+    }
+
+    std::ptrdiff_t pwrite(int fd, const std::byte* data, std::size_t size,
+                          std::int64_t offset) override {
+        if (!begin("pwrite")) {
+            return -1;
+        }
+        if (zero_writes > 0) {
+            --zero_writes;
+            return 0;
+        }
+        return real().pwrite(fd, data, size, offset);
     }
 
     int full_fsync(int fd) override {
