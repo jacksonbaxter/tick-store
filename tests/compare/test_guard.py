@@ -9,8 +9,13 @@ swap device, is shown not stopping a run: "The guard's swap rule" in docs/NOTES.
 """
 
 import io
+import json
+import os
+import shutil
 import signal
 import sys
+import tempfile
+import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -159,6 +164,72 @@ class Breach(unittest.TestCase):
             watcher.take_sample(1, io.StringIO(), 10.0)
             watcher.take_sample(1, io.StringIO(), 12.5)
         self.assertEqual(watcher.swap_in_peak, 1000 * PAGE_BYTES / 2.5)
+
+
+class StopPath(unittest.TestCase):
+    """The guard's stop path end to end (review F-9): a breach sends the command's session
+    SIGTERM, the command dies well inside the grace period, and the guard exits 70 with a report
+    that says why and how the command ended."""
+
+    def setUp(self):
+        scratch = REPO_ROOT / "build"
+        scratch.mkdir(exist_ok=True)
+        self.directory = Path(tempfile.mkdtemp(dir=scratch, prefix="test_guard_"))
+        self.addCleanup(shutil.rmtree, self.directory, True)
+        # Guard.run takes SIGTERM and SIGINT for itself; give them back after the test.
+        for number in (signal.SIGTERM, signal.SIGINT):
+            self.addCleanup(signal.signal, number, signal.getsignal(number))
+
+    def guard_run(self, child, min_available_gib):
+        argv = ["--report", str(self.directory / "guard.json"),
+                "--samples", str(self.directory / "guard.csv"), "--watch", str(self.directory),
+                "--min-available-gib", str(min_available_gib), "--",
+                sys.executable, "-c", child]
+        started = time.monotonic()
+        code = guard.Guard(guard.parse_arguments(argv)).run()
+        seconds = time.monotonic() - started
+        report = json.loads((self.directory / "guard.json").read_text(encoding="utf-8"))
+        return code, seconds, report
+
+    def assert_stopped(self, code, seconds, report):
+        self.assertEqual(code, guard.EXIT_GUARD_FIRED)
+        self.assertTrue(report["guard_fired"])
+        self.assertIn("MemAvailable", report["guard_reason"])
+        self.assertEqual(report["exit"], {"code": None, "signal": "SIGTERM"})
+        self.assertLess(seconds, guard.TERM_GRACE_SECONDS / 6)
+
+    def test_a_breach_stops_the_session_and_the_guard_exits_70(self):
+        # The host's readings are faked, so this runs on every host; the session is real.
+        def alive(session):
+            try:
+                os.kill(session, 0)
+            except ProcessLookupError:
+                return []
+            return [session]
+
+        low = host(available=int(2.5 * GIB))  # Under the 3 GiB floor, over the 2 GiB hard one.
+        with (mock.patch.object(guard, "read_host", lambda watch: low),
+              mock.patch.object(guard, "session_members", alive)):
+            code, seconds, report = self.guard_run("import time; time.sleep(20)", 3)
+        self.assert_stopped(code, seconds, report)
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "the guard reads /proc: Linux only")
+    def test_on_linux_a_real_breach_stops_the_whole_session(self):
+        # Nothing faked: MemAvailable is under a floor of 100,000 GiB on any host. The command
+        # starts a second process in its session, and both must be gone.
+        pids = self.directory / "pids"
+        child = ("import os, subprocess, sys, time\n"
+                 "p = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(600)'])\n"
+                 f"open({str(pids)!r}, 'w').write(f'{{os.getpid()}} {{p.pid}}')\n"
+                 "time.sleep(600)\n")
+        code, seconds, report = self.guard_run(child, 100_000)
+        self.assert_stopped(code, seconds, report)
+        session, _ = (int(pid) for pid in pids.read_text().split())
+        deadline = time.monotonic() + 10
+        while guard.session_members(session) and time.monotonic() < deadline:
+            time.sleep(0.1)
+        self.assertEqual(guard.session_members(session), [])
+        self.assertTrue(any(name.split()[0] == str(session) for name in report["processes"]))
 
 
 class ProcFiles(unittest.TestCase):

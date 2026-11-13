@@ -1,0 +1,11 @@
+diff --git a/compare/guard.py b/compare/guard.py
+--- a/compare/guard.py
++++ b/compare/guard.py
+@@ -252,7 +252,6 @@ class Guard:
+         self.report.update({"guard_fired": True, "guard_reason": reason,
+                             "guard_fired_at_seconds": round(time.monotonic() - started, 1)})
+         self.fired_at = time.monotonic()
+-        signal_session(session, signal.SIGTERM)
+ 
+     def overdue(self):
+         late = time.monotonic() - self.fired_at > TERM_GRACE_SECONDS

@@ -660,6 +660,34 @@ class SecondSibling(unittest.TestCase):
             self.assertEqual(len(ran), 2)  # No second reading, so run again.
 
 
+class GuardedRun(unittest.TestCase):
+    """run.py's run_one refuses a system the guard stopped, even when the command exited 0, and
+    keeps nothing that would let a resumed run reuse its part (review F-9)."""
+
+    def test_a_run_the_guard_stopped_is_a_failure_and_leaves_no_load_lines(self):
+        args = compare_run.parse_arguments(["--day", DAY_LABEL])
+
+        def system(command, **kwargs):
+            parts = Path(command[command.index("--part") + 1]).parent
+            (parts / "parquet.json").write_text("{}", encoding="utf-8")
+            report = command[command.index("--report") + 1]
+            Path(report).write_text(json.dumps({"guard_fired": True,
+                                                "guard_reason": "MemAvailable under 3.00 GiB"}),
+                                    encoding="utf-8")
+            return SimpleNamespace(returncode=0)
+
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "build") as scratch:
+            parts = Path(scratch)
+            layout = SimpleNamespace(work=parts, as_arguments=lambda: [])
+            with (mock.patch.object(compare_run.run_bench, "host_label", return_value="Linux"),
+                  mock.patch.object(compare_run.subprocess, "run", system),
+                  self.assertRaisesRegex(compare_run.run_bench.Failure,
+                                         "parquet: the guard stopped it: MemAvailable")):
+                compare_run.run_one("parquet", args, layout, None, parts, None)
+            self.assertFalse((parts / "parquet.load").exists())
+            self.assertFalse((parts / "parquet.arguments.json").exists())
+
+
 class RuntimeReading(unittest.TestCase):
     """The reading on both hosts' output, whichever host runs this."""
 

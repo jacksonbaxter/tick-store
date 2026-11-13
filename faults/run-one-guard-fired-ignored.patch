@@ -1,0 +1,12 @@
+diff --git a/compare/run.py b/compare/run.py
+--- a/compare/run.py
++++ b/compare/run.py
+@@ -323,7 +323,7 @@ def run_one(system, args, layout, measure, parts, meter, variants=None, second_m
+     text = stderr_path.read_text(encoding="utf-8", errors="replace")
+     if guard is not None and guard["report"].exists():
+         report = json.loads(guard["report"].read_text(encoding="utf-8"))
+-        if report.get("guard_fired"):
++        if False:
+             raise run_bench.Failure(1, f"{system}: the guard stopped it: "
+                                        f"{report.get('guard_reason')}")
+     if code == run_bench.EXIT_RETRY_LATER and measure:

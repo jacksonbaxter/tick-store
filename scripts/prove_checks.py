@@ -599,6 +599,14 @@ FAULTS = (
           "pages by the nominal 2 s, not the time between its samples, and overstates the rate",
           CHECK_FAILED, "FAIL: test_the_rate_is_over_the_time_between_the_samples "
           "(__main__.Breach"),
+    # Review F-9: the guard's stop path, and run.py's refusal of a run the guard stopped.
+    Fault("guard-stop-signals-nothing", "py-scripts", "compare/guard.py records a breach and "
+          "sends the session nothing, so the command runs on", CHECK_FAILED,
+          "FAIL: test_a_breach_stops_the_session_and_the_guard_exits_70 (__main__.StopPath"),
+    Fault("run-one-guard-fired-ignored", "py-compare", "run.py takes a system the guard stopped "
+          "as finished when its command exits 0", CHECK_FAILED,
+          "FAIL: test_a_run_the_guard_stopped_is_a_failure_and_leaves_no_load_lines "
+          "(__main__.GuardedRun"),
     # Review F-6: a class A claim needs its proof for every system, not tick-store's alone.
     Fault("compare-class-a-parquet-flush-unchecked", "py-scripts", "check_compare.py takes "
           "Parquet's class A as proven with the harness's flush made", CHECK_FAILED,
