@@ -3546,7 +3546,11 @@ place fails even where the sizes are right.
 
 A-5. Closed with the reviewer's code change rather than a note, since the change is three lines
 and a note would leave a caller able to end a stream by accident. `value_out_of_range`'s comment
-now says that for "raw bytes" `expected` is the fewest allowed, not the largest.
+now says that for "raw bytes" `expected` is the fewest allowed, not the largest. The fix was
+checked with the ITCH tests alone, and the closing check's full run found the one it missed:
+`StubWriter.RefusesARawMessageWithNoBytes` expected the stub writer's "empty record", which the
+encoder's refusal now pre-empts. That check could not be reached any more, so it was removed
+rather than kept as a second name for one error (`b499c50`).
 
 A-6. The signal test cannot be sure the signal lands inside `poll`: the helper waits 50 ms after
 reading the command, which the gate writes just before it polls. A signal that came early would
