@@ -3558,6 +3558,14 @@ A-7. Fixed in code: each `Case` carries the text of its reference, so the text a
 sit in the same builder. No script reads `verification.against`. The iteration runs that show
 the new text are in `phase4-raw/fix-itch-bench/a7.log`; no figure from them is reported.
 
+A-8. What the validators require of `tree_dirty`: only `run_bench.py` reads it, refusing a
+measured run whose build says true; `check_results.py`, `render_results.py` and the compare
+scripts do not read it, and the results headers do not carry it. So the flag keeps its value
+for an export, which the sync script makes from a committed HEAD, and the new `commit_source`
+says it was not compared. `tick_codec_eval` and `tick_reference_eval` write `tree_dirty` from the
+same build info, so they write `commit_source` too; the codec-eval files are rebuilt at the
+freeze anyway (TASKS), and no reference-eval file is committed.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
