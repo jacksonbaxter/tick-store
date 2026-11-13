@@ -648,6 +648,11 @@ FAULTS = (
           "passes on the harness's own assumption", CHECK_FAILED,
           "FAIL: test_class_b_flags_the_engine_does_not_have_are_not_read_as_0 "
           "(__main__.ArcticDBSettings"),
+    # Review F-8: the one-symbol store's rows are held to the rows read back.
+    Fault("arcticdb-rows-against-themselves", "py-compare", "ArcticDB's one-symbol stored "
+          "settings compare the description's row count with itself, a check that cannot "
+          "fail", CHECK_FAILED,
+          "FAIL: test_a_description_short_of_the_rows_read_back (__main__.ArcticDBStoredRows"),
     # Review F-5: a measured run is the whole protocol, and a resumed one never mixes parts.
     Fault("compare-measured-run-narrowed", "py-compare", "compare/run.py takes repetition "
           "overrides, --variants or fewer --systems in a measured run, so a reported file can "

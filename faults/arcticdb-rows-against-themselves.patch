@@ -1,0 +1,12 @@
+diff --git a/compare/systems/arcticdb_system.py b/compare/systems/arcticdb_system.py
+--- a/compare/systems/arcticdb_system.py
++++ b/compare/systems/arcticdb_system.py
+@@ -576,7 +576,7 @@
+         if self.rows_read is not None:
+             # The rows read back against the store's own count, as per security. With nothing
+             # read back first, as in compare/fullday.py, there is nothing to hold it to.
+-            settings.append(Setting("rows in the description", self.rows_read,
++            settings.append(Setting("rows in the description", int(description.row_count),
+                                     int(description.row_count),
+                                     "lib.get_description against the rows read back"))
+         checked = require_all_match(settings)

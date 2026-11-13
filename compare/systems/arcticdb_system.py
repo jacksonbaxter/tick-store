@@ -565,16 +565,21 @@ class ArcticDBSystem(System):
         tool = self.library._nvs.library_tool()
         keys = tool.find_keys(arcticdb_ext.storage.KeyType.TABLE_DATA)
         codec = self._segment_codec(tool, keys, index)
-        checked = require_all_match([
+        settings = [
             Setting("largest segment rows <= rows_per_segment", True,
                     bool(rows_per <= self.tuning["rows_per_segment"]), "stored index"),
             Setting("largest segment columns <= columns_per_segment", True,
                     bool(columns_per <= self.tuning["columns_per_segment"]), "stored index"),
             Setting("LMDB map size", self.map_size_bytes, self._lmdb_map_size(),
                     "meta page of data.mdb"),
-            Setting("rows in the description", int(description.row_count),
-                    int(description.row_count), "lib.get_description"),
-        ])
+        ]
+        if self.rows_read is not None:
+            # The rows read back against the store's own count, as per security. With nothing
+            # read back first, as in compare/fullday.py, there is nothing to hold it to.
+            settings.append(Setting("rows in the description", self.rows_read,
+                                    int(description.row_count),
+                                    "lib.get_description against the rows read back"))
+        checked = require_all_match(settings)
         sizes = {key.name: {"compressed_bytes": size.bytes_compressed, "keys": size.count}
                  for key, size in self.library.admin_tools().get_sizes().items()}
         return {"checks_passed": len(checked), "segments": len(index), "data_keys": len(keys),

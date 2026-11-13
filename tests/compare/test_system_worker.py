@@ -1201,6 +1201,46 @@ class ArcticDBSettings(unittest.TestCase):
                        "read_from": "ArcticDB's config, as the engine sees it"}, checked)
 
 
+class ArcticDBStoredRows(unittest.TestCase):
+    """The one-symbol store's row count against the rows read back (review F-8)."""
+
+    def stored(self, described, read):
+        import pandas
+
+        from compare.systems.arcticdb_system import ArcticDBSystem
+
+        system = ArcticDBSystem(RunContext(layout=None, root=Path("unused"),
+                                           variant="rows100k-cols127", durability=CLASS_B,
+                                           day=None))
+        index = pandas.DataFrame({"start_row": [0], "end_row": [described], "start_col": [0],
+                                  "end_col": [1]})
+        tool = SimpleNamespace(find_keys=lambda kind: ["key"])
+        system.library = SimpleNamespace(
+            get_description=lambda symbol: SimpleNamespace(row_count=described),
+            _nvs=SimpleNamespace(read_index=lambda symbol: index, library_tool=lambda: tool),
+            admin_tools=lambda: SimpleNamespace(get_sizes=lambda: {}))
+        system.rows_read = read
+        engine = SimpleNamespace(storage=SimpleNamespace(KeyType=SimpleNamespace(TABLE_DATA=1)))
+        with (mock.patch.dict(sys.modules, {"arcticdb_ext": engine}),
+              mock.patch.object(system, "_segment_codec", return_value={}),
+              mock.patch.object(system, "_lmdb_map_size", return_value=system.map_size_bytes)):
+            return system.stored_settings()
+
+    def test_a_description_short_of_the_rows_read_back(self):
+        from compare.settings import SettingsMismatch
+
+        with self.assertRaises(SettingsMismatch) as caught:
+            self.stored(described=5, read=4)
+        self.assertIn("rows in the description: requested 4, in force 5", str(caught.exception))
+
+    def test_the_rows_read_back_are_the_description_s(self):
+        self.assertEqual(self.stored(described=5, read=5)["checks_passed"], 4)
+
+    def test_with_nothing_read_back_the_rows_are_not_a_check(self):
+        # compare/fullday.py's capacity check asks for the stored settings without a read-back.
+        self.assertEqual(self.stored(described=5, read=None)["checks_passed"], 3)
+
+
 class HeapStatements(unittest.TestCase):
     """What compare/run.py writes, against the validator and the real capacity file."""
 
