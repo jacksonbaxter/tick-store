@@ -4153,6 +4153,15 @@ each, and any other number in the pitch must be a listed text with its reason fo
 result. The store's size figures come from `results/store-size-12302019.json`, the latencies and
 ingest from the Linux day.
 
+**D-10's caveat in the Targets block.** Each per-locate figure judged against a compression
+target now says it leaves out the locate sequence that rebuilds file order: CR-3's per locate
+(25.488 bits), CR-4's per locate and per locate and side (6.264 and 5.480), and CR-7's A and F
+per locate (2.614). The sequence costs at least 11.17 bits a message by its order-0 entropy,
+11.05 a message over the adds alone and 12.04 by locate and side (`permutation_estimate` in
+`results/codec-eval-12302019.json`), or nothing for a store that keeps a file-order locate
+column. Version 4 files carry `excludes_permutation` and the generator reads it; the committed
+version 3 files do not, and the generator takes the column's order, by which the tool sets it.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from

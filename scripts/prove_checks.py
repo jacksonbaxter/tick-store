@@ -914,6 +914,12 @@ FAULTS = (
           "pitch that nothing checks", EXIT_RENDER_REFUSED,
           "a figure in the README's pitch that nothing checks: '42'",
           type_an_unchecked_pitch_figure),
+    # D-10: a per-locate figure says it leaves out the permutation to file order.
+    Fault("render-permutation-caveat-dropped", "py-scripts", "render_results.py shows a "
+          "per-locate column's bits against a compression target with no word that they leave "
+          "out the locate sequence that rebuilds file order", CHECK_FAILED,
+          "FAIL: test_a_per_locate_figure_says_it_leaves_out_the_permutation "
+          "(__main__.RenderTargetsTest"),
     Fault("results-md-hand-edit", "render-check", "a hand edit inside RESULTS.md's benchmark "
           "block, a host's heading changed", CHECK_FAILED,
           "the table in RESULTS.md is stale or was edited by hand", hand_edit_results_md),
