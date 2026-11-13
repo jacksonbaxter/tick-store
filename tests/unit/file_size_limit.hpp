@@ -9,6 +9,7 @@
 #include <sys/resource.h>
 
 #include <csignal>
+#include <tuple>
 
 namespace tick_store::test {
 
@@ -28,8 +29,8 @@ public:
     FileSizeLimit& operator=(FileSizeLimit&&) = delete;
 
     ~FileSizeLimit() {
-        ::setrlimit(RLIMIT_FSIZE, &previous_);
-        std::signal(SIGXFSZ, previous_handler_);
+        std::ignore = ::setrlimit(RLIMIT_FSIZE, &previous_);
+        std::ignore = std::signal(SIGXFSZ, previous_handler_);
     }
 
 private:

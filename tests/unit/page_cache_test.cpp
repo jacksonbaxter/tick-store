@@ -13,8 +13,10 @@
 
 #include <fcntl.h>
 #include <sys/mman.h>
-#include <sys/stat.h>
 #include <unistd.h>
+#ifdef __linux__
+#include <sys/stat.h>
+#endif
 
 #include <cstddef>
 #include <cstdint>
@@ -100,7 +102,7 @@ TEST(PageCache, AMissingFileIsAnError) {
 // every page is resident, whatever the cache holds. So such a file has to be refused, not
 // counted. A system file stands in for one, read only: nothing here evicts it.
 TEST(PageCache, AFileThisUserNeitherOwnsNorCanWriteIsRefusedOnLinux) {
-#if !defined(__linux__)
+#ifndef __linux__
     GTEST_SKIP() << "the rule is Linux's";
 #else
     if (::geteuid() == 0) {

@@ -35,6 +35,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <tuple>
 #include <vector>
 
 namespace tick_store::harness {
@@ -569,11 +570,12 @@ int write_cli_output(const CliOutput& output, int code, std::FILE* out, std::FIL
     const bool written =
         std::fwrite(output.out.data(), 1, output.out.size(), out) == output.out.size() &&
         std::fflush(out) == 0 && std::ferror(out) == 0;
-    std::fwrite(output.err.data(), 1, output.err.size(), err);
+    // Nothing is left to tell if stderr fails too, so its results are not checked.
+    std::ignore = std::fwrite(output.err.data(), 1, output.err.size(), err);
     if (!written) {
-        std::fputs("cannot write the output: standard output refused it\n", err);
+        std::ignore = std::fputs("cannot write the output: standard output refused it\n", err);
     }
-    std::fflush(err);
+    std::ignore = std::fflush(err);
     if (written) {
         return code;
     }

@@ -1,5 +1,6 @@
 #include "tick_store/harness/reference_eval.hpp"
 
+#include "tick_store/codec/codec_error.hpp"
 #include "tick_store/codec/dictionary.hpp"
 #include "tick_store/codec/pfor.hpp"
 #include "tick_store/codec/stream_vbyte.hpp"
@@ -594,16 +595,17 @@ int run_reference_eval_cli(std::span<const std::string_view> arguments,
             json.field("column_bytes", cost.column_bytes);
             json.field("state_bytes", cost.state_bytes);
             // An encoding not measured has its column alone, which is no cost.
-            json.field("total_bytes", cost.measured ? std::optional{cost.column_bytes + cost.state_bytes}
-                                                    : std::nullopt);
+            const std::uint64_t total = cost.column_bytes + cost.state_bytes;
+            std::optional<double> bits;
+            if (cost.measured) {
+                bits = result->references == 0 ? 0.0
+                                               : static_cast<double>(total) * 8.0 /
+                                                     static_cast<double>(result->references);
+            }
+            json.field("total_bytes", cost.measured ? std::optional{total} : std::nullopt);
             json.field("state_values", cost.state_values);
             json.field("max_segment_state_values", cost.max_segment_state_values);
-            json.field("bits_per_reference",
-                       !cost.measured ? std::nullopt
-                       : result->references == 0
-                           ? std::optional{0.0}
-                           : std::optional{static_cast<double>(cost.column_bytes + cost.state_bytes) *
-                                           8.0 / static_cast<double>(result->references)});
+            json.field("bits_per_reference", bits);
             json.end_object();
         }
         json.end_array();

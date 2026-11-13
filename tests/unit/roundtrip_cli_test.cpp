@@ -25,6 +25,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -441,9 +442,10 @@ TEST(WriteCliOutput, AnOutputThatCannotBeWrittenIsAnErrorAndAFailureKeepsItsCode
             const std::optional<test::FileSizeLimit> limit =
                 limited ? std::optional<test::FileSizeLimit>{std::in_place, 256} : std::nullopt;
             result = write_cli_output(output, code, out, err);
-            // Closed under the limit too, or the close would write what the flush could not.
-            std::fclose(out);
-            std::fclose(err);
+            // Closed under the limit too, or the close would write what the flush could not;
+            // a close that cannot write fails, which is expected here.
+            std::ignore = std::fclose(out);
+            std::ignore = std::fclose(err);
         }
         return result;
     };
