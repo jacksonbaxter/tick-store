@@ -607,6 +607,10 @@ FAULTS = (
           "as finished when its command exits 0", CHECK_FAILED,
           "FAIL: test_a_run_the_guard_stopped_is_a_failure_and_leaves_no_load_lines "
           "(__main__.GuardedRun"),
+    # Review F-12: QuestDB's version is the running server's, not a literal.
+    Fault("questdb-version-a-literal", "py-compare", "QuestDB's version is written as 10.1.0 "
+          "whatever the running server's SELECT build says", CHECK_FAILED,
+          "FAIL: test_the_version_is_the_one_each_running_server_gave (__main__.QuestDBVersion"),
     # Review F-6: a class A claim needs its proof for every system, not tick-store's alone.
     Fault("compare-class-a-parquet-flush-unchecked", "py-scripts", "check_compare.py takes "
           "Parquet's class A as proven with the harness's flush made", CHECK_FAILED,

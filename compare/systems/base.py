@@ -275,3 +275,9 @@ class System(ABC):
     @abstractmethod
     def versions():
         """Exact versions, from the running code and not from a pin."""
+
+    @staticmethod
+    def versions_read(facts):
+        """Versions only a running service gives, from each class's `service_facts`: none for
+        a system with no service."""
+        return {}

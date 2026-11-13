@@ -1,0 +1,12 @@
+diff --git a/compare/systems/questdb_system.py b/compare/systems/questdb_system.py
+--- a/compare/systems/questdb_system.py
++++ b/compare/systems/questdb_system.py
+@@ -916,7 +916,7 @@ class QuestDBSystem(System):
+         if len(found) != 1:
+             raise ServerFailure(f"QuestDB's servers gave the versions {sorted(found)}, and a "
+                                 "part runs one")
+-        return {"questdb_server": found.pop()}
++        return {"questdb_server": "10.1.0"}
+ 
+ 
+ def _flag(command, prefix):

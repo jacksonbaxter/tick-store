@@ -562,11 +562,12 @@ class Assembly(unittest.TestCase):
         runner.columns_dir = Path("export")
         runner.window_end_ns = lambda: 1
         runner.system_class = SimpleNamespace(variants={"v3-seg4Mi": {}}, versions=lambda: {},
+                                              versions_read=lambda facts: {},
                                               headline_variant="v3-seg4Mi")
         swap_counts = {"pages_in": 0, "pages_out": 0}
 
         def run_class(variant, durability, control):
-            return {"swap": {"write": swap_counts, "read_back": swap_counts}}, {
+            return {"swap": {"write": swap_counts, "read_back": swap_counts}, "facts": {}}, {
                 "data_dirty_pages": 1}
 
         def run_queries(variant, durability, queries, truth):
@@ -686,6 +687,41 @@ class GuardedRun(unittest.TestCase):
                 compare_run.run_one("parquet", args, layout, None, parts, None)
             self.assertFalse((parts / "parquet.load").exists())
             self.assertFalse((parts / "parquet.arguments.json").exists())
+
+
+class QuestDBVersion(unittest.TestCase):
+    """QuestDB's version comes from the running server's `SELECT build`, not from a literal
+    (review F-12)."""
+
+    BUILD = ("Build Information: QuestDB {}, JDK 25.0.2, Commit Hash "
+             "e11c837f8a169b533540bd6fa57ef3d520b68ad9")
+
+    def test_the_version_is_the_one_each_running_server_gave(self):
+        from compare.systems.questdb_system import QuestDBSystem
+
+        facts = [{"server_build": self.BUILD.format("10.2.0")}] * 2
+        self.assertEqual(QuestDBSystem.versions_read(facts), {"questdb_server": "10.2.0"})
+        self.assertNotIn("questdb_server", QuestDBSystem.versions())
+
+    def test_two_readings_or_none_are_refused(self):
+        from compare.systems.questdb_system import QuestDBSystem
+
+        for facts in ([{"server_build": self.BUILD.format("10.1.0")},
+                       {"server_build": self.BUILD.format("10.2.0")}],
+                      [{"server_build": "QuestDB"}], []):
+            with self.subTest(facts=facts), self.assertRaises(ServerFailure):
+                QuestDBSystem.versions_read(facts)
+
+    def test_a_part_carries_the_version_its_classes_read(self):
+        from compare import run_system
+
+        runner = run_system.Runner.__new__(run_system.Runner)
+        variants = {"plain": {"classes": {
+            "A": {"facts": {"server_build": self.BUILD.format("10.2.0")}},
+            "B": {"facts": {"server_build": self.BUILD.format("10.2.0")}}}}}
+        from compare.systems.questdb_system import QuestDBSystem
+        runner.system_class = QuestDBSystem
+        self.assertEqual(runner.versions(variants)["questdb_server"], "10.2.0")
 
 
 class RuntimeReading(unittest.TestCase):

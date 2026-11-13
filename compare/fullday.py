@@ -182,8 +182,10 @@ class FullDay:
             self.report["settings"] = system.service_settings()
             self.step(system, "ingest_stream", columns=str(self.columns_dir))
             self.report["settle"] = self.timed("settle", system.settle)
-            self.report["facts"] = {**system.service_facts(), "requested": system.requested(),
-                                    "versions": system.versions()}
+            facts = system.service_facts()
+            self.report["facts"] = {**facts, "requested": system.requested(),
+                                    "versions": {**system.versions(),
+                                                 **system.versions_read([facts])}}
         finally:
             self.report["service_after_ingest"] = system.stop_service()
             self.save()

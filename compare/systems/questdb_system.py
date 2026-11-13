@@ -44,6 +44,8 @@ WAL_POLL_SECONDS = 2
 # query's timeout, 60 s, so the WAL is polled down first, for at most this long.
 CONVERSION_WAIT_SECONDS = 3600
 LINUX_JEMALLOC = "libjemalloc.so"
+# `SELECT build` answers "Build Information: QuestDB 10.1.0, JDK ..., Commit Hash ...".
+BUILD_VERSION = re.compile(r"\bQuestDB ([^,\s]+),")
 # Beyond bin/questdb.sh's options: the JVM prints its own properties to the log as it starts.
 SHOW_PROPERTIES = "-XshowSettings:properties"
 PROPERTY_BLOCK = "Property settings:"
@@ -898,8 +900,23 @@ class QuestDBSystem(System):
         import pyarrow as pa
         import questdb
 
-        return {"questdb_server": "10.1.0", "questdb_client": questdb.__version__,
-                "pyarrow": pa.__version__}
+        return {"questdb_client": questdb.__version__, "pyarrow": pa.__version__}
+
+    @staticmethod
+    def versions_read(facts):
+        """The server's version, from `SELECT build` on every server that ran (review F-12):
+        one version, or the part fails."""
+        found = set()
+        for each in facts:
+            match = BUILD_VERSION.search(str(each.get("server_build", "")))
+            if match is None:
+                raise ServerFailure(f"no QuestDB version in the server's build: "
+                                    f"{each.get('server_build')!r}")
+            found.add(match.group(1))
+        if len(found) != 1:
+            raise ServerFailure(f"QuestDB's servers gave the versions {sorted(found)}, and a "
+                                "part runs one")
+        return {"questdb_server": found.pop()}
 
 
 def _flag(command, prefix):

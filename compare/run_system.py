@@ -485,6 +485,7 @@ class Runner:
                 entry["after_queries"] = extra
             out["variants"][variant] = entry
             shutil.rmtree(self.stores / variant, ignore_errors=True)
+        out["versions"] = self.versions(out["variants"])
         out["swap_by_phase"] = swap_by_phase(out["variants"])
         out["queries"] = [query_to_json(query) for query in queries]
         out["truth"] = truth
@@ -496,6 +497,12 @@ class Runner:
                                        "samples": len(self.memory_seen)}
                                       if self.memory_seen else "not-available")
         return out
+
+    def versions(self, variants):
+        """The system's versions, with those its running service gave in each class."""
+        facts = [entry["facts"] for variant in variants.values()
+                 for entry in variant["classes"].values()]
+        return {**self.system_class.versions(), **self.system_class.versions_read(facts)}
 
     def window_end_ns(self):
         hours, minutes, seconds = (int(part) for part in self.pin["to"].split(":"))
