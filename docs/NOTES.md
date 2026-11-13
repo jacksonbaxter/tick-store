@@ -3655,6 +3655,13 @@ holds, so the decode error that keeps the old words is not reachable from a file
 no column is named bogus" (`phase4-raw/fix-second-pass/codec-eval-sibling/`). It is outside this
 finding and is left for a TASKS item.
 
+RD-4. Closed with the reviewer's optional guard rather than left as a note, because a note cannot
+make a revert of D-11 fail. The block size rides in `EncodeErrors`, which every encoder helper
+already takes, so no helper gained a parameter. The tool has no flag for it and always passes
+the default, so its output is unchanged; no reference-eval results file is committed. The
+revert first written for the demonstration did not compile (`errors` unused under `-Werror`),
+and the unit binary from before ran instead and passed; the run that counts kept `errors` used.
+
 ### The final review: Phase 2 items closed
 
 The gate on the review found open items still under Phase 2 in docs/TASKS.md. Each below was
