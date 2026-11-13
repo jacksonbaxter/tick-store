@@ -1,7 +1,8 @@
 diff --git a/scripts/check_compare.py b/scripts/check_compare.py
+index e00786c..4e88d6d 100644
 --- a/scripts/check_compare.py
 +++ b/scripts/check_compare.py
-@@ -278,7 +278,7 @@
+@@ -295,7 +295,7 @@ def check_write_record(where, write, name, full_day=False, host=None):
          elif not full_day and resident != pages:
              problems.append(f"{where}.write: repetition {number} started its clock with "
                              f"{resident} of its input's {pages} pages resident")
@@ -9,4 +10,4 @@ diff --git a/scripts/check_compare.py b/scripts/check_compare.py
 +        if False:
              problems.append(f"{where}.write: repetition {number} records no device bytes read "
                              "while it ran")
-         elif host == "macOS" and MACOS_WRITE_COUNTER not in str(item["device_counter"]):
+         elif host == "macOS" and item["device_counter"] != MACOS_WRITE_COUNTER:

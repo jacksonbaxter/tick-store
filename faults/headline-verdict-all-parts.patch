@@ -1,12 +1,13 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
+index c4d2beb..8d4dad4 100644
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -772,7 +772,7 @@
+@@ -1033,7 +1033,7 @@ def render_headline(definitions_path, root):
              if wanted:
                  parts = [part for part in parts if part[0] in wanted]
              labels.update(part[0] for part in parts)
--            verdict = verdict_of(parts)
-+            verdict = verdict_of(every)
+-            verdict = verdict_text(row, parts)
++            verdict = verdict_text(row, every)
              host = row["host"] if row["host"] != "any" else hosts_of(part[4] for part in parts)
          except (TargetError, KeyError, TypeError, ZeroDivisionError) as error:
              raise TargetError(f"headline {name}: {error}") from error
