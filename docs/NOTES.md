@@ -3969,6 +3969,8 @@ after the freeze rerun (docs/TASKS.md).
 
 **RF-2, engine-only seconds as defined.** Confirmed by a test: every class B Parquet write repetition set to 0.5 s of engine-only time, its median 0.5, passed, though each total was 1.9 to 2.1 s with 0.1 s of Python. Each repetition's `engine_only_seconds` must now equal its `seconds` less its `python_seconds`, the worker's own subtraction, to 1 part in 10^9.
 
+**RF-7, tick-store's engine time per repetition.** Confirmed by a test: a cold engine time of 80 and 100 us beside queries of 60 and 70 us passed, since the cold median it was held to holds the open too. Each repetition's engine time must now be within its own round trip warm and its query's cold. On the debian protocol 2 slice of the last round (`85a4912`, iteration-only) the engine's largest share of a round trip is 0.9995 warm and cold, so the rule holds on real runs; that file passes every rule of this round with the three wrapper-only header fields taken from the reported `67ae574` slice.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
