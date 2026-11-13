@@ -194,14 +194,74 @@ TEST(FuzzOracles, PassEveryWayAStreamCanEnd) {
 }
 
 // A frame whose prefix has both bytes set, 0x0101, and so both halves of the length
-// read (review A-1): a cursor that stopped on it as zero-length would drop a whole
-// frame, and the oracle must say so rather than accept the stop.
+// read (review A-1). The oracle passes the cursor's stops on it; that it refuses a
+// zero-length stop there, which would drop a whole frame, is shown by the test below.
 TEST(FuzzOracles, PassAFrameOf257Bytes) {
     const Bytes payload(257, std::byte{0x41});
     Bytes stream = test::framed(0x0101, payload);
     EXPECT_EQ(text(oracle::check_stream(exact_copy(stream))), "");
     stream.push_back(std::byte{0x01});
     EXPECT_EQ(text(oracle::check_stream(exact_copy(stream))), "");
+}
+
+// Stops no correct cursor makes, each over the tail it claims to describe: every one must
+// be refused, by the check named, and the right stop over the same tail accepted. The
+// cursor is inline and constexpr, so only check_stop can be handed a wrong stop (review
+// RA-1): without these, deleting a stop check passed every test.
+TEST(FuzzOracles, TheFrameOracleRefusesAStopTheBytesDoNotJustify) {
+    using enum FrameStopKind;
+    Bytes whole = test::framed(0x0101, Bytes(257, std::byte{0x41}));
+    const Bytes short_body = test::bytes({0x00, 0x04, 'x', 'x', 'x'});
+    const Bytes whole_body = test::bytes({0x00, 0x04, 'x', 'x', 'x', 'x'});
+    const Bytes zero = test::bytes({0x00, 0x00, 'x'});
+    const Bytes one = test::bytes({0x01});
+    const Bytes two = test::bytes({0x00, 0x04});
+    const Bytes none;
+
+    struct Case {
+        const char* label;
+        FrameStop stop;
+        const Bytes& tail;
+        std::string refusal;
+    };
+    const Case cases[] = {
+        {"zero-length on 01 01", {zero_length, 0, 0, 257}, whole,
+         "a zero-length stop and a zero prefix do not go together"},
+        {"body, wrong expected", {truncated_body, 0, 5, 3}, short_body,
+         "a truncated body does not state its prefix's length, or that length is there"},
+        {"body, wrong actual", {truncated_body, 0, 4, 2}, short_body,
+         "a stop does not state the bytes after its prefix"},
+        {"body, whole body there", {truncated_body, 0, 4, 4}, whole_body,
+         "the cursor reported a truncated body with the whole body present"},
+        {"prefix, 2 bytes left", {truncated_prefix, 0, 2, 1}, two,
+         "the cursor reported a truncated prefix with a whole prefix left"},
+        {"prefix, wrong numbers", {truncated_prefix, 0, 2, 2}, one,
+         "a truncated prefix does not state 2 bytes needed and the 1 left"},
+        {"zero-length, states bytes needed", {zero_length, 0, 2, 1}, zero,
+         "a zero-length stop states bytes needed"},
+        {"zero-length, wrong actual", {zero_length, 0, 0, 0}, zero,
+         "a stop does not state the bytes after its prefix"},
+        {"body over one byte", {truncated_body, 0, 2, 0}, one,
+         "the cursor read a prefix that is not there"},
+        {"end with bytes left", {end, 0, 0, 0}, one, "the cursor reported end with bytes left"},
+        {"fault with no bytes", {zero_length, 0, 0, 0}, none,
+         "the cursor reported a fault with no bytes left"},
+    };
+    for (const Case& c : cases) {
+        SCOPED_TRACE(c.label);
+        EXPECT_EQ(text(oracle::check_stop(c.stop, c.tail)), c.refusal);
+    }
+
+    const std::pair<FrameStop, const Bytes&> right[] = {
+        {{zero_length, 0, 0, 1}, zero},          {{truncated_body, 0, 4, 3}, short_body},
+        {{truncated_body, 0, 4, 0}, two},        {{truncated_prefix, 0, 2, 1}, one},
+        {{end, 0, 0, 0}, none},
+    };
+    for (const auto& [stop, tail] : right) {
+        EXPECT_EQ(text(oracle::check_stop(stop, tail)), "") << to_string(stop);
+    }
+    whole.pop_back();
+    EXPECT_EQ(text(oracle::check_stop({truncated_body, 0, 257, 256}, whole)), "");
 }
 
 // A real export, as fuzz_columns' sections, cut at every length of the whole input and

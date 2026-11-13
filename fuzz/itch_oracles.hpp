@@ -74,14 +74,60 @@ namespace tick_store::itch::oracle {
     return nullptr;
 }
 
+// One stop against the bytes the cursor left, `tail` being everything from the stopped
+// frame on. The stop must be justified by those bytes: a whole frame must never be
+// reported as truncated, a zero-length stop must sit on a prefix of 00 00 and a truncated
+// body on a prefix declaring more than is left, and each fault stop's `expected` and
+// `actual` must be the numbers frame.hpp gives for it, read from the tail. Apart from
+// check_stream so that a test can hand it stops no correct cursor makes (review RA-1).
+[[nodiscard]] inline const char* check_stop(const FrameStop& stop,
+                                            std::span<const std::byte> tail) {
+    if (stop.kind == FrameStopKind::end && !tail.empty()) {
+        return "the cursor reported end with bytes left";
+    }
+    if (stop.kind != FrameStopKind::end && tail.empty()) {
+        return "the cursor reported a fault with no bytes left";
+    }
+    if (stop.kind == FrameStopKind::truncated_prefix && tail.size() >= kFramePrefixSize) {
+        return "the cursor reported a truncated prefix with a whole prefix left";
+    }
+    if (stop.kind == FrameStopKind::truncated_body && stop.actual >= stop.expected) {
+        return "the cursor reported a truncated body with the whole body present";
+    }
+    // Each stop's numbers, read from the bytes themselves (review A-1).
+    if (stop.kind == FrameStopKind::truncated_prefix &&
+        (tail.size() != 1 || stop.expected != kFramePrefixSize || stop.actual != 1)) {
+        return "a truncated prefix does not state 2 bytes needed and the 1 left";
+    }
+    if (stop.kind == FrameStopKind::zero_length || stop.kind == FrameStopKind::truncated_body) {
+        if (tail.size() < kFramePrefixSize) {
+            return "the cursor read a prefix that is not there";
+        }
+        const std::size_t declared =
+            (std::to_integer<std::size_t>(tail[0]) << 8U) | std::to_integer<std::size_t>(tail[1]);
+        const std::size_t after_prefix = tail.size() - kFramePrefixSize;
+        if (stop.actual != after_prefix) {
+            return "a stop does not state the bytes after its prefix";
+        }
+        if ((stop.kind == FrameStopKind::zero_length) != (declared == 0)) {
+            return "a zero-length stop and a zero prefix do not go together";
+        }
+        if (stop.kind == FrameStopKind::zero_length && stop.expected != 0) {
+            return "a zero-length stop states bytes needed";
+        }
+        if (stop.kind == FrameStopKind::truncated_body &&
+            (stop.expected != declared || declared <= after_prefix)) {
+            return "a truncated body does not state its prefix's length, or that length is there";
+        }
+    }
+    return nullptr;
+}
+
 // A byte stream through the cursor. Each frame must lie inside the input, directly
 // after the one before; re-encoding every frame and appending the tail the cursor
-// reports must rebuild the input exactly; and a cursor over any shorter prefix must
-// agree on every frame that fits and stop where the cut lands. A stop must also be
-// justified by the bytes: a whole frame must never be reported as truncated, a
-// zero-length stop must sit on a prefix of 00 00 and a truncated body on a prefix
-// declaring more than is left, and each stop's `expected` and `actual` must be the
-// numbers frame.hpp gives for it, read from the tail.
+// reports must rebuild the input exactly; the stop must pass check_stop against that
+// tail; and a cursor over any shorter prefix must agree on every frame that fits and
+// stop where the cut lands.
 [[nodiscard]] inline const char* check_stream(std::span<const std::byte> stream) {
     std::vector<std::byte> rebuilt(stream.size());
     std::size_t out = 0;
@@ -124,43 +170,8 @@ namespace tick_store::itch::oracle {
     if (tail.size() != stream.size() - out) {
         return "the tail does not cover the unread bytes";
     }
-    if (stop.kind == FrameStopKind::end && !tail.empty()) {
-        return "the cursor reported end with bytes left";
-    }
-    if (stop.kind != FrameStopKind::end && tail.empty()) {
-        return "the cursor reported a fault with no bytes left";
-    }
-    if (stop.kind == FrameStopKind::truncated_prefix && tail.size() >= kFramePrefixSize) {
-        return "the cursor reported a truncated prefix with a whole prefix left";
-    }
-    if (stop.kind == FrameStopKind::truncated_body && stop.actual >= stop.expected) {
-        return "the cursor reported a truncated body with the whole body present";
-    }
-    // Each stop's numbers, read from the bytes themselves (review A-1).
-    if (stop.kind == FrameStopKind::truncated_prefix &&
-        (tail.size() != 1 || stop.expected != kFramePrefixSize || stop.actual != 1)) {
-        return "a truncated prefix does not state 2 bytes needed and the 1 left";
-    }
-    if (stop.kind == FrameStopKind::zero_length || stop.kind == FrameStopKind::truncated_body) {
-        if (tail.size() < kFramePrefixSize) {
-            return "the cursor read a prefix that is not there";
-        }
-        const std::size_t declared =
-            (std::to_integer<std::size_t>(tail[0]) << 8U) | std::to_integer<std::size_t>(tail[1]);
-        const std::size_t after_prefix = tail.size() - kFramePrefixSize;
-        if (stop.actual != after_prefix) {
-            return "a stop does not state the bytes after its prefix";
-        }
-        if ((stop.kind == FrameStopKind::zero_length) != (declared == 0)) {
-            return "a zero-length stop and a zero prefix do not go together";
-        }
-        if (stop.kind == FrameStopKind::zero_length && stop.expected != 0) {
-            return "a zero-length stop states bytes needed";
-        }
-        if (stop.kind == FrameStopKind::truncated_body &&
-            (stop.expected != declared || declared <= after_prefix)) {
-            return "a truncated body does not state its prefix's length, or that length is there";
-        }
+    if (const char* failure = check_stop(stop, tail); failure != nullptr) {
+        return failure;
     }
     std::ranges::copy(tail, std::span{rebuilt}.subspan(out).begin());
     if (!std::ranges::equal(rebuilt, stream)) {
