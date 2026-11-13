@@ -150,6 +150,16 @@ TEST(ReferenceEval, TheCommandLineSaysWhatFailed) {
     EXPECT_FALSE(std::filesystem::exists(dir / "out.json"));
 }
 
+// An encoder's refusal fails the run, never a figure counted short (D-11). With the store's
+// block size no encoder refuses, so the test asks for a block of 0 values (review RD-4).
+TEST(ReferenceEval, AnEncoderRefusalFailsTheRun) {
+    const Bytes source = stream();
+    const auto result = evaluate_references(
+        source, {.segment_records = {2}, .checkpoint_segment_records = {2}, .block_values = 0});
+    ASSERT_FALSE(result.has_value());
+    EXPECT_TRUE(result.error().starts_with("an encoding failed: ")) << result.error();
+}
+
 TEST(ReferenceEval, RefusesACheckpointSizeThatIsNotASegmentSize) {
     const Bytes source = stream();
     const auto result =

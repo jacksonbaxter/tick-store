@@ -42,7 +42,6 @@ namespace tick_store::harness {
 namespace {
 
 constexpr std::size_t kLocates = 65536;
-constexpr std::uint32_t kBlock = store::kColumnBlockValues;
 
 enum Encoding : std::uint8_t {
     within_stock_imports,
@@ -59,10 +58,12 @@ constexpr std::array<std::string_view, kEncodings> kEncodingNames{
     "within_stock_imports", "all_creations_imports", "values_pfor_delta", "values_head_delta",
     "values_svb_delta",     "day_distance_checkpoint", "day_distance_index"};
 
-// The first encoder error of a run. Every figure is the real codecs' output, so an encoding
-// that fails fails the run rather than count short. The encoders refuse only a bad block size
-// or transform, and both are constants here.
+// The block size every encoding uses, and the first encoder error of a run. Every figure is
+// the real codecs' output, so an encoding that fails fails the run rather than count short.
+// The encoders refuse only a bad block size or transform: the transforms are constants here,
+// and the block size is the store's unless a test sets another.
 struct EncodeErrors {
+    std::uint32_t block = store::kColumnBlockValues;
     std::optional<std::string> first;
 
     void note(const std::expected<void, codec::CodecError>& result) {
@@ -78,7 +79,7 @@ struct EncodeErrors {
         return 0;
     }
     std::vector<std::byte> out;
-    errors.note(codec::encode_pfor(values, kBlock, {.transform = transform}, out));
+    errors.note(codec::encode_pfor(values, errors.block, {.transform = transform}, out));
     return out.size();
 }
 
@@ -87,7 +88,7 @@ struct EncodeErrors {
         return 0;
     }
     std::vector<std::byte> out;
-    errors.note(codec::encode_dict(values, kBlock, out));
+    errors.note(codec::encode_dict(values, errors.block, out));
     return out.size();
 }
 
@@ -96,7 +97,7 @@ struct EncodeErrors {
         return 0;
     }
     std::vector<std::byte> out;
-    errors.note(codec::encode_svb(values, kBlock, true, out));
+    errors.note(codec::encode_svb(values, errors.block, true, out));
     return out.size();
 }
 
@@ -337,6 +338,7 @@ struct SizeState {
 class Walker {
 public:
     explicit Walker(const ReferenceEvalOptions& options) {
+        errors_.block = options.block_values;
         for (const std::uint32_t n : options.segment_records) {
             sizes_.emplace_back(n, std::ranges::find(options.checkpoint_segment_records, n) !=
                                        options.checkpoint_segment_records.end());
@@ -576,7 +578,7 @@ int run_reference_eval_cli(std::span<const std::string_view> arguments,
     json.field("commit_source", provenance.commit_source);
     json.field("compiler", provenance.compiler);
     json.field("build_type", provenance.build_type);
-    json.field("block_values", std::uint64_t{kBlock});
+    json.field("block_values", std::uint64_t{options.block_values});
     json.field("records", result->records);
     json.field("references", result->references);
     json.field("unresolved", result->unresolved);

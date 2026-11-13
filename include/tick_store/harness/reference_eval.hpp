@@ -30,6 +30,7 @@
 
 #include "tick_store/harness/codec_eval.hpp"
 #include "tick_store/harness/roundtrip_cli.hpp"
+#include "tick_store/store/itch_store.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -45,6 +46,9 @@ struct ReferenceEvalOptions {
     std::vector<std::uint32_t> segment_records;
     // The sizes at which the book checkpoint is encoded too; each must be in segment_records.
     std::vector<std::uint32_t> checkpoint_segment_records;
+    // The values a codec block holds, the store's own. Only a test sets another, to reach
+    // the encoders' refusal, which fails the run (review RD-4).
+    std::uint32_t block_values = store::kColumnBlockValues;
 };
 
 struct EncodingCost {
