@@ -3952,6 +3952,21 @@ file every other rule passes, the protocol 2 rules included. What the new fields
 - Every slice warm proof records one untimed warm-up per query; class B's flush reports read 0
   dirty pages for every system.
 
+### The second pass over the comparison protocol
+
+A second reviewer read the protocol 2 fixes at `ab57c83` (RF-1 to RF-11), and the first review's
+open comparison findings F-5 to F-8, F-13 and F-15 are taken in the same round. Raw logs are in
+`phase4-raw/fix-compare-validator/`. No results file was regenerated or edited; the four
+committed files pass `check_compare.py` after every change.
+
+**RF-1, protocol 1 for the committed files only.** Confirmed by a test: a protocol 2 slice
+document from another commit, with its `protocol` removed and a query's `warm_up_runs` removed,
+passed with exit 0, as did one stating `1`, `true` or `2.0`. `check_compare.py` now names the two
+commits the committed files carry, `67ae574` and `2503d1e`, in `PROTOCOL_1_COMMITS`: only a file
+of one of them may state no protocol, and a stated protocol must be exactly the integer 2. The
+test fixtures, which stand for the committed files, carry `67ae574`'s commit. The list empties
+after the freeze rerun (docs/TASKS.md).
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
