@@ -549,6 +549,29 @@ void write_itch_store_seeds(SeedDir& seeds) {
             }
         }));
     }
+    // A reference distance one past its locate's list: an add, then an execution of it, is
+    // stored as distance 1 against a list of 1; made 2 and rebuilt with valid CRCs, it reaches
+    // the decoder's bound on the list from the first input instead of by chance.
+    const MessageHeader at_one{1, 0, 34'200'000'000'000ULL};
+    const std::vector<Message> named{AddOrder{at_one, 77, ch('B'), 100, kStock, Price4{100'000}},
+                                     OrderExecuted{at_one, 77, 10, 1}};
+    seeds.add(with_itch_store_part(written_itch_store(named, {}, 8), [](Parts& blocks, Parts&) {
+        for (st::ContainerPart& block : blocks) {
+            const auto metadata = st::parse_column_metadata(block.metadata, 0);
+            if (!metadata.has_value() || metadata->column != st::Column::ref_distance) {
+                continue;
+            }
+            const std::vector<std::uint64_t> past{2};
+            auto chunks = st::encode_column(st::Column::ref_distance, past);
+            if (!chunks.has_value() || chunks->size() != 1) {
+                throw std::runtime_error("ref_distance does not re-encode");
+            }
+            block.codec = chunks->front().codec;
+            block.bytes = std::move(chunks->front().bytes);
+            return;
+        }
+        throw std::runtime_error("no ref_distance block");
+    }));
     // Cuts at the header, inside the data and inside the footer.
     for (const std::size_t cut : {std::size_t{0}, std::size_t{16}, base.size() / 2, base.size() - 1}) {
         seeds.add(std::span{base}.first(cut));

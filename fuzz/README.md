@@ -32,7 +32,8 @@ exception and references under other locates; one over the 64-record cap; then t
 with each store section field, a symbols count and order, each metadata field of a type block and
 of a column block (its piece index among them), a block's codec, a dropped, repeated or swapped block, a column wrapped in zstd
 by hand with each zstd header field changed, and a byte of each of the first twelve payloads
-changed, each rebuilt through `build_container` so its CRCs hold; and cuts. The query seeds are
+changed, and a store of an add and its execution with the execution's reference distance one
+past its locate's list, each rebuilt through `build_container` so its CRCs hold; and cuts. The query seeds are
 stores of 9,000 records of adds, executions, cancels, deletes, replaces, trades and system events
 at 4,500, 9,000 and 20,487 records a segment, one of 18,384 records in one segment so that its
 columns are in two pieces, with its type column's second piece renumbered and its first a value
