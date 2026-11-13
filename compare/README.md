@@ -328,7 +328,11 @@ instead, and `scripts/check_compare.py` checks the proofs again.
 
 **Warm.** `tick_coldcache warm` reads every store file through, with the server running. `mincore`
 on a fresh mapping must then read 100% of pages resident, both before and after all 30 repetitions
-of each query.
+of each query. Each query first runs once untimed, its answer checked, as on a full day, so that
+no timed repetition is the engine's first call in the worker; the proof records `warm_up_runs`,
+and each query its warm-up's seconds. The files before protocol 2 had no warm-up on the slice, so
+their first repetition paid each engine's first-call set-up, and with 30 runs their tail figure,
+the slowest, could be that call (review F-3).
 
 **Cold.** Seven repetitions per query:
 

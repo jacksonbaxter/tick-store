@@ -164,7 +164,8 @@ MACOS_HEAP = {"setting": QUESTDB_HEAP, "full_day_check": "Linux only",
               "statement": f"QuestDB ran with {QUESTDB_HEAP}, as on Linux, so that the two runs "
                            "match. The full-day capacity check is Linux only."}
 WARM_METHOD = ("Every store file read through tick_coldcache warm, then residency read at 100% "
-               "of pages by mincore before and after all repetitions, with the server running.")
+               "of pages by mincore before and after all repetitions, with the server running. "
+               "Each query first runs once untimed, its answer checked.")
 COLD_METHOD = {
     "macOS": ("Service stopped. A fresh read-only MAP_SHARED mapping and msync(MS_INVALIDATE) "
               "per file, repeated until mincore reads 0 on every file. A fresh process then "

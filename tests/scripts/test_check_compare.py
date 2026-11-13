@@ -1308,6 +1308,8 @@ def protocol_2(document):
             for entry in variant["queries"].values():
                 warm_extra = {key: value for key, value in entry["warm"].items()
                               if key in ("proof", "swap_timed")}
+                if "pages" in warm_extra["proof"]:
+                    warm_extra["proof"]["warm_up_runs"] = 1
                 cold_extra = {key: value for key, value in entry["cold"].items()
                               if key in ("proofs", "swap_timed", "run_again_refilled_pages")}
                 entry["warm"] = {**latency_block(WARM_SECONDS), **warm_extra}
@@ -1546,6 +1548,14 @@ class Protocol2(Harness):
             del document["systems"]["questdb"]["variants"]["v"]["warm_worker_open"]
         self.assert_fault_2(fault, "questdb.v.warm_worker_open: the warm worker's open is not "
                                    "timed")
+
+    # F-3: the slice's warm path warms up untimed first, as the day's does.
+
+    def test_a_slice_warm_figure_with_no_warm_up(self):
+        def fault(document):
+            q1_of(document, "questdb")["warm"]["proof"]["warm_up_runs"] = 0
+        self.assert_fault_2(fault, "questdb.v.queries.Q1.warm: no untimed run before the "
+                                   "repetitions")
 
     def test_protocol_1_files_keep_the_rules_they_were_measured_by(self):
         result = self.run_on(valid_document("Linux"), "Linux")

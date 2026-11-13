@@ -151,8 +151,10 @@ def python_floor(system):
 
 
 def step_warm_queries(system, request, layout):
-    """Every query, `repetitions` times, between two residency proofs. A whole day's store can
-    be larger than memory, so on a Linux day the proof is the query's own: see `warm_full_day`.
+    """Every query, `repetitions` times, between two residency proofs, each query first run
+    WARM_UP_RUNS times untimed, its answer checked, as on a day (review F-3), so that no timed
+    repetition is the engine's first call in this process. A whole day's store can be larger
+    than memory, so on a Linux day the proof is the query's own: see `warm_full_day`.
     tick-store's day off Linux keeps the residency proof (compare/run_system.py)."""
     proof = request.get("warm_proof", "process_reads")
     if request.get("full_day") and proof == "process_reads":
@@ -165,13 +167,15 @@ def step_warm_queries(system, request, layout):
     before = coldcache.residency(layout, paths)
     answers = {}
     for query in queries:
+        warm_up = timed_repetitions(system, query, truth, WARM_UP_RUNS)[0]
         with swap.Phase() as phase:
             seconds, engine, digest = timed_repetitions(system, query, truth, repetitions)
-        answers[query.name] = {"seconds": seconds, "digest": digest, "swap_timed": phase.counts}
+        answers[query.name] = {"seconds": seconds, "digest": digest, "swap_timed": phase.counts,
+                               "warm_up_runs": len(warm_up), "warm_up_seconds": warm_up}
         if None not in engine:
             answers[query.name]["engine_seconds"] = engine
     after = coldcache.residency(layout, paths)
-    proof = coldcache.proof_of_warm(before, after)
+    proof = {**coldcache.proof_of_warm(before, after), "warm_up_runs": WARM_UP_RUNS}
     floor = python_floor(system)
     facts = {query.name: system.scan_facts(query) for query in queries}
     return {"queries": answers, "proof": proof, "floor_seconds": floor, "scan_facts": facts,

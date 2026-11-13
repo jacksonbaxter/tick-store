@@ -248,6 +248,46 @@ class ResidencyWarmOnADay(unittest.TestCase):
         self.assertEqual(answer["proof"]["resident_before"], 8)
         self.assertEqual(len(answer["queries"]["Q5"]["seconds"]), 3)
 
+    def test_the_slice_runs_untimed_answer_checked_warm_ups_first(self):
+        """Review F-3: a first call that pays the engine's set-up is not a timed repetition."""
+        import time
+
+        from compare import coldcache, worker
+
+        calls = []
+
+        def column_sum(column):
+            calls.append(time.perf_counter())
+            if len(calls) == 1:
+                time.sleep(0.05)
+            return [[1, 2]]
+
+        system = SimpleNamespace(name="fake", query_column_sum=column_sum,
+                                 scan_facts=lambda query: {"status": "unavailable"},
+                                 reported_open_seconds=lambda: None)
+        query = Query("Q5", "column_sum", 0, 0)
+        request = {"queries": [query_to_json(query)], "repetitions": 5, "paths": ["store"],
+                   "truth": {"Q5": {"rows": 1, "sha256": "x"}}}
+        residency = {"pages": 8, "resident_pages": 8, "page_size": 4096}
+        digests = []
+
+        def digest(query, result):
+            digests.append(result)
+            return {"rows": 1, "sha256": "x"}
+
+        with (mock.patch.object(coldcache, "warm", return_value=residency),
+              mock.patch.object(coldcache, "residency", return_value=residency),
+              mock.patch.object(worker, "digest_result", digest),
+              mock.patch.object(worker, "python_floor", return_value=[0.0])):
+            answer = worker.step_warm_queries(system, request, None)
+        seconds = answer["queries"]["Q5"]["seconds"]
+        self.assertEqual(len(seconds), 5)
+        self.assertLess(max(seconds), 0.04)
+        self.assertEqual(len(calls), 5 + worker.WARM_UP_RUNS)
+        self.assertEqual(len(digests), 5 + worker.WARM_UP_RUNS)
+        self.assertEqual(answer["proof"]["warm_up_runs"], worker.WARM_UP_RUNS)
+        self.assertEqual(answer["queries"]["Q5"]["warm_up_runs"], worker.WARM_UP_RUNS)
+
     def test_a_linux_day_keeps_the_per_process_proof(self):
         from compare import run_system
 

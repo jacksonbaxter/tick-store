@@ -45,7 +45,8 @@ tick-store's source must have been wholly resident. Every cold proof records the
 resident just before its clock started, which must be 0 where the clock holds the system's
 whole open (Parquet's, which opens the file inside every call, and tick-store's, whose cold
 figure adds the open its query tool reports, both parts kept); and each warm worker's open is
-timed once.
+timed once. Warm repetitions follow an untimed, answer-checked run of each query, on the slice
+as on a day.
 
 Standard library only. tests/scripts/test_check_compare.py shows each rule failing on an
 injected fault.
@@ -362,13 +363,17 @@ def check_warm_full_day(where, warm):
     return problems + ([] if (warm.get("n") or 0) > 0 else [f"{where}.warm: no repetitions"])
 
 
-def check_warm(where, warm, full_day=False):
+def check_warm(where, warm, full_day=False, protocol=PROTOCOL_1):
     if full_day:
         return check_warm_full_day(where, warm)
     proof = (warm or {}).get("proof") or {}
     pages = proof.get("pages")
     if not pages or proof.get("resident_before") != pages or proof.get("resident_after") != pages:
         return [f"{where}.warm: a warm number without residency proven before and after"]
+    if protocol >= PROTOCOL_2 and (not is_count(proof.get("warm_up_runs"))
+                                   or proof["warm_up_runs"] < 1):
+        # Review F-3: as on a day, no timed repetition is the engine's first call.
+        return [f"{where}.warm: no untimed run before the repetitions"]
     return [] if (warm.get("n") or 0) > 0 else [f"{where}.warm: no repetitions"]
 
 
@@ -637,7 +642,7 @@ def check_queries(where, queries, truth, system_name=None, full_day=False, proto
         here = f"{where}.queries.{name}"
         if query.get("digest") != truth.get(name) or query.get("matches_ground_truth") is not True:
             problems.append(f"{here}: differs from the ground truth")
-        problems += check_warm(here, query.get("warm"), full_day)
+        problems += check_warm(here, query.get("warm"), full_day, protocol)
         problems += check_cold(here, query.get("cold"))
         problems += check_latency(here, query)
         if protocol >= PROTOCOL_2:
