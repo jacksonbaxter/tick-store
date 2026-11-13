@@ -592,6 +592,12 @@ FAULTS = (
           "passes as a full day", CHECK_FAILED,
           "FAIL: test_a_clipped_hour_passing_as_a_full_day (__main__.FullDay"),
     # Review F-15: a day's variant source is itself a reported, valid slice file.
+    # Review RV-9: a full day named as the variant source is refused once, not recursed into.
+    Fault("compare-variant-source-day-recursed", "py-scripts", "check_compare.py validates a "
+          "full day named as a day's variant source, which names its source again, until "
+          "Python's stack runs out", CHECK_FAILED,
+          "FAIL: test_a_variant_source_that_is_a_full_day_is_refused_without_a_traceback "
+          "(__main__.FullDay"),
     Fault("compare-variant-source-unvalidated", "py-scripts", "check_compare.py ranks a full "
           "day's variants from a slice file it never validates, an iteration-only one included",
           CHECK_FAILED, "FAIL: test_a_slice_file_measured_iteration_only (__main__.FullDay"),

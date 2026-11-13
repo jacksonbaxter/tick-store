@@ -1159,6 +1159,18 @@ class FullDay(Harness):
         self.assert_full_fault(fault, "variant_selection: the slice file "
                                       f"Linux-{SLICE}-{COMMIT[:12]}.json: parquet.v.B")
 
+    def test_a_variant_source_that_is_a_full_day_is_refused_without_a_traceback(self):
+        # Review RV-9: a day naming itself, or another day, as its slice file is refused once,
+        # not validated again and again until the stack runs out.
+        name = f"Linux-{DAY}-full-{COMMIT[:12]}.json"
+        document, source = full_day_document()
+        document["variant_selection"]["source"] = name
+        result = self.run_full(document, source, name)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+        self.assertIn("variant_selection: the slice file is not this host's at this commit",
+                      result.stderr)
+
 
 def tickstore_only_document():
     """tick-store alone on the day, on macOS: the full day's rules, every variant it has, warm

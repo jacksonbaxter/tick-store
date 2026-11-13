@@ -1003,7 +1003,9 @@ def check_variant_selection(document, path, pins, capacity):
             slice_header.get("host") != header.get("host") or \
             "slice" not in (slice_document.get("input") or {}):
         problems.append("variant_selection: the slice file is not this host's at this commit")
-    if isinstance(slice_document, dict):
+    if isinstance(slice_document, dict) and "slice" in (slice_document.get("input") or {}):
+        # Only a slice is validated as the source: a full day named there is refused above, and
+        # validating it would name its own source again, without end (review RV-9).
         problems += [f"variant_selection: the slice file {source.name}: {problem}"
                      for problem in check_document(slice_document, list(slice_document), source,
                                                    pins, capacity, sha256=slice_sha256)]
