@@ -3646,6 +3646,15 @@ unknown kind reaches the error that names the kinds. A request that also has a f
 wrong type is still told about the field first, which is true of it either way. No caller in
 `compare/` sends an unknown kind.
 
+RD-3. Shown through the error a test can reach, a source cut inside a frame (D-4's), rather
+than the injected encoder fault the reviewer named: both went out under the same wrong words.
+The error is written alone, as the reviewer proposed, without a tool-name prefix, since none of
+this CLI's other errors has one. `itch::decode` refuses only an empty payload, which no frame
+holds, so the decode error that keeps the old words is not reachable from a file today.
+`tick_codec_eval` has the same line: given `--columns bogus` it says "the source did not decode:
+no column is named bogus" (`phase4-raw/fix-second-pass/codec-eval-sibling/`). It is outside this
+finding and is left for a TASKS item.
+
 ### The final review: Phase 2 items closed
 
 The gate on the review found open items still under Phase 2 in docs/TASKS.md. Each below was
