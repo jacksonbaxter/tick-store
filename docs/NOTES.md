@@ -3596,6 +3596,36 @@ oracle's cut-and-flip test uncapped, 481.11 s, the exact-path test's capped part
 `ItchQuery.SegmentsWithRawRowsTakeTheExactPath` uncapped, 428.56 s, three at a time on a host
 whose load average was 9 to 12 from other work (`phase4-raw/fix-itch-bench/debian-gate/`).
 
+### The final review: Phase 2 items closed
+
+The gate on the review found open items still under Phase 2 in docs/TASKS.md. Each below was
+checked against the code and the committed results, then ticked or closed with its evidence.
+Raw notes are in `phase4-raw/phase2-items/`.
+
+**Phase 3's parsers and decoders have fuzz targets: ticked.** `fuzz/CMakeLists.txt` builds 13
+targets, and `fuzz/README.md` names each one's oracle. Matching them against every function in
+`src/` and `include/` that reads untrusted bytes leaves nothing out:
+
+- the ITCH layer: `itch::decode` and `decode_strict` (`fuzz_itch_message`) and `FrameCursor`
+  (`fuzz_itch_frame`);
+- the codecs: the block decoders of Gorilla timestamps and XOR, PFOR, Stream VByte, dictionary
+  and run-length, each with its own target, which also reach the shared block header reader, the
+  patch lists, lane unpacking and the price-to-double mappings; `decode_xor_doubles` only
+  reinterprets `decode_xor`'s words and parses nothing itself;
+- the container: `ContainerParser` (`fuzz_container`), which `ContainerReader` and the ITCH store
+  reader both open;
+- the ITCH store: its header, symbol table, column metadata, zstd wrapper, seek index, run
+  directory, run positions and time residuals, reached through `ItchStoreReader` and
+  `SegmentReader` by `fuzz_itch_store` and through the query engine by `fuzz_itch_query`;
+- the column directory and manifest (`fuzz_columns`) and the stub store (`fuzz_stub_store`).
+
+The harness's readers (`ColumnsReader`, `StubRecordReader`, `ItchStoreRecordReader`) and its tools that
+read ITCH (census, slice, codec and reference evaluation) call only those parsers. The 30-minute
+record is `results/fuzz-g3-ea1dde4c02e4.json`: at `ea1dde4`, all 13 targets on macOS at NEON and
+the 7 AVX2 or CRC32C path targets on Linux at AVX2, 1,801 to 1,804 s each, every run clean with
+no finding. Code has changed since `ea1dde4`; the rerun at the freeze is the open G-3 item under
+Phase 4.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
