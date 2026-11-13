@@ -4454,6 +4454,24 @@ kernel file is measured at the same window, `28c8269`'s pass rule, at the freeze
 Raw files, the trial's status, document and every case's `.stat` and `.report`:
 `phase4-raw/fix-prover-ci/ds4-trial/`.
 
+### The final review's checking machinery
+
+Review E's findings on the prover, CI and the repository's own checks, after E-1 to E-4 and E-7
+to E-9. Raw logs: `phase4-raw/fix-prover-ci/`.
+
+**E-5, a proof's key.** The prover keeps a fault's proof while the last code commit and the
+fault's fingerprint are unchanged. The fingerprint held a mutation's name, not its code, and the
+code commit leaves out every `*.md` file and the prover itself. So an edited mutation, an edited
+`judge()`, or a README or RESULTS.md edit under a render-check fault kept its old verdict. The
+fingerprint now holds the source of the mutation and of every prover function and class it
+reaches, with the plain values they read; the same for the verdict path from `prove()`; and the
+committed blob of each file the fault edits, from a patch's headers or the paths a mutation
+names. Bytecode stands in where Python has no source, as for a function made in a test. A prose
+edit still leaves the code commit alone, so it invalidates only the faults that edit that file.
+All 186 fingerprints changed with this, so every stored proof waits for the full re-proof. Fault
+`prover-key-names-only` drops the code and blobs from the key again; `test_prove_checks.py`
+refuses it.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
