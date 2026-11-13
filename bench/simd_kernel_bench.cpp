@@ -23,7 +23,9 @@
 //   B1  Every input comes from a fixed seed owned by its case, so a new case changes
 //       nothing about another's data.
 //   B2  Before any timing each case's output is compared by memcmp with the scalar set's
-//       on the same input, and again after the timed passes.
+//       on the same input, and again after the timed passes. The output is filled with a
+//       poison value after warm-up, outside every timed region, so the check after them
+//       sees a timed pass that wrote nothing (review A-4).
 //   B3  DoNotOptimize on the output after every call and ClobberMemory after every pass.
 //   B4  Values per second here; counters from `perf stat` around the same passes on
 //       Linux, marked unavailable on macOS.
@@ -102,7 +104,14 @@ struct Case {
     std::size_t values_per_call = codec::kVectorValues;
     std::function<void(std::size_t calls)> run;
     std::function<bool()> verify;
+    // Where run() writes, so poison() can overwrite what warm-up left there.
+    std::shared_ptr<Vector> out;
 };
+
+// No case's answer is this value in all 1,024 places.
+constexpr std::uint64_t kPoison = 0xA5A5'A5A5'A5A5'A5A5ULL;
+
+void poison(const Case& c) { std::ranges::fill(*c.out, kPoison); }
 
 Case named(std::string name, std::uint64_t seed) {
     Case c;
@@ -150,6 +159,7 @@ Case unpack_case(const simd::Kernels& set, unsigned width) {
     const auto in = packed_vector(seed, width);
     const auto out = std::make_shared<Vector>();
     Case c = named(std::format("pfor_unpack/w={}/{}", width, level_name(set)), seed);
+    c.out = out;
     c.run = [&set, in, out, width](std::size_t calls) {
         for (std::size_t i = 0; i < calls; ++i) {
             set.unpack_vector(in->bytes, width, *out);
@@ -174,6 +184,7 @@ Case linear_case(const simd::Kernels& set, unsigned width) {
     in->bytes.shrink_to_fit();
     const auto out = std::make_shared<Vector>();
     Case c = named(std::format("linear_unpack/w={}/{}", width, level_name(set)), seed);
+    c.out = out;
     c.run = [&set, in, out, width](std::size_t calls) {
         for (std::size_t i = 0; i < calls; ++i) {
             set.unpack_linear(in->bytes, width, *out);
@@ -205,6 +216,7 @@ Case delta_case(const simd::Kernels& set, unsigned width, DeltaForm form) {
                                                      "pfor_delta_narrow"};
     Case c = named(std::format("{}/w={}/{}", kNames[static_cast<std::size_t>(form)], width,
                                level_name(set)), seed);
+    c.out = out;
     c.run = [&set, in, out, width, form](std::size_t calls) {
         for (std::size_t i = 0; i < calls; ++i) {
             switch (form) {
@@ -237,6 +249,7 @@ Case prefix_case(const simd::Kernels& set, std::string_view form_name,
     const auto reference = std::make_shared<Vector>(in->values);
     (void)scalar().prefix_sum(*reference, 0);
     Case c = named(std::format("prefix_sum/{}/{}", form_name, level_name(set)), seed);
+    c.out = out;
     c.run = [in, out, form](std::size_t calls) {
         for (std::size_t i = 0; i < calls; ++i) {
             *out = in->values;
@@ -255,6 +268,7 @@ Case for_case(const simd::Kernels& set, bool zigzag) {
     const auto reference = std::make_shared<Vector>(in->values);
     scalar().add_base(*reference, 12345, zigzag);
     Case c = named(std::format("{}/{}", zigzag ? "for_add_zigzag" : "for_add", level_name(set)), seed);
+    c.out = out;
     c.run = [&set, in, out, zigzag](std::size_t calls) {
         for (std::size_t i = 0; i < calls; ++i) {
             *out = in->values;
@@ -307,6 +321,7 @@ Case svb_case(const simd::Kernels& set) {
     const auto out = std::make_shared<Vector>();
     const auto ok = std::make_shared<bool>(true);
     Case c = named(std::format("svb_decode/{}", level_name(set)), seed);
+    c.out = out;
     c.run = [&set, in, out, ok](std::size_t calls) {
         for (std::size_t i = 0; i < calls; ++i) {
             *ok = set.svb_decode(in->control, in->data, *out) && *ok;
@@ -341,6 +356,7 @@ Case dod_case(bool copy_only) {
     codec::delta_of_delta_encode(*values, *second);
     const auto out = std::make_shared<Vector>();
     Case c = named(copy_only ? "restore_copy/scalar" : "dod_reconstruct/scalar", seed);
+    c.out = out;
     c.run = [second, out, copy_only](std::size_t calls) {
         for (std::size_t i = 0; i < calls; ++i) {
             *out = *second;
@@ -425,6 +441,7 @@ void warm_up(Session& session) {
 
 void throughput(benchmark::State& state, Session& session) {
     warm_up(session);
+    poison(*session.c);
     if (const auto opened = session.gate->enable(); !opened.has_value()) {
         state.SkipWithError(opened.error());
         return;
@@ -454,6 +471,7 @@ void throughput(benchmark::State& state, Session& session) {
 
 void batch_latency(benchmark::State& state, Session& session) {
     warm_up(session);
+    poison(*session.c);
     for (const auto iteration : state) {
         static_cast<void>(iteration);
         for (std::size_t done = 0; done < kPassCalls; done += kBatchCalls) {
@@ -685,6 +703,7 @@ int run_by_hand(std::vector<Case>& cases) {
             return fail(checked.error());
         }
         benchmark::RegisterBenchmark(c.name, [&c](benchmark::State& state) {
+            poison(c);
             for (const auto iteration : state) {
         static_cast<void>(iteration);
                 c.run(1);

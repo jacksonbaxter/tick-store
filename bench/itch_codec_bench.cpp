@@ -11,7 +11,9 @@
 //       nothing about another's data.
 //   B2  verify_round_trip() must pass before a benchmark is registered, and each timed
 //       pass is checked afterwards, outside its timing: the message count always, and
-//       for decode then encode, its output against the source.
+//       for decode then encode, its output against the source. That output is filled
+//       with a poison byte after warm-up, outside every timed region, so the check sees
+//       a timed pass that wrote nothing (review A-4).
 //   B3  DoNotOptimize on every decoded message, and ClobberMemory after every pass.
 //   B4  Throughput here, counters from `perf stat` around the same loop. Where a counter
 //       is unavailable, the results file says so.
@@ -82,6 +84,7 @@ struct DecodeOnly {
     static constexpr std::uint64_t kBatchPhaseSeed = 0x1D0C0DE'0000'0001ULL;
 
     void begin_pass() noexcept {}
+    void poison() noexcept {}
     [[nodiscard]] bool operator()(std::span<const std::byte> payload) noexcept {
         auto message = itch::decode(payload);
         benchmark::DoNotOptimize(message);
@@ -102,6 +105,9 @@ struct DecodeEncode {
     std::size_t written = 0;
 
     void begin_pass() noexcept { written = 0; }
+    // Overwrites what warm-up and the check before timing left, so only the timed pass can
+    // put the source back.
+    void poison() noexcept { std::ranges::fill(output, std::byte{0xA5}); }
     [[nodiscard]] bool operator()(std::span<const std::byte> payload) noexcept {
         auto message = itch::decode(payload);
         if (!message.has_value()) [[unlikely]] {
@@ -204,6 +210,7 @@ void warm_up(Session& session, Step& step) {
 template <class Step>
 void throughput(benchmark::State& state, Session& session, Step step) {
     warm_up(session, step);
+    step.poison();
     if (const auto opened = session.gate.enable(); !opened.has_value()) {
         state.SkipWithError(opened.error());
         return;
@@ -242,6 +249,7 @@ void throughput(benchmark::State& state, Session& session, Step step) {
 template <class Step>
 void batch_latency(benchmark::State& state, Session& session, Step step, std::mt19937_64& phases) {
     warm_up(session, step);
+    step.poison();
     std::uint64_t succeeded = 0;
     for (const auto _ : state) {
         const std::uint64_t phase = phases() % kBatchMessages;
