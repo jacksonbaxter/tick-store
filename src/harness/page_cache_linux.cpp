@@ -15,6 +15,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 namespace tick_store::harness {
@@ -65,6 +66,25 @@ private:
     return ::open(path.c_str(), O_RDONLY | O_CLOEXEC);
 }
 
+// Since 5.2, Linux reveals a file's page-cache state only to a caller who owns the file or
+// could open it for writing (mm/mincore.c, can_do_mincore()). For any other file mincore
+// fills its vector with 1, so every page reads as resident and eviction can never be seen,
+// and newer kernels refuse cachestat on it with EPERM. Neither answer can be told from a
+// real one, so such a file is refused. Root passes the kernel's owner check by CAP_FOWNER;
+// a non-root caller holding CAP_FOWNER is refused here, which errs on the safe side.
+[[nodiscard]] std::optional<std::string> unobservable(const std::filesystem::path& path,
+                                                      const struct stat& info) {
+    const uid_t user = ::geteuid();
+    if (user == 0 || info.st_uid == user ||
+        ::faccessat(AT_FDCWD, path.c_str(), W_OK, AT_EACCESS) == 0) {
+        return std::nullopt;
+    }
+    return std::format(
+        "page-cache residency is not observable for {}: Linux's mincore reports every page "
+        "of a file resident unless the caller owns it or could open it for writing",
+        path.string());
+}
+
 // Dirty plus writeback pages, or nullopt on a kernel without cachestat.
 [[nodiscard]] std::optional<std::uint64_t> unflushed_pages(int fd) noexcept {
     const CachestatRange range{};
@@ -94,6 +114,9 @@ std::expected<FileResidency, std::string> file_residency(const std::filesystem::
     struct stat info{};
     if (::fstat(fd.get(), &info) != 0) {
         return std::unexpected(failure("fstat", path));
+    }
+    if (auto refused = unobservable(path, info); refused.has_value()) {
+        return std::unexpected(std::move(*refused));
     }
     const auto length = static_cast<std::size_t>(info.st_size);
     FileResidency result{.bytes = length,
@@ -127,6 +150,14 @@ std::expected<void, std::string> evict_file(const std::filesystem::path& path) {
     const Descriptor fd{open_read_only(path)};
     if (fd.get() < 0) {
         return std::unexpected(failure("open", path));
+    }
+    struct stat info{};
+    if (::fstat(fd.get(), &info) != 0) {
+        return std::unexpected(failure("fstat", path));
+    }
+    // Eviction of such a file could never be proven, so it fails at once with the reason.
+    if (auto refused = unobservable(path, info); refused.has_value()) {
+        return std::unexpected(std::move(*refused));
     }
     if (::fsync(fd.get()) != 0) {
         return std::unexpected(failure("fsync", path));

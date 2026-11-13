@@ -13,6 +13,7 @@
 
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <cstddef>
@@ -92,6 +93,41 @@ TEST(PageCache, AMissingFileIsAnError) {
     const ScratchDir scratch;
     EXPECT_FALSE(file_residency(scratch / "absent").has_value());
     EXPECT_FALSE(evict_file(scratch / "absent").has_value());
+}
+
+// Since 5.2, Linux reveals a file's page-cache state only to a caller who owns the file or
+// could open it for writing (mm/mincore.c, can_do_mincore()); for any other file mincore says
+// every page is resident, whatever the cache holds. So such a file has to be refused, not
+// counted. A system file stands in for one, read only: nothing here evicts it.
+TEST(PageCache, AFileThisUserNeitherOwnsNorCanWriteIsRefusedOnLinux) {
+#if !defined(__linux__)
+    GTEST_SKIP() << "the rule is Linux's";
+#else
+    if (::geteuid() == 0) {
+        GTEST_SKIP() << "root may see any file's pages";
+    }
+    std::filesystem::path chosen;
+    for (const char* const candidate : {"/etc/passwd", "/etc/os-release", "/usr/bin/env", "/bin/sh"}) {
+        struct stat info{};
+        if (::stat(candidate, &info) == 0 && S_ISREG(info.st_mode) && info.st_size > 0 &&
+            info.st_uid != ::geteuid() && ::access(candidate, R_OK) == 0 &&
+            ::faccessat(AT_FDCWD, candidate, W_OK, AT_EACCESS) != 0) {
+            chosen = candidate;
+            break;
+        }
+    }
+    if (chosen.empty()) {
+        GTEST_SKIP() << "no readable file here that this user neither owns nor can write";
+    }
+    const auto residency = file_residency(chosen);
+    ASSERT_FALSE(residency.has_value()) << chosen << ": " << residency->resident_pages << " of "
+                                        << residency->pages << " pages reported resident";
+    EXPECT_TRUE(residency.error().contains("not observable")) << residency.error();
+    const CliRun reported = run({"residency", chosen.string()});
+    EXPECT_EQ(reported.code, kExitUsageOrIo);
+    EXPECT_TRUE(reported.output.err.contains("not observable")) << reported.output.err;
+    EXPECT_TRUE(reported.output.out.empty());
+#endif
 }
 
 TEST(PageCache, WarmFillsEvictEmptiesAndAFreshReadFillsOnlyWhatItRead) {

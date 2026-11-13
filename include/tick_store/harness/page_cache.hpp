@@ -13,6 +13,10 @@
 //          and residency has to.
 //
 // Neither reaches file system metadata, so "cold" means data pages only.
+//
+// On Linux, page-cache state is visible only for a file the caller owns or could open for
+// writing: for any other, mincore reports every page resident. file_residency and evict_file
+// refuse such a file with an error rather than report what cannot be seen.
 
 #include <cstdint>
 #include <expected>
