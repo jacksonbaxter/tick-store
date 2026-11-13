@@ -3691,7 +3691,7 @@ the test's headers bring in without including `<algorithm>`; deleting `<thread>`
 reviewer proposed, is a compile error in either form. The probe was never committed.
 
 RA-6 is closed by moving the comment and correcting the example, as the reviewer proposed. The
-second-pass reviewer of the codec and store fixes also found that REVIEW's R-1 row said a nested
+same reviewer also found that REVIEW's R-1 row said a nested
 block gets the same error as before in every case, which holds only for a well-formed nested
 block; the row now says so, as this file's R-1 paragraph already did.
 
