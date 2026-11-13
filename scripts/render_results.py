@@ -791,8 +791,29 @@ def lowest_parts(row, document):
             names = " / ".join("median" if field == "median_us" else
                                tail if field in TAIL_FIELDS else field
                                for field in spec["fields"])
-            parts.append((f"{query} {kind}", f"{values} against {others} ({names})", met))
+            note = faster_variants(spec, document, query, kind, ours, row) if met else ""
+            parts.append((f"{query} {kind}", f"{values} against {others} ({names}){note}", met))
     return parts
+
+
+COUNT_WORDS = {2: "two", 3: "three", 4: "four"}
+
+
+def faster_variants(spec, document, query, kind, ours, row):
+    """For a part met under QL-4: that it compares headline variants, and each other system's
+    variant that is not its headline and has a lower median on that query, with its figures."""
+    count = 1 + len(spec["others"])
+    note = f", met among the {COUNT_WORDS.get(count, str(count))} headline variants"
+    first = spec["fields"][0]
+    faster = []
+    for system in spec["others"]:
+        headline_name = walk(document, ["systems", system, "headline_variant"])
+        for name, variant in walk(document, ["systems", system, "variants"]).items():
+            block = walk(variant, ["queries", query, kind])
+            if name != headline_name and block[first] < ours[first]:
+                figures = " / ".join(shown(block[field], row) for field in spec["fields"])
+                faster.append(f"{SYSTEM_LABEL[system]}'s `{name}` is faster, {figures}")
+    return note + (", though " + " and ".join(faster) if faster else "")
 
 
 # The fields that hold a latency block's tail figure: p99_us under its old name.

@@ -608,6 +608,29 @@ class RenderLowestTest(Scratch):
                       "(median / slowest of 7)", self.row())
         self.assertIn("| missed; p99 measured as", self.row())
 
+    def test_a_met_part_says_it_is_among_the_headlines_and_names_a_faster_variant(self):
+        # QL-4 compares headline variants: where it is met, the text says so, and names another
+        # system's variant the file shows faster on that query.
+        document = lowest_document()
+        parquet = document["systems"]["parquet"]["variants"]
+        parquet["fast"] = json.loads(json.dumps(parquet["h"]))
+        parquet["fast"]["queries"]["Q1"]["warm"] = latency(500.0, 900.0, 30)
+        (self.tree / "results" / "day-0123.json").write_text(json.dumps(document),
+                                                            encoding="utf-8")
+        result = self.render()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Q1 warm: 1.00 ms / 2.00 ms against Parquet's 3.00 ms / 4.00 ms (median / "
+                      "slowest of 30), met among the two headline variants, though Parquet's "
+                      "`fast` is faster, 0.50 ms / 0.90 ms;", self.row())
+        # A missed part says nothing more.
+        self.assertIn("Q1 cold: 5.00 ms / 9.00 ms against Parquet's 4.00 ms / 6.00 ms (median / "
+                      "slowest of 7) |", self.row())
+
+    def test_a_met_part_with_no_faster_variant_still_says_it_is_among_the_headlines(self):
+        self.assertEqual(self.render().returncode, 0)
+        self.assertIn("(median / slowest of 30), met among the two headline variants;",
+                      self.row())
+
     def test_each_pair_names_its_tail_figure_and_the_verdict_says_what_p99_was(self):
         result = self.render()
         self.assertEqual(result.returncode, 0, result.stderr)
