@@ -3411,6 +3411,15 @@ type sequence, which the store keeps anyway as `message_type`, so it is `false` 
 so its CR-3 and CR-4 "per locate" rows still show the bits with no caveat; TASKS carries what the
 rendering needs.
 
+D-11. The encoders' results go to a small sink, `EncodeErrors`, which the walker owns and passes
+down; the first error fails `evaluate_references`, and the CLI exits 2. With the block size
+injected as 0, the counting test failed with "an encoding failed: bad parameter: block values at
+bit 0: expected 1048576, have 0"; restored, it passes. Decoding each encoding back, the other half
+of the finding, was not added: the figures are sizes, the encoders are the store's own, whose
+round trips the codec and store tests prove, and a decode pass would lengthen a whole-day run for
+no figure. No script reads this tool's JSON and no reference-eval results file is committed, so
+the nulls change no reader.
+
 Raw: `phase4-raw/fix-harness/`: each finding's failing and passing logs.
 
 ## Process notes
