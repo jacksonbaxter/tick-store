@@ -3487,6 +3487,15 @@ A-2. Documentation only, as the reviewer proposed. The test was first written to
 promise and failed (`decode_strict` returned an `AddOrder` with side `X`); it now asserts the
 decode, so a later field check would have to change the test and the header together.
 
+R-1. The reviewer's demonstration, the error's `actual` of 1,048,576, does not tell a decode from
+a precheck: both report the stated count. So each test also gives the nested block of 2^20
+values a spare byte that its header counts, which the PFOR decoder refuses only after decoding
+every value; before the fix all four nested blocks came back with that trailing-byte error, and
+after it with `bad_count` at the nested block's start. The check is `stated_block_count` in
+`block.hpp`, which `decode_column`'s own precheck now uses too. A count of 0 or past the cap
+is still the PFOR decoder's to refuse, as for the outer blocks. Huffman indices are not a
+nested block and are read to the block's count. No error text changes for a well-formed block.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
