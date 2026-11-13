@@ -3403,6 +3403,14 @@ diagnostics: the committed codec-eval files hold none from a file-order column o
 locate unless a value failed, and every value on both days came back, so their numbers do not
 move.
 
+D-10. Of the reviewer's two fixes, the field beside `met` keeps every verdict where a reader
+already finds it, and says what it leaves out. A per-type column rebuilds file order from the
+type sequence, which the store keeps anyway as `message_type`, so it is `false` there, as
+`not_counted` already treats only per-locate columns. No script reads `comparison`:
+`render_results.py` judges the Targets block from each column's codecs by `scripts/targets.json`,
+so its CR-3 and CR-4 "per locate" rows still show the bits with no caveat; TASKS carries what the
+rendering needs.
+
 Raw: `phase4-raw/fix-harness/`: each finding's failing and passing logs.
 
 ## Process notes
