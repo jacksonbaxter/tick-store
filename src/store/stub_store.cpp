@@ -149,10 +149,6 @@ std::expected<void, StoreError> StubWriter::append(const itch::Message& message)
                               header_.record_count, written.error().expected,
                               written.error().actual));
     }
-    if (*written == itch::kFramePrefixSize) {
-        return fail(bad_field(StoreErrorKind::unencodable_record, "empty record",
-                              header_.record_count, 1, 0));
-    }
     buffered_ += *written;
     ++header_.record_count;
     header_.records_bytes += *written;

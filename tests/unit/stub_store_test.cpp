@@ -389,7 +389,10 @@ TEST(StubWriter, RefusesARawMessageWithNoBytes) {
     const auto appended = writer->append(itch::RawMessage{});
     ASSERT_FALSE(appended.has_value());
     EXPECT_EQ(appended.error().kind, StoreErrorKind::unencodable_record);
-    EXPECT_EQ(appended.error().field, "empty record");
+    // The encoder refuses it, so the error names the encoder's field (review A-5).
+    EXPECT_EQ(appended.error().field, "raw bytes");
+    EXPECT_EQ(appended.error().expected, 1U);
+    EXPECT_EQ(appended.error().actual, 0U);
 }
 
 TEST(StubWriter, RefusesATimestampTheWireCannotHold) {
