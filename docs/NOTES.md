@@ -4018,6 +4018,14 @@ document the validator passes and sets its measurement to `compare/fullday.py`'s
 and requires exactly the iteration-only problem. With that refusal removed from
 `check_results.py` the old test still passed and the new one failed. The file still runs only by
 hand under the `.venv`, since `scripts/check.sh` does not list it (F-9, outside this round).
+**F-15, the variant source and the guard's rate.** Confirmed by tests. A full day passed beside
+a variant-source slice file marked iteration-only, or one with a setting not in force, since
+only its host, commit and `slice` key were read. `check_compare.py` now validates that file by
+every rule it holds a slice to, with the same pins and capacity file, and names each problem
+under `variant_selection`. The guard divided each swap delta by the nominal 2 s, while the next
+sample comes 2 s after the last one ended, so the rate was overstated, in the safe direction but
+not as registered. It now divides by the time between the two samples: 1000 pages 2.5 s apart
+read 1,638,400 B/s, where the nominal interval gave 2,048,000.
 
 ## Process notes
 
