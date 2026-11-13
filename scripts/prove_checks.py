@@ -1072,6 +1072,11 @@ FAULTS = (
           "what it read, so its fault changes nothing", CHECK_FAILED,
           "FAIL: test_every_listed_mutation_changes_the_committed_tree "
           "(__main__.EveryFaultApplies"),
+    # The coverage summary says which kernel sets its gate requires.
+    Fault("coverage-kernel-statement-stale", "py-scripts", "coverage_report.py writes that no "
+          "SIMD kernel exists, though its gate requires the scalar set and this processor's",
+          CHECK_FAILED, "FAIL: test_the_kernel_statement_is_the_kernel_sets_required "
+          "(__main__.RequiredList"),
     Fault("coverage-required-removed", "coverage", "bench_support_test.cpp dropped from the "
           "tests, so the guard and the round-trip check lose their only callers", CHECK_FAILED,
           "REQUIRED FUNCTION NOT REACHED: verify_round_trip"),

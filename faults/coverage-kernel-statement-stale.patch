@@ -1,0 +1,12 @@
+diff --git a/scripts/coverage_report.py b/scripts/coverage_report.py
+index 64cc3a2..78f4cc8 100755
+--- a/scripts/coverage_report.py
++++ b/scripts/coverage_report.py
+@@ -338,6 +338,7 @@ SIMD_SET_NAMES = {SIMD_NEON: "NEON", SIMD_AVX2: "AVX2, with its CPUID check"}
+ 
+ def simd_statement(machine=None):
+     """What the summary says of the SIMD kernels, from the list the gate holds them to."""
++    return "No SIMD kernels exist yet, so none are reported and none are claimed."
+     machine = platform.machine() if machine is None else machine
+     statement = (f"The kernels' dispatch, {SIMD_DISPATCH}, and their scalar set, {SIMD_SCALAR}, "
+                  "are required on every processor.")
