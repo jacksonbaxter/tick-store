@@ -3458,7 +3458,15 @@ new denominators, and `excludes_permutation` beside every verdict. `scripts/chec
 work on the committed files and on the new output alike; no script changed. TASKS lists the
 files.
 
-Raw: `phase4-raw/fix-harness/`: each finding's failing and passing logs.
+Checks. On the Mac at 036c534, `scripts/check.sh --only`: dev build, dev tests (659, one skipped:
+the Linux-only page-cache test), oracle, ASan/UBSan build and tests (659, the same skip),
+clang-tidy (122 files), the Python scripts and compare tests, check-results, render-check and
+hygiene all pass. The Mac does not build `page_cache_linux.cpp`, so clang-tidy ran on it on
+`debian`, where it asked for `sys/types.h` for `uid_t` (22c4422). On `debian` at 22c4422, the dev
+preset builds, ctest runs 659 tests with none failing and the two real-day tests skipped (no data there), the
+Linux-only page-cache test among the passes, and clang-tidy on `page_cache_linux.cpp` passes.
+
+Raw: `phase4-raw/fix-harness/`: each finding's failing and passing logs, and the checks.
 
 ## Process notes
 
