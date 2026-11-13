@@ -643,11 +643,13 @@ def evaluate(expression, document):
         return statistics.median(walk(case, expression["field"])
                                  for case in bench_cases(document, expression["cases_median"]))
     if "best" in expression:
+        # Only a codec that gave every value back counts, as in store_estimate.py (review E-4).
         codecs = [codec for codec in codec_column(document, expression["best"])["codecs"]
                   if codec.get("family") == expression.get("family", codec.get("family"))
-                  and codec.get("family") != expression.get("not_family")]
+                  and codec.get("family") != expression.get("not_family")
+                  and codec.get("exact") is True]
         if not codecs:
-            raise TargetError(f"no codec of that family on {expression['best']!r}")
+            raise TargetError(f"no exact codec of that family on {expression['best']!r}")
         return min(codec["bits_per_value"] for codec in codecs)
     if "codec" in expression:
         codecs = [codec for codec in codec_column(document, expression["column"])["codecs"]

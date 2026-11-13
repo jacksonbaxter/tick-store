@@ -339,6 +339,26 @@ class RenderTargetsTest(Scratch):
         self.assertIn("g2.exit_code_corrupt is 1, and g2.data_crc exited 2", result.stderr)
         self.assertIn("a round-trip results file failed validation", result.stderr)
 
+    def test_the_best_codec_is_the_best_exact_one(self):
+        # Review E-4: a lossy codec's fewer bits never meet a compression target.
+        codecs = [{"codec": "a", "family": "f", "bits_per_value": 3.0, "exact": True},
+                  {"codec": "b", "family": "f", "bits_per_value": 1.0, "exact": False}]
+        (self.tree / "results" / "eval-0123.json").write_text(json.dumps(
+            {"host": "macOS", "columns": [{"name": "c", "codecs": codecs}]}), encoding="utf-8")
+        self.write_targets([{"id": "T-11", "host": "any", "target": {"at_most": 2},
+                             "digits": 1, "unit": " bits",
+                             "parts": [{"label": "c", "file": "results/eval-*.json",
+                                        "value": {"best": "c"}}]}])
+        result = self.render()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("| 3.0 bits | missed |", self.row("T-11", "any"))
+        codecs[0]["exact"] = False
+        (self.tree / "results" / "eval-0123.json").write_text(json.dumps(
+            {"host": "macOS", "columns": [{"name": "c", "codecs": codecs}]}), encoding="utf-8")
+        result = self.render()
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("no exact codec of that family on 'c'", result.stderr)
+
     def test_two_files_for_one_pattern_fail(self):
         (self.tree / "results" / "day-4567.json").write_text(json.dumps(TARGET_DOCUMENT),
                                                             encoding="utf-8")
