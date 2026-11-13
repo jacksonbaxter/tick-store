@@ -1098,6 +1098,21 @@ TEST(CodecEvalCli, ExitsOneWhenAValueDoesNotComeBack) {
     EXPECT_TRUE(output.out.contains("NOT EXACT"));
 }
 
+// The CLI writes the evaluation's error as it is: a column that does not exist is not a
+// source that did not decode (as review RD-3 found in tick_reference_eval).
+TEST(CodecEvalCli, TheCommandLineSaysWhatFailed) {
+    const test::ScratchDir dir;
+    test::write_file(dir / "day", small_day(1).bytes);
+    const std::string source = (dir / "day").string();
+    const std::string out = (dir / "eval.json").string();
+    const std::vector<std::string_view> arguments{source, out, "--day", "D", "--columns", "bogus"};
+    CliOutput output;
+    EXPECT_EQ(run_codec_eval_cli(arguments, kProvenance, output), kExitUsageOrIo);
+    EXPECT_TRUE(output.err.contains("no column is named bogus")) << output.err;
+    EXPECT_FALSE(output.err.contains("did not decode")) << output.err;
+    EXPECT_FALSE(std::filesystem::exists(dir / "eval.json"));
+}
+
 TEST(CodecEvalCli, FailsWithExitTwo) {
     const test::ScratchDir dir;
     test::write_file(dir / "day", small_day(1).bytes);

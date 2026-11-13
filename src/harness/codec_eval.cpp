@@ -2553,7 +2553,8 @@ std::expected<EvalResult, std::string> evaluate_codecs(std::span<const std::byte
         // The cursor returns no empty payload, and only that fails to decode.
         const auto message = itch::decode(frame->payload);
         if (!message.has_value()) {
-            return std::unexpected(itch::to_string(message.error()));
+            return std::unexpected(
+                std::format("the source did not decode: {}", itch::to_string(message.error())));
         }
         walk.observe(*message, frame->payload);
     }
@@ -2596,7 +2597,7 @@ int run_codec_eval_cli(std::span<const std::string_view> arguments,
                                                     .columns = options->columns,
                                                     .observe_block = {}});
     if (!result.has_value()) {
-        output.err += std::format("the source did not decode: {}\n", result.error());
+        output.err += std::format("{}\n", result.error());
         return kExitUsageOrIo;
     }
     std::vector<Price4Proof> proofs;
