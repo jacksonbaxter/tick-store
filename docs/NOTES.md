@@ -3623,6 +3623,14 @@ For the fields, a hot row's share count made one more in `row_values` failed 12 
 not tried. On macOS, libFuzzer's crash handler hung after reporting the oracle's failure on the
 first failing seed, and was stopped by hand once its message was in the log.
 
+RA-2. Checked in code, not narrowed in the text, since both checks are a few lines. The shorter
+cursor's stop is now held to the same rule as the input's, its offset where its last whole
+frame ends; the old check, that it fell inside the cut, follows from that. No in-tree test can
+reach the shorter-input check with a wrong stop, because the cursor is inline and `constexpr`,
+so it was shown with a driver in the raw folder built against a mutated copy of `frame.hpp`
+first on its include path (`phase4-raw/fix-second-pass/ra2-driver/`), as for A-1. The unit
+suite's `check_stop` test covers what the shorter stop goes through.
+
 ### The final review: Phase 2 items closed
 
 The gate on the review found open items still under Phase 2 in docs/TASKS.md. Each below was
