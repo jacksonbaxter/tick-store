@@ -4101,6 +4101,31 @@ headline preamble and its pitch changed wording only; regenerating moved no figu
 (the word diff is in `phase4-raw/fix-generator/`). `BENCHMARKS.md` keeps QL-4's "lowest median and
 p99": the verdict says beside it what p99 was measured as.
 
+**Write targets on both clocks (RF-3).** WT-3 and WT-4 are now judged against each system on
+the total seconds and on the engine-only seconds, the total less the time reading the input and
+putting it in the form the system's call takes, and met only if tick-store is no slower on both.
+The committed day files are protocol 1 and keep no engine-only figure, but each full-day write is
+one repetition, so its engine-only seconds are its seconds less its `python_seconds`, the
+definition protocol 2 records. A protocol 1 slice write of three repetitions kept medians alone,
+and the median of the differences is not the difference of the medians, so its engine-only cell
+reads "not recorded" and no target is judged on it. The verdicts that changed, on the Linux day at
+`67ae574`:
+
+| Target | Against | Total s, tick-store / other | Engine-only s, tick-store / other | Before | Now |
+|---|---|---|---|---|---|
+| WT-3 | Parquet | 195.3 / 158.4 | 195.0 / 81.1 | missed | missed |
+| WT-3 | ArcticDB | 195.3 / 120.1 | 195.0 / 34.6 | missed | missed |
+| WT-3 | QuestDB | 195.3 / 273.6 | 195.0 / 151.0 | met | missed |
+| WT-4 | Parquet | 188.9 / 266.3 | 188.5 / 98.4 | met | missed |
+| WT-4 | ArcticDB | 188.9 / 123.6 | 188.5 / 42.6 | missed | missed |
+| WT-4 | QuestDB, not like-for-like | 188.9 / 1,269.2 | 188.5 / 1,137.3 | met | met |
+
+WT-3 on Linux reads missed, and WT-4 met against QuestDB only. The other three systems spend
+45% (QuestDB) to 71% (ArcticDB) of their class A day's write reading the export in chunks and
+building their input inside the clock; tick-store's
+source is resident before its clock, and its time is nearly all its own. `BENCHMARKS.md`'s
+hand-written status rows for WT-3 and WT-4 still give the old verdicts until the end of the phase.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
