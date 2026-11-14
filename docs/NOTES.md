@@ -5099,6 +5099,112 @@ host, if the child outlives the 2 s after SIGTERM; it can signal nothing outside
 session, and the reviewer asks for no fix. If it flakes, a hard floor of its own keeps SIGKILL
 out of its window.
 
+### The diagnostic runs at the freeze
+
+Written before the runs. Several targets are missed, and the record says why for some of them
+from profiles taken at older commits, on the slice or on a loaded host. These runs make the
+day's version at the freeze commit, so the write-up can explain a miss from a figure made on the
+code that missed it. Raw logs and the dry runs are in `phase4-raw/diag/`.
+
+**What they are, and what they are not.** Four diagnostics, D1 to D4, and the build they need.
+Each runs once, at `ede0176`, on the Linux host, as steps L14 to L18 of the freeze runner's
+part B. Part B runs in the second measurement window, and these steps come after its three
+benchmarks, so no diagnostic runs before or beside a measured case. They judge no target and
+are never cited as one's figure. A profile gives shares of sampled user-mode cycles
+(`cycles:u`). Kernel time is not in any profile, and the counters are user-mode too. D3 reads
+the write's system time from perf's `user_time` and `system_time` events, so its share of the
+write is stated, but nothing is said of what that kernel time was spent on. The profiles report
+no time. D3 reports engine times, read from `tick_query`'s own answer lines (`engine_ns`), not
+from wall time, and those are its only times. Each is one run with no spread, so a share or a
+ratio here is a reading, not an estimate with an interval.
+
+| Step | What | Wrapper | Explains |
+|---|---|---|---|
+| L14 | the line-tables build of `tick_roundtrip`, `tick_query` and `column_decode_bench`, and the identical-code check | `heavy.sh`, `taskset -c 2,6,7` | (the build D1, D2 and D4 use) |
+| L15, D1 | the writer's profile over the whole day: `perf record -e cycles:u --user-callchains --call-graph dwarf,16384 -F 199` of `tick_roundtrip ingest` | `heavy.sh`, `taskset -c 2,6,7` | WT-1 and WT-2: what the single-threaded writer's time goes to (parsing, book state, segment assembly, sorting, PFOR and dictionary encoding, zstd, CRC, container writing), and the cause behind WT-3 and WT-4 |
+| L16, D2 | each of Q1 to Q5's profile on D1's store, `-F 499`, 30, 100, 100, 30 and 30 requests | `heavy.sh`, `taskset -c 2,6,7` | QL-1 to QL-4: the shares of dictionary decode, PFOR unpack, run positions, time bases, zstd, the scan and the digest, which is made after the engine's clock stops |
+| L17, D3 | `perf stat -x,` counters of the write and of each query process, at AVX2 and capped to scalar (`TICK_STORE_SIMD`), two rounds in alternating order, 31 requests a file, the first untimed | `measure.sh`, `taskset -c 4` | what SIMD changes on the queries on this host, the writer's IPC and mispredicts per message, the write's system share, and the effective clock (cycles over user seconds) |
+| L18, D4 | the price column's decode, `store_decode/add_price` on the slice, `-F 4000`, recorded only inside the bench's timed passes through its perf control FIFOs | `heavy.sh`, `taskset -c 2,6,7` | DS-5 on both hosts and DS-6's prices: the split of zstd inflate, PFOR unpack, the decode drivers and allocation |
+
+The query parameters for D2 and D3 are the ones the freeze's own Linux full day ran:
+`queries.parameters` of part A's `Linux-12302019-full-ede0176b10bb.json`, or of its `.pending`
+if the validator refused the day. They are inputs either way, and the summary names the file it
+used. D1 and D2 keep their `perf.data` files on the host and write text reports only:
+`perf report --stdio` and `perf stat -x,`. Every command, with its start, end and exit, is in
+the run's status file, and so is D3's sibling busy share. That share is read over each of the
+two holds (the write, then all the queries) and over each query run inside them, from
+`/proc/stat`, by `scripts/run_bench.py`'s own functions, as the benchmarks read it. It is
+reported, not held to the benchmarks' 5% rule, because no target is judged here.
+
+The host may restart itself at 11:02Z, so part B's window must end before then. No diagnostic
+step starts at or after 10:30Z (the runner's `--diag-until`), and no `perf report` runs past
+that time. Each report also has its own cap: an hour, or 20 minutes for one that resolves
+source lines. A report that is cut off is a partial file, and the summary refuses it, because
+its shares do not sum to 100. A skipped or refused diagnostic is reported as not made, with its
+cause.
+
+**The line-tables variant, and how its code is shown identical.** Without line tables, work
+the compiler inlined is charged to the function it was inlined into: the probe found 11.4% of
+the writer's cycles in `SegmentBuilder::finish`'s self time, which a flat profile cannot split.
+The variant is the bench preset with `-gline-tables-only` added to every compile and link
+through the clang driver's own `CCC_OVERRIDE_OPTIONS`. The plan's form, `-DCMAKE_CXX_FLAGS=...`,
+was wrong for this, and was found wrong while checking it at the freeze commit:
+`cmake/BuildInfo.cmake` embeds `CMAKE_CXX_FLAGS` in every binary's build facts, so the variant
+would have carried a different string and been a different build. Through the driver's variable
+no CMake value differs. The step records what `scripts/build_preset.py` reads from the variant's
+cache, and the summary refuses anything but `bench`.
+L14 then compares the `.text` section of each of the three binaries, byte for byte, with the
+measured build's. A binary whose `.text` differs is not used: D1, D2 and D4 then profile the
+measured build without line tables, each summary says so (`text_identical`), and inlined steps
+are not split. D3 always runs the measured build, the binaries the comparison ran.
+
+**What each results file will hold.** One small JSON per diagnostic, written by
+`scripts/diag_summary.py` from the step's folder:
+`results/diag/{writer-profile,query-profile,counters-simd,price-decode-profile}-12302019-ede0176b10bb.json`.
+Each states that it is a diagnostic: one run, judging no target, shares or counter totals. Each
+records the commit, the build (the preset from `build_preset.py`, the extra flag, whether the
+code was identical), the wrapper, and, for a profile, the event, frequency, call graph, the
+samples recorded and in the report, and the report commands with every path reduced to its last
+part. A profile's shares are computed from perf's per-line periods, not copied from its
+percentages, and are grouped by a table that lives in the script: a symbol goes to the first
+group with a pattern that matches it. Whatever no pattern matches is its own `unmatched` share,
+with its largest symbols listed, and is never spread over the groups. Every pattern has a real
+or code-named symbol in `tests/scripts/test_diag_summary.py`, whose fixtures are the feasibility
+probe's own reports, cut down. The table is also written into each summary. D1 adds inclusive
+shares (`encode_column`, `encode_pfor`, `encode_dict` and others, from the `--children` report)
+and the store's codecs by column from `layout --blocks`. D2 adds, per query, the engine, digest
+and open shares and the answers' values decoded and kernel runs. D3 holds the write's counters
+per message, each query run's engine median and slowest at each level, the AVX2-over-scalar
+ratio of the pooled medians, the load lines, governor, boost and the sibling shares. With line
+tables, D1 and D4 also give their shares by source file. D2 asks for no source-line report: it
+would need five slow ones. They are reported as measured, whatever they show. A share that
+contradicts a cause given elsewhere in the record is reported, and the cause is corrected.
+
+The summary refuses input it cannot account for, and writes nothing: a report with no samples, a
+run at a commit other than the one given, self shares that do not sum to 100 within the
+report's rounding (a report cut at a percent limit), periods that do not add up to the event
+count, a line it cannot read, a build other than the bench preset, a query answer that is an
+error or ran kernels above its cap, and output that would hold an absolute path, this machine's
+name or user, or a word given with `--forbid` (the collector passes the host's name). A smoke's
+folder is iteration only and is never written under `results/`. Each refusal has a test. Six
+faults show a rule failing: `diag-no-samples-accepted`, `diag-commit-unchecked`,
+`diag-sum-unchecked`, `diag-unmatched-spread`, `diag-absolute-path-kept` and
+`diag-first-answer-timed`. Each is PROVEN with `--only` (`prove-diag.log`). No script globs
+`results/diag/`: `check.sh` validates the bench and comparison files only, and
+`render_results.py` reads named patterns. `check_hygiene.py` passes on a sample summary in the
+tests.
+
+**Not smoke-tested.** Nothing of L14 to L18 has run on the Linux host. That host is inside part
+A's measurement window until part B starts, and nothing runs there beside a measurement. What was
+checked: `bash -n` on the runner; on the Mac, the runner's embedded helpers on stand-ins (the
+`.text` comparison on made ELF files, same, differing and not ELF; the request files from the
+committed Linux day's parameters; the D3 query loop with stand-ins for `perf` and `tick_query`
+whose output the summary then read); and the summary on the probe's real reports. The flags of
+every command were checked against the code at the freeze: `tick_query`'s answer and ready
+fields, `column_decode_bench`'s options and report, `tick_roundtrip`'s `layout --blocks`, and
+`run_bench.py`'s sibling and boost readings. If a step fails on the host, its summary is not
+written, and the run is reported as not made, with its cause.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
