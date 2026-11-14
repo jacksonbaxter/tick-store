@@ -224,7 +224,18 @@ store is 1.76 GB, 4.69 times smaller than the day. `scripts/g2_plan.py` finds bo
 listing by that rule, the middle segment's first timestamp block and the footer, each at its
 middle byte, bit 1: `python3 -I scripts/g2_plan.py build/12302019-layout.json build/g2.json`
 prints the data and footer offsets `flip-bit` is given, and writes the `g2.json` that
-`scripts/store_results.py` reads.
+`scripts/store_results.py` reads. That script assembles the published files from one day's
+runs: each run's output, `/usr/bin/time -l` report and exit status in one folder, named as its
+docstring lists, and `--build`, the build folder the tools ran from, whose preset it reads from
+the folder's cache with `scripts/build_preset.py` and writes as `build_preset`:
+
+```sh
+python3 -I scripts/store_results.py build/roundtrip-raw --day 12302019 \
+    --commit "$(git rev-parse --short HEAD)" --host macOS --build build/bench \
+    --capacity results/fullday-capacity-12302019.json \
+    --roundtrip results/roundtrip-12302019.json --size results/store-size-12302019.json
+```
+
 Results for both pinned days are in `results/roundtrip-12302019.json` and
 `results/roundtrip-10302019.json`, with every byte of each store by column, section and footer in
 `results/store-size-*.json`, and G-1 for one day on Linux in `results/roundtrip-12302019-linux.json`.

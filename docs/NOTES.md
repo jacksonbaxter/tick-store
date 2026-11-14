@@ -4904,8 +4904,7 @@ recipe, `fuzz/README.md` and "The G-3 launch at the freeze" name them. The tests
 first (`item7/before-test_*.log`). Faults `build-preset-option-defaults-ignored`,
 `codec-eval-preset-assumed`, `codec-eval-build-type-unchecked`,
 `g2-plan-footer-trailer-counted`, `fuzz-host-absolute-path-kept` and `fuzz-host-name-kept`,
-each PROVEN with `--only` (`prove-item7.log`). `store_results.py` still writes the round-trip
-files' `build_preset` as `bench`, the preset their runs are made with; this round leaves it.
+each PROVEN with `--only` (`prove-item7.log`).
 
 **The pre-registration revised (RP-1 to RP-3).** The second-pass review found that the
 pre-registration let a figure cause a rerun: only a figure past its threshold was investigated,
@@ -4923,6 +4922,18 @@ write peak RSS, tick-store's engine seconds, the warm worker's open, the Python 
 peak memory, durability verdicts, and variant selection; each has a threshold only where the
 same sources give a second run (`spread_more.py`, `item8/spread_more.txt`). `check_compare.py`'s
 rules at the freeze commit are final for the freeze.
+
+**The round-trip files' preset read, not typed.** `store_results.py` wrote `build_preset` as
+the constant `bench` in both the round-trip and the store-size files. It now takes `--build`,
+the build folder `tick_roundtrip` ran from, and writes the preset `scripts/build_preset.py`
+reads from that folder's cache, as `codec_eval_results.py` does; a folder with no cache, or one
+no preset or more than one configured, is refused, exit 1, and nothing is written.
+`codec_eval_results.py` also holds the tool's stated build type to the folder's;
+`tick_roundtrip`'s output states none, so there is nothing to hold here. The README's
+round-trip recipe gives the command. The tests failed first (`item1-before.log`, 1 failure
+and 27 errors: no `--build`, and `assemble` and `assemble_g1` took no build folder). Faults
+`store-results-preset-assumed` and `store-results-unconfigured-build-taken`, each PROVEN with
+`--only` (`prove-item1.log`). Raw logs are in `phase4-raw/fix-freeze-b/`.
 
 ## Process notes
 
