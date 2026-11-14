@@ -220,7 +220,11 @@ $tools/tick_roundtrip verify $day build/12302019.tsc --expect-sha256 $pin       
 Byte 878,213,784 is the middle of segment 32's timestamp block, the middle segment of 65, in the
 store `ingest` writes from the pinned day at the default settings; the writer is deterministic,
 so the offset is the same on any host. On the Mac, `ingest` took 85 s and `verify` 38 s; the
-store is 1.76 GB, 4.69 times smaller than the day.
+store is 1.76 GB, 4.69 times smaller than the day. `scripts/g2_plan.py` finds both flips from the
+listing by that rule, the middle segment's first timestamp block and the footer, each at its
+middle byte, bit 1: `python3 -I scripts/g2_plan.py build/12302019-layout.json build/g2.json`
+prints the data and footer offsets `flip-bit` is given, and writes the `g2.json` that
+`scripts/store_results.py` reads.
 Results for both pinned days are in `results/roundtrip-12302019.json` and
 `results/roundtrip-10302019.json`, with every byte of each store by column, section and footer in
 `results/store-size-*.json`, and G-1 for one day on Linux in `results/roundtrip-12302019-linux.json`.
@@ -232,6 +236,17 @@ block and one in the footer, each caught with CRCs on and with them off.
 40-byte header with no checksum, which `verify` recognises by its magic.
 
 `tick_census <source> <output.json>` writes the aggregate statistics in `results/`.
+`results/codec-eval-<day>.json` is `tick_codec_eval`'s output with the build's preset and its
+peak memory added by `scripts/codec_eval_results.py`, which reads the preset from the build
+folder's cache:
+
+```sh
+/usr/bin/time -l -o build/eval.time $tools/tick_codec_eval $day build/codec-eval.tool.json \
+    --day 12302019 --prove-all-price4
+python3 -I scripts/codec_eval_results.py --tool-output build/codec-eval.tool.json \
+    --time build/eval.time --build build/bench --out results/codec-eval-12302019.json
+```
+
 `tick_slice <source> <output> [--from HH:MM:SS] [--to HH:MM:SS]` writes a small valid
 stream for the comparison harness: every `S` and `R` of the day plus one window.
 

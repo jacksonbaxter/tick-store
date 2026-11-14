@@ -207,6 +207,9 @@ build/fuzz/fuzz/fuzz_run_length -max_total_time=60 -max_len=16384 \
   `results/fuzz-g3-<commit>.json` from each host's logs, and `scripts/check_fuzz.py` refuses it
   if a target is missing, a clean run's timed part is under 1,800 s, its replay or merge was
   not clean, or anything a fuzz binary is built from or launched with changed after its commit.
+  Each host's `host.json`, the facts `fuzz_results.py` reads, is written by
+  `scripts/fuzz_host.py` from the fuzz build's compile command and link flags and
+  `fuzz/launch.txt`, with no absolute path and no host name in it.
   docs/NOTES.md, "The G-3 launch at the freeze", has each host's commands.
 - `fuzz/launch.txt` sets the leak options: `detect_leaks=1:leak_check_at_exit=0` for the
   fuzzers on macOS, where ASan leaves leak detection off and the check at exit reports

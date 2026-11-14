@@ -2949,9 +2949,24 @@ replays above: `fuzz_pfor` about 49 minutes, `fuzz_dictionary` 39, `fuzz_itch_qu
 the other four 30 to 32, so about 1 hour 40 minutes in all, and about 2 for the build. The saved
 corpora in `$P/corpus` are the ones the `ea1dde4` runs left.
 
-Each host's logs folder also needs `host.json`, written by hand as at `ea1dde4` (the fields
-`fuzz_results.py`'s docstring lists, `default_kernel_level` `neon` on the Mac and `avx2` on
-`debian`). The Linux logs come to the Mac with `scp -r` from the host's `logs/g3-F` into
+Each host's logs folder also needs `host.json`, the fields `fuzz_results.py`'s docstring
+lists. It was written by hand at `ea1dde4`; `scripts/fuzz_host.py` now writes it on the host,
+from the fuzz build's compile command for `fuzz/fuzz_pfor.cpp`, its link flags in
+`build.ninja`, the compiler's version line and `fuzz/launch.txt`, and refuses a file that would
+hold an absolute path or the host's name. Only the two sentences no build file states are
+given:
+
+```sh
+python3 -I scripts/fuzz_host.py --build build/fuzz --host macOS --out $RAW/mac/host.json \
+    --concurrency "four targets at once, unpinned, in four batches, each batch its own heavy.sh job; the Mac has 16 cores and other sessions' jobs may run beside it" \
+    --peak-memory "libFuzzer's peak_rss_mb, and BSD time -l per fuzzer: maximum resident set size and peak memory footprint"
+python3 -I scripts/fuzz_host.py --build $P/build/fuzz --host Linux --level avx2 \
+    --out $P/logs/g3-F/host.json \
+    --concurrency "three targets at once, each pinned with taskset to one of cpu2, cpu6 and cpu7, in one heavy.sh job; cpu4 and cpu5 left alone, no measurement running" \
+    --peak-memory "libFuzzer's peak_rss_mb, and the fuzzer's VmHWM read from /proc every 5 s; this host has no GNU time"
+```
+
+`default_kernel_level` comes out `neon` on the Mac and `avx2` on `debian`. The Linux logs come to the Mac with `scp -r` from the host's `logs/g3-F` into
 `$RAW/linux`, and one file is made from both:
 
 ```sh
@@ -4833,6 +4848,29 @@ document to PATH before validation, whatever the verdict, the same bytes the pen
 nothing else changes. The DS-4 section's rule names it. The tests failed first
 (`item6-before.log`). Fault `run-bench-refused-document-not-kept`, PROVEN with `--only`
 (`prove-item6.log`).
+
+**The freeze runners' helpers in the repository.** Three files the freeze would publish were
+made by code a reader did not have: the codec evaluation files' memory merge, G-2's flip plan
+and each fuzz host's `host.json`, written by hand at `ea1dde4`. Each is now a script, from the
+runners' text, with a test. `scripts/codec_eval_results.py` adds `build_preset`,
+`peak_rss_bytes`, `peak_rss_note` and `peak_memory_footprint_bytes` from BSD `time -l` right
+after `sanitizers`, where the committed files have them; `build_preset` is no longer typed as
+`bench` but read from the build folder's cache by `scripts/build_preset.py`, which names the
+one preset whose variables and option defaults the cache holds, and a tool whose build type is
+not the folder's is refused. No script reads the four fields; they are for the reader.
+`scripts/g2_plan.py` writes the `g2.json` `store_results.py` reads from `layout --blocks`, and
+on the committed day's layout gives its flips, bytes 878,213,784 and 1,755,725,349.
+`scripts/fuzz_host.py` writes `host.json` from the fuzz build's compile command, link flags and
+`fuzz/launch.txt`, with a path under the build written as under `build/fuzz/`, and refuses a
+file holding an absolute path or the host's name. On the runners' smoke inputs the first two
+give the runners' files byte for byte, and the third the same file but for the build type
+named in `compile_flags`, as at `ea1dde4` (`item7/smoke.log`). The README's round-trip
+recipe, `fuzz/README.md` and "The G-3 launch at the freeze" name them. The tests failed
+first (`item7/before-test_*.log`). Faults `build-preset-option-defaults-ignored`,
+`codec-eval-preset-assumed`, `codec-eval-build-type-unchecked`,
+`g2-plan-footer-trailer-counted`, `fuzz-host-absolute-path-kept` and `fuzz-host-name-kept`,
+each PROVEN with `--only` (`prove-item7.log`). `store_results.py` still writes the round-trip
+files' `build_preset` as `bench`, the preset their runs are made with; this round leaves it.
 
 ## Process notes
 
