@@ -292,6 +292,42 @@ class CheckFuzzTest(Checking):
         result = self.run_check(document)
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    # Review RG-1: a run whose replay or merge failed carries that part's command, which has no
+    # time budget; it is taken as not clean, and still held to the targets' caps.
+
+    def failed_in_replay(self, document):
+        run = find(document, "fuzz_pfor", "macOS")
+        del run["merge"], run["timed"]
+        run["replay"].update(clean=False, exit_code=1,
+                             findings=[{"kind": "crash", "detail": "ERROR: AddressSanitizer"}])
+        run.update(clean=False, exit_code=1, seconds=None, findings=run["replay"]["findings"],
+                   command=run["replay"]["command"])
+        resummarise(document)
+        return run
+
+    def test_a_run_that_failed_in_its_replay_passes_as_not_clean(self):
+        document = valid_document()
+        self.failed_in_replay(document)
+        self.assertEqual(document["summary"]["macOS"]["targets_clean"], len(TARGETS) - 1)
+        result = self.run_check(document)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_a_failed_parts_command_still_needs_the_caps(self):
+        def loose(document):
+            run = self.failed_in_replay(document)
+            run["command"] = run["replay"]["command"] = run["command"].replace(
+                "-malloc_limit_mb=256", "-malloc_limit_mb=0")
+        self.assert_fails(loose, "command: no -malloc_limit_mb=256")
+
+    def test_a_run_whose_timed_part_ran_still_needs_its_budget(self):
+        def short(document):
+            run = find(document, "fuzz_pfor", "macOS")
+            run.update(clean=False, exit_code=77, seconds=40, command=command("fuzz_pfor", 600),
+                       findings=[{"kind": "crash", "detail": "ERROR: AddressSanitizer"}])
+            run["replay"]["clean"] = False
+            resummarise(document)
+        self.assert_fails(short, "-max_total_time is not at least 1800")
+
     def test_a_summary_that_is_not_the_runs_is_refused(self):
         def inflate(document):
             document["summary"]["Linux"]["targets_clean"] = 99
@@ -626,6 +662,12 @@ class AssembleTest(Scratch):
         del record["timed"]
         phases_path.write_text(json.dumps(record), encoding="utf-8")
         shutil.copyfile(mac / "fuzz_pfor.merge.log", mac / "fuzz_pfor.log")
+        # The launcher writes the failed part's command, which has no time budget, as the
+        # run's (review RG-1).
+        meta_path = mac / "fuzz_pfor.meta"
+        meta = [f"command={record['merge']['command']}" if line.startswith("command=") else line
+                for line in meta_path.read_text(encoding="utf-8").splitlines()]
+        meta_path.write_text("\n".join(meta) + "\n", encoding="utf-8")
         linux = self.write_host("Linux", {})
         out = self.dir / NAME
         result = subprocess.run(

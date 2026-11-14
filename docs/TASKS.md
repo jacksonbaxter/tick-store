@@ -194,6 +194,8 @@ Measure on both hosts
 
 ## Phase 4: Final review and done criteria
 
+- [ ] The measured code is frozen at `ede0176`. Every results file is being measured again at it by unattended runners working from private copies, and until those files are committed `results/` holds the files from before the freeze. No commit may change what the measurements run: `src/`, `include/`, `fuzz/`, `cmake/`, `CMakeLists.txt`, `CMakePresets.json`, `bench/`, `tools/`, `compare/`, `tests/unit/`, or `scripts/fuzz_g3.py`, `scripts/run_bench.py`, `scripts/store_results.py`, `scripts/codec_eval_results.py`, `scripts/g2_plan.py`, `scripts/fuzz_host.py`, `scripts/build_preset.py`, `scripts/coverage.sh` and `scripts/coverage_report.py`; `scripts/check_compare.py`'s rules are final for the freeze, and only its tests may change. `git diff --stat ede0176..HEAD --` those paths prints nothing
+
 The final review (docs/REVIEW.md)
 - [x] The codec findings, B-1 to B-7: five fixed in code, each with a test seen failing first; B-3 closed by stating the bound in `docs/store.md`, with a test pinning the worst block; B-6 by correcting `simd.hpp` (docs/NOTES.md, The final review's codec findings)
 - [x] The store findings, C-1 to C-10, and the gate's message finding, G-3: eight fixed in code, each with a test seen failing first; C-4 closed by stating `raw_bytes`'s worst case in `docs/store.md`, with a test pinning it; C-9's demonstration refuted, and what no process-crash test can show stated in `docs/format.md` and beside the tests (docs/NOTES.md, The final review's store findings)

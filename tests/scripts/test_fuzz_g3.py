@@ -179,6 +179,7 @@ class LauncherTest(unittest.TestCase):
         run = self.run_record()
         self.assertFalse(run["clean"])
         self.assertEqual(run["findings"][0]["kind"], "crash")
+        self.assert_publishable_as_missed(run)
 
     def test_a_merge_libfuzzer_had_to_restart_fails_the_target(self):
         done = self.launch_run("merge")
@@ -188,6 +189,16 @@ class LauncherTest(unittest.TestCase):
         run = self.run_record()
         self.assertFalse(run["clean"])
         self.assertEqual(run["merge"]["attempts"], 2)
+        self.assert_publishable_as_missed(run)
+
+    def assert_publishable_as_missed(self, run):
+        """Review RG-1: the launcher writes the failed part's command as the run's, which has
+        no time budget, and the validator still takes the run, as not clean."""
+        header = {"schema": check_fuzz.SCHEMA, "commit": run["commit"],
+                  "targets": ["fuzz_stand_in"]}
+        problems, runs = check_fuzz.check_runs({"runs": [run]}, header)
+        self.assertEqual(problems, [])
+        self.assertEqual(check_fuzz.summary_of(header, runs)["macOS"]["targets_clean"], 0)
 
     def test_a_checkout_whose_fuzzed_code_differs_from_head_is_refused(self):
         (self.repo / "src" / "code.cpp").write_text("int g();\n")

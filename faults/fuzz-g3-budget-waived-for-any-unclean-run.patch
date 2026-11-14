@@ -1,0 +1,12 @@
+diff --git a/scripts/check_fuzz.py b/scripts/check_fuzz.py
+--- a/scripts/check_fuzz.py
++++ b/scripts/check_fuzz.py
+@@ -349,7 +349,7 @@ def check_runs(document, header):
+             problems.append(f"{where}: a second run of {run['target']} on {host} at "
+                             f"{run['kernel_level']}")
+         seen.add(key)
+-        if failed_part(run) is None:
++        if run["clean"] is not False:
+             problems += check_command(where, run["command"])
+         else:
+             problems += check_caps(where, run["command"])

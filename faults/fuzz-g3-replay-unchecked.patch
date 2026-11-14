@@ -1,8 +1,8 @@
 diff --git a/scripts/check_fuzz.py b/scripts/check_fuzz.py
 --- a/scripts/check_fuzz.py
 +++ b/scripts/check_fuzz.py
-@@ -330,7 +330,7 @@
-         problems += check_command(where, run["command"])
+@@ -355,7 +355,7 @@ def check_runs(document, header):
+             problems += check_caps(where, run["command"])
          if run["clean"] is True:
              problems += check_clean(where, run)
 -            if header.get("schema") == SCHEMA:

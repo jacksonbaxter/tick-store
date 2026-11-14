@@ -1024,6 +1024,15 @@ FAULTS = (
           "could record no replay", CHECK_FAILED,
           "FAIL: test_only_the_pinned_file_may_keep_the_schema_from_before_the_launcher "
           "(__main__.TieTest"),
+    # Review RG-1: a run stopped by its replay or merge carries that part's command.
+    Fault("fuzz-g3-failed-part-caps-unchecked", "py-scripts", "check_fuzz.py holds a run "
+          "stopped by its replay or merge, which carries that part's command, to no caps at "
+          "all", CHECK_FAILED, "FAIL: test_a_failed_parts_command_still_needs_the_caps "
+          "(__main__.CheckFuzzTest"),
+    Fault("fuzz-g3-budget-waived-for-any-unclean-run", "py-scripts", "check_fuzz.py waives the "
+          "time budget for any run that was not clean, not only one its replay or merge "
+          "stopped", CHECK_FAILED,
+          "FAIL: test_a_run_whose_timed_part_ran_still_needs_its_budget (__main__.CheckFuzzTest"),
     Fault("fuzz-g3-launch-replay-finding-ignored", "py-scripts", "fuzz_g3.py goes on to the "
           "merge and the timed run after a finding in the replay", CHECK_FAILED,
           "FAIL: test_a_finding_in_the_replay_stops_the_target_before_its_timed_run "

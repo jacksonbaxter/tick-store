@@ -13,7 +13,9 @@ counts that are not the runs'. A run is scripts/fuzz_g3.py's three parts: the re
 saved corpus input and seed, which must have run them all clean; their merge, in one attempt,
 since a second means an input crashed it; and the timed run on the merged set, at least
 1,800 s by its own clock, split where its first new input ran. A run that was not clean may stop early, but must say what it
-found; RESULTS.md's Targets block then reads it as missed, never as met.
+found; RESULTS.md's Targets block then reads it as missed, never as met. One stopped by its replay
+or merge carries that part's command, as the launcher writes it, held to the caps but to no time
+budget, since the timed part never ran.
 
 It also refuses anything not safe to publish, with check_results.py's rules.
 
@@ -180,12 +182,15 @@ def check_header(header, top_keys, path, targets):
     return problems
 
 
-def check_command(where, command):
-    problems = []
+def check_caps(where, command):
     words = str(command).split()
-    for flag in REQUIRED_FLAGS:
-        if flag not in words:
-            problems.append(f"{where}.command: no {flag}, so it is not the targets' run")
+    return [f"{where}.command: no {flag}, so it is not the targets' run"
+            for flag in REQUIRED_FLAGS if flag not in words]
+
+
+def check_command(where, command):
+    problems = check_caps(where, command)
+    words = str(command).split()
     budget = [word for word in words if word.startswith("-max_total_time=")]
     if len(budget) != 1 or not budget[0].split("=", 1)[1].isdigit() or \
             int(budget[0].split("=", 1)[1]) < REQUIRED_SECONDS:
@@ -295,6 +300,23 @@ def check_phases(where, run):
     return problems
 
 
+def failed_part(run):
+    """The replay or merge that stopped a run that was not clean, if the run carries that part's
+    command as its own: the launcher writes it so and never starts the timed part. That command
+    has no time budget, so the run is held to the caps alone, and read as missed (review RG-1)."""
+    if run.get("clean") is not False or "timed" in run:
+        return None
+    words = str(run.get("command")).split()
+    for name in ("replay", "merge"):
+        part = run.get(name)
+        if not isinstance(part, dict) or part.get("clean") is True:
+            continue
+        part_words = str(part.get("command")).split()
+        if part_words and words[-len(part_words):] == part_words:
+            return name
+    return None
+
+
 def check_runs(document, header):
     problems = []
     runs = document.get("runs")
@@ -327,7 +349,10 @@ def check_runs(document, header):
             problems.append(f"{where}: a second run of {run['target']} on {host} at "
                             f"{run['kernel_level']}")
         seen.add(key)
-        problems += check_command(where, run["command"])
+        if failed_part(run) is None:
+            problems += check_command(where, run["command"])
+        else:
+            problems += check_caps(where, run["command"])
         if run["clean"] is True:
             problems += check_clean(where, run)
             if header.get("schema") == SCHEMA:
