@@ -1,0 +1,227 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 23K of event 'cycles:u'
+#
+# Overhead  Symbol
+# ........
+#
+    22.14% [.] tick_store::codec::(anonymous namespace)::choose_width(std::__1::span<unsigned char const, 18446744073709551615ul>, bool) - -
+    16.91% [.] tick_store::codec::(anonymous namespace)::encode_scaled(std::__1::span<unsigned long const, 18446744073709551615ul>, unsigned long, tick_store::code
+    11.41% [.] tick_store::store::SegmentBuilder::finish(unsigned long, tick_store::store::SegmentSummary&) - -
+    9.68% [.] tick_store::store::(anonymous namespace)::RefMap::assign(unsigned long, unsigned short, unsigned int) - -
+    6.67% [.] tick_store::codec::encode_dict_block(std::__1::span<unsigned long const, 18446744073709551615ul>, std::__1::vector<std::byte, std::__1::allocator<std
+    2.83% [.] std::__1::pair<unsigned long*, bool> std::__1::__bitset_partition[abi:nqe230104]<std::__1::_ClassicAlgPolicy, unsigned long*, std::__1::ranges::less>
+    2.26% [.] tick_store::store::SegmentBuilder::State::header(std::byte, tick_store::itch::MessageHeader const&) - -
+    1.54% [.] void std::__1::__introsort[abi:nqe230104]<std::__1::_ClassicAlgPolicy, std::__1::ranges::less, unsigned long*, true>(unsigned long*, unsigned long*,
+    1.49% [.] auto tick_store::itch::(anonymous namespace)::with_message_type<tick_store::itch::decode_strict(std::__1::span<std::byte const, 18446744073709551615u
+    1.34% [.] tick_store::store::compute_seek(std::__1::array<unsigned long, 38ul> const&, std::__1::span<unsigned long const, 18446744073709551615ul>, std::__1::s
+    1.34% [.] tick_store::codec::pack_linear(std::__1::span<unsigned long const, 18446744073709551615ul>, unsigned int, std::__1::vector<std::byte, std::__1::alloc
+    1.25% [.] tick_store::store::SegmentBuilder::State::name(std::byte, unsigned short, unsigned long) - -
+    1.24% [.] tick_store::codec::(anonymous namespace)::encode_block_with(std::__1::span<unsigned long const, 18446744073709551615ul>, tick_store::codec::PforOptio
+    1.08% [.] tick_store::itch::decode(std::__1::span<std::byte const, 18446744073709551615ul>) - -
+    1.07% [.] tick_store::codec::append_words_le(std::__1::span<unsigned long const, 18446744073709551615ul>, std::__1::vector<std::byte, std::__1::allocator<std::
+    0.84% [.] tick_store::store::SegmentBuilder::add(std::__1::variant<tick_store::itch::SystemEvent, tick_store::itch::StockDirectory, tick_store::itch::StockTrad
+    0.81% [.] tick_store::store::column_maxima(tick_store::store::SegmentColumns const&) - -
+    0.75% [.] ZSTD_compressBlock_fast - -
+    0.74% [.] tick_store::store::SegmentBuilder::State::add_order(std::byte, tick_store::itch::MessageHeader const&, unsigned long, std::byte, unsigned int, tick_s
+    0.67% [.] tick_store::store::column_form_plain(std::__1::variant<tick_store::itch::SystemEvent, tick_store::itch::StockDirectory, tick_store::itch::StockTradin
+    0.54% [.] tick_store::harness::run_roundtrip_cli(std::__1::span<std::__1::basic_string_view<char, std::__1::char_traits<char> > const, 18446744073709551615ul>,
+    0.53% [.] tick_store::store::encode_column(tick_store::store::Column, std::__1::span<unsigned long const, 18446744073709551615ul>) - -
+    0.48% [.] tick_store::codec::pack_vector(std::__1::span<unsigned long const, 1024ul>, unsigned int, std::__1::span<unsigned long, 18446744073709551615ul>) - -
+    0.45% [.] tick_store::store::ItchStoreWriter::append(std::__1::variant<tick_store::itch::SystemEvent, tick_store::itch::StockDirectory, tick_store::itch::Stock
+    0.43% [.] decltype(auto) std::__1::__variant_detail::__visitation::__base::__dispatcher<10ul>::__dispatch[abi:nqe230104]<std::__1::__variant_detail::__visitati
+    0.38% [.] decltype(auto) std::__1::__variant_detail::__visitation::__base::__dispatcher<10ul>::__dispatch[abi:nqe230104]<std::__1::__variant_detail::__visitati
+    0.36% [.] decltype(auto) std::__1::__variant_detail::__visitation::__base::__dispatcher<15ul>::__dispatch[abi:nqe230104]<std::__1::__variant_detail::__visitati
+    0.32% [.] bool std::__1::__insertion_sort_incomplete[abi:nqe230104]<std::__1::_ClassicAlgPolicy, std::__1::ranges::less, unsigned long*>(unsigned long*, unsign
+    0.32% [.] tick_store::codec::BitWriter::write(unsigned long, unsigned int) - -
+    0.28% [.] tick_store::store::SegmentBuilder::State::create(unsigned short, unsigned long) - -
+    0.26% [.] tick_store::store::(anonymous namespace)::hot_fields(std::__1::variant<tick_store::itch::SystemEvent, tick_store::itch::StockDirectory, tick_store::i
+    0.25% [.] tick_store::store::SymbolTable::learn(unsigned short, std::__1::array<std::byte, 8ul> const&) - -
+    0.24% [.] 0x0000000000163304 - -
+    0.23% [.] tick_store::store::time_residuals(std::__1::span<unsigned long const, 18446744073709551615ul>, std::__1::span<unsigned long const, 184467440737095516
+    0.23% [.] tick_store::codec::append_patches(tick_store::codec::Patches const&, unsigned int, std::__1::vector<std::byte, std::__1::allocator<std::byte> >&) - -
+    0.23% [.] HUF_compress1X_usingCTable_internal_bmi2 - -
+    0.22% [.] 0x0000000000162a33 - -
+    0.22% [.] malloc - -
+    0.22% [.] tick_store::store::time_bases(std::__1::span<unsigned long const, 18446744073709551615ul>, std::__1::span<unsigned long const, 18446744073709551615ul
+    0.21% [.] 0x0000000000162a45 - -
+    0.21% [.] 0x000000000016330e - -
+    0.21% [.] 0x0000000000163313 - -
+    0.21% [.] 0x0000000000162a2e - -
+    0.21% [.] tick_store::store::(anonymous namespace)::order_by_key(std::__1::vector<unsigned int, std::__1::allocator<unsigned int> > const&) - -
+    0.21% [.] 0x0000000000163309 - -
+    0.19% [.] decltype(auto) std::__1::__variant_detail::__visitation::__base::__dispatcher<15ul>::__dispatch[abi:nqe230104]<std::__1::__variant_detail::__visitati
+    0.18% [.] tick_store::store::SegmentBuilder::State::derived_stock(unsigned short, std::__1::array<std::byte, 8ul> const&) - -
+    0.18% [.] 0x0000000000162a24 - -
+    0.17% [.] tick_store::store::(anonymous namespace)::group_by_key(std::__1::vector<unsigned long, std::__1::allocator<unsigned long> > const&, std::__1::vector<
+    0.17% [.] 0x0000000000162c68 - -
+    0.16% [.] tick_store::store::SegmentBuilder::records() const - -
+    0.14% [.] tick_store::store::detail::crc32c_sse42(unsigned int, std::__1::span<std::byte const, 18446744073709551615ul>) - -
+    0.14% [.] 0x00000000001633e3 - -
+    0.13% [.] 0x0000000000162a3b - -
+    0.13% [.] HIST_count_parallel_wksp - -
+    0.12% [.] decltype(auto) std::__1::__variant_detail::__visitation::__base::__dispatcher<16ul>::__dispatch[abi:nqe230104]<std::__1::__variant_detail::__visitati
+    0.12% [k] 0xffffffffafa01280 - -
+    0.12% [.] void std::__1::__stable_sort[abi:nqe230104]<std::__1::_RangeAlgPolicy, tick_store::codec::(anonymous namespace)::prepare(std::__1::span<unsigned long
+    0.12% [.] void std::__1::__introsort[abi:nqe230104]<std::__1::_RangeAlgPolicy, std::__1::ranges::less&, std::__1::pair<unsigned long, unsigned long>*, false>(s
+    0.11% [.] cfree - -
+    0.10% [.] 0x0000000000162a29 - -
+    0.10% [.] HUF_buildCTable_wksp - -
+    0.10% [.] decltype(auto) std::__1::__variant_detail::__visitation::__base::__dispatcher<11ul>::__dispatch[abi:nqe230104]<std::__1::__variant_detail::__visitati
+    0.10% [.] decltype(auto) std::__1::__variant_detail::__visitation::__base::__dispatcher<11ul>::__dispatch[abi:nqe230104]<std::__1::__variant_detail::__visitati
+    0.09% [.] 0x00000000001633d9 - -
+    0.09% [.] 0x00000000001633de - -
+    0.09% [.] 0x0000000000162c78 - -
+    0.09% [.] std::__1::pair<std::__1::pair<unsigned long, unsigned long>*, bool> std::__1::__partition_with_equals_on_right[abi:nqe230104]<std::__1::_RangeAlgPoli
+    0.09% [.] 0x0000000000162dd8 - -
+    0.08% [.] 0x0000000000162a4a - -
+    0.08% [.] tick_store::store::SegmentBuilder::State::operator()(tick_store::itch::OrderReplace const&) - -
+    0.08% [.] 0x0000000000162de8 - -
+    0.07% [.] decltype(auto) std::__1::__variant_detail::__visitation::__base::__dispatcher<16ul>::__dispatch[abi:nqe230104]<std::__1::__variant_detail::__visitati
+    0.06% [.] 0x0000000000162c5b - -
+    0.06% [.] 0x00000000001633d4 - -
+    0.06% [.] 0x0000000000162aa5 - -
+    0.06% [.] 0x0000000000162a40 - -
+    0.05% [.] 0x0000000000162dc1 - -
+    0.05% [.] ZSTD_encodeSequences_bmi2 - -
+    0.05% [.] 0x0000000000162ab3 - -
+    0.05% [.] tick_store::store::SegmentBuilder::State::operator()(tick_store::itch::NetOrderImbalance const&) - -
+    0.05% [.] 0x0000000000162aaa - -
+    0.05% [.] unsigned long* std::__1::__partial_sort_impl[abi:nqe230104]<std::__1::_ClassicAlgPolicy, std::__1::ranges::less&, unsigned long*, unsigned long*>(uns
+    0.05% [.] 0x0000000000162e28 - -
+    0.05% [.] 0x0000000000162c80 - -
+    0.04% [.] decltype(auto) std::__1::__variant_detail::__visitation::__base::__dispatcher<10ul>::__dispatch[abi:nqe230104]<std::__1::__variant_detail::__visitati
+    0.04% [.] 0x0000000000163324 - -
+    0.04% [.] 0x000000000016332e - -
+    0.04% [.] 0x0000000000163336 - -
+    0.04% [.] 0x0000000000162c70 - -
+    0.04% [.] 0x00000000001632d2 - -
+    0.04% [.] 0x0000000000162d9a - -
+    0.03% [.] 0x0000000000162e38 - -
+    0.03% [.] 0x00000000001632e3 - -
+    0.03% [.] 0x0000000000162ac6 - -
+    0.03% [.] 0x0000000000162dcb - -
+    0.03% [.] 0x0000000000162e08 - -
+    0.03% [.] 0x00000000001629f1 - -
+    0.03% [.] FSE_buildCTable_wksp - -
+    0.03% [.] decltype(auto) std::__1::__variant_detail::__visitation::__base::__dispatcher<15ul>::__dispatch[abi:nqe230104]<std::__1::__variant_detail::__visitati
+    0.03% [.] 0x0000000000162c88 - -
+    0.03% [.] 0x0000000000162da1 - -
+    0.03% [.] 0x0000000000162c51 - -
+    0.03% [.] 0x00000000001632e8 - -
+    0.03% [.] 0x0000000000162aca - -
+    0.03% [.] ZSTD_buildSequencesStatistics - -
+    0.03% [.] 0x00000000001627f3 - -
+    0.03% [.] tick_store::store::SegmentBuilder::State::operator()(tick_store::itch::OrderExecuted const&) - -
+    0.03% [.] 0x0000000000162dbd - -
+    0.02% [.] 0x000000000009eb03 - -
+    0.02% [.] 0x0000000000162c92 - -
+    0.02% [k] 0xffffffffafa01287 - -
+    0.02% [.] 0x0000000000163333 - -
+    0.02% [.] 0x0000000000163280 - -
+    0.02% [.] FSE_normalizeCount - -
+    0.02% [.] 0x00000000000a1b54 - -
+    0.02% [.] 0x0000000000162ac1 - -
+    0.02% [.] 0x0000000000162df8 - -
+    0.02% [.] 0x0000000000163320 - -
+    0.02% [.] 0x0000000000162e8f - -
+    0.02% [.] 0x0000000000162abc - -
+    0.02% [.] 0x0000000000162aaf - -
+    0.02% [.] std::__1::vector<std::byte, std::__1::allocator<std::byte> >::emplace_back[abi:nqe230104]<std::byte>(std::byte&&)::{lambda()#2}::operator()[abi:nqe23
+    0.02% [.] memmove@plt - -
+    0.02% [.] 0x00000000001627f0 - -
+    0.02% [.] decltype(auto) std::__1::__variant_detail::__visitation::__base::__dispatcher<14ul>::__dispatch[abi:nqe230104]<std::__1::__variant_detail::__visitati
+    0.02% [.] HIST_countFast_wksp - -
+    0.02% [.] 0x0000000000162e10 - -
+    0.02% [.] 0x0000000000162c9f - -
+    0.02% [.] decltype(auto) std::__1::__variant_detail::__visitation::__base::__dispatcher<12ul>::__dispatch[abi:nqe230104]<std::__1::__variant_detail::__visitati
+    0.02% [.] 0x0000000000162e18 - -
+    0.02% [.] 0x0000000000162801 - -
+    0.02% [.] std::__1::vector<unsigned long, std::__1::allocator<unsigned long> >::resize[abi:nqe230104](unsigned long) - -
+    0.02% [.] 0x0000000000162e42 - -
+    0.02% [.] 0x00000000000a16b4 - -
+    0.02% [.] 0x00000000000a1240 - -
+    0.02% [.] decltype(auto) std::__1::__variant_detail::__visitation::__base::__dispatcher<20ul>::__dispatch[abi:nqe230104]<std::__1::__variant_detail::__visitati
+    0.02% [.] 0x0000000000162caf - -
+    0.02% [k] 0xffffffffaed77607 - -
+    0.01% [.] 0x0000000000162e7f - -
+    0.01% [.] 0x0000000000162e9f - -
+    0.01% [.] decltype(auto) std::__1::__variant_detail::__visitation::__base::__dispatcher<20ul>::__dispatch[abi:nqe230104]<std::__1::__variant_detail::__visitati
+    0.01% [.] tick_store::store::SegmentBuilder::State::operator()(tick_store::itch::Trade const&) - -
+    0.01% [.] memset@plt - -
+    0.01% [.] 0x00000000000a1642 - -
+    0.01% [.] operator new(unsigned long) - -
+    0.01% [.] 0x000000000009ec26 - -
+    0.01% [.] 0x0000000000162905 - -
+    0.01% [.] 0x00000000000a11c3 - -
+    0.01% [.] 0x00000000000a164f - -
+    0.01% [.] 0x00000000001628b8 - -
+    0.01% [.] 0x0000000000163329 - -
+    0.01% [.] void std::__1::__stable_sort_move[abi:nqe230104]<std::__1::_RangeAlgPolicy, tick_store::codec::(anonymous namespace)::prepare(std::__1::span<unsigned
+    0.01% [.] 0x00000000001628e6 - -
+    0.01% [.] ZSTD_compressContinue_internal - -
+    0.01% [.] 0x000000000009eda5 - -
+    0.01% [.] decltype(auto) std::__1::__variant_detail::__visitation::__base::__dispatcher<12ul>::__dispatch[abi:nqe230104]<std::__1::__variant_detail::__visitati
+    0.01% [.] 0x0000000000162daf - -
+    0.01% [.] 0x0000000000162e5f - -
+    0.01% [.] 0x0000000000162e6f - -
+    0.01% [.] 0x0000000000162ca7 - -
+    0.01% [.] 0x0000000000162db6 - -
+    0.01% [.] decltype(auto) std::__1::__variant_detail::__visitation::__base::__dispatcher<16ul>::__dispatch[abi:nqe230104]<std::__1::__variant_detail::__visitati
+    0.01% [.] 0x0000000000162dd0 - -
+    0.01% [.] 0x0000000000162dc6 - -
+    0.01% [.] 0x0000000000162e87 - -
+    0.01% [.] 0x0000000000162e4f - -
+    0.01% [.] 0x0000000000162da8 - -
+    0.01% [k] 0xffffffffafa015f0 - -
+    0.01% [.] tick_store::store::SegmentBuilder::State::operator()(tick_store::itch::OrderCancel const&) - -
+    0.01% [.] 0x00000000001632c7 - -
+    0.01% [.] 0x00000000000a12db - -
+    0.01% [.] 0x0000000000162cb7 - -
+    0.01% [.] 0x00000000000a161c - -
+    0.01% [.] operator delete(void*) - -
+    0.01% [.] 0x0000000000162c56 - -
+    0.01% [.] 0x00000000000a16a4 - -
+    0.01% [.] 0x00000000000a16a0 - -
+    0.01% [.] 0x0000000000162a58 - -
+    0.01% [.] decltype(auto) std::__1::__variant_detail::__visitation::__base::__dispatcher<18ul>::__dispatch[abi:nqe230104]<std::__1::__variant_detail::__visitati
+    0.01% [.] std::__1::vector<tick_store::codec::(anonymous namespace)::Entry, std::__1::allocator<tick_store::codec::(anonymous namespace)::Entry> >::emplace_bac
+    0.01% [.] void tick_store::store::SegmentBuilder::State::operator()<tick_store::itch::StockDirectory>(tick_store::itch::StockDirectory const&) requires !(std::
+    0.01% [.] HIST_count_simple - -
+    0.01% [.] 0x000000000009eb59 - -
+    0.01% [.] 0x00000000000a1341 - -
+    0.01% [.] 0x00000000000a16ac - -
+    0.01% [.] void std::__1::vector<unsigned long, std::__1::allocator<unsigned long> >::__assign_with_size[abi:nqe230104]<std::__1::_ClassicAlgPolicy, std::__1::_
+    0.01% [.] decltype(auto) std::__1::__variant_detail::__visitation::__base::__dispatcher<1ul>::__dispatch[abi:nqe230104]<std::__1::__variant_detail::__visitatio
+    0.01% [.] decltype(auto) std::__1::__variant_detail::__visitation::__base::__dispatcher<17ul>::__dispatch[abi:nqe230104]<std::__1::__variant_detail::__visitati
+    0.01% [.] decltype(auto) std::__1::__variant_detail::__visitation::__base::__dispatcher<1ul>::__dispatch[abi:nqe230104]<std::__1::__variant_detail::__visitatio
+    0.01% [.] 0x0000000000162811 - -
+    0.01% [.] 0x000000000016281e - -
+    0.01% [.] FSE_compress_usingCTable_generic - -
+    0.01% [.] 0x00000000000a1852 - -
+    0.01% [.] ZSTD_selectEncodingType - -
+    0.01% [.] bool std::__1::__insertion_sort_incomplete[abi:nqe230104]<std::__1::_RangeAlgPolicy, std::__1::ranges::less&, std::__1::pair<unsigned long, unsigned
+    0.01% [.] 0x0000000000162c31 - -
+    0.01% [.] 0x000000000016281b - -
+    0.01% [.] 0x00000000001622bf - -
+    0.01% [.] 0x000000000016290b - -
+    0.01% [.] 0x0000000000162e77 - -
+    0.01% [.] 0x0000000000162e20 - -
+    0.01% [k] 0xffffffffaf90a222 - -
+    0.01% [k] 0xffffffffaf90dd54 - -
+    0.01% [k] 0xffffffffaef7e2bc - -
+    0.01% [.] 0x0000000000162df0 - -
+    0.01% [.] 0x0000000000162ea7 - -
+    0.01% [.] tick_store::store::ContainerWriter::append(std::__1::span<std::byte const, 18446744073709551615ul>) - -
+    0.01% [.] 0x000000000009eb1b - -
+    0.01% [k] 0xffffffffafa01cd2 - -
+    0.01% [.] decltype(auto) std::__1::__variant_detail::__visitation::__base::__dispatcher<11ul>::__dispatch[abi:nqe230104]<std::__1::__variant_detail::__visitati
+    0.01% [.] 0x0000000000162de0 - -
+    0.01% [.] 0x0000000000162e97 - -
+    0.01% [.] 0x0000000000162c8d - -
+    0.01% [k] 0xffffffffaf90dd49 - -
+    0.01% [.] 0x0000000000162d8c - -
+    0.01% [.] 0x0000000000162e30 - -

@@ -1,0 +1,34 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 5K of event 'cycles:u'
+#
+# Children      Self  Symbol
+# ........
+#
+    99.97% 0.55% [.] tick_store::harness::run_roundtrip_cli(std::__1::span<std::__1::basic_string_view<char, std::__1::char_traits<char> > const, 1844674
+    99.97% 0.00% [.] _start - -
+    99.97% 0.00% [.] main - -
+    99.97% 0.00% [.] 0x00007f24a145dca7 - -
+    94.33% 0.00% [.] tick_store::store::ItchStoreWriter::write_segment() - -
+    93.88% 0.00% [.] __libc_start_main - -
+    69.90% 0.33% [.] tick_store::store::ItchStoreWriter::append(std::__1::variant<tick_store::itch::SystemEvent, tick_store::itch::StockDirectory, tick_s
+    59.01% 0.57% [.] tick_store::store::encode_column(tick_store::store::Column, std::__1::span<unsigned long const, 18446744073709551615ul>) - -
+    44.98% 1.50% [.] tick_store::codec::(anonymous namespace)::encode_block_with(std::__1::span<unsigned long const, 18446744073709551615ul>, tick_store:
+    43.36% 15.39% [.] tick_store::codec::(anonymous namespace)::encode_scaled(std::__1::span<unsigned long const, 18446744073709551615ul>, unsigned long,
+    35.06% 11.49% [.] tick_store::store::SegmentBuilder::finish(unsigned long, tick_store::store::SegmentSummary&) - -
+    31.82% 0.00% [.] tick_store::codec::encode_pfor(std::__1::span<unsigned long const, 18446744073709551615ul>, unsigned long, tick_store::codec::PforOp
+    27.01% 0.00% [.] tick_store::store::ItchStoreWriter::finish(std::__1::span<std::byte const, 18446744073709551615ul>) - -
+    27.01% 0.00% [.] tick_store::store::ItchStoreWriter::write_last(std::__1::span<std::byte const, 18446744073709551615ul>) - -
+    25.62% 0.00% [.] tick_store::codec::encode_dict(std::__1::span<unsigned long const, 18446744073709551615ul>, unsigned long, std::__1::vector<std::byt
+    25.57% 7.78% [.] tick_store::codec::encode_dict_block(std::__1::span<unsigned long const, 18446744073709551615ul>, std::__1::vector<std::byte, std::_
+    23.30% 22.44% [.] tick_store::codec::(anonymous namespace)::choose_width(std::__1::span<unsigned char const, 18446744073709551615ul>, bool) - -
+    13.20% 0.00% [.] tick_store::codec::encode_pfor_block(std::__1::span<unsigned long const, 18446744073709551615ul>, tick_store::codec::PforOptions con
+    11.78% 0.81% [.] tick_store::store::SegmentBuilder::State::add_order(std::byte, tick_store::itch::MessageHeader const&, unsigned long, std::byte, uns
+    10.69% 0.55% [.] tick_store::store::SegmentBuilder::State::create(unsigned short, unsigned long) - -
+    10.04% 9.82% [.] tick_store::store::(anonymous namespace)::RefMap::assign(unsigned long, unsigned short, unsigned int) - -
+    9.68% 0.31% [.] decltype(auto) std::__1::__variant_detail::__visitation::__base::__dispatcher<10ul>::__dispatch[abi:nqe230104]<std::__1::__variant_de
+    4.77% 1.52% [.] void std::__1::__introsort[abi:nqe230104]<std::__1::_ClassicAlgPolicy, std::__1::ranges::less, unsigned long*, true>(unsigned long*,
+    3.88% 0.00% [.] __libc_start_main - -
