@@ -723,6 +723,49 @@ class QuestDBVersion(unittest.TestCase):
         runner.system_class = QuestDBSystem
         self.assertEqual(runner.versions(variants)["questdb_server"], "10.2.0")
 
+    class WentOn(Exception):
+        pass
+
+    def test_an_unexpected_build_fails_the_first_class_when_its_facts_are_read(self):
+        # Review RP-6: the version is parsed when the running server's facts are first read,
+        # so a build string it cannot parse stops the first class there, not the whole part
+        # after every variant and class has run.
+        from compare import run_system
+        from compare.systems.questdb_system import QuestDBSystem
+
+        runner = run_system.Runner.__new__(run_system.Runner)
+        runner.note = lambda text: None
+        runner.stores = Path("stores")
+        runner.columns_dir = Path("export")
+        runner.write_repetitions = 1
+        runner.full_day = False
+        runner.flush_probe = lambda variant, durability: {}
+        runner.system_class = QuestDBSystem
+        stopped = []
+        system = SimpleNamespace(start_service=lambda: None, service_settings=lambda: [],
+                                 stop_service=lambda: stopped.append(True) or {},
+                                 service_processes=lambda: {"questdb": 42},
+                                 settle=lambda: {}, requested=lambda: {},
+                                 service_facts=lambda: {"server_build": "Build Information: "
+                                                                        "an unknown build"})
+        runner.fresh = lambda root, variant, durability: system
+        runner.worker = lambda system, step, **fields: {"timings": {}, "peak_rss_bytes": 1,
+                                                        "settings": [], "flush": {}}
+
+        def went_on(root):
+            raise self.WentOn
+
+        raised = None
+        with mock.patch.object(run_system.swap, "Phase", Assembly.Phase), \
+                mock.patch.object(run_system, "sync_tree", went_on):
+            try:
+                runner.run_class("plain", CLASS_B, None)
+            except (ServerFailure, self.WentOn) as error:
+                raised = error
+        self.assertIsInstance(raised, ServerFailure)
+        self.assertIn("no QuestDB version in the server's build", str(raised))
+        self.assertEqual(stopped, [True])
+
 
 class RuntimeReading(unittest.TestCase):
     """The reading on both hosts' output, whichever host runs this."""

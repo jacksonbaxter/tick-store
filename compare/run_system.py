@@ -220,6 +220,11 @@ class Runner:
                                      service_processes=system.service_processes())
                 settle = system.settle() if last else {}
                 facts = system.service_facts() if last else {}
+                if last:
+                    # Parsed here, when the running service's facts are first read, so that
+                    # a version it cannot give stops the first class and not the whole part
+                    # after every class has run (review RP-6).
+                    self.system_class.versions_read([facts])
                 facts["requested"] = system.requested()
             finally:
                 service = system.stop_service()

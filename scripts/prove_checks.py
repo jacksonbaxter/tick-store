@@ -650,6 +650,12 @@ FAULTS = (
     Fault("questdb-version-a-literal", "py-compare", "QuestDB's version is written as 10.1.0 "
           "whatever the running server's SELECT build says", CHECK_FAILED,
           "FAIL: test_the_version_is_the_one_each_running_server_gave (__main__.QuestDBVersion"),
+    # Review RP-6: the version is parsed when the server's facts are first read.
+    Fault("questdb-version-read-after-the-part", "py-compare", "QuestDB's build string is "
+          "parsed only once every variant and class has run, so a build it cannot read costs "
+          "the whole part", CHECK_FAILED,
+          "FAIL: test_an_unexpected_build_fails_the_first_class_when_its_facts_are_read "
+          "(__main__.QuestDBVersion"),
     # Review F-6: a class A claim needs its proof for every system, not tick-store's alone.
     Fault("compare-class-a-parquet-flush-unchecked", "py-scripts", "check_compare.py takes "
           "Parquet's class A as proven with the harness's flush made", CHECK_FAILED,
