@@ -4999,6 +4999,62 @@ test failed first (`rg3-before.log`). Fault `render-ratio-permutation-caveat-dro
 `render-permutation-caveat-dropped` remade on the moved lines, each PROVEN with `--only`
 (`prove-rg1-3.log`).
 
+**RG-4 and RG-13, the pitch's figures and its rankings.** The pitch check looked for each figure
+anywhere in the pitch, formatted alone, and the source's and the store's sizes shared one
+format, so a pitch stating the store bigger than the source passed; its four ranking sentences
+held no figure at all, so the results could reverse them unseen. A scratch README with the two
+sizes swapped, and one with "ArcticDB or QuestDB is fastest" turned into "tick-store is fastest",
+each passed `--check` at HEAD (`rg4-rg13-readme-before.log`). The four store-size figures are now
+one, its format carrying the words between them, and the check refuses two figures of one
+format. Each ranking sentence is listed under `claims` in `scripts/targets.json` with a
+condition computed from the results: CR-2's verdict on Linux for the least disk, QL-4's Q2 and Q3
+parts on Linux for the lowest median and slowest run, the per-security variant's medians against
+tick-store's headline for ArcticDB's, and the fastest headline variant on Q1 and Q4, warm and
+cold, for ArcticDB or QuestDB. A claim whose condition fails, or whose words the pitch no
+longer holds, stops the check. The tests failed first (`rg4-rg13-before.log`). Faults
+`readme-pitch-store-figures-swapped`, `render-pitch-shared-format-accepted`,
+`readme-pitch-claim-reworded` and `render-pitch-claim-unchecked`, each PROVEN with `--only`
+(`prove-rg4-13.log`).
+
+**RG-5, the round-trip files known by their bytes.** `check_roundtrip.py` returned no problem
+for any file naming the commit `1669ae0`, so a file edited by hand, or a new one given that
+commit, passed with G-2's codes typed and none observed. The three files from before the exit
+codes are now pinned by the SHA-256 of their bytes in `scripts/data_pins.json`, under a key that
+may pin no other file, as `check_fuzz.py` knows G-3's file from before the tie; a pinned name
+with other bytes is checked in full. The reviewer's case passed first (`rg5-before.log`). Faults
+`roundtrip-pinned-name-other-bytes` and `roundtrip-pin-other-file-accepted`, PROVEN with
+`--only` (`prove-rg4-13.log`). TASKS's item for the freeze rerun now removes the pins.
+
+**RG-6, G-3 at this code.** G-3 read met from the file made at `ea1dde4`, before G-3 was tied to
+the code, which `check_fuzz.py` lets through by its pin while saying the fuzzed code changed
+since, and whose timed runs held their corpus replay. A part read from that file is now not
+judged on this code, the reason in the row, and RESULTS.md and the README are regenerated. The
+test failed first, reading "met" (`rg6-before.log`). Fault `render-g3-before-the-tie-judged`,
+PROVEN with `--only` (`prove-rg4-13.log`).
+
+**RG-7, RG-11 and RG-12, the rest of `check_fuzz.py`.** Each part's flags were checked but not
+its folders; the replay's folders must now be the merge's inputs and the timed run's only folder
+the merge's output, the shape the launcher gives them. A file naming a commit no history holds
+was unjudged, a skip under `check.sh`, even in a full clone; in a full clone of this repository
+it is now refused, and a shallow clone or an exported copy stays unjudged. And `true` passed as
+a merge's attempts, a replay's inputs or a merge's kept inputs, since a boolean is an int in
+Python; no count there takes one now. The tests failed first (`rg7-rg11-rg12-before.log`).
+`check.sh`'s test of an untied G-3 file in an exported copy then failed on the new folder rule,
+and on RG-6's row once the pin was gone; its fixture now gives the parts the launcher's folders
+and renders the copy's blocks again (`check-sh-untie-before.log`, `-after.log`). Faults
+`fuzz-g3-part-folders-unchecked`, `fuzz-g3-missing-commit-unjudged` and
+`fuzz-g3-boolean-count-accepted`, and `fuzz-g3-merge-crash-accepted` remade on the moved line,
+each PROVEN with `--only` (`prove-rg4-13.log`).
+
+**Noted and not changed: RG-8, RG-10 and two of RG-12's points.** G-3 is stated as 1,800 s of
+the timed part including the load of the merged set, and the file records the split for each
+run (RG-8). The launcher does not check that its binaries were built from HEAD, but it is
+frozen, and the freeze runner builds the fuzz targets from its clean private copy in the same
+run, before launching (RG-10). `ls-files --exclude-standard` hides an ignored untracked file
+under a tied path, which matters only if a tracked file names it, itself a change the tie sees;
+and `check.sh` and the frozen launcher parse `fuzz/launch.txt` differently only on a malformed
+row, which the committed file has none of (RG-12).
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
