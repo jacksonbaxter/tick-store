@@ -4829,8 +4829,9 @@ at the final code, as TASKS says.
 
 ### The last round before the freeze
 
-The last change to measured code: at the commit this round ends on, every published number is
-measured again, once, unattended. Raw logs are in `phase4-raw/fix-freeze-a/`.
+The last change to measured code: at the freeze commit, which follows this round's last two
+items, every published number is measured again, once, unattended. Raw logs are in
+`phase4-raw/fix-freeze-a/`, and for the last two items in `phase4-raw/fix-freeze-b/`.
 
 **E-10 for the comparison: boost read twice.** `compare/run.py` read cpufreq boost once, after
 its last system. It now reads it before the first system's part too, outside the lock, and
