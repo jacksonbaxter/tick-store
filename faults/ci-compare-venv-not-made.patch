@@ -1,8 +1,7 @@
 diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
-index e727d90..001af54 100644
 --- a/.github/workflows/ci.yml
 +++ b/.github/workflows/ci.yml
-@@ -73,12 +73,6 @@ jobs:
+@@ -76,13 +76,6 @@
        - name: Confirm the runner is the host this job names
          run: test "$(uname -m)" = "${{ matrix.host.machine }}"
  
@@ -10,7 +9,8 @@ index e727d90..001af54 100644
 -        if: matrix.check.name == 'repo'
 -        run: |
 -          python -m venv .venv
--          .venv/bin/python -m pip install --require-hashes --no-deps -r compare/requirements.lock
+-          .venv/bin/python -m pip install --require-hashes --no-deps --only-binary=:all: \
+-            -r compare/requirements.lock
 -
        - name: Run the checks
          env:

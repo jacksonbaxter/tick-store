@@ -193,10 +193,12 @@ class CheckScript(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stdout)
         self.assertIn("made before the tie and pinned, so not tied", done.stdout)
 
-    def workflow_runs(self):
-        """The workflow's check.sh command lines."""
-        return [line.strip() for line in WORKFLOW.read_text().splitlines()
-                if "scripts/check.sh" in line and line.strip().startswith(("run:", "scripts/"))]
+    def workflow_runs(self, text=None):
+        """The workflow's check.sh command lines: every line that names it outside a comment,
+        however it is called (review RP-15)."""
+        text = WORKFLOW.read_text() if text is None else text
+        code = (re.sub(r"(^|\s)#.*", "", line).strip() for line in text.splitlines())
+        return [line for line in code if "scripts/check.sh" in line]
 
     def test_the_workflow_runs_every_step_it_names(self):
         runs = self.workflow_runs()
@@ -204,6 +206,14 @@ class CheckScript(unittest.TestCase):
         for run in runs:
             self.assertIn("--no-skips", run)
             self.assertNotIn("--quick", run)
+
+    def test_check_sh_is_found_however_a_step_calls_it(self):
+        text = ("# scripts/check.sh is named here only in a comment\n"
+                "        run: |\n"
+                "          bash scripts/check.sh --only hygiene\n"
+                "          ./scripts/check.sh --only actionlint  # and here after one\n")
+        self.assertEqual(self.workflow_runs(text), ["bash scripts/check.sh --only hygiene",
+                                                    "./scripts/check.sh --only actionlint"])
 
     def test_the_workflow_makes_the_environment_py_compare_needs(self):
         text = WORKFLOW.read_text()
@@ -214,6 +224,9 @@ class CheckScript(unittest.TestCase):
         self.assertIn("-m venv .venv", commands)
         self.assertIn("--require-hashes", commands)
         self.assertIn("-r compare/requirements.lock", commands)
+        # Review RP-16: wheels only, since a source build's own requirements are fetched
+        # unhashed.
+        self.assertIn("--only-binary=:all:", commands)
 
     def test_the_workflow_checks_out_the_history_g3s_tie_needs(self):
         # actions/checkout fetches one commit by default, and G-3's file judges an older one.

@@ -15,7 +15,9 @@
 # Options:
 #   --quick           skip the sanitizers, fuzzing and coverage, and say so in the summary
 #   --no-skips        every step must run: one that would skip fails with its reason. CI
-#                     passes it, so a step it names cannot pass there by not running
+#                     passes it, so a step it names cannot pass there by not running. It
+#                     works per step: tests a step skips inside it, as on a platform or with
+#                     no fetched sources, stay notes, the step passing with their count
 #   --fuzz-seconds N  each fuzz target's budget, 20 by default
 #   --fuzz-seed N     a fixed libFuzzer seed, for a repeatable run
 #   --fresh-corpus    drop the saved fuzz corpus first, so a run starts from the seeds

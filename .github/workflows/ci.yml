@@ -80,7 +80,8 @@ jobs:
         if: matrix.check.name == 'repo'
         run: |
           python -m venv .venv
-          .venv/bin/python -m pip install --require-hashes --no-deps -r compare/requirements.lock
+          .venv/bin/python -m pip install --require-hashes --no-deps --only-binary=:all: \
+            -r compare/requirements.lock
 
       - name: Run the checks
         env:

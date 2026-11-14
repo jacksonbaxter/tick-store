@@ -1290,6 +1290,14 @@ FAULTS = (
     Fault("ci-skips-allowed", "py-scripts", "the workflow runs check.sh without --no-skips, so a "
           "step it names may skip and the job still pass", CHECK_FAILED,
           "FAIL: test_the_workflow_runs_every_step_it_names (__main__.CheckScript"),
+    # Review RP-15: check.sh is found however a step calls it.
+    Fault("ci-check-sh-run-block-skips-allowed", "py-scripts", "the workflow calls check.sh a "
+          "second time, as `bash scripts/check.sh` in a run block, without --no-skips",
+          CHECK_FAILED, "FAIL: test_the_workflow_runs_every_step_it_names (__main__.CheckScript"),
+    # Review RP-16: the comparison's environment is made of hashed wheels only.
+    Fault("ci-compare-sources-allowed", "py-scripts", "the workflow lets pip build a locked "
+          "package from source, its build requirements fetched unhashed", CHECK_FAILED,
+          "FAIL: test_the_workflow_makes_the_environment_py_compare_needs (__main__.CheckScript"),
     # Review E-5: a proof's key holds the code and prose that made its verdict.
     Fault("prover-key-names-only", "py-scripts", "the prover's key for a proof holds a "
           "mutation's name and no code or prose, so an edited mutation keeps its old proof",

@@ -208,7 +208,11 @@ class EveryFaultApplies(unittest.TestCase):
                 done = self.git("apply", "--check", "--whitespace=nowarn",
                                 "--exclude=build/_deps/*", str(patch))
                 self.assertEqual(done.returncode, 0, done.stderr)
-                if fetched and "build/_deps/" in patch.read_text():
+                if "build/_deps/" in patch.read_text():
+                    if not fetched:
+                        # Review RP-14: said, not passed, when nothing of it was checked.
+                        self.skipTest(f"{fault.id}: no build/_deps here, so its fetched "
+                                      "source's part of the patch is not checked")
                     done = self.git("apply", "--check", "--whitespace=nowarn",
                                     "--include=build/_deps/*", str(patch), root=REPO_ROOT)
                     self.assertEqual(done.returncode, 0, done.stderr)

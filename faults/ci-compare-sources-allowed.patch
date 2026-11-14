@@ -1,0 +1,12 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -80,7 +80,7 @@
+         if: matrix.check.name == 'repo'
+         run: |
+           python -m venv .venv
+-          .venv/bin/python -m pip install --require-hashes --no-deps --only-binary=:all: \
++          .venv/bin/python -m pip install --require-hashes --no-deps \
+             -r compare/requirements.lock
+ 
+       - name: Run the checks

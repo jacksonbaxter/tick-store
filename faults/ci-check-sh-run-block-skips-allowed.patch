@@ -1,0 +1,14 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -85,7 +85,9 @@
+       - name: Run the checks
+         env:
+           ONLY: ${{ matrix.check.only }}
+-        run: scripts/check.sh --no-skips --fuzz-seconds "$FUZZ_SECONDS" --only "$ONLY"
++        run: |
++          scripts/check.sh --no-skips --fuzz-seconds "$FUZZ_SECONDS" --only "$ONLY"
++          bash scripts/check.sh --fuzz-seconds "$FUZZ_SECONDS" --only hygiene
+ 
+       - name: Keep logs and crashers
+         if: failure()
