@@ -940,6 +940,29 @@ FAULTS = (
           "file could not be tied to the code, rather than skipping, which --no-skips fails",
           CHECK_FAILED, "FAIL: test_a_g3_file_with_no_history_to_tie_it_skips_and_fails_under_"
           "no_skips (__main__.CheckScript"),
+    # G-3's run is a replay of every input, a merge, then the timed part on the merged set.
+    Fault("fuzz-g3-replay-unchecked", "py-scripts", "check_fuzz.py stops checking a clean run's "
+          "replay, merge and timed split, so a run that never replayed its corpus and seeds "
+          "could pass", CHECK_FAILED,
+          "FAIL: test_a_run_with_no_replay_record_is_refused (__main__.CheckFuzzTest"),
+    Fault("fuzz-g3-merge-crash-accepted", "py-scripts", "check_fuzz.py takes a merge libFuzzer "
+          "had to start again, which it does only past an input that crashed it", CHECK_FAILED,
+          "FAIL: test_a_merge_that_crashed_is_refused (__main__.CheckFuzzTest"),
+    Fault("fuzz-g3-timed-short-accepted", "py-scripts", "check_fuzz.py stops requiring 1,800 s "
+          "of the timed part before and after its first new input", CHECK_FAILED,
+          "FAIL: test_a_timed_part_under_1800_seconds_is_refused (__main__.CheckFuzzTest"),
+    Fault("fuzz-g3-old-schema-accepted", "py-scripts", "check_fuzz.py takes the schema from "
+          "before the launcher in any file, not only in the pinned ea1dde4 one, so a new file "
+          "could record no replay", CHECK_FAILED,
+          "FAIL: test_only_the_pinned_file_may_keep_the_schema_from_before_the_launcher "
+          "(__main__.TieTest"),
+    Fault("fuzz-g3-launch-replay-finding-ignored", "py-scripts", "fuzz_g3.py goes on to the "
+          "merge and the timed run after a finding in the replay", CHECK_FAILED,
+          "FAIL: test_a_finding_in_the_replay_stops_the_target_before_its_timed_run "
+          "(__main__.LauncherTest"),
+    Fault("fuzz-g3-launch-merge-restart-ignored", "py-scripts", "fuzz_g3.py takes a merge "
+          "libFuzzer restarted past a crashing input", CHECK_FAILED,
+          "FAIL: test_a_merge_libfuzzer_had_to_restart_fails_the_target (__main__.LauncherTest"),
     Fault("ci-shallow-checkout", "py-scripts", "CI checks out the single commit it was pushed "
           "at, so G-3's file, which judges an older one, could never be tied there",
           CHECK_FAILED, "FAIL: test_the_workflow_checks_out_the_history_g3s_tie_needs "

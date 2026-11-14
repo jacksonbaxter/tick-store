@@ -1,0 +1,12 @@
+diff --git a/scripts/check_fuzz.py b/scripts/check_fuzz.py
+--- a/scripts/check_fuzz.py
++++ b/scripts/check_fuzz.py
+@@ -273,7 +273,7 @@
+             int(done[1]) != replay["runs"] or replay["runs"] < replay["inputs"]:
+         problems.append(f"{where}.replay: its Done line does not run each of its "
+                         f"{replay['inputs']} inputs")
+-    if merge["attempts"] != 1:
++    if merge["attempts"] < 1:
+         problems.append(f"{where}.merge.attempts: {merge['attempts']}; libFuzzer starts its "
+                         "merge again only past an input that crashed it")
+     if not isinstance(merge["inputs_kept"], int) or merge["inputs_kept"] < 1 or \

@@ -1,0 +1,12 @@
+diff --git a/scripts/fuzz_g3.py b/scripts/fuzz_g3.py
+--- a/scripts/fuzz_g3.py
++++ b/scripts/fuzz_g3.py
+@@ -177,7 +177,7 @@
+         failed = clock["exit_code"] != 0 or findings or (
+             name == "replay" and not fuzz_results.read_log(log_path)["done"]) or (
+             name == "merge" and merge_attempts(log_path) != 1)
+-        if failed:
++        if failed and name == "merge":
+             phases["failed_in"] = name
+             shutil.copyfile(log_path, logs / f"{tag}.log")
+             last = (command, clock)

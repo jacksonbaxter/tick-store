@@ -1,0 +1,12 @@
+diff --git a/scripts/check_fuzz.py b/scripts/check_fuzz.py
+--- a/scripts/check_fuzz.py
++++ b/scripts/check_fuzz.py
+@@ -452,7 +452,7 @@
+     """(problems, unjudged, note) for a file whose content is valid."""
+     problems, exempt = pinned_before_the_tie(path, pins)
+     schema = json.loads(path.read_text(encoding="utf-8"))["header"]["schema"]
+-    if schema == PRE_TIE_SCHEMA and not exempt:
++    if False:
+         problems.append(f"header.schema: {PRE_TIE_SCHEMA} records no replay or merge, and only "
+                         f"{PRE_TIE_FILE}, by its pin, may keep it; a file made now is {SCHEMA}")
+     reason = history_problem(repo, commit)
