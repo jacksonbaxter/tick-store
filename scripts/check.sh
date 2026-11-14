@@ -174,15 +174,6 @@ rm -f "$LOG_DIR"/*.log "$LOG_DIR/summary.tsv"
 export TMPDIR=$ROOT/build/tmp
 export TSAN_OPTIONS=${TSAN_OPTIONS:-halt_on_error=1}
 export UBSAN_OPTIONS=${UBSAN_OPTIONS:-print_stacktrace=1}
-# LeakSanitizer comes with ASan, on by default on Linux and off on macOS, where a leaking test
-# or fuzz target passed. It is asked for on both. libFuzzer checks each input for a leak
-# itself; its check at exit stays off on macOS, where it reports libFuzzer's own RSS thread,
-# which is never freed. Options set in ASAN_OPTIONS come after these, so they win.
-if [[ $(uname -s) == Darwin ]]; then
-    FUZZ_LEAKS=detect_leaks=1:leak_check_at_exit=0
-else
-    FUZZ_LEAKS=detect_leaks=1
-fi
 
 SUMMARY=$LOG_DIR/summary.tsv
 : >"$SUMMARY"
@@ -253,6 +244,7 @@ test_preset() {
 step_dev_build() { build_preset dev; }
 step_dev_test() { test_preset dev "$1"; }
 step_asan_build() { build_preset asan-ubsan; }
+# LeakSanitizer comes with ASan and is off by default on macOS, where a leaking test passed.
 step_asan_test() {
     local -x ASAN_OPTIONS=detect_leaks=1${ASAN_OPTIONS:+:$ASAN_OPTIONS}
     test_preset asan-ubsan "$1"
@@ -350,23 +342,52 @@ step_clang_tidy() {
 
 step_fuzz_build() { build_preset fuzz; }
 
-# Flags and their reasons are in fuzz/README.md. libFuzzer exits 0 after no runs at all if
-# it is handed nothing to do, so the run count from its final stats has to be above zero.
+# How each fuzz target is launched, its flags, ASan options and folders, is fuzz/launch.txt's,
+# which the 30-minute G-3 runs read too; fuzz/README.md gives the reasons. LeakSanitizer is
+# asked for on macOS there too, where ASan leaves it off, so a leaking test or fuzz target
+# fails on both. Options set in ASAN_OPTIONS come after the file's, so they win.
+LAUNCH=fuzz/launch.txt
+
+# The words after the first line of fuzz/launch.txt that starts with these words.
+launch_of() {
+    awk -v kind="$1" -v name="${2:-}" '
+        $1 == kind && (name == "" || $2 == name) {
+            line = $0
+            sub(/^[^ ]+ +/, "", line)
+            if (name != "") sub(/^[^ ]+ +/, "", line)
+            print line
+            found = 1
+            exit
+        }
+        END { exit !found }' "$LAUNCH"
+}
+
+# libFuzzer exits 0 after no runs at all if it is handed nothing to do, so the run count from
+# its final stats has to be above zero.
 run_fuzzer() {
-    local log=$1 target=$2 corpus=$3 seeds=build/fuzz/fuzz-seeds/$4 max_len=$5
-    local corpus_dir=build/fuzz/corpus/$corpus code runs
+    local log=$1 target=$2 row flags asan system corpus seeds max_len corpus_dir code runs
+    system=Linux
+    [[ $(uname -s) != Darwin ]] || system=Darwin
+    if ! row=$(launch_of target "$target") || ! flags=$(launch_of flags) ||
+            ! asan=$(launch_of asan_options "$system"); then
+        echo "$LAUNCH has no target row for $target, no flags row or no asan_options $system"
+        return 1
+    fi
+    read -r corpus seeds max_len <<<"$row"
+    corpus_dir=build/fuzz/corpus/$corpus
+    seeds=build/fuzz/fuzz-seeds/$seeds
     if [[ -z $(ls -A "$seeds" 2>/dev/null) ]]; then
         echo "no seeds in $seeds"
         return 1
     fi
     [[ $FRESH_CORPUS -eq 0 ]] || rm -rf "$corpus_dir"
     mkdir -p "$corpus_dir" build/fuzz/artifacts
-    local args=("-max_total_time=$FUZZ_SECONDS" "-max_len=$max_len" -rss_limit_mb=2048
-                -malloc_limit_mb=256 -timeout=10 -print_final_stats=1
+    local words=()
+    read -r -a words <<<"$flags"
+    local args=("-max_total_time=$FUZZ_SECONDS" "-max_len=$max_len" "${words[@]}"
                 -artifact_prefix=build/fuzz/artifacts/)
     [[ -z $FUZZ_SEED ]] || args+=("-seed=$FUZZ_SEED")
-    # ASan aborts on macOS and exits 1 on Linux. Pinned to libFuzzer's own code for a defect.
-    ASAN_OPTIONS=$FUZZ_LEAKS:abort_on_error=0:exitcode=77${ASAN_OPTIONS:+:$ASAN_OPTIONS} \
+    ASAN_OPTIONS=$asan${ASAN_OPTIONS:+:$ASAN_OPTIONS} \
         "build/fuzz/fuzz/$target" "${args[@]}" "$corpus_dir" "$seeds"
     code=$?
     runs=$(sed -n 's/^stat::number_of_executed_units: *//p' "$log")
@@ -375,21 +396,19 @@ run_fuzzer() {
     return "$code"
 }
 
-step_fuzz_columns() { run_fuzzer "$1" fuzz_columns columns columns 70000; }
-step_fuzz_container() { run_fuzzer "$1" fuzz_container container container 70000; }
-step_fuzz_dictionary() { run_fuzzer "$1" fuzz_dictionary dictionary dictionary 16384; }
-step_fuzz_gorilla_timestamps() {
-    run_fuzzer "$1" fuzz_gorilla_timestamps gorilla_timestamps gorilla_timestamps 70000
-}
-step_fuzz_gorilla_xor() { run_fuzzer "$1" fuzz_gorilla_xor gorilla_xor gorilla_xor 70000; }
-step_fuzz_itch_frame() { run_fuzzer "$1" fuzz_itch_frame itch_frame frame 70000; }
-step_fuzz_itch_message() { run_fuzzer "$1" fuzz_itch_message itch_message message 256; }
-step_fuzz_itch_query() { run_fuzzer "$1" fuzz_itch_query itch_query itch_query 131072; }
-step_fuzz_itch_store() { run_fuzzer "$1" fuzz_itch_store itch_store itch_store 70000; }
-step_fuzz_pfor() { run_fuzzer "$1" fuzz_pfor pfor pfor 16384; }
-step_fuzz_run_length() { run_fuzzer "$1" fuzz_run_length run_length run_length 16384; }
-step_fuzz_stream_vbyte() { run_fuzzer "$1" fuzz_stream_vbyte stream_vbyte stream_vbyte 70000; }
-step_fuzz_stub_store() { run_fuzzer "$1" fuzz_stub_store stub_store store 70000; }
+step_fuzz_columns() { run_fuzzer "$1" fuzz_columns; }
+step_fuzz_container() { run_fuzzer "$1" fuzz_container; }
+step_fuzz_dictionary() { run_fuzzer "$1" fuzz_dictionary; }
+step_fuzz_gorilla_timestamps() { run_fuzzer "$1" fuzz_gorilla_timestamps; }
+step_fuzz_gorilla_xor() { run_fuzzer "$1" fuzz_gorilla_xor; }
+step_fuzz_itch_frame() { run_fuzzer "$1" fuzz_itch_frame; }
+step_fuzz_itch_message() { run_fuzzer "$1" fuzz_itch_message; }
+step_fuzz_itch_query() { run_fuzzer "$1" fuzz_itch_query; }
+step_fuzz_itch_store() { run_fuzzer "$1" fuzz_itch_store; }
+step_fuzz_pfor() { run_fuzzer "$1" fuzz_pfor; }
+step_fuzz_run_length() { run_fuzzer "$1" fuzz_run_length; }
+step_fuzz_stream_vbyte() { run_fuzzer "$1" fuzz_stream_vbyte; }
+step_fuzz_stub_store() { run_fuzzer "$1" fuzz_stub_store; }
 
 step_coverage() {
     scripts/coverage.sh --output build/coverage/coverage.json

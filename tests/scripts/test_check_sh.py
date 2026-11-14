@@ -100,6 +100,22 @@ class CheckScript(unittest.TestCase):
         self.assertEqual(done.returncode, 2)
         self.assertIn("--no-skips and --quick", done.stderr)
 
+    def test_the_fuzz_launch_lives_in_fuzz_launch_txt_alone(self):
+        # G-3's tie to the code names fuzz/; check.sh, where unrelated edits are frequent,
+        # names no fuzz flag itself, so the 30-minute runs and the short steps share one list.
+        launch = (REPO_ROOT / "fuzz" / "launch.txt").read_text()
+        rows = [line.split() for line in launch.splitlines() if line.startswith("target ")]
+        cmake = (REPO_ROOT / "fuzz" / "CMakeLists.txt").read_text()
+        targets = sorted(re.findall(r"^tick_store_add_fuzzer\((\w+)\)", cmake, re.MULTILINE))
+        self.assertEqual(sorted(row[1] for row in rows), targets)
+        self.assertTrue(all(len(row) == 5 and row[4].isdigit() for row in rows), rows)
+        script = SCRIPT.read_text()
+        for flag in ("-rss_limit_mb", "-malloc_limit_mb", "-timeout=", "exitcode=77",
+                     "leak_check_at_exit"):
+            self.assertNotIn(flag, script)
+        for target in targets:
+            self.assertIn(f"run_fuzzer \"$1\" {target}; }}", script)
+
     def workflow_runs(self):
         """The workflow's check.sh command lines."""
         return [line.strip() for line in WORKFLOW.read_text().splitlines()

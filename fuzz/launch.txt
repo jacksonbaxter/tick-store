@@ -1,0 +1,34 @@
+# How every fuzz run is launched. scripts/check.sh's short fuzz steps and scripts/fuzz_g3.py's
+# 30-minute G-3 runs both read this file, and scripts/check_fuzz.py refuses a G-3 results file
+# whose commit is older than a change to it. fuzz/README.md gives each flag's reason.
+#
+#   flags FLAG...                     what every run takes, after its budget and -max_len
+#   asan_options SYSTEM OPTIONS       ASAN_OPTIONS on that system, as `uname -s` names it,
+#                                     ahead of anything set in the environment. Linux's row
+#                                     serves every system but Darwin
+#   target NAME CORPUS SEEDS MAX_LEN  the saved corpus build/fuzz/corpus/CORPUS, the seeds the
+#                                     build writes to build/fuzz/fuzz-seeds/SEEDS, -max_len
+#
+# LeakSanitizer comes with ASan, on by default on Linux and off on macOS, where a leaking fuzz
+# target passed. It is asked for on both. libFuzzer checks each input for a leak itself; its
+# check at exit stays off on macOS, where it reports libFuzzer's own RSS thread, which is never
+# freed. ASan aborts on macOS and exits 1 on Linux, so the exit code is pinned to libFuzzer's
+# own code for a defect, 77.
+
+flags -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1
+asan_options Darwin detect_leaks=1:leak_check_at_exit=0:abort_on_error=0:exitcode=77
+asan_options Linux detect_leaks=1:abort_on_error=0:exitcode=77
+
+target fuzz_columns columns columns 70000
+target fuzz_container container container 70000
+target fuzz_dictionary dictionary dictionary 16384
+target fuzz_gorilla_timestamps gorilla_timestamps gorilla_timestamps 70000
+target fuzz_gorilla_xor gorilla_xor gorilla_xor 70000
+target fuzz_itch_frame itch_frame frame 70000
+target fuzz_itch_message itch_message message 256
+target fuzz_itch_query itch_query itch_query 131072
+target fuzz_itch_store itch_store itch_store 70000
+target fuzz_pfor pfor pfor 16384
+target fuzz_run_length run_length run_length 16384
+target fuzz_stream_vbyte stream_vbyte stream_vbyte 70000
+target fuzz_stub_store stub_store store 70000
