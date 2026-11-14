@@ -43,9 +43,21 @@
 //
 // The segment size is capped at kQueryFuzzMaxSegmentRecords, a piece and a seek group and a
 // few records, so a file reaches several groups, a short last one and a column's second
-// piece while one input stays within libFuzzer's limits.
+// piece while one input stays within libFuzzer's allocation limit.
+//
+// That cap leaves the work unbounded: 1,431 bytes hold a segment of 400 raw records of
+// 65,535 bytes, 26 million values, and both paths decode every segment a request reaches
+// for each request. And a day of typed records with a few raw ones, 131,072 bytes and
+// 18,334 records, takes about 2.5 s on the Mac, every segment not plain, so the indexed path
+// decodes as much as the exact one, three times over. So the fuzz target passes
+// kQueryFuzzBounds: a cap on the values a file's segments state, a file stating more opened
+// but not queried, and a budget on the cross-checks, the indexed path asked a second time
+// and asked with the scalar set forced. Called without bounds, as the unit suite calls it,
+// the check queries every file within the segment cap with every request on every check
+// (fuzz/README.md, "Bounds").
 
 #include "container_oracles.hpp"
+#include "itch_store_oracles.hpp"
 #include "tick_store/codec/simd.hpp"
 #include "tick_store/itch/codec.hpp"
 #include "tick_store/store/columns.hpp"
@@ -67,6 +79,39 @@
 namespace tick_store::store::oracle {
 
 inline constexpr std::uint32_t kQueryFuzzMaxSegmentRecords = kPieceValues + kSeekGroupRecords + 7;
+
+// How much of one file the check queries. The defaults query every file within the segment
+// cap, with every request on every check.
+struct QueryBounds {
+    // The values a file's segments may state in all, over every column and piece
+    // (SegmentEntry::values). A file stating more is opened but not queried, as one over the
+    // segment cap.
+    std::uint64_t stated_values = std::numeric_limits<std::uint64_t>::max();
+    // The cross-checks, the indexed path asked again and asked with the scalar kernel set
+    // forced, take every request while the file states at most this many values, and the
+    // first kQueryPastBudgetRequests past it. Never budgeted: each path's answers to every
+    // request, once, and their comparisons with each other and with the column form.
+    std::uint64_t cross_checked_values = std::numeric_limits<std::uint64_t>::max();
+};
+
+// The requests the cross-checks take past the budget: the first window's, the whole file,
+// with no locate and at locate 0, so every kind of answer (rows, locate counts, minute
+// aggregates and the share sum) still meets both cross-checks over every row.
+inline constexpr std::size_t kQueryPastBudgetRequests = 2;
+
+// The fuzz target's cap, 135,168: the values of generate_seeds' two-piece seed, 134,341, the
+// file a segment needs to reach a column's second piece, rounded up to a whole column block
+// (kColumnBlockValues). Its cost is in its values: past the budget about 11 microseconds a
+// value on the Mac for typed records in segments that are not plain, the dearest kind, and
+// 131,072 bytes of add orders state 3.8 million values.
+inline constexpr std::uint64_t kQueryFuzzMaxValues = std::uint64_t{33} * kColumnBlockValues;
+// The budget, 69,632: the values of generate_seeds' days of 9,000 records, 66,874 at most,
+// rounded up to a whole column block, so every seed but the two-piece one takes every
+// cross-check. Within it, about 20 microseconds a value of the same kind, so the dearest
+// file within it costs about what the dearest past it does.
+inline constexpr std::uint64_t kQueryFuzzCrossCheckedValues = std::uint64_t{17} * kColumnBlockValues;
+inline constexpr QueryBounds kQueryFuzzBounds{.stated_values = kQueryFuzzMaxValues,
+                                              .cross_checked_values = kQueryFuzzCrossCheckedValues};
 
 namespace query_detail {
 
@@ -152,7 +197,7 @@ struct Answers {
 }
 
 [[nodiscard]] inline Answers answer(const ItchStoreReader& reader, QueryPath path,
-                                    const std::vector<Request>& requests) {
+                                    std::span<const Request> requests) {
     ItchQuery query{reader, path};
     Answers out;
     for (const Request& request : requests) {
@@ -235,7 +280,7 @@ struct ColumnForm {
 // (itch_query.hpp): rows of a half-open window, a locate's add orders per minute, rows per
 // locate, and every record's shares summed.
 [[nodiscard]] inline Answers answer_from(const std::vector<QueryRow>& all,
-                                        const std::vector<Request>& requests) {
+                                        std::span<const Request> requests) {
     constexpr std::uint64_t kNanosPerMinute = 60ULL * 1'000'000'000ULL;
     Answers out;
     for (const Request& request : requests) {
@@ -289,6 +334,24 @@ struct ColumnForm {
     return out;
 }
 
+// The answers to the first `count` requests, cut from the answers to them all.
+[[nodiscard]] inline Answers first_answers(const Answers& all, std::span<const Request> requests,
+                                           std::size_t count) {
+    Answers out;
+    std::size_t minutes = 0;
+    std::size_t counts = 0;
+    for (std::size_t i = 0; i < count; ++i) {
+        out.rows.push_back(all.rows[i]);
+        if (requests[i].locate.has_value()) {
+            out.minutes.push_back(all.minutes[minutes++]);
+        } else {
+            out.counts.push_back(all.counts[counts++]);
+        }
+    }
+    out.sum = all.sum;
+    return out;
+}
+
 template <class T>
 [[nodiscard]] bool all_answered(const std::vector<std::expected<T, ItchStoreError>>& answers) {
     return std::ranges::all_of(answers, [](const auto& one) { return one.has_value(); });
@@ -296,24 +359,33 @@ template <class T>
 
 }  // namespace query_detail
 
-[[nodiscard]] inline const char* check_itch_query(std::span<const std::byte> file) {
+[[nodiscard]] inline const char* check_itch_query(std::span<const std::byte> file,
+                                                 const QueryBounds& bounds) {
     const detail::Bytes fixed = fixed_checksums(file);
     auto reader = ItchStoreReader::open_bytes(fixed, {.checksums = Checksums::verify});
     if (!reader.has_value()) {
         return nullptr;
     }
-    if (reader->header().segment_records > kQueryFuzzMaxSegmentRecords) {
+    const std::uint64_t stated = detail::stated_values(*reader);
+    if (reader->header().segment_records > kQueryFuzzMaxSegmentRecords ||
+        stated > bounds.stated_values) {
         return nullptr;
     }
     const auto requests = query_detail::requests_for(*reader, file);
-    const query_detail::Answers indexed = query_detail::answer(*reader, QueryPath::indexed, requests);
-    if (query_detail::answer(*reader, QueryPath::indexed, requests) != indexed) {
+    const std::span<const query_detail::Request> all{requests};
+    const query_detail::Answers indexed = query_detail::answer(*reader, QueryPath::indexed, all);
+    // The cross-checks take every request within the budget, and the first few past it.
+    const std::size_t crossed = stated <= bounds.cross_checked_values
+                                    ? requests.size()
+                                    : std::min(requests.size(), kQueryPastBudgetRequests);
+    const query_detail::Answers expected = query_detail::first_answers(indexed, all, crossed);
+    if (query_detail::answer(*reader, QueryPath::indexed, all.first(crossed)) != expected) {
         return "the indexed path answered the same queries differently twice";
     }
     {
         // The kernel-against-scalar oracle: the same answers with the scalar set forced.
         const codec::simd::ScalarKernelsOnThisThread scalar;
-        if (query_detail::answer(*reader, QueryPath::indexed, requests) != indexed) {
+        if (query_detail::answer(*reader, QueryPath::indexed, all.first(crossed)) != expected) {
             return "the kernel set and the scalar set answered the same queries differently";
         }
     }
@@ -324,13 +396,13 @@ template <class T>
     if (!form.every_record_has_a_row) {
         return "a record the whole decode accepts has no row in the column form";
     }
-    const query_detail::Answers exact = query_detail::answer(*reader, QueryPath::exact, requests);
+    const query_detail::Answers exact = query_detail::answer(*reader, QueryPath::exact, all);
     if (!query_detail::all_answered(exact.rows) || !query_detail::all_answered(exact.minutes) ||
         !query_detail::all_answered(exact.counts) || !exact.sum.has_value() ||
         !exact.sum->has_value()) {
         return "the exact path refused a file the whole decode accepts";
     }
-    const query_detail::Answers want = query_detail::answer_from(form.rows, requests);
+    const query_detail::Answers want = query_detail::answer_from(form.rows, all);
     if (exact.rows != want.rows) {
         return "the exact path's rows differ from the column form of the whole decode";
     }
@@ -356,6 +428,11 @@ template <class T>
         return "the indexed path's share sum differs from the exact path's";
     }
     return nullptr;
+}
+
+// The whole check, as the unit suite runs it.
+[[nodiscard]] inline const char* check_itch_query(std::span<const std::byte> file) {
+    return check_itch_query(file, QueryBounds{});
 }
 
 }  // namespace tick_store::store::oracle

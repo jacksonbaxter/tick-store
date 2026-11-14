@@ -15,7 +15,9 @@
 
 extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size) {
     const std::span<const std::byte> input = std::as_bytes(std::span{data, size});
-    if (const char* failure = tick_store::codec::oracle::check_rle_column(input)) {
+    namespace oracle = tick_store::codec::oracle;
+    // Bounded so one input stays inside -timeout: fuzz/README.md, "Bounds".
+    if (const char* failure = oracle::check_rle_column(input, oracle::kFuzzBounds)) {
         std::println(stderr, "check_rle_column: {}", failure);
         std::abort();
     }

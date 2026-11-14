@@ -16,7 +16,9 @@
 
 extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size) {
     const std::span<const std::byte> file = std::as_bytes(std::span{data, size});
-    if (const char* failure = tick_store::store::oracle::check_itch_query(file)) {
+    namespace oracle = tick_store::store::oracle;
+    // Bounded so one input stays inside -timeout: fuzz/README.md, "Bounds".
+    if (const char* failure = oracle::check_itch_query(file, oracle::kQueryFuzzBounds)) {
         std::println(stderr, "check_itch_query: {}", failure);
         std::abort();
     }

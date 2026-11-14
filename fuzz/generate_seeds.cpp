@@ -18,6 +18,7 @@
 // seeds follow the code (Z4). Corrupt seeds are those same bytes cut, extended or
 // relabelled, one for each way the decoders and the parser can refuse an input.
 
+#include "bound_seeds.hpp"
 #include "codec_oracles.hpp"
 #include "columns_oracles.hpp"
 #include "container_oracles.hpp"
@@ -166,6 +167,14 @@ public:
     void add(std::span<const std::byte> bytes) {
         write_seed(dir_ / std::format("seed-{:05}", next_++), bytes);
     }
+
+    // A seed under a name of its own, which a runner can pick out (fuzz/bound_seeds.txt).
+    void add_named(std::string_view name, std::span<const std::byte> bytes) {
+        write_seed(dir_ / name, bytes);
+        ++next_;
+    }
+
+    [[nodiscard]] const std::filesystem::path& dir() const noexcept { return dir_; }
 
     [[nodiscard]] std::size_t count() const noexcept { return next_; }
 
@@ -788,54 +797,10 @@ Bytes text_offset_past_its_file(const std::vector<Bytes>& payloads) {
     return seed;
 }
 
-// A day-like stream for the query engine: adds, executions, cancels, deletes, replaces and
-// trades over a few locates, system events on locate 0, ties in time and orders named
-// across segments, enough records for several seek groups.
+// The query seeds' day (fuzz/bound_seeds.hpp, which builds that target's costliest inputs
+// from it too).
 std::vector<Message> query_messages(std::size_t records) {
-    std::vector<Message> out;
-    out.reserve(records);
-    std::uint64_t state = 11;
-    std::vector<std::vector<std::uint64_t>> live(6);
-    std::uint64_t next = 9'000;
-    std::uint64_t time = 34'199'000'000'000ULL;
-    for (std::size_t i = 0; i < records; ++i) {
-        state = (state * 6364136223846793005ULL) + 1442695040888963407ULL;
-        time += (state >> 61U) == 0 ? 0 : (state >> 40U) % 2'000'000;
-        const auto locate = static_cast<std::uint16_t>(1 + ((state >> 33U) % 5));
-        const MessageHeader h{locate, static_cast<std::uint16_t>(i % 3), time};
-        std::vector<std::uint64_t>& orders = live[locate];
-        const std::uint64_t pick = (state >> 20U) % 16;
-        const auto price = Price4{static_cast<std::uint32_t>(100'000 + ((state >> 44U) % 900))};
-        if (pick == 15) {
-            out.emplace_back(SystemEvent{MessageHeader{0, 0, time}, ch('Q')});
-            continue;
-        }
-        if (orders.empty() || pick < 6) {
-            out.emplace_back(AddOrder{h, next, (state & 1U) != 0 ? ch('B') : ch('S'),
-                                      static_cast<std::uint32_t>(100 * (1 + (state >> 58U))),
-                                      i % 1'000 == 999 ? alpha<8>("OTHER   ") : kStock, price});
-            orders.push_back(next++);
-            continue;
-        }
-        const std::size_t at = (state >> 8U) % orders.size();
-        const std::uint64_t named = (state >> 7U) % 23 == 0 ? next + 77 : orders[at];
-        if (pick < 9) {
-            out.emplace_back(OrderExecuted{h, named, 10, 90'000 + i});
-        } else if (pick < 10) {
-            out.emplace_back(OrderExecutedWithPrice{h, named, 5, 90'000 + i, ch('Y'), price});
-        } else if (pick < 11) {
-            out.emplace_back(OrderReplace{h, named, next, 100, price});
-            orders[at] = next++;
-        } else if (pick < 12) {
-            out.emplace_back(OrderCancel{h, named, 5});
-        } else if (pick < 14) {
-            out.emplace_back(OrderDelete{h, named});
-            orders.erase(orders.begin() + static_cast<std::ptrdiff_t>(at));
-        } else {
-            out.emplace_back(Trade{h, named, ch('B'), 100, kStock, price, 70'000 + i});
-        }
-    }
-    return out;
+    return tick_store::bound_seeds::day_messages(records);
 }
 
 // Stores for the query engine at segment sizes up to its fuzzing cap, one holding records
@@ -1526,6 +1491,21 @@ int main(int argc, char** argv) {
     add_dict_refusals(dict);
     write_low_cardinality_seeds(rle, tick_store::codec::oracle::detail::kRleEncoders);
     add_rle_refusals(rle);
+    // The costliest inputs of the bounded and the codec targets, under their names
+    // (fuzz/bound_seeds.hpp).
+    for (const auto& seed : tick_store::bound_seeds::kBoundSeeds) {
+        bool written = false;
+        for (SeedDir* dir :
+             {&pfor, &svb, &dict, &rle, &timestamps, &xor_words, &itch_store, &itch_query}) {
+            if (dir->dir().filename() == seed.seeds) {
+                dir->add_named(seed.name, seed.make());
+                written = true;
+            }
+        }
+        if (!written) {
+            throw std::runtime_error(std::format("no seed folder {}", seed.seeds));
+        }
+    }
     std::println("wrote {} message, {} frame, {} store, {} container, {} itch_store, {} itch_query, {} columns, "
                  "{} gorilla_timestamps, {} gorilla_xor, {} pfor, {} stream_vbyte, "
                  "{} dictionary and {} run_length seeds",

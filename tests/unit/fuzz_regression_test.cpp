@@ -2,6 +2,7 @@
 // the golden fixtures through them, so the oracles stay exercised on every build
 // even when the crasher directories hold nothing.
 
+#include "bound_seeds.hpp"
 #include "codec_oracles.hpp"
 #include "columns_fixture.hpp"
 #include "columns_oracles.hpp"
@@ -16,6 +17,7 @@
 #include "store_oracles.hpp"
 #include "stub_fixture.hpp"
 #include "test_bytes.hpp"
+#include "tick_store/codec/block.hpp"
 #include "tick_store/codec/dictionary.hpp"
 #include "tick_store/codec/gorilla_timestamps.hpp"
 #include "tick_store/codec/gorilla_xor.hpp"
@@ -41,6 +43,7 @@
 #include <iterator>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -165,6 +168,70 @@ TEST(FuzzRegression, RunLengthCrashersStayFixed) {
         EXPECT_EQ(text(codec::oracle::check_rle_column(read_file(path))), "");
     }
 }
+
+// fuzz/bound_seeds.txt, which a runner times the bound seeds from, names the seeds
+// fuzz/bound_seeds.hpp builds, in the same order.
+TEST(FuzzRegression, BoundSeedsAreTheListedOnes) {
+    std::ifstream list{TICK_STORE_BOUND_SEEDS};
+    ASSERT_TRUE(list.is_open());
+    std::vector<std::string> lines;
+    for (std::string line; std::getline(list, line);) {
+        lines.push_back(line);
+    }
+    std::vector<std::string> named;
+    named.reserve(bound_seeds::kBoundSeeds.size());
+    for (const auto& seed : bound_seeds::kBoundSeeds) {
+        named.push_back(std::string{seed.target} + " " + std::string{seed.seeds} + "/" +
+                        std::string{seed.name});
+    }
+    EXPECT_EQ(lines, named);
+}
+
+// The costliest input of each bounded and each codec fuzz target (fuzz/bound_seeds.hpp),
+// through its oracle with no bounds, so what the fuzz targets' caps and budgets leave out of
+// one input is still checked on these. Each must sit where it was built to, so it keeps
+// showing the bound it stands for. One test a seed, so check.sh's limit for one test holds
+// each on its own.
+class BoundSeeds : public ::testing::TestWithParam<std::size_t> {};
+
+TEST_P(BoundSeeds, PassTheWholeCheck) {
+    using bound_seeds::Side;
+    const auto& seed = bound_seeds::kBoundSeeds.at(GetParam());
+    const std::vector<std::byte> bytes = exact_copy(seed.make());
+    EXPECT_LE(bytes.size(), seed.max_len);
+    if (seed.side == Side::first_block_maximal) {
+        EXPECT_EQ(codec::stated_block_count(bytes), codec::kMaxBlockValues);
+        EXPECT_EQ(codec::oracle::kFuzzDecodedValues, codec::kMaxBlockValues);
+    } else if (seed.side != Side::unbounded) {
+        const auto reader = store::ItchStoreReader::open_bytes(bytes);
+        ASSERT_TRUE(reader.has_value());
+        const std::uint64_t stated = store::oracle::detail::stated_values(*reader);
+        if (seed.side == Side::within_store_cap) {
+            EXPECT_LE(stated, store::oracle::kFuzzMaxStoreValues);
+        } else {
+            EXPECT_LE(stated, store::oracle::kQueryFuzzMaxValues);
+            EXPECT_EQ(stated > store::oracle::kQueryFuzzCrossCheckedValues,
+                      seed.side == Side::past_query_budget);
+        }
+    }
+    EXPECT_EQ(text(seed.check(bytes)), "");
+}
+
+// Named for the target, and for the seed where a target has two: .../pfor,
+// .../pfor_maximal_delta, .../itch_query_within_budget.
+INSTANTIATE_TEST_SUITE_P(
+    FuzzRegression, BoundSeeds,
+    ::testing::Range<std::size_t>(0, bound_seeds::kBoundSeeds.size()),
+    [](const ::testing::TestParamInfo<std::size_t>& info) {
+        const auto& seed = bound_seeds::kBoundSeeds.at(info.param);
+        std::string name{seed.target.substr(std::string_view{"fuzz_"}.size())};
+        if (seed.name.ends_with("within-budget")) {
+            name += "_within_budget";
+        } else if (seed.name.ends_with("maximal-delta")) {
+            name += "_maximal_delta";
+        }
+        return name;
+    });
 
 TEST(FuzzOracles, PassEveryFixtureWholeAndCutAtEveryLength) {
     for (const auto& f : fixtures()) {

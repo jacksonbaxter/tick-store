@@ -22,8 +22,16 @@
 // and its directory checked, but its segments are not decoded. A segment's raw bytes can
 // reach 65,535 a record, held as one 64-bit value a byte, so the cap keeps one input
 // within libFuzzer's allocation limit.
+//
+// That cap leaves the work unbounded: 759 bytes, zstd standing in for the raw bytes, hold
+// a segment of 64 records of 65,535 raw bytes, 4,194,240 values, and every value is
+// decoded five times and encoded twice here. So the fuzz target also passes kStoreFuzzBounds, which caps the values a
+// file's segments state in all, from the directory alone; a file stating more is treated
+// as one over the segment cap. Called without bounds, as the unit suite calls it, the
+// check decodes every file within the segment cap (fuzz/README.md, "Bounds").
 
 #include "container_oracles.hpp"
+#include "tick_store/codec/block.hpp"
 #include "tick_store/codec/simd.hpp"
 #include "tick_store/itch/codec.hpp"
 #include "tick_store/itch/message.hpp"
@@ -36,6 +44,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <limits>
 #include <optional>
 #include <span>
 #include <utility>
@@ -45,6 +54,24 @@
 namespace tick_store::store::oracle {
 
 inline constexpr std::uint32_t kFuzzMaxSegmentRecords = 64;
+
+// How much of one file the check decodes. The default decodes every file within the
+// segment cap.
+struct StoreBounds {
+    // The values a file's segments may state in all, over every column and piece
+    // (SegmentEntry::values). A column is decoded only when its stated count is the one its
+    // records need, and to exactly that many values, so this bounds every decode and
+    // re-encode the check makes of the file.
+    std::uint64_t stated_values = std::numeric_limits<std::uint64_t>::max();
+};
+
+// The fuzz target's cap: one largest codec block's values, 1,048,576. A segment's raw bytes
+// may then reach 15 records of the largest payload, or 64 records of 16,380 bytes, and the
+// dearest file within it, raw bytes to the cap, takes about 0.5 s on the Mac. Files of
+// typed records stay far below it at -max_len: the densest built, 70,000 bytes of add
+// orders in segments of 64, state 35,624 values.
+inline constexpr std::uint64_t kFuzzMaxStoreValues = codec::kMaxBlockValues;
+inline constexpr StoreBounds kStoreFuzzBounds{.stated_values = kFuzzMaxStoreValues};
 
 namespace detail {
 
@@ -58,7 +85,7 @@ struct StoreContent {
 };
 
 // What reading a file gave: its content, a refusal, or nothing decoded because the
-// segment size is over the cap.
+// segment size or the values stated are over their cap.
 struct ReadResult {
     std::optional<StoreContent> content;
     std::optional<ItchStoreError> error;
@@ -102,15 +129,29 @@ struct ReadResult {
     }
 }
 
+// The values a file's segments state in all, from the directory, saturating.
+[[nodiscard]] inline std::uint64_t stated_values(const ItchStoreReader& reader) {
+    std::uint64_t total = 0;
+    for (std::uint64_t s = 0; s < reader.segment_count(); ++s) {
+        for (const std::uint32_t values : reader.segment(s).values) {
+            total = values > std::numeric_limits<std::uint64_t>::max() - total
+                        ? std::numeric_limits<std::uint64_t>::max()
+                        : total + values;
+        }
+    }
+    return total;
+}
+
 [[nodiscard]] inline ReadResult read_store(std::span<const std::byte> file, Checksums checksums,
-                                           const char*& failure) {
+                                           const StoreBounds& bounds, const char*& failure) {
     ReadResult result;
     auto reader = ItchStoreReader::open_bytes(file, {.checksums = checksums});
     if (!reader.has_value()) {
         result.error = reader.error();
         return result;
     }
-    if (reader->header().segment_records > kFuzzMaxSegmentRecords) {
+    if (reader->header().segment_records > kFuzzMaxSegmentRecords ||
+        stated_values(*reader) > bounds.stated_values) {
         result.over_cap = true;
         return result;
     }
@@ -184,9 +225,10 @@ struct ReadResult {
 
 }  // namespace detail
 
-[[nodiscard]] inline const char* check_itch_store(std::span<const std::byte> file) {
+[[nodiscard]] inline const char* check_itch_store(std::span<const std::byte> file,
+                                                 const StoreBounds& bounds) {
     const char* failure = nullptr;
-    const detail::ReadResult skipped = detail::read_store(file, Checksums::skip, failure);
+    const detail::ReadResult skipped = detail::read_store(file, Checksums::skip, bounds, failure);
     if (failure != nullptr) {
         return failure;
     }
@@ -194,7 +236,8 @@ struct ReadResult {
         // The kernel-against-scalar oracle: the same verdict and records with the scalar
         // set forced.
         const codec::simd::ScalarKernelsOnThisThread scalar;
-        const detail::ReadResult by_scalar = detail::read_store(file, Checksums::skip, failure);
+        const detail::ReadResult by_scalar =
+            detail::read_store(file, Checksums::skip, bounds, failure);
         if (failure != nullptr) {
             return failure;
         }
@@ -204,7 +247,7 @@ struct ReadResult {
         }
     }
     const detail::Bytes fixed = fixed_checksums(file);
-    const detail::ReadResult repaired = detail::read_store(fixed, Checksums::verify, failure);
+    const detail::ReadResult repaired = detail::read_store(fixed, Checksums::verify, bounds, failure);
     if (failure != nullptr) {
         return failure;
     }
@@ -213,7 +256,7 @@ struct ReadResult {
         return "skipping CRCs and recomputing them gave different verdicts";
     }
     if (skipped.error.has_value()) {
-        const detail::ReadResult again = detail::read_store(file, Checksums::skip, failure);
+        const detail::ReadResult again = detail::read_store(file, Checksums::skip, bounds, failure);
         return again.error != skipped.error ? "a refusal was not repeatable" : nullptr;
     }
     if (skipped.over_cap) {
@@ -234,7 +277,9 @@ struct ReadResult {
     if (!written.has_value()) {
         return "the writer refused what the reader gave";
     }
-    const detail::ReadResult reread = detail::read_store(*written, Checksums::verify, failure);
+    // The writer's file holds what the reader gave, so it states the same values.
+    const detail::ReadResult reread =
+        detail::read_store(*written, Checksums::verify, StoreBounds{}, failure);
     if (failure != nullptr) {
         return failure;
     }
@@ -249,6 +294,11 @@ struct ReadResult {
         return "the writer's output is not a fixed point";
     }
     return nullptr;
+}
+
+// The whole check, as the unit suite runs it.
+[[nodiscard]] inline const char* check_itch_store(std::span<const std::byte> file) {
+    return check_itch_store(file, StoreBounds{});
 }
 
 }  // namespace tick_store::store::oracle

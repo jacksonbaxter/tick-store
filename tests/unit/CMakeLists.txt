@@ -50,7 +50,7 @@ target_link_libraries(tick_store_unit_tests PRIVATE
 tick_store_apply_warnings(tick_store_unit_tests)
 target_include_directories(tick_store_unit_tests PRIVATE ${PROJECT_SOURCE_DIR}/fuzz)
 set_source_files_properties(fuzz_regression_test.cpp PROPERTIES
-    COMPILE_DEFINITIONS "TICK_STORE_CRASHER_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/crashers\""
+    COMPILE_DEFINITIONS "TICK_STORE_CRASHER_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/crashers\";TICK_STORE_BOUND_SEEDS=\"${PROJECT_SOURCE_DIR}/fuzz/bound_seeds.txt\""
 )
 set_source_files_properties(itch_real_day_test.cpp codec_real_day_test.cpp PROPERTIES
     COMPILE_DEFINITIONS "TICK_STORE_DATA_DIR=\"${TICK_STORE_DATA_DIR}\""
@@ -73,10 +73,15 @@ set(TICK_STORE_SCALAR_CAPPED_FILTER
 # One ctest entry ran all of it, and on the Linux host it passed check.sh's 900 s limit
 # for a single test (R-3), so it runs as these parts, each a gtest filter, the slowest
 # tests on their own. simd_capped_to_scalar_partition checks that the parts together
-# list exactly the tests the filter above lists, each in one part.
+# list exactly the tests the filter above lists, each in one part. The bound seeds' whole
+# checks (fuzz/bound_seeds.hpp) take minutes, PFOR's and the dictionary's most, so they
+# are parts of their own.
 set(TICK_STORE_SCALAR_CAPPED_PARTS
     "codecs=Simd*:Pfor*:StreamVByte*:Dictionary*:RunLength*:LanePack*:LinearPack*:PatchList*:CodecRegistry*:CodecEval*"
-    "store=ItchStore*:FuzzRegression*"
+    "store=ItchStore*:FuzzRegression*-FuzzRegression/BoundSeeds.*"
+    "bound_seed_pfor=FuzzRegression/BoundSeeds.*/pfor"
+    "bound_seed_dictionary=FuzzRegression/BoundSeeds.*/dictionary"
+    "bound_seeds=FuzzRegression/BoundSeeds.*-FuzzRegression/BoundSeeds.*/pfor:FuzzRegression/BoundSeeds.*/dictionary"
     "query=ItchQuery*-ItchQuery.SegmentsWithRawRowsTakeTheExactPath"
     "query_exact_path=ItchQuery.SegmentsWithRawRowsTakeTheExactPath"
     "fuzz_oracles=FuzzOracles*-FuzzOracles.PassEveryCutAndFlipThroughTheQueryOracle"
