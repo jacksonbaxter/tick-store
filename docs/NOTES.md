@@ -2767,6 +2767,55 @@ branches those are was not established.
 
 Raw logs, with the reach replays and the runner scripts: `phase3-raw/close-p3/crc-g3/`.
 
+### G-3's tie to the code it judged
+
+`results/fuzz-g3-<commit>.json` named its commit, and nothing checked that the fuzzed code was
+still that commit's. `check_fuzz.py` now refuses a G-3 file once anything a fuzz binary is built
+from or launched with differs from the file's commit in the tree, committed, uncommitted or new:
+`src/`, `include/`, `fuzz/` but its prose, `cmake/`, `CMakeLists.txt`, `CMakePresets.json` and
+the launcher `scripts/fuzz_g3.py` (`TIED_PATHS`). Editing prose, results, other scripts or tests
+leaves a file tied.
+
+The launch flags. They lived in `scripts/check.sh`'s `run_fuzzer` and its thirteen step lines,
+where unrelated edits are frequent, so a tie naming `check.sh` would untie the file on every
+change to any other step. They moved to `fuzz/launch.txt`: the common flags, each system's
+`ASAN_OPTIONS`, and each target's corpus and seed folders and `-max_len`. `check.sh`'s fuzz
+steps and the G-3 launcher both read it, so the 30-minute runs and the short steps cannot
+drift, and the tie names it through `fuzz/`. Recording the flags in the results file and
+comparing them was the other way; it would have needed the comparison to parse `check.sh`, and
+left two places to keep in step. `test_the_fuzz_launch_lives_in_fuzz_launch_txt_alone` fails if
+`check.sh` names a fuzz flag again. The short steps passed as before: `fuzz-itch-message` 21 s
+and `fuzz-pfor` 91 s, against 22 s and 89 s in the last full check.
+
+The pinned file. The committed file, from `ea1dde4`, predates 61 such changes at `ff8e4b6`, and
+the freeze replaces it. Until then it passes by
+the SHA-256 of its bytes, under `fuzz_g3_file_before_the_tie` in `scripts/data_pins.json`, the
+way that file pins the comparison's protocol 1 files. `check_fuzz.py` lets only
+`fuzz-g3-ea1dde4c02e4.json` be pinned there, and refuses a pin naming any other file, so a new
+file cannot be exempted by adding its digest. It says so: "ok, made before the tie and pinned,
+so not tied; 61 tied files changed since ea1dde4c02e4", which is also `render-check`'s note.
+
+History. The check needs the file's commit in git's history. Where it is missing, an exported
+tree such as `debian`'s or a clone too shallow to hold it, `check_fuzz.py` exits 3 and says "could
+not judge whether the fuzzed code changed after ...". `render_results.py` finishes the render and
+exits 3 too, and `check.sh` reports `render-check` as SKIP with that reason, so it never passes
+silently, and `--no-skips` turns it into a failure. `actions/checkout` fetches one commit by
+default, and the freeze file is committed after the commit it judges, so CI could never have
+tied it: every job now checks out the whole history (`fetch-depth: 0`, about 3.4 MB), and
+`test_the_workflow_checks_out_the_history_g3s_tie_needs` fails without it. The pinned file
+needs no history, so it passes on `debian` as before.
+
+Tests first: the new tests in `test_check_fuzz.py` (a scratch git repository, one change in each
+tied place, an uncommitted and a new file, prose that stays tied, an exported copy, a shallow
+clone, the pin, a pin on other bytes, a pin for another file) failed on the old script, and
+`test_check_sh.py`'s exported-tree test failed on the old `render-check` step; raw output in
+`phase4-raw/fix-fuzz-launch/`. Six faults, each proven with `prove_checks.py --only` under
+`heavy.sh`: `fuzz-g3-tie-ignored`, `fuzz-g3-pin-any-content`, `fuzz-g3-pin-other-file`,
+`fuzz-g3-unjudged-passes`, `check-sh-untied-g3-passes` and `ci-shallow-checkout`: 6 of 6 as
+expected, each baseline passing and each fault failing `py-scripts` with exit 1 on the test it
+names, at `ff8e4b6`. `results/check-proofs.json` was restored from git after the run. Raw
+logs: `phase4-raw/fix-fuzz-launch/proofs1/`.
+
 ### check.sh on the Linux host
 
 `debian` holds an exported tree: `debian_sync.sh` unpacks `git archive` and writes `COMMIT`, so
