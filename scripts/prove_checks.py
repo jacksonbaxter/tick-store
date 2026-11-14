@@ -1205,6 +1205,11 @@ FAULTS = (
           "still passes", CHECK_FAILED,
           "FAIL: test_a_claim_the_results_no_longer_bear_out_stops_the_check "
           "(__main__.RenderPitchTest"),
+    # Review RG-6: G-3's file from before the tie is not judged at this code.
+    Fault("render-g3-before-the-tie-judged", "py-scripts", "render_results.py judges G-3 met on "
+          "the file made before G-3 was tied to the code, which judged an older commit",
+          CHECK_FAILED, "FAIL: test_the_file_from_before_the_tie_is_not_judged_at_this_code "
+          "(__main__.RenderPreTieTest"),
     # D-10: a per-locate figure says it leaves out the permutation to file order.
     Fault("render-permutation-caveat-dropped", "py-scripts", "render_results.py shows a "
           "per-locate column's bits against a compression target with no word that they leave "

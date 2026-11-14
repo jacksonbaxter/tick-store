@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -936,7 +936,7 @@
+         return None
+     _, exempt = check_fuzz.pinned_before_the_tie(path, json.loads(pins_path.read_text(
+         encoding="utf-8")))
+-    if not exempt:
++    if True:
+         return None
+     commit = json.loads(path.read_text(encoding="utf-8"))["header"]["commit"]
+     return (f"this code: `{path.name}` was made at `{commit[:12]}`, before G-3 was tied to the "
