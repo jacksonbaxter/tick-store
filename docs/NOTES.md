@@ -4910,7 +4910,10 @@ after `sanitizers`, where the committed files have them; `build_preset` is no lo
 one preset whose variables and option defaults the cache holds, and a tool whose build type is
 not the folder's is refused. No script reads the four fields; they are for the reader.
 `scripts/g2_plan.py` writes the `g2.json` `store_results.py` reads from `layout --blocks`, and
-on the committed day's layout gives its flips, bytes 878,213,784 and 1,755,725,349.
+on `12302019`'s layout, the only day checked then, gives that day's committed flips, bytes
+878,213,784 and 1,755,725,349. It did not give `10302019`'s: it had no rule for a footer flip
+that falls in a block entry's CRC32C, and the final run at the freeze showed it (G-2's footer
+flip at the freeze).
 `scripts/fuzz_host.py` writes `host.json` from the fuzz build's compile command, link flags and
 `fuzz/launch.txt`, with a path under the build written as under `build/fuzz/`, and refuses a
 file holding an absolute path or the host's name. On the runners' smoke inputs the first two
@@ -5204,6 +5207,82 @@ every command were checked against the code at the freeze: `tick_query`'s answer
 fields, `column_decode_bench`'s options and report, `tick_roundtrip`'s `layout --blocks`, and
 `run_bench.py`'s sibling and boost readings. If a step fails on the host, its summary is not
 written, and the run is reported as not made, with its cause.
+
+### G-2's footer flip at the freeze
+
+2026-11-14. The final run's round trip of `10302019` on macOS, at `ede0176`, made no file.
+`scripts/g2_plan.py` put the footer flip on the footer's middle byte, 1,932,611,735, the last
+byte of block 85775's CRC32C. With checksums off nothing reads that field, so `verify
+--no-checksums` passed on the flipped store and exited 0, and `scripts/store_results.py` refused
+the day: "G-2 footer_no_checksums: verify passed on a corrupt store". The other three corrupt
+runs were caught and the restored store passed. That failed attempt stays in the record as it
+happened, beside the rerun that is owed. It is the case Phase 3 met by hand on the same day ("G-2
+is caught on both days" above): the flip moved one byte on, to the entry's codec id, and the
+committed file's seed says so. The planner's docstring claimed the committed files' rule, but it
+had none for this, and its test checked only `12302019`, whose middle byte is byte 16 of block
+78417's entry, the payload size; the pre-freeze smoke used a small store.
+
+**Which footer bytes the reader reads with checksums off.** For each field, what a flip of bit 1
+there does to `tick_roundtrip verify --no-checksums`, from the reader's code at `ede0176`. Every
+field but the two CRC32Cs is always refused when the store is opened or decoded, or changes
+what verify compares:
+
+| Field (bytes) | With checksums off | Where |
+|---|---|---|
+| Fixed part: block count, section count, metadata size (0-23) | the counts must fill the footer exactly | `src/store/container.cpp:281-300` |
+| Block entry: payload offset (0-7), payload size (16-19) | blocks and sections must tile the data region | `container.cpp:336-337`, `:369-375`, `:409-412`, `:419-422` |
+| Block entry: metadata offset (8-15), metadata size (20-23) | metadata must tile the metadata area | `container.cpp:357-368`, `:423-427` |
+| Block entry: CRC32C (24-27) | **not read**: compared only when checksums are verified | `container.cpp:494-500` |
+| Block entry: codec id (28-29) | must be a readable codec and the column's own or zstd; bit 1 never turns one into the other | `container.cpp:350-356`, `src/store/itch_store_reader.cpp:250-262`, `include/tick_store/codec/registry.hpp:44-54` |
+| Block entry: reserved (30-31) | must be 0 | `container.cpp:345-349` |
+| Section entry: offset (0-7), size (8-15) | tiling, as above | `container.cpp:339-341`, `:402-407` |
+| Section entry: CRC32C (16-19) | **not read**: compared only when checksums are verified | `container.cpp:539-545` |
+| Section entry: name length (20), name and padding (21-63) | length 1 to 43, the alphabet, zero padding; a name bit 1 leaves in the alphabet is no longer `store`, `symbols` or `tail`, which the reader requires | `container.cpp:380-401`, `itch_store_reader.cpp:80-115` |
+| Block metadata, every block: segment (0-3), column (4-5), piece (6-7) | the directory's order: segment by segment, columns rising, pieces counted | `itch_store_reader.cpp:170-220`, `src/store/itch_store.cpp:378-384` |
+| Block metadata: value count (8-11) | not 0, a piece's count, the segment's sum, and the decoded values | `itch_store.cpp:385-388`, `itch_store_reader.cpp:186-189`, `:221-247`, `:269-273`, `src/store/itch_segment.cpp:1095-1100` |
+| Segment summary: first record (12-19), records (52-55) | the running record count and the header's | `itch_store_reader.cpp:182-189`, `:119-135`, `itch_store.cpp:418-420` |
+| Segment summary: first, last, min and max time (20-51), typed records (56-59) | their own rules, then the decoded times and typed count | `itch_store.cpp:421-438`, `itch_segment.cpp:1149-1180` |
+| Segment summary: plain (60) | must be 0 or 1, so bit 1 is refused; bit 0 would pass, since only queries read the flag | `itch_store.cpp:406-410`, `src/store/itch_query.cpp:1318` |
+| Segment summary: bitmap size (61-62), locate bitmap (63 on) | the metadata's size, a non-zero last byte, then the bitmap of the decoded locates | `itch_store.cpp:411-417`, `:439-446`, `itch_segment.cpp:1182-1203` |
+
+The summary has no padding: its fields run from byte 12 to the bitmap's end.
+
+**The rule.** The footer's flip is bit 1 of the first byte at or after the footer's middle byte
+that the reader reads with checksums off, so it passes over a block or section entry's CRC32C
+to the byte after it, the codec id or the name's length. The seed keeps the committed wording
+and says what the middle byte fell in and how far the flip moved ("..., moved one byte on
+because it fell in a block entry's CRC32C, the last byte of block 85775's"; for a section entry
+"... a section entry's CRC32C, the first byte of section 1's"). It refuses a footer it cannot
+plan: one whose fixed part, block entries or section entries are not the sizes `container.hpp`
+gives, or whose parts do not add up to it, and one with no read byte at or after its middle,
+which these sizes never leave. A test reads the constants from the header. On the final run's
+layout listings: `10302019` gives 963,271,577 and 1,932,611,736, its flips and seed equal to
+`results/roundtrip-10302019.json`'s; `12302019`'s `g2.json` is byte for byte the one its run used,
+so that day's result stands (`freeze-findings/g2-planner/compare.log`).
+
+**Shown on a real store, every byte.** `scripts/check_oracle.py`, check.sh's `oracle` step, which
+CI's unit job runs on Linux and macOS, now flips bit 1 of every byte of its store's footer in
+turn and runs `verify --no-checksums` on each: 1,464 bytes, 26 blocks and 3 sections, about 5 s
+on the Mac. Every byte the rule may flip was caught, 1,348; every byte it passes over passed,
+116, the 4 CRC32C bytes of each of the 29 entries; and from every byte the byte the rule moves
+to was caught. A sweep that did not flip each byte once is refused, and a missing tool fails the
+step with "no tick_roundtrip at ...", never a skip. The same sweep, written out, is
+`tests/scripts/oracle_fixtures/footer-sweep.json`, which `tests/scripts/test_check_oracle.py`
+judges with no tool. The new tests failed on the scripts before (`before-test_*.log`). Faults
+`g2-plan-crc-move-removed`, `g2-plan-move-one-short`, `g2-plan-section-crc-classed-read`,
+`g2-plan-no-read-byte-unchecked`, `g2-plan-block-entry-size-unchecked`,
+`g2-plan-footer-parts-unchecked`, `g2-plan-block-crc-offset-drifted` and
+`oracle-sweep-skips-positions`, and `g2-plan-footer-trailer-counted` again on the new code, are
+each PROVEN with `--only` (`prove-g2-planner.log`). The oracle step itself, run directly with
+the built tool, fails on the classification and skipping faults with the sweep's message, and
+on the move one short with a KeyError, the seed's word for a move of no bytes; it passes with the
+rule removed from `footer_flip`, since its sweep exercises `flip_from`, and the planner's tests
+catch that one (`oracle-live-faults.log`).
+
+The round trip of `10302019` on macOS is owed again, and with it `store-size-10302019.json`, which
+`store_results.py` writes in the same step. `scripts/g2_plan.py` is one of the paths the freeze
+said no later commit changes; TASKS says why this one does. Raw logs are in
+`phase4-raw/fix-g2-plan/` and `phase4-raw/freeze-findings/g2-planner/`.
 
 ## Process notes
 

@@ -99,7 +99,8 @@ actionlint shellcheck` installs into the gitignored `.tools/` after checking its
 step logs go under `build/check/`, or `--log-dir` or `CHECK_LOG_DIR`.
 
 The steps: the `dev` build with `-Wall -Wextra -Werror` and its tests, G-1 and G-2 through
-`tick_roundtrip` on a small generated stream, the `asan-ubsan` and `tsan` builds and their
+`tick_roundtrip` on a small generated stream, with bit 1 of every byte of its store's footer
+flipped in turn against G-2's rule, the `asan-ubsan` and `tsan` builds and their
 tests, clang-tidy over all our C++, each libFuzzer target, coverage, the Python tests,
 `scripts/check_results.py`, `scripts/check_compare.py`, `scripts/render_results.py --check`,
 which fails if the headline above or any table of RESULTS.md differs from a fresh render,
@@ -222,7 +223,9 @@ store `ingest` writes from the pinned day at the default settings; the writer is
 so the offset is the same on any host. On the Mac, `ingest` took 85 s and `verify` 38 s; the
 store is 1.76 GB, 4.69 times smaller than the day. `scripts/g2_plan.py` finds both flips from the
 listing by that rule, the middle segment's first timestamp block and the footer, each at its
-middle byte, bit 1: `python3 -I scripts/g2_plan.py build/12302019-layout.json build/g2.json`
+middle byte, bit 1, the footer's moved on to the first byte after it the reader reads with CRCs
+off, past a block or section entry's CRC32C, as on `10302019`:
+`python3 -I scripts/g2_plan.py build/12302019-layout.json build/g2.json`
 prints the data and footer offsets `flip-bit` is given, and writes the `g2.json` that
 `scripts/store_results.py` reads. That script assembles the published files from one day's
 runs: each run's output, `/usr/bin/time -l` report and exit status in one folder, named as its
