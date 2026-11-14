@@ -140,7 +140,9 @@ class CheckScript(unittest.TestCase):
 
     def untie(self, tree):
         """The committed G-3 file with its pin taken out, so the tie applies to it, and as the
-        launcher records a run, so nothing else refuses it: the Targets block reads the same."""
+        launcher records a run, so nothing else refuses it. The pinned file's G-3 row says it is
+        not judged on this code (review RG-6), and an untied one's does not, so the tree's
+        generated blocks are rendered again for it."""
         pins_path = tree / "scripts" / "data_pins.json"
         pins = json.loads(pins_path.read_text())
         del pins[check_fuzz.PRE_TIE_PINS]
@@ -150,15 +152,25 @@ class CheckScript(unittest.TestCase):
         document["header"]["schema"] = check_fuzz.SCHEMA
         for run in document["runs"]:
             budget = f"-max_total_time={check_fuzz.REQUIRED_SECONDS}"
-            run["replay"] = {"command": run["command"].replace(budget, "-runs=0"), "inputs": 1,
+            # The launcher's folders: the replay on the corpus and seeds, the merge of them
+            # into the target's own folder, and the timed run on that folder alone.
+            inputs = " ".join(check_fuzz.folders_of(run["command"]))
+            merged = f"build/fuzz/g3/{run['target']}"
+            replay_command = run["command"].replace(budget, "-runs=0")
+            merge_command = run["command"].replace(budget, "-merge=1").replace(
+                inputs, f"{merged} {inputs}")
+            run["command"] = run["command"].replace(inputs, merged)
+            run["replay"] = {"command": replay_command, "inputs": 1,
                              "runs": 1, "seconds": 1.0, "exit_code": 0, "clean": True,
                              "findings": [], "done_line": "Done 1 runs in 1 second(s)"}
-            run["merge"] = {"command": run["command"].replace(budget, "-merge=1"),
+            run["merge"] = {"command": merge_command,
                             "inputs_kept": 1, "attempts": 1, "seconds": 1.0, "exit_code": 0,
                             "clean": True, "findings": []}
             run["timed"] = {"seconds_before_first_new_input": 0.0,
                             "seconds_after_first_new_input": float(run["wall_seconds"])}
         path.write_text(json.dumps(document, indent=1) + "\n")
+        subprocess.run([sys.executable, "-I", str(tree / "scripts" / "render_results.py")],
+                       capture_output=True, text=True, cwd=tree, env=self.env)
 
     def test_a_g3_file_with_no_history_to_tie_it_skips_and_fails_under_no_skips(self):
         tree = self.exported_copy()
