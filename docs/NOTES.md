@@ -4777,6 +4777,14 @@ protocol 2. The tests failed first (`item1-before-*.log`). Faults
 `compare-tickstore-alone-protocol-2-refused` remade on the moved lines, each PROVEN with `--only`
 (`prove-item1.log`).
 
+**RP-6, QuestDB's version read early.** `versions_read`, which takes QuestDB's version from the
+running server's `SELECT build` and refuses a build with none, ran only once every variant and
+class had run. `run_class` now calls it when a class's last write first reads the server's
+facts, so a build string it cannot parse stops the first class, not the part hours later. The
+committed build strings all parse. The test failed first (`item2-before.log`). Fault
+`questdb-version-read-after-the-part`, and `run-system-write-service-uncounted` remade on the
+moved lines, each PROVEN with `--only` (`prove-item2*.log`).
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
