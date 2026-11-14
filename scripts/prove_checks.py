@@ -31,6 +31,7 @@ Standard library only.
 """
 
 import argparse
+import copy
 import functools
 import hashlib
 import inspect
@@ -70,10 +71,14 @@ QUERY_CORRUPT = ("--test-regex", "ItchQueryCorrupt")
 
 
 def edit_json(path, change):
+    """Writes the document back only if `change` changed it, so a mutation that changes
+    nothing leaves the tree as it was, which the prover's tests then see (review RP-13)."""
     target = TREE / path
     document = json.loads(target.read_text())
+    before = copy.deepcopy(document)
     change(document)
-    target.write_text(json.dumps(document, indent=2) + "\n")
+    if document != before:
+        target.write_text(json.dumps(document, indent=2) + "\n")
 
 
 def edit_text(path, old, new):
@@ -1303,6 +1308,15 @@ FAULTS = (
           "mutation's name and no code or prose, so an edited mutation keeps its old proof",
           CHECK_FAILED, "FAIL: test_a_mutation_with_another_body_has_another_fingerprint "
           "(__main__.Fingerprint"),
+    # Reviews RP-11 and RP-12: the key holds how a fault is judged and the gate on stored ones.
+    Fault("prover-key-judging-left-out", "py-scripts", "the prover's key leaves out whether a "
+          "fault is tolerated or a control, so a fault judged otherwise keeps its old verdict",
+          CHECK_FAILED, "FAIL: test_a_fault_judged_otherwise_has_a_changed_fingerprint "
+          "(__main__.FaultList"),
+    Fault("prover-key-gate-left-out", "py-scripts", "the prover's key leaves out the gate that "
+          "keeps a stored verdict, so widening it passes every stored failure unproven",
+          CHECK_FAILED, "FAIL: test_an_edited_gate_on_stored_verdicts_changes_every_fingerprint "
+          "(__main__.Fingerprint"),
     # Every listed fault breaks what it says on the committed tree.
     Fault("prover-patch-stale", "py-scripts", "a listed patch as it was before the code it "
           "edits moved, so it no longer applies", CHECK_FAILED,
@@ -1311,6 +1325,11 @@ FAULTS = (
     Fault("prover-mutation-changes-nothing", "py-scripts", "a listed mutation that writes back "
           "what it read, so its fault changes nothing", CHECK_FAILED,
           "FAIL: test_every_listed_mutation_changes_the_committed_tree "
+          "(__main__.EveryFaultApplies"),
+    # Review RP-13: a mutation that changes nothing writes nothing, so the test sees it.
+    Fault("prover-mutation-matches-nothing", "py-scripts", "a listed mutation that looks for a "
+          "setting no file has, so it changes nothing but the files it writes back",
+          CHECK_FAILED, "FAIL: test_every_listed_mutation_changes_the_committed_tree "
           "(__main__.EveryFaultApplies"),
     # The coverage summary says which kernel sets its gate requires.
     Fault("coverage-kernel-statement-stale", "py-scripts", "coverage_report.py writes that no "
@@ -1329,10 +1348,12 @@ def fingerprint(fault, blob_of=None):
     """Changes when the fault does, so an edited fault cannot keep an old verdict: its fields,
     its patch, the code of its mutation and of this script's verdict path, and the committed
     content of each file it edits. Prose and this script are outside source_commit, so a
-    fault's own key must hold what of them made its verdict (review E-5)."""
+    fault's own key must hold what of them made its verdict (review E-5): its judging,
+    whether it is tolerated or a control (review RP-11), and the gate in main that keeps a
+    stored verdict rather than proving it again (review RP-12)."""
     blob_of = blob_of or head_blobs().get
     patch = patch_of(fault)
-    texts, strings = code_of(prove)[0], set()
+    texts, strings = code_of(prove)[0] + code_of(main)[0], set()
     if fault.mutate is not None:
         mutation, strings = code_of(fault.mutate)
         texts += mutation
@@ -1340,7 +1361,7 @@ def fingerprint(fault, blob_of=None):
         strings = strings | patched_paths(patch.read_text())
     edited = sorted((path, blob) for path in strings if (blob := blob_of(path)) is not None)
     described = repr((fault.check, fault.arguments, fault.fault_arguments, fault.expected_exit,
-                      fault.expected_string, fault.later_step,
+                      fault.expected_string, fault.later_step, fault.tolerated, fault.control,
                       getattr(fault.mutate, "__name__", None),
                       patch.read_text() if patch else None, texts, edited))
     return hashlib.sha256(described.encode()).hexdigest()[:12]

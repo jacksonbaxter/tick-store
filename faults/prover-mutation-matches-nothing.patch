@@ -1,0 +1,12 @@
+diff --git a/scripts/prove_checks.py b/scripts/prove_checks.py
+--- a/scripts/prove_checks.py
++++ b/scripts/prove_checks.py
+@@ -161,7 +161,7 @@
+ def mismatched_commit_mode():
+     def change(document):
+         for setting in questdb_variant(document)["classes"]["B"]["settings"]:
+-            if setting["name"] == "cairo.commit.mode (conf file)":
++            if setting["name"] == "cairo.commit.mode (no such setting)":
+                 setting["in_force"] = "nosync"
+     edit_compare_slice(change)
+ 

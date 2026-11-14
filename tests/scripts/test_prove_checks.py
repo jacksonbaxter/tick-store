@@ -8,6 +8,7 @@ a detection can be wrong, a build error above all. The rest ties the fault list 
 every check has a fault, and every patch in faults/ is used.
 """
 
+import dataclasses
 import importlib.util
 import shutil
 import subprocess
@@ -98,6 +99,13 @@ class FaultList(unittest.TestCase):
         other = prove.Fault("example", "dev-test", "an example", 8, "another string")
         self.assertNotEqual(prove.fingerprint(FAULT), prove.fingerprint(other))
 
+    def test_a_fault_judged_otherwise_has_a_changed_fingerprint(self):
+        # Review RP-11: a tolerated fault must pass, a control go undetected.
+        for field in ("tolerated", "control"):
+            with self.subTest(field=field):
+                other = dataclasses.replace(FAULT, **{field: not getattr(FAULT, field)})
+                self.assertNotEqual(prove.fingerprint(FAULT), prove.fingerprint(other))
+
 
 def mutation_named_alike(argument, helper_value="one"):
     """A mutation called `mutate` that calls a helper with `argument`, as the prover's own
@@ -136,6 +144,15 @@ class Fingerprint(unittest.TestCase):
         self.addCleanup(setattr, prove, "judge", original)
         # An edit to judge() in the script itself: a new body in the script's own globals.
         exec("def judge(fault, result):\n    return 'PROVEN'\n", vars(prove))
+        self.assertNotEqual(prove.fingerprint(FAULT), before)
+
+    def test_an_edited_gate_on_stored_verdicts_changes_every_fingerprint(self):
+        # Review RP-12: main keeps a stored verdict by is_proven, which proving never reaches.
+        before = prove.fingerprint(FAULT)
+        original = prove.is_proven
+        self.addCleanup(setattr, prove, "is_proven", original)
+        exec("def is_proven(entry):\n    return entry.get('verdict') != 'UNDETECTED'\n",
+             vars(prove))
         self.assertNotEqual(prove.fingerprint(FAULT), before)
 
     def test_the_prose_a_patch_edits_is_in_its_fingerprint(self):

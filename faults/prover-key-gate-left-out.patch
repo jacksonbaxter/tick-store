@@ -1,0 +1,12 @@
+diff --git a/scripts/prove_checks.py b/scripts/prove_checks.py
+--- a/scripts/prove_checks.py
++++ b/scripts/prove_checks.py
+@@ -1339,7 +1339,7 @@
+     stored verdict rather than proving it again (review RP-12)."""
+     blob_of = blob_of or head_blobs().get
+     patch = patch_of(fault)
+-    texts, strings = code_of(prove)[0] + code_of(main)[0], set()
++    texts, strings = code_of(prove)[0], set()
+     if fault.mutate is not None:
+         mutation, strings = code_of(fault.mutate)
+         texts += mutation

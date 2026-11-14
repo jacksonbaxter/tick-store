@@ -1,10 +1,9 @@
 diff --git a/scripts/prove_checks.py b/scripts/prove_checks.py
-index a02e5ef..6aab7d7 100644
 --- a/scripts/prove_checks.py
 +++ b/scripts/prove_checks.py
-@@ -1067,7 +1067,7 @@ def fingerprint(fault, blob_of=None):
+@@ -1363,7 +1363,7 @@
      described = repr((fault.check, fault.arguments, fault.fault_arguments, fault.expected_exit,
-                       fault.expected_string, fault.later_step,
+                       fault.expected_string, fault.later_step, fault.tolerated, fault.control,
                        getattr(fault.mutate, "__name__", None),
 -                      patch.read_text() if patch else None, texts, edited))
 +                      patch.read_text() if patch else None))

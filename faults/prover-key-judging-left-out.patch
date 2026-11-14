@@ -1,0 +1,12 @@
+diff --git a/scripts/prove_checks.py b/scripts/prove_checks.py
+--- a/scripts/prove_checks.py
++++ b/scripts/prove_checks.py
+@@ -1347,7 +1347,7 @@
+         strings = strings | patched_paths(patch.read_text())
+     edited = sorted((path, blob) for path in strings if (blob := blob_of(path)) is not None)
+     described = repr((fault.check, fault.arguments, fault.fault_arguments, fault.expected_exit,
+-                      fault.expected_string, fault.later_step, fault.tolerated, fault.control,
++                      fault.expected_string, fault.later_step,
+                       getattr(fault.mutate, "__name__", None),
+                       patch.read_text() if patch else None, texts, edited))
+     return hashlib.sha256(described.encode()).hexdigest()[:12]
