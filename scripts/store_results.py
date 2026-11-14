@@ -2,8 +2,12 @@
 """Assemble the full-day ITCH store results from the raw outputs of one day's runs.
 
     python3 -I scripts/store_results.py <raw-dir> --day DAY --commit SHA --host HOST \\
-        --capacity results/fullday-capacity-12302019.json \\
+        --build build/bench --capacity results/fullday-capacity-12302019.json \\
         --roundtrip results/roundtrip-DAY.json --size results/store-size-DAY.json
+
+--build is the build folder tick_roundtrip ran from. Both files' build_preset is the
+CMakePresets.json preset that configured it, read from its CMakeCache.txt by
+scripts/build_preset.py, as scripts/codec_eval_results.py reads it.
 
 <raw-dir> holds what tick_roundtrip printed, what /usr/bin/time -l wrote, and the exit status
 the runner saw (`echo $? > <stem>.exit`), one run per stem:
@@ -23,14 +27,17 @@ takes, if present, cross-verify.json and its .exit, a store written on another h
 here, with cross-host.txt naming that host and store.sha256 and cross-store.sha256 holding the
 two stores' SHA-256.
 
-Every value comes from those files; nothing is estimated. Each run's exit_code is the one in its
-.exit file, and G-2's exit_code_corrupt and exit_code_restored are those of its runs. It refuses,
-exit 1, a run with no exit status, an ingest or a passing verify that did not exit 0, a G-1 that
-did not pass, a G-2 run that did not exit 1 where the store was corrupt (verify exits 1 on a
-mismatch, 2 on a usage or I/O error) or did not pass and exit 0 once restored, a CRC failure
-that does not name the flipped block and its offset, and a layout whose parts do not add up to
-the file. CR-1 is judged on the day BENCHMARKS.md gives it (12302019); CR-2 against
-the stored bytes of the comparison file, which holds that day only.
+Every value comes from those files and the build folder's cache; nothing is estimated. Each
+run's exit_code is the one in its .exit file, and G-2's exit_code_corrupt and exit_code_restored
+are those of its runs. It refuses, exit 1, a run with no exit status, an ingest or a passing
+verify that did not exit 0, a G-1 that did not pass, a G-2 run that did not exit 1 where the
+store was corrupt (verify exits 1 on a mismatch, 2 on a usage or I/O error) or did not pass and
+exit 0 once restored, a CRC failure that does not name the flipped block and its offset, a
+layout whose parts do not add up to the file, and a build folder with no CMakeCache.txt or that
+no preset, or more than one, configured. tick_roundtrip's output states no build type, so,
+unlike codec_eval_results.py, it has none to hold to the folder's. CR-1 is judged on the day
+BENCHMARKS.md gives it (12302019); CR-2 against the stored bytes of the comparison file, which
+holds that day only.
 
 Standard library only.
 """
@@ -40,6 +47,10 @@ import json
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import build_preset  # noqa: E402
 
 # BENCHMARKS.md CR-1: the pinned file's own .gz ratio, rounded up, on 12302019. The second
 # day's .gz ratio is context, not a target.
@@ -65,6 +76,14 @@ def read_json(folder, name):
 
 def read_text(folder, name):
     return load(folder, name).read_text()
+
+
+def preset_of(build):
+    """The preset that configured the build folder the tools ran from, or Refused."""
+    try:
+        return build_preset.preset_of(build)
+    except build_preset.Refused as refused:
+        raise Refused(str(refused)) from None
 
 
 def time_figures(folder, name):
@@ -244,11 +263,12 @@ def cross_host(folder, pin):
             "same_store_bytes": here == there}
 
 
-def assemble_g1(folder, day, commit, host, placement=None):
+def assemble_g1(folder, day, commit, host, build, placement=None):
     """G-1 alone, for a host that runs only that gate. Without time files, the peaks are the
     tool's own, getrusage's ru_maxrss, which on Linux is VmHWM."""
+    preset = preset_of(build)
     ingest, verify, pin = g1(folder, timed=(Path(folder) / "verify.time").is_file())
-    out = {"day": day, "source": ingest_source(day), "host": host, "build_preset": "bench",
+    out = {"day": day, "source": ingest_source(day), "host": host, "build_preset": preset,
            "commit": commit, "store_format": verify["store_format"],
            "durability": ingest["durability"], "segment_records": ingest["segment_records"]}
     if placement:
@@ -260,7 +280,8 @@ def assemble_g1(folder, day, commit, host, placement=None):
     return out
 
 
-def assemble(folder, day, commit, host, capacity):
+def assemble(folder, day, commit, host, capacity, build):
+    preset = preset_of(build)
     ingest, verify, pin = g1(folder)
     layout = read_json(folder, "layout.json")
     flips = read_json(folder, "g2.json")
@@ -297,7 +318,7 @@ def assemble(folder, day, commit, host, capacity):
         cr2["verdict"] = "no comparison"
         cr2["note"] = "the comparison systems were stored for 12302019 only"
 
-    common = {"day": day, "source": ingest_source(day), "host": host, "build_preset": "bench",
+    common = {"day": day, "source": ingest_source(day), "host": host, "build_preset": preset,
               "commit": commit, "store_format": layout["store_format"]}
     size = {
         **common,
@@ -350,6 +371,8 @@ def main(argv=None):
     parser.add_argument("--day", required=True)
     parser.add_argument("--commit", required=True)
     parser.add_argument("--host", required=True)
+    parser.add_argument("--build", required=True,
+                        help="the build folder tick_roundtrip ran from")
     parser.add_argument("--capacity")
     parser.add_argument("--roundtrip", required=True)
     parser.add_argument("--size")
@@ -360,7 +383,8 @@ def main(argv=None):
     capacity = json.loads(Path(args.capacity).read_text()) if args.capacity else None
     if args.g1_only:
         try:
-            roundtrip = assemble_g1(args.raw, args.day, args.commit, args.host, args.placement)
+            roundtrip = assemble_g1(args.raw, args.day, args.commit, args.host, args.build,
+                                    args.placement)
         except Refused as refused:
             print(f"refused: {refused}", file=sys.stderr)
             return 1
@@ -370,7 +394,8 @@ def main(argv=None):
     if not args.size:
         parser.error("--size is required without --g1-only")
     try:
-        roundtrip, size = assemble(args.raw, args.day, args.commit, args.host, capacity)
+        roundtrip, size = assemble(args.raw, args.day, args.commit, args.host, capacity,
+                                   args.build)
     except Refused as refused:
         print(f"refused: {refused}", file=sys.stderr)
         return 1

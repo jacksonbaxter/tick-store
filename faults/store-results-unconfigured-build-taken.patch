@@ -1,0 +1,12 @@
+diff --git a/scripts/store_results.py b/scripts/store_results.py
+--- a/scripts/store_results.py
++++ b/scripts/store_results.py
+@@ -83,7 +83,7 @@
+     try:
+         return build_preset.preset_of(build)
+     except build_preset.Refused as refused:
+-        raise Refused(str(refused)) from None
++        return "bench"
+ 
+ 
+ def time_figures(folder, name):

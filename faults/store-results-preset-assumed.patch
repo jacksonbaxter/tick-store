@@ -1,0 +1,21 @@
+diff --git a/scripts/store_results.py b/scripts/store_results.py
+--- a/scripts/store_results.py
++++ b/scripts/store_results.py
+@@ -266,7 +266,7 @@
+ def assemble_g1(folder, day, commit, host, build, placement=None):
+     """G-1 alone, for a host that runs only that gate. Without time files, the peaks are the
+     tool's own, getrusage's ru_maxrss, which on Linux is VmHWM."""
+-    preset = preset_of(build)
++    preset = "bench"
+     ingest, verify, pin = g1(folder, timed=(Path(folder) / "verify.time").is_file())
+     out = {"day": day, "source": ingest_source(day), "host": host, "build_preset": preset,
+            "commit": commit, "store_format": verify["store_format"],
+@@ -281,7 +281,7 @@
+ 
+ 
+ def assemble(folder, day, commit, host, capacity, build):
+-    preset = preset_of(build)
++    preset = "bench"
+     ingest, verify, pin = g1(folder)
+     layout = read_json(folder, "layout.json")
+     flips = read_json(folder, "g2.json")

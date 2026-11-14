@@ -635,6 +635,15 @@ FAULTS = (
           "build folder whose build type is not the one the tool states it was built with",
           CHECK_FAILED, "FAIL: test_a_tool_built_otherwise_than_the_folder_is_refused "
           "(__main__.CodecEvalResults"),
+    Fault("store-results-preset-assumed", "py-scripts", "store_results.py writes the "
+          "round-trip and store-size files' build_preset as bench whatever the build folder's "
+          "cache says", CHECK_FAILED,
+          "FAIL: test_the_preset_is_read_from_the_build_folder_not_assumed "
+          "(__main__.StoreResults"),
+    Fault("store-results-unconfigured-build-taken", "py-scripts", "store_results.py takes a "
+          "build folder no preset configured, or one with no cache, and writes it as bench",
+          CHECK_FAILED, "FAIL: test_a_build_folder_no_preset_configures_is_refused "
+          "(__main__.StoreResults"),
     Fault("g2-plan-footer-trailer-counted", "py-scripts", "g2_plan.py counts the trailer as "
           "footer, so the footer flip is not the footer's middle byte", CHECK_FAILED,
           "FAIL: test_the_committed_days_flips_follow_from_its_layout (__main__.G2Plan"),

@@ -5,17 +5,24 @@
 
 The script turns one day's raw outputs into the committed results, so these feed it a small
 hand-made set and require the sizes to add up, the CR-1 and CR-2 verdicts, and a refusal of
-every run that does not show what the gates require.
+every run that does not show what the gates require. The build folder the tools ran from is a
+CMakeCache.txt written beside the raw files, all under the repo's gitignored build/ directory.
 """
 
 import importlib.util
 import json
 import shutil
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(REPO_ROOT / "tests" / "scripts"))
+
+from test_build_preset import BENCH, DEV, write_cache  # noqa: E402
+
 SPEC = importlib.util.spec_from_file_location("store_results",
                                               REPO_ROOT / "scripts" / "store_results.py")
 results = importlib.util.module_from_spec(SPEC)
@@ -87,6 +94,10 @@ class StoreResults(unittest.TestCase):
                            ("g2-data-nocrc", 1), ("g2-footer-crc", 1), ("g2-footer-nocrc", 1),
                            ("g2-restored", 0)):
             (self.dir / f"{stem}.exit").write_text(f"{code}\n")
+        # The build folder the tools ran from, configured by the bench preset.
+        self.build = self.dir / "bench-build"
+        self.build.mkdir()
+        write_cache(self.build, BENCH)
 
     def tearDown(self):
         shutil.rmtree(self.dir)
@@ -96,7 +107,10 @@ class StoreResults(unittest.TestCase):
 
     def assemble(self, day="12302019", cap=None):
         return results.assemble(self.dir, day, "abc1234", "macOS",
-                                capacity() if cap is None else cap)
+                                capacity() if cap is None else cap, self.build)
+
+    def assemble_g1(self, host="Linux", placement=None):
+        return results.assemble_g1(self.dir, "12302019", "abc1234", host, self.build, placement)
 
     def test_query_index_bytes_come_from_the_seek_and_run_directory_columns(self):
         document = layout()
@@ -179,17 +193,17 @@ class StoreResults(unittest.TestCase):
             "\tElapsed (wall clock) time (h:mm:ss or m:ss): 1:02.50\n"
             "\tMaximum resident set size (kbytes): 2000\n")
         self.write("verify.json", {**verify(), "store_format": "itch-store-v3"})
-        roundtrip = results.assemble_g1(self.dir, "12302019", "abc1234", "Linux")
+        roundtrip = self.assemble_g1()
         self.assertEqual(roundtrip["g1"]["verify"]["real_seconds"], 62.5)
         self.assertEqual(roundtrip["g1"]["verify"]["time_peak_rss_bytes"], 2_048_000)
         self.assertNotIn("g2", roundtrip)
         for stem in ("ingest", "verify"):
             (self.dir / f"{stem}.time").unlink()
-        untimed = results.assemble_g1(self.dir, "12302019", "abc1234", "Linux")
+        untimed = self.assemble_g1()
         self.assertNotIn("real_seconds", untimed["g1"]["verify"])
         self.write("verify.json", verify("mismatch"))
         with self.assertRaises(results.Refused):
-            results.assemble_g1(self.dir, "12302019", "abc1234", "Linux")
+            self.assemble_g1()
 
     def test_a_store_from_the_other_host_must_verify_here(self):
         self.write("verify.json", {**verify(), "store_format": "itch-store-v3"})
@@ -199,22 +213,22 @@ class StoreResults(unittest.TestCase):
         (self.dir / "cross-host.txt").write_text("macOS\n")
         (self.dir / "store.sha256").write_text("ee\n")
         (self.dir / "cross-store.sha256").write_text("ee\n")
-        roundtrip = results.assemble_g1(self.dir, "12302019", "abc1234", "Linux", "pinned")
+        roundtrip = self.assemble_g1(placement="pinned")
         self.assertEqual(roundtrip["placement"], "pinned")
         self.assertEqual(roundtrip["cross_host"]["written_on"], "macOS")
         self.assertTrue(roundtrip["cross_host"]["same_store_bytes"])
         self.assertEqual(roundtrip["cross_host"]["verify"]["real_seconds"], 12.5)
         (self.dir / "cross-store.sha256").write_text("ff\n")
-        crossed = results.assemble_g1(self.dir, "12302019", "abc1234", "Linux")
+        crossed = self.assemble_g1()
         self.assertFalse(crossed["cross_host"]["same_store_bytes"])
         self.assertNotIn("placement", crossed)
         self.write("cross-verify.json", verify("mismatch", stored="cd"))
         with self.assertRaises(results.Refused):
-            results.assemble_g1(self.dir, "12302019", "abc1234", "Linux")
+            self.assemble_g1()
         self.write("cross-verify.json", verify())
         (self.dir / "cross-host.txt").unlink()
         with self.assertRaises(results.Refused):
-            results.assemble_g1(self.dir, "12302019", "abc1234", "Linux")
+            self.assemble_g1()
 
     def test_a_missing_file_is_refused(self):
         (self.dir / "g2-restored.time").unlink()
@@ -254,6 +268,50 @@ class StoreResults(unittest.TestCase):
                 with self.assertRaises(results.Refused):
                     self.assemble()
                 path.write_text("1\n")
+
+    def test_the_preset_is_read_from_the_build_folder_not_assumed(self):
+        roundtrip, size = self.assemble()
+        self.assertEqual(roundtrip["build_preset"], "bench")
+        self.assertEqual(size["build_preset"], "bench")
+        self.write("verify.json", {**verify(), "store_format": "itch-store-v3"})
+        self.assertEqual(self.assemble_g1()["build_preset"], "bench")
+        write_cache(self.build, DEV)
+        roundtrip, size = self.assemble()
+        self.assertEqual(roundtrip["build_preset"], "dev")
+        self.assertEqual(size["build_preset"], "dev")
+        self.assertEqual(self.assemble_g1()["build_preset"], "dev")
+
+    def test_a_build_folder_no_preset_configures_is_refused(self):
+        self.write("verify.json", {**verify(), "store_format": "itch-store-v3"})
+        write_cache(self.build, dict(BENCH, **{"TICK_STORE_SANITIZE:STRING": "tsan"}))
+        for assemble in (self.assemble, self.assemble_g1):
+            with self.subTest(assemble=assemble.__name__):
+                with self.assertRaisesRegex(results.Refused, "no preset in CMakePresets.json"):
+                    assemble()
+        (self.build / "CMakeCache.txt").unlink()
+        for assemble in (self.assemble, self.assemble_g1):
+            with self.subTest(assemble=assemble.__name__, cache=None):
+                with self.assertRaisesRegex(results.Refused, "no CMakeCache.txt"):
+                    assemble()
+
+    def test_the_command_takes_the_build_folder_and_writes_nothing_it_refuses(self):
+        out = self.dir / "out"
+        out.mkdir()
+        roundtrip, size = out / "roundtrip.json", out / "size.json"
+        arguments = [str(self.dir), "--day", "12302019", "--commit", "abc1234", "--host",
+                     "macOS", "--roundtrip", str(roundtrip), "--size", str(size)]
+        with self.assertRaises(SystemExit):
+            results.main(arguments)
+        self.assertEqual(results.main(arguments + ["--build", str(self.build)]), 0)
+        self.assertEqual(json.loads(roundtrip.read_text())["build_preset"], "bench")
+        roundtrip.unlink()
+        size.unlink()
+        write_cache(self.build, dict(BENCH, **{"TICK_STORE_SANITIZE:STRING": "tsan"}))
+        self.assertEqual(results.main(arguments + ["--build", str(self.build)]), 1)
+        self.write("verify.json", {**verify(), "store_format": "itch-store-v3"})
+        self.assertEqual(results.main(arguments + ["--build", str(self.build), "--g1-only"]), 1)
+        self.assertFalse(roundtrip.exists())
+        self.assertFalse(size.exists())
 
 
 if __name__ == "__main__":
