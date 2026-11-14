@@ -4535,7 +4535,10 @@ requires `--list` to exit 0 with steps. With a venv made this way on the Mac, `p
 --no-skips` passed: 210 tests, 3 skipped inside the step (`py-compare-civenv.log`). The tests
 failed first: 4 failures (`e6-test-before.log`). `--list` exiting 1 with no output, injected by
 hand, failed the step-list test (`e6-list-injected.log`). Faults `check-sh-no-skips-ignored`,
-`ci-compare-venv-not-made` and `ci-skips-allowed`.
+`ci-compare-venv-not-made` and `ci-skips-allowed`. CI run 43532567179, at `9d8bd95`, passed all
+16 jobs. Its repo jobs installed the lock and ran `py-compare` with `--no-skips`: 210 tests on
+Linux, 3 skipped inside the step, and 210 on macOS, 6 skipped. Every step passed, and none
+skipped.
 
 **E-10, turbo.** Confirmed in part. The host's `measure.sh` sets the governor under its lock and
 never writes the boost switch, which was read there, read-only. So the turbo `run_bench.py`
