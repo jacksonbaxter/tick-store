@@ -4785,6 +4785,19 @@ committed build strings all parse. The test failed first (`item2-before.log`). F
 `questdb-version-read-after-the-part`, and `run-system-write-service-uncounted` remade on the
 moved lines, each PROVEN with `--only` (`prove-item2*.log`).
 
+**RP-4 and RP-5, the variant source.** RV-9 validated a day's variant source if its input held a
+slice, but `check_document` checks a file as a full day if its input holds a day or its name
+`-full-`. So a day whose input held a slice too, naming itself as its source, still recursed to
+a `RecursionError`; the reviewer's second shape, a slice-shaped file under a full day's name,
+was already refused at `5c77c6d` by its missing day pin, and recursed only once it named the day
+as well. The source is now validated only if `check_document`'s own test, `is_full_day_file`,
+says it is no day; anything else is refused once. A test for each shape. A day's source must
+also state the day's protocol, so a protocol 2 day cannot be ranked from a pinned protocol 1
+slice (RP-5). The tests failed first (`item3-before.log`). Faults
+`compare-variant-source-day-and-slice-recursed` and `compare-variant-source-other-protocol`, and
+`compare-variant-source-day-recursed` and `compare-variant-source-unvalidated` remade on the
+moved lines, each PROVEN with `--only` (`prove-item3.log`).
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
