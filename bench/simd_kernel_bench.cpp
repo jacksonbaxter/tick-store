@@ -13,7 +13,7 @@
 //
 //   run_bench.py drives one process per case, --case=NAME --report=PATH, through the
 //   measurement wrapper: ten repetitions of one pass each, a pass the whole number of
-//   rounds of kPassCalls calls that lasts at least 150 ms, then the same passes
+//   rounds of kPassCalls calls sized to last at least 150 ms, then the same passes
 //   timed in batches for the latency histogram.
 //
 //   By hand, with no --case: every case of every width 0 to 64, under Google Benchmark's
@@ -89,7 +89,7 @@ using Vector = std::array<std::uint64_t, codec::kVectorValues>;
 
 // Calls per round: about 8.4 M values, 1 to 20 ms at any rate here.
 constexpr std::size_t kPassCalls = bs::kKernelRoundCalls;
-// The least a pass lasts is bs::kKernelMinPassTime, 150 ms, so a case lasts about 10 s. At
+// A pass is sized to last at least bs::kKernelMinPassTime, 150 ms, so a case lasts about 10 s. At
 // one round a pass, a case lasted about a second, and on Linux a burst of 6 jiffies or more
 // on the pinned core's SMT sibling put 4 to 13 cases of 314 over check_results.py's 5% limit
 // (DS-4, docs/NOTES.md). A pass is whole rounds, so a value is measured as before, and a
@@ -449,7 +449,7 @@ struct Session {
     std::uint64_t gated_items = 0;
     std::uint64_t gated_ticks = 0;
     std::vector<std::uint64_t> warmup_pass_ticks;
-    // A whole number of rounds of kPassCalls, at least bs::kKernelMinPassTime long.
+    // A whole number of rounds of kPassCalls, sized to last at least bs::kKernelMinPassTime.
     std::size_t calls_per_pass = kPassCalls;
 };
 

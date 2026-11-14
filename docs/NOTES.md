@@ -4668,8 +4668,9 @@ stated:
 refused for cpu5 over 5% busy in 4 to 13 of 314 cases of about 1.1 s ("DS-4: three more
 refusals"). At that length, 6 jiffies on the sibling put a case over the limit. The open TASKS
 item asked for a case long enough that a stray jiffy is not 1% of its window, with the rule
-unchanged. `28c8269` made each pass of `simd_kernel_bench` whole rounds of 8,192 calls lasting at
-least 150 ms. A case then lasts about 10 s, so the same burst is about 0.6% of it. That length
+unchanged. `28c8269` made each pass of `simd_kernel_bench` whole rounds of 8,192 calls, enough
+to last at least 150 ms at the speed of a round timed before the warm-up. A case then lasts
+about 10 s, so the same burst is about 0.6% of it. That length
 came from the TASKS reasoning, not from any result: it was committed before any run with it.
 
 One trial then ran once at `4af007f` (`28c8269`, records, and a one-line clang-tidy fix that changes no timing). It
@@ -4706,6 +4707,18 @@ kernel file is measured at the same window, `28c8269`'s pass rule, at the freeze
 Since `6679710` a pass is sized from the fastest of three timed rounds rather than one (RL-1),
 and as a case's latency batches are 5,120 a round, the set of latency percentiles a kernel case
 publishes depends on its rounds: p99.9 needs 2 or more, p99.99 20 or more (RL-2).
+
+**The timed passes are not held to 150 ms.** A pass is sized to last at least 150 ms at the
+speed of the fastest of three rounds timed before the warm-up passes. The timed passes can run
+a few percent shorter. In the Linux gate at `f7be141`, iteration only, under `measure.sh` on
+cpu4, `pfor_delta_fused/w=13/avx2` was sized at 22 rounds, 180,224 calls a pass. Its two
+warm-up passes took 153.2 and 151.3 ms, its ten throughput passes 142.1 to 152.7 ms, median
+143.8, with one of 223.5 ms, and its ten latency passes 144.1 to 145.8 ms: at the median 4%
+under 150 ms. The host runs with boost on and no fixed clock; what made the timed passes faster
+than the rounds they were sized from was not measured. On the Mac, `pfor_delta_fused/w=13/neon`
+ran 491,520 calls a pass in passes of about 156 ms. The rule for the freeze and the number of
+attempts are unchanged. Raw files: `phase4-raw/fix-freeze-a/linux/case-report.json` and
+`case-gbench.json`, and `phase4-raw/fix-freeze-a/item4-mac-case-report.json`.
 
 Raw files, the trial's status, document and every case's `.stat` and `.report`:
 `phase4-raw/fix-prover-ci/ds4-trial/`.
@@ -4859,7 +4872,9 @@ pass from one timed round, so one slowed round shortened every pass of the case.
 the fastest of three, since a round cannot be measured faster than it runs. The arithmetic,
 unchanged, is in `include/tick_store/bench_support/pass_sizing.hpp`, which the bench and the
 unit tests share; `KernelPassSizing` pins the contract: whole rounds of 8,192 calls, at least
-one, lasting at least 150 ms, one round for a slow round and 150 for a 1 ms one. The
+one, enough to last at least 150 ms at the measured round's speed, one round for a slow round and
+150 for a 1 ms one. The timed passes are not held to that length: in the Linux gate
+they ran a few percent shorter (DS-4 section, "The timed passes are not held to 150 ms"). The
 three-round test failed first (`item4-before.log`). Fault `kernel-pass-sized-from-one-round`,
 PROVEN with `--only` (`prove-item4.log`). `--verify-all` still matches 576 cases. One case on the
 Mac, iteration only: `pfor_delta_fused/w=13/neon` ran 491,520 calls a pass, 60 rounds, in passes
@@ -4934,6 +4949,13 @@ round-trip recipe gives the command. The tests failed first (`item1-before.log`,
 and 27 errors: no `--build`, and `assemble` and `assemble_g1` took no build folder). Faults
 `store-results-preset-assumed` and `store-results-unconfigured-build-taken`, each PROVEN with
 `--only` (`prove-item1.log`). Raw logs are in `phase4-raw/fix-freeze-b/`.
+
+**The pass length as measured.** The record said a kernel pass lasts at least 150 ms. It is
+sized to, at the speed of the fastest of three rounds timed before the warm-up; in the Linux
+gate the timed passes ran a few percent shorter, most about 144 ms. The DS-4 section, the RL-1
+paragraph above, TASKS, and the comments in `pass_sizing.hpp` and `simd_kernel_bench.cpp` now
+say so. Comments only; no code changed. `kernel-pass-sized-from-one-round`'s patch, whose
+context held the header's comment, was remade and PROVEN with `--only` (`prove-item2.log`).
 
 ## Process notes
 

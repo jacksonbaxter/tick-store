@@ -1,8 +1,8 @@
 #pragma once
 
 // How long a kernel benchmark's pass is (DS-4, docs/NOTES.md): whole rounds of a fixed
-// number of calls, enough rounds for the pass to last at least a set time, sized once per
-// case from untimed rounds before its warm-up.
+// number of calls, enough to last at least a set time at the speed of the fastest of the
+// rounds timed once per case before its warm-up; the timed passes can run a few percent shorter.
 
 #include <algorithm>
 #include <chrono>
@@ -14,7 +14,7 @@ namespace tick_store::bench_support {
 
 // Calls per round: about 8.4 M values of the kernel bench's vector, 1 to 20 ms at any rate.
 inline constexpr std::size_t kKernelRoundCalls = 8192;
-// The least a pass lasts, so a kernel case lasts about 10 s.
+// The least a pass lasts at the speed it is sized at, so a kernel case lasts about 10 s.
 inline constexpr std::chrono::milliseconds kKernelMinPassTime{150};
 // Timed rounds a pass is sized from.
 inline constexpr int kKernelSizingRounds = 3;
