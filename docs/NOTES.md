@@ -4546,6 +4546,14 @@ if the two readings agree; otherwise the header says why it is unavailable, and
 `turbo-read-after-the-run-only`. The comparison harness reads turbo the same way, after its
 run. It is outside this change and is left open in TASKS.
 
+**The coverage statement.** `coverage_report.py`'s docstring and the `simd_kernels` statement it
+writes into every summary said no SIMD kernel existed. The kernels have been in its required
+list since `0a03ce5`. Both now say what the gate requires: the dispatch and the scalar set on
+every processor, plus this processor's set, NEON or AVX2 with its CPUID check, built from the
+list itself. The tests failed first (`cov-test-before.log`). Fault
+`coverage-kernel-statement-stale`. `results/coverage.json` is not republished here. That happens
+at the final code, as TASKS says.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
