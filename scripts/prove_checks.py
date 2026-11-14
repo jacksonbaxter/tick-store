@@ -921,6 +921,29 @@ FAULTS = (
           "shorter than 1,800 s, so a 20-second run could stand for G-3's 30 minutes",
           CHECK_FAILED, "FAIL: test_a_clean_run_under_1800_seconds_is_refused "
           "(__main__.CheckFuzzTest"),
+    # G-3's file is tied to the code it judged.
+    Fault("fuzz-g3-tie-ignored", "py-scripts", "check_fuzz.py stops refusing a G-3 file whose "
+          "commit is older than a change to the fuzzed code, so a file from before a codec "
+          "change could still stand for G-3", CHECK_FAILED,
+          "FAIL: test_a_file_older_than_a_fuzzed_code_change_is_refused (__main__.TieTest"),
+    Fault("fuzz-g3-pin-any-content", "py-scripts", "check_fuzz.py lets any file named as the "
+          "ea1dde4 one through the tie, whatever its bytes, where only the pinned SHA-256 may "
+          "pass", CHECK_FAILED,
+          "FAIL: test_the_pin_lets_through_no_other_content (__main__.TieTest"),
+    Fault("fuzz-g3-pin-other-file", "py-scripts", "check_fuzz.py takes a pin for any file, so a "
+          "new G-3 file could be pinned past the tie", CHECK_FAILED,
+          "FAIL: test_no_other_file_may_be_pinned (__main__.TieTest"),
+    Fault("fuzz-g3-unjudged-passes", "py-scripts", "check_fuzz.py passes a file it could not "
+          "tie to the code for want of git history, as in an exported tree or a shallow clone",
+          CHECK_FAILED, "FAIL: test_no_history_is_not_judged (__main__.TieTest"),
+    Fault("check-sh-untied-g3-passes", "py-scripts", "check.sh's render-check passes when G-3's "
+          "file could not be tied to the code, rather than skipping, which --no-skips fails",
+          CHECK_FAILED, "FAIL: test_a_g3_file_with_no_history_to_tie_it_skips_and_fails_under_"
+          "no_skips (__main__.CheckScript"),
+    Fault("ci-shallow-checkout", "py-scripts", "CI checks out the single commit it was pushed "
+          "at, so G-3's file, which judges an older one, could never be tied there",
+          CHECK_FAILED, "FAIL: test_the_workflow_checks_out_the_history_g3s_tie_needs "
+          "(__main__.CheckScript"),
     # Review E-1: G-2's exit codes are the ones its runs exited with.
     Fault("store-results-corrupt-exit-unchecked", "py-scripts", "store_results.py writes G-2's "
           "corrupt exit code as the constant 1 and takes a corrupt run that exited 2 or 0",

@@ -1,0 +1,12 @@
+diff --git a/scripts/check_fuzz.py b/scripts/check_fuzz.py
+--- a/scripts/check_fuzz.py
++++ b/scripts/check_fuzz.py
+@@ -380,7 +380,7 @@
+         return problems, (f"could not judge whether the fuzzed code changed after "
+                           f"{commit[:12]}: {reason}"), None
+     changed = tied_changes(repo, commit)
+-    if changed:
++    if changed and False:
+         shown = ", ".join(changed[:8]) + (f" and {len(changed) - 8} more" if len(changed) > 8
+                                           else "")
+         problems.append(f"the fuzzed code changed after {commit[:12]}, the file's commit: "

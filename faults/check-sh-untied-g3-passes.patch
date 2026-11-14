@@ -1,0 +1,11 @@
+diff --git a/scripts/check.sh b/scripts/check.sh
+--- a/scripts/check.sh
++++ b/scripts/check.sh
+@@ -488,7 +488,6 @@
+     local code=$?
+     NOTE=$(sed -n 's/^fuzz-g3-[0-9a-f]*\.json: ok, //p' "$1" | head -n 1)
+     if [[ $code -eq 3 ]]; then
+-        skip_step "G-3's results file could not be tied to the code it judged: no git history"
+         return 0
+     fi
+     return "$code"

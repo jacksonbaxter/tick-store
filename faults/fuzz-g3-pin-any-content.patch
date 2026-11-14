@@ -1,0 +1,12 @@
+diff --git a/scripts/check_fuzz.py b/scripts/check_fuzz.py
+--- a/scripts/check_fuzz.py
++++ b/scripts/check_fuzz.py
+@@ -364,7 +364,7 @@
+     problems = [f"{PRE_TIE_PINS} in the pins file: {name} is pinned, and only {PRE_TIE_FILE} "
+                 "may be" for name in sorted(pinned) if name != PRE_TIE_FILE]
+     digest = hashlib.sha256(path.read_bytes()).hexdigest()
+-    exempt = path.name == PRE_TIE_FILE and pinned.get(PRE_TIE_FILE) == digest
++    exempt = path.name == PRE_TIE_FILE and PRE_TIE_FILE in pinned
+     return problems, exempt
+ 
+ 

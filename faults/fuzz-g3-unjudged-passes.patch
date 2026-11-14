@@ -1,0 +1,12 @@
+diff --git a/scripts/check_fuzz.py b/scripts/check_fuzz.py
+--- a/scripts/check_fuzz.py
++++ b/scripts/check_fuzz.py
+@@ -428,7 +428,7 @@
+             print(f"{path.name}: ok, {note}")
+     if failed:
+         return EXIT_INVALID
+-    return EXIT_UNJUDGED if unjudged else EXIT_OK
++    return EXIT_OK
+ 
+ 
+ if __name__ == "__main__":
