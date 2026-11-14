@@ -88,6 +88,27 @@ def command(target, seconds=1800):
             f"build/fuzz/corpus/{target} build/fuzz/fuzz-seeds/{target}")
 
 
+def part_command(target, flag):
+    return (f"ASAN_OPTIONS=abort_on_error=0:exitcode=77 build/fuzz/fuzz/{target} {flag} "
+            "-max_len=70000 -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 "
+            "-print_final_stats=1 -artifact_prefix=build/fuzz/artifacts/ "
+            f"build/fuzz/corpus/{target} build/fuzz/fuzz-seeds/{target}")
+
+
+def phases(target):
+    """What fuzz_g3.py's three parts record of a clean run."""
+    return {
+        "replay": {"command": part_command(target, "-runs=0"), "inputs": 5099, "runs": 5103,
+                   "seconds": 567.3, "exit_code": 0, "clean": True, "findings": [],
+                   "done_line": "Done 5103 runs in 567 second(s)"},
+        "merge": {"command": part_command(target, "-merge=1"), "inputs_kept": 914,
+                  "attempts": 1, "seconds": 560.2, "exit_code": 0, "clean": True,
+                  "findings": []},
+        "timed": {"seconds_before_first_new_input": 95.0, "seconds_after_first_new_input": 1707.5,
+                  "new_inputs_saved": 12},
+    }
+
+
 def clean_run(target, host, level):
     return {
         "target": target, "host": host, "commit": COMMIT, "cpu": "unpinned",
@@ -101,6 +122,7 @@ def clean_run(target, host, level):
         "final_stats": {"number_of_executed_units": 90050, "average_exec_per_sec": 50,
                         "new_units_added": 12, "slowest_unit_time_sec": 0, "peak_rss_mb": 1200},
         "command": command(target),
+        **phases(target),
     }
 
 
@@ -289,6 +311,52 @@ class CheckFuzzTest(Checking):
         self.assert_fails(lambda document: None, f"is not {NAME}",
                           name="fuzz-g3-latest.json")
 
+    def test_a_run_with_no_replay_record_is_refused(self):
+        def drop(document):
+            del find(document, "fuzz_pfor", "Linux")["replay"]
+        self.assert_fails(drop, "replay: missing, or without command")
+
+    def test_a_replay_with_a_finding_is_refused(self):
+        def found(document):
+            replay = find(document, "fuzz_pfor", "Linux")["replay"]
+            replay.update(clean=False, findings=[{"kind": "leak", "detail": "LeakSanitizer"}])
+        self.assert_fails(found, "replay: not clean, so the timed run cannot be")
+
+    def test_a_replay_that_did_not_run_every_input_is_refused(self):
+        def fewer(document):
+            replay = find(document, "fuzz_pfor", "Linux")["replay"]
+            replay.update(runs=10, done_line="Done 10 runs in 1 second(s)")
+        self.assert_fails(fewer, "replay: its Done line does not run each of its 5099 inputs")
+
+    def test_a_replay_on_a_time_budget_is_refused(self):
+        def budget(document):
+            replay = find(document, "fuzz_pfor", "Linux")["replay"]
+            replay["command"] = replay["command"].replace("-runs=0", "-max_total_time=60")
+        self.assert_fails(budget, "replay.command: no -runs=0")
+
+    def test_a_merge_that_crashed_is_refused(self):
+        def twice(document):
+            find(document, "fuzz_pfor", "Linux")["merge"]["attempts"] = 2
+        self.assert_fails(twice, "merge.attempts: 2; libFuzzer starts its merge again")
+
+    def test_a_merge_at_another_max_len_is_refused(self):
+        def other(document):
+            merge = find(document, "fuzz_pfor", "Linux")["merge"]
+            merge["command"] = merge["command"].replace("-max_len=70000", "-max_len=64")
+        self.assert_fails(other, "merge.command: its -max_len is not the timed run's")
+
+    def test_a_timed_part_under_1800_seconds_is_refused(self):
+        def short(document):
+            run = find(document, "fuzz_pfor", "Linux")
+            run["timed"]["seconds_after_first_new_input"] = 1600.0
+            run["wall_seconds"] = 1695
+        self.assert_fails(short, "timed: 95.0 s before its first new input and 1600.0 s after")
+
+    def test_a_timed_part_that_is_not_the_runs_time_is_refused(self):
+        def off(document):
+            find(document, "fuzz_pfor", "Linux")["timed"]["seconds_after_first_new_input"] = 2900
+        self.assert_fails(off, "timed: 2995.0 s is not the run's 1803 s")
+
     def test_a_home_path_is_refused(self):
         def leak(document):
             find(document, "fuzz_columns", "macOS")["command"] += " /Users/someone/corpus"
@@ -410,6 +478,21 @@ class TieTest(Checking):
                       result.stderr)
         self.assertIn("the fuzzed code changed after", result.stderr)
 
+    def test_only_the_pinned_file_may_keep_the_schema_from_before_the_launcher(self):
+        document = self.pre_tie_document()
+        document["header"]["schema"] = check_fuzz.PRE_TIE_SCHEMA
+        for run in document["runs"]:
+            for part in ("replay", "merge", "timed"):
+                del run[part]
+        result = self.run_check(document, check_fuzz.PRE_TIE_FILE, pins=self.pin_of(document))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        document = valid_document()
+        document["header"]["schema"] = check_fuzz.PRE_TIE_SCHEMA
+        result = self.run_check(document)
+        self.assertEqual(result.returncode, check_fuzz.EXIT_INVALID, result.stdout)
+        self.assertIn(f"header.schema: {check_fuzz.PRE_TIE_SCHEMA} records no replay or merge",
+                      result.stderr)
+
     def test_the_committed_file_is_the_one_pinned(self):
         pins = json.loads(check_fuzz.DEFAULT_PINS.read_text(encoding="utf-8"))
         path = REPO_ROOT / "results" / check_fuzz.PRE_TIE_FILE
@@ -430,6 +513,25 @@ stat::average_exec_per_sec:     50
 stat::new_units_added:          12
 stat::slowest_unit_time_sec:    0
 stat::peak_rss_mb:              1200
+"""
+
+LOG_REPLAY = """INFO: Seed: 1
+INFO:      811 files found in /x/repo/build/fuzz/corpus/pfor
+INFO:     4288 files found in /x/repo/build/fuzz/fuzz-seeds/pfor
+INFO: seed corpus: files: 5099 min: 1b max: 55022b total: 15149303b rss: 46Mb
+#5103\tINITED cov: 1468 ft: 7494 corp: 914/2803Kb exec/s: 9 rss: 601Mb
+#5103\tDONE   cov: 1468 ft: 7494 corp: 914/2803Kb lim: 16384 exec/s: 9 rss: 601Mb
+Done 5103 runs in 567 second(s)
+stat::number_of_executed_units: 5103
+stat::peak_rss_mb:              601
+"""
+
+LOG_MERGE = """MERGE-OUTER: 5099 files, 0 in the initial corpus, 0 processed earlier
+MERGE-OUTER: attempt 1
+MERGE-INNER: 5099 total files; 0 processed earlier; will process 5099 files now
+#5099\tDONE   cov: 1468 ft: 7494 exec/s: 9 rss: 601Mb
+MERGE-OUTER: successful in 1 attempt(s)
+MERGE-OUTER: 914 new files with 7494 new features added; 1468 new coverage edges
 """
 
 LOG_CRASH = """INFO: Seed: 1
@@ -460,6 +562,19 @@ class AssembleTest(Scratch):
                 f"command={run_command}\n"
                 f"end=2026-11-11T10:30:03Z epoch=2803 exit={exit_code}\n", encoding="utf-8")
             (folder / f"{tag}.log").write_text(logs.get(name, LOG_CLEAN), encoding="utf-8")
+            (folder / f"{tag}.replay.log").write_text(LOG_REPLAY, encoding="utf-8")
+            (folder / f"{tag}.merge.log").write_text(LOG_MERGE, encoding="utf-8")
+            parts = phases(name)
+            (folder / f"{tag}.phases.json").write_text(json.dumps({
+                "tag": tag, "commit": COMMIT,
+                "replay": {"command": run_command.replace("-max_total_time=1800", "-runs=0"),
+                           "seconds": 567.3, "exit_code": 0},
+                "merge": {"command": run_command.replace("-max_total_time=1800", "-merge=1"),
+                          "seconds": 560.2, "exit_code": 0},
+                "timed": {"command": run_command, "seconds": 1802.5, "exit_code": exit_code,
+                          "seconds_to_inited": 95.0,
+                          "new_inputs_saved": parts["timed"]["new_inputs_saved"]}}),
+                encoding="utf-8")
         return folder
 
     def assemble(self, crash=None):
@@ -486,6 +601,42 @@ class AssembleTest(Scratch):
                                   "--repo", str(REPO), str(out)], capture_output=True, text=True,
                                  check=False)
         self.assertEqual(checked.returncode, 0, checked.stderr)
+
+    def test_the_replay_merge_and_timed_split_are_recorded(self):
+        result, out = self.assemble()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        run = find(json.loads(out.read_text(encoding="utf-8")), "fuzz_pfor", "Linux")
+        self.assertEqual((run["replay"]["inputs"], run["replay"]["runs"], run["replay"]["seconds"]),
+                         (5099, 5103, 567.3))
+        self.assertTrue(run["replay"]["command"].startswith("taskset -c 2 build/fuzz/fuzz/"))
+        self.assertEqual((run["merge"]["inputs_kept"], run["merge"]["attempts"]), (914, 1))
+        self.assertEqual(run["timed"], {"seconds_before_first_new_input": 95.0,
+                                        "seconds_after_first_new_input": 1707.5,
+                                        "new_inputs_saved": 12})
+
+    def test_a_merge_crash_is_recorded_as_not_clean(self):
+        mac = self.write_host("macOS", {})
+        (mac / "fuzz_pfor.merge.log").write_text(
+            LOG_MERGE.replace("MERGE-OUTER: successful", "==9== ERROR: AddressSanitizer: "
+                              "heap-buffer-overflow\nMERGE-OUTER: attempt 2\nMERGE-OUTER: "
+                              "successful"), encoding="utf-8")
+        phases_path = mac / "fuzz_pfor.phases.json"
+        record = json.loads(phases_path.read_text(encoding="utf-8"))
+        record["failed_in"] = "merge"
+        del record["timed"]
+        phases_path.write_text(json.dumps(record), encoding="utf-8")
+        shutil.copyfile(mac / "fuzz_pfor.merge.log", mac / "fuzz_pfor.log")
+        linux = self.write_host("Linux", {})
+        out = self.dir / NAME
+        result = subprocess.run(
+            [sys.executable, "-I", str(ASSEMBLER), "--commit", COMMIT, "--out", str(out),
+             "--host", f"macOS={mac}", "--host", f"Linux={linux}", "--strip", "/x/repo",
+             "--cmake", str(self.cmake)], capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        run = find(json.loads(out.read_text(encoding="utf-8")), "fuzz_pfor", "macOS")
+        self.assertFalse(run["clean"])
+        self.assertEqual(run["merge"]["attempts"], 2)
+        self.assertEqual(run["findings"][0]["kind"], "crash")
 
     def test_a_crash_is_recorded_as_not_clean(self):
         result, out = self.assemble(crash="fuzz_pfor")

@@ -139,11 +139,26 @@ class CheckScript(unittest.TestCase):
         return tree
 
     def untie(self, tree):
-        """The committed G-3 file with its pin taken out, so the tie applies to it."""
+        """The committed G-3 file with its pin taken out, so the tie applies to it, and as the
+        launcher records a run, so nothing else refuses it: the Targets block reads the same."""
         pins_path = tree / "scripts" / "data_pins.json"
         pins = json.loads(pins_path.read_text())
         del pins[check_fuzz.PRE_TIE_PINS]
         pins_path.write_text(json.dumps(pins, indent=2) + "\n")
+        path = tree / "results" / check_fuzz.PRE_TIE_FILE
+        document = json.loads(path.read_text())
+        document["header"]["schema"] = check_fuzz.SCHEMA
+        for run in document["runs"]:
+            budget = f"-max_total_time={check_fuzz.REQUIRED_SECONDS}"
+            run["replay"] = {"command": run["command"].replace(budget, "-runs=0"), "inputs": 1,
+                             "runs": 1, "seconds": 1.0, "exit_code": 0, "clean": True,
+                             "findings": [], "done_line": "Done 1 runs in 1 second(s)"}
+            run["merge"] = {"command": run["command"].replace(budget, "-merge=1"),
+                            "inputs_kept": 1, "attempts": 1, "seconds": 1.0, "exit_code": 0,
+                            "clean": True, "findings": []}
+            run["timed"] = {"seconds_before_first_new_input": 0.0,
+                            "seconds_after_first_new_input": float(run["wall_seconds"])}
+        path.write_text(json.dumps(document, indent=1) + "\n")
 
     def test_a_g3_file_with_no_history_to_tie_it_skips_and_fails_under_no_skips(self):
         tree = self.exported_copy()

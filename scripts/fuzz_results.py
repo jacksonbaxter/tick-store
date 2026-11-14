@@ -5,12 +5,20 @@
         --host macOS=DIR --host Linux=DIR [--strip PREFIX ...]
 
 Each DIR holds host.json, the host's facts (cpu_model, kernel, compiler, compile_flags,
-sanitizer_options, concurrency, peak_memory, default_kernel_level), and for each run:
+sanitizer_options, concurrency, peak_memory, default_kernel_level), and for each run what
+scripts/fuzz_g3.py wrote:
 
-    <tag>.meta   key=value lines the runner wrote: commit=, start= epoch=, the environment line,
-                 command=, and end= epoch= exit= (and vmhwm_kb_polled= on Linux)
-    <tag>.log    the fuzzer's own output, with -print_final_stats=1
-    <tag>.time   on macOS, what /usr/bin/time -l wrote
+    <tag>.meta         key=value lines: commit=, start= epoch=, the environment line, command=,
+                       and end= epoch= exit= (and vmhwm_kb_polled= on Linux)
+    <tag>.log          the timed run's own output, with -print_final_stats=1
+    <tag>.time         on macOS, what /usr/bin/time -l wrote
+    <tag>.replay.log   the replay of the saved corpus and the seeds, -runs=0
+    <tag>.merge.log    their merge, -merge=1, into the folder the timed run starts from
+    <tag>.phases.json  each part's command, exit code and clock
+
+The replay's inputs are libFuzzer's count of files in its folders, its runs its Done line, and
+the merge's kept inputs its own count of new files; the seconds are the launcher's clock, the
+timed run's split at its INITED line, after which its first new input runs.
 
 Every value comes from those files. A run is clean only if the fuzzer exited 0, printed its final
 DONE line, its Done line and its final stats, and its log holds no sanitizer report, no libFuzzer
@@ -45,6 +53,8 @@ FINDINGS = (
     ("other", re.compile(r"Test unit written to|ERROR: libFuzzer")),
 )
 STAT = re.compile(r"^stat::(\w+):\s+(\d+)$")
+SEED_FILES = re.compile(r"INFO: seed corpus: files: (\d+) ")
+MERGED = re.compile(r"MERGE-OUTER: (\d+) new files with ")
 INITED = re.compile(r"^#(\d+)\s+INITED .*exec/s: (\d+) ")
 TIME_FIELDS = {"maximum resident set size": "max_rss_bytes",
                "peak memory footprint": "peak_footprint_bytes"}
@@ -164,6 +174,12 @@ def run_of(host, folder, tag, facts, prefixes):
     if log["inited"] is not None:
         runs, rate = int(log["inited"][1]), int(log["inited"][2])
         run["inited"] = {"runs": runs, "approx_seconds": round(runs / rate) if rate else None}
+    run.update(phases_of(folder, tag, prefixes))
+    failed_in = run.pop("failed_in", None)
+    if failed_in and not run["findings"]:
+        run["findings"] = [{"kind": "other", "detail": f"the {failed_in} did not pass"}]
+    if failed_in:
+        run["clean"] = False
     time_path = folder / f"{tag}.time"
     if time_path.exists():
         run["os_peak_memory"] = {"method": "BSD time -l", **read_time(time_path)}
@@ -171,6 +187,49 @@ def run_of(host, folder, tag, facts, prefixes):
         run["os_peak_memory"] = {"method": "VmHWM read from /proc every 5 s while it ran",
                                  "vmhwm_bytes": int(meta["vmhwm_kb_polled"]) * 1024}
     return run
+
+
+def phases_of(folder, tag, prefixes):
+    """The replay, the merge and the timed run's split, from fuzz_g3.py's files."""
+    path = folder / f"{tag}.phases.json"
+    if not path.exists():
+        raise Refused(f"{path.name}: missing; scripts/fuzz_g3.py writes it beside each run")
+    phases = json.loads(path.read_text(encoding="utf-8"))
+    record = {}
+    if phases.get("failed_in"):
+        record["failed_in"] = phases["failed_in"]
+    for name in ("replay", "merge"):
+        if name not in phases:
+            continue
+        log_path = folder / f"{tag}.{name}.log"
+        text = log_path.read_text(encoding="utf-8", errors="replace")
+        log = read_log(log_path)
+        part = {"command": relative(phases[name]["command"], prefixes),
+                "seconds": phases[name]["seconds"], "exit_code": phases[name]["exit_code"],
+                "findings": log["findings"]}
+        if name == "replay":
+            files = SEED_FILES.search(text)
+            done = re.match(r"^Done (\d+) runs in \d+ second\(s\)$", log["done"])
+            part.update(inputs=int(files[1]) if files else None,
+                        runs=int(done[1]) if done else None, done_line=log["done"])
+            part["clean"] = (part["exit_code"] == 0 and not part["findings"]
+                             and done is not None and files is not None)
+        else:
+            kept = MERGED.search(text)
+            part.update(inputs_kept=int(kept[1]) if kept else None,
+                        attempts=text.count("MERGE-OUTER: attempt "))
+            part["clean"] = (part["exit_code"] == 0 and not part["findings"]
+                             and part["attempts"] == 1 and kept is not None)
+        record[name] = part
+    if "timed" in phases:
+        timed = phases["timed"]
+        inited = timed["seconds_to_inited"]
+        record["timed"] = {
+            "seconds_before_first_new_input": inited,
+            "seconds_after_first_new_input": (None if inited is None
+                                              else round(timed["seconds"] - inited, 1)),
+            "new_inputs_saved": timed.get("new_inputs_saved")}
+    return record
 
 
 # What a commit can change without changing a fuzz binary.
@@ -211,13 +270,16 @@ def assemble(commit, hosts, prefixes, cmake):
     runs.sort(key=lambda run: (order[run["host"]], run["target"], run["kernel_level"]))
     header = {
         "schema": check_fuzz.SCHEMA, "gate": "G-3", "commit": commit,
-        "statement": ("Each libFuzzer target of fuzz/CMakeLists.txt, run for at least "
-                      f"{check_fuzz.REQUIRED_SECONDS} s under the heavy-job lock, with "
-                      "scripts/check.sh's flags and caps, on the existing corpus and the seeds "
-                      "the real encoders write; on Linux, each target whose decode reaches the "
-                      "AVX2 kernels or that verifies CRC32C, which runs the SSE4.2 kernel there, "
-                      "with the level set to avx2. Coverage, corpus and exec/s are libFuzzer's "
-                      "own final figures."),
+        "statement": ("Each libFuzzer target of fuzz/CMakeLists.txt, under the heavy-job "
+                      "lock, with fuzz/launch.txt's flags and caps: first every input of the "
+                      "saved corpus and every seed the real encoders write, run once through "
+                      "the target's oracle, then merged into the smallest set that keeps their "
+                      "coverage, then a timed run of at least "
+                      f"{check_fuzz.REQUIRED_SECONDS} s that starts from that set; on Linux, "
+                      "each target whose decode reaches the AVX2 kernels or that verifies "
+                      "CRC32C, which runs the SSE4.2 kernel there, with the level set to avx2. "
+                      "Coverage, corpus and exec/s are the timed run's, libFuzzer's own final "
+                      "figures."),
         "required_seconds": check_fuzz.REQUIRED_SECONDS,
         "targets_file": "fuzz/CMakeLists.txt", "targets": targets,
         "avx2_path_targets": list(check_fuzz.AVX2_PATH),

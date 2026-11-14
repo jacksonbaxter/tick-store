@@ -9,7 +9,10 @@ on Linux for every target whose decode reaches the AVX2 kernels or that verifies
 runs the SSE4.2 kernel there, since the Mac can run neither.
 This refuses a file that leaves a target out, a clean run shorter than 1,800 s, a run whose own
 final lines disagree with its numbers, a run looser than the targets' memory caps, and summary
-counts that are not the runs'. A run that was not clean may stop early, but must say what it
+counts that are not the runs'. A run is scripts/fuzz_g3.py's three parts: the replay of every
+saved corpus input and seed, which must have run them all clean; their merge, in one attempt,
+since a second means an input crashed it; and the timed run on the merged set, at least
+1,800 s by its own clock, split where its first new input ran. A run that was not clean may stop early, but must say what it
 found; RESULTS.md's Targets block then reads it as missed, never as met.
 
 It also refuses anything not safe to publish, with check_results.py's rules.
@@ -21,7 +24,8 @@ shallow to hold it, the file is not judged: it exits EXIT_UNJUDGED and says why,
 render_results.py passes on and scripts/check.sh reports as a skip, a failure under --no-skips.
 One file made before this rule is let through it until the freeze replaces it: PRE_TIE_FILE,
 known by the SHA-256 of its bytes under PRE_TIE_PINS in scripts/data_pins.json, never by
-anything the file says of itself. No other file may be pinned there.
+anything the file says of itself. No other file may be pinned there. It is also the one file
+that may keep PRE_TIE_SCHEMA, from before the launcher, whose runs record no replay or merge.
 
 Standard library only. tests/scripts/test_check_fuzz.py shows each rule failing on an injected
 fault.
@@ -43,7 +47,10 @@ import check_results  # noqa: E402
 DEFAULT_CMAKE = REPO_ROOT / "fuzz" / "CMakeLists.txt"
 DEFAULT_PINS = REPO_ROOT / "scripts" / "data_pins.json"
 
-SCHEMA = "tick-store-fuzz-1"
+SCHEMA = "tick-store-fuzz-2"
+# The pinned file's, from before scripts/fuzz_g3.py: each run replayed its folders inside its
+# timed part, and records nothing of it.
+PRE_TIE_SCHEMA = "tick-store-fuzz-1"
 EXIT_OK = 0
 EXIT_INVALID = 1
 EXIT_USAGE = 2
@@ -99,6 +106,13 @@ RUN_FIELDS = ("target", "host", "commit", "kernel_level", "seconds", "wall_secon
               "exec_per_second", "coverage", "corpus", "peak_rss_mb", "clean", "exit_code",
               "findings", "final_status_line", "done_line", "final_stats", "command")
 FINDING_KINDS = ("crash", "timeout", "oom", "leak", "other")
+REPLAY_FIELDS = ("command", "inputs", "runs", "seconds", "exit_code", "clean", "findings",
+                 "done_line")
+MERGE_FIELDS = ("command", "inputs_kept", "attempts", "seconds", "exit_code", "clean",
+                "findings")
+TIMED_FIELDS = ("seconds_before_first_new_input", "seconds_after_first_new_input")
+# How far the launcher's clock and the meta file's whole-second epochs may differ.
+CLOCK_SLACK_SECONDS = 2
 SUMMARY_FIELDS = ("targets_required", "targets_clean", "shortest_seconds")
 
 FUZZER = re.compile(r"^\s*tick_store_add_fuzzer\(\s*(\w+)\s*\)", re.MULTILINE)
@@ -122,7 +136,7 @@ def check_header(header, top_keys, path, targets):
     for field in HEADER_FIELDS:
         if field not in header:
             problems.append(f"header: missing field '{field}'")
-    if header.get("schema") != SCHEMA:
+    if header.get("schema") not in (SCHEMA, PRE_TIE_SCHEMA):
         problems.append(f"header.schema: expected {SCHEMA}")
     if header.get("gate") != "G-3":
         problems.append("header.gate: this file judges G-3")
@@ -217,6 +231,70 @@ def check_clean(where, run):
     return problems
 
 
+def max_len_of(command):
+    found = [word for word in str(command).split() if word.startswith("-max_len=")]
+    return found[0] if len(found) == 1 else None
+
+
+def check_part_command(where, command, flag, timed_command):
+    problems = []
+    words = str(command).split()
+    if flag not in words:
+        problems.append(f"{where}.command: no {flag}")
+    for required in REQUIRED_FLAGS:
+        if required not in words:
+            problems.append(f"{where}.command: no {required}, so it is not the targets' run")
+    if any(word.startswith("-max_total_time=") for word in words):
+        problems.append(f"{where}.command: a time budget, so it may not run every input")
+    if max_len_of(command) is None or max_len_of(command) != max_len_of(timed_command):
+        problems.append(f"{where}.command: its -max_len is not the timed run's")
+    return problems
+
+
+def check_phases(where, run):
+    """A clean run's replay ran every input clean, its merge took one attempt, and its timed
+    part, before and after its first new input, is the run's own time and at least G-3's."""
+    problems = []
+    replay, merge, timed = run.get("replay"), run.get("merge"), run.get("timed")
+    for name, part, fields in (("replay", replay, REPLAY_FIELDS), ("merge", merge, MERGE_FIELDS),
+                               ("timed", timed, TIMED_FIELDS)):
+        if not isinstance(part, dict) or any(field not in part for field in fields):
+            problems.append(f"{where}.{name}: missing, or without {', '.join(fields)}")
+    if problems:
+        return problems
+    for name, part, flag in (("replay", replay, "-runs=0"), ("merge", merge, "-merge=1")):
+        if part["exit_code"] != 0 or part["clean"] is not True or part["findings"]:
+            problems.append(f"{where}.{name}: not clean, so the timed run cannot be")
+        if not is_number(part["seconds"]) or part["seconds"] < 0:
+            problems.append(f"{where}.{name}.seconds: not a time")
+        problems += check_part_command(f"{where}.{name}", part["command"], flag, run["command"])
+    done = DONE.match(str(replay["done_line"]))
+    if not isinstance(replay["inputs"], int) or replay["inputs"] < 1 or done is None or \
+            int(done[1]) != replay["runs"] or replay["runs"] < replay["inputs"]:
+        problems.append(f"{where}.replay: its Done line does not run each of its "
+                        f"{replay['inputs']} inputs")
+    if merge["attempts"] != 1:
+        problems.append(f"{where}.merge.attempts: {merge['attempts']}; libFuzzer starts its "
+                        "merge again only past an input that crashed it")
+    if not isinstance(merge["inputs_kept"], int) or merge["inputs_kept"] < 1 or \
+            isinstance(replay["inputs"], int) and merge["inputs_kept"] > replay["inputs"]:
+        problems.append(f"{where}.merge.inputs_kept: {merge['inputs_kept']} is not a set of the "
+                        "replayed inputs")
+    before, after = timed["seconds_before_first_new_input"], timed["seconds_after_first_new_input"]
+    if not is_number(before) or not is_number(after) or before < 0 or after < 0:
+        problems.append(f"{where}.timed: not two times")
+        return problems
+    if before + after < REQUIRED_SECONDS:
+        problems.append(f"{where}.timed: {before} s before its first new input and {after} s "
+                        f"after, {before + after:.1f} s, under the {REQUIRED_SECONDS} s G-3 asks "
+                        "for")
+    if is_number(run["wall_seconds"]) and \
+            abs(before + after - run["wall_seconds"]) > CLOCK_SLACK_SECONDS:
+        problems.append(f"{where}.timed: {before + after:.1f} s is not the run's "
+                        f"{run['wall_seconds']} s")
+    return problems
+
+
 def check_runs(document, header):
     problems = []
     runs = document.get("runs")
@@ -252,6 +330,8 @@ def check_runs(document, header):
         problems += check_command(where, run["command"])
         if run["clean"] is True:
             problems += check_clean(where, run)
+            if header.get("schema") == SCHEMA:
+                problems += check_phases(where, run)
         elif run["clean"] is False:
             findings = run["findings"]
             if not isinstance(findings, list) or not findings or not all(
@@ -371,6 +451,10 @@ def pinned_before_the_tie(path, pins):
 def check_tie(path, commit, repo, pins):
     """(problems, unjudged, note) for a file whose content is valid."""
     problems, exempt = pinned_before_the_tie(path, pins)
+    schema = json.loads(path.read_text(encoding="utf-8"))["header"]["schema"]
+    if schema == PRE_TIE_SCHEMA and not exempt:
+        problems.append(f"header.schema: {PRE_TIE_SCHEMA} records no replay or merge, and only "
+                        f"{PRE_TIE_FILE}, by its pin, may keep it; a file made now is {SCHEMA}")
     reason = history_problem(repo, commit)
     if exempt:
         counted = ("" if reason else
