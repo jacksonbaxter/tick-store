@@ -4813,6 +4813,18 @@ PROVEN with `--only` (`prove-item4.log`). `--verify-all` still matches 576 cases
 Mac, iteration only: `pfor_delta_fused/w=13/neon` ran 491,520 calls a pass, 60 rounds, in passes
 of 156 ms, and published p50 to p99.99. The DS-4 section says how a pass is sized now.
 
+**RG-9, a launcher worker that raises.** In `scripts/fuzz_g3.py` a target whose part raised in
+the launcher ended its worker thread: it never reached the results, the targets queued behind
+it on that worker never ran, and the launcher printed "failed: none" and exited 0. A part that
+raises now fails its target, printed with the error, and the worker goes on; a listed target
+with no result counts as failed; and a `--logs` folder that already holds a listed target's
+files, an earlier launch's `.meta` or `.phases.json` among them, is refused before anything
+runs, so they cannot be read as this launch's. The freeze's four Mac batches share one folder
+with no target in two, so the refusal leaves them as they are. The tests failed first
+(`item5-before.log`). Faults `fuzz-g3-launch-missing-target-passed`,
+`fuzz-g3-launch-worker-raise-uncaught` and `fuzz-g3-launch-earlier-files-taken`, each PROVEN
+with `--only` (`prove-item5.log`).
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
