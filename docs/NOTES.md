@@ -4540,13 +4540,18 @@ about 38 minutes a variant.
 
 ### Pre-registration of the freeze comparison
 
-Written at the final review, before any measured run of protocol 2. Every protocol 2 run so far is
-iteration-only. The spread below comes from `spread.py` in `phase4-raw/fix-compare-rest/prereg/`,
+Written at the final review, before any measured run of protocol 2, and revised on 2026-11-14
+after the second-pass review (RP-1 to RP-3, `phase4-raw/review/R2-compare-prover.md`), still
+before any measured run. Every protocol 2 run so far is iteration-only. `scripts/check_compare.py`
+at the freeze commit is final for the freeze: no rule of it changes between the first measured
+run and the last. The spread below comes from `spread.py` in `phase4-raw/fix-compare-rest/prereg/`,
 over three sources: the repetitions inside the committed files; the protocol 2 Linux slice at
 `85a4912` (`phase4-raw/fix-compare-protocol/`), against the `67ae574` Linux slice; and the
 iteration day's tick-store part at `4c049c7` (`phase4-raw/fullday-precondition/`), against
 tick-store's `v3-seg4Mi` block in the `67ae574` Linux day. The first comparison is the only
-second run of the three other systems. Neither has a second run on macOS.
+second run of the three other systems. Neither has a second run on macOS. The families the
+revision added are computed the same way, over the same files, by `spread_more.py` in
+`phase4-raw/fix-freeze-a/item8/`.
 
 **What is measured at the freeze.** Four documents, all at the freeze commit, each under its
 host's wrapper with `TICK_STORE_MEASURE` set, so `check_compare.py` passes each one before it is
@@ -4561,20 +4566,45 @@ The new files replace the three `67ae574` files. The macOS day replaces
 `scripts/data_pins.json`, as the open item in docs/TASKS.md says. Each figure is compared with
 the same host, scope, system, variant, class and query in the file it replaces.
 
+**Which runs count.** A run is void for these causes alone, checked on every run whatever its
+figures: the harness did not finish (`compare/run.py` exited non-zero, its memory guard stopped
+a system, or the host or the session was lost), or `check_compare.py` at the freeze commit
+refuses the document. Exit 75 from the wrapper is no run and no attempt: nothing was measured.
+Nothing found while investigating a figure voids a run. The Linux four-system day gets at most
+two attempts, then the fallback below; each slice and the macOS day get at most three. The
+first attempt not void is the reported file. Every attempt is listed here with its voiding
+cause, and a void document stays `.pending` and is not reported.
+
+**The percentage.** Every percentage below is |new − old| / old, of one figure in the new file
+and the same figure in the file it replaces: a write's `seconds_median` (engine-only,
+`engine_only_seconds_median`), and a latency block's `median_us` for a median and `p99_us` for
+a slowest, which are what the tables print; for the other families, the fields their rows name.
+A threshold is the largest such change in the sources, rounded up to the next 5% where this
+revision set it.
+
 **The families, and what changed.**
 
 | Family | Protocol 2 against protocol 1 | Investigate past |
 |---|---|---|
-| Stored bytes, allocated at rest | Unchanged: the same sum after the same flush of every file | Apparent bytes not equal to the byte for Parquet, QuestDB and tick-store, with the same writer code and library versions. ArcticDB more than 2% apart. On Linux, allocated more than 4 KiB a file from the old figure when apparent is equal. On macOS allocated is not compared; see the next section |
+| Stored bytes, allocated at rest | Unchanged: the same sum after the same flush of every file | `apparent_bytes` not equal to the byte for Parquet, QuestDB and tick-store; a changed library version in `versions` is then a cause to write down. ArcticDB: `apparent_bytes` more than 2% apart. On Linux, `allocated_bytes` more than 4,096 bytes times the new document's `files` from the old figure, when apparent is equal. On macOS allocated is not compared; see "macOS st_blocks and QuestDB's converted partition" |
 | Write, total seconds | The clock is unchanged. The slice now refuses a write whose export is not wholly resident (F-10), which the method only claimed before | 15% for class A in every scope, and for class B on macOS and on the Linux day. 75% for class B on the Linux slice |
 | Write, engine-only seconds | Changed: defined for every system, per repetition, as the total less `python_seconds` (RF-2). Protocol 1 slice files kept medians alone | None: first measurement |
+| Write, peak RSS: `peak_rss_bytes_client`, `peak_rss_bytes_service` | Unchanged | Linux slice: 5%, each. Linux day: tick-store's client 20%. None for the others on the day, or on macOS: no second run |
 | Warm medians | Changed on the slice and on the macOS day, which now run each query once untimed, its answer checked, before timing (F-3). Unchanged on the Linux day, which already did | 10%, on the Linux day |
 | Warm slowest of 30 | As warm medians. The figure is the old `p99_us`, now named for what it is (F-4) | 50%, on the Linux day |
-| Cold medians | Changed for tick-store, whose clock now holds the store's open (F-1). Unchanged for Parquet, ArcticDB and QuestDB, which now state whether their clock holds their open | Parquet, ArcticDB and QuestDB: 25% on the Linux day, 55% on the slice |
-| Cold slowest of 7 | As cold medians | The same three: 50% on the Linux day, 100% on the slice |
+| Cold medians | Changed for tick-store, whose clock now holds the store's open (F-1). Unchanged for Parquet, ArcticDB and QuestDB, which now state whether their clock holds their open | Parquet, ArcticDB and QuestDB: 25% on the Linux day, 55% on the Linux slice |
+| Cold slowest of 7 | As cold medians | The same three: 50% on the Linux day, 100% on the Linux slice |
+| tick-store's engine seconds, a latency block's `engine` | Warm as warm medians. Cold unchanged: `engine` is the query call alone, without the open F-1 added to the clock | Warm, Linux day: median 5%, slowest 10%. Cold: Linux slice median 15%, slowest 35%; Linux day median 10%, slowest 5% |
+| The warm worker's open, `warm_worker_open.seconds` | New in protocol 2 | None: first measurement |
+| The Python floor, `python_floor` `median_us` and `p99_us` | Unchanged | Linux slice: median 25%, `p99_us` 535%. Linux day, tick-store: median 10%, `p99_us` 35%. None on macOS: no second run |
+| Peak memory of a day, `peak_memory`: `vmhwm_bytes_largest` (Largest VmHWM) and `session_rss_bytes_peak`; on the macOS day BSD `time -l`'s `maximum_resident_set_size_bytes` and `peak_memory_footprint_bytes` | Unchanged readings. The guard's swap rate is now over the time between its samples (`cefe2ae`), which changes when it stops a system, not these figures | Linux day, tick-store: 20%, each. None for the other three, or for the macOS day: no second run |
+| Durability verdicts, a class's `durability.status` | Unchanged | None. A durability or residency proof whose verdict differs from the replaced file's is always named |
+| Variant selection | Changed: protocol 2's `variant_rule.RULE` is not `RULE_PROTOCOL_1`, so the Linux day may run variants the old day did not | None. A variant with no counterpart in the replaced file is reported as measured, and said to have none |
 
-A changed family has no threshold. Its first protocol 2 figure is reported as measured, and
-wherever it appears beside a protocol 1 figure, the change is named.
+The macOS slice has no second run, so it has no threshold for cold medians, cold slowest or any
+family the table gives on the Linux slice alone. A family with no threshold is reported as
+measured, and wherever it appears beside a protocol 1 figure, the change, or that there was no
+second run, is named.
 
 **The spread the thresholds rest on.**
 
@@ -4599,25 +4629,30 @@ wherever it appears beside a protocol 1 figure, the change is named.
   slowest over median: 90th percentile 31.7% on the `67ae574` Linux slice and 5.4% on macOS. No
   second day exists for these three. The day's thresholds are the starting points, untested
   against a second day, and they may well be crossed.
+- *The revision's families,* run to run, largest change. Write peak RSS, Linux slice: client
+  1.32% (32 pairs), service 2.26% (QuestDB, 4); Linux day, tick-store's client: 18.97% in class A,
+  7.70 to 9.16 GB. tick-store's `engine`: warm on the Linux day, median 0.41%, slowest 9.12%;
+  cold on the Linux slice, median 13.52%, slowest 34.29% (10 queries); cold on the Linux day,
+  median 5.31%, slowest 4.77%. Python floor, Linux slice: median 24.43%, `p99_us` 531.21%
+  (QuestDB `locate-index`, 1.14 to 7.18 ms; 16 variants); Linux day, tick-store: 7.12% and
+  32.38%. Peak memory, Linux day, tick-store: Largest VmHWM 16.61%, session RSS peak 16.81%
+  (14.5 to 12.1 GB, `tick_roundtrip`). Durability verdicts: equal in all 32 slice and 2 day
+  pairs. `warm_worker_open` is in the `85a4912` slice alone.
 
-**What "investigated" means.** A figure past its threshold holds back its file. The cause is
-found and written down in this file before the file is accepted, with the evidence from that
-run: its load lines, sibling busy figures, swap per phase, residency and device reads, and the
-guard's report. A cause may be a code change between the two commits, a host condition the
-logs show, or the spread of the file's own repetitions. A file is never dropped, rerun or
-replaced because a figure is slower or faster. A rerun needs a cause that voids the run itself,
-written down first. The voided file is then listed with that cause.
+**Past a threshold.** A figure past its threshold never holds a file back and never causes a
+rerun. Its cause is looked for in that run's own evidence (its load lines, sibling busy
+figures, swap per phase, residency and device reads, and the guard's report) and in the code
+changed between the two commits, and written beside the figure, or it is written that none was
+found. The crossing is named wherever the figure is quoted.
 
 **Write targets** are judged on both clocks. WT-3 and WT-4 are met against a system only if
 tick-store is no slower on its total seconds and on its engine-only seconds
 (`scripts/targets.json`). WT-1 and WT-2 are rates from the total clock. For tick-store the two
 clocks differ by its tool's start and exit, 0.3 and 0.4 s of a day's write of about 190 s at
-`67ae574`. Both clocks are shown beside each other. **A run the validator refuses is not
-reported.** It stays `.pending`, and it is listed here with the validator's reason.
+`67ae574`. Both clocks are shown beside each other.
 
-**Fallback.** The Linux four-system day might not produce a file the validator accepts: the
-guard stops a system, the host is not available, or a refusal cannot be fixed without changing
-a rule. Linux then reports tick-store alone on the day (`--tickstore-alone`, as in
+**Fallback.** If neither of the Linux four-system day's two attempts gives a run that is not
+void, Linux reports tick-store alone on the day (`--tickstore-alone`, as in
 compare/README.md). It is read beside the other three systems' figures from
 `Linux-12302019-full-67ae574f5666.json`. Wherever both appear, the protocol differences are
 stated:
@@ -4871,6 +4906,23 @@ first (`item7/before-test_*.log`). Faults `build-preset-option-defaults-ignored`
 `g2-plan-footer-trailer-counted`, `fuzz-host-absolute-path-kept` and `fuzz-host-name-kept`,
 each PROVEN with `--only` (`prove-item7.log`). `store_results.py` still writes the round-trip
 files' `build_preset` as `bench`, the preset their runs are made with; this round leaves it.
+
+**The pre-registration revised (RP-1 to RP-3).** The second-pass review found that the
+pre-registration let a figure cause a rerun: only a figure past its threshold was investigated,
+the investigation could find "a host condition the logs show", and such a cause could void the
+run (RP-1, BLOCK). It also found thresholds two readers could apply differently (RP-2) and
+reported families in neither list (RP-3). "Pre-registration of the freeze comparison" is
+revised on 2026-11-14, before any measured run, only where the findings name. A run is now void
+for a closed list of causes, checked on every run whatever its figures; a figure past its
+threshold never holds a file back or causes a rerun, and its cause, or that none was found, is
+written beside it; the Linux day gets at most two attempts and each other document three. The
+percentage is defined once, the stored-bytes row no longer depends on unchanged writer code,
+ArcticDB's 2% is of apparent bytes, the 4 KiB is a file of the new document, the slice's cold
+thresholds are the Linux slice's, and the section reference is right. Seven families are added:
+write peak RSS, tick-store's engine seconds, the warm worker's open, the Python floor, a day's
+peak memory, durability verdicts, and variant selection; each has a threshold only where the
+same sources give a second run (`spread_more.py`, `item8/spread_more.txt`). `check_compare.py`'s
+rules at the freeze commit are final for the freeze.
 
 ## Process notes
 
