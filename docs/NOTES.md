@@ -4648,7 +4648,9 @@ any wait for a quiet host. That is an estimate from the case count, not a run.
 made as the trial was. The first whose every case passes the unchanged sibling rule is the
 reported file. Every attempt is listed here with its count of refused cases, the passing one
 included. Nothing is estimated, and no figure from a refused run is reported. If none of the
-three passes, DS-4 stays "not judged", and the write-up says so with the attempts. The Mac's
+three passes, DS-4 stays "not judged", and the write-up says so with the attempts. Each attempt
+runs `scripts/run_bench.py --keep-document <the attempt's folder>/document.json`, which writes
+the document before it is validated, so a refused attempt's document is kept. The Mac's
 kernel file is measured at the same window, `28c8269`'s pass rule, at the freeze commit.
 
 Since `6679710` a pass is sized from the fastest of three timed rounds rather than one (RL-1),
@@ -4824,6 +4826,13 @@ with no target in two, so the refusal leaves them as they are. The tests failed 
 (`item5-before.log`). Faults `fuzz-g3-launch-missing-target-passed`,
 `fuzz-g3-launch-worker-raise-uncaught` and `fuzz-g3-launch-earlier-files-taken`, each PROVEN
 with `--only` (`prove-item5.log`).
+
+**Every DS-4 attempt's document kept.** `run_bench.py` deletes a document its validator
+refuses, and DS-4's rule lists every attempt. `--keep-document PATH` writes the assembled
+document to PATH before validation, whatever the verdict, the same bytes the pending file gets;
+nothing else changes. The DS-4 section's rule names it. The tests failed first
+(`item6-before.log`). Fault `run-bench-refused-document-not-kept`, PROVEN with `--only`
+(`prove-item6.log`).
 
 ## Process notes
 
