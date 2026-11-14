@@ -5,7 +5,7 @@
 // maximal PFOR delta block that puts the delta kernel past the budget. generate_seeds
 // writes each into its target's seeds under its name here, fuzz/bound_seeds.txt lists them so
 // a runner can time each one alone, and every replay of the seeds (scripts/check.sh's fuzz
-// steps, CI, a G-3 run) shows the bound again. FuzzRegression.BoundSeedsPassTheWholeCheck
+// steps, CI, a G-3 run) shows the bound again. FuzzRegression/BoundSeeds.PassTheWholeCheck
 // replays each through its oracle with no bounds, so what the bounds leave out is still
 // checked on them, and holds each to the side of the bounds it was built for.
 //

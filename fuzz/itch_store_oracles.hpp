@@ -67,7 +67,8 @@ struct StoreBounds {
 
 // The fuzz target's cap: one largest codec block's values, 1,048,576. A segment's raw bytes
 // may then reach 15 records of the largest payload, or 64 records of 16,380 bytes, and the
-// dearest file within it, raw bytes to the cap, takes about 0.5 s on the Mac. Files of
+// dearest file built within it, 3,840 add orders beside a segment of raw bytes to the cap
+// (bound_seeds.hpp), takes about 0.5 s on the Mac. Files of
 // typed records stay far below it at -max_len: the densest built, 70,000 bytes of add
 // orders in segments of 64, state 35,624 values.
 inline constexpr std::uint64_t kFuzzMaxStoreValues = codec::kMaxBlockValues;
