@@ -5021,9 +5021,11 @@ for any file naming the commit `1669ae0`, so a file edited by hand, or a new one
 commit, passed with G-2's codes typed and none observed. The three files from before the exit
 codes are now pinned by the SHA-256 of their bytes in `scripts/data_pins.json`, under a key that
 may pin no other file, as `check_fuzz.py` knows G-3's file from before the tie; a pinned name
-with other bytes is checked in full. The reviewer's case passed first (`rg5-before.log`). Faults
-`roundtrip-pinned-name-other-bytes` and `roundtrip-pin-other-file-accepted`, PROVEN with
-`--only` (`prove-rg4-13.log`). TASKS's item for the freeze rerun now removes the pins.
+with other bytes is checked in full. The measuring scripts read the same pins file, but only
+its `days` and `slices`, so the new key changes nothing they run. The reviewer's case passed
+first (`rg5-before.log`). Faults `roundtrip-pinned-name-other-bytes` and
+`roundtrip-pin-other-file-accepted`, PROVEN with `--only` (`prove-rg4-13.log`). TASKS's item for
+the freeze rerun now removes the pins.
 
 **RG-6, G-3 at this code.** G-3 read met from the file made at `ea1dde4`, before G-3 was tied to
 the code, which `check_fuzz.py` lets through by its pin while saying the fuzzed code changed
@@ -5054,6 +5056,48 @@ run, before launching (RG-10). `ls-files --exclude-standard` hides an ignored un
 under a tied path, which matters only if a tracked file names it, itself a change the tie sees;
 and `check.sh` and the frozen launcher parse `fuzz/launch.txt` differently only on a malformed
 row, which the committed file has none of (RG-12).
+
+**RP-8 to RP-10, the comparison validator's fault tests.** Two remade faults were proven by
+something other than their rule: under `compare-write-device-reads-unchecked` the validator
+crashed with `KeyError` on the count the test deletes, read by RV-7's macOS branch, and under
+`compare-slice-warm-up-unchecked` RF-10's rule refused the document for the untimed seconds the
+fixture kept. Neither test needed the faulted document to pass, and none of the validator's
+fault tests asserted that the run did not crash. The run helpers now fail a test on a
+traceback, the device-reads test runs on Linux, where no later rule reads the count, and the
+warm-up test states no untimed seconds; under each fault the document now passes
+(`rp8-rp9-after-*.log`). Every comparison-validator fault in the prover was applied to a clone
+of HEAD with the new helper and its own test run (`rp10-scan-before.log`): only RP-8's crashed
+where it should not have; the two faults of the variant-source recursion crash by design, the
+defect their tests exist to refuse, so they stay as they are. Fault
+`compare-tests-traceback-accepted` proves the helper, and the two remade faults are PROVEN again
+(`prove-rp.log`).
+
+**RP-11 to RP-13, the prover's key and its mutation test.** A proof's key left out whether its
+fault is tolerated or a control, which change what `judge` requires, and the gate in `main`
+that keeps a stored verdict, so either could change and leave stored verdicts in place; both
+are in the key now. And `edit_json` rewrote any file it opened with its own indentation, which
+reformats the comparison files and the pins, so the test that every mutation changes the tree
+passed a mutation that changed nothing; it writes back only a document its change changed, and
+`mismatched_commit_mode` looking for a setting no file has now fails that test
+(`rp11-13-before.log`, `rp11-13-after.log`). Faults `prover-key-judging-left-out`,
+`prover-key-gate-left-out` and `prover-mutation-matches-nothing`, PROVEN with `--only`
+(`prove-rp.log`).
+
+**RP-14 to RP-16, the workflow and `--no-skips`.** `--no-skips` works per step, and check.sh's
+text now says that tests a step skips inside it stay notes; the patch test, which passed a
+fetched-source patch it had not checked where `build/_deps` is absent, as on CI, now reports
+that case as a skip with its reason (`rp14-before-after.log`). The workflow test found
+`check.sh` only on lines starting `run:` or `scripts/`, so a second call in a run block could
+drop `--no-skips` unseen; it now takes every line naming it outside a comment
+(`rp15-before-after.log`). CI installs the comparison's locked packages as wheels only, so no
+build requirement is fetched unhashed (`rp16-before.log`). Faults
+`ci-check-sh-run-block-skips-allowed` and `ci-compare-sources-allowed`, PROVEN with `--only`
+(`prove-rp.log`).
+
+**Noted and not changed: RP-7.** The Linux stop-path test of the guard can fail on a stalled
+host, if the child outlives the 2 s after SIGTERM; it can signal nothing outside the child's
+session, and the reviewer asks for no fix. If it flakes, a hard floor of its own keeps SIGKILL
+out of its window.
 
 ## Process notes
 
