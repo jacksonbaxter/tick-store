@@ -1,11 +1,11 @@
 diff --git a/scripts/check_compare.py b/scripts/check_compare.py
 --- a/scripts/check_compare.py
 +++ b/scripts/check_compare.py
-@@ -1003,7 +1003,7 @@ def check_variant_selection(document, path, pins, capacity):
-             slice_header.get("host") != header.get("host") or \
-             "slice" not in (slice_document.get("input") or {}):
-         problems.append("variant_selection: the slice file is not this host's at this commit")
--    if isinstance(slice_document, dict) and "slice" in (slice_document.get("input") or {}):
+@@ -1053,7 +1053,7 @@
+         problems.append(f"variant_selection: the slice file states protocol "
+                         f"{protocol_of(slice_document)!r}, and this day protocol "
+                         f"{protocol_of(document)!r}")
+-    if is_slice:
 +    if isinstance(slice_document, dict):
          # Only a slice is validated as the source: a full day named there is refused above, and
          # validating it would name its own source again, without end (review RV-9).

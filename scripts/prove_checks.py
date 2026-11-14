@@ -631,6 +631,17 @@ FAULTS = (
           "Python's stack runs out", CHECK_FAILED,
           "FAIL: test_a_variant_source_that_is_a_full_day_is_refused_without_a_traceback "
           "(__main__.FullDay"),
+    # Review RP-4: the source is a slice by check_document's own test of a day.
+    Fault("compare-variant-source-day-and-slice-recursed", "py-scripts", "check_compare.py "
+          "validates a variant source that holds a slice, though its day or its name makes "
+          "it a full day, so a day naming itself recurses until Python's stack runs out",
+          CHECK_FAILED, "FAIL: test_a_day_that_also_holds_a_slice_naming_itself_is_refused_"
+          "without_a_traceback (__main__.FullDay"),
+    # Review RP-5: a day's variant source states the day's protocol.
+    Fault("compare-variant-source-other-protocol", "py-scripts", "check_compare.py ranks a "
+          "protocol 2 day's variants from a protocol 1 slice file", CHECK_FAILED,
+          "FAIL: test_a_protocol_2_day_ranked_from_a_protocol_1_slice "
+          "(__main__.Protocol2FullDay"),
     Fault("compare-variant-source-unvalidated", "py-scripts", "check_compare.py ranks a full "
           "day's variants from a slice file it never validates, an iteration-only one included",
           CHECK_FAILED, "FAIL: test_a_slice_file_measured_iteration_only (__main__.FullDay"),

@@ -1171,6 +1171,36 @@ class FullDay(Harness):
         self.assertIn("variant_selection: the slice file is not this host's at this commit",
                       result.stderr)
 
+    def test_a_day_that_also_holds_a_slice_naming_itself_is_refused_without_a_traceback(self):
+        # Review RP-4 (a): an input with both a day and a slice is a day to check_document, so
+        # as a variant source it is refused, not validated again until the stack runs out.
+        name = f"Linux-{DAY}-full-{COMMIT[:12]}.json"
+        document, source = full_day_document()
+        document["input"]["slice"] = SLICE
+        document["variant_selection"]["source"] = name
+        result = self.run_full(document, source, name)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+        self.assertIn("variant_selection: the slice file is not this host's at this commit",
+                      result.stderr)
+
+    def test_a_slice_named_as_a_full_day_naming_itself_is_refused_without_a_traceback(self):
+        # Review RP-4 (b): a slice-shaped file under a full day's name is a day to
+        # check_document, so it is refused as a variant source, not validated as one.
+        name = f"Linux-{DAY}-full-{COMMIT[:12]}.json"
+        _, source = full_day_document()
+        document = valid_document("Linux")
+        document["variant_selection"] = {"rule": variant_rule.RULE_PROTOCOL_1, "source": name,
+                                         "source_commit": COMMIT,
+                                         "systems": variant_rule.select(source)}
+        for day in (None, DAY):
+            with self.subTest(day=day):
+                if day is not None:
+                    document["input"]["day"] = day
+                result = self.run_full(document, source, name)
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertNotIn("Traceback", result.stderr)
+
 
 def tickstore_only_document():
     """tick-store alone on the day, on macOS: the full day's rules, every variant it has, warm
@@ -1991,6 +2021,18 @@ class Protocol2FullDay(Harness):
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn("variant_selection: the rule is not compare/variant_rule.py's",
                       result.stderr)
+
+    def test_a_protocol_2_day_ranked_from_a_protocol_1_slice(self):
+        # Review RP-5: the variant source is a slice of the day's own protocol. A protocol 1
+        # slice, pinned as the committed ones are, passes on its own but is not the source of
+        # a protocol 2 day.
+        document, source = full_day_document()
+        protocol_2(document)
+        result = self.run_full(document, source)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+        self.assertIn("variant_selection: the slice file states protocol 1, and this day "
+                      "protocol 2", result.stderr)
 
     def test_a_day_warm_up_stated_with_other_seconds_beside_it(self):
         # Review RV-8: a day's per-process warm proof holds its untimed runs to their seconds,

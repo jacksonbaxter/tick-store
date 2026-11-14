@@ -1,0 +1,13 @@
+diff --git a/scripts/check_compare.py b/scripts/check_compare.py
+--- a/scripts/check_compare.py
++++ b/scripts/check_compare.py
+@@ -1018,8 +1018,7 @@
+ def is_slice_file(document, path):
+     """A slice, and nothing check_document would check as a full day."""
+     input_block = (document.get("input") if isinstance(document, dict) else None) or {}
+-    return isinstance(input_block, dict) and "slice" in input_block and \
+-        not is_full_day_file(input_block, path)
++    return isinstance(input_block, dict) and "slice" in input_block
+ 
+ 
+ def check_variant_selection(document, path, pins, capacity):

@@ -1010,6 +1010,18 @@ def check_turbo(header, protocol):
     return []
 
 
+def is_full_day_file(input_block, path):
+    """What check_document checks as a full day: a day in its input, or a full day's name."""
+    return "day" in input_block or f"-{FULL_DAY}-" in path.name
+
+
+def is_slice_file(document, path):
+    """A slice, and nothing check_document would check as a full day."""
+    input_block = (document.get("input") if isinstance(document, dict) else None) or {}
+    return isinstance(input_block, dict) and "slice" in input_block and \
+        not is_full_day_file(input_block, path)
+
+
 def check_variant_selection(document, path, pins, capacity):
     """The variants each system ran are what the rule gives from the slice file named, which
     must sit beside this one: same host, same commit, and itself a reported file that passes
@@ -1031,11 +1043,17 @@ def check_variant_selection(document, path, pins, capacity):
         return [*problems, f"variant_selection: the slice file {selection.get('source')!r} is "
                            "not beside this one"]
     slice_header = slice_document.get("header") or {}
+    # A slice by check_document's own test of a day, its input and its name, so that nothing
+    # it would check as a day is validated here (reviews RV-9 and RP-4).
+    is_slice = is_slice_file(slice_document, source)
     if slice_header.get("commit") != header.get("commit") or \
-            slice_header.get("host") != header.get("host") or \
-            "slice" not in (slice_document.get("input") or {}):
+            slice_header.get("host") != header.get("host") or not is_slice:
         problems.append("variant_selection: the slice file is not this host's at this commit")
-    if isinstance(slice_document, dict) and "slice" in (slice_document.get("input") or {}):
+    if is_slice and protocol_of(slice_document) != protocol_of(document):
+        problems.append(f"variant_selection: the slice file states protocol "
+                        f"{protocol_of(slice_document)!r}, and this day protocol "
+                        f"{protocol_of(document)!r}")
+    if is_slice:
         # Only a slice is validated as the source: a full day named there is refused above, and
         # validating it would name its own source again, without end (review RV-9).
         problems += [f"variant_selection: the slice file {source.name}: {problem}"
@@ -1156,7 +1174,7 @@ def check_document(document, top_keys, path, pins, capacity, real_path=None, sha
     problems += check_turbo(header, protocol_of(document))
     label = str(document.get("label", ""))
     input_block = document.get("input") or {}
-    full_day = "day" in input_block or f"-{FULL_DAY}-" in path.name
+    full_day = is_full_day_file(input_block, path)
     if full_day:
         day = input_block.get("day")
         stem = TICKSTORE_ONLY_NAME if alone else FULL_DAY

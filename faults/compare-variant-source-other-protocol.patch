@@ -1,0 +1,12 @@
+diff --git a/scripts/check_compare.py b/scripts/check_compare.py
+--- a/scripts/check_compare.py
++++ b/scripts/check_compare.py
+@@ -1049,7 +1049,7 @@
+     if slice_header.get("commit") != header.get("commit") or \
+             slice_header.get("host") != header.get("host") or not is_slice:
+         problems.append("variant_selection: the slice file is not this host's at this commit")
+-    if is_slice and protocol_of(slice_document) != protocol_of(document):
++    if False:
+         problems.append(f"variant_selection: the slice file states protocol "
+                         f"{protocol_of(slice_document)!r}, and this day protocol "
+                         f"{protocol_of(document)!r}")
