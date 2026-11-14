@@ -1033,6 +1033,12 @@ FAULTS = (
           "time budget for any run that was not clean, not only one its replay or merge "
           "stopped", CHECK_FAILED,
           "FAIL: test_a_run_whose_timed_part_ran_still_needs_its_budget (__main__.CheckFuzzTest"),
+    # Review RG-2: the assembler relabels runs only across commits the tie says do not matter.
+    Fault("fuzz-results-relabel-across-launcher-change", "py-scripts", "fuzz_results.py writes "
+          "runs made at one commit as a later one's when only scripts changed in between, the "
+          "G-3 launcher among them", CHECK_FAILED,
+          "FAIL: test_runs_are_not_written_as_a_commit_whose_launcher_changed "
+          "(__main__.AssembleTest"),
     Fault("fuzz-g3-launch-replay-finding-ignored", "py-scripts", "fuzz_g3.py goes on to the "
           "merge and the timed run after a finding in the replay", CHECK_FAILED,
           "FAIL: test_a_finding_in_the_replay_stops_the_target_before_its_timed_run "

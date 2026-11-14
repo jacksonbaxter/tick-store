@@ -24,9 +24,9 @@ Every value comes from those files. A run is clean only if the fuzzer exited 0, 
 DONE line, its Done line and its final stats, and its log holds no sanitizer report, no libFuzzer
 error and no crash artifact. --strip removes a machine's own folder from the commands, which
 must be relative to the repository or the project folder in the file. A run whose checkout had
-moved past --commit is taken only if nothing a fuzz build reads changed in between, and keeps
-that checkout as checkout_at_start. The output is checked with check_fuzz.py before it is
-written, and not written if it fails.
+moved past --commit is taken only if nothing check_fuzz.py ties the file to (TIED_PATHS)
+changed in between, and keeps that checkout as checkout_at_start. The output is checked with
+check_fuzz.py before it is written, and not written if it fails.
 
 Standard library only.
 """
@@ -232,15 +232,12 @@ def phases_of(folder, tag, prefixes):
     return record
 
 
-# What a commit can change without changing a fuzz binary.
-NOT_BUILT = (":(exclude)scripts", ":(exclude)tests/scripts", ":(exclude)faults",
-             ":(exclude)results", ":(exclude)*.md")
-
-
 def code_changes(first, second):
-    """The files between two commits that a fuzz build reads, or "" if none."""
+    """The files between two commits that a fuzz binary is built from or launched with, or ""
+    if none: check_fuzz.py's tie, so the two scripts define it once (review RG-2)."""
     done = subprocess.run(["git", "-C", str(REPO_ROOT), "diff", "--name-only", first, second,
-                           "--", ".", *NOT_BUILT], capture_output=True, text=True, check=False)
+                           "--", *check_fuzz.TIED_PATHS, *check_fuzz.NOT_TIED],
+                          capture_output=True, text=True, check=False)
     if done.returncode != 0:
         raise Refused(f"git diff {first} {second}: {done.stderr.strip()}")
     return " ".join(done.stdout.split())
@@ -262,8 +259,8 @@ def assemble(commit, hosts, prefixes, cmake):
             if changed:
                 raise Refused(f"{run['target']} on {run['host']} ran at {run['commit']}, not "
                               f"{commit}, and these differ: {changed}")
-            # The checkout moved on while the binaries built at the commit ran: only scripts,
-            # their tests, faults or prose changed in between. Both are recorded.
+            # The checkout moved on while the binaries built at the commit ran: nothing the tie
+            # names changed in between. Both are recorded.
             run["checkout_at_start"] = run["commit"]
             run["commit"] = commit
     order = {"macOS": 0, "Linux": 1}

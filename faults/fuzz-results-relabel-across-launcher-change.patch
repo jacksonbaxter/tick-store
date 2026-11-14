@@ -1,0 +1,12 @@
+diff --git a/scripts/fuzz_results.py b/scripts/fuzz_results.py
+--- a/scripts/fuzz_results.py
++++ b/scripts/fuzz_results.py
+@@ -236,7 +236,7 @@ def code_changes(first, second):
+     """The files between two commits that a fuzz binary is built from or launched with, or ""
+     if none: check_fuzz.py's tie, so the two scripts define it once (review RG-2)."""
+     done = subprocess.run(["git", "-C", str(REPO_ROOT), "diff", "--name-only", first, second,
+-                           "--", *check_fuzz.TIED_PATHS, *check_fuzz.NOT_TIED],
++                           "--", ".", ":(exclude)scripts", ":(exclude)*.md"],
+                           capture_output=True, text=True, check=False)
+     if done.returncode != 0:
+         raise Refused(f"git diff {first} {second}: {done.stderr.strip()}")

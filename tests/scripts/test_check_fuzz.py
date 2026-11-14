@@ -21,6 +21,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "check_fuzz.py"
@@ -29,6 +30,7 @@ SCRATCH_ROOT = REPO_ROOT / "build" / "test_check_fuzz"
 
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 import check_fuzz  # noqa: E402
+import fuzz_results  # noqa: E402
 
 # A repository with one file in each place the tie names, and some it does not.
 CODE = {"src/codec/pfor.cpp": "int f();\n", "include/tick_store/codec/pfor.hpp": "int f();\n",
@@ -679,6 +681,31 @@ class AssembleTest(Scratch):
         self.assertFalse(run["clean"])
         self.assertEqual(run["merge"]["attempts"], 2)
         self.assertEqual(run["findings"][0]["kind"], "crash")
+
+    # Review RG-2: runs made at one commit are written as a later one's only if nothing the tie
+    # names changed in between, the launcher included.
+
+    def assemble_after(self, *names):
+        """The runs, made at COMMIT, assembled as the commit that changes only these files."""
+        self.addCleanup(git, REPO, "reset", "-q", "--hard", COMMIT)
+        for name in names:
+            with (REPO / name).open("a", encoding="utf-8") as file:
+                file.write("# changed\n")
+        git(REPO, "commit", "-q", "-am", "change " + " ".join(names))
+        later = git(REPO, "rev-parse", "HEAD")
+        hosts = [("macOS", self.write_host("macOS", {})), ("Linux", self.write_host("Linux", {}))]
+        with mock.patch.object(fuzz_results, "REPO_ROOT", REPO):
+            return later, fuzz_results.assemble(later, hosts, ["/x/repo"], self.cmake)
+
+    def test_runs_are_not_written_as_a_commit_whose_launcher_changed(self):
+        with self.assertRaises(fuzz_results.Refused) as refused:
+            self.assemble_after("scripts/fuzz_g3.py")
+        self.assertIn("scripts/fuzz_g3.py", str(refused.exception))
+
+    def test_runs_are_written_as_a_commit_that_changed_nothing_tied(self):
+        later, document = self.assemble_after(*NOT_TIED)
+        run = find(document, "fuzz_pfor", "macOS")
+        self.assertEqual((run["commit"], run["checkout_at_start"]), (later, COMMIT))
 
     def test_a_crash_is_recorded_as_not_clean(self):
         result, out = self.assemble(crash="fuzz_pfor")
