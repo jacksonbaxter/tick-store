@@ -51,5 +51,10 @@
   },
   "fuzz_g3_file_before_the_tie": {
     "fuzz-g3-ea1dde4c02e4.json": "bc76620e292023aa1fe78c941b3fb1a135e7716ca1b23c5aee17f9acbd746846"
+  },
+  "roundtrip_files_before_exit_codes": {
+    "roundtrip-10302019.json": "caca950aae8c69cc1dcea45ac760383c85b7248396e1e1adee29e36ab9755c43",
+    "roundtrip-12302019-linux.json": "626686c436902cc66435de585e7382467a6446e81d8d3533c0fab799018c1b1f",
+    "roundtrip-12302019.json": "b22de55c624c3bb1c0570a982b376d07c4bd75d777a85de318797b74d4c10001"
   }
 }

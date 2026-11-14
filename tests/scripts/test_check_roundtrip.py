@@ -5,9 +5,10 @@
 
 G-2 is judged on a round-trip file's exit_code_corrupt and exit_code_restored. These require
 each to be borne out by the exit codes its runs recorded, and the committed files, which
-predate them, to pass until the freeze rerun replaces them.
+predate them, to pass by the SHA-256 of their bytes until the freeze rerun replaces them.
 """
 
+import hashlib
 import importlib.util
 import json
 import shutil
@@ -88,23 +89,56 @@ class CheckRoundtrip(unittest.TestCase):
         del alone["g2"]
         self.assertEqual(check_roundtrip.check(alone), [])
 
-    def test_the_committed_files_commit_passes_until_the_freeze(self):
+    def test_the_commit_a_file_names_exempts_nothing(self):
+        # Review RG-5: the committed files were let through by the commit they name, which any
+        # file can name.
         old = document()
         old["commit"] = "1669ae0"
         for name in check_roundtrip.G2_CORRUPT + ("restored",):
             del old["g2"][name]["exit_code"]
         del old["g1"]["verify"]["exit_code"]
-        self.assertEqual(check_roundtrip.check(old), [])
-        old["commit"] = "1669ae1"
-        self.assertTrue(check_roundtrip.check(old))
+        self.assertIn("g2.data_crc: no exit_code observed", check_roundtrip.check(old))
 
-    def test_the_committed_files_pass(self):
+    def test_the_committed_files_pass_by_their_pins(self):
+        pins = json.loads(check_roundtrip.DEFAULT_PINS.read_text(encoding="utf-8"))
         paths = sorted((REPO_ROOT / "results").glob("roundtrip-*.json"))
-        self.assertTrue(paths)
+        self.assertEqual(sorted(pins[check_roundtrip.PINS_KEY]),
+                         sorted(path.name for path in paths))
         for path in paths:
             with self.subTest(path=path.name):
-                problems = check_roundtrip.check(json.loads(path.read_text(encoding="utf-8")))
-                self.assertEqual(problems, [])
+                self.assertEqual(check_roundtrip.check_file(path, pins), [])
+
+    def scratch(self):
+        root = REPO_ROOT / "build"
+        root.mkdir(exist_ok=True)
+        folder = Path(tempfile.mkdtemp(prefix="test-check-roundtrip-", dir=root))
+        self.addCleanup(shutil.rmtree, folder)
+        return folder
+
+    def test_a_pinned_name_with_other_bytes_is_checked_in_full(self):
+        # The reviewer's case: the committed file, its commit kept, G-2's data block verdict
+        # turned to a pass, under the pinned name.
+        edited = json.loads((REPO_ROOT / "results" / "roundtrip-12302019.json").read_text())
+        edited["g2"]["data_crc"]["verdict"] = "pass"
+        path = self.scratch() / "roundtrip-12302019.json"
+        path.write_text(json.dumps(edited, indent=1), encoding="utf-8")
+        ran = subprocess.run([sys.executable, "-I", str(SCRIPT), str(path)],
+                             capture_output=True, text=True, check=False)
+        self.assertEqual(ran.returncode, 1, ran.stderr)
+        self.assertIn("roundtrip-12302019.json: g1.ingest: no exit_code observed", ran.stderr)
+
+    def test_no_other_file_may_be_pinned(self):
+        folder = self.scratch()
+        path = folder / "roundtrip-good.json"
+        path.write_text(json.dumps(document()), encoding="utf-8")
+        pins = folder / "pins.json"
+        pins.write_text(json.dumps({check_roundtrip.PINS_KEY: {
+            path.name: hashlib.sha256(path.read_bytes()).hexdigest()}}), encoding="utf-8")
+        ran = subprocess.run([sys.executable, "-I", str(SCRIPT), "--pins", str(pins), str(path)],
+                             capture_output=True, text=True, check=False)
+        self.assertEqual(ran.returncode, 1, ran.stderr)
+        self.assertIn("roundtrip-good.json is pinned, and only the files from before the exit "
+                      "codes may be", ran.stderr)
 
     def test_the_command_line_exits_1_and_names_the_file(self):
         scratch = REPO_ROOT / "build"
