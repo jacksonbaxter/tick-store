@@ -9,15 +9,21 @@ hide: a failed step gives a non-zero exit and is named, the steps after it still
 skip is never counted as a pass.
 """
 
+import json
 import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+import check_fuzz  # noqa: E402
+import check_hygiene  # noqa: E402
+
 SCRIPT = REPO_ROOT / "scripts" / "check.sh"
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 SCRATCH_ROOT = REPO_ROOT / "build" / "test_check_sh"
@@ -115,6 +121,50 @@ class CheckScript(unittest.TestCase):
             self.assertNotIn(flag, script)
         for target in targets:
             self.assertIn(f"run_fuzzer \"$1\" {target}; }}", script)
+
+    def exported_copy(self):
+        """This tree's tracked files as a sync to the Linux host exports them: no .git, and a
+        COMMIT file. Under build/, so git finds the repository above it, not one of its own."""
+        if check_hygiene.is_work_tree_top(REPO_ROOT):
+            names = check_hygiene.tracked_files(REPO_ROOT)
+        else:
+            names = check_hygiene.exported_files(REPO_ROOT)
+        tree = self.logs / "tree"
+        for name in names:
+            source = REPO_ROOT / name
+            if source.is_file():
+                (tree / name).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, tree / name)
+        (tree / "COMMIT").write_text("0" * 40 + "\n")
+        return tree
+
+    def untie(self, tree):
+        """The committed G-3 file with its pin taken out, so the tie applies to it."""
+        pins_path = tree / "scripts" / "data_pins.json"
+        pins = json.loads(pins_path.read_text())
+        del pins[check_fuzz.PRE_TIE_PINS]
+        pins_path.write_text(json.dumps(pins, indent=2) + "\n")
+
+    def test_a_g3_file_with_no_history_to_tie_it_skips_and_fails_under_no_skips(self):
+        tree = self.exported_copy()
+        self.untie(tree)
+        script = str(tree / "scripts" / "check.sh")
+        done = subprocess.run([script, "--log-dir", str(self.logs), "--only", "render-check"],
+                              capture_output=True, text=True, env=self.env)
+        self.assertEqual(done.returncode, 0, done.stdout)
+        self.assertEqual(self.summary(), {"render-check": "SKIP"})
+        self.assertIn("could not be tied to the code it judged: no git history", done.stdout)
+        self.assertIn("could not judge whether the fuzzed code changed after ea1dde4c02e4",
+                      (self.logs / "render-check.log").read_text())
+        done = subprocess.run([script, "--no-skips", "--log-dir", str(self.logs), "--only",
+                               "render-check"], capture_output=True, text=True, env=self.env)
+        self.assertEqual(done.returncode, 1, done.stdout)
+        self.assertEqual(self.summary(), {"render-check": "FAIL"})
+
+    def test_render_check_names_how_the_g3_file_is_tied(self):
+        done = self.run_script("--only", "render-check")
+        self.assertEqual(done.returncode, 0, done.stdout)
+        self.assertIn("made before the tie and pinned, so not tied", done.stdout)
 
     def workflow_runs(self):
         """The workflow's check.sh command lines."""

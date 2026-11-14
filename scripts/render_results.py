@@ -45,8 +45,10 @@ there with its reason for being no result, so --check stops on a pitch figure th
 longer give.
 
 G-3's file, results/fuzz-g3-<commit>.json, must pass check_fuzz.py first, against the fuzz
-targets fuzz/CMakeLists.txt defines: one that leaves a target out, or holds a clean run under
-1,800 s, stops the render. Each results/roundtrip-*.json, which G-1 and G-2 read, must pass
+targets fuzz/CMakeLists.txt defines: one that leaves a target out, holds a clean run under
+1,800 s, or whose commit is older than the fuzzed code, stops the render. Where git has no
+history to tell the last, check_fuzz.py says so, the render goes on, and this exits
+EXIT_UNJUDGED once it is done, which scripts/check.sh reports as a skip. Each results/roundtrip-*.json, which G-1 and G-2 read, must pass
 check_roundtrip.py, so G-2's exit codes are the ones its runs exited with.
 """
 
@@ -121,6 +123,8 @@ SWAP_MARK = " (swap-in)"
 
 EXIT_STALE = 1
 EXIT_USAGE = 2
+# Everything passed, but G-3's file could not be tied to the code: check_fuzz.py's own code.
+EXIT_UNJUDGED = 3
 
 COLUMNS = ("Case", "Commit", "Passes", "Messages/s", "Spread (CV)", "Batch", "p50 µs", "p99 µs",
            "p99.9 µs", "Cycles/msg", "Instr/msg", "Branch misses/msg", "Load at start")
@@ -1101,13 +1105,18 @@ def block_of(text, begin=BEGIN, end=END):
     return text[:start], text[start:last], text[last:]
 
 
-def validate(paths, pins, validator=CHECK_RESULTS, extra=()):
+def validate(paths, pins, validator=CHECK_RESULTS, extra=(), echo=False):
+    """True if the validator passed the files; its exit code instead with echo, which also
+    prints what it said of each file that passed."""
     if not paths:
-        return True
+        return 0 if echo else True
     command = [sys.executable, "-I", str(validator), *(("--pins", str(pins)) if pins else ()),
                *extra, *[str(path) for path in paths]]
     checked = subprocess.run(command, check=False, capture_output=True, text=True)
     print(checked.stderr, end="", file=sys.stderr)
+    if echo:
+        print(checked.stdout, end="")
+        return checked.returncode
     return checked.returncode == 0
 
 
@@ -1141,10 +1150,15 @@ def main(argv=None):
         return EXIT_USAGE
     # G-3's file, which the targets block reads, against the fuzz targets of the same tree.
     fuzz_paths = sorted((args.targets_root / "results").glob("fuzz-g3-*.json"))
-    if not validate(fuzz_paths, None, CHECK_FUZZ,
-                    ("--cmake", str(args.targets_root / "fuzz" / "CMakeLists.txt"))):
+    fuzz_code = validate(fuzz_paths, None, CHECK_FUZZ,
+                         ("--cmake", str(args.targets_root / "fuzz" / "CMakeLists.txt"),
+                          "--repo", str(args.targets_root),
+                          "--pins", str(args.targets_root / "scripts" / "data_pins.json")),
+                         echo=True)
+    if fuzz_code not in (0, EXIT_UNJUDGED):
         print("render_results: a fuzzing results file failed validation", file=sys.stderr)
         return EXIT_USAGE
+    done = EXIT_UNJUDGED if fuzz_code == EXIT_UNJUDGED else 0
     roundtrip_paths = sorted((args.targets_root / "results").glob("roundtrip-*.json"))
     if not validate(roundtrip_paths, None, CHECK_ROUNDTRIP):
         print("render_results: a round-trip results file failed validation", file=sys.stderr)
@@ -1224,11 +1238,18 @@ def main(argv=None):
         if stale:
             return EXIT_STALE
         print(" and ".join(path.name for path, _, _ in rendered) + ": tables are current")
-        return 0
+        return untied(done)
     for path, content, fresh in rendered:
         if fresh != content:
             path.write_text(fresh, encoding="utf-8")
-    return 0
+    return untied(done)
+
+
+def untied(code):
+    if code == EXIT_UNJUDGED:
+        print("render_results: G-3's file could not be tied to the code it judged, for want of "
+              "git history here", file=sys.stderr)
+    return code
 
 
 if __name__ == "__main__":

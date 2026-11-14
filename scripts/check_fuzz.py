@@ -14,13 +14,24 @@ found; RESULTS.md's Targets block then reads it as missed, never as met.
 
 It also refuses anything not safe to publish, with check_results.py's rules.
 
+A file holds for the code it was made at and no later: it is refused once anything a fuzz binary
+is built from or launched with, TIED_PATHS, differs from the file's commit, committed or not.
+That needs the commit in git's history. Where there is none, an exported tree or a clone too
+shallow to hold it, the file is not judged: it exits EXIT_UNJUDGED and says why, which
+render_results.py passes on and scripts/check.sh reports as a skip, a failure under --no-skips.
+One file made before this rule is let through it until the freeze replaces it: PRE_TIE_FILE,
+known by the SHA-256 of its bytes under PRE_TIE_PINS in scripts/data_pins.json, never by
+anything the file says of itself. No other file may be pinned there.
+
 Standard library only. tests/scripts/test_check_fuzz.py shows each rule failing on an injected
 fault.
 """
 
 import argparse
+import hashlib
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -30,11 +41,26 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 import check_results  # noqa: E402
 
 DEFAULT_CMAKE = REPO_ROOT / "fuzz" / "CMakeLists.txt"
+DEFAULT_PINS = REPO_ROOT / "scripts" / "data_pins.json"
 
 SCHEMA = "tick-store-fuzz-1"
 EXIT_OK = 0
 EXIT_INVALID = 1
 EXIT_USAGE = 2
+# The file is valid, but git cannot say whether the fuzzed code changed after its commit.
+EXIT_UNJUDGED = 3
+
+# What a fuzz binary is built from or launched with: the sources and headers, the targets, their
+# oracles and seed generator, the CMake files and presets, fuzz/launch.txt's flags and folders,
+# and the G-3 launcher. fuzz/'s prose is not. A file is refused once any of these differs from
+# its commit. scripts/check.sh is not here: its fuzz steps read fuzz/launch.txt.
+TIED_PATHS = ("src", "include", "fuzz", "cmake", "CMakeLists.txt", "CMakePresets.json",
+              "scripts/fuzz_g3.py")
+NOT_TIED = (":(exclude)fuzz/*.md",)
+# G-3's file from ea1dde4, made before the tie, and the key of the pins file that holds its
+# SHA-256. docs/TASKS.md removes both when the freeze's file is committed.
+PRE_TIE_FILE = "fuzz-g3-ea1dde4c02e4.json"
+PRE_TIE_PINS = "fuzz_g3_file_before_the_tie"
 
 # G-3's 30 minutes. The file states it too, and may not state less.
 REQUIRED_SECONDS = 1800
@@ -305,30 +331,104 @@ def check_file(path, targets):
     return check_document(document, top_keys, path, targets)
 
 
+def git(repo, *arguments):
+    return subprocess.run(["git", "-C", str(repo), *arguments], capture_output=True, text=True,
+                          check=False)
+
+
+def history_problem(repo, commit):
+    """Why git here cannot compare the tree with the commit, or None if it can."""
+    top = git(repo, "rev-parse", "--show-toplevel")
+    if top.returncode != 0 or Path(top.stdout.strip()).resolve() != Path(repo).resolve():
+        return (f"{Path(repo).name} is not a git checkout, as an exported tree is not, so there "
+                "is no history to compare with")
+    if git(repo, "cat-file", "-e", f"{commit}^{{commit}}").returncode != 0:
+        return (f"{commit[:12]} is not in this checkout's history, as in a shallow clone; fetch "
+                "it whole")
+    return None
+
+
+def tied_changes(repo, commit):
+    """Every tied file that differs from the commit in the tree, committed or not, or new."""
+    changed = git(repo, "diff", "--name-only", commit, "--", *TIED_PATHS, *NOT_TIED)
+    new = git(repo, "ls-files", "--others", "--exclude-standard", "--", *TIED_PATHS, *NOT_TIED)
+    for done in (changed, new):
+        if done.returncode != 0:
+            raise OSError(f"git: {done.stderr.strip()}")
+    return sorted(set(changed.stdout.split()) | set(new.stdout.split()))
+
+
+def pinned_before_the_tie(path, pins):
+    """(problems, exempt): whether this is the one file made before the tie, by its bytes."""
+    pinned = pins.get(PRE_TIE_PINS) or {}
+    problems = [f"{PRE_TIE_PINS} in the pins file: {name} is pinned, and only {PRE_TIE_FILE} "
+                "may be" for name in sorted(pinned) if name != PRE_TIE_FILE]
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    exempt = path.name == PRE_TIE_FILE and pinned.get(PRE_TIE_FILE) == digest
+    return problems, exempt
+
+
+def check_tie(path, commit, repo, pins):
+    """(problems, unjudged, note) for a file whose content is valid."""
+    problems, exempt = pinned_before_the_tie(path, pins)
+    reason = history_problem(repo, commit)
+    if exempt:
+        counted = ("" if reason else
+                   f"; {len(tied_changes(repo, commit))} tied files changed since {commit[:12]}")
+        return problems, None, f"made before the tie and pinned, so not tied{counted}"
+    if reason:
+        return problems, (f"could not judge whether the fuzzed code changed after "
+                          f"{commit[:12]}: {reason}"), None
+    changed = tied_changes(repo, commit)
+    if changed:
+        shown = ", ".join(changed[:8]) + (f" and {len(changed) - 8} more" if len(changed) > 8
+                                          else "")
+        problems.append(f"the fuzzed code changed after {commit[:12]}, the file's commit: "
+                        f"{shown}. Run G-3 again at this code")
+    return problems, None, f"tied: nothing fuzzed changed since {commit[:12]}"
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Validate the G-3 fuzzing results file.")
     parser.add_argument("files", nargs="+", type=Path)
     parser.add_argument("--cmake", type=Path, default=DEFAULT_CMAKE,
                         help="the fuzz/CMakeLists.txt whose targets the file must cover")
+    parser.add_argument("--repo", type=Path, default=REPO_ROOT,
+                        help="the checkout whose code the file must still be the code of")
+    parser.add_argument("--pins", type=Path, default=DEFAULT_PINS)
     args = parser.parse_args(argv)
     try:
         targets = targets_in(args.cmake)
-    except OSError as error:
-        print(f"check_fuzz: cannot read {args.cmake.name}: {error}", file=sys.stderr)
+        pins = json.loads(args.pins.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        print(f"check_fuzz: cannot read {args.cmake.name} or {args.pins.name}: {error}",
+              file=sys.stderr)
         return EXIT_USAGE
     if not targets:
         print(f"check_fuzz: {args.cmake.name} defines no fuzz targets", file=sys.stderr)
         return EXIT_USAGE
-    failed = False
+    failed = unjudged = False
     for path in args.files:
         problems = check_file(path, targets)
+        reason = note = None
+        if not problems:
+            commit = json.loads(path.read_text(encoding="utf-8"))["header"]["commit"]
+            try:
+                problems, reason, note = check_tie(path, commit, args.repo, pins)
+            except OSError as error:
+                problems = [f"cannot compare with {commit[:12]}: {error}"]
         if problems:
             failed = True
             for problem in problems:
                 print(f"{path.name}: {problem}", file=sys.stderr)
+        elif reason:
+            unjudged = True
+            print(f"{path.name}: {reason}", file=sys.stderr)
         else:
-            print(f"{path.name}: ok")
-    return EXIT_INVALID if failed else EXIT_OK
+            print(f"{path.name}: ok, {note}")
+    if failed:
+        return EXIT_INVALID
+    return EXIT_UNJUDGED if unjudged else EXIT_OK
 
 
 if __name__ == "__main__":

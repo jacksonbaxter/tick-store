@@ -7,10 +7,12 @@ The validator runs as a subprocess on files generated under the repo's gitignore
 directory, against a fuzz/CMakeLists.txt written there too. Each rule gets one injected fault
 into an otherwise valid file, and the test requires the exit code and the message naming the
 rule; the valid file is shown passing first. The assembler is run on raw logs written in
-libFuzzer's own format, clean and not.
+libFuzzer's own format, clean and not. The files judge a commit of a small git repository made
+there, so the tie to the code is judged against its history.
 """
 
 import copy
+import hashlib
 import json
 import os
 import shutil
@@ -28,7 +30,41 @@ SCRATCH_ROOT = REPO_ROOT / "build" / "test_check_fuzz"
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 import check_fuzz  # noqa: E402
 
-COMMIT = "0123456789abcdef0123456789abcdef01234567"
+# A repository with one file in each place the tie names, and some it does not.
+CODE = {"src/codec/pfor.cpp": "int f();\n", "include/tick_store/codec/pfor.hpp": "int f();\n",
+        "fuzz/fuzz_pfor.cpp": "int g();\n", "fuzz/launch.txt": "flags -timeout=10\n",
+        "fuzz/README.md": "# Fuzzing\n", "cmake/Warnings.cmake": "# warnings\n",
+        "CMakeLists.txt": "project(x)\n", "CMakePresets.json": "{}\n",
+        "scripts/fuzz_g3.py": "# launcher\n", "scripts/check.sh": "# checks\n",
+        "docs/NOTES.md": "# Notes\n", "tests/scripts/test_x.py": "# test\n"}
+TIED = ("src/codec/pfor.cpp", "include/tick_store/codec/pfor.hpp", "fuzz/fuzz_pfor.cpp",
+        "fuzz/launch.txt", "cmake/Warnings.cmake", "CMakeLists.txt", "CMakePresets.json",
+        "scripts/fuzz_g3.py")
+NOT_TIED = ("fuzz/README.md", "scripts/check.sh", "docs/NOTES.md", "tests/scripts/test_x.py")
+REPO = SCRATCH_ROOT / "repo"
+PINS = {"fuzz_g3_file_before_the_tie": {}}
+
+
+def git(repo, *arguments):
+    return subprocess.run(["git", "-C", str(repo), "-c", "user.name=test", "-c",
+                           "user.email=test@example.invalid", "-c", "commit.gpgsign=false",
+                           *arguments], capture_output=True, text=True, check=True).stdout.strip()
+
+
+def make_repo(root):
+    if root.exists():
+        shutil.rmtree(root)
+    root.mkdir(parents=True)
+    git(root, "init", "-q")
+    for name, text in CODE.items():
+        (root / name).parent.mkdir(parents=True, exist_ok=True)
+        (root / name).write_text(text, encoding="utf-8")
+    git(root, "add", "-A")
+    git(root, "commit", "-q", "-m", "the code G-3 judged")
+    return git(root, "rev-parse", "HEAD")
+
+
+COMMIT = make_repo(REPO)
 NAME = f"fuzz-g3-{COMMIT[:12]}.json"
 TARGETS = sorted({"fuzz_columns", "fuzz_itch_message", *check_fuzz.LINUX_REQUIRED})
 CMAKE = "".join(f"tick_store_add_fuzzer({name})\n" for name in reversed(TARGETS))
@@ -100,13 +136,18 @@ class Scratch(unittest.TestCase):
         self.cmake.write_text(CMAKE, encoding="utf-8")
 
 
-class CheckFuzzTest(Scratch):
-    def run_check(self, document, name=NAME):
+class Checking(Scratch):
+    def run_check(self, document, name=NAME, repo=REPO, pins=None):
         path = self.dir / name
         path.write_text(json.dumps(document, indent=1), encoding="utf-8")
+        pins_path = self.dir / "pins.json"
+        pins_path.write_text(json.dumps(PINS if pins is None else pins), encoding="utf-8")
         return subprocess.run([sys.executable, "-I", str(SCRIPT), "--cmake", str(self.cmake),
-                               str(path)], capture_output=True, text=True, check=False)
+                               "--repo", str(repo), "--pins", str(pins_path), str(path)],
+                              capture_output=True, text=True, check=False)
 
+
+class CheckFuzzTest(Checking):
     def assert_fails(self, mutate, expected, name=NAME):
         document = valid_document()
         mutate(document)
@@ -245,7 +286,7 @@ class CheckFuzzTest(Scratch):
         self.assert_fails(other, "commit: not the header's commit")
 
     def test_a_wrong_file_name_is_refused(self):
-        self.assert_fails(lambda document: None, "is not fuzz-g3-0123456789ab.json",
+        self.assert_fails(lambda document: None, f"is not {NAME}",
                           name="fuzz-g3-latest.json")
 
     def test_a_home_path_is_refused(self):
@@ -258,6 +299,126 @@ class CheckFuzzTest(Scratch):
         self.assertEqual(len(targets), 13)
         for name in check_fuzz.LINUX_REQUIRED:
             self.assertIn(name, targets)
+
+
+class TieTest(Checking):
+    """A file holds for the code of its commit: anything a fuzz binary is built from or
+    launched with that changed since refuses it, and where git has no history it is not
+    judged. Each test starts from the repository as committed."""
+
+    def setUp(self):
+        super().setUp()
+        self.addCleanup(self.restore)
+
+    def restore(self):
+        git(REPO, "reset", "-q", "--hard", COMMIT)
+        git(REPO, "clean", "-q", "-fd")
+
+    def change(self, name, commit=True):
+        with (REPO / name).open("a", encoding="utf-8") as file:
+            file.write("// changed\n")
+        if commit:
+            git(REPO, "commit", "-q", "-am", f"change {name}")
+
+    def test_a_file_at_unchanged_code_is_tied_and_passes(self):
+        result = self.run_check(valid_document())
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(f"ok, tied: nothing fuzzed changed since {COMMIT[:12]}", result.stdout)
+
+    def test_a_file_older_than_a_fuzzed_code_change_is_refused(self):
+        for name in TIED:
+            with self.subTest(name=name):
+                self.change(name)
+                result = self.run_check(valid_document())
+                self.assertEqual(result.returncode, check_fuzz.EXIT_INVALID, result.stdout)
+                self.assertIn(f"the fuzzed code changed after {COMMIT[:12]}", result.stderr)
+                self.assertIn(name, result.stderr)
+                self.restore()
+
+    def test_an_uncommitted_or_new_fuzzed_file_is_refused(self):
+        self.change("src/codec/pfor.cpp", commit=False)
+        result = self.run_check(valid_document())
+        self.assertEqual(result.returncode, check_fuzz.EXIT_INVALID, result.stdout)
+        self.assertIn("src/codec/pfor.cpp", result.stderr)
+        self.restore()
+        (REPO / "fuzz" / "fuzz_new.cpp").write_text("int h();\n", encoding="utf-8")
+        result = self.run_check(valid_document())
+        self.assertEqual(result.returncode, check_fuzz.EXIT_INVALID, result.stdout)
+        self.assertIn("fuzz/fuzz_new.cpp", result.stderr)
+
+    def test_prose_scripts_and_tests_do_not_untie_it(self):
+        for name in NOT_TIED:
+            self.change(name)
+        result = self.run_check(valid_document())
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_no_history_is_not_judged(self):
+        exported = self.dir / "exported"
+        shutil.copytree(REPO, exported, ignore=shutil.ignore_patterns(".git"))
+        result = self.run_check(valid_document(), repo=exported)
+        self.assertEqual(result.returncode, check_fuzz.EXIT_UNJUDGED, result.stdout)
+        self.assertIn(f"could not judge whether the fuzzed code changed after {COMMIT[:12]}: "
+                      "exported is not a git checkout", result.stderr)
+        self.assertNotIn("ok", result.stdout)
+
+    def test_a_clone_too_shallow_to_hold_the_commit_is_not_judged(self):
+        self.change("docs/NOTES.md")
+        shallow = self.dir / "shallow"
+        subprocess.run(["git", "clone", "-q", "--depth", "1", REPO.as_uri(), str(shallow)],
+                       check=True, capture_output=True)
+        result = self.run_check(valid_document(), repo=shallow)
+        self.assertEqual(result.returncode, check_fuzz.EXIT_UNJUDGED, result.stdout)
+        self.assertIn(f"{COMMIT[:12]} is not in this checkout's history", result.stderr)
+
+    def pre_tie_document(self):
+        """A valid file named as the one made before the tie, at a commit this repository
+        does not hold, so only the pin can let it through."""
+        document = valid_document()
+        commit = check_fuzz.PRE_TIE_FILE[len("fuzz-g3-"):-len(".json")] + "0" * 28
+        document["header"]["commit"] = commit
+        for run in document["runs"]:
+            run["commit"] = commit
+        return document
+
+    def pin_of(self, document):
+        digest = hashlib.sha256(json.dumps(document, indent=1).encode()).hexdigest()
+        return {check_fuzz.PRE_TIE_PINS: {check_fuzz.PRE_TIE_FILE: digest}}
+
+    def test_the_file_made_before_the_tie_passes_by_its_pin(self):
+        document = self.pre_tie_document()
+        result = self.run_check(document, check_fuzz.PRE_TIE_FILE, pins=self.pin_of(document))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("made before the tie and pinned, so not tied", result.stdout)
+
+    def test_the_pin_lets_through_no_other_content(self):
+        document = self.pre_tie_document()
+        pins = self.pin_of(document)
+        find(document, "fuzz_columns", "macOS")["cpu"] = "cpu 3"
+        result = self.run_check(document, check_fuzz.PRE_TIE_FILE, pins=pins)
+        self.assertEqual(result.returncode, check_fuzz.EXIT_UNJUDGED, result.stdout)
+        self.assertIn("is not in this checkout's history", result.stderr)
+        self.assertNotIn("pinned", result.stdout)
+
+    def test_no_other_file_may_be_pinned(self):
+        self.change("src/codec/pfor.cpp")
+        document = valid_document()
+        pins = {check_fuzz.PRE_TIE_PINS: {NAME: hashlib.sha256(
+            json.dumps(document, indent=1).encode()).hexdigest()}}
+        result = self.run_check(document, pins=pins)
+        self.assertEqual(result.returncode, check_fuzz.EXIT_INVALID, result.stdout)
+        self.assertIn(f"{NAME} is pinned, and only {check_fuzz.PRE_TIE_FILE} may be",
+                      result.stderr)
+        self.assertIn("the fuzzed code changed after", result.stderr)
+
+    def test_the_committed_file_is_the_one_pinned(self):
+        pins = json.loads(check_fuzz.DEFAULT_PINS.read_text(encoding="utf-8"))
+        path = REPO_ROOT / "results" / check_fuzz.PRE_TIE_FILE
+        self.assertEqual(pins[check_fuzz.PRE_TIE_PINS],
+                         {path.name: hashlib.sha256(path.read_bytes()).hexdigest()})
+        result = subprocess.run([sys.executable, "-I", str(SCRIPT), str(path)],
+                                capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("made before the tie and pinned", result.stdout)
 
 
 LOG_CLEAN = """INFO: Seed: 1
@@ -322,7 +483,8 @@ class AssembleTest(Scratch):
         self.assertEqual((linux["kernel_level"], linux["cpu"]), ("avx2", "cpu 2"))
         self.assertNotIn("/x/repo", out.read_text(encoding="utf-8"))
         checked = subprocess.run([sys.executable, "-I", str(SCRIPT), "--cmake", str(self.cmake),
-                                  str(out)], capture_output=True, text=True, check=False)
+                                  "--repo", str(REPO), str(out)], capture_output=True, text=True,
+                                 check=False)
         self.assertEqual(checked.returncode, 0, checked.stderr)
 
     def test_a_crash_is_recorded_as_not_clean(self):

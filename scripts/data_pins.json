@@ -48,5 +48,8 @@
     "Linux-12302019-open-67ae574f5666.json": "34b353a6bd13bdc133dafcb34a73eed469038e6cef52dd56ddfc31bbccf7ebc4",
     "macOS-12302019-full-tickstore-2503d1e7c5f6.json": "4b08050480beab45d4d884ec536c04d0c9b6bdf36417174afc9863bc9598e749",
     "macOS-12302019-open-67ae574f5666.json": "4f475ca1311633c62e62c76b23a7022fcbcb513be457bdfdfe3b3a9d6098a9e9"
+  },
+  "fuzz_g3_file_before_the_tie": {
+    "fuzz-g3-ea1dde4c02e4.json": "bc76620e292023aa1fe78c941b3fb1a135e7716ca1b23c5aee17f9acbd746846"
   }
 }

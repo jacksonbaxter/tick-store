@@ -481,7 +481,18 @@ run_validator() {
 
 step_check_results() { run_validator scripts/check_results.py results/bench; }
 step_check_compare() { run_validator scripts/check_compare.py results/compare; }
-step_render_check() { python3 -I scripts/render_results.py --check; }
+# render_results.py exits 3 when every check passed but G-3's file could not be tied to the code
+# it judged, for want of git history: an exported tree, or a shallow clone. That is no pass.
+step_render_check() {
+    python3 -I scripts/render_results.py --check
+    local code=$?
+    NOTE=$(sed -n 's/^fuzz-g3-[0-9a-f]*\.json: ok, //p' "$1" | head -n 1)
+    if [[ $code -eq 3 ]]; then
+        skip_step "G-3's results file could not be tied to the code it judged: no git history"
+        return 0
+    fi
+    return "$code"
+}
 
 step_actionlint() {
     local tool=${ACTIONLINT:-}
