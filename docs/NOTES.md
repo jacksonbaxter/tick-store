@@ -4651,6 +4651,10 @@ included. Nothing is estimated, and no figure from a refused run is reported. If
 three passes, DS-4 stays "not judged", and the write-up says so with the attempts. The Mac's
 kernel file is measured at the same window, `28c8269`'s pass rule, at the freeze commit.
 
+Since `6679710` a pass is sized from the fastest of three timed rounds rather than one (RL-1),
+and as a case's latency batches are 5,120 a round, the set of latency percentiles a kernel case
+publishes depends on its rounds: p99.9 needs 2 or more, p99.99 20 or more (RL-2).
+
 Raw files, the trial's status, document and every case's `.stat` and `.report`:
 `phase4-raw/fix-prover-ci/ds4-trial/`.
 
@@ -4797,6 +4801,17 @@ slice (RP-5). The tests failed first (`item3-before.log`). Faults
 `compare-variant-source-day-and-slice-recursed` and `compare-variant-source-other-protocol`, and
 `compare-variant-source-day-recursed` and `compare-variant-source-unvalidated` remade on the
 moved lines, each PROVEN with `--only` (`prove-item3.log`).
+
+**RL-1 and RL-2, a kernel pass sized from three rounds.** `simd_kernel_bench` sized each case's
+pass from one timed round, so one slowed round shortened every pass of the case. It now takes
+the fastest of three, since a round cannot be measured faster than it runs. The arithmetic,
+unchanged, is in `include/tick_store/bench_support/pass_sizing.hpp`, which the bench and the
+unit tests share; `KernelPassSizing` pins the contract: whole rounds of 8,192 calls, at least
+one, lasting at least 150 ms, one round for a slow round and 150 for a 1 ms one. The
+three-round test failed first (`item4-before.log`). Fault `kernel-pass-sized-from-one-round`,
+PROVEN with `--only` (`prove-item4.log`). `--verify-all` still matches 576 cases. One case on the
+Mac, iteration only: `pfor_delta_fused/w=13/neon` ran 491,520 calls a pass, 60 rounds, in passes
+of 156 ms, and published p50 to p99.99. The DS-4 section says how a pass is sized now.
 
 ## Process notes
 
