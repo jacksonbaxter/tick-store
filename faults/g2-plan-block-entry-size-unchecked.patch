@@ -1,0 +1,13 @@
+diff --git a/scripts/g2_plan.py b/scripts/g2_plan.py
+index ccd3ffc..3c4f3cf 100644
+--- a/scripts/g2_plan.py
++++ b/scripts/g2_plan.py
+@@ -59,7 +59,7 @@ def footer_flip(layout, footer_offset, footer_bytes):
+     if fixed != FOOTER_FIXED_BYTES:
+         raise Refused(f"the footer's fixed part is {fixed} bytes, not the "
+                       f"{FOOTER_FIXED_BYTES} this rule reads")
+-    if block_entries != layout["blocks"] * BLOCK_ENTRY_BYTES:
++    if False:
+         raise Refused(f"the footer's block entries are {block_entries} bytes for "
+                       f"{layout['blocks']} blocks, not {BLOCK_ENTRY_BYTES} a block")
+     if section_entries % SECTION_ENTRY_BYTES:

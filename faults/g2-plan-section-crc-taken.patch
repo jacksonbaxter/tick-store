@@ -1,0 +1,13 @@
+diff --git a/scripts/g2_plan.py b/scripts/g2_plan.py
+index ccd3ffc..9b4822d 100644
+--- a/scripts/g2_plan.py
++++ b/scripts/g2_plan.py
+@@ -79,7 +79,7 @@ def footer_flip(layout, footer_offset, footer_bytes):
+                                     f"byte of block {block}'s")
+     elif 0 <= at - block_entries < section_entries:
+         section, byte = divmod(at - block_entries, SECTION_ENTRY_BYTES)
+-        if SECTION_CRC <= byte < SECTION_CRC + CRC_BYTES:
++        if False:
+             raise Refused(f"the footer's middle byte, {footer_offset + middle}, is in section "
+                           f"{section}'s CRC32C, which nothing reads with checksums off, and no "
+                           "committed file gives a rule for it")

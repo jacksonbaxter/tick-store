@@ -1,0 +1,15 @@
+diff --git a/scripts/g2_plan.py b/scripts/g2_plan.py
+index ccd3ffc..78d17d9 100644
+--- a/scripts/g2_plan.py
++++ b/scripts/g2_plan.py
+@@ -38,8 +38,8 @@ BIT = 1
+ # reads either CRC32C (src/store/container.cpp, block_with and section_at).
+ FOOTER_FIXED_BYTES = 24     # kFooterFixedSize
+ BLOCK_ENTRY_BYTES = 32      # kBlockEntrySize
+-BLOCK_CRC = 24              # kBlockCrc
+-BLOCK_CODEC = 28            # kBlockCodec
++BLOCK_CRC = 20              # kBlockCrc
++BLOCK_CODEC = 24            # kBlockCodec
+ SECTION_ENTRY_BYTES = 64    # kSectionEntrySize
+ SECTION_CRC = 16            # kSectionCrc
+ CRC_BYTES = 4

@@ -1,0 +1,13 @@
+diff --git a/scripts/g2_plan.py b/scripts/g2_plan.py
+index ccd3ffc..08ca2e0 100644
+--- a/scripts/g2_plan.py
++++ b/scripts/g2_plan.py
+@@ -74,7 +74,7 @@ def footer_flip(layout, footer_offset, footer_bytes):
+         block, byte = divmod(at, BLOCK_ENTRY_BYTES)
+         if BLOCK_CRC <= byte < BLOCK_CODEC:
+             moved = BLOCK_CODEC - byte
+-            return middle + moved, (f"{SEED}, moved {MOVED[moved]} on because it fell in a "
++            return middle + moved + 1, (f"{SEED}, moved {MOVED[moved]} on because it fell in a "
+                                     f"block entry's CRC32C, the {WHICH_BYTE[byte - BLOCK_CRC]} "
+                                     f"byte of block {block}'s")
+     elif 0 <= at - block_entries < section_entries:
