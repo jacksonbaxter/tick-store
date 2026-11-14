@@ -4958,6 +4958,47 @@ paragraph above, TASKS, and the comments in `pass_sizing.hpp` and `simd_kernel_b
 say so. Comments only; no code changed. `kernel-pass-sized-from-one-round`'s patch, whose
 context held the header's comment, was remade and PROVEN with `--only` (`prove-item2.log`).
 
+### The checking and publishing scripts after the freeze
+
+The measured code is frozen at `ede0176`, and every results file is being measured again there
+by unattended runners working from private copies. This round fixes what the second-pass
+reviews found in the scripts that check and publish those files (RG- and RP- rows in
+docs/REVIEW.md), none of which a measurement runs: no commit of it changes `src/`, `include/`,
+`fuzz/`, `cmake/`, the CMake files, `bench/`, `tools/`, `compare/`, `tests/unit/` or the
+measuring scripts TASKS lists, and `check_compare.py`'s rules stay as the pre-registration
+fixed them; only its tests change. Raw logs are in `phase4-raw/fix-stage-b/`.
+
+**RG-1, a run stopped by its replay or merge.** When the replay or the merge fails, the launcher
+writes that part's command as the run's, with no `-max_total_time`, and `check_fuzz.py` held
+every run's command to a budget of 1,800 s. So the run the launcher records as not clean, the
+case the replay exists to catch, could not be assembled at all: `fuzz_results.py` printed
+"`-max_total_time is not at least 1800`" and wrote nothing. The launcher is frozen, so the
+validator changed: a run that was not clean, has no timed part and carries its failed replay's
+or merge's command as its own is held to the caps alone, and is read as missed. Every other run
+keeps the budget. The end-to-end tests, the launcher's replay and merge failures through the
+assembler into `check_runs`, and the assembler's merge test with the `.meta` the launcher
+writes, failed first (`rg1-before.log`). Faults `fuzz-g3-failed-part-caps-unchecked` and
+`fuzz-g3-budget-waived-for-any-unclean-run`, and `fuzz-g3-replay-unchecked` remade on the moved
+line, each PROVEN with `--only` (`prove-rg1-3.log`).
+
+**RG-2, one definition of what a fuzz run depends on.** `fuzz_results.py` wrote runs made at
+one commit as a later one's whenever nothing but `scripts/`, its tests, faults, results or prose
+changed in between, while `check_fuzz.py`'s tie names the launcher, `scripts/fuzz_g3.py`, among
+what a fuzz binary is launched with. Runs launched before a change to the launcher could so be
+published as the launcher's after it. The assembler now diffs the tie's own paths. The test, a
+scratch repository whose second commit changes only the launcher, failed first: the runs were
+relabelled (`rg2-before.log`). Fault `fuzz-results-relabel-across-launcher-change`, PROVEN with
+`--only` (`prove-rg1-3.log`).
+
+**RG-3, CR-5's per-locate ratios.** The per-locate caveat was added only when a figure was a
+best-codec expression, and CR-5's parts are ratios of per-locate figures, so its four per-locate
+parts read met with no word that they leave out the locate sequence; the sequence's cost added
+to both terms would lower each ratio. A figure that reads a per-locate column through a ratio or
+a product now carries the caveat. RESULTS.md's CR-5 row is regenerated; no verdict moved. The
+test failed first (`rg3-before.log`). Fault `render-ratio-permutation-caveat-dropped`, and
+`render-permutation-caveat-dropped` remade on the moved lines, each PROVEN with `--only`
+(`prove-rg1-3.log`).
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
