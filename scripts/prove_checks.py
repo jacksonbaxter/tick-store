@@ -145,12 +145,25 @@ def questdb_variant(document):
     return next(iter(document["systems"]["questdb"]["variants"].values()))
 
 
+def edit_compare_slice(change):
+    """The macOS slice, edited, with its pin moved to the edited bytes. A protocol 1 file is
+    known by its SHA-256 in scripts/data_pins.json, which would refuse any edit first, so a
+    fault in its content re-pins it, and only the rule the fault is about can refuse it."""
+    path = macos_results("compare", benchmark=COMPARE_FAULT_SLICE)
+    edit_json(path, change)
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+
+    def repin(pins):
+        pins["protocol_1_comparison_files"][path.name] = digest
+    edit_json("scripts/data_pins.json", repin)
+
+
 def mismatched_commit_mode():
     def change(document):
         for setting in questdb_variant(document)["classes"]["B"]["settings"]:
             if setting["name"] == "cairo.commit.mode (conf file)":
                 setting["in_force"] = "nosync"
-    edit_json(macos_results("compare", benchmark=COMPARE_FAULT_SLICE), change)
+    edit_compare_slice(change)
 
 
 def load_lines_as_a_string():
@@ -158,7 +171,7 @@ def load_lines_as_a_string():
     (review E-2)."""
     def change(document):
         document["header"]["load_lines"] = " ".join(document["header"]["load_lines"])
-    edit_json(macos_results("compare", benchmark=COMPARE_FAULT_SLICE), change)
+    edit_compare_slice(change)
 
 
 def failed_read_back():
@@ -166,13 +179,13 @@ def failed_read_back():
         oracle = questdb_variant(document)["classes"]["B"]["read_back"]["oracle"]
         oracle["verdict"] = "mismatch"
         oracle["exit_code"] = 1
-    edit_json(macos_results("compare", benchmark=COMPARE_FAULT_SLICE), change)
+    edit_compare_slice(change)
 
 
 def query_digest_mismatch():
     def change(document):
         questdb_variant(document)["queries"]["Q1"]["digest"] = "0" * 64
-    edit_json(macos_results("compare", benchmark=COMPARE_FAULT_SLICE), change)
+    edit_compare_slice(change)
 
 
 def unflagged_swap_in():
@@ -181,7 +194,7 @@ def unflagged_swap_in():
         cold["pages_in"] += 1
         cold["pages_in_by_repetition"][0] += 1
         cold["flagged"] = False
-    edit_json(macos_results("compare", benchmark=COMPARE_FAULT_SLICE), change)
+    edit_compare_slice(change)
 
 
 def drop_g3_run(target, host):
