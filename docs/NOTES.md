@@ -2710,6 +2710,10 @@ The full `scripts/check.sh` passed all 30 steps at `28435e4` under `heavy.sh`, i
 Raw logs, with every fuzzer's log, `.meta`, BSD `time` output, the runner scripts and the leak
 probe: `phase3-raw/fuzz-g3/`.
 
+Those runs replayed the whole corpus inside their 30 minutes. A G-3 run is now three parts,
+`scripts/fuzz_g3.py`'s replay, merge and timed run, and the file records each (below, "The
+G-3 replay and merge"); "The G-3 launch at the freeze" has the commands for both hosts.
+
 ### Leak checking on the Mac
 
 `check.sh` could not fail on a leak on macOS: ASan leaves LeakSanitizer off there, and the
@@ -2815,6 +2819,153 @@ clone, the pin, a pin on other bytes, a pin for another file) failed on the old 
 expected, each baseline passing and each fault failing `py-scripts` with exit 1 on the test it
 names, at `ff8e4b6`. `results/check-proofs.json` was restored from git after the run. Raw
 logs: `phase4-raw/fix-fuzz-launch/proofs1/`.
+
+### The G-3 replay and merge
+
+At `ea1dde4` each target's half hour began by replaying its saved corpus and its seeds: the time
+before its `INITED` line, after which libFuzzer runs only inputs it makes by mutation. libFuzzer
+prints exec/s as runs over whole seconds since start, so the `INITED` line's runs and exec/s
+bound that time. From the logs in `phase3-raw/fuzz-g3/` and `phase3-raw/close-p3/crc-g3/`:
+
+| Target | macOS, s | Linux at avx2, s | Inputs replayed, macOS / Linux |
+|---|---|---|---|
+| `fuzz_columns` | under 1 | | 408 |
+| `fuzz_container` | under 1 | under 1 | 706 / 743 |
+| `fuzz_dictionary` | 60 to 61 | 240 to 262 | 2,865 / 2,873 |
+| `fuzz_gorilla_timestamps` | under 1 | | 1,134 |
+| `fuzz_gorilla_xor` | 1 | | 1,350 |
+| `fuzz_itch_frame` | under 1 | | 3,711 |
+| `fuzz_itch_message` | under 1 | | 1,142 |
+| `fuzz_itch_query` | 46 to 47 | 175 to 192 | 1,878 / 1,917 |
+| `fuzz_itch_store` | 7 | 48 to 49 | 2,075 / 2,108 |
+| `fuzz_pfor` | 80 to 81 | 510 to 567 | 5,095 / 5,099 |
+| `fuzz_run_length` | 9 | 62 to 64 | 2,047 / 2,047 |
+| `fuzz_stream_vbyte` | 4 | 28 | 1,348 / 1,348 |
+| `fuzz_stub_store` | under 1 | | 787 |
+
+So on `debian` `fuzz_pfor` had at most 1,291 s of its 1,801 for new inputs, and
+`fuzz_dictionary` 1,561. The figures and the script that read them:
+`phase4-raw/fix-fuzz-launch/old-replay-seconds.txt` and `bin/old_replay.py`.
+
+What a 30-minute run now consists of, `scripts/fuzz_g3.py`'s three parts for each target, all
+with `fuzz/launch.txt`'s flags, caps, ASan options and `-max_len`:
+
+1. The replay: `-runs=0` over the saved corpus and the seeds. libFuzzer runs every input once,
+   through the oracle and with its per-input leak check, exactly as the start of a fuzzing run
+   does, and stops. A finding, a nonzero exit or no `Done` line fails the target there.
+2. The merge: `-merge=1` of the same two folders into an empty one, which keeps the smallest set
+   of inputs that reaches all their coverage and features. libFuzzer restarts its merge child
+   past an input that crashes it and still exits 0, so the launcher fails a merge of more than
+   one attempt.
+3. The timed run: `-max_total_time=1800` on the merged folder alone. Its new inputs go there,
+   and are then copied to the saved corpus; the merged copies of seeds are not.
+
+`results/fuzz-g3-<commit>.json` is now schema `tick-store-fuzz-2`: each run holds `replay`
+(command, inputs, runs, seconds, exit code, findings), `merge` (command, inputs kept,
+attempts, seconds, exit code, findings) and `timed` (seconds before and after its first new
+input, split at `INITED`, and the new inputs saved). `check_fuzz.py` requires, of a clean
+run, a clean replay whose `Done` line ran each input, a clean merge in one attempt at the timed
+run's `-max_len`, neither on a time budget, and a timed part of at least 1,800 s that agrees
+with the run's own clock within 2 s. The pinned `ea1dde4` file alone may keep schema
+`tick-store-fuzz-1`. The short fuzz steps of `check.sh` and CI are unchanged: they still load
+the saved corpus and the seeds on their 20 s or 240 s budget.
+
+Checked on this libFuzzer by short real runs through `heavy.sh` with the launcher at
+`9935099`, each with 30 s of fuzzing (`phase4-raw/fix-fuzz-launch/short-run*/`):
+
+- `fuzz_itch_message`: the replay ran 1,139 files in 1,140 runs, 0.1 s; the merge kept 395 in one
+  attempt; the timed run reached `INITED` at once with the replay's own coverage, cov 635 and
+  ft 690.
+- `fuzz_pfor`, the slowest to replay: the replay ran 5,556 files in 5,560 runs in 90.1 s, to
+  cov 1,549 ft 8,194; the merge took 90.4 s and kept 1,012 files, "8194 new features added;
+  1549 new coverage edges"; the timed run loaded them in 21.1 s, to cov 1,549 ft 8,193, against
+  the 90 s a run spent before. One feature of 8,194 was not reached again on loading, which
+  libFuzzer's own counting allows between runs; every input had run in the replay. 5 new
+  inputs went to the saved corpus.
+
+So each target now spends about twice its old replay before its timed run starts, and the timed
+run about a quarter of it before its first new input. On `debian` that would leave `fuzz_pfor`
+about 1,670 of its 1,800 s for new inputs rather than 1,291, if the merged set loads there in
+the same proportion as on the Mac; the next run's file records the figure itself.
+
+Tests: `test_check_fuzz.py`'s rules for each part, written first, failed on the item-1 scripts
+(`2-tests-before.log`); `test_fuzz_g3.py` runs the launcher on a stand-in fuzzer, clean, with a
+replay finding, with a restarted merge, and in a checkout whose fuzzed code differs from HEAD.
+Faults `fuzz-g3-replay-unchecked`, `fuzz-g3-merge-crash-accepted`,
+`fuzz-g3-timed-short-accepted`, `fuzz-g3-old-schema-accepted`,
+`fuzz-g3-launch-replay-finding-ignored` and `fuzz-g3-launch-merge-restart-ignored`, with the
+three older G-3 faults again since `check_fuzz.py` changed: 9 of 9 as expected with
+`prove_checks.py --only` under `heavy.sh` at `bac6e9d`, the six new ones and
+`fuzz-g3-short-run-accepted` failing `py-scripts` with exit 1 on the test each names, and
+`fuzz-g3-target-missing` and `fuzz-g3-crc-target-missing` failing `render-check` with exit 2.
+`results/check-proofs.json` was restored from git after the run. Raw logs:
+`phase4-raw/fix-fuzz-launch/proofs2/`.
+
+### The G-3 launch at the freeze
+
+The commands, checked against `scripts/fuzz_g3.py`, `fuzz_results.py` and `check_fuzz.py`. `F`
+is the freeze commit, committed and pushed, the Mac's checkout clean at it: the launcher refuses
+a checkout whose fuzzed code differs from HEAD. `HEAVY` is the Mac's heavy-job wrapper and
+`RAW` a folder outside the repository for the logs.
+
+On the Mac, from the repository, after sourcing the toolchain's environment script:
+
+```sh
+$HEAVY scripts/check.sh --only fuzz-build
+$HEAVY python3 -I scripts/fuzz_g3.py --logs $RAW/mac --parallel 4 \
+    fuzz_pfor fuzz_dictionary fuzz_itch_query fuzz_itch_store
+$HEAVY python3 -I scripts/fuzz_g3.py --logs $RAW/mac --parallel 4 \
+    fuzz_run_length fuzz_stream_vbyte fuzz_container fuzz_columns
+$HEAVY python3 -I scripts/fuzz_g3.py --logs $RAW/mac --parallel 4 \
+    fuzz_gorilla_timestamps fuzz_gorilla_xor fuzz_itch_frame fuzz_itch_message
+$HEAVY python3 -I scripts/fuzz_g3.py --logs $RAW/mac fuzz_stub_store
+```
+
+Four `heavy.sh` jobs, as at `ea1dde4`, so a measurement can get in between. Each batch takes its
+slowest target's replay and merge plus 1,800 s: about 33 minutes for the first (`fuzz_pfor`,
+90 s and 90 s) and 30 to 31 for the others, so about 2 hours 5 minutes, and the fuzz build.
+
+On `debian`, after `debian_sync.sh tick-store` exports F to `~/quant-projects/tick-store/src`
+with its `COMMIT`, in a `bash -s` heredoc that sources `~/quant-projects/.toolchain/env.sh` and
+`~/quant-projects/tick-store/env-debian.sh`, from `~/quant-projects/tick-store/src`, with
+`P=$HOME/quant-projects/tick-store`:
+
+```sh
+~/quant-projects/bin/heavy.sh taskset -c 2,6,7 sh -c "cmake --preset fuzz -B $P/build/fuzz \
+    -DFETCHCONTENT_BASE_DIR=$P/build/_deps && cmake --build $P/build/fuzz -j 3"
+mkdir -p $P/logs/g3-F
+setsid nohup ~/quant-projects/bin/heavy.sh taskset -c 2,6,7 python3 -I scripts/fuzz_g3.py \
+    --logs $P/logs/g3-F --cpus 2,6,7 --level avx2 --build $P/build/fuzz --corpus $P/corpus \
+    --work $P/build/fuzz/g3 --artifacts $P/artifacts \
+    fuzz_pfor fuzz_dictionary fuzz_itch_query fuzz_itch_store fuzz_run_length \
+    fuzz_stream_vbyte fuzz_container > $P/logs/g3-F.out 2>&1 &
+```
+
+then short polls of `g3-F.out` until its "done:" line. The launcher takes the commit from
+`COMMIT`, pins each target to one of cpu2, cpu6 and cpu7 inside the heavy job, three at once,
+and reads each fuzzer's `VmHWM` every 5 s, since the host has no GNU `time`. The seven run
+longest first. Taking each target's merge as long as its replay, as on the Mac, and the
+replays above: `fuzz_pfor` about 49 minutes, `fuzz_dictionary` 39, `fuzz_itch_query` 36 and
+the other four 30 to 32, so about 1 hour 40 minutes in all, and about 2 for the build. The saved
+corpora in `$P/corpus` are the ones the `ea1dde4` runs left.
+
+Each host's logs folder also needs `host.json`, written by hand as at `ea1dde4` (the fields
+`fuzz_results.py`'s docstring lists, `default_kernel_level` `neon` on the Mac and `avx2` on
+`debian`). The Linux logs come to the Mac with `scp -r` from the host's `logs/g3-F` into
+`$RAW/linux`, and one file is made from both:
+
+```sh
+python3 -I scripts/fuzz_results.py --commit F --out results/fuzz-g3-<F's first 12>.json \
+    --host macOS=$RAW/mac --host Linux=$RAW/linux --strip "$PWD" --strip <debian's P>
+python3 -I scripts/check_fuzz.py results/fuzz-g3-<F's first 12>.json
+```
+
+`--strip` takes the Linux host's absolute folder out of its commands, as at `ea1dde4`.
+`fuzz_results.py` writes the file only if `check_fuzz.py`'s content rules pass it. Committed
+after F, with nothing in `TIED_PATHS` changed, `check_fuzz.py` must print
+`fuzz-g3-<F's first 12>.json: ok, tied: nothing fuzzed changed since <F's first 12>` and exit 0,
+and `render-check` must pass with that note; then the TASKS item removes the `ea1dde4` file and
+its pin.
 
 ### check.sh on the Linux host
 

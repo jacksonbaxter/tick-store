@@ -79,7 +79,9 @@ mkdir -p build/fuzz/corpus/itch_message build/fuzz/corpus/itch_frame \
 ## Run
 
 From the repository root. New inputs go to the first directory, so the seeds stay
-as generated. Budget a run with `-max_total_time`.
+as generated. Budget a run with `-max_total_time`. The flags, folders and `-max_len` below
+are `fuzz/launch.txt`'s, which also holds the ASan options; `scripts/check.sh`'s fuzz steps
+and the G-3 launcher read that file.
 
 ```sh
 build/fuzz/fuzz/fuzz_itch_message -max_total_time=60 -max_len=256 \
@@ -184,14 +186,32 @@ build/fuzz/fuzz/fuzz_run_length -max_total_time=60 -max_len=16384 \
   there `store::crc32c()` runs the SSE4.2 kernel, which the Mac cannot. The oracles compute the
   CRCs they recompute with the same kernel, so these runs check the kernel for memory errors
   on fuzzed lengths and offsets; its agreement with the software table is the unit test
-  `Crc32c.HardwareMatchesSoftwareOnRandomLengthsAndOffsets`. Run each with the flags above and
-  `-max_total_time=1800`, then `scripts/fuzz_results.py` builds `results/fuzz-g3-<commit>.json`
-  from the logs, and `scripts/check_fuzz.py` refuses it if a target is missing or a clean run is
-  under 1,800 s. On macOS, add `detect_leaks=1:leak_check_at_exit=0` to `ASAN_OPTIONS`: ASan
-  leaves leak detection off there, and the check at exit reports libFuzzer's own RSS thread.
-- `scripts/check.sh` sets those leak options itself: `detect_leaks=1:leak_check_at_exit=0` for
-  the fuzzers on macOS and `detect_leaks=1` on Linux, where it is the default, ahead of anything
-  in `ASAN_OPTIONS`. libFuzzer then checks each input for a leak and exits 77 on one. Its
+  `Crc32c.HardwareMatchesSoftwareOnRandomLengthsAndOffsets`.
+- A G-3 run of one target is `scripts/fuzz_g3.py`'s three parts, one after another, each with
+  the flags, caps, ASan options and `-max_len` of `fuzz/launch.txt`:
+  1. the replay: `-runs=0` over the saved corpus and the seeds, which runs every input once
+     through the target and its oracle, with the per-input leak check, exactly as the start of a
+     fuzzing run does, and stops. A finding, a nonzero exit or no `Done` line fails the target
+     there;
+  2. the merge: `-merge=1` of the same two folders into an empty one, which keeps the smallest
+     set of inputs that reaches all their coverage and features. libFuzzer restarts its merge
+     child past an input that crashes it, so a second attempt fails the target too;
+  3. the timed run: `-max_total_time=1800` on the merged folder alone. It loads that smaller
+     set, prints `INITED`, and from then on runs only inputs it makes by mutation; its new
+     inputs go to the merged folder and are then copied to the saved corpus.
+  The results file records, per target, the replay's inputs, runs and seconds, the merge's
+  kept inputs and attempts, and the timed run's seconds before and after its first new input,
+  split at `INITED`. Before this, the timed run replayed the whole corpus inside its 30
+  minutes: at `ea1dde4`, `fuzz_pfor` spent up to 567 of its 1,801 s on `debian` before its
+  first new input (docs/NOTES.md, G-3). Then `scripts/fuzz_results.py` builds
+  `results/fuzz-g3-<commit>.json` from each host's logs, and `scripts/check_fuzz.py` refuses it
+  if a target is missing, a clean run's timed part is under 1,800 s, its replay or merge was
+  not clean, or anything a fuzz binary is built from or launched with changed after its commit.
+  docs/NOTES.md, "The G-3 launch at the freeze", has each host's commands.
+- `fuzz/launch.txt` sets the leak options: `detect_leaks=1:leak_check_at_exit=0` for the
+  fuzzers on macOS, where ASan leaves leak detection off and the check at exit reports
+  libFuzzer's own RSS thread, and `detect_leaks=1` on Linux, where it is the default, ahead of
+  anything in `ASAN_OPTIONS`. libFuzzer then checks each input for a leak and exits 77 on one. Its
   `asan-test` step sets `detect_leaks=1` too, so a leaking unit test fails on the Mac as well.
 
 ## Reach
