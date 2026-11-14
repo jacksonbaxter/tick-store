@@ -4472,6 +4472,60 @@ All 186 fingerprints changed with this, so every stored proof waits for the full
 `prover-key-names-only` drops the code and blobs from the key again; `test_prove_checks.py`
 refuses it.
 
+The first proof run after this stopped at its seventh fault with a tokenizer error: a commit to
+the prover during the run had moved its lines on disk, and `inspect` reads source from disk.
+The key now reads the prover's text as it was loaded (`c19a064`). The test that failed first
+imports a copy, moves the copy's lines on disk and asks for the same key
+(`e5-ondisk-test-before.log`). The prover still should not be edited while it runs.
+
+**Every listed fault exists and applies.** At `3862f88` the list held 187 faults: 159 patches,
+27 mutations, and one, `check-sh-no-tests`, by its arguments alone. No patch in `faults/` was
+unlisted. Every mutation is committed and changes the tree, `compare-load-lines-a-string`
+(`load_lines_as_a_string`, `1010452`) and `readme-pitch-unchecked-figure`
+(`type_an_unchecked_pitch_figure`, `96908d0`) among them. Both are mutations, so no patch file
+is named for either. Seven patches no longer applied with `git apply`, the prover's own call:
+the three in TASKS, and `compare-variant-source-unvalidated`,
+`compare-write-device-reads-unchecked` and `compare-slice-warm-up-unchecked` on
+`check_compare.py`, and `headline-verdict-all-parts` on `render_results.py`. Each is remade on
+the current code with the same edit, so it breaks the same rule (`fa49bc6`, `75d8210`). The
+dictionary's check is now `scan_for_repeats(...).repeated`. `render_results.py` now calls
+`verdict_text(row, parts)`, and the fault passes `every`.
+
+`test_prove_checks.py`'s `EveryFaultApplies` clones the committed tree into `build/`. It
+requires every listed patch to apply there, a fetched source's part where it was fetched, and
+every listed mutation to change it. It failed first on the seven patches
+(`item3-test-before.log`). Nine mutations also "changed nothing" in that first run, but the
+cause was in the prover: its results-file helpers took the clone's path as a default bound
+when the script loaded, so they edited the prover's own clone, not the test's. They now read it
+when called (`07abeca`). Two faults keep the test honest: `prover-patch-stale` puts back
+`container-block-crc-skipped`'s old patch, and `prover-mutation-changes-nothing` makes
+`hand_edit_results_md` write back what it read.
+
+Proving the remade faults found a second kind of rot, which the new test does not catch.
+`compare-load-lines-a-string` was WRONG REASON: its mutation edits the macOS slice, and since
+`8fb2533` `check_compare.py` knows a protocol 1 file by its SHA-256. So the pin refused the edit
+first, and the load-lines rule was never reached. A run of each results-file mutation's step
+on a clone (`sweep/expected.log`) showed four more of the same kind:
+`compare-commit-mode`, `compare-read-back`, `compare-query-digest` and
+`compare-swap-unflagged`. They now edit the slice through `edit_compare_slice`, which moves the
+slice's pin in `scripts/data_pins.json` to the edited bytes, so only the rule each fault is
+about can refuse it (`85b66f3`). The pin's own rule is proven by its own fault. Only a full
+re-proof shows whether a patch's expected string still matches, since a step must run for
+that.
+
+Proven with `--only` through `heavy.sh`, each PROVEN: `fuzz-dictionary-repeated-entry` (exit
+77), `fuzz-container-block-reserved` (77) and `container-block-crc-skipped` (8) at `c29ed0f`
+(`prove-item3.log`). The run then stopped on the key error above. Then
+`compare-variant-source-unvalidated`, `compare-write-device-reads-unchecked` and
+`compare-slice-warm-up-unchecked` (1 each), also at `c29ed0f`. At `c19a064`
+(`prove-batch2.log`): `headline-verdict-all-parts`, `readme-pitch-unchecked-figure` (2),
+`prover-key-names-only`, `prover-patch-stale`, `prover-mutation-changes-nothing`,
+`turbo-read-after-the-run-only`, `check-sh-no-skips-ignored`, `ci-compare-venv-not-made`,
+`ci-skips-allowed` and `coverage-kernel-statement-stale`, with `compare-load-lines-a-string`
+WRONG REASON as described. At `85b66f3` (`prove-batch3.log`): the five slice faults (1 each).
+The list now holds 194 faults: 166 patches, 27 mutations and one by arguments. `results/check-proofs.json` is unchanged
+here: the full re-proof writes it.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
