@@ -4526,6 +4526,26 @@ WRONG REASON as described. At `85b66f3` (`prove-batch3.log`): the five slice fau
 The list now holds 194 faults: 166 patches, 27 mutations and one by arguments. `results/check-proofs.json` is unchanged
 here: the full re-proof writes it.
 
+**E-6, CI and py-compare.** The repo job named `py-compare`, but CI made no `.venv`, so the step
+skipped and the job passed without it, and the workflow test only looked for the step's name.
+The repo job now makes `.venv` from `compare/requirements.lock` with pip, by hash and with no
+dependency resolution. Every job runs `check.sh --no-skips`, which fails a step that would skip
+and refuses `--quick`. `test_check_sh.py` requires both of these in the workflow, and it
+requires `--list` to exit 0 with steps. With a venv made this way on the Mac, `py-compare
+--no-skips` passed: 210 tests, 3 skipped inside the step (`py-compare-civenv.log`). The tests
+failed first: 4 failures (`e6-test-before.log`). `--list` exiting 1 with no output, injected by
+hand, failed the step-list test (`e6-list-injected.log`). Faults `check-sh-no-skips-ignored`,
+`ci-compare-venv-not-made` and `ci-skips-allowed`.
+
+**E-10, turbo.** Confirmed in part. The host's `measure.sh` sets the governor under its lock and
+never writes the boost switch, which was read there, read-only. So the turbo `run_bench.py`
+recorded after the last case was right for the committed files. Still, it was one reading,
+taken after the run. `run_bench.py` now reads boost before the first case too, and states it only
+if the two readings agree; otherwise the header says why it is unavailable, and
+`check_results.py` refuses the file. The tests failed first (`e10-test-before.log`). Fault
+`turbo-read-after-the-run-only`. The comparison harness reads turbo the same way, after its
+run. It is outside this change and is left open in TASKS.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
