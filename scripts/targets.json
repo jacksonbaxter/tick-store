@@ -14,12 +14,9 @@
   ]
  },
  "pitch": {
-  "what": "The README's pitch, the prose above its headline, written by hand. render_results.py requires each figure below to appear in it as the results give it now, each value times scale put through format, and every other number in it to be one of not_results, each with the reason it is no result.",
+  "what": "The README's pitch, the prose above its headline, written by hand. render_results.py requires each figure below to appear in it as the results give it now, each value times scale put through format, and every other number in it to be one of not_results, each with the reason it is no result. A format carries the words that say what its figures are, and no two figures share one, so two figures cannot trade places unseen. Each of claims is a sentence there that ranks tick-store with no figure of its own: it must be in the pitch, and its condition must hold on the results: a target row's verdict on the parts named, pairs of figures each below the other, or the fastest of the systems' headline variants by a field on each query and kind.",
   "figures": [
-   {"file": "results/store-size-12302019.json", "values": [{"path": ["records"]}], "format": "{:,} messages"},
-   {"file": "results/store-size-12302019.json", "values": [{"path": ["source_bytes"]}], "scale": 1e-9, "format": "{:.2f} GB"},
-   {"file": "results/store-size-12302019.json", "values": [{"path": ["stored_bytes"]}], "scale": 1e-9, "format": "{:.2f} GB"},
-   {"file": "results/store-size-12302019.json", "values": [{"path": ["ratio"]}], "format": "{:.2f} times smaller"},
+   {"file": "results/store-size-12302019.json", "values": [{"path": ["records"]}, {"mul": [{"path": ["source_bytes"]}, 1e-9]}, {"mul": [{"path": ["stored_bytes"]}, 1e-9]}, {"path": ["ratio"]}], "format": "{:,} messages and {:.2f} GB, in {:.2f} GB, {:.2f} times smaller"},
    {"file": "results/compare/Linux-12302019-full-*.json", "values": [{"path": ["systems", "tickstore", "variants", "@headline", "queries", "Q2", "warm", "n"]}, {"path": ["systems", "tickstore", "variants", "@headline", "queries", "Q2", "cold", "n"]}], "format": "of {} warm runs and of {} cold"},
    {"file": "results/compare/Linux-12302019-full-*.json", "values": [{"path": ["systems", "arcticdb", "variants", "rows100k-cols127-per-security", "queries", "Q2", "warm", "median_us"]}, {"path": ["systems", "arcticdb", "variants", "rows100k-cols127-per-security", "queries", "Q3", "warm", "median_us"]}, {"path": ["systems", "tickstore", "variants", "@headline", "queries", "Q2", "warm", "median_us"]}, {"path": ["systems", "tickstore", "variants", "@headline", "queries", "Q3", "warm", "median_us"]}], "scale": 0.001, "format": "{:.2f} and {:.2f} ms warm against {:.2f} and {:.2f} ms"},
    {"file": "results/compare/Linux-12302019-full-*.json", "values": [{"path": ["systems", "arcticdb", "variants", "rows100k-cols127-per-security", "queries", "Q1", "warm", "median_us"]}], "scale": 1e-6, "format": "{:.1f} s on Q1 warm"},
@@ -36,6 +33,14 @@
    {"text": "8.59 M", "why": "WT-1's target value, from BENCHMARKS.md"},
    {"text": "32 workers on 32 vCPUs", "why": "the setup of the published figure WT-1 is taken from, from BENCHMARKS.md"},
    {"text": "WT-1", "why": "a target's id"}
+  ],
+  "claims": [
+   {"text": "it takes the least disk of the four", "target": {"id": "CR-2", "host": "Linux", "verdict": "met"}},
+   {"text": "it has the lowest median latency and the lowest slowest run", "target": {"id": "QL-4", "host": "Linux", "parts": ["Q2 warm", "Q2 cold", "Q3 warm", "Q3 cold"], "verdict": "met"}},
+   {"text": "ArcticDB's per-security variant is faster on both", "file": "results/compare/Linux-12302019-full-*.json", "below": [
+     [{"path": ["systems", "arcticdb", "variants", "rows100k-cols127-per-security", "queries", "Q2", "warm", "median_us"]}, {"path": ["systems", "tickstore", "variants", "@headline", "queries", "Q2", "warm", "median_us"]}],
+     [{"path": ["systems", "arcticdb", "variants", "rows100k-cols127-per-security", "queries", "Q3", "warm", "median_us"]}, {"path": ["systems", "tickstore", "variants", "@headline", "queries", "Q3", "warm", "median_us"]}]]},
+   {"text": "ArcticDB or QuestDB is fastest", "file": "results/compare/Linux-12302019-full-*.json", "fastest": {"systems": ["parquet", "arcticdb", "questdb", "tickstore"], "queries": ["Q1", "Q4"], "kinds": ["warm", "cold"], "field": "median_us", "one_of": ["arcticdb", "questdb"]}}
   ]
  },
  "rows": [

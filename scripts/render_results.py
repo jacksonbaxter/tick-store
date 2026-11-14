@@ -1079,12 +1079,23 @@ def check_pitch(definitions_path, root, readme):
     scripts/targets.json lists under "pitch" must appear in it as the results give it now, and
     every other number in it must be a text listed with the reason it is no result, such as a
     language version or a target's own value, so no figure there goes stale unseen (review
-    E-9)."""
-    pitch = json.loads(definitions_path.read_text(encoding="utf-8")).get("pitch")
+    E-9). Each figure's format carries the words that say what it is, and no two figures share
+    one (review RG-4). Each sentence listed under "claims", which ranks tick-store with no
+    figure of its own, must be in it and borne out by its condition (review RG-13)."""
+    definitions = json.loads(definitions_path.read_text(encoding="utf-8"))
+    pitch = definitions.get("pitch")
     if not pitch:
         return
     text = " ".join(readme.split(HEADLINE_BEGIN)[0].split())
     remaining = text
+    # A figure is found by its format's words as well as its digits. Two figures of one format
+    # could trade places in the text and both still be found, so each format is one figure's,
+    # and carries the words that say what its figure is (review RG-4).
+    formats = [figure["format"] for figure in pitch["figures"]]
+    shared = sorted({form for form in formats if formats.count(form) > 1})
+    if shared:
+        raise TargetError(f"pitch: two figures share the format {shared[0]!r}, so they could "
+                          "trade places in the text unseen; give each the words around it")
     for figure in pitch["figures"]:
         path = target_file(root, figure["file"])
         if path is None:
@@ -1105,6 +1116,62 @@ def check_pitch(definitions_path, root, readme):
     left = NUMBER.findall(remaining)
     if left:
         raise TargetError(f"a figure in the README's pitch that nothing checks: {left[0]!r}")
+    for claim in pitch.get("claims", []):
+        if claim["text"] not in text:
+            raise TargetError(f"the README's pitch no longer says {claim['text']!r}, which "
+                              "scripts/targets.json ties to the results; change the claim there "
+                              "with the sentence")
+        problem = claim_problem(claim, definitions, root)
+        if problem:
+            raise TargetError(f"the README's pitch says {claim['text']!r}, and the results do "
+                              f"not bear it out: {problem}")
+
+
+def claim_problem(claim, definitions, root):
+    """Why the results do not bear out a sentence of the pitch that ranks tick-store, or None
+    (review RG-13). "target" is a row's verdict, judged as in the targets block, on the parts
+    named; "below" pairs of figures of one file, each first below its second; "fastest" the
+    system with the lowest field among the systems' headline variants, for each query and kind,
+    one of those named."""
+    if "target" in claim:
+        spec = claim["target"]
+        row = next((row for row in definitions["rows"]
+                    if (row["id"], row["host"]) == (spec["id"], spec["host"])), None)
+        if row is None:
+            raise TargetError(f"pitch: no target row {spec['id']} on {spec['host']}")
+        parts, reason = judged_parts(row, root)
+        if parts is None:
+            return f"{spec['id']} on {spec['host']} is {reason}"
+        if spec.get("parts"):
+            unknown = [label for label in spec["parts"] if label not in [p[0] for p in parts]]
+            if unknown:
+                raise TargetError(f"pitch: no part {unknown} in {spec['id']} on {spec['host']}")
+            parts = [part for part in parts if part[0] in spec["parts"]]
+        verdict = verdict_of(parts)
+        return None if verdict == spec["verdict"] else \
+            f"{spec['id']} on {spec['host']} is {verdict}, not {spec['verdict']}"
+    path = target_file(root, claim["file"])
+    if path is None:
+        raise TargetError(f"pitch: no results file matches {claim['file']}")
+    document = json.loads(path.read_text(encoding="utf-8"))
+    if "below" in claim:
+        for lower, higher in claim["below"]:
+            first, second = evaluate(lower, document), evaluate(higher, document)
+            if not first < second:
+                return f"{first} is not below {second}"
+        return None
+    if "fastest" in claim:
+        spec = claim["fastest"]
+        for query in spec["queries"]:
+            for kind in spec["kinds"]:
+                values = {system: walk(document, ["systems", system, "variants", "@headline",
+                                                  "queries", query, kind, spec["field"]])
+                          for system in spec["systems"]}
+                fastest = min(values, key=values.get)
+                if fastest not in spec["one_of"]:
+                    return f"{query} {kind}: {fastest} has the lowest {spec['field']}"
+        return None
+    raise TargetError(f"pitch: the claim {claim['text']!r} names no condition")
 
 
 def block_of(text, begin=BEGIN, end=END):

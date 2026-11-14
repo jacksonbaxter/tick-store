@@ -278,6 +278,21 @@ def hand_edit_pitch_figure():
     edit_text("README.md", "reaches 1.376 M records/s", "reaches 2.376 M records/s")
 
 
+def swap_pitch_store_sizes():
+    """The README's pitch with the source's size and the store's in each other's places, both
+    still figures the results give (review RG-4)."""
+    document = json.loads((TREE / "results" / "store-size-12302019.json").read_text())
+    source, stored = (f"{document[key] * 1e-9:.2f} GB" for key in ("source_bytes",
+                                                                   "stored_bytes"))
+    edit_text("README.md", f"{source}, in {stored}", f"{stored}, in {source}")
+
+
+def reword_a_pitch_claim():
+    """The pitch's Q1 and Q4 sentence reworded to rank tick-store first, with no figure in it
+    for the figure check to catch (review RG-13)."""
+    edit_text("README.md", "ArcticDB or QuestDB is fastest", "tick-store is fastest")
+
+
 def type_an_unchecked_pitch_figure():
     """A figure typed into the README's pitch that no row of its check covers (review E-9)."""
     edit_text("README.md", "It misses targets too.", "It is 42 times faster. It misses targets too.")
@@ -1172,6 +1187,24 @@ FAULTS = (
           "pitch that nothing checks", EXIT_RENDER_REFUSED,
           "a figure in the README's pitch that nothing checks: '42'",
           type_an_unchecked_pitch_figure),
+    # Reviews RG-4 and RG-13: a pitch figure is bound to its words, and a ranking to the results.
+    Fault("readme-pitch-store-figures-swapped", "render-check", "the README's pitch with the "
+          "source's size and the store's traded, both still figures the results give",
+          EXIT_RENDER_REFUSED, "the README's pitch does not state '268,744,780 messages and",
+          swap_pitch_store_sizes),
+    Fault("render-pitch-shared-format-accepted", "py-scripts", "render_results.py takes two "
+          "pitch figures of one format, which could trade places in the text unseen",
+          CHECK_FAILED,
+          "FAIL: test_two_figures_of_one_format_are_refused (__main__.RenderPitchTest"),
+    Fault("readme-pitch-claim-reworded", "render-check", "the pitch's Q1 and Q4 sentence "
+          "reworded to rank tick-store first, with no figure in it", EXIT_RENDER_REFUSED,
+          "the README's pitch no longer says 'ArcticDB or QuestDB is fastest'",
+          reword_a_pitch_claim),
+    Fault("render-pitch-claim-unchecked", "py-scripts", "render_results.py finds each claim's "
+          "words in the pitch and never judges its condition, so a ranking the results reverse "
+          "still passes", CHECK_FAILED,
+          "FAIL: test_a_claim_the_results_no_longer_bear_out_stops_the_check "
+          "(__main__.RenderPitchTest"),
     # D-10: a per-locate figure says it leaves out the permutation to file order.
     Fault("render-permutation-caveat-dropped", "py-scripts", "render_results.py shows a "
           "per-locate column's bits against a compression target with no word that they leave "
