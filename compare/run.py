@@ -281,6 +281,43 @@ def part_arguments(args, variants, measure):
             "tickstore_alone": is_tickstore_only(args), "measured": bool(measure)}
 
 
+# cpufreq boost before the first system's part, kept with the parts it was read for.
+TURBO_FILE = "turbo-before.json"
+
+
+def turbo_before(args, measure, parts, host):
+    """cpufreq boost read once before the first system's part, outside the lock, as
+    run_bench.py reads it before its first case (review E-10). It is kept beside the parts, so
+    a run started again on the same work folder after the wrapper's exit 75 keeps the reading
+    it took first and never takes it again. A reading made with other arguments is not this
+    run's: those parts are all made again, so it is read again."""
+    if host != "Linux":
+        return None
+    path = parts / TURBO_FILE
+    arguments = part_arguments(args, None, measure)
+    try:
+        kept = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        kept = None
+    if isinstance(kept, dict) and kept.get("arguments") == arguments:
+        return kept.get("before_first_system")
+    state = run_bench.linux_turbo()
+    path.write_text(json.dumps({"arguments": arguments, "before_first_system": state}),
+                    encoding="utf-8")
+    return state
+
+
+def turbo_across(before, after):
+    """The boost state stated only if it read the same before the first system and after the
+    last; scripts/check_compare.py requires both readings and their agreement."""
+    if before is None:
+        return "unavailable: cpufreq boost was not read before the first system"
+    if before != after:
+        return (f"unavailable: cpufreq boost read {before!r} before the first system and "
+                f"{after!r} after the last")
+    return after
+
+
 def made_with(path, arguments):
     try:
         return json.loads(path.read_text(encoding="utf-8")) == arguments
@@ -408,8 +445,9 @@ def peak_memory(report):
 
 
 def build_document(host, args, layout, pin, commit, measure, parts, load_lines, meter=None,
-                   selection=None, second_meter=None):
+                   selection=None, second_meter=None, turbo_first=None):
     linux = host == "Linux"
+    turbo_last = run_bench.linux_turbo() if linux else None
     full_day = is_full_day(args)
     alone = is_tickstore_only(args)
     systems = {system: json.loads((parts / f"{system}.json").read_text(encoding="utf-8"))
@@ -447,7 +485,9 @@ def build_document(host, args, layout, pin, commit, measure, parts, load_lines, 
                                                      "sibling-second"),
         "second_thread": "cpu6, used by every system" if linux else "not-available",
         "governor": run_bench.governor_of(host, runs),
-        "turbo": run_bench.linux_turbo() if linux else "not-available",
+        "turbo": turbo_across(turbo_first, turbo_last) if linux else "not-available",
+        "turbo_readings": ({"before_first_system": turbo_first, "after_last_system": turbo_last}
+                           if linux else "not-available"),
         "pinning": "pinned" if linux else "not-supported",
         "questdb_runtime": questdb_runtime(systems),
         "load_lines": [line for lines in load_lines for line in lines],
@@ -634,10 +674,11 @@ def run(args):
         chosen = {system: entry["selected"] for system, entry in selection["systems"].items()}
     elif args.variants is not None:
         chosen = {system: args.variants.split(",") for system in args.systems}
+    turbo_first = turbo_before(args, measure, parts, host)
     load_lines = [run_one(system, args, layout, measure, parts, meter, chosen.get(system),
                           second_meter) for system in args.systems]
     document = build_document(host, args, layout, pin, commit, measure, parts, load_lines, meter,
-                              selection, second_meter)
+                              selection, second_meter, turbo_first)
     directory = args.results_dir if measure else args.iteration_dir
     suffix = TICKSTORE_ONLY_SUFFIX if alone else FULL_DAY_SUFFIX
     name = f"{args.day}-{suffix}" if args.day else (

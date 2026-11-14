@@ -1483,6 +1483,9 @@ def protocol_2(document):
     document["header"]["protocol"] = 2
     document["header"]["second_sibling_busy_percent"] = (
         second_sibling_block() if document["header"]["host"] == "Linux" else "not-available")
+    document["header"]["turbo_readings"] = (
+        {"before_first_system": "enabled", "after_last_system": "enabled"}
+        if document["header"]["host"] == "Linux" else "not-available")
     if "variant_selection" in document and \
             document["variant_selection"].get("rule") == variant_rule.RULE_PROTOCOL_1:
         document["variant_selection"]["rule"] = variant_rule.RULE
@@ -1901,6 +1904,46 @@ class Protocol2(Harness):
             with self.subTest(stated=stated):
                 self.assert_fault_2(fault, f"header.protocol: {stated!r}, and a file states "
                                            "protocol 2")
+
+    # cpufreq boost read before the first system and after the last (review E-10's leftover).
+
+    def test_a_linux_turbo_read_only_after_the_run(self):
+        def fault(document):
+            del document["header"]["turbo_readings"]
+        self.assert_fault_2(fault, "header.turbo_readings: cpufreq boost was not read before "
+                                   "the first system and after the last", "Linux")
+
+    def test_a_linux_turbo_not_read_before_the_first_system(self):
+        for reading in (None, "unavailable: no cpufreq boost switch, as on a virtual machine"):
+            def fault(document, reading=reading):
+                readings = document["header"]["turbo_readings"]
+                if reading is None:
+                    del readings["before_first_system"]
+                else:
+                    readings["before_first_system"] = reading
+            with self.subTest(reading=reading):
+                self.assert_fault_2(fault, f"header.turbo_readings: before_first_system is "
+                                           f"{reading!r}, not a reading of cpufreq boost",
+                                    "Linux")
+
+    def test_a_linux_turbo_that_changed_across_the_run(self):
+        def fault(document):
+            document["header"]["turbo_readings"]["before_first_system"] = "disabled"
+        self.assert_fault_2(fault, "header.turbo_readings: cpufreq boost read 'disabled' before "
+                                   "the first system and 'enabled' after the last", "Linux")
+
+    def test_a_linux_turbo_stated_against_its_readings(self):
+        def fault(document):
+            document["header"]["turbo_readings"] = {"before_first_system": "disabled",
+                                                    "after_last_system": "disabled"}
+        self.assert_fault_2(fault, "header.turbo: states 'enabled', and both readings are "
+                                   "'disabled'", "Linux")
+
+    def test_a_macos_document_claiming_turbo_readings(self):
+        def fault(document):
+            document["header"]["turbo_readings"] = {"before_first_system": "enabled",
+                                                    "after_last_system": "enabled"}
+        self.assert_fault_2(fault, "header.turbo_readings: macOS has no boost switch to read")
 
     def test_a_protocol_2_document_from_any_commit_passes(self):
         document = protocol_2(valid_document("Linux"))

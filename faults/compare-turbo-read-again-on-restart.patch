@@ -1,0 +1,12 @@
+diff --git a/compare/run.py b/compare/run.py
+--- a/compare/run.py
++++ b/compare/run.py
+@@ -299,7 +299,7 @@
+         kept = json.loads(path.read_text(encoding="utf-8"))
+     except (OSError, json.JSONDecodeError):
+         kept = None
+-    if isinstance(kept, dict) and kept.get("arguments") == arguments:
++    if False:
+         return kept.get("before_first_system")
+     state = run_bench.linux_turbo()
+     path.write_text(json.dumps({"arguments": arguments, "before_first_system": state}),

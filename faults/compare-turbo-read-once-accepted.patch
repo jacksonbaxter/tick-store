@@ -1,0 +1,12 @@
+diff --git a/scripts/check_compare.py b/scripts/check_compare.py
+--- a/scripts/check_compare.py
++++ b/scripts/check_compare.py
+@@ -986,7 +986,7 @@
+     """Protocol 2: on Linux, cpufreq boost read before the first system's part and after the
+     last, the two the same, and the state stated theirs, as run_bench.py requires of a
+     benchmark (review E-10). macOS has no boost switch to read."""
+-    if protocol < PROTOCOL_2:
++    if True:
+         return []
+     readings = header.get(TURBO_READINGS)
+     if header.get("host") != "Linux":

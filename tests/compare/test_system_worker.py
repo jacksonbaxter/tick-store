@@ -1386,13 +1386,25 @@ class FakeDay:
         def block(self, cases):
             return {"core": self.core, "sibling": self.core + 1, "cases": cases}
 
-    def __init__(self, case, scratch, host, measure="wrapper"):
+    def __init__(self, case, scratch, host, measure="wrapper", turbo="enabled", stop_at=None):
         self.case, self.scratch, self.host, self.measure = case, Path(scratch), host, measure
         self.ran = []
         self.published = []
+        # What cpufreq boost reads, and every reading and system run in the order they came.
+        self.turbo, self.events = turbo, []
+        # A system whose run the wrapper sends back with exit 75, as the unattended runner sees.
+        self.stop_at = stop_at
+
+    def read_turbo(self, *_):
+        self.events.append(("turbo", self.turbo))
+        return self.turbo
 
     def run_one(self, system, args, layout, measure, parts, meter, variants=None,
                 second_meter=None):
+        self.events.append(("run", system))
+        if system == self.stop_at:
+            raise compare_run.run_bench.Failure(compare_run.run_bench.EXIT_RETRY_LATER,
+                                                "retry later")
         self.ran.append((system, variants))
         part = {"truth": {}, "queries": [], "full_day": {"clipped": False},
                 "headline_variant": "v3-seg4Mi",
@@ -1416,7 +1428,7 @@ class FakeDay:
               mock.patch.object(run_bench, "current_commit", return_value="c" * 40),
               mock.patch.object(run_bench, "SiblingMeter", self.Meter),
               mock.patch.object(run_bench, "cpu_model", return_value="cpu"),
-              mock.patch.object(run_bench, "linux_turbo", return_value="enabled"),
+              mock.patch.object(run_bench, "linux_turbo", self.read_turbo),
               mock.patch.object(run_bench, "governor_of", return_value="performance"),
               mock.patch.object(compare_run, "require_clean_tree"),
               mock.patch.object(compare_run.Layout, "from_arguments", return_value=layout),
@@ -1451,6 +1463,70 @@ class MeasuredRun(unittest.TestCase):
             day = FakeDay(self, scratch, "Linux", measure=None)
             day.run(["--warm-repetitions", "5", "--systems", "parquet", "--variants", "v"])
         self.assertEqual(day.ran, [("parquet", ["v"])])
+
+
+class TurboReadings(unittest.TestCase):
+    """cpufreq boost is read before the first system's part and after the last, and stated only
+    if the two agree, as run_bench.py does for a benchmark (review E-10's leftover). The first
+    reading is kept with the work folder, so a run started again after the wrapper's exit 75
+    keeps it."""
+
+    SYSTEMS = ["parquet", "tickstore"]
+    ARGV = ["--systems", *SYSTEMS]
+
+    def test_turbo_is_read_before_the_first_system_and_after_the_last(self):
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "build") as scratch:
+            day = FakeDay(self, scratch, "Linux", measure=None)
+            self.assertEqual(day.run(self.ARGV), 0)
+        self.assertEqual(day.events, [("turbo", "enabled"),
+                                      *[("run", system) for system in self.SYSTEMS],
+                                      ("turbo", "enabled")])
+        (document, _), = day.published
+        header = document["header"]
+        self.assertEqual(header["turbo"], "enabled")
+        self.assertEqual(header["turbo_readings"], {"before_first_system": "enabled",
+                                                    "after_last_system": "enabled"})
+        self.assertEqual(check_compare.check_turbo(header, check_compare.PROTOCOL_2), [])
+
+    def test_a_restarted_run_keeps_its_first_turbo_reading(self):
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "build") as scratch:
+            first = FakeDay(self, scratch, "Linux", measure=None, stop_at="tickstore")
+            self.assertEqual(first.run(self.ARGV), compare_run.run_bench.EXIT_RETRY_LATER)
+            again = FakeDay(self, scratch, "Linux", measure=None, turbo="disabled")
+            self.assertEqual(again.run(self.ARGV), 0)
+        self.assertEqual(first.events[0], ("turbo", "enabled"))
+        # Started again, it reads boost only after the last system: the first reading stands.
+        self.assertEqual(again.events, [*[("run", system) for system in self.SYSTEMS],
+                                        ("turbo", "disabled")])
+        (document, _), = again.published
+        header = document["header"]
+        self.assertEqual(header["turbo_readings"], {"before_first_system": "enabled",
+                                                    "after_last_system": "disabled"})
+        self.assertTrue(header["turbo"].startswith("unavailable: "), header["turbo"])
+        self.assertIn("header.turbo_readings: cpufreq boost read 'enabled' before the first "
+                      "system and 'disabled' after the last",
+                      check_compare.check_turbo(header, check_compare.PROTOCOL_2))
+
+    def test_a_run_with_other_arguments_reads_turbo_again(self):
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "build") as scratch:
+            first = FakeDay(self, scratch, "Linux", measure=None)
+            self.assertEqual(first.run([*self.ARGV, "--warm-repetitions", "5"]), 0)
+            again = FakeDay(self, scratch, "Linux", measure=None, turbo="disabled")
+            self.assertEqual(again.run(self.ARGV), 0)
+        self.assertEqual(again.events[0], ("turbo", "disabled"))
+        (document, _), = again.published
+        self.assertEqual(document["header"]["turbo"], "disabled")
+
+    def test_macos_reads_no_turbo(self):
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "build") as scratch:
+            day = FakeDay(self, scratch, "macOS", measure=None)
+            self.assertEqual(day.run(self.ARGV), 0)
+        self.assertNotIn("turbo", [event for event, _ in day.events])
+        (document, _), = day.published
+        self.assertEqual((document["header"]["turbo"], document["header"]["turbo_readings"]),
+                         ("not-available", "not-available"))
+        self.assertEqual(check_compare.check_turbo(document["header"],
+                                                   check_compare.PROTOCOL_2), [])
 
 
 class TickstoreAloneDay(unittest.TestCase):

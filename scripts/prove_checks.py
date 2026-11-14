@@ -611,6 +611,15 @@ FAULTS = (
     Fault("turbo-read-after-the-run-only", "py-scripts", "run_bench.py states the boost it "
           "reads after the last case, though it read another before the first", CHECK_FAILED,
           "FAIL: test_turbo_that_changed_across_the_run_is_not_stated (__main__.RunBenchTest"),
+    # E-10's leftover: the comparison reads boost before its first system and after its last.
+    Fault("compare-turbo-read-once-accepted", "py-scripts", "check_compare.py takes a protocol "
+          "2 Linux document whose boost was read once, after the run, with no reading before "
+          "the first system", CHECK_FAILED,
+          "FAIL: test_a_linux_turbo_read_only_after_the_run (__main__.Protocol2"),
+    Fault("compare-turbo-read-again-on-restart", "py-compare", "compare/run.py started again "
+          "after the wrapper's exit 75 reads boost again before its systems, so the first "
+          "reading of the document is lost", CHECK_FAILED,
+          "FAIL: test_a_restarted_run_keeps_its_first_turbo_reading (__main__.TurboReadings"),
     Fault("compare-full-day-clipped-window", "py-scripts", "check_compare.py stops comparing a "
           "full-day file's query windows with BENCHMARKS.md's, so an hour clipped to the slice "
           "passes as a full day", CHECK_FAILED,

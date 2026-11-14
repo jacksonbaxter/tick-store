@@ -45,7 +45,8 @@ figure for what it is, the nearest-rank 99th percentile with n and the rank used
 100 runs is the slowest run and must say so; and every latency block and every write keeps each
 repetition's seconds, from which its median, its tail figure and its write medians are
 recomputed here. On Linux the sibling of the second pinned CPU, cpu6, is measured and held to
-the first one's rule. Every write records its total and its engine-only seconds, says what each
+the first one's rule, and cpufreq boost is read before the first system and after the last and
+stated only if the two agree. Every write records its total and its engine-only seconds, says what each
 holds, and records how much of its input was resident when its clock started and the device
 bytes read while it ran, on macOS for the processes that did it; tick-store's source must have
 been wholly resident. Every cold proof records the store's bytes resident just before its clock
@@ -114,6 +115,9 @@ MACOS_WRITE_COUNTER = coldcache.ProcessDiskReads.COUNTER
 # The second pinned CPU's sibling, measured from protocol 2 and held to the first one's rule.
 SECOND_CPU = 6
 SECOND_SIBLING = "second_sibling_busy_percent"
+# Protocol 2: cpufreq boost read before the first system's part and after the last on Linux.
+TURBO_READINGS = "turbo_readings"
+TURBO_STATES = ("enabled", "disabled")
 FULL_DAY = "full"
 TICKSTORE_ONLY_NAME = "full-tickstore"
 # tick-store alone on a day: macOS's figures for the targets marked Both, and tick-store's own
@@ -978,6 +982,34 @@ def check_second_sibling(header, cases, protocol):
     return []
 
 
+def check_turbo(header, protocol):
+    """Protocol 2: on Linux, cpufreq boost read before the first system's part and after the
+    last, the two the same, and the state stated theirs, as run_bench.py requires of a
+    benchmark (review E-10). macOS has no boost switch to read."""
+    if protocol < PROTOCOL_2:
+        return []
+    readings = header.get(TURBO_READINGS)
+    if header.get("host") != "Linux":
+        if readings != check_results.NOT_AVAILABLE:
+            return [f"header.{TURBO_READINGS}: macOS has no boost switch to read"]
+        return []
+    if not isinstance(readings, dict):
+        return [f"header.{TURBO_READINGS}: cpufreq boost was not read before the first system "
+                "and after the last"]
+    before, after = readings.get("before_first_system"), readings.get("after_last_system")
+    problems = [f"header.{TURBO_READINGS}: {name} is {value!r}, not a reading of cpufreq boost"
+                for name, value in (("before_first_system", before), ("after_last_system", after))
+                if value not in TURBO_STATES]
+    if problems:
+        return problems
+    if before != after:
+        return [f"header.{TURBO_READINGS}: cpufreq boost read {before!r} before the first system "
+                f"and {after!r} after the last"]
+    if header.get("turbo") != after:
+        return [f"header.turbo: states {header.get('turbo')!r}, and both readings are {after!r}"]
+    return []
+
+
 def check_variant_selection(document, path, pins, capacity):
     """The variants each system ran are what the rule gives from the slice file named, which
     must sit beside this one: same host, same commit, and itself a reported file that passes
@@ -1121,6 +1153,7 @@ def check_document(document, top_keys, path, pins, capacity, real_path=None, sha
         if not alone:
             problems += check_heap(document, "Linux", capacity)
     problems += check_second_sibling(header, list(systems), protocol_of(document))
+    problems += check_turbo(header, protocol_of(document))
     label = str(document.get("label", ""))
     input_block = document.get("input") or {}
     full_day = "day" in input_block or f"-{FULL_DAY}-" in path.name
