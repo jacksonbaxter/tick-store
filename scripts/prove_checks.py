@@ -622,6 +622,28 @@ FAULTS = (
           "refused attempt's document is lost", CHECK_FAILED,
           "FAIL: test_a_refused_document_is_kept_where_asked_and_still_never_published "
           "(__main__.RunBenchTest"),
+    # The helpers that make published inputs read what they state, and publish no machine's own.
+    Fault("build-preset-option-defaults-ignored", "py-scripts", "build_preset.py compares only "
+          "the variables a preset sets, so a dev build configured with the benchmarks on is "
+          "named dev", CHECK_FAILED,
+          "FAIL: test_a_cache_no_preset_configures_is_refused (__main__.BuildPreset"),
+    Fault("codec-eval-preset-assumed", "py-scripts", "codec_eval_results.py writes "
+          "build_preset as bench whatever the build folder's cache says", CHECK_FAILED,
+          "FAIL: test_the_preset_is_read_from_the_build_folder_not_assumed "
+          "(__main__.CodecEvalResults"),
+    Fault("codec-eval-build-type-unchecked", "py-scripts", "codec_eval_results.py takes a "
+          "build folder whose build type is not the one the tool states it was built with",
+          CHECK_FAILED, "FAIL: test_a_tool_built_otherwise_than_the_folder_is_refused "
+          "(__main__.CodecEvalResults"),
+    Fault("g2-plan-footer-trailer-counted", "py-scripts", "g2_plan.py counts the trailer as "
+          "footer, so the footer flip is not the footer's middle byte", CHECK_FAILED,
+          "FAIL: test_the_committed_days_flips_follow_from_its_layout (__main__.G2Plan"),
+    Fault("fuzz-host-absolute-path-kept", "py-scripts", "fuzz_host.py writes host.json with "
+          "an absolute path in it", CHECK_FAILED,
+          "FAIL: test_no_absolute_path_is_left_in_the_file (__main__.FuzzHost"),
+    Fault("fuzz-host-name-kept", "py-scripts", "fuzz_host.py writes host.json with the host's "
+          "name in it", CHECK_FAILED,
+          "FAIL: test_the_hosts_name_is_never_in_the_file (__main__.FuzzHost"),
     # E-10's leftover: the comparison reads boost before its first system and after its last.
     Fault("compare-turbo-read-once-accepted", "py-scripts", "check_compare.py takes a protocol "
           "2 Linux document whose boost was read once, after the run, with no reading before "

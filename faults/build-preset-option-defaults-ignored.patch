@@ -1,0 +1,13 @@
+diff --git a/scripts/build_preset.py b/scripts/build_preset.py
+--- a/scripts/build_preset.py
++++ b/scripts/build_preset.py
+@@ -92,9 +92,6 @@
+             continue
+         if not same(cache.get(key), str(value)):
+             return False
+-    for key, value in defaults.items():
+-        if key not in variables and not same(cache.get(key), value):
+-            return False
+     return True
+ 
+ 

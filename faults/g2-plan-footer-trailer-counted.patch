@@ -1,0 +1,12 @@
+diff --git a/scripts/g2_plan.py b/scripts/g2_plan.py
+--- a/scripts/g2_plan.py
++++ b/scripts/g2_plan.py
+@@ -36,7 +36,7 @@
+         raise Refused("not the output of tick_roundtrip layout --blocks: no block_list")
+     container = layout["container"]
+     footer_offset = container["footer_offset"]
+-    footer_bytes = layout["file_bytes"] - container["trailer_bytes"] - footer_offset
++    footer_bytes = layout["file_bytes"] - footer_offset
+     if footer_bytes <= 0:
+         raise Refused(f"the footer at {footer_offset} has {footer_bytes} bytes before the "
+                       f"trailer of a {layout['file_bytes']}-byte file")

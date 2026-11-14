@@ -1,0 +1,12 @@
+diff --git a/scripts/codec_eval_results.py b/scripts/codec_eval_results.py
+--- a/scripts/codec_eval_results.py
++++ b/scripts/codec_eval_results.py
+@@ -66,7 +66,7 @@
+     for key, value in tool.items():
+         out[key] = value
+         if key == AFTER:
+-            out.update({"build_preset": preset, "peak_rss_bytes": figures["peak_rss_bytes"],
++            out.update({"build_preset": "bench", "peak_rss_bytes": figures["peak_rss_bytes"],
+                         "peak_rss_note": NOTE,
+                         "peak_memory_footprint_bytes": figures["peak_memory_footprint_bytes"]})
+     return out
