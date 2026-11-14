@@ -616,6 +616,12 @@ FAULTS = (
     Fault("turbo-read-after-the-run-only", "py-scripts", "run_bench.py states the boost it "
           "reads after the last case, though it read another before the first", CHECK_FAILED,
           "FAIL: test_turbo_that_changed_across_the_run_is_not_stated (__main__.RunBenchTest"),
+    # DS-4's rule keeps every attempt's document: run_bench.py writes it before validating.
+    Fault("run-bench-refused-document-not-kept", "py-scripts", "run_bench.py writes the copy "
+          "--keep-document asks for only after the validator has passed the document, so a "
+          "refused attempt's document is lost", CHECK_FAILED,
+          "FAIL: test_a_refused_document_is_kept_where_asked_and_still_never_published "
+          "(__main__.RunBenchTest"),
     # E-10's leftover: the comparison reads boost before its first system and after its last.
     Fault("compare-turbo-read-once-accepted", "py-scripts", "check_compare.py takes a protocol "
           "2 Linux document whose boost was read once, after the run, with no reading before "

@@ -27,6 +27,8 @@ against /proc/stat when it exits, to record how busy the core's SMT sibling was:
 keeps it idle. stdout and stderr go to files on the host, so nothing depends on a
 terminal or an SSH connection staying up. The results file appears only when the whole
 run has finished and check_results.py has passed it, so a file that exists is complete.
+--keep-document PATH also writes the document to PATH before it is validated, whatever the
+verdict, so a refused attempt's document is kept (DS-4's rule in docs/NOTES.md).
 
 Exit codes: 0 done, 75 the wrapper says retry later (nothing was measured), 2 usage or
 setup, anything else the code the wrapper or benchmark exited with.
@@ -572,6 +574,9 @@ def parse_arguments(argv):
                         help="where the kernel's CPU topology and boost switch are")
     parser.add_argument("--proc-stat", type=Path, default=PROC_STAT,
                         help="where the kernel's CPU times are")
+    parser.add_argument("--keep-document", type=Path,
+                        help="also write the assembled document here before it is validated, "
+                             "whatever the verdict, as DS-4's rule keeps every attempt's")
     return parser.parse_args(argv)
 
 
@@ -600,6 +605,10 @@ def run(args):
                               args.sysfs_cpu, turbo_before)
     directory = args.results_dir if measure else args.iteration_dir
     output = directory / f"{host}-{benchmark}-{commit[:12]}.json"
+    if args.keep_document is not None:
+        # A refused document is deleted below, so a copy asked for is written first.
+        args.keep_document.parent.mkdir(parents=True, exist_ok=True)
+        args.keep_document.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
     publish(document, output, args.pins, measure)
     if not measure:
         print(f"{MEASURE_ENV} is not set, so this is iteration-only: {output}")

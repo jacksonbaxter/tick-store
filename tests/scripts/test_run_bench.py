@@ -307,7 +307,7 @@ class RunBenchTest(unittest.TestCase):
         write_script(path, text.format(extra=extra))
         return path
 
-    def run_bench(self, binary, wrapper=None):
+    def run_bench(self, binary, wrapper=None, extra=()):
         environment = {key: value for key, value in os.environ.items()
                        if key != "TICK_STORE_MEASURE"}
         environment["PATH"] = f"{self.bin}{os.pathsep}{environment['PATH']}"
@@ -318,7 +318,7 @@ class RunBenchTest(unittest.TestCase):
              "--slice-path", str(self.slice), "--pins", str(self.pins),
              "--results-dir", str(self.results), "--iteration-dir", str(self.iteration),
              "--work-dir", str(self.work), "--sysfs-cpu", str(self.sysfs),
-             "--proc-stat", str(self.stat)],
+             "--proc-stat", str(self.stat), *extra],
             capture_output=True, text=True, env=environment, check=False)
 
     def result_path(self):
@@ -399,6 +399,29 @@ class RunBenchTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("no file was written", result.stderr)
         self.assertEqual(list(self.results.iterdir()), [])
+
+    # DS-4's rule keeps every attempt's document, the refused ones too: --keep-document writes
+    # the assembled document to a path before validation, whatever the verdict.
+
+    def test_a_refused_document_is_kept_where_asked_and_still_never_published(self):
+        wrapper = self.make_wrapper(WRAPPER.replace("exit=$rc", "exit=9"))
+        kept = self.dir / "attempts" / "attempt-1" / "document.json"
+        result = self.run_bench(self.make_binary(), wrapper, ("--keep-document", str(kept)))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("no file was written", result.stderr)
+        self.assertEqual(list(self.results.iterdir()), [])
+        self.assertTrue(kept.exists(), "the refused document was not kept")
+        document = json.loads(kept.read_text(encoding="utf-8"))
+        self.assertEqual(next(iter(document)), "header")
+        self.assertEqual(document["header"]["measurement"], "reported")
+        self.assertTrue(any("exit=9" in line for line in document["header"]["load_lines"]))
+
+    def test_a_kept_document_is_the_published_file_byte_for_byte(self):
+        kept = self.dir / "kept.json"
+        result = self.run_bench(self.make_binary(), self.make_wrapper(),
+                                ("--keep-document", str(kept)))
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertEqual(kept.read_bytes(), self.result_path().read_bytes())
 
     def test_each_case_runs_directly_under_the_wrapper(self):
         self.run_bench(self.make_binary(), self.make_wrapper())

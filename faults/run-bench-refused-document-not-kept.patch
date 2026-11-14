@@ -1,0 +1,16 @@
+diff --git a/scripts/run_bench.py b/scripts/run_bench.py
+--- a/scripts/run_bench.py
++++ b/scripts/run_bench.py
+@@ -605,11 +605,11 @@
+                               args.sysfs_cpu, turbo_before)
+     directory = args.results_dir if measure else args.iteration_dir
+     output = directory / f"{host}-{benchmark}-{commit[:12]}.json"
++    publish(document, output, args.pins, measure)
+     if args.keep_document is not None:
+         # A refused document is deleted below, so a copy asked for is written first.
+         args.keep_document.parent.mkdir(parents=True, exist_ok=True)
+         args.keep_document.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+-    publish(document, output, args.pins, measure)
+     if not measure:
+         print(f"{MEASURE_ENV} is not set, so this is iteration-only: {output}")
+     else:
