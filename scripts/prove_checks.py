@@ -1150,6 +1150,12 @@ FAULTS = (
           "out the locate sequence that rebuilds file order", CHECK_FAILED,
           "FAIL: test_a_per_locate_figure_says_it_leaves_out_the_permutation "
           "(__main__.RenderTargetsTest"),
+    # Review RG-3: so does a ratio of per-locate figures, as CR-5's are.
+    Fault("render-ratio-permutation-caveat-dropped", "py-scripts", "render_results.py adds the "
+          "per-locate caveat only to a best-codec figure, so a ratio of per-locate figures, "
+          "CR-5's, is shown met with no word that it leaves out the permutation", CHECK_FAILED,
+          "FAIL: test_a_ratio_of_per_locate_figures_says_it_leaves_out_the_permutation "
+          "(__main__.RenderTargetsTest"),
     # Review F's note for RESULTS: QL-4 compares headline variants, and says so where it is met.
     Fault("render-ql4-met-unqualified", "py-scripts", "render_results.py calls a QL-4 part met "
           "with no word that it compares headline variants, nor of another system's faster "

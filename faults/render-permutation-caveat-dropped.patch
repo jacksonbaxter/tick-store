@@ -1,13 +1,11 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
-index 1739394..66718e2 100644
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -753,9 +753,6 @@ def judge(item, row, document):
+@@ -778,8 +778,6 @@ def judge(item, row, document):
      text = shown(value, row)
      if isinstance(operand, dict):
          text += f" against {shown(against, row)}"
--    if isinstance(item["value"], dict) and "best" in item["value"] and \
--            excludes_permutation(document, item["value"]["best"]):
+-    if any(excludes_permutation(document, name) for name in codec_columns_of(item["value"])):
 -        text += f", {PERMUTATION_CAVEAT}"
      if item.get("label") and item is not row:
          text = f"{item['label']} {text}"

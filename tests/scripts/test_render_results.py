@@ -417,6 +417,26 @@ class RenderTargetsTest(Scratch):
         self.assertIn(f"| file order: 3.0 bits, {caveat}; per locate: 3.0 bits | met |",
                       self.row("T-13", "any"))
 
+    def test_a_ratio_of_per_locate_figures_says_it_leaves_out_the_permutation(self):
+        # Review RG-3: CR-5's ratios divide one per-locate figure by another, and adding the
+        # locate sequence's cost to both would lower the ratio, so they carry the caveat too.
+        caveat = "leaving out the locate sequence that rebuilds file order"
+        self.eval_rows(3, {}, {})
+
+        def ratio(column):
+            return {"div": [{"codec": "a", "column": column, "field": "bits_per_value"},
+                            {"best": column, "not_family": "g"}]}
+        self.write_targets([{"id": "T-14", "host": "any", "target": {"at_least": 1},
+                             "digits": 1, "unit": "x",
+                             "parts": [{"label": "file order", "file": "results/eval-*.json",
+                                        "value": ratio("c")},
+                                       {"label": "per locate", "file": "results/eval-*.json",
+                                        "value": ratio("c_per_locate")}]}])
+        result = self.render()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(f"| file order: 1.0x; per locate: 1.0x, {caveat} | met |",
+                      self.row("T-14", "any"))
+
     def test_a_version_4_verdict_without_its_permutation_field_is_refused(self):
         result = self.eval_rows(4, {"target": "CR-0", "excludes_permutation": False},
                                 {"target": "CR-0"})

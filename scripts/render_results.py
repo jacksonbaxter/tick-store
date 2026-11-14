@@ -651,6 +651,19 @@ def excludes_permutation(document, name):
     return column.get("order") in PERMUTED_ORDERS
 
 
+def codec_columns_of(expression):
+    """The codec-eval columns an expression reads, through div and mul, so a ratio of
+    per-locate figures carries the permutation caveat as the figures do (review RG-3)."""
+    if not isinstance(expression, dict):
+        return []
+    if "best" in expression:
+        return [expression["best"]]
+    if "codec" in expression:
+        return [expression["column"]]
+    return [name for key in ("div", "mul") for operand in expression.get(key, ())
+            for name in codec_columns_of(operand)]
+
+
 def bench_cases(document, pattern):
     found = [result for result in document.get("results", [])
              if fnmatch.fnmatchcase(result.get("case", ""), pattern)]
@@ -765,8 +778,7 @@ def judge(item, row, document):
     text = shown(value, row)
     if isinstance(operand, dict):
         text += f" against {shown(against, row)}"
-    if isinstance(item["value"], dict) and "best" in item["value"] and \
-            excludes_permutation(document, item["value"]["best"]):
+    if any(excludes_permutation(document, name) for name in codec_columns_of(item["value"])):
         text += f", {PERMUTATION_CAVEAT}"
     if item.get("label") and item is not row:
         text = f"{item['label']} {text}"
