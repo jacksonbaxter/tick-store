@@ -1,0 +1,12 @@
+diff --git a/include/tick_store/bench_support/pass_sizing.hpp b/include/tick_store/bench_support/pass_sizing.hpp
+--- a/include/tick_store/bench_support/pass_sizing.hpp
++++ b/include/tick_store/bench_support/pass_sizing.hpp
+@@ -17,7 +17,7 @@
+ // The least a pass lasts, so a kernel case lasts about 10 s.
+ inline constexpr std::chrono::milliseconds kKernelMinPassTime{150};
+ // Timed rounds a pass is sized from.
+-inline constexpr int kKernelSizingRounds = 3;
++inline constexpr int kKernelSizingRounds = 1;
+ 
+ // The fewest whole rounds of `round_calls` calls that last at least `least_ns` at
+ // `round_ns` a round, and never fewer than one. A round measured at 0 ns or less counts as

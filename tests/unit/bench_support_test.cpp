@@ -7,6 +7,7 @@
 #include "tick_store/bench_support/build_info.hpp"
 #include "tick_store/bench_support/counter_gate.hpp"
 #include "tick_store/bench_support/latency_recorder.hpp"
+#include "tick_store/bench_support/pass_sizing.hpp"
 #include "tick_store/bench_support/resolution_guard.hpp"
 #include "tick_store/bench_support/stream_check.hpp"
 #include "tick_store/bench_support/timer.hpp"
@@ -19,6 +20,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <array>
 #include <csignal>
 #include <chrono>
@@ -499,6 +501,53 @@ TEST(BuildInfo, NamesTheCompilerAndCarriesNoPath) {
     EXPECT_FALSE(info.isa.empty());
     EXPECT_EQ(info.compile_flags.find('/'), std::string_view::npos);
     EXPECT_EQ(info.compile_flags.find("-I"), std::string_view::npos);
+}
+
+// A kernel case's pass (DS-4; reviews RL-1 and RL-2): whole rounds of 8,192 calls, enough of
+// them to last 150 ms, sized from the fastest of three timed rounds.
+constexpr std::int64_t kLeastPassNs = 150'000'000;
+
+TEST(KernelPassSizing, APassIsAPositiveWholeNumberOfRounds) {
+    EXPECT_EQ(kKernelRoundCalls, 8192U);
+    EXPECT_EQ(kKernelMinPassTime, std::chrono::milliseconds{150});
+    const std::array<std::int64_t, 10> round_ns{-5,        0,           1,           999,
+                                                1'000'000, 7'000'000,   149'999'999, 150'000'000,
+                                                150'000'001, 400'000'000};
+    for (const std::int64_t one : round_ns) {
+        const std::size_t calls = calls_per_pass(one, kLeastPassNs, kKernelRoundCalls);
+        EXPECT_GT(calls, 0U) << one;
+        EXPECT_EQ(calls % kKernelRoundCalls, 0U) << one;
+        const auto rounds = static_cast<std::int64_t>(calls / kKernelRoundCalls);
+        const std::int64_t measured = std::max<std::int64_t>(one, 1);
+        if (rounds > 1) {
+            EXPECT_GE(rounds * measured, kLeastPassNs) << one;
+            EXPECT_LT((rounds - 1) * measured, kLeastPassNs) << one;
+        }
+    }
+}
+
+TEST(KernelPassSizing, ASlowRoundIsOneRoundAndAFastRoundIsMany) {
+    // A round slower than the least pass is a pass of one round.
+    EXPECT_EQ(calls_per_pass(200'000'000, kLeastPassNs, kKernelRoundCalls), 8192U);
+    EXPECT_EQ(calls_per_pass(150'000'000, kLeastPassNs, kKernelRoundCalls), 8192U);
+    // A fast one: 1 ms a round is 150 rounds, 7 ms is 22, the pass at least 150 ms.
+    EXPECT_EQ(calls_per_pass(1'000'000, kLeastPassNs, kKernelRoundCalls), 150U * 8192U);
+    EXPECT_EQ(calls_per_pass(7'000'000, kLeastPassNs, kKernelRoundCalls), 22U * 8192U);
+    // A round measured at no time at all counts as 1 ns.
+    EXPECT_EQ(calls_per_pass(0, kLeastPassNs, kKernelRoundCalls),
+              std::size_t{150'000'000} * 8192U);
+}
+
+TEST(KernelPassSizing, APassIsSizedFromTheFastestOfThreeRounds) {
+    // One slow round, as preemption or a clock still ramping gives, no longer shortens the
+    // pass: 9 ms alone would give 17 rounds, 51 ms at the 3 ms the kernel runs at; the
+    // fastest gives 50, 150 ms.
+    const std::array<std::int64_t, 3> measured{9'000'000, 3'000'000, 5'000'000};
+    std::size_t timed = 0;
+    const std::size_t calls = size_kernel_pass([&measured, &timed] { return measured.at(timed++); });
+    EXPECT_EQ(kKernelSizingRounds, 3);
+    EXPECT_EQ(timed, 3U);
+    EXPECT_EQ(calls, 50U * 8192U);
 }
 
 }  // namespace

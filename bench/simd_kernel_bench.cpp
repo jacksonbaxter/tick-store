@@ -13,7 +13,7 @@
 //
 //   run_bench.py drives one process per case, --case=NAME --report=PATH, through the
 //   measurement wrapper: ten repetitions of one pass each, a pass the whole number of
-//   rounds of kPassCalls calls that lasts at least kMinPassTime, then the same passes
+//   rounds of kPassCalls calls that lasts at least 150 ms, then the same passes
 //   timed in batches for the latency histogram.
 //
 //   By hand, with no --case: every case of every width 0 to 64, under Google Benchmark's
@@ -42,6 +42,7 @@
 #include "tick_store/bench_support/build_info.hpp"
 #include "tick_store/bench_support/counter_gate.hpp"
 #include "tick_store/bench_support/latency_recorder.hpp"
+#include "tick_store/bench_support/pass_sizing.hpp"
 #include "tick_store/bench_support/resolution_guard.hpp"
 #include "tick_store/bench_support/timer.hpp"
 #include "tick_store/codec/int_transform.hpp"
@@ -87,13 +88,13 @@ namespace simd = tick_store::codec::simd;
 using Vector = std::array<std::uint64_t, codec::kVectorValues>;
 
 // Calls per round: about 8.4 M values, 1 to 20 ms at any rate here.
-constexpr std::size_t kPassCalls = 8192;
-// The least a pass lasts, so a case lasts about 10 s. At one round a pass, a case lasted
-// about a second, and on Linux a burst of 6 jiffies or more on the pinned core's SMT sibling
-// put 4 to 13 cases of 314 over check_results.py's 5% limit (DS-4, docs/NOTES.md). A pass
-// is whole rounds, so a value is measured as before, and a case's calls are sized once,
-// from an untimed round, before its warm-up.
-constexpr std::chrono::milliseconds kMinPassTime{150};
+constexpr std::size_t kPassCalls = bs::kKernelRoundCalls;
+// The least a pass lasts is bs::kKernelMinPassTime, 150 ms, so a case lasts about 10 s. At
+// one round a pass, a case lasted about a second, and on Linux a burst of 6 jiffies or more
+// on the pinned core's SMT sibling put 4 to 13 cases of 314 over check_results.py's 5% limit
+// (DS-4, docs/NOTES.md). A pass is whole rounds, so a value is measured as before, and a
+// case's calls are sized once, from untimed rounds, before its warm-up
+// (bench_support/pass_sizing.hpp).
 // Calls per latency batch: microseconds, far above either host's timer floor.
 constexpr std::size_t kBatchCalls = 16;
 constexpr int kRepetitions = 10;
@@ -448,7 +449,7 @@ struct Session {
     std::uint64_t gated_items = 0;
     std::uint64_t gated_ticks = 0;
     std::vector<std::uint64_t> warmup_pass_ticks;
-    // A whole number of rounds of kPassCalls, at least kMinPassTime long.
+    // A whole number of rounds of kPassCalls, at least bs::kKernelMinPassTime long.
     std::size_t calls_per_pass = kPassCalls;
 };
 
@@ -716,20 +717,18 @@ int fail(std::string_view message) {
     return kExitFailed;
 }
 
-// Whole rounds of kPassCalls, enough for a pass to last kMinPassTime by one untimed round,
-// timed after another has warmed the caches and the clock.
+// Whole rounds of kPassCalls, enough for a pass to last bs::kKernelMinPassTime by the fastest
+// of the untimed rounds bs::size_kernel_pass times, after another has warmed the caches and
+// the clock.
 [[nodiscard]] std::size_t sized_pass(const Case& c) {
     c.run(kPassCalls);
-    const auto start = std::chrono::steady_clock::now();
-    c.run(kPassCalls);
-    const std::int64_t one = std::max<std::int64_t>(
-        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() -
-                                                              start)
-            .count(),
-        1);
-    const std::int64_t least = std::chrono::nanoseconds{kMinPassTime}.count();
-    const std::int64_t rounds = (least + one - 1) / one;
-    return kPassCalls * static_cast<std::size_t>(std::max<std::int64_t>(rounds, 1));
+    return bs::size_kernel_pass([&c] {
+        const auto start = std::chrono::steady_clock::now();
+        c.run(kPassCalls);
+        return static_cast<std::int64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                             std::chrono::steady_clock::now() - start)
+                                             .count());
+    });
 }
 
 // B2 before anything is timed: one call, then the check against its reference.

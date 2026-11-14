@@ -351,6 +351,10 @@ FAULTS = (
           "table the decoder is generated from", EXIT_CTEST, "ItchGolden.OrderReplace"),
     Fault("golden-reserved-byte", "dev-test", "the encoder drops the reserved byte of a stock "
           "trading action", EXIT_CTEST, "ItchGolden.StockTradingAction"),
+    # Reviews RL-1 and RL-2: a kernel case's pass is sized from the fastest of three rounds.
+    Fault("kernel-pass-sized-from-one-round", "dev-test", "the kernel bench sizes a case's "
+          "pass from one timed round, so one slow round shortens every pass of the case",
+          EXIT_CTEST, "KernelPassSizing.APassIsSizedFromTheFastestOfThreeRounds"),
     Fault("asan-frame-overread", "asan-test", "the frame cursor reads its length prefix before "
           "checking that two bytes remain, one byte past a heap buffer", EXIT_CTEST,
           "heap-buffer-overflow"),
