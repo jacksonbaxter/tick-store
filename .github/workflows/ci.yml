@@ -60,9 +60,12 @@ jobs:
           - { name: coverage, only: "coverage" }
           - { name: repo, only: "py-scripts,py-compare,check-results,check-compare,render-check,actionlint,hygiene" }
     steps:
+      # The whole history, not the default single commit: check_fuzz.py, in render-check,
+      # compares the code with the commit G-3's file was made at, which a later commit holds.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:

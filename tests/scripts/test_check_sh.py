@@ -188,6 +188,14 @@ class CheckScript(unittest.TestCase):
         self.assertIn("--require-hashes", commands)
         self.assertIn("-r compare/requirements.lock", commands)
 
+    def test_the_workflow_checks_out_the_history_g3s_tie_needs(self):
+        # actions/checkout fetches one commit by default, and G-3's file judges an older one.
+        text = WORKFLOW.read_text()
+        checkouts = re.findall(r"- uses: actions/checkout@\S+.*\n((?:\s{8,}\S[^\n]*\n)*)", text)
+        self.assertTrue(checkouts)
+        for block in checkouts:
+            self.assertRegex(block, r"\n\s+fetch-depth: 0\n")
+
     def test_every_step_is_run_by_the_workflow(self):
         listed = subprocess.run([str(SCRIPT), "--list"], capture_output=True, text=True,
                                 env=self.env)
