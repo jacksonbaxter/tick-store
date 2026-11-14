@@ -1,0 +1,15 @@
+diff --git a/scripts/diag_summary.py b/scripts/diag_summary.py
+index 1931c78..821f939 100644
+--- a/scripts/diag_summary.py
++++ b/scripts/diag_summary.py
+@@ -400,10 +400,6 @@ def self_shares(report):
+     name = report["name"]
+     rows = report["rows"]
+     column = self_column(report)
+-    if not rows or report["samples_header"] == "0":
+-        raise Refused(f"{name}: the report has no samples")
+-    if "Samples" in report["columns"] and sum(row["Samples"] for row in rows) == 0:
+-        raise Refused(f"{name}: the report has no samples")
+     printed = sum(row[column] for row in rows)
+     allowed = HALF_UNIT * len(rows) + 1e-9
+     if abs(printed - 100.0) > allowed:

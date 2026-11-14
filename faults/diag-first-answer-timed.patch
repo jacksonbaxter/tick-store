@@ -1,0 +1,13 @@
+diff --git a/scripts/diag_summary.py b/scripts/diag_summary.py
+index 1931c78..c4415c8 100644
+--- a/scripts/diag_summary.py
++++ b/scripts/diag_summary.py
+@@ -836,7 +836,7 @@ def counters_simd(facts, folder, commit):
+                 requested = len(json_lines(folder / f"{name}.jsonl"))
+                 if len(answers) != requested or requested < 2:
+                     raise Refused(f"{stem}: {len(answers)} answers to {requested} requests")
+-                timed = answers[1:]
++                timed = answers
+                 for answer in timed:
+                     other = {lv: n for lv, n in (answer.get("kernel_runs") or {}).items()
+                              if lv in ABOVE[level] and n}

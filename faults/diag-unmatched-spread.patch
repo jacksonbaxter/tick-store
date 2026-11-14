@@ -1,0 +1,14 @@
+diff --git a/scripts/diag_summary.py b/scripts/diag_summary.py
+index 1931c78..7df07f5 100644
+--- a/scripts/diag_summary.py
++++ b/scripts/diag_summary.py
+@@ -463,6 +463,9 @@ def grouped(kind, report):
+         else:
+             totals[group] += share
+     rest = sum(share for share, _key in unmatched)
++    known = sum(totals.values())
++    totals = {g: v + rest * v / known for g, v in totals.items()}
++    rest, unmatched = 0.0, []
+     if abs(sum(totals.values()) + rest - 100.0) > 1e-6:
+         raise Refused(f"{report['name']}: the groups' shares do not add up to 100")
+     out = [{"name": group, "self_share_percent": round(totals[group], 3)}

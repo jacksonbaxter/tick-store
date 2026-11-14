@@ -680,6 +680,28 @@ FAULTS = (
     Fault("fuzz-host-name-kept", "py-scripts", "fuzz_host.py writes host.json with the host's "
           "name in it", CHECK_FAILED,
           "FAIL: test_the_hosts_name_is_never_in_the_file (__main__.FuzzHost"),
+    # docs/NOTES.md, The diagnostic runs at the freeze: the summary's refusals.
+    Fault("diag-no-samples-accepted", "py-scripts", "diag_summary.py takes a perf report with "
+          "no samples", CHECK_FAILED,
+          "FAIL: test_a_report_with_no_samples_is_refused (__main__.Reports"),
+    Fault("diag-commit-unchecked", "py-scripts", "diag_summary.py writes a run made at another "
+          "commit under the commit given", CHECK_FAILED,
+          "FAIL: test_a_commit_that_is_not_the_one_given_is_refused (__main__.Summaries"),
+    Fault("diag-sum-unchecked", "py-scripts", "diag_summary.py takes a report whose self shares "
+          "do not sum to 100, one cut at a percent limit, and spreads the missing lines over "
+          "the rest", CHECK_FAILED,
+          "FAIL: test_a_report_cut_at_a_percent_limit_is_refused (__main__.Reports"),
+    Fault("diag-unmatched-spread", "py-scripts", "diag_summary.py spreads the share no pattern "
+          "matches over the groups instead of keeping it apart", CHECK_FAILED,
+          "FAIL: test_what_no_pattern_matches_is_its_own_share_and_spread_over_none "
+          "(__main__.Reports"),
+    Fault("diag-absolute-path-kept", "py-scripts", "diag_summary.py writes a summary with an "
+          "absolute path in it", CHECK_FAILED,
+          "FAIL: test_a_path_the_summary_would_publish_is_refused (__main__.Summaries"),
+    Fault("diag-first-answer-timed", "py-scripts", "diag_summary.py counts each query file's "
+          "untimed first answer among D3's engine times", CHECK_FAILED,
+          "FAIL: test_the_counters_summary_reads_engine_times_from_the_answers "
+          "(__main__.Summaries"),
     # E-10's leftover: the comparison reads boost before its first system and after its last.
     Fault("compare-turbo-read-once-accepted", "py-scripts", "check_compare.py takes a protocol "
           "2 Linux document whose boost was read once, after the run, with no reading before "
