@@ -1046,6 +1046,19 @@ FAULTS = (
           "G-3 launcher among them", CHECK_FAILED,
           "FAIL: test_runs_are_not_written_as_a_commit_whose_launcher_changed "
           "(__main__.AssembleTest"),
+    # Reviews RG-7, RG-11 and RG-12: the parts' folders, a commit no full clone holds, and a
+    # count that is a boolean.
+    Fault("fuzz-g3-part-folders-unchecked", "py-scripts", "check_fuzz.py takes a merge of other "
+          "folders than the replay's, or a timed run not on the merged set alone", CHECK_FAILED,
+          "FAIL: test_a_merge_of_other_folders_than_the_replays_is_refused "
+          "(__main__.CheckFuzzTest"),
+    Fault("fuzz-g3-missing-commit-unjudged", "py-scripts", "check_fuzz.py leaves a file whose "
+          "commit no full clone holds unjudged, as if the clone were shallow, where it is "
+          "refused", CHECK_FAILED,
+          "FAIL: test_a_commit_in_no_history_of_a_full_clone_is_refused (__main__.TieTest"),
+    Fault("fuzz-g3-boolean-count-accepted", "py-scripts", "check_fuzz.py takes true for a merge's "
+          "attempts, a replay's inputs or a merge's kept inputs, as Python counts it 1",
+          CHECK_FAILED, "FAIL: test_a_count_that_is_a_boolean_is_refused (__main__.CheckFuzzTest"),
     Fault("fuzz-g3-launch-replay-finding-ignored", "py-scripts", "fuzz_g3.py goes on to the "
           "merge and the timed run after a finding in the replay", CHECK_FAILED,
           "FAIL: test_a_finding_in_the_replay_stops_the_target_before_its_timed_run "

@@ -24,6 +24,9 @@ is built from or launched with, TIED_PATHS, differs from the file's commit, comm
 That needs the commit in git's history. Where there is none, an exported tree or a clone too
 shallow to hold it, the file is not judged: it exits EXIT_UNJUDGED and says why, which
 render_results.py passes on and scripts/check.sh reports as a skip, a failure under --no-skips.
+A full clone that holds no such commit refuses the file: the commit was made up or rebased away.
+The three parts must also run on the launcher's folders: the merge merges the replay's folders
+into one of its own, and the timed run starts from that one alone.
 One file made before this rule is let through it until the freeze replaces it: PRE_TIE_FILE,
 known by the SHA-256 of its bytes under PRE_TIE_PINS in scripts/data_pins.json, never by
 anything the file says of itself. No other file may be pinned there. It is also the one file
@@ -124,6 +127,11 @@ STATUS = re.compile(r"^#(\d+)\s+DONE\s+cov: (\d+) ft: (\d+) corp: (\d+)/\S+ .*rs
 
 def is_number(value):
     return check_results.is_number(value)
+
+
+def is_count(value):
+    """A whole number, and not a boolean, which Python counts as one (review RG-12)."""
+    return isinstance(value, int) and not isinstance(value, bool)
 
 
 def targets_in(cmake):
@@ -256,6 +264,32 @@ def check_part_command(where, command, flag, timed_command):
     return problems
 
 
+def folders_of(command):
+    """The folders a part's command gives the fuzz binary: the words after it that are no flag."""
+    words = str(command).split()
+    binary = next((index for index, word in enumerate(words)
+                   if Path(word).name.startswith("fuzz_")), None)
+    if binary is None:
+        return []
+    return [word for word in words[binary + 1:] if not word.startswith("-")]
+
+
+def check_folders(where, replay_command, merge_command, timed_command):
+    """The parts ran on the folders the launcher gives them: the merge merged the folders the
+    replay ran, into a folder of its own, and the timed run started from that folder alone
+    (review RG-7)."""
+    problems = []
+    replayed, merged, timed = (folders_of(command) for command in
+                               (replay_command, merge_command, timed_command))
+    if not replayed or merged[1:] != replayed:
+        problems.append(f"{where}.merge.command: it merged {' '.join(merged[1:]) or 'nothing'}, "
+                        f"not the replay's {' '.join(replayed) or 'nothing'}")
+    if not merged or timed != merged[:1]:
+        problems.append(f"{where}.command: the timed run started from {' '.join(timed) or 'nothing'}"
+                        f", not the merge's set alone, {' '.join(merged[:1]) or 'nothing'}")
+    return problems
+
+
 def check_phases(where, run):
     """A clean run's replay ran every input clean, its merge took one attempt, and its timed
     part, before and after its first new input, is the run's own time and at least G-3's."""
@@ -274,17 +308,19 @@ def check_phases(where, run):
             problems.append(f"{where}.{name}.seconds: not a time")
         problems += check_part_command(f"{where}.{name}", part["command"], flag, run["command"])
     done = DONE.match(str(replay["done_line"]))
-    if not isinstance(replay["inputs"], int) or replay["inputs"] < 1 or done is None or \
-            int(done[1]) != replay["runs"] or replay["runs"] < replay["inputs"]:
+    if not is_count(replay["inputs"]) or replay["inputs"] < 1 or done is None or \
+            not is_count(replay["runs"]) or int(done[1]) != replay["runs"] or \
+            replay["runs"] < replay["inputs"]:
         problems.append(f"{where}.replay: its Done line does not run each of its "
                         f"{replay['inputs']} inputs")
-    if merge["attempts"] != 1:
+    if not is_count(merge["attempts"]) or merge["attempts"] != 1:
         problems.append(f"{where}.merge.attempts: {merge['attempts']}; libFuzzer starts its "
                         "merge again only past an input that crashed it")
-    if not isinstance(merge["inputs_kept"], int) or merge["inputs_kept"] < 1 or \
-            isinstance(replay["inputs"], int) and merge["inputs_kept"] > replay["inputs"]:
+    if not is_count(merge["inputs_kept"]) or merge["inputs_kept"] < 1 or \
+            is_count(replay["inputs"]) and merge["inputs_kept"] > replay["inputs"]:
         problems.append(f"{where}.merge.inputs_kept: {merge['inputs_kept']} is not a set of the "
                         "replayed inputs")
+    problems += check_folders(where, replay["command"], merge["command"], run["command"])
     before, after = timed["seconds_before_first_new_input"], timed["seconds_after_first_new_input"]
     if not is_number(before) or not is_number(after) or before < 0 or after < 0:
         problems.append(f"{where}.timed: not two times")
@@ -453,6 +489,22 @@ def history_problem(repo, commit):
     return None
 
 
+def missing_from_full_history(repo, commit):
+    """A refusal if this checkout is a full clone and holds no such commit: one made up, or
+    rebased away. Only a shallow clone may lack the commit and leave the file unjudged (review
+    RG-11)."""
+    top = git(repo, "rev-parse", "--show-toplevel")
+    if top.returncode != 0 or Path(top.stdout.strip()).resolve() != Path(repo).resolve():
+        return None
+    shallow = git(repo, "rev-parse", "--is-shallow-repository")
+    if shallow.returncode != 0 or shallow.stdout.strip() != "false":
+        return None
+    if git(repo, "cat-file", "-e", f"{commit}^{{commit}}").returncode == 0:
+        return None
+    return (f"{commit[:12]} is in no commit of this checkout's full history: made up, or "
+            "rebased away; a file names the commit it was made at")
+
+
 def tied_changes(repo, commit):
     """Every tied file that differs from the commit in the tree, committed or not, or new."""
     changed = git(repo, "diff", "--name-only", commit, "--", *TIED_PATHS, *NOT_TIED)
@@ -486,6 +538,9 @@ def check_tie(path, commit, repo, pins):
                    f"; {len(tied_changes(repo, commit))} tied files changed since {commit[:12]}")
         return problems, None, f"made before the tie and pinned, so not tied{counted}"
     if reason:
+        missing = missing_from_full_history(repo, commit)
+        if missing:
+            return problems + [missing], None, None
         return problems, (f"could not judge whether the fuzzed code changed after "
                           f"{commit[:12]}: {reason}"), None
     changed = tied_changes(repo, commit)

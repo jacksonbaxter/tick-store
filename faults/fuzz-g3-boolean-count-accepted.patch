@@ -1,0 +1,12 @@
+diff --git a/scripts/check_fuzz.py b/scripts/check_fuzz.py
+--- a/scripts/check_fuzz.py
++++ b/scripts/check_fuzz.py
+@@ -131,7 +131,7 @@
+ 
+ def is_count(value):
+     """A whole number, and not a boolean, which Python counts as one (review RG-12)."""
+-    return isinstance(value, int) and not isinstance(value, bool)
++    return isinstance(value, int)
+ 
+ 
+ def targets_in(cmake):

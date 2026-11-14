@@ -1,0 +1,11 @@
+diff --git a/scripts/check_fuzz.py b/scripts/check_fuzz.py
+--- a/scripts/check_fuzz.py
++++ b/scripts/check_fuzz.py
+@@ -320,7 +320,6 @@
+             is_count(replay["inputs"]) and merge["inputs_kept"] > replay["inputs"]:
+         problems.append(f"{where}.merge.inputs_kept: {merge['inputs_kept']} is not a set of the "
+                         "replayed inputs")
+-    problems += check_folders(where, replay["command"], merge["command"], run["command"])
+     before, after = timed["seconds_before_first_new_input"], timed["seconds_after_first_new_input"]
+     if not is_number(before) or not is_number(after) or before < 0 or after < 0:
+         problems.append(f"{where}.timed: not two times")

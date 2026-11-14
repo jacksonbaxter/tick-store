@@ -83,18 +83,27 @@ HOST_FACTS = {
 }
 
 
+# The folders as scripts/fuzz_g3.py gives them: the replay reads the saved corpus and the seeds,
+# the merge writes their merged set to a folder of its own, and the timed run starts from that.
+def folders(target, part):
+    inputs = f"build/fuzz/corpus/{target} build/fuzz/fuzz-seeds/{target}"
+    merged = f"build/fuzz/g3/{target}"
+    return {"replay": inputs, "merge": f"{merged} {inputs}", "timed": merged}[part]
+
+
 def command(target, seconds=1800):
     return (f"ASAN_OPTIONS=abort_on_error=0:exitcode=77 build/fuzz/fuzz/{target} "
             f"-max_total_time={seconds} -max_len=70000 -rss_limit_mb=2048 -malloc_limit_mb=256 "
             "-timeout=10 -print_final_stats=1 -artifact_prefix=build/fuzz/artifacts/ "
-            f"build/fuzz/corpus/{target} build/fuzz/fuzz-seeds/{target}")
+            f"{folders(target, 'timed')}")
 
 
 def part_command(target, flag):
+    part = "replay" if flag == "-runs=0" else "merge"
     return (f"ASAN_OPTIONS=abort_on_error=0:exitcode=77 build/fuzz/fuzz/{target} {flag} "
             "-max_len=70000 -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 "
             "-print_final_stats=1 -artifact_prefix=build/fuzz/artifacts/ "
-            f"build/fuzz/corpus/{target} build/fuzz/fuzz-seeds/{target}")
+            f"{folders(target, part)}")
 
 
 def phases(target):
@@ -395,6 +404,36 @@ class CheckFuzzTest(Checking):
             find(document, "fuzz_pfor", "Linux")["timed"]["seconds_after_first_new_input"] = 2900
         self.assert_fails(off, "timed: 2995.0 s is not the run's 1803 s")
 
+    # Review RG-7: the three parts ran on the folders the launcher gives them.
+
+    def test_a_merge_of_other_folders_than_the_replays_is_refused(self):
+        def other(document):
+            merge = find(document, "fuzz_pfor", "Linux")["merge"]
+            merge["command"] = merge["command"].replace("build/fuzz/corpus/fuzz_pfor ", "")
+        self.assert_fails(other, "merge.command: it merged build/fuzz/fuzz-seeds/fuzz_pfor, not "
+                                 "the replay's build/fuzz/corpus/fuzz_pfor "
+                                 "build/fuzz/fuzz-seeds/fuzz_pfor")
+
+    def test_a_timed_run_not_on_the_merged_set_alone_is_refused(self):
+        def other(document):
+            run = find(document, "fuzz_pfor", "Linux")
+            run["command"] += " build/fuzz/corpus/fuzz_pfor"
+        self.assert_fails(other, "command: the timed run started from build/fuzz/g3/fuzz_pfor "
+                                 "build/fuzz/corpus/fuzz_pfor, not the merge's set alone, "
+                                 "build/fuzz/g3/fuzz_pfor")
+
+    # Review RG-12: a count that is true is no count.
+
+    def test_a_count_that_is_a_boolean_is_refused(self):
+        for part, field, expected in (("merge", "attempts", "merge.attempts: True"),
+                                      ("replay", "inputs", "replay: its Done line does not run "
+                                                           "each of its True inputs"),
+                                      ("merge", "inputs_kept", "merge.inputs_kept: True")):
+            with self.subTest(field=field):
+                def flag(document, part=part, field=field):
+                    find(document, "fuzz_pfor", "Linux")[part][field] = True
+                self.assert_fails(flag, expected)
+
     def test_a_home_path_is_refused(self):
         def leak(document):
             find(document, "fuzz_columns", "macOS")["command"] += " /Users/someone/corpus"
@@ -501,9 +540,23 @@ class TieTest(Checking):
         pins = self.pin_of(document)
         find(document, "fuzz_columns", "macOS")["cpu"] = "cpu 3"
         result = self.run_check(document, check_fuzz.PRE_TIE_FILE, pins=pins)
-        self.assertEqual(result.returncode, check_fuzz.EXIT_UNJUDGED, result.stdout)
-        self.assertIn("is not in this checkout's history", result.stderr)
+        # Its commit is in no history of this full clone, so it is refused (review RG-11).
+        self.assertEqual(result.returncode, check_fuzz.EXIT_INVALID, result.stdout)
+        self.assertIn("is in no commit of this checkout's full history", result.stderr)
         self.assertNotIn("pinned", result.stdout)
+
+    def test_a_commit_in_no_history_of_a_full_clone_is_refused(self):
+        # Review RG-11: in a clone that is not shallow, a commit git cannot find was made up or
+        # rebased away, and the file is refused, not left unjudged.
+        document = valid_document()
+        commit = "0123456789ab" + "0" * 28
+        document["header"]["commit"] = commit
+        for run in document["runs"]:
+            run["commit"] = commit
+        result = self.run_check(document, f"fuzz-g3-{commit[:12]}.json")
+        self.assertEqual(result.returncode, check_fuzz.EXIT_INVALID, result.stdout)
+        self.assertIn(f"{commit[:12]} is in no commit of this checkout's full history",
+                      result.stderr)
 
     def test_no_other_file_may_be_pinned(self):
         self.change("src/codec/pfor.cpp")
@@ -590,9 +643,10 @@ class AssembleTest(Scratch):
         for name in names:
             tag = name if host == "macOS" else f"{name}-avx2"
             exit_code = 77 if logs.get(name) is LOG_CRASH else 0
-            run_command = command(name).split(" ", 1)[1].replace("build/", "/x/repo/build/")
-            if host == "Linux":
-                run_command = f"taskset -c 2 {run_command}"
+            def local(text, host=host):
+                text = text.split(" ", 1)[1].replace("build/", "/x/repo/build/")
+                return f"taskset -c 2 {text}" if host == "Linux" else text
+            run_command = local(command(name))
             (folder / f"{tag}.meta").write_text(
                 f"commit={COMMIT}\nstart=2026-11-11T10:00:00Z epoch=1000\n"
                 f"ASAN_OPTIONS=abort_on_error=0:exitcode=77 UBSAN_OPTIONS=print_stacktrace=1"
@@ -605,9 +659,9 @@ class AssembleTest(Scratch):
             parts = phases(name)
             (folder / f"{tag}.phases.json").write_text(json.dumps({
                 "tag": tag, "commit": COMMIT,
-                "replay": {"command": run_command.replace("-max_total_time=1800", "-runs=0"),
+                "replay": {"command": local(part_command(name, "-runs=0")),
                            "seconds": 567.3, "exit_code": 0},
-                "merge": {"command": run_command.replace("-max_total_time=1800", "-merge=1"),
+                "merge": {"command": local(part_command(name, "-merge=1")),
                           "seconds": 560.2, "exit_code": 0},
                 "timed": {"command": run_command, "seconds": 1802.5, "exit_code": exit_code,
                           "seconds_to_inited": 95.0,
