@@ -4747,7 +4747,8 @@ taken after the run. `run_bench.py` now reads boost before the first case too, a
 if the two readings agree; otherwise the header says why it is unavailable, and
 `check_results.py` refuses the file. The tests failed first (`e10-test-before.log`). Fault
 `turbo-read-after-the-run-only`. The comparison harness reads turbo the same way, after its
-run. It is outside this change and is left open in TASKS.
+run. It is outside this change and is left open in TASKS (closed in The last round before the
+freeze).
 
 **The coverage statement.** `coverage_report.py`'s docstring and the `simd_kernels` statement it
 writes into every summary said no SIMD kernel existed. The kernels have been in its required
@@ -4756,6 +4757,25 @@ every processor, plus this processor's set, NEON or AVX2 with its CPUID check, b
 list itself. The tests failed first (`cov-test-before.log`). Fault
 `coverage-kernel-statement-stale`. `results/coverage.json` is not republished here. That happens
 at the final code, as TASKS says.
+
+### The last round before the freeze
+
+The last change to measured code: at the commit this round ends on, every published number is
+measured again, once, unattended. Raw logs are in `phase4-raw/fix-freeze-a/`.
+
+**E-10 for the comparison: boost read twice.** `compare/run.py` read cpufreq boost once, after
+its last system. It now reads it before the first system's part too, outside the lock, and
+keeps that reading beside the parts in `turbo-before.json`, with the run's arguments. A run
+started again on the same work folder, as the unattended runner does after the wrapper's exit
+75, keeps the reading it took first and never takes it again; a run with other arguments,
+whose parts are all made again, reads it again. The header holds both readings in
+`turbo_readings` and states `turbo` only if they agree. `check_compare.py` requires both, each
+`enabled` or `disabled`, their agreement and the stated state in a protocol 2 Linux document,
+and `not-available` on macOS. No reported protocol 2 file exists yet, so the rule joins
+protocol 2. The tests failed first (`item1-before-*.log`). Faults
+`compare-turbo-read-once-accepted` and `compare-turbo-read-again-on-restart`, and
+`compare-tickstore-alone-protocol-2-refused` remade on the moved lines, each PROVEN with `--only`
+(`prove-item1.log`).
 
 ## Process notes
 
