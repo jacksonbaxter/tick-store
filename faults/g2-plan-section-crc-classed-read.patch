@@ -1,0 +1,12 @@
+diff --git a/scripts/g2_plan.py b/scripts/g2_plan.py
+--- a/scripts/g2_plan.py
++++ b/scripts/g2_plan.py
+@@ -70,7 +70,7 @@
+     entry_at -= block_entries
+     if 0 <= entry_at < section_entries:
+         index, byte = divmod(entry_at, SECTION_ENTRY_BYTES)
+-        if SECTION_CRC <= byte < SECTION_CRC + CRC_BYTES:
++        if False:
+             return "section", index, byte - SECTION_CRC
+     return None
+ 

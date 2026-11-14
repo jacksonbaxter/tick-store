@@ -674,16 +674,25 @@ FAULTS = (
     Fault("g2-plan-footer-trailer-counted", "py-scripts", "g2_plan.py counts the trailer as "
           "footer, so the footer flip is not the footer's middle byte", CHECK_FAILED,
           "FAIL: test_the_committed_days_flips_follow_from_its_layout (__main__.G2Plan"),
-    # docs/REVIEW.md, G-2 footer flip: the final run's footer flip fell in a CRC32C.
-    Fault("g2-plan-crc-move-removed", "py-scripts", "g2_plan.py leaves the footer flip on the "
-          "footer's middle byte when it falls in a block entry's CRC32C, which nothing reads "
-          "with checksums off", CHECK_FAILED,
+    # docs/REVIEW.md, G-2 footer flip: the final run's footer flip fell in a CRC32C. The rule
+    # moves the flip to the first byte the reader reads with checksums off, and the oracle
+    # step's sweep of every footer byte of a real store holds it to the tool's verdicts.
+    Fault("g2-plan-crc-move-removed", "py-scripts", "g2_plan.py flips the footer's middle byte "
+          "even when it falls in a CRC32C, which nothing reads with checksums off", CHECK_FAILED,
           "FAIL: test_a_middle_byte_in_a_block_entrys_crc_moves_to_the_byte_after_it "
           "(__main__.G2Plan"),
-    Fault("g2-plan-crc-move-one-too-far", "py-scripts", "g2_plan.py moves a footer flip out of "
-          "a block entry's CRC32C one byte past the codec id's first byte", CHECK_FAILED,
-          "FAIL: test_a_middle_byte_in_a_block_entrys_crc_moves_to_the_byte_after_it "
-          "(__main__.G2Plan"),
+    Fault("g2-plan-move-one-short", "py-scripts", "g2_plan.py moves a footer flip out of a "
+          "CRC32C one byte short, onto the field's last byte", CHECK_FAILED,
+          "FAIL: test_from_every_footer_byte_the_rule_flips_one_verify_caught "
+          "(__main__.FooterSweep"),
+    Fault("g2-plan-section-crc-classed-read", "py-scripts", "g2_plan.py classes a section "
+          "entry's CRC32C as read with checksums off, which the real store's sweep shows it "
+          "is not", CHECK_FAILED,
+          "FAIL: test_every_byte_the_rule_reads_was_caught_and_every_byte_it_skips_was_not "
+          "(__main__.FooterSweep"),
+    Fault("g2-plan-no-read-byte-unchecked", "py-scripts", "g2_plan.py plans a footer flip past "
+          "the footer's end when no byte at or after its middle is read", CHECK_FAILED,
+          "FAIL: test_a_footer_with_no_read_byte_left_is_refused (__main__.G2Plan"),
     Fault("g2-plan-block-entry-size-unchecked", "py-scripts", "g2_plan.py takes a footer whose "
           "block entries are not 32 bytes a block, so its CRC32C positions are not the file's",
           CHECK_FAILED, "FAIL: test_a_footer_whose_entries_are_not_the_sizes_the_rule_reads_is_"
@@ -691,12 +700,13 @@ FAULTS = (
     Fault("g2-plan-footer-parts-unchecked", "py-scripts", "g2_plan.py takes a footer whose "
           "parts do not add up to it", CHECK_FAILED,
           "FAIL: test_a_footer_whose_parts_do_not_add_up_to_it_is_refused (__main__.G2Plan"),
-    Fault("g2-plan-section-crc-taken", "py-scripts", "g2_plan.py plans a footer flip in a "
-          "section entry's CRC32C, which nothing reads with checksums off", CHECK_FAILED,
-          "FAIL: test_a_middle_byte_in_a_section_entrys_crc_is_refused (__main__.G2Plan"),
     Fault("g2-plan-block-crc-offset-drifted", "py-scripts", "g2_plan.py places a block entry's "
           "CRC32C four bytes before container.hpp's kBlockCrc", CHECK_FAILED,
           "FAIL: test_the_footer_constants_are_the_containers (__main__.G2Plan"),
+    Fault("oracle-sweep-skips-positions", "py-scripts", "check_oracle.py's footer sweep flips "
+          "every other footer byte", CHECK_FAILED,
+          "FAIL: test_the_sweep_flips_every_footer_byte_once_and_puts_it_back "
+          "(__main__.FooterSweep"),
     Fault("fuzz-host-absolute-path-kept", "py-scripts", "fuzz_host.py writes host.json with "
           "an absolute path in it", CHECK_FAILED,
           "FAIL: test_no_absolute_path_is_left_in_the_file (__main__.FuzzHost"),

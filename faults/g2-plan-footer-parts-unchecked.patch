@@ -1,13 +1,12 @@
 diff --git a/scripts/g2_plan.py b/scripts/g2_plan.py
-index ccd3ffc..89a65bc 100644
 --- a/scripts/g2_plan.py
 +++ b/scripts/g2_plan.py
-@@ -66,7 +66,7 @@ def footer_flip(layout, footer_offset, footer_bytes):
+@@ -107,7 +107,7 @@
          raise Refused(f"the footer's section entries are {section_entries} bytes, not "
                        f"{SECTION_ENTRY_BYTES} a section")
      parts = fixed + block_entries + section_entries + container["block_metadata_bytes"]
 -    if parts != footer_bytes:
 +    if False:
          raise Refused(f"the footer's parts add to {parts} bytes, and it has {footer_bytes}")
-     middle = footer_bytes // 2
-     at = middle - fixed
+     return flip_from(layout, footer_bytes // 2, footer_bytes)
+ 

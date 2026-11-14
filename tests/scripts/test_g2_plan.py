@@ -30,9 +30,9 @@ SEED = ("the middle segment's timestamp block, its middle byte, bit 1; the foote
         "byte, bit 1")
 
 
-def moved_seed(moved, which, block):
-    return (f"{SEED}, moved {moved} on because it fell in a block entry's CRC32C, the {which} "
-            f"byte of block {block}'s")
+def moved_seed(moved, which, index, kind="block"):
+    return (f"{SEED}, moved {moved} on because it fell in a {kind} entry's CRC32C, the {which} "
+            f"byte of {kind} {index}'s")
 
 
 def blocks(segments=5, footer_offset=90_000, trailer=24, file_bytes=100_000, sections=3):
@@ -187,8 +187,10 @@ class G2Plan(unittest.TestCase):
     def test_a_middle_byte_past_the_block_entries_stays_where_it_is(self):
         layout = blocks()
         sections_at = 24 + layout["container"]["block_entry_bytes"]
-        # A section entry's size, its name's length and the blocks' metadata.
-        for at in (sections_at + 64 + 8, sections_at + 64 + 20, sections_at + 3 * 64 + 40):
+        # A section entry's size, the byte before its CRC32C, its name's length and the
+        # blocks' metadata.
+        for at in (sections_at + 64 + 8, sections_at + 64 + 15, sections_at + 64 + 20,
+                   sections_at + 3 * 64 + 40):
             with self.subTest(at=at):
                 self.assertEqual(self.footer_flip(middle_at(at)), (SEED, at))
 
@@ -200,13 +202,37 @@ class G2Plan(unittest.TestCase):
                                              "block_metadata_bytes": 16}}
         self.assertEqual(g2_plan.footer_flip(layout, 1000, 40), (20, SEED))
 
-    def test_a_middle_byte_in_a_section_entrys_crc_is_refused(self):
+    def test_a_middle_byte_in_a_section_entrys_crc_moves_to_the_byte_after_it(self):
+        # Bytes 16 to 19 of a section entry are its CRC32C, byte 20 its name's length.
         sections_at = 24 + blocks()["container"]["block_entry_bytes"]
-        for byte in (16, 19):
+        for byte, moved, which in ((16, "four bytes", "first"), (17, "three bytes", "second"),
+                                   (18, "two bytes", "third"), (19, "one byte", "last")):
             with self.subTest(byte=byte):
-                layout = middle_at(sections_at + 64 + byte)
-                self.refused(layout, f"is in section 1's CRC32C, which nothing reads with "
-                                     "checksums off")
+                seed, flipped = self.footer_flip(middle_at(sections_at + 64 + byte))
+                self.assertEqual(flipped, sections_at + 64 + 20)
+                self.assertEqual(seed, moved_seed(moved, which, 1, "section"))
+
+    def test_the_byte_moved_to_is_the_first_read_one_from_any_byte(self):
+        # Every byte of the footer of blocks(): a byte in a CRC32C goes to the byte after the
+        # field, every other byte stays.
+        layout = blocks()
+        footer_bytes = 100_000 - 24 - 90_000
+        sections_at = 24 + layout["container"]["block_entry_bytes"]
+        for at in range(footer_bytes):
+            flipped, _ = g2_plan.flip_from(layout, at, footer_bytes)
+            if 24 <= at < sections_at and 24 <= (at - 24) % 32 < 28:
+                self.assertEqual(flipped, at - (at - 24) % 32 + 28, at)
+            elif sections_at <= at < sections_at + 192 and 16 <= (at - sections_at) % 64 < 20:
+                self.assertEqual(flipped, at - (at - sections_at) % 64 + 20, at)
+            else:
+                self.assertEqual(flipped, at, at)
+
+    def test_a_footer_with_no_read_byte_left_is_refused(self):
+        # Cut in a block entry's CRC32C: nothing read follows the middle byte.
+        layout = blocks()
+        with self.assertRaisesRegex(g2_plan.Refused, "no byte of the footer at or after its "
+                                                     "byte 50 is read with checksums off"):
+            g2_plan.flip_from(layout, 50, 52)
 
     def test_a_footer_whose_entries_are_not_the_sizes_the_rule_reads_is_refused(self):
         layout = blocks()

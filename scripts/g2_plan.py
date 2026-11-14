@@ -5,21 +5,26 @@
     python3 -I scripts/g2_plan.py layout-blocks.json g2.json
 
 The rule is the committed files' (results/roundtrip-*.json, `seed`): the middle segment's
-first timestamp block, its middle byte, bit 1; and the footer's middle byte, bit 1, unless
-that byte falls in a block entry's CRC32C, which nothing reads with checksums off, so a flip
-there cannot be caught and leaves the data intact. Then the flip moves on to the first byte
-after the CRC32C, the entry's codec id, and the seed says so in the committed file's words, as
-results/roundtrip-10302019.json's does. The middle segment is the listing's segment count
-halved, rounded down; the footer runs from the container's footer offset to the trailer.
-g2.json is what scripts/store_results.py reads as the flips, and the one line printed,
-"<data offset> <footer offset>", is the two byte offsets `tick_roundtrip flip-bit` is given.
+first timestamp block, its middle byte, bit 1; and in the footer, bit 1 of the first byte at
+or after its middle byte that the reader reads with checksums off. With checksums on the
+footer's CRC32C covers every byte of it; with them off, the reader checks or decodes every
+footer byte but the CRC32C of each block entry and of each section entry, which only a
+checked read compares (docs/NOTES.md, G-2's footer flip at the freeze, has the table). A flip
+in one of those cannot be caught and leaves the data intact, so the flip moves on past it, and
+the seed says what the middle byte fell in and how far the flip moved, in the words of
+results/roundtrip-10302019.json, whose footer flip was moved one byte on by hand. Where the
+middle byte is read, the seed and the flip are the middle byte's, as on 12302019. The middle
+segment is the listing's segment count halved, rounded down; the footer runs from the
+container's footer offset to the trailer. g2.json is what scripts/store_results.py reads as
+the flips, and the one line printed, "<data offset> <footer offset>", is the two byte offsets
+`tick_roundtrip flip-bit` is given. scripts/check_oracle.py flips every footer byte of a small
+store and holds the tool's verdicts to unread() and flip_from().
 
 It refuses, exit 1, layout output without its block list, a middle segment without exactly
 one first timestamp block, a block or footer that is not inside the file where the container
-says, a footer whose parts are not the sizes the rule reads (a fixed part of 24 bytes and 32
-bytes of entry a block, as include/tick_store/store/container.hpp has them) or do not add up
-to it, and a footer middle byte in a section entry's CRC32C, which nothing reads with checksums
-off either and for which no committed file gives a rule.
+says, a footer whose parts are not the sizes the rule reads (a fixed part of 24 bytes, 32 bytes
+of entry a block and 64 a section, as include/tick_store/store/container.hpp has them) or do
+not add up to it, and a footer with no byte read at or after its middle.
 
 Standard library only.
 """
@@ -51,6 +56,42 @@ class Refused(Exception):
     pass
 
 
+def unread(layout, at):
+    """What byte `at` of the footer is, if nothing reads it with checksums off: the kind of
+    entry, the entry's index and the byte of its CRC32C. None for a byte the reader reads."""
+    container = layout["container"]
+    block_entries, section_entries = (container["block_entry_bytes"],
+                                      container["section_entry_bytes"])
+    entry_at = at - FOOTER_FIXED_BYTES
+    if 0 <= entry_at < block_entries:
+        index, byte = divmod(entry_at, BLOCK_ENTRY_BYTES)
+        if BLOCK_CRC <= byte < BLOCK_CRC + CRC_BYTES:
+            return "block", index, byte - BLOCK_CRC
+    entry_at -= block_entries
+    if 0 <= entry_at < section_entries:
+        index, byte = divmod(entry_at, SECTION_ENTRY_BYTES)
+        if SECTION_CRC <= byte < SECTION_CRC + CRC_BYTES:
+            return "section", index, byte - SECTION_CRC
+    return None
+
+
+def flip_from(layout, at, footer_bytes):
+    """The first byte at or after byte `at` of the footer that the reader reads with checksums
+    off, and the seed that names it."""
+    fell_in = unread(layout, at)
+    flipped = at
+    while flipped < footer_bytes and unread(layout, flipped) is not None:
+        flipped += 1
+    if flipped >= footer_bytes:
+        raise Refused(f"no byte of the footer at or after its byte {at} is read with "
+                      "checksums off")
+    if fell_in is None:
+        return flipped, SEED
+    kind, index, byte = fell_in
+    return flipped, (f"{SEED}, moved {MOVED[flipped - at]} on because it fell in a {kind} "
+                     f"entry's CRC32C, the {WHICH_BYTE[byte]} byte of {kind} {index}'s")
+
+
 def footer_flip(layout, footer_offset, footer_bytes):
     """The footer's flip, as a byte of the footer, and the seed that names it."""
     container = layout["container"]
@@ -68,22 +109,7 @@ def footer_flip(layout, footer_offset, footer_bytes):
     parts = fixed + block_entries + section_entries + container["block_metadata_bytes"]
     if parts != footer_bytes:
         raise Refused(f"the footer's parts add to {parts} bytes, and it has {footer_bytes}")
-    middle = footer_bytes // 2
-    at = middle - fixed
-    if 0 <= at < block_entries:
-        block, byte = divmod(at, BLOCK_ENTRY_BYTES)
-        if BLOCK_CRC <= byte < BLOCK_CODEC:
-            moved = BLOCK_CODEC - byte
-            return middle + moved, (f"{SEED}, moved {MOVED[moved]} on because it fell in a "
-                                    f"block entry's CRC32C, the {WHICH_BYTE[byte - BLOCK_CRC]} "
-                                    f"byte of block {block}'s")
-    elif 0 <= at - block_entries < section_entries:
-        section, byte = divmod(at - block_entries, SECTION_ENTRY_BYTES)
-        if SECTION_CRC <= byte < SECTION_CRC + CRC_BYTES:
-            raise Refused(f"the footer's middle byte, {footer_offset + middle}, is in section "
-                          f"{section}'s CRC32C, which nothing reads with checksums off, and no "
-                          "committed file gives a rule for it")
-    return middle, SEED
+    return flip_from(layout, footer_bytes // 2, footer_bytes)
 
 
 def plan(layout):

@@ -1,0 +1,12 @@
+diff --git a/scripts/check_oracle.py b/scripts/check_oracle.py
+--- a/scripts/check_oracle.py
++++ b/scripts/check_oracle.py
+@@ -106,7 +106,7 @@
+     """Flips bit g2_plan.BIT of each footer byte in turn, runs `verify` and puts the byte back.
+     Returns [footer byte, True if verify exited 1] in the order flipped."""
+     swept = []
+-    for at in range(footer_bytes):
++    for at in range(0, footer_bytes, 2):
+         flip(store, footer_offset + at, g2_plan.BIT)
+         try:
+             code = verify()

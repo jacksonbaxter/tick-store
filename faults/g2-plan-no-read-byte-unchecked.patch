@@ -1,0 +1,12 @@
+diff --git a/scripts/g2_plan.py b/scripts/g2_plan.py
+--- a/scripts/g2_plan.py
++++ b/scripts/g2_plan.py
+@@ -82,7 +82,7 @@
+     flipped = at
+     while flipped < footer_bytes and unread(layout, flipped) is not None:
+         flipped += 1
+-    if flipped >= footer_bytes:
++    if False:
+         raise Refused(f"no byte of the footer at or after its byte {at} is read with "
+                       "checksums off")
+     if fell_in is None:
