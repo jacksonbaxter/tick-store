@@ -286,13 +286,19 @@ class Harness(unittest.TestCase):
         self.capacity = self.directory / "capacity.json"
         self.capacity.write_text(json.dumps(CAPACITY), encoding="utf-8")
 
+    def validated(self, command):
+        """The validator's run, which may refuse the document but not crash on it: a fault
+        proven by a traceback lacking the message proves nothing of the rule (review RP-10)."""
+        result = subprocess.run(command, check=False, capture_output=True, text=True)
+        self.assertNotIn("Traceback", result.stderr)
+        return result
+
     def run_on(self, document, host="macOS", capacity=None):
         path = self.directory / f"{host}-{SLICE}-{COMMIT[:12]}.json"
         path.write_text(json.dumps(document), encoding="utf-8")
         pin_protocol_1(self.pins, self.directory)
-        return subprocess.run([sys.executable, "-I", str(SCRIPT), "--pins", str(self.pins),
-                               "--capacity", str(capacity or self.capacity), str(path)],
-                              check=False, capture_output=True, text=True)
+        return self.validated([sys.executable, "-I", str(SCRIPT), "--pins", str(self.pins),
+                               "--capacity", str(capacity or self.capacity), str(path)])
 
     def assert_fault(self, mutate, expected, host="macOS", capacity=None):
         document = copy.deepcopy(valid_document(host))
@@ -320,6 +326,11 @@ class Valid(Harness):
     def test_the_repos_own_capacity_file_records_the_heap_a_linux_file_states(self):
         result = self.run_on(valid_document("Linux"), "Linux", REPO_ROOT / CAPACITY_FILE)
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_a_validator_that_crashes_fails_the_test_that_ran_it(self):
+        # Review RP-10: a crash exits 1, as a refusal does, and is no proof of a rule.
+        with self.assertRaises(AssertionError):
+            self.validated([sys.executable, "-I", "-c", "import sys; sys.exit(1 + {}['key'])"])
 
 
 def a_of(document, system="questdb"):
@@ -992,9 +1003,8 @@ class FullDay(Harness):
         path = self.directory / (name or f"Linux-{DAY}-full-{COMMIT[:12]}.json")
         path.write_text(json.dumps(document), encoding="utf-8")
         pin_protocol_1(self.pins, self.directory)
-        return subprocess.run([sys.executable, "-I", str(SCRIPT), "--pins", str(self.pins),
-                               "--capacity", str(self.capacity), str(path)],
-                              check=False, capture_output=True, text=True)
+        return self.validated([sys.executable, "-I", str(SCRIPT), "--pins", str(self.pins),
+                               "--capacity", str(self.capacity), str(path)])
 
     def assert_full_fault(self, mutate, expected, name=None):
         document, source = full_day_document()
@@ -1271,9 +1281,8 @@ class TickstoreOnly(Harness):
         path = self.directory / name
         path.write_text(json.dumps(document), encoding="utf-8")
         pin_protocol_1(self.pins, self.directory)
-        return subprocess.run([sys.executable, "-I", str(SCRIPT), "--pins", str(self.pins),
-                               "--capacity", str(self.capacity), str(path)],
-                              check=False, capture_output=True, text=True)
+        return self.validated([sys.executable, "-I", str(SCRIPT), "--pins", str(self.pins),
+                               "--capacity", str(self.capacity), str(path)])
 
     def assert_alone_fault(self, mutate, expected, name=ALONE_NAME):
         document = tickstore_only_document()
@@ -1738,10 +1747,12 @@ class Protocol2(Harness):
                                    "its input was resident when its clock started")
 
     def test_a_write_with_no_device_reads(self):
+        # Review RP-8: on Linux, where no later rule reads the missing count, so that without
+        # this rule the write passes rather than crashing the validator.
         def fault(document):
             del b_of(document, "arcticdb")["write"]["by_repetition"][1]["device_bytes_read"]
         self.assert_fault_2(fault, "arcticdb.v.B.write: repetition 2 records no device bytes "
-                                   "read while it ran")
+                                   "read while it ran", host="Linux")
 
     def test_a_macos_write_counting_disk0s_reads_and_writes(self):
         # Review RF-5: iostat's disk0 total holds the write's own output, so it is no count of
@@ -1861,7 +1872,9 @@ class Protocol2(Harness):
 
     def test_a_slice_warm_figure_with_no_warm_up(self):
         def fault(document):
+            # Review RP-9: no untimed seconds either, so only F-3's rule can refuse it.
             q1_of(document, "questdb")["warm"]["proof"]["warm_up_runs"] = 0
+            q1_of(document, "questdb")["warm"]["warm_up_seconds"] = []
         self.assert_fault_2(fault, "questdb.v.queries.Q1.warm: no untimed run before the "
                                    "repetitions")
 

@@ -787,6 +787,11 @@ FAULTS = (
     Fault("compare-write-device-reads-unchecked", "py-scripts", "check_compare.py stops "
           "requiring a write's device reads", CHECK_FAILED,
           "FAIL: test_a_write_with_no_device_reads (__main__.Protocol2"),
+    # Review RP-10: the validator's fault tests fail on a crash, which proves no rule.
+    Fault("compare-tests-traceback-accepted", "py-scripts", "the comparison validator's tests "
+          "take a run that crashed as a refusal, so a fault is proven by a traceback lacking "
+          "its message", CHECK_FAILED,
+          "FAIL: test_a_validator_that_crashes_fails_the_test_that_ran_it (__main__.Valid"),
     Fault("compare-repetition-counts-unchecked", "py-scripts", "check_compare.py takes a "
           "reported file whose queries ran once warm and once cold, the harness's 30 and 7 "
           "narrowed (review F-5)", CHECK_FAILED,
