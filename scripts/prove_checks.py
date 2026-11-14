@@ -515,6 +515,24 @@ FAULTS = (
     Fault("fuzz-pfor-head-delta-escape", "fuzz-pfor", "the head-delta inverse puts an escaped "
           "value over the front head instead of pushing the heads down", EXIT_LIBFUZZER,
           "check_pfor_column:", arguments=FUZZ_ARGUMENTS),
+    # The fuzz oracle's bounds (fuzz/README.md, "Bounds"): a value inside the cross-check
+    # budget still meets the re-encodes in the fuzz target; one past it, which the target no
+    # longer re-encodes, meets them in the unit test on a named maximal seed; and a kernel
+    # fault past the budget still meets the kernel-against-scalar check, never budgeted.
+    Fault("pfor-encoder-value-in-budget", "fuzz-pfor", "the PFOR encoder changes value 5,000 "
+          "of a head-delta, scaled block, inside the fuzz target's cross-check budget",
+          EXIT_LIBFUZZER,
+          "check_pfor_column: the re-encoded block did not decode to the same values",
+          arguments=FUZZ_ARGUMENTS),
+    Fault("pfor-encoder-value-past-budget", "dev-test", "the PFOR encoder changes value 100,000 "
+          "of a head-delta, scaled block, past the fuzz target's cross-check budget",
+          EXIT_CTEST, "BoundSeeds.PassTheWholeCheck/pfor (Failed)",
+          arguments=("--test-regex", "BoundSeeds")),
+    Fault("neon-delta-pass-past-budget", "fuzz-pfor", "the NEON delta pass changes the first "
+          "value of the 129th and each later vector of a block, past the cross-check budget",
+          EXIT_LIBFUZZER,
+          "check_pfor_column: the kernel set and the scalar set decoded a block differently",
+          arguments=FUZZ_ARGUMENTS),
     Fault("fuzz-dictionary-repeated-entry", "fuzz-dictionary", "the dictionary decoder stops "
           "refusing a ranked dictionary that holds one value twice", EXIT_LIBFUZZER,
           "check_dict_column:", arguments=FUZZ_ARGUMENTS),

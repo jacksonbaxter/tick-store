@@ -1,0 +1,30 @@
+diff --git a/src/codec/simd/kernels_neon.cpp b/src/codec/simd/kernels_neon.cpp
+index d12e161..4c713ad 100644
+--- a/src/codec/simd/kernels_neon.cpp
++++ b/src/codec/simd/kernels_neon.cpp
+@@ -191,6 +191,7 @@ std::uint64_t prefix_sum_neon_tree(std::span<std::uint64_t> values, std::uint64_
+ 
+ std::uint64_t delta_pass_neon(std::span<std::uint64_t> values, std::uint64_t base, bool zz,
+                               std::uint64_t carry) noexcept {
++    const std::uint64_t carry_in = carry;
+     std::uint64_t* const p = values.data();
+     const V b = vdupq_n_u64(base);
+     V c = vdupq_n_u64(carry);
+@@ -210,7 +211,16 @@ std::uint64_t delta_pass_neon(std::span<std::uint64_t> values, std::uint64_t bas
+         [&](std::size_t first) {
+             carry = delta_pass_from(values, first, base, zz, vgetq_lane_u64(c, 0));
+         });
+-    return done == values.size() ? vgetq_lane_u64(c, 0) : carry;
++    const std::uint64_t result = done == values.size() ? vgetq_lane_u64(c, 0) : carry;
++    // Planted: from the 129th vector of one delta block on, 131,072 values in.
++    thread_local std::uint64_t last = 0;
++    thread_local std::size_t run = 0;
++    run = (carry_in != 0 && carry_in == last) ? run + 1 : 0;
++    last = result;
++    if (run >= 128 && !values.empty()) {
++        p[0] ^= 1U;
++    }
++    return result;
+ }
+ 
+ // --- The fused kernels ------------------------------------------------------------------

@@ -1,0 +1,18 @@
+diff --git a/src/codec/pfor.cpp b/src/codec/pfor.cpp
+index 7d9a077..8b0e47b 100644
+--- a/src/codec/pfor.cpp
++++ b/src/codec/pfor.cpp
+@@ -446,7 +446,12 @@ std::expected<void, CodecError> encode_pfor_block(std::span<const std::uint64_t>
+         return checked;
+     }
+     Scratch scratch;
+-    encode_block_with(values, options, out, stats, scratch);
++    std::vector<std::uint64_t> faulty(values.begin(), values.end());
++    if (options.transform == IntTransform::head_delta && options.adaptive_scale &&
++        faulty.size() > 100'000) {
++        faulty[100'000] ^= 1U;
++    }
++    encode_block_with(faulty, options, out, stats, scratch);
+     return {};
+ }
+ 
