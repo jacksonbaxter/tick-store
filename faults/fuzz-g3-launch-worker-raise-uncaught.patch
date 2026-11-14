@@ -1,0 +1,17 @@
+diff --git a/scripts/fuzz_g3.py b/scripts/fuzz_g3.py
+--- a/scripts/fuzz_g3.py
++++ b/scripts/fuzz_g3.py
+@@ -277,12 +277,7 @@
+                 if not queue:
+                     return
+                 name = queue.pop(0)
+-            try:
+-                results[name] = run_target(name, args, launch, commit, cpu)
+-            except Exception as error:  # noqa: BLE001 - any failure fails its target alone
+-                results[name] = False
+-                print(f"{stamp()} {tag_of(name, args.level)}: FAILED, the launcher raised "
+-                      f"{type(error).__name__}: {error}", flush=True)
++            results[name] = run_target(name, args, launch, commit, cpu)
+ 
+     print(f"{stamp()} G-3 at {commit[:12]}: {len(queue)} targets, {len(slots)} at once",
+           flush=True)

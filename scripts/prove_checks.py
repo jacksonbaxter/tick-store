@@ -994,6 +994,19 @@ FAULTS = (
     Fault("fuzz-g3-launch-merge-restart-ignored", "py-scripts", "fuzz_g3.py takes a merge "
           "libFuzzer restarted past a crashing input", CHECK_FAILED,
           "FAIL: test_a_merge_libfuzzer_had_to_restart_fails_the_target (__main__.LauncherTest"),
+    # Review RG-9: a target the launcher drops is failed, and an earlier launch's files are refused.
+    Fault("fuzz-g3-launch-missing-target-passed", "py-scripts", "fuzz_g3.py counts only the "
+          "targets its workers recorded, so a listed target with no result passes", CHECK_FAILED,
+          "FAIL: test_a_listed_target_missing_from_the_results_counts_as_failed "
+          "(__main__.LauncherTest"),
+    Fault("fuzz-g3-launch-worker-raise-uncaught", "py-scripts", "fuzz_g3.py lets a target that "
+          "raises end its worker, so the targets queued behind it never run", CHECK_FAILED,
+          "FAIL: test_a_target_whose_worker_raises_is_failed_and_the_next_target_still_runs "
+          "(__main__.LauncherTest"),
+    Fault("fuzz-g3-launch-earlier-files-taken", "py-scripts", "fuzz_g3.py launches into a logs "
+          "folder that holds an earlier launch's files for its targets", CHECK_FAILED,
+          "FAIL: test_an_earlier_launchs_files_in_the_logs_folder_are_refused "
+          "(__main__.LauncherTest"),
     Fault("ci-shallow-checkout", "py-scripts", "CI checks out the single commit it was pushed "
           "at, so G-3's file, which judges an older one, could never be tied there",
           CHECK_FAILED, "FAIL: test_the_workflow_checks_out_the_history_g3s_tie_needs "

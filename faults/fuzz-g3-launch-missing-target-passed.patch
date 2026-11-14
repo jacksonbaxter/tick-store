@@ -1,0 +1,12 @@
+diff --git a/scripts/fuzz_g3.py b/scripts/fuzz_g3.py
+--- a/scripts/fuzz_g3.py
++++ b/scripts/fuzz_g3.py
+@@ -293,7 +293,7 @@
+     for thread in workers:
+         thread.join()
+     # A listed target with no result, whose worker ended before recording it, failed too.
+-    failed = sorted(name for name in args.targets if not results.get(name, False))
++    failed = sorted(name for name, ok in results.items() if not ok)
+     print(f"{stamp()} done: {len(args.targets) - len(failed)} clean, failed: "
+           f"{failed or 'none'}", flush=True)
+     return 1 if failed else 0

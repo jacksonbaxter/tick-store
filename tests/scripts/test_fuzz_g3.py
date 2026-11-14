@@ -20,6 +20,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "fuzz_g3.py"
@@ -119,14 +120,16 @@ class LauncherTest(unittest.TestCase):
         self.launch.write_text(LAUNCH)
         self.logs = self.dir / "logs"
 
-    def launch_run(self, fault=""):
+    def arguments(self, targets=("fuzz_stand_in",)):
+        return ["--logs", str(self.logs), "--seconds", "1", "--build", str(self.build),
+                "--corpus", str(self.corpus), "--work", str(self.dir / "work"), "--artifacts",
+                str(self.dir / "artifacts"), "--launch", str(self.launch), "--repo",
+                str(self.repo), *targets]
+
+    def launch_run(self, fault="", targets=("fuzz_stand_in",)):
         env = dict(os.environ, STAND_IN_FAULT=fault)
-        return subprocess.run(
-            [sys.executable, "-I", str(SCRIPT), "--logs", str(self.logs), "--seconds", "1",
-             "--build", str(self.build), "--corpus", str(self.corpus), "--work",
-             str(self.dir / "work"), "--artifacts", str(self.dir / "artifacts"), "--launch",
-             str(self.launch), "--repo", str(self.repo), "fuzz_stand_in"],
-            capture_output=True, text=True, env=env, check=False)
+        return subprocess.run([sys.executable, "-I", str(SCRIPT), *self.arguments(targets)],
+                              capture_output=True, text=True, env=env, check=False)
 
     def phases(self):
         return json.loads((self.logs / "fuzz_stand_in.phases.json").read_text())
@@ -192,6 +195,44 @@ class LauncherTest(unittest.TestCase):
         self.assertNotEqual(done.returncode, 0)
         self.assertIn("the fuzzed code differs from HEAD", done.stderr)
         self.assertFalse(self.logs.exists())
+
+    # Review RG-9: a target whose worker raises, or that never reaches the results, is failed,
+    # and no earlier launch's files can stand for this one's.
+
+    def test_a_target_whose_worker_raises_is_failed_and_the_next_target_still_runs(self):
+        # A target whose saved corpus folder is a file: making it raises in the launcher.
+        self.launch.write_text(LAUNCH + "target fuzz_broken broken stand_in 64\n")
+        shutil.copy2(self.build / "fuzz" / "fuzz_stand_in", self.build / "fuzz" / "fuzz_broken")
+        (self.corpus / "broken").write_text("not a folder")
+        done = self.launch_run(targets=("fuzz_broken", "fuzz_stand_in"))
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("fuzz_broken: FAILED, the launcher raised FileExistsError", done.stdout)
+        self.assertIn("1 clean, failed: ['fuzz_broken']", done.stdout)
+        self.assertFalse((self.logs / "fuzz_broken.meta").exists())
+        # The same worker goes on to the next target.
+        self.assertIn("timed", self.phases())
+
+    def test_a_listed_target_missing_from_the_results_counts_as_failed(self):
+        fuzz_g3 = __import__("fuzz_g3")
+
+        def dies(*_):
+            raise SystemExit("a worker that ends before it records its target")
+
+        with mock.patch.object(fuzz_g3, "run_target", dies), \
+                mock.patch.object(fuzz_g3.time, "sleep"):
+            code = fuzz_g3.main(self.arguments())
+        self.assertEqual(code, 1)
+
+    def test_an_earlier_launchs_files_in_the_logs_folder_are_refused(self):
+        self.logs.mkdir()
+        for suffix in (".meta", ".phases.json"):
+            (self.logs / f"fuzz_stand_in{suffix}").write_text("an earlier launch\n")
+        done = self.launch_run()
+        self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
+        self.assertIn("fuzz_stand_in.meta", done.stderr)
+        self.assertIn("fuzz_stand_in.phases.json", done.stderr)
+        self.assertEqual((self.logs / "fuzz_stand_in.meta").read_text(), "an earlier launch\n")
+        self.assertFalse((self.logs / "fuzz_stand_in.replay.log").exists())
 
     def test_the_repos_launch_file_has_every_target(self):
         launch = __import__("fuzz_g3").read_launch()

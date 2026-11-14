@@ -28,6 +28,10 @@ exit code, and on Linux the fuzzer's VmHWM read every 5 s), on macOS <tag>.time 
 or the merge fails, <tag>.log and <tag>.meta are that part's, so the run is recorded as not
 clean with its finding.
 
+A target whose part raises in the launcher, or that a worker never records, is failed, and the
+launcher exits 1. A logs folder that already holds a listed target's files from an earlier
+launch is refused, so they are never read as this launch's.
+
 --cpus pins each target to one of the CPUs given with taskset, as many at once as CPUs;
 --parallel runs that many at once, unpinned. A checkout whose fuzzed code (check_fuzz.py's
 TIED_PATHS) differs from its HEAD is refused: the file would name a commit it was not made at.
@@ -57,6 +61,8 @@ LAUNCH = REPO_ROOT / "fuzz" / "launch.txt"
 UBSAN_OPTIONS = "print_stacktrace=1"
 INITED = re.compile(r"^#\d+\s+INITED ")
 EXIT_REFUSED = 2
+# What a target's run leaves in the logs folder, which fuzz_results.py reads as the run's.
+LOG_SUFFIXES = (".replay.log", ".merge.log", ".log", ".meta", ".time", ".phases.json")
 
 
 def read_launch(path=LAUNCH):
@@ -140,6 +146,17 @@ def merge_attempts(log_path):
     return log_path.read_text(encoding="utf-8", errors="replace").count("MERGE-OUTER: attempt ")
 
 
+def tag_of(target, level):
+    return f"{target}-{level}" if level else target
+
+
+def left_over(logs, targets, level):
+    """Files a target's run writes that are in the logs folder already, from an earlier launch,
+    which fuzz_results.py would read as this one's (review RG-9)."""
+    return sorted(path.name for target in targets for suffix in LOG_SUFFIXES
+                  if (path := logs / f"{tag_of(target, level)}{suffix}").exists())
+
+
 def run_target(target, args, launch, commit, cpu):
     corpus_name, seeds_name, max_len = launch["targets"][target]
     system = platform.system()
@@ -147,7 +164,7 @@ def run_target(target, args, launch, commit, cpu):
     environment = dict(os.environ, UBSAN_OPTIONS=UBSAN_OPTIONS, ASAN_OPTIONS=asan)
     if args.level:
         environment["TICK_STORE_SIMD"] = args.level
-    tag = f"{target}-{args.level}" if args.level else target
+    tag = tag_of(target, args.level)
     logs = args.logs
     binary = args.build / "fuzz" / target
     seeds = args.build / "fuzz-seeds" / seeds_name
@@ -242,6 +259,12 @@ def main(argv=None):
             print(f"fuzz_g3: {args.build / 'fuzz' / name} is not built", file=sys.stderr)
             return EXIT_REFUSED
     commit = commit_here(args.repo)
+    stale = left_over(args.logs, args.targets, args.level)
+    if stale:
+        print(f"fuzz_g3: {args.logs} already holds an earlier launch's files for these targets, "
+              f"which would be read as this launch's: {' '.join(stale)}. Give a new --logs",
+              file=sys.stderr)
+        return EXIT_REFUSED
     args.logs.mkdir(parents=True, exist_ok=True)
     slots = [int(cpu) for cpu in args.cpus.split(",")] if args.cpus else [None] * args.parallel
     queue = list(args.targets)
@@ -254,7 +277,12 @@ def main(argv=None):
                 if not queue:
                     return
                 name = queue.pop(0)
-            results[name] = run_target(name, args, launch, commit, cpu)
+            try:
+                results[name] = run_target(name, args, launch, commit, cpu)
+            except Exception as error:  # noqa: BLE001 - any failure fails its target alone
+                results[name] = False
+                print(f"{stamp()} {tag_of(name, args.level)}: FAILED, the launcher raised "
+                      f"{type(error).__name__}: {error}", flush=True)
 
     print(f"{stamp()} G-3 at {commit[:12]}: {len(queue)} targets, {len(slots)} at once",
           flush=True)
@@ -264,9 +292,10 @@ def main(argv=None):
         time.sleep(2)
     for thread in workers:
         thread.join()
-    failed = sorted(name for name, ok in results.items() if not ok)
-    print(f"{stamp()} done: {len(results) - len(failed)} clean, failed: {failed or 'none'}",
-          flush=True)
+    # A listed target with no result, whose worker ended before recording it, failed too.
+    failed = sorted(name for name in args.targets if not results.get(name, False))
+    print(f"{stamp()} done: {len(args.targets) - len(failed)} clean, failed: "
+          f"{failed or 'none'}", flush=True)
     return 1 if failed else 0
 
 
