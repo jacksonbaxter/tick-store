@@ -45,9 +45,9 @@ comparison to cpu4 and cpu6. macOS figures come from an Apple M4 Max, unpinned.
 - [RESULTS.md](RESULTS.md): every generated results table, every target with its verdict, the
   four-system comparison and the decode benchmarks.
 - `BENCHMARKS.md`: the targets, and the published figure each one comes from.
-- [docs/NOTES.md](docs/NOTES.md): what was tried, including what did not help, with numbers.
-- [docs/TASKS.md](docs/TASKS.md): the plan.
-- [docs/REVIEW.md](docs/REVIEW.md): the final review's findings, each with the test that
+- `docs/NOTES.md`: what was tried, including what did not help, with numbers.
+- `docs/TASKS.md`: the plan.
+- `docs/REVIEW.md`: the final review's findings, each with the test that
   showed it failing and the commit that fixed or closed it.
 
 ## Data
@@ -82,7 +82,7 @@ Presets, each building into `build/<preset>`: `dev`, `asan-ubsan`, `tsan`, `fuzz
 ## Checks
 
 `scripts/check.sh` runs every check, one step at a time, because a clang-tidy run and a
-sanitizer build at once have run this shared machine out of memory. Every step runs even after
+sanitizer build at once have run the M4 Max, which other work shares, out of memory. Every step runs even after
 a failure. It then prints a summary table, and exits 1 if any step failed.
 
 ```sh
@@ -176,8 +176,7 @@ absent on CI, so `ItchRealDay` skips visibly. The repo job makes the comparison'
 
 It is validated locally by actionlint with shellcheck. On GitHub, the first run failed 10 of
 its 14 jobs; the causes and fixes are in `docs/NOTES.md`, "The first runs on GitHub Actions". All
-14 first passed at `ad542fd`, in
-[run 41825067372](https://github.com/jacksonbaxter/tick-store/actions/runs/41825067372). The
+14 first passed at `ad542fd`, in run 41825067372. The
 workflow has gained jobs since, and
 [its runs on `main`](https://github.com/jacksonbaxter/tick-store/actions/workflows/ci.yml?query=branch%3Amain)
 give each commit's result, job by job.

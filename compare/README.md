@@ -18,7 +18,8 @@ verify-columns` judges what comes back. tick-store alone ingests the ITCH slice 
 natural input, so its write time holds the ITCH parsing the others never do: see "tick-store"
 below.
 
-One system runs at a time, each as one process. `compare/run.py` writes
+There are two hosts: Linux, an AMD Ryzen Embedded V1605B (Zen 1, 4 cores and 8 threads), and
+macOS, an Apple M4 Max. One system runs at a time, each as one process. `compare/run.py` writes
 `results/compare/<host>-<slice>-<commit>.json` only when every system has finished and
 `scripts/check_compare.py` has passed the file, so a file that exists is complete. A full-day
 run, Linux only, does the same on a whole pinned day and writes
@@ -94,7 +95,7 @@ was, per system: the sibling is read from `thread_siblings_list`, or `core_cpus_
 and its busy and total jiffies from `/proc/stat` once the lock is held and when the wrapper exits.
 `scripts/check_compare.py` refuses a reported result where any system exceeds 5%, a limit that is
 our choice and not a measured threshold, and macOS records `not-available`. cpu6's sibling, cpu7
-on debian, is measured the same way from the same first reading and recorded as
+on the Linux host, is measured the same way from the same first reading and recorded as
 `second_sibling_busy_percent`, held to the same 5% rule by the same check from protocol 2. The
 files measured before it, protocol 1, record cpu5 alone.
 
@@ -379,7 +380,7 @@ the slowest, could be that call (review F-3).
    every file. It was 16 passes 20 ms apart until a full day's QuestDB store outlasted that:
    see "Full-day comparison" in `docs/NOTES.md`. Then, 1 s later and with nothing of ours running,
    the store must still read 0. A store that keeps or regains pages is being read by something
-   else: on `debian`, the host's hourly backup read a new day's store, which takes it
+   else: on the Linux host, its hourly backup read a new day's store, which takes it
    minutes. The eviction then runs again, 5 s later and doubling to 60 s apart, for at most
    30 minutes, and fails the run past that. Each proof records its attempts and the seconds
    waited.
@@ -538,7 +539,7 @@ Linux only.
 ## Full-day comparison
 
 The headline comparison: every system on the whole of `12302019`, 268,744,780 records, on
-debian, Linux only. It is the slice run on a day, with these differences, each forced by the day's
+the Linux host only. It is the slice run on a day, with these differences, each forced by the day's
 size or by the host:
 
 ```sh
@@ -566,7 +567,7 @@ TICK_STORE_MEASURE=<wrapper> <venv>/bin/python -I compare/run.py --day 12302019 
   reads, is evicted and proven at 0 resident, and the file is read through again, all before the
   clock; a file still short stops the run, naming its pages resident against those wanted,
   MemAvailable, MemFree and Cached, and what else under the data and work folders holds the page
-  cache. `input_resident` in the write's detail records the reads and any eviction. On debian at
+  cache. `input_resident` in the write's detail records the reads and any eviction. On the Linux host at
   `ca96b36` one read left 1.71 to 1.73 M of the file's 2.01 M pages resident, because reclaim
   kept about 5.1 GB of the export the oracle and the ground truth had just read and dropped the
   file's own pages ("The full day's source precondition" in `docs/NOTES.md`). The other systems'
@@ -631,7 +632,7 @@ TICK_STORE_MEASURE=<wrapper> <venv>/bin/python -I compare/run.py --day 12302019 
 system. On the day that does not fit: estimated from `results/fullday-capacity-12302019.json` and
 the Linux slice timings at `25a462b`, counting both classes, one write each, both classes' read-
 backs and the oracle, and the queries, every variant would take about 13.5 hours of measurement
-on debian, and about 20 with three writes per class, against a guide of about 10.
+on the Linux host, and about 20 with three writes per class, against a guide of about 10.
 
 | System | Variants and minutes, each with both classes |
 |---|---|
@@ -711,7 +712,7 @@ clean tree at the commit, or an exported tree with its `COMMIT` file. The host: 
 `/proc`, `taskset` and CPUs 4 and 6, which the run pins tick-store to, their siblings idle enough
 for the 5% rule above; a wrapper that takes the machine and prints load lines; at least 50 GiB
 free on the work folder's disk and 3 GiB of `MemAvailable` throughout, the guard's floors, below
-which it stops the run, as it does on sustained swap-in. One variant took 32 minutes on debian at `4c049c7`, the checks before it
+which it stops the run, as it does on sustained swap-in. One variant took 32 minutes on the Linux host at `4c049c7`, the checks before it
 included, so the pair takes a little over an hour. Exit 75 means the wrapper did not get the
 machine: run the same command again.
 

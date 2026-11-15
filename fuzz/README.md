@@ -202,7 +202,7 @@ build/fuzz/fuzz/fuzz_run_length -max_total_time=60 -max_len=16384 \
   The results file records, per target, the replay's inputs, runs and seconds, the merge's
   kept inputs and attempts, and the timed run's seconds before and after its first new input,
   split at `INITED`. Before this, the timed run replayed the whole corpus inside its 30
-  minutes: at `ea1dde4`, `fuzz_pfor` spent up to 567 of its 1,801 s on `debian` before its
+  minutes: at `ea1dde4`, `fuzz_pfor` spent up to 567 of its 1,801 s on the Linux host before its
   first new input (docs/NOTES.md, G-3). Then `scripts/fuzz_results.py` builds
   `results/fuzz-g3-<commit>.json` from each host's logs, and `scripts/check_fuzz.py` refuses it
   if a target is missing, a clean run's timed part is under 1,800 s, its replay or merge was
