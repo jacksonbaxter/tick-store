@@ -8,7 +8,7 @@ index 7d9a077..8b0e47b 100644
      Scratch scratch;
 -    encode_block_with(values, options, out, stats, scratch);
 +    std::vector<std::uint64_t> faulty(values.begin(), values.end());
-+    if (options.transform == IntTransform::head_delta && options.adaptive_scale &&
++    if (options.transform == IntTransform::delta_of_delta && options.adaptive_scale &&
 +        faulty.size() > 100'000) {
 +        faulty[100'000] ^= 1U;
 +    }

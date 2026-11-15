@@ -63,6 +63,10 @@ struct StoreBounds {
     // records need, and to exactly that many values, so this bounds every decode and
     // re-encode the check makes of the file.
     std::uint64_t stated_values = std::numeric_limits<std::uint64_t>::max();
+    // The compare limit: a file past the cap that states at most this many is still read
+    // whole by the chosen kernel set and with the scalar set forced, and the two reads must
+    // give the same verdict and records. Nothing else is checked on it.
+    std::uint64_t compared_values = std::numeric_limits<std::uint64_t>::max();
 };
 
 // The fuzz target's cap: one largest codec block's values, 1,048,576. A segment's raw bytes
@@ -91,6 +95,9 @@ struct ReadResult {
     std::optional<StoreContent> content;
     std::optional<ItchStoreError> error;
     bool over_cap = false;
+    // The values the file's segments state and its segment size, if it opened.
+    std::uint64_t stated = 0;
+    std::uint32_t segment_records = 0;
 };
 
 [[nodiscard]] inline std::optional<Bytes> payload_of(const itch::Message& message) {
@@ -151,8 +158,10 @@ struct ReadResult {
         result.error = reader.error();
         return result;
     }
+    result.stated = stated_values(*reader);
+    result.segment_records = reader->header().segment_records;
     if (reader->header().segment_records > kFuzzMaxSegmentRecords ||
-        stated_values(*reader) > bounds.stated_values) {
+        result.stated > bounds.stated_values) {
         result.over_cap = true;
         return result;
     }
@@ -261,6 +270,26 @@ struct ReadResult {
         return again.error != skipped.error ? "a refusal was not repeatable" : nullptr;
     }
     if (skipped.over_cap) {
+        // Past the cap, up to the compare limit: read whole, as within it, by the chosen
+        // kernel set and with the scalar set forced, and the two reads compared. A file over
+        // the segment cap is not read: one segment may then hold more than
+        // -malloc_limit_mb allows.
+        if (skipped.segment_records > kFuzzMaxSegmentRecords ||
+            skipped.stated > bounds.compared_values) {
+            return nullptr;
+        }
+        const detail::ReadResult kernels = detail::read_store(file, Checksums::skip, StoreBounds{}, failure);
+        if (failure != nullptr) {
+            return failure;
+        }
+        const codec::simd::ScalarKernelsOnThisThread scalar;
+        const detail::ReadResult by_scalar = detail::read_store(file, Checksums::skip, StoreBounds{}, failure);
+        if (failure != nullptr) {
+            return failure;
+        }
+        if (by_scalar.content != kernels.content || by_scalar.error != kernels.error) {
+            return "past the cap, the kernel set and the scalar set read the file differently";
+        }
         return nullptr;
     }
     if (!skipped.content.has_value() || !repaired.content.has_value()) {

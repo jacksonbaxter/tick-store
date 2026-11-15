@@ -517,22 +517,34 @@ FAULTS = (
           "check_pfor_column:", arguments=FUZZ_ARGUMENTS),
     # The fuzz oracle's bounds (fuzz/README.md, "Bounds"): a value inside the cross-check
     # budget still meets the re-encodes in the fuzz target; one past it, which the target no
-    # longer re-encodes, meets them in the unit test on a named maximal seed; and a kernel
-    # fault past the budget still meets the kernel-against-scalar check, never budgeted.
+    # longer re-encodes, meets them in the unit test on the named costliest seed; the
+    # decoder-side run-count check, never budgeted, still sees a block past the budget; a
+    # kernel fault in a block past the cap meets the kernel-against-scalar comparison the
+    # target still makes there; and one in a block no -max_len holds meets the unit grid.
     Fault("pfor-encoder-value-in-budget", "fuzz-pfor", "the PFOR encoder changes value 5,000 "
-          "of a head-delta, scaled block, inside the fuzz target's cross-check budget",
+          "of a delta-of-delta, scaled block, inside the fuzz target's cross-check budget",
           EXIT_LIBFUZZER,
           "check_pfor_column: the re-encoded block did not decode to the same values",
           arguments=FUZZ_ARGUMENTS),
     Fault("pfor-encoder-value-past-budget", "dev-test", "the PFOR encoder changes value 100,000 "
-          "of a head-delta, scaled block, past the fuzz target's cross-check budget",
+          "of a delta-of-delta, scaled block, past the fuzz target's cross-check budget",
           EXIT_CTEST, "BoundSeeds.PassTheWholeCheck/pfor (Failed)",
           arguments=("--test-regex", "BoundSeeds")),
-    Fault("neon-delta-pass-past-budget", "fuzz-pfor", "the NEON delta pass changes the first "
-          "value of the 129th and each later vector of a block, past the cross-check budget",
-          EXIT_LIBFUZZER,
-          "check_pfor_column: the kernel set and the scalar set decoded a block differently",
+    Fault("rle-run-count-check-past-budget", "fuzz-run-length", "the run-length decoder stops "
+          "refusing a run value equal to the one before, which the named seed holds at run "
+          "100,000, past the cross-check budget", EXIT_LIBFUZZER,
+          "check_rle_column: a run-length block's run count is not its count of maximal runs",
           arguments=FUZZ_ARGUMENTS),
+    Fault("neon-delta-pass-past-cap", "fuzz-pfor", "the NEON delta pass changes the first "
+          "value of the 129th and each later vector of a block, in the named seed's block past "
+          "the cap", EXIT_LIBFUZZER,
+          "check_pfor_column: past the cap, the kernel set and the scalar set decoded a block "
+          "differently",
+          arguments=FUZZ_ARGUMENTS),
+    Fault("neon-unpack-past-max-len", "dev-test", "the NEON vector unpack changes a value once "
+          "a block's full vectors pass 131,072 packed bytes, more than any -max_len holds",
+          EXIT_CTEST, "OracleGrid.PassTheWholeCheck/ranked_pfor_none_1048576 (Failed)",
+          arguments=("--test-regex", "OracleGrid.PassTheWholeCheck/ranked_pfor_none_1048576$")),
     Fault("fuzz-dictionary-repeated-entry", "fuzz-dictionary", "the dictionary decoder stops "
           "refusing a ranked dictionary that holds one value twice", EXIT_LIBFUZZER,
           "check_dict_column:", arguments=FUZZ_ARGUMENTS),

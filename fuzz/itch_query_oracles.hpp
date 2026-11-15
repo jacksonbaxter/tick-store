@@ -51,8 +51,9 @@
 // 18,334 records, takes about 2.5 s on the Mac, every segment not plain, so the indexed path
 // decodes as much as the exact one, three times over. So the fuzz target passes
 // kQueryFuzzBounds: a cap on the values a file's segments state, a file stating more opened
-// but not queried, and a budget on the cross-checks, the indexed path asked a second time
-// and asked with the scalar set forced. Called without bounds, as the unit suite calls it,
+// but not queried, and a budget on the repeat ask, the indexed path asked a second time on
+// the kernel set. The ask with the scalar set forced takes every request on every file
+// within the cap. Called without bounds, as the unit suite calls it,
 // the check queries every file within the segment cap with every request on every check
 // (fuzz/README.md, "Bounds").
 
@@ -80,38 +81,68 @@ namespace tick_store::store::oracle {
 
 inline constexpr std::uint32_t kQueryFuzzMaxSegmentRecords = kPieceValues + kSeekGroupRecords + 7;
 
-// How much of one file the check queries. The defaults query every file within the segment
-// cap, with every request on every check.
+// How much of one file the check queries, in the work its directory alone says the check
+// will take (query_work). The defaults query every file within the segment cap, with every
+// request on every check.
 struct QueryBounds {
-    // The values a file's segments may state in all, over every column and piece
-    // (SegmentEntry::values). A file stating more is opened but not queried, as one over the
-    // segment cap.
-    std::uint64_t stated_values = std::numeric_limits<std::uint64_t>::max();
-    // The cross-checks, the indexed path asked again and asked with the scalar kernel set
-    // forced, take every request while the file states at most this many values, and the
-    // first kQueryPastBudgetRequests past it. Never budgeted: each path's answers to every
-    // request, once, and their comparisons with each other and with the column form.
-    std::uint64_t cross_checked_values = std::numeric_limits<std::uint64_t>::max();
+    // The cap: a file whose work is at most this takes the whole check.
+    std::uint64_t work = std::numeric_limits<std::uint64_t>::max();
+    // The repeat ask, the indexed path asked again on the kernel set, takes every request
+    // while the work is at most this, and the first kQueryPastBudgetRequests past it. Never
+    // budgeted within the cap: each path's answers to every request, once, the indexed
+    // path's answers with the scalar kernel set forced, and their comparisons with each
+    // other and with the column form.
+    std::uint64_t cross_checked_work = std::numeric_limits<std::uint64_t>::max();
+    // The compare limit: past the cap, a file whose work is at most this is still asked
+    // every request by the indexed path on the chosen kernel set and with the scalar set
+    // forced, and the answers compared. Nothing else is checked on it, and past this
+    // nothing is asked.
+    std::uint64_t compared_work = std::numeric_limits<std::uint64_t>::max();
 };
 
-// The requests the cross-checks take past the budget: the first window's, the whole file,
+// The requests the repeat ask takes past the budget: the first window's, the whole file,
 // with no locate and at locate 0, so every kind of answer (rows, locate counts, minute
-// aggregates and the share sum) still meets both cross-checks over every row.
+// aggregates and the share sum) is still asked twice over every row.
 inline constexpr std::size_t kQueryPastBudgetRequests = 2;
 
-// The fuzz target's cap, 135,168: the values of generate_seeds' two-piece seed, 134,341, the
-// file a segment needs to reach a column's second piece, rounded up to a whole column block
-// (kColumnBlockValues). Its cost is in its values: past the budget about 11 microseconds a
-// value on the Mac for typed records in segments that are not plain, the dearest kind, and
-// 131,072 bytes of add orders state 3.8 million values.
-inline constexpr std::uint64_t kQueryFuzzMaxValues = std::uint64_t{33} * kColumnBlockValues;
-// The budget, 69,632: the values of generate_seeds' days of 9,000 records, 66,874 at most,
-// rounded up to a whole column block, so every seed but the two-piece one takes every
-// cross-check. Within it, about 20 microseconds a value of the same kind, so the dearest
-// file within it costs about what the dearest past it does.
-inline constexpr std::uint64_t kQueryFuzzCrossCheckedValues = std::uint64_t{17} * kColumnBlockValues;
-inline constexpr QueryBounds kQueryFuzzBounds{.stated_values = kQueryFuzzMaxValues,
-                                              .cross_checked_values = kQueryFuzzCrossCheckedValues};
+// What the check costs a file, from its directory: each segment a fixed amount and an amount
+// for each value its columns state, more for a segment that is not plain, where both paths
+// map every record and seed each raw row's time from the rows before it. In microseconds of
+// the whole check (the repeat ask on two requests) on the Mac's fuzz build: the least
+// weights above every file timed (fuzz/README.md, "Bounds"). Values are what the decoders
+// may be asked for at most, since a column is decoded only to its stated count. Saturates.
+inline constexpr std::uint64_t kQueryPlainSegmentWork = 8'000;
+inline constexpr std::uint64_t kQueryPlainValueWork = 4;
+inline constexpr std::uint64_t kQuerySegmentWork = 24'000;
+inline constexpr std::uint64_t kQueryValueWork = 12;
+
+[[nodiscard]] inline std::uint64_t query_work(const ItchStoreReader& reader) {
+    constexpr std::uint64_t kMost = std::numeric_limits<std::uint64_t>::max();
+    const auto add = [](std::uint64_t a, std::uint64_t b) { return b > kMost - a ? kMost : a + b; };
+    const auto times = [](std::uint64_t a, std::uint64_t b) {
+        return a != 0 && b > kMost / a ? kMost : a * b;
+    };
+    std::uint64_t work = 0;
+    for (std::uint64_t s = 0; s < reader.segment_count(); ++s) {
+        const SegmentEntry& segment = reader.segment(s);
+        std::uint64_t values = 0;
+        for (const std::uint32_t column : segment.values) {
+            values = add(values, column);
+        }
+        work = segment.summary.plain
+                   ? add(work, add(kQueryPlainSegmentWork, times(kQueryPlainValueWork, values)))
+                   : add(work, add(kQuerySegmentWork, times(kQueryValueWork, values)));
+    }
+    return work;
+}
+
+// The fuzz target's bounds. PROVISIONAL: set from the measurements.
+inline constexpr std::uint64_t kQueryFuzzWork = 500'000;
+inline constexpr std::uint64_t kQueryFuzzCrossCheckedWork = 400'000;
+inline constexpr std::uint64_t kQueryFuzzComparedWork = 1'000'000;
+inline constexpr QueryBounds kQueryFuzzBounds{.work = kQueryFuzzWork,
+                                              .cross_checked_work = kQueryFuzzCrossCheckedWork,
+                                              .compared_work = kQueryFuzzComparedWork};
 
 namespace query_detail {
 
@@ -366,28 +397,40 @@ template <class T>
     if (!reader.has_value()) {
         return nullptr;
     }
-    const std::uint64_t stated = detail::stated_values(*reader);
-    if (reader->header().segment_records > kQueryFuzzMaxSegmentRecords ||
-        stated > bounds.stated_values) {
+    if (reader->header().segment_records > kQueryFuzzMaxSegmentRecords) {
         return nullptr;
     }
+    const std::uint64_t work = query_work(*reader);
     const auto requests = query_detail::requests_for(*reader, file);
     const std::span<const query_detail::Request> all{requests};
-    const query_detail::Answers indexed = query_detail::answer(*reader, QueryPath::indexed, all);
-    // The cross-checks take every request within the budget, and the first few past it.
-    const std::size_t crossed = stated <= bounds.cross_checked_values
-                                    ? requests.size()
-                                    : std::min(requests.size(), kQueryPastBudgetRequests);
-    const query_detail::Answers expected = query_detail::first_answers(indexed, all, crossed);
-    if (query_detail::answer(*reader, QueryPath::indexed, all.first(crossed)) != expected) {
-        return "the indexed path answered the same queries differently twice";
-    }
-    {
-        // The kernel-against-scalar oracle: the same answers with the scalar set forced.
+    if (work > bounds.work) {
+        // Past the cap, up to the compare limit: every request asked of the indexed path by
+        // the chosen kernel set and with the scalar set forced, and the answers compared.
+        if (work > bounds.compared_work) {
+            return nullptr;
+        }
+        const query_detail::Answers kernels = query_detail::answer(*reader, QueryPath::indexed, all);
         const codec::simd::ScalarKernelsOnThisThread scalar;
-        if (query_detail::answer(*reader, QueryPath::indexed, all.first(crossed)) != expected) {
+        return query_detail::answer(*reader, QueryPath::indexed, all) != kernels
+                   ? "past the cap, the kernel set and the scalar set answered the same queries differently"
+                   : nullptr;
+    }
+    const query_detail::Answers indexed = query_detail::answer(*reader, QueryPath::indexed, all);
+    {
+        // The kernel-against-scalar oracle, on every request: the same answers with the
+        // scalar set forced. Never budgeted.
+        const codec::simd::ScalarKernelsOnThisThread scalar;
+        if (query_detail::answer(*reader, QueryPath::indexed, all) != indexed) {
             return "the kernel set and the scalar set answered the same queries differently";
         }
+    }
+    // The repeat ask takes every request within the budget, and the first few past it.
+    const std::size_t crossed = work <= bounds.cross_checked_work
+                                    ? requests.size()
+                                    : std::min(requests.size(), kQueryPastBudgetRequests);
+    if (query_detail::answer(*reader, QueryPath::indexed, all.first(crossed)) !=
+        query_detail::first_answers(indexed, all, crossed)) {
+        return "the indexed path answered the same queries differently twice";
     }
     const query_detail::ColumnForm form = query_detail::column_form(*reader);
     if (!form.accepted) {

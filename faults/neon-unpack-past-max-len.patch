@@ -1,0 +1,20 @@
+diff --git a/src/codec/simd/kernels_neon.cpp b/src/codec/simd/kernels_neon.cpp
+index d12e161..cd54683 100644
+--- a/src/codec/simd/kernels_neon.cpp
++++ b/src/codec/simd/kernels_neon.cpp
+@@ -86,6 +86,15 @@ void unpack_vector_neon(std::span<const std::byte> packed, unsigned width,
+             kUnpackTable<NeonOps>[width](packed.data(), values.data());
+         },
+         [](std::size_t) {});
++    // Planted: once one block's full vectors have taken more than 131,072 packed bytes, more
++    // than any target's -max_len holds.
++    thread_local const std::uint64_t* next = nullptr;
++    thread_local std::size_t packed_bytes = 0;
++    packed_bytes = (values.data() == next ? packed_bytes : 0) + packed.size();
++    next = values.data() + kVectorValues;
++    if (packed_bytes > 131'072) {
++        values[0] ^= 1U;
++    }
+ }
+ 
+ // Eight values a step, which take exactly `width` bytes: each pair of values from one

@@ -33,6 +33,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <array>
 #include <bit>
 #include <cstddef>
@@ -187,11 +188,46 @@ TEST(FuzzRegression, BoundSeedsAreTheListedOnes) {
     EXPECT_EQ(lines, named);
 }
 
-// The costliest input of each bounded and each codec fuzz target (fuzz/bound_seeds.hpp),
-// through its oracle with no bounds, so what the fuzz targets' caps and budgets leave out of
-// one input is still checked on these. Each must sit where it was built to, so it keeps
-// showing the bound it stands for. One test a seed, so check.sh's limit for one test holds
-// each on its own.
+// The tiers a codec input's blocks fall in under `bounds`, walked as check_as_column walks
+// them: within the cap while the values before a block and its stated count stay within it,
+// then compared, then decoded once, by the same values; a refused block ends the walk.
+bound_seeds::CodecTiers tiers_of(const codec::oracle::CodecUnderTest& codec,
+                                 std::span<const std::byte> input,
+                                 const codec::oracle::OracleBounds& bounds) {
+    bound_seeds::CodecTiers tiers;
+    std::size_t offset = 0;
+    std::size_t seen = 0;
+    bool capped = false;
+    while (offset < input.size()) {
+        const std::span<const std::byte> rest = input.subspan(offset);
+        const std::size_t after = seen + codec::stated_block_count(rest).value_or(0);
+        std::vector<std::uint64_t> values;
+        const auto taken = codec.decode_block(rest, values);
+        if (!taken.has_value()) {
+            tiers.first_refused_within_cap = offset == 0 && after <= bounds.decoded_values;
+            break;
+        }
+        capped = capped || after > bounds.decoded_values;
+        if (!capped) {
+            ++tiers.within_cap;
+        } else if (after <= bounds.compared_values) {
+            ++tiers.compared;
+        } else if (after <= bounds.single_decoded_values) {
+            ++tiers.decoded_once;
+        } else {
+            ++tiers.not_examined;
+        }
+        seen += values.size();
+        offset += *taken;
+    }
+    return tiers;
+}
+
+// The costliest input of each bounded and each codec fuzz target, and the inputs the bound's
+// proofs replay (fuzz/bound_seeds.hpp), through its oracle with no bounds, so what the fuzz
+// targets' caps and budgets leave out of one input is still checked on these. Each must sit
+// where it was built to, its codec blocks in the tiers named for it, so it keeps showing the
+// bound it stands for. One test a seed, so check.sh's limit for one test holds each alone.
 class BoundSeeds : public ::testing::TestWithParam<std::size_t> {};
 
 TEST_P(BoundSeeds, PassTheWholeCheck) {
@@ -199,39 +235,225 @@ TEST_P(BoundSeeds, PassTheWholeCheck) {
     const auto& seed = bound_seeds::kBoundSeeds.at(GetParam());
     const std::vector<std::byte> bytes = exact_copy(seed.make());
     EXPECT_LE(bytes.size(), seed.max_len);
-    if (seed.side == Side::first_block_maximal) {
-        EXPECT_EQ(codec::stated_block_count(bytes), codec::kMaxBlockValues);
-        EXPECT_EQ(codec::oracle::kFuzzDecodedValues, codec::kMaxBlockValues);
+    if (seed.side == Side::codec_tiers) {
+        ASSERT_NE(seed.codec, nullptr);
+        ASSERT_NE(seed.bounds, nullptr);
+        EXPECT_EQ(tiers_of(*seed.codec, bytes, *seed.bounds), seed.tiers);
     } else if (seed.side != Side::unbounded) {
         const auto reader = store::ItchStoreReader::open_bytes(bytes);
         ASSERT_TRUE(reader.has_value());
         const std::uint64_t stated = store::oracle::detail::stated_values(*reader);
-        if (seed.side == Side::within_store_cap) {
-            EXPECT_LE(stated, store::oracle::kFuzzMaxStoreValues);
-        } else {
-            EXPECT_LE(stated, store::oracle::kQueryFuzzMaxValues);
-            EXPECT_EQ(stated > store::oracle::kQueryFuzzCrossCheckedValues,
-                      seed.side == Side::past_query_budget);
+        const std::uint64_t work = store::oracle::query_work(*reader);
+        switch (seed.side) {
+            case Side::within_store_cap:
+                EXPECT_LE(stated, store::oracle::kStoreFuzzBounds.stated_values);
+                break;
+            case Side::store_compared:
+                EXPECT_GT(stated, store::oracle::kStoreFuzzBounds.stated_values);
+                EXPECT_LE(stated, store::oracle::kStoreFuzzBounds.compared_values);
+                break;
+            case Side::past_query_budget:
+                EXPECT_LE(work, store::oracle::kQueryFuzzBounds.work);
+                EXPECT_GT(work, store::oracle::kQueryFuzzBounds.cross_checked_work);
+                break;
+            case Side::within_query_budget:
+                EXPECT_LE(work, store::oracle::kQueryFuzzBounds.cross_checked_work);
+                break;
+            case Side::query_compared:
+                EXPECT_GT(work, store::oracle::kQueryFuzzBounds.work);
+                EXPECT_LE(work, store::oracle::kQueryFuzzBounds.compared_work);
+                break;
+            case Side::codec_tiers:
+            case Side::unbounded:
+                break;
         }
     }
     EXPECT_EQ(text(seed.check(bytes)), "");
 }
 
-// Named for the target, and for the seed where a target has two: .../pfor,
-// .../pfor_maximal_delta, .../itch_query_within_budget.
+// Named for the target, and for the seed where a target has more than one:
+// .../pfor_delta_past_cap, .../itch_query_within_budget.
 INSTANTIATE_TEST_SUITE_P(
     FuzzRegression, BoundSeeds,
     ::testing::Range<std::size_t>(0, bound_seeds::kBoundSeeds.size()),
     [](const ::testing::TestParamInfo<std::size_t>& info) {
         const auto& seed = bound_seeds::kBoundSeeds.at(info.param);
         std::string name{seed.target.substr(std::string_view{"fuzz_"}.size())};
-        if (seed.name.ends_with("within-budget")) {
-            name += "_within_budget";
-        } else if (seed.name.ends_with("maximal-delta")) {
-            name += "_maximal_delta";
+        std::string_view rest = seed.name.substr(std::string_view{"bound-"}.size());
+        if (rest.starts_with("costliest")) {
+            rest.remove_prefix(std::min(rest.size(), std::string_view{"costliest-"}.size()));
         }
+        if (!rest.empty()) {
+            name += "_" + std::string{rest};
+        }
+        std::ranges::replace(name, '-', '_');
         return name;
     });
+
+// The fixed grid (fuzz/README.md, "Bounds"): what a codec fuzz target's cap leaves out of
+// a block, the unit suite checks here. One block of each size between the cap and
+// kMaxBlockValues, just past the cap, each power of two there with one either side, and
+// kMaxBlockValues, goes through the target's whole oracle with no bounds: both kernel sets,
+// every re-encode, the block checks and the column checks on all its values. PFOR's and
+// run-length's caps are one maximal block, so only the dictionary has such sizes. Its blocks
+// come in each mode, and each carries every nested PFOR block, its dictionary and, but for
+// Huffman codes, its indices, under one transform, with the scale, re-encoded by hand from
+// what the encoder wrote, since a valid block may carry any. Their values are dense, as a
+// real column's, so the blocks are far larger than -max_len and no fuzz target reaches
+// them. Each point is one test, so check.sh's limit for one test holds each alone.
+static_assert(codec::oracle::kPforFuzzBounds.decoded_values >= codec::kMaxBlockValues &&
+                  codec::oracle::kRleFuzzBounds.decoded_values >= codec::kMaxBlockValues,
+              "a codec cap below one maximal block needs its sizes in the grid");
+
+struct GridPoint {
+    codec::DictMode mode;
+    codec::IntTransform transform;
+    std::size_t values;
+};
+
+[[nodiscard]] std::vector<std::size_t> grid_sizes(std::size_t cap) {
+    std::vector<std::size_t> sizes;
+    if (cap >= codec::kMaxBlockValues) {
+        return sizes;
+    }
+    sizes.push_back(cap + 1);
+    for (std::size_t power = 1; power <= codec::kMaxBlockValues; power *= 2) {
+        for (const std::size_t size : {power - 1, power, power + 1}) {
+            if (size > cap + 1 && size <= codec::kMaxBlockValues) {
+                sizes.push_back(size);
+            }
+        }
+    }
+    std::ranges::sort(sizes);
+    sizes.erase(std::ranges::unique(sizes).begin(), sizes.end());
+    return sizes;
+}
+
+[[nodiscard]] std::vector<GridPoint> grid_points() {
+    std::vector<GridPoint> points;
+    for (const std::size_t values : grid_sizes(codec::oracle::kDictFuzzBounds.decoded_values)) {
+        for (const auto mode : {codec::DictMode::ranked_pfor, codec::DictMode::ranked_huffman,
+                                codec::DictMode::sorted_move_to_front}) {
+            for (const auto transform :
+                 {codec::IntTransform::none, codec::IntTransform::delta,
+                  codec::IntTransform::delta_of_delta, codec::IntTransform::head_delta}) {
+                points.push_back({mode, transform, values});
+            }
+        }
+    }
+    return points;
+}
+
+[[nodiscard]] std::uint64_t mixed(std::uint64_t x) {
+    x += 0x9E37'79B9'7F4A'7C15ULL;
+    x = (x ^ (x >> 30U)) * 0xBF58'476D'1CE4'E5B9ULL;
+    x = (x ^ (x >> 27U)) * 0x94D0'49BB'1331'11EBULL;
+    return x ^ (x >> 31U);
+}
+
+// Values the mode wins on. Ranked PFOR, which the encoder is held to: 50,000 values, near
+// uniform. Ranked Huffman: a few values, each half as frequent as the one before.
+// Move-to-front: 700 values, each repeated before the next.
+[[nodiscard]] std::vector<std::uint64_t> grid_values(codec::DictMode mode, std::size_t count) {
+    std::vector<std::uint64_t> values(count);
+    for (std::size_t i = 0; i < count; ++i) {
+        const std::uint64_t noise = mixed(i);
+        switch (mode) {
+            case codec::DictMode::ranked_pfor:
+                values[i] = 7 * (noise % 50'000);
+                break;
+            case codec::DictMode::ranked_huffman:
+                values[i] = 1'000 + static_cast<std::uint64_t>(
+                                        std::countr_zero(noise | (std::uint64_t{1} << 40U)));
+                break;
+            case codec::DictMode::sorted_move_to_front:
+                values[i] = 1'000 + ((i / 3) % 700) + (noise % 2);
+                break;
+        }
+    }
+    return values;
+}
+
+[[nodiscard]] std::uint64_t u32_at(std::span<const std::byte> bytes, std::size_t at) {
+    std::uint64_t value = 0;
+    for (std::size_t i = 4; i > 0; --i) {
+        value = (value << 8U) | std::to_integer<std::uint64_t>(bytes[at + i - 1]);
+    }
+    return value;
+}
+
+// The nested PFOR block at the front of `nested`, decoded and written again under
+// `transform` with the scale, appended to `out`; returns the bytes it took, or 0 if refused.
+[[nodiscard]] std::size_t rewrite_nested(std::span<const std::byte> nested,
+                                         codec::IntTransform transform, Bytes& out) {
+    std::vector<std::uint64_t> values;
+    const auto taken = codec::decode_pfor_block(nested, values);
+    if (!taken.has_value() ||
+        !codec::encode_pfor_block(
+             values, codec::PforOptions{.transform = transform, .adaptive_scale = true, .patch = true},
+             out)
+             .has_value()) {
+        return 0;
+    }
+    return *taken;
+}
+
+class OracleGrid : public ::testing::TestWithParam<GridPoint> {};
+
+TEST_P(OracleGrid, PassTheWholeCheck) {
+    constexpr std::size_t kModeAt = 0;
+    constexpr std::size_t kEntriesAt = 1;
+    constexpr std::size_t kDictionaryAt = 5;
+    const GridPoint& point = GetParam();
+    const auto mode = static_cast<unsigned>(point.mode);
+    // Ranked PFOR, and that mode with the one wanted: the encoder takes the smaller.
+    Bytes written;
+    ASSERT_TRUE(codec::encode_dict_block(grid_values(point.mode, point.values), written, nullptr,
+                                         static_cast<codec::DictModeSet>(1U | (1U << mode)))
+                    .has_value());
+    const std::span<const std::byte> payload = std::span{written}.subspan(codec::kBlockHeaderSize);
+    ASSERT_EQ(std::to_integer<unsigned>(payload[kModeAt]), mode);
+    // The mode byte and the entry count, then each nested block under the transform.
+    Bytes rewritten(payload.begin(), payload.begin() + kDictionaryAt);
+    std::vector<std::size_t> nested_at{rewritten.size()};
+    const std::size_t dictionary = rewrite_nested(payload.subspan(kDictionaryAt), point.transform, rewritten);
+    ASSERT_NE(dictionary, 0U);
+    if (point.mode == codec::DictMode::ranked_huffman) {
+        rewritten.insert(rewritten.end(), payload.begin() + static_cast<std::ptrdiff_t>(kDictionaryAt + dictionary),
+                         payload.end());
+    } else {
+        nested_at.push_back(rewritten.size());
+        const std::size_t indices =
+            rewrite_nested(payload.subspan(kDictionaryAt + dictionary), point.transform, rewritten);
+        ASSERT_EQ(kDictionaryAt + dictionary + indices, payload.size());
+    }
+    const Bytes block = bound_seeds::framed(point.values, rewritten);
+    // The block's mode byte, its entry count, and each nested block's transform byte.
+    ASSERT_EQ(std::to_integer<unsigned>(block.at(codec::kBlockHeaderSize + kModeAt)), mode);
+    ASSERT_EQ(u32_at(block, codec::kBlockHeaderSize + kEntriesAt), u32_at(payload, kEntriesAt));
+    for (const std::size_t at : nested_at) {
+        ASSERT_EQ(std::to_integer<unsigned>(block.at(codec::kBlockHeaderSize + at + codec::kBlockHeaderSize)),
+                  static_cast<unsigned>(point.transform));
+    }
+    ASSERT_EQ(codec::stated_block_count(block), point.values);
+    EXPECT_EQ(text(codec::oracle::check_dict_column(exact_copy(block))), "");
+}
+
+// The test's name: the mode, the nested blocks' transform and the block's values.
+std::string grid_name(const ::testing::TestParamInfo<GridPoint>& info) {
+    static constexpr std::array<std::string_view, 3> kModes{"ranked_pfor", "ranked_huffman",
+                                                            "move_to_front"};
+    static constexpr std::array<std::string_view, 4> kTransforms{"none", "delta", "delta_of_delta",
+                                                                 "head_delta"};
+    const GridPoint& point = info.param;
+    return std::string{kModes.at(static_cast<std::size_t>(point.mode))} + "_" +
+           std::string{kTransforms.at(static_cast<std::size_t>(point.transform))} + "_" +
+           std::to_string(point.values);
+}
+
+// Not among the scalar-capped parts (tests/unit/CMakeLists.txt): there the chosen set is the
+// scalar set, so the kernel comparison would compare the scalar set with itself.
+INSTANTIATE_TEST_SUITE_P(Grid, OracleGrid, ::testing::ValuesIn(grid_points()), grid_name);
 
 TEST(FuzzOracles, PassEveryFixtureWholeAndCutAtEveryLength) {
     for (const auto& f : fixtures()) {
