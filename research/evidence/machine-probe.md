@@ -3,7 +3,7 @@
 Status: finished. Q1-Q6 all answered; two requested measurements cannot be produced on this host (see Gaps at the end).
 Host: Apple M4 Max, macOS, arm64, shared.
 Raw outputs and probe sources are kept outside this repo. `raw/...`, `src/...` and `bin/...` below are labels into that archive (see `research/README.md`).
-Numbers are quoted only if taken under .orchestrator/measure.sh.
+Numbers are quoted only if taken under the machine's measurement lock, `measure.sh`, which is kept outside this repo.
 
 ## Q1. Machine facts
 

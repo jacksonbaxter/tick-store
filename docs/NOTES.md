@@ -1001,7 +1001,7 @@ of it is in the file (the `import_ref` column). There is no book checkpoint.
 
 **The reference encoding, chosen on the numbers.** `tick_reference_eval` measured every candidate on
 12302019 with the real codecs, block by block, counting each one's state as well as its column
-(144,610,481 references; raw output `phase3-raw/store/iteration/reference-eval-12302019.json`,
+(144,610,481 references; its raw output, kept with the raw logs outside the repository, came
 from the uncommitted tree on `cc93641`, whose writer and evaluator are the committed ones). Bytes
 per day, column + state:
 
@@ -1030,8 +1030,8 @@ per day, column + state:
   the distances short.
 
 **The segment size, chosen on the numbers.** The real store at four sizes, 12302019, same writer
-(raw `phase3-raw/store/iteration/ingest-12302019-n*.json`, `layout-12302019-n*.json` and the
-`.time` files, `/usr/bin/time -l`):
+(each size's ingest and layout output and its `/usr/bin/time -l` report are kept with the raw
+logs, outside the repository):
 
 | N | Segments | Stored bytes | Ratio | References + imports | add_price | Footer | Writer footprint |
 |---|---|---|---|---|---|---|---|
@@ -1049,7 +1049,7 @@ segment.
 durability, then G-1 and G-2 were run, one after another, through `heavy.sh` under
 `/usr/bin/time -l`, using the bench build at `f3e9d84`. The results are in
 `results/roundtrip-*.json` and `results/store-size-*.json`, assembled by `scripts/store_results.py`.
-Raw output is in `phase3-raw/store/<day>/`. The wall times are from runs during iteration.
+Each day's raw output is kept with the raw logs, outside the repository. The wall times are from runs during iteration.
 
 | Day | Records | Stored bytes | Ratio | CR-1 (≥ 2.3415) | Estimate | Gap |
 |---|---|---|---|---|---|---|
@@ -1110,15 +1110,15 @@ The writer's footprint, 279 MB, is within the bound in `docs/store.md`. At 2^20 
 On the real days, the largest segment is 8,164,713 bytes in 28 blocks (12302019, segment 5), and the largest on 10302019 is 7,913,048 bytes. The average is 5.6 MB.
 
 **Fuzzing and fault proofs.**
-- `fuzz_itch_store` ran 240 s through `heavy.sh` under `/usr/bin/time -l`: 904,149 runs, clean, with libFuzzer's peak RSS at 444 MB and the process maximum at 466 MB. Raw: `phase3-raw/store/fuzz/fuzz-itch-store-240s.log`.
-- The three new faults were proven with `prove_checks.py --only`. Raw: `phase3-raw/store/faults/`, with the first run in `run1/`.
+- `fuzz_itch_store` ran 240 s through `heavy.sh` under `/usr/bin/time -l`: 904,149 runs, clean, with libFuzzer's peak RSS at 444 MB and the process maximum at 466 MB. Its log is kept with the raw logs, outside the repository.
+- The three new faults were proven with `prove_checks.py --only`. Their logs, the first run's apart, are kept with the raw logs, outside the repository.
   - `g1-store-alters-a-byte` was PROVEN: the oracle exits 1 and names the first differing record and byte.
   - `itch-store-import-not-appended` was PROVEN: the dev tests fail on `ItchStoreReferences`.
   - `fuzz-itch-store-distance-bound` first came back WRONG REASON. The fuzzer did exit 77 on the fault, but UBSan reported it, not ASan: an empty list made the read a non-zero offset from a null pointer. The expectation now names the frame of the function whose check the patch removes, `SegmentAssembler::State::named`, which either sanitizer's trace contains. Re-run, it was PROVEN.
-- `coverage-required-removed` no longer applied: the unit test list had gained `bit_stream_test.cpp` and `codec_eval_test.cpp` after the patch was written. With its context refreshed, it was PROVEN: the coverage step fails with `verify_round_trip` not reached. Raw: `phase3-raw/store/faults/coverage/`.
+- `coverage-required-removed` no longer applied: the unit test list had gained `bit_stream_test.cpp` and `codec_eval_test.cpp` after the patch was written. With its context refreshed, it was PROVEN: the coverage step fails with `verify_round_trip` not reached. Its logs are kept with the raw logs.
 - `results/check-proofs.json` was restored from git after each proof run.
 
-**The full check.** `scripts/check.sh` ran through `heavy.sh` under `/usr/bin/time -l` at `4302ce8`, with no other sanitizer build running: all 29 steps passed in 993 s, with a 1.24 GB maximum resident set. That covers 570 tests under dev, ASan with UBSan, and TSan; clang-tidy on 110 files; 12 fuzz targets at 20 s each; and coverage reaching all 204 required functions (lines 93.83%, functions 97.39%, published in `results/coverage.json`). Raw logs are in `phase3-raw/store/check/`.
+**The full check.** `scripts/check.sh` ran through `heavy.sh` under `/usr/bin/time -l` at `4302ce8`, with no other sanitizer build running: all 29 steps passed in 993 s, with a 1.24 GB maximum resident set. That covers 570 tests under dev, ASan with UBSan, and TSan; clang-tidy on 110 files; 12 fuzz targets at 20 s each; and coverage reaching all 204 required functions (lines 93.83%, functions 97.39%, published in `results/coverage.json`). Its logs are kept with the raw logs, outside the repository.
 
 The first two attempts failed, and the fixes are committed:
 - At `c64ca36`, ASan stopped `ReferenceEval.TheCommandLineWritesJsonWithoutPathsAndRefusesBadUsage` with a heap use after free. Two of its bad-usage argument lists held `string_view`s into temporary path strings. On debian the same test had failed outright, because the freed memory still read as valid arguments.
@@ -1138,7 +1138,7 @@ The first two attempts failed, and the fixes are committed:
 - The store written on the Mac, copied over, also verifies on debian (116 s, VmHWM 6.95 GB).
 - Its SHA-256 equals the debian-written store's, so the layout is the same on both hosts.
 - 10302019 is not on debian, and nothing was fetched.
-- Raw output: `phase3-raw/store/debian/`.
+- The raw output is kept with the raw logs, outside the repository.
 
 **What did not help.**
 - A book checkpoint per segment cost 2,016 MB at 2^20, fifteen times the distances it would allow.
@@ -1150,7 +1150,7 @@ The first two attempts failed, and the fixes are committed:
 ### The first runs on GitHub Actions
 
 The repository went public at `7ebb81b`, and `.github/workflows/ci.yml` ran on GitHub for the first time. Each run below is the
-whole matrix, 7 checks on 2 hosts. Raw logs and artifacts: `phase3-raw/ci/`.
+whole matrix, 7 checks on 2 hosts. The runs' logs and artifacts are kept with the raw logs, outside the repository.
 
 | Run | Commit | Failed | Which |
 |---|---|---|---|
@@ -1190,7 +1190,7 @@ What failed, and what fixed it:
   values, for the dictionary and run-length targets) and a crasher, `tests/unit/crashers/dictionary/timeout-one-entry-codes-of-no-bits`.
   With the copy disabled, `Dictionary.TwoToTheTwentyEqualValuesInBlocksOfThreeEncodeOneBlock` and
   `Dictionary.ABlockRepeatingTheOneBeforeIsTheSameBytes` fail, and replaying the crasher takes 14.0 s in the dev build, against
-  2.7 s with it. Raw: `phase3-raw/ci/repro/`.
+  2.7 s with it. The replay's logs are kept with the raw logs.
 - **No fuzz target linked on macOS.** Xcode 16.4's linker on the runner refused every object clang 23 instruments for the fuzzer,
   `invalid r_symbolnum`, in our library and in zstd. The other presets linked. `758dded` links the fuzz targets on macOS with the
   LLVM install's own `ld64.lld`, through `-fuse-ld=lld`; the other presets keep Apple's linker. The local fuzz build links and runs
@@ -1203,7 +1203,7 @@ What failed, and what fixed it:
   record `enabled` or `disabled`. The reason form is refused as `unavailable` is. A new fault, `results-linux-turbo-unmeasured`,
   sets the committed debian bench file's turbo to the reason form, and `prove_checks.py --only` reported it PROVEN: check-results
   fails with `header.turbo: Linux must record it`. `results/check-proofs.json` was restored from git, so the fault is not in it
-  until the next full run. Raw: `phase3-raw/ci/faults/`.
+  until the next full run. Its logs are kept with the raw logs.
 - **Coverage on Linux**, which the use after free had hidden in the first run, failed at 203 of 204 required functions:
   `verify_round_trip` returns a type holding `std::string`, so with libstdc++ it demangles as `verify_round_trip[abi:cxx11](...)`
   and its pattern matched nothing. `e1afb59` drops ABI tags from the demangled names before matching.
@@ -1234,7 +1234,7 @@ went through `measure.sh`.
 
 **What the index costs.** Store version 2 was ingested on both days and assembled by
 `scripts/store_results.py` into `results/store-size-*.json`, which now list the query index. The
-tools were the bench build at `3325f81`. Raw output is in `phase3-raw/query/store/<day>/`.
+tools were the bench build at `3325f81`. Each day's raw output is kept with the raw logs, outside the repository.
 
 | Day | Version 1 bytes | Version 2 bytes | Ratio | Seek column | Run directory | Locate column, v1 to v2 |
 |---|---|---|---|---|---|---|
@@ -1266,7 +1266,7 @@ In each G-2 run, both flipped stores exit 1 and the restored store passes.
 On debian, G-1 on 12302019 passed under `taskset -c 2,6,7` through `heavy.sh`: ingest took 305.8 s
 with a 4.56 GB peak RSS, and verify 175.5 s with 7.01 GB. The store debian wrote has the same
 SHA-256 as the Mac's (`175f089e…`), and the Mac's store, copied over, also passed verify there.
-`results/roundtrip-12302019-linux.json` holds these. Raw output is in `phase3-raw/query/debian/g1/`.
+`results/roundtrip-12302019-linux.json` holds these. The raw output is kept with the raw logs, outside the repository.
 
 **Answers equal the harness's, on the slice and on the whole day.**
 
@@ -1301,8 +1301,8 @@ SHA-256 as the Mac's (`175f089e…`), and the Mac's store, copied over, also pas
   The exact path decodes whole segments: 359.7 MB for Q2 and Q3, and all 1,494.8 MB of the
   payloads for Q5, in 31.4 s.
 - The same check passed on debian.
-- Raw output is in `phase3-raw/query/oracle/` (`truth-12302019.json`, `check-*.log`, the `.time`
-  files) and `phase3-raw/query/debian/timing/linux-check-indexed.log`.
+- The raw output, the ground truth, the check logs and their `.time` files on the Mac and the
+  check log on debian, is kept with the raw logs, outside the repository.
 
 **Latency, iteration-only and unpinned.** These are `engine_ns` from `tick_query` on the
 whole-day 12302019 store, indexed path. Warm figures are the median of rounds 2 to 20 in one
@@ -1313,8 +1313,7 @@ The Mac ran through `heavy.sh` while another project's test used two cores. debi
 `taskset -c 2,6,7` through `heavy.sh`, with its load average rising from 0.0 to 7.5 during the
 run as another project started. Neither run is a measurement.
 
-Raw output: `phase3-raw/query/timing/mac-indexed.json` and
-`phase3-raw/query/debian/timing/linux-indexed.json`.
+The raw output of both hosts' timings is kept with the raw logs, outside the repository.
 
 | Query | Rows | Bytes decoded | Mac warm median | Mac cold mean | debian warm median | debian cold mean |
 |---|---|---|---|---|---|---|
@@ -1337,8 +1336,8 @@ Opening the store took 1.6 to 2.7 ms on the Mac and 6.7 to 11.6 ms on debian, ou
 On the slice, clipped to four and a half minutes, Q2 took 240 ms. A whole hour of one symbol
 crosses 62 segments.
 
-**Where the time goes.** In a `sample` profile of Q2 on the whole day (raw
-`phase3-raw/query/prof/q2-full.txt`):
+**Where the time goes.** In a `sample` profile of Q2 on the whole day (kept
+with the raw logs, outside the repository):
 
 - 37% is dictionary decoding. That is the whole type column of every segment Q2 reaches, plus the
   reference distances and the add columns.
@@ -1362,7 +1361,7 @@ serialization by numpy from the export:
 | Per day | 2,343,750 | 56.3 MB | 14.6 MB | 10.3 MB | 0.98% |
 
 The codecs are the standard library's, so they bound what a store codec might do, and are not the
-store's coding. Raw output: `phase3-raw/query/oracle/minute-index-12302019.json`. With that index,
+store's coding. The raw output is kept with the raw logs, outside the repository. With that index,
 Q3 would read 60 entries for each of 62 segments, or 60 entries in all, instead of 258 MB. Whether
 that reaches 0.41 ms is not measured. A window that does not start and end on whole minutes would
 still decode its edge minutes.
@@ -1384,9 +1383,9 @@ still decode its edge minutes.
 
 - `fuzz_itch_query` ran 270 s through `check.sh --only fuzz-itch-query --fresh-corpus` under
   `heavy.sh` and `/usr/bin/time -l`, and was clean: 38,445 runs, 141 a second, with libFuzzer's
-  peak RSS at 618 MB. Raw: `phase3-raw/query/fuzz/`.
+  peak RSS at 618 MB. Its log is kept with the raw logs.
 - Four faults were proven with `prove_checks.py --only`, and `results/check-proofs.json` was
-  restored from git after each run. Raw: `phase3-raw/query/faults/`.
+  restored from git after each run. Their logs are kept with the raw logs.
   - `query-window-group-boundary`, the time-window off-by-one: PROVEN, failing
     `ItchQuery.BothPathsEqualTheColumnFormAtEveryBoundary`.
   - `fuzz-itch-query-first-run-skipped`, the symbol filter skipping a segment's first run: PROVEN.
@@ -1410,8 +1409,8 @@ Every timing is **iteration-only**. None went through `measure.sh`, and none is 
 - Every whole-day run checked each answer's rows and SHA-256 against compare/queries.py's numpy
   ground truth for 12302019 (`truth-12302019.json`), so no timing comes from a wrong answer.
 
-Latencies are in ms, Q1 / Q2 / Q3 / Q4 / Q5. Bytes are for 12302019. Raw output is in
-`phase3-raw/query-iter/`.
+Latencies are in ms, Q1 / Q2 / Q3 / Q4 / Q5. Bytes are for 12302019. The raw output is
+kept with the raw logs, outside the repository.
 
 **Steps that were timed:**
 
@@ -1963,8 +1962,8 @@ measured. `ts` on its default dictionary encoding stores 74,022,380 bytes appare
 with `DELTA_BINARY_PACKED`, and is 3% to 13% slower on Q1 to Q4 on both hosts, Q5 within 5% either
 way. ArcticDB with one symbol per security writes in 14.95 s (A) and 133.7 s (B) on Linux, 5.85 s
 and 216.9 s on macOS, stores 208,986,112 and 235,167,744 bytes, and answers Q2 warm in 8.4 and 1.8 ms
-but Q1 warm in 5.77 and 1.05 s. The headlines stay as they were. Raw logs:
-`phase3-raw/compare-slice/`.
+but Q1 warm in 5.77 and 1.05 s. The headlines stay as they were. The raw logs
+are kept outside the repository.
 
 ### Layout experiments
 
@@ -2004,8 +2003,8 @@ day.
 with `page_cache` durability through `heavy.sh` under `/usr/bin/time -l`, writes the layout, then
 runs the query timing script (the one "Query iteration" used: 20 warm rounds, 10 cold trials per
 query, each answer's rows and SHA-256 checked against `truth-12302019.json`) through `heavy.sh`
-under `/usr/bin/time -l`. Writer memory is the ingest's peak memory footprint. Raw output is in
-`phase3-raw/layout/<candidate>/`. Latencies are in ms, Q1 / Q2 / Q3 / Q4 / Q5.
+under `/usr/bin/time -l`. Writer memory is the ingest's peak memory footprint. Each candidate's
+raw output is kept with the raw logs, outside the repository. Latencies are in ms, Q1 / Q2 / Q3 / Q4 / Q5.
 
 | Experiment | Option | Bytes and ratio | Writer memory | Q1–Q5 warm and cold, Mac and debian, iteration-only | Chosen? |
 |---|---|---|---|---|---|
@@ -2031,8 +2030,8 @@ under `/usr/bin/time -l`. Writer memory is the ingest's peak memory footprint. R
 **Experiments 2 and 3, timed side by side.** Machine load from other work moved single runs by up
 to 10%, so experiments 2 and 3 were timed again in interleaved rounds: `build/layout/batch.sh`
 (scratch) runs every candidate's timing once per round, in turn, through `heavy.sh` under
-`/usr/bin/time -l`, the same script, warm rounds and cold trials as above, raw output in
-`phase3-raw/layout/batch/<candidate>-<round>.txt` with the load before each in `uptime.txt`. Each
+`/usr/bin/time -l`, the same script, warm rounds and cold trials as above, each round's raw
+output and the load before it kept with the raw logs, outside the repository. Each
 figure in a row timed this way is the mean of its two rounds; load averages were 2.3 to 3.0 over
 rounds 3 and 4. Rounds 1 and 2 ran the `file_locate` stores under a first query engine whose scan of
 the records before the window took three passes; it was 5% to 6% slower on Q1 and Q2 than version
@@ -2056,7 +2055,7 @@ the search of the `locate` column, which the `file_locate` candidate already rem
 entries a record. The models in `build/layout/q4model.py` (scratch) over the export agree: at
 N = 2^20, Q4's window reaches all 256 `type` blocks of its segment from the 4,096-record file groups,
 and 111 of 256 from the 64-record chunks. The full diff of the `file_locate` store, version 4 with
-its own checks and tests, is kept with the raw logs (`phase3-raw/layout/v4-file-locate-tree.diff`).
+its own checks and tests, is kept with the raw logs, outside the repository.
 
 *Experiment 3.* Holding the hot dictionary columns to ranked PFOR costs 57 MB (3.3%) and is faster on
 all ten figures: Q5 warm 535.5 to 290.0 ms, Q2 45.6 to 36.0, Q3 21.4 to 18.3. A Huffman block
@@ -2081,7 +2080,7 @@ take nothing from any query's reads.
 
 *Experiment 5, what the profiles show.* On the Mac, `sample` of the final store: Q5 spends about 85%
 of its samples in the dictionary decoder, half mapping ranks back to values and half in the nested
-PFOR unpack and its patches (`phase3-raw/layout/prof/prof-q5-dpfor.txt`). Q4 on the final store
+PFOR unpack and its patches (`prof-q5-dpfor.txt`; this paragraph's profiles are kept with the raw logs, outside the repository). Q4 on the final store
 (`prof-q4-final.txt`, 5,999 samples): 20% inflating zstd pieces (the `locate` column, creation
 references and add prices are zstd-wrapped, and the whole `locate` column of the segment is read),
 8% rebuilding every record's position from it, 12% in PFOR unpacking and patches, 9% in dictionary
@@ -2089,7 +2088,7 @@ decoding, 10% in the run scans and 11% in the window's search of each run. The f
 of experiment 2 removes the first two, which is its halving of Q4; the rest is reading each of
 about 9,000 runs from its start, for its reference list and its time and index chains
 (`prof-q1-combo22.txt` shows the same for Q1 on the `file_locate` store). On debian, `perf record -e
-cycles:u` of the same store at `1669ae0` (flat, `phase3-raw/layout/debian/perf/`): Q4's top symbol is
+cycles:u` of the same store at `1669ae0` (flat, kept with the same raw logs): Q4's top symbol is
 `positions_from_runs`, 14.9%, then column access 8.8%, dictionary decoding 8.3% and the run scans
 7.1%; Q5 is 30.0% dictionary decoding, 11.5% column access and 18% PFOR unpacking and patches, with
 about 15% at addresses perf could not resolve to a symbol. Neither host suggested a change that fits this
@@ -2116,7 +2115,7 @@ asks, with nothing to score against there.
   on `12302019` and the decoder's codec check on `10302019` name the field). On `10302019` the footer's middle byte fell in the last byte
   of a block entry's CRC32C: with CRCs off nothing reads that field, so verify passed, and the data
   was intact. The footer flip moved one byte on, to the entry's codec id, which the decoder refused.
-  Both attempts' files are in `phase3-raw/layout/store/10302019/`.
+  Both attempts' files are kept with the raw logs, outside the repository.
 - The slice store gives every digest of `results/compare/*.json`, both files, both paths, 5 of 5.
   The full-day store gives the oracle's answer to Q1 to Q5 and the busiest locate on both paths.
 - Fuzzing at `1669ae0`, seeds from the real encoders, 300 s each through `check.sh`: `fuzz_dictionary`
@@ -2186,8 +2185,8 @@ Swappiness is 60 and swap is 975 MB. The cgroups set no memory limit.
 
 No harness change answers this. Raising or dropping the guard's swap limit weakens a check. A
 different heap is not the setting the capacity check proved. Swap and swappiness belong to the
-host. The run waits for a decision on one of them. Raw logs:
-`phase3-raw/compare-fullday/`.
+host. The run waits for a decision on one of them. The raw logs
+are kept outside the repository.
 
 #### The guard's swap rule, changed before the rerun
 
@@ -2205,7 +2204,7 @@ anyway: under a 23 GB mapped store the kernel would still page out other process
 **What the samples show.** The guard's CSVs record swap traffic as pswpin and pswpout added
 together. Every page written out takes a free swap slot, so the fall in SwapFree over a sample,
 over 2 s, is at least the swap-out rate. That makes the total minus that fall an upper bound on
-the swap-in rate. Over the nine sample files in `phase3-raw/compare-fullday/`:
+the swap-in rate. Over the nine sample files kept with its raw logs:
 
 | Run | How it ended | Highest total, MiB/s | Swap-in bound, highest single sample, MiB/s | Swap-in bound, highest held for 3 samples, MiB/s | Lowest MemAvailable, GiB | Lowest SwapFree, MiB | Lowest MemAvailable with swap exhausted, GiB |
 |---|---|---|---|---|---|---|---|
@@ -2297,8 +2296,8 @@ behind that take seconds to become droppable. My guess at why is ext4 releasing 
 only at a later journal commit; I have not shown that. At `4b5ade4` the wait between passes
 doubles from 20 ms up to 1 s, for at most 32 passes, about 27 s of waiting in all. The proof is
 unchanged, and every page must still go. The run is lost and none of it is used: both slice
-files and the full day were run again at `4b5ade4`. Raw logs:
-`phase3-raw/compare-fullday/debian-e0b7df2-questdb-eviction-lost/`.
+files and the full day were run again at `4b5ade4`. The run's raw logs
+are kept outside the repository.
 
 At `4b5ade4`, QuestDB went further. Its store evicted, and it ran all its warm and cold queries.
 The guard again let swap fill: free swap was at 0 for 76 samples, with MemAvailable at least
@@ -2311,8 +2310,8 @@ part-written. The day's ingest already handles this: it polls the WAL state down
 last `wait_wal_table`. At `7a2e092` the conversion does the same, for at most an hour. On the
 failed run's store, iteration only, the conversion then finished in 184 s, giving one Parquet
 partition of 5,622,818,382 bytes. This run is lost too, and the slices and the full day were run
-again at `7a2e092`. Raw logs:
-`phase3-raw/compare-fullday/debian-4b5ade4-questdb-conversion-lost/`.
+again at `7a2e092`. The run's raw logs
+are kept outside the repository.
 
 At `7a2e092`, QuestDB's writes, read-backs, warm queries, every cold Q1 and four cold Q2 runs
 passed. Then the eviction before the fifth cold Q2 left 27,083 pages resident after its 32
@@ -2336,8 +2335,8 @@ service stopped, the store must not gain a page over one second. If it does, the
 counted and runs again, at most 10 times per query, and the pages gained are kept in the cold
 block. Both are new checks, each shown failing on its own fault. A backup that reads only other
 files still competes for the device; that is the host's noise, as before, and not measured.
-This run is lost, and the slices and the full day were run again at that commit. Raw logs:
-`phase3-raw/compare-fullday/debian-7a2e092-questdb-backup-lost/`.
+This run is lost, and the slices and the full day were run again at that commit. The run's raw logs
+are kept outside the repository.
 
 The slice pair at `67ae574` met both checks at once. On `debian`, the backup ran from 12:25:54 to
 12:27:05, and at 12:26:21 ArcticDB `rows100k-cols1`'s store gained 16,442 pages over a second
@@ -2484,7 +2483,7 @@ full-day verdict.
   built. Q5 warm here, 907.64 ms, is in line with the 911.95 ms measured on `debian` at
   iteration for the final layout (`1669ae0`); the 280 ms there was the Mac's.
 
-Raw logs: `phase3-raw/compare-fullday/debian-67ae574/`.
+The run's raw logs are kept outside the repository.
 
 #### The macOS full day, tick-store alone
 
@@ -2552,8 +2551,8 @@ Warm is 30 runs and cold 7, as on Linux. The p99s are in the README's macOS full
 - WT-3 and QL-4 compare systems. Only Linux ran the day with all four, so on macOS they are not
   judged, and the targets block says so.
 
-Raw logs: `phase3-raw/mac-day2/`: the runner's log with `time -l`, each step's log and the parts
-files. The first run and the smoke run are in `phase3-raw/mac-day/`.
+The raw logs, the runner's log with `time -l`, each step's log and the parts files, and those of
+the first run and the smoke run, are kept outside the repository.
 
 ### The targets block
 
@@ -2615,7 +2614,7 @@ cpu5 and cpu4. Any of them can take the 6 jiffies of cpu5 that put a 1.1 s case 
 That is an observation, not a proven cause. The rule stands. What would get a file is a case long
 enough that a stray jiffy does not count, or a host where cpu5 is reserved (TASKS).
 
-Raw logs, with every case's perf, report and `/proc/stat` snapshots: `phase3-raw/ds4-b053aff/`.
+The raw logs, with every case's perf, report and `/proc/stat` snapshots, are kept outside the repository.
 
 ### G-3: 30-minute fuzz runs
 
@@ -2713,8 +2712,8 @@ and `py-scripts` fails `test_a_clean_run_under_1800_seconds_is_refused`.
 
 The full `scripts/check.sh` passed all 30 steps at `28435e4` under `heavy.sh`, in 2,122 s.
 
-Raw logs, with every fuzzer's log, `.meta`, BSD `time` output, the runner scripts and the leak
-probe: `phase3-raw/fuzz-g3/`.
+The raw logs, with every fuzzer's log, `.meta`, BSD `time` output, the runner scripts and the leak
+probe, are kept outside the repository.
 
 Those runs replayed the whole corpus inside their 30 minutes. A G-3 run is now three parts,
 `scripts/fuzz_g3.py`'s replay, merge and timed run, and the file records each (below, "The
@@ -2775,7 +2774,7 @@ the container's corpus after the run covers 10 of the kernel's 17 edges, as the 
 did; the three uncovered points are all on line 26, the `memcpy` in its load helper. Which
 branches those are was not established.
 
-Raw logs, with the reach replays and the runner scripts: `phase3-raw/close-p3/crc-g3/`.
+The raw logs, with the reach replays and the runner scripts, are kept outside the repository.
 
 ### G-3's tie to the code it judged
 
@@ -2818,20 +2817,20 @@ needs no history, so it passes on `debian` as before.
 Tests first: the new tests in `test_check_fuzz.py` (a scratch git repository, one change in each
 tied place, an uncommitted and a new file, prose that stays tied, an exported copy, a shallow
 clone, the pin, a pin on other bytes, a pin for another file) failed on the old script, and
-`test_check_sh.py`'s exported-tree test failed on the old `render-check` step; raw output in
-`phase4-raw/fix-fuzz-launch/`. Six faults, each proven with `prove_checks.py --only` under
+`test_check_sh.py`'s exported-tree test failed on the old `render-check` step; its raw output is
+kept with the raw logs, outside the repository. Six faults, each proven with `prove_checks.py --only` under
 `heavy.sh`: `fuzz-g3-tie-ignored`, `fuzz-g3-pin-any-content`, `fuzz-g3-pin-other-file`,
 `fuzz-g3-unjudged-passes`, `check-sh-untied-g3-passes` and `ci-shallow-checkout`: 6 of 6 as
 expected, each baseline passing and each fault failing `py-scripts` with exit 1 on the test it
-names, at `ff8e4b6`. `results/check-proofs.json` was restored from git after the run. Raw
-logs: `phase4-raw/fix-fuzz-launch/proofs1/`.
+names, at `ff8e4b6`. `results/check-proofs.json` was restored from git after the run. Its
+logs are kept with the raw logs.
 
 ### The G-3 replay and merge
 
 At `ea1dde4` each target's half hour began by replaying its saved corpus and its seeds: the time
 before its `INITED` line, after which libFuzzer runs only inputs it makes by mutation. libFuzzer
 prints exec/s as runs over whole seconds since start, so the `INITED` line's runs and exec/s
-bound that time. From the logs in `phase3-raw/fuzz-g3/` and `phase3-raw/close-p3/crc-g3/`:
+bound that time. From those runs' logs, kept with the raw logs:
 
 | Target | macOS, s | Linux at avx2, s | Inputs replayed, macOS / Linux |
 |---|---|---|---|
@@ -2850,8 +2849,8 @@ bound that time. From the logs in `phase3-raw/fuzz-g3/` and `phase3-raw/close-p3
 | `fuzz_stub_store` | under 1 | | 787 |
 
 So on `debian` `fuzz_pfor` had at most 1,291 s of its 1,801 for new inputs, and
-`fuzz_dictionary` 1,561. The figures and the script that read them:
-`phase4-raw/fix-fuzz-launch/old-replay-seconds.txt` and `bin/old_replay.py`.
+`fuzz_dictionary` 1,561. The figures and the script that read them
+are kept with the raw logs, outside the repository.
 
 What a 30-minute run now consists of, `scripts/fuzz_g3.py`'s three parts for each target, all
 with `fuzz/launch.txt`'s flags, caps, ASan options and `-max_len`:
@@ -2877,7 +2876,7 @@ with the run's own clock within 2 s. The pinned `ea1dde4` file alone may keep sc
 the saved corpus and the seeds on their 20 s or 240 s budget.
 
 Checked on this libFuzzer by short real runs through `heavy.sh` with the launcher at
-`9935099`, each with 30 s of fuzzing (`phase4-raw/fix-fuzz-launch/short-run*/`):
+`9935099`, each with 30 s of fuzzing (their logs kept with the raw logs):
 
 - `fuzz_itch_message`: the replay ran 1,139 files in 1,140 runs, 0.1 s; the merge kept 395 in one
   attempt; the timed run reached `INITED` at once with the replay's own coverage, cov 635 and
@@ -2904,8 +2903,8 @@ three older G-3 faults again since `check_fuzz.py` changed: 9 of 9 as expected w
 `prove_checks.py --only` under `heavy.sh` at `bac6e9d`, the six new ones and
 `fuzz-g3-short-run-accepted` failing `py-scripts` with exit 1 on the test each names, and
 `fuzz-g3-target-missing` and `fuzz-g3-crc-target-missing` failing `render-check` with exit 2.
-`results/check-proofs.json` was restored from git after the run. Raw logs:
-`phase4-raw/fix-fuzz-launch/proofs2/`.
+`results/check-proofs.json` was restored from git after the run. Its logs
+are kept with the raw logs.
 
 ### The G-3 launch at the freeze
 
@@ -3028,7 +3027,7 @@ the Mac, Arm and NEON sources that Linux does not build; coverage was 93.58% of 
 `hygiene` failed with exit 1 on `docs/injected-home.txt:1: absolute home path`, and passed
 again once the file was removed.
 
-Raw logs: `phase3-raw/close-p3/linux-check/`.
+The raw logs are kept outside the repository.
 
 ### The full fault re-proof at d307a31
 
@@ -3068,8 +3067,7 @@ were not, and neither was a check that had broken:
 set. `results/check-proofs.json` holds all 94 entries at `d307a31`: 93 PROVEN, and the control
 UNDETECTED.
 
-Raw logs: `phase3-raw/close-p3/reproof/`, with the four-run study and the seven patches under
-`investigate/distance-bound/`.
+The raw logs, with the four-run study and the seven patches, are kept outside the repository.
 
 ### README layout and RESULTS.md
 
@@ -3116,7 +3114,7 @@ GitHub's markdown API in `gfm` mode renders each newline in a paragraph as a lin
 repository file is not rendered that way. The previews were made in both `gfm` and `markdown`
 modes, and only `markdown` mode shows the README as the repository page does.
 
-Raw: `phase3-raw/readme/`, the renders and `prove-only-9f77e52.txt` with its logs.
+The raw output, the renders and `prove-only-9f77e52.txt` with its logs, is kept outside the repository.
 
 ### Repo layout: CLAUDE.md, docs/ and the licence
 
@@ -3185,9 +3183,9 @@ attempts", with the notice "Due to capacity constraints, jobs targeting macOS ar
 experience longer queue times." That is a GitHub-side fault, so the failed jobs were rerun with
 `gh run rerun 43251305872 --failed`, with no change to the code. The second attempt passed all 16.
 
-Raw: `phase3-raw/layout-docs/`, the check.sh logs and `prove-only.txt` with its logs;
-`phase3-raw/close-final/debian/`, the debian gate's script, status, build log tail and ctest
-summary; `phase3-raw/close-final/ci/`, the CI run's jobs and annotations.
+Kept with the raw logs, outside the repository: the check.sh logs and `prove-only.txt` with its
+logs; the debian gate's script, status, build log tail and ctest summary; and the CI run's jobs
+and annotations.
 
 ### The full fault re-proof at 5a810a2
 
@@ -3203,8 +3201,8 @@ A first start was stopped seconds in, on its first fault, because its runner had
 limit; the run above started again from the beginning with `--force`, and nothing was resumed
 from the record.
 
-Raw: `phase3-raw/close-final/`, `prove-full.txt` with `prove-logs/`, and the record as written,
-`check-proofs-full-5a810a2.json`.
+Kept with the raw logs, outside the repository: `prove-full.txt` with its logs, and the record as
+written, `check-proofs-full-5a810a2.json`.
 
 ### The README's stale lines
 
@@ -3254,7 +3252,7 @@ the README, `readme-headline-hand-edit`, `readme-headline-markers-removed` and
 `readme-keeps-a-results-block`, were proven again with `prove_checks.py --force --only` through
 `heavy.sh`: 3 of 3 PROVEN, and `results/check-proofs.json` came out unchanged.
 
-Raw: `phase3-raw/readme-accuracy/`, the check logs and `prove-only.txt` with its logs.
+Kept with the raw logs, outside the repository: the check logs and `prove-only.txt` with its logs.
 
 ## Phase 4 notes
 
@@ -3358,7 +3356,7 @@ produce no results file, and `compare/README.md` now says how to read tick-store
 such a run. The work folder and the gate's `build/compare-orchestrator-gate`, which held no store,
 were removed after their logs were copied.
 
-Raw: `phase4-raw/fullday-precondition/`: `diag.py`, the replay's logs (`debian/asis.*`,
+Kept with the raw logs, outside the repository: `diag.py`, the replay's logs (`debian/asis.*`,
 `debian/cold.*`), `67ae574`'s guard samples, the gate's work folder logs, the check logs, the
 proof run, and the iteration run's script, logs, part and `.pending` file (`iter/`).
 
@@ -3442,7 +3440,7 @@ With the tail-padding refusal removed from `decode_pfor_block`, `Pfor.EachVector
 failed and `FuzzOracles.PassEveryCutAndFlipOfAnIntegerColumn` and the PFOR, dictionary and
 run-length crasher replays passed, as the item says.
 
-Raw: `phase4-raw/fix-codecs/`: each finding's failing and passing logs, the helpers in `tools/`
+Kept with the raw logs, outside the repository: each finding's failing and passing logs, the helpers in `tools/`
 (the hostile block, the corpus scan, the hash patterns, the worst move-to-front block),
 `kernels-in-use.md` and the check logs.
 
@@ -3534,7 +3532,7 @@ De Morgan, two loops without a reserve, two headers included only indirectly and
 round-trip oracle, clang-tidy, the fuzz build and 20 s of each of the 13 targets, and hygiene. On debian at the same commit, the dev build
 and 644 of 644 tests passed, the two real-day tests skipped for want of the day's file.
 
-Raw: `phase4-raw/fix-store/`: each finding's failing and passing logs, the fault runs for C-5,
+Kept with the raw logs, outside the repository: each finding's failing and passing logs, the fault runs for C-5,
 C-9 and the seed (`tasks238-*`), and the check logs.
 
 ### The final review's harness and tools findings
@@ -3694,7 +3692,7 @@ hygiene all pass. The Mac does not build `page_cache_linux.cpp`, so clang-tidy r
 preset builds, ctest runs 659 tests with none failing and the two real-day tests skipped (no data there), the
 Linux-only page-cache test among the passes, and clang-tidy on `page_cache_linux.cpp` passes.
 
-Raw: `phase4-raw/fix-harness/`: each finding's failing and passing logs, and the checks.
+Kept with the raw logs, outside the repository: each finding's failing and passing logs, and the checks.
 
 ### The final review's ITCH, bench and second-pass findings
 
@@ -3746,7 +3744,7 @@ only, and their batch count beside them; giving them more repetitions would leng
 latency run, which is the freeze's to decide. Checked without running a benchmark: the rule
 applied by hand to copies of the five committed `results/bench` files passes
 `check_results.py`, and `render_results.render` gives the same tables from the copies as from
-the committed files (`phase4-raw/fix-itch-bench/a3-render-diff.log`). `run_bench.py` copies
+the committed files (the diff is kept with the raw logs). `run_bench.py` copies
 the latency block whole, so the new field reaches the results file. No script changed.
 
 A-4. The mutation was run, not only read: scratch copies of the two benchmarks, the committed
@@ -3788,7 +3786,7 @@ every platform, since a lone path is a mistyped command line wherever it is type
 
 A-7. Fixed in code: each `Case` carries the text of its reference, so the text and `verify()`
 sit in the same builder. No script reads `verification.against`. The iteration runs that show
-the new text are in `phase4-raw/fix-itch-bench/a7.log`; no figure from them is reported.
+the new text are kept with the raw logs; no figure from them is reported.
 
 A-8. What the validators require of `tree_dirty`: only `run_bench.py` reads it, refusing a
 measured run whose build says true; `check_results.py`, `render_results.py` and the compare
@@ -3810,7 +3808,7 @@ not: the stub writer's test of an empty RawMessage (A-5, above) and three names 
 test that clang-tidy's include check could not trace through the C library's private headers,
 on macOS and, as CI showed, on Linux. After
 those, every step passed, the unit runs at 678 tests with the one Linux-only test skipped
-(`phase4-raw/fix-itch-bench/check2`, `check3`). On the Linux host the dev build and ctest at
+(their logs are kept with the raw logs). On the Linux host the dev build and ctest at
 `9ca302d` failed only the R-3 partition check: before CMake 4, script mode sets no policies, and
 `if(IN_LIST)` is not an operator without CMP0057, so the check failed on its first `if` there
 while it passed on the Mac's CMake 4. With the policy floor set (`d05f4e2`), the gate passed,
@@ -3822,13 +3820,13 @@ took 106.66 s (codecs), 124.32 s (store), 392.66 s (query), 436.90 s (the exact-
 1,613.25 s for the single entry at `50b1cba`. The slowest entries of the run were the query
 oracle's cut-and-flip test uncapped, 481.11 s, the exact-path test's capped part, 436.90 s, and
 `ItchQuery.SegmentsWithRawRowsTakeTheExactPath` uncapped, 428.56 s, three at a time on a host
-whose load average was 9 to 12 from other work (`phase4-raw/fix-itch-bench/debian-gate/`).
+whose load average was 9 to 12 from other work (its logs are kept with the raw logs).
 
 ### The final review's second pass over the ITCH, bench and harness fixes
 
 Two more reviewers read the fixes: one the ITCH and bench round at `381c738` (RA-1 to RA-6), the
 other the harness round and the query fuzz oracle at `c804d77` (RD-1 to RD-6). Neither built or
-ran anything. The record is `docs/REVIEW.md`; raw logs are in `phase4-raw/fix-second-pass/`.
+ran anything. The record is `docs/REVIEW.md`; raw logs are kept outside the repository.
 
 RA-1. Confirmed by running the reviewer's mutation, not only reading it: with the stop checks A-1
 added deleted, all 669 unit tests passed. The fix is the reviewer's: the checks moved unchanged
@@ -3856,7 +3854,7 @@ cursor's stop is now held to the same rule as the input's, its offset where its 
 frame ends; the old check, that it fell inside the cut, follows from that. No in-tree test can
 reach the shorter-input check with a wrong stop, because the cursor is inline and `constexpr`,
 so it was shown with a driver in the raw folder built against a mutated copy of `frame.hpp`
-first on its include path (`phase4-raw/fix-second-pass/ra2-driver/`), as for A-1. The unit
+first on its include path (the driver is kept with the raw logs), as for A-1. The unit
 suite's `check_stop` test covers what the shorter stop goes through.
 
 RD-2. Fixed in code, the reviewer's option (a), not by describing the empty owner in the header:
@@ -3880,11 +3878,11 @@ The error is written alone, as the reviewer proposed, without a tool-name prefix
 this CLI's other errors has one. `itch::decode` refuses only an empty payload, which no frame
 holds, so the decode error that keeps the old words is not reachable from a file today.
 `tick_codec_eval` has the same line: given `--columns bogus` it says "the source did not decode:
-no column is named bogus" (`phase4-raw/fix-second-pass/codec-eval-sibling/`). It is outside this
+no column is named bogus" (its output is kept with the raw logs). It is outside this
 finding and is left for a TASKS item.
 That item is done: `tick_codec_eval` writes the error as it is, and its decode error carries the
 words itself, as `tick_reference_eval`'s does. `CodecEvalCli.TheCommandLineSaysWhatFailed` read
-the old words before the change (`phase4-raw/fix-leftovers/item2-before.log`).
+the old words before the change (the log is kept with the raw logs).
 
 RD-4. Closed with the reviewer's optional guard rather than left as a note, because a note cannot
 make a revert of D-11 fail. The block size rides in `EncodeErrors`, which every encoder helper
@@ -3939,13 +3937,13 @@ test (RA-3's narrowed suppression, which CI's Linux run once found wanting), the
 and the frame test, and ctest passed 680 of 682 with the two real-day tests skipped for want of
 the day's file, in 1,350.6 s; its slowest entries were the query oracle's cut-and-flip test
 (445.8 s) and the exact-path test's capped part (432.4 s). A first gate at `d45f4a4` was stopped
-near its end once clang-tidy had found the test to fix (`phase4-raw/fix-second-pass/`).
+near its end once clang-tidy had found the test to fix (its logs are kept with the raw logs).
 
 ### The final review: Phase 2 items closed
 
 The gate on the review found open items still under Phase 2 in docs/TASKS.md. Each below was
 checked against the code and the committed results, then ticked or closed with its evidence.
-Raw notes are in `phase4-raw/phase2-items/`.
+The raw notes are kept outside the repository.
 
 **Phase 3's parsers and decoders have fuzz targets: ticked.** `fuzz/CMakeLists.txt` builds 13
 targets, and `fuzz/README.md` names each one's oracle. Matching them against every function in
@@ -4056,7 +4054,7 @@ speed figure.
 ### The final review's comparison protocol
 
 The triage's "Comparison protocol" binds F-1, F-2, F-3, F-4, E-3 and F-14, with F-10 and F-11
-beside them. Raw logs are in `phase4-raw/fix-compare-protocol/`. New documents carry
+beside them. Raw logs are kept outside the repository. New documents carry
 `"protocol": 2` in their header; the committed files carry none and count as protocol 1.
 `scripts/check_compare.py` holds a protocol 2 file to every rule below and keeps the committed
 files to the rules they were measured by, so `check.sh` stays green until the freeze rerun
@@ -4186,8 +4184,8 @@ file every other rule passes, the protocol 2 rules included. What the new fields
 ### The second pass over the comparison protocol
 
 A second reviewer read the protocol 2 fixes at `ab57c83` (RF-1 to RF-11), and the first review's
-open comparison findings F-5 to F-8, F-13 and F-15 are taken in the same round. Raw logs are in
-`phase4-raw/fix-compare-validator/`. No results file was regenerated or edited; the four
+open comparison findings F-5 to F-8, F-13 and F-15 are taken in the same round. Raw logs are kept
+outside the repository. No results file was regenerated or edited; the four
 committed files pass `check_compare.py` after every change.
 
 **RF-1, protocol 1 for the committed files only.** Confirmed by a test: a protocol 2 slice
@@ -4285,8 +4283,8 @@ test and no prover fault. `Assembly` now builds a part from fakes of the workers
 `SecondSibling` runs `run_one` twice with fake meters; a day test holds tick-store's source
 whole on a day. Each of the sixteen gaps has a fault in `scripts/prove_checks.py`, every one
 proven with `--only`.
-**RR-1 to RR-3, the same reviewer's notes on the RA and RD fixes.** Raw logs are in
-`phase4-raw/fix-leftovers/`. RR-1: two requests of an unknown kind, one with a negative start and
+**RR-1 to RR-3, the same reviewer's notes on the RA and RD fixes.** Raw logs are kept
+outside the repository. RR-1: two requests of an unknown kind, one with a negative start and
 one with a locate of the wrong type, were told about the field, as the reviewer said
 (`rr1-before.log`); the worker now refuses a kind it does not know before it reads a field. RR-2
 is a comment and no change to the count: a step to a head no value has reached can match only a
@@ -4304,7 +4302,7 @@ error cannot be pinned by a test, since no frame holds the empty payload that al
 The review's findings on the scripts that turn results files into the published tables and
 judge them (E-1, E-2, E-4, E-7 to E-9), the tail figure's name (F-4's generator half, RF-4), the
 write targets on both clocks (RF-3), a Linux tick-store-alone day (RV-1) and D-10's caveat. Raw
-logs are in `phase4-raw/fix-generator/`.
+logs are kept outside the repository.
 
 **E-1, G-2's exit codes.** `store_results.py` typed `exit_code_corrupt` 1 and
 `exit_code_restored` 0. The runner of the committed runs did keep each run's exit status, as
@@ -4326,7 +4324,7 @@ generator now names it from the file, from a protocol 2 block's `tail`, or from 
 block's `n` with `p99_us` held to `max_us`, and stops on a block whose figure is not what its n
 makes it. The query columns, each comparison's preamble, QL-4's pairs and verdict, the README's
 headline preamble and its pitch changed wording only; regenerating moved no figure and no verdict
-(the word diff is in `phase4-raw/fix-generator/`). `BENCHMARKS.md` keeps QL-4's "lowest median and
+(the word diff is kept with the raw logs). `BENCHMARKS.md` keeps QL-4's "lowest median and
 p99": the verdict says beside it what p99 was measured as.
 
 **Write targets on both clocks (RF-3).** WT-3 and WT-4 are now judged against each system on
@@ -4399,7 +4397,7 @@ README's pitch already said; Q5 cold has no faster variant.
 
 A second reviewer read the validator round at `9b3cf94` (RV-1 to RV-11; RV-1 is under "The final
 review's generator findings"), and the first review's F-9 and F-12 are taken in the same round.
-Raw logs are in `phase4-raw/fix-compare-rest/`. No results file was regenerated or edited.
+Raw logs are kept outside the repository. No results file was regenerated or edited.
 
 **RV-3, a fault that left most of its rule on.** Confirmed by applying it: `False and A or B or
 C` is `(False and A) or B or C`, so four of the five cases of the test were still refused with
@@ -4486,8 +4484,8 @@ narrowed; `TickstoreAloneDay` fails on each.
 ### macOS st_blocks and QuestDB's converted partition
 
 The two open Phase 2 items, each looked into on the slice on the Mac with the harness's own
-steps, iteration only, the stores under `build/`. Probes and their output are in
-`phase4-raw/fix-compare-rest/phase2/`.
+steps, iteration only, the stores under `build/`. Probes and their output are kept
+with the raw logs, outside the repository.
 
 **macOS `st_blocks`: settled.** The cause is APFS allocating blocks past the end of a file that
 grows in many writes spread over time, not the bytes the file holds.
@@ -4552,17 +4550,17 @@ about 38 minutes a variant.
 ### Pre-registration of the freeze comparison
 
 Written at the final review, before any measured run of protocol 2, and revised on 2026-11-14
-after the second-pass review (RP-1 to RP-3, `phase4-raw/review/R2-compare-prover.md`), still
+after the second-pass review (RP-1 to RP-3, whose review notes are kept with the raw logs), still
 before any measured run. Every protocol 2 run so far is iteration-only. `scripts/check_compare.py`
 at the freeze commit is final for the freeze: no rule of it changes between the first measured
-run and the last. The spread below comes from `spread.py` in `phase4-raw/fix-compare-rest/prereg/`,
+run and the last. The spread below comes from `spread.py`, kept with the raw logs,
 over three sources: the repetitions inside the committed files; the protocol 2 Linux slice at
-`85a4912` (`phase4-raw/fix-compare-protocol/`), against the `67ae574` Linux slice; and the
-iteration day's tick-store part at `4c049c7` (`phase4-raw/fullday-precondition/`), against
+`85a4912`, against the `67ae574` Linux slice; and the
+iteration day's tick-store part at `4c049c7`, against
 tick-store's `v3-seg4Mi` block in the `67ae574` Linux day. The first comparison is the only
 second run of the three other systems. Neither has a second run on macOS. The families the
-revision added are computed the same way, over the same files, by `spread_more.py` in
-`phase4-raw/fix-freeze-a/item8/`.
+revision added are computed the same way, over the same files, by `spread_more.py`,
+kept with the raw logs.
 
 **What is measured at the freeze.** Four documents, all at the freeze commit, each under its
 host's wrapper with `TICK_STORE_MEASURE` set, so `check_compare.py` passes each one before it is
@@ -4728,16 +4726,16 @@ warm-up passes took 153.2 and 151.3 ms, its ten throughput passes 142.1 to 152.7
 under 150 ms. The host runs with boost on and no fixed clock; what made the timed passes faster
 than the rounds they were sized from was not measured. On the Mac, `pfor_delta_fused/w=13/neon`
 ran 491,520 calls a pass in passes of about 156 ms. The rule for the freeze and the number of
-attempts are unchanged. Raw files: `phase4-raw/fix-freeze-a/linux/case-report.json` and
-`case-gbench.json`, and `phase4-raw/fix-freeze-a/item4-mac-case-report.json`.
+attempts are unchanged. The raw files, each host's case report and the Linux case's
+Google Benchmark output, are kept outside the repository.
 
-Raw files, the trial's status, document and every case's `.stat` and `.report`:
-`phase4-raw/fix-prover-ci/ds4-trial/`.
+The raw files, the trial's status, document and every case's `.stat` and `.report`, are
+kept outside the repository.
 
 ### The final review's checking machinery
 
 Review E's findings on the prover, CI and the repository's own checks, after E-1 to E-4 and E-7
-to E-9. Raw logs: `phase4-raw/fix-prover-ci/`.
+to E-9. Raw logs are kept outside the repository.
 
 **E-5, a proof's key.** The prover keeps a fault's proof while the last code commit and the
 fault's fingerprint are unchanged. The fingerprint held a mutation's name, not its code, and the
@@ -4841,8 +4839,8 @@ at the final code, as TASKS says.
 ### The last round before the freeze
 
 The last change to measured code: at the freeze commit, which follows this round's last two
-items, every published number is measured again, once, unattended. Raw logs are in
-`phase4-raw/fix-freeze-a/`, and for the last two items in `phase4-raw/fix-freeze-b/`.
+items, every published number is measured again, once, unattended. Raw logs are kept
+outside the repository.
 
 **E-10 for the comparison: boost read twice.** `compare/run.py` read cpufreq boost once, after
 its last system. It now reads it before the first system's part too, outside the lock, and
@@ -4963,7 +4961,7 @@ no preset or more than one configured, is refused, exit 1, and nothing is writte
 round-trip recipe gives the command. The tests failed first (`item1-before.log`, 1 failure
 and 27 errors: no `--build`, and `assemble` and `assemble_g1` took no build folder). Faults
 `store-results-preset-assumed` and `store-results-unconfigured-build-taken`, each PROVEN with
-`--only` (`prove-item1.log`). Raw logs are in `phase4-raw/fix-freeze-b/`.
+`--only` (`prove-item1.log`). Raw logs are kept outside the repository.
 
 **The pass length as measured.** The record said a kernel pass lasts at least 150 ms. It is
 sized to, at the speed of the fastest of three rounds timed before the warm-up; in the Linux
@@ -4980,7 +4978,7 @@ reviews found in the scripts that check and publish those files (RG- and RP- row
 docs/REVIEW.md), none of which a measurement runs: no commit of it changes `src/`, `include/`,
 `fuzz/`, `cmake/`, the CMake files, `bench/`, `tools/`, `compare/`, `tests/unit/` or the
 measuring scripts TASKS lists, and `check_compare.py`'s rules stay as the pre-registration
-fixed them; only its tests change. Raw logs are in `phase4-raw/fix-stage-b/`.
+fixed them; only its tests change. Raw logs are kept outside the repository.
 
 **RG-1, a run stopped by its replay or merge.** When the replay or the merge fails, the launcher
 writes that part's command as the run's, with no `-max_total_time`, and `check_fuzz.py` held
@@ -5118,7 +5116,7 @@ out of its window.
 Written before the runs. Several targets are missed, and the record says why for some of them
 from profiles taken at older commits, on the slice or on a loaded host. These runs make the
 day's version at the freeze commit, so the write-up can explain a miss from a figure made on the
-code that missed it. Raw logs and the dry runs are in `phase4-raw/diag/`.
+code that missed it. Raw logs and the dry runs are kept outside the repository.
 
 **What they are, and what they are not.** Four diagnostics, D1 to D4, and the build they need.
 Each runs once, at `ede0176`, on the Linux host, as steps L14 to L18 of the freeze runner's
@@ -5269,7 +5267,7 @@ gives, or whose parts do not add up to it, and one with no read byte at or after
 which these sizes never leave. A test reads the constants from the header. On the final run's
 layout listings: `10302019` gives 963,271,577 and 1,932,611,736, its flips and seed equal to
 `results/roundtrip-10302019.json`'s; `12302019`'s `g2.json` is byte for byte the one its run used,
-so that day's result stands (`freeze-findings/g2-planner/compare.log`).
+so that day's result stands (the comparison's output, kept with the raw logs outside the repository).
 
 **Shown on a real store, every byte.** `scripts/check_oracle.py`, check.sh's `oracle` step, which
 CI's unit job runs on Linux and macOS, now flips bit 1 of every byte of its store's footer in
@@ -5292,8 +5290,8 @@ catch that one (`oracle-live-faults.log`).
 
 The round trip of `10302019` on macOS is owed again, and with it `store-size-10302019.json`, which
 `store_results.py` writes in the same step. `scripts/g2_plan.py` is one of the paths the freeze
-said no later commit changes; TASKS says why this one does. Raw logs are in
-`phase4-raw/fix-g2-plan/` and `phase4-raw/freeze-findings/g2-planner/`.
+said no later commit changes; TASKS says why this one does. Raw logs are kept
+outside the repository.
 
 ### The results files tied to their code
 
@@ -5429,7 +5427,7 @@ which stay a source comparison. The cost is two bench-preset builds per commit c
 minutes each on the Mac, and longer on the Linux host, where heavy.sh and the measurement lock
 apply; on CI it would add both builds to the repo job. It would catch less than the source
 comparison does on purpose: a change that leaves every object identical, such as a comment,
-would pass. Raw logs: `phase4-raw/ties/`.
+would pass. Raw logs are kept outside the repository.
 
 ## Process notes
 
