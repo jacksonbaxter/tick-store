@@ -47,6 +47,7 @@ FILE_OF = {
     "scripts/store_estimate.py": "scripts/store_estimate.py",
     "scripts/diag_summary.py": "scripts/diag_summary.py",
     "scripts/fuzz_results.py": "scripts/fuzz_results.py",
+    "scripts/fuzz_host.py": "scripts/fuzz_host.py",
 }
 # Files no kind measures: prose, faults, the prover, and what prove_checks.py leaves out of its
 # key; then scripts and tests that are code to the prover alone.
@@ -86,7 +87,7 @@ ASSEMBLED = {
     "store-estimate": {"scripts/store_estimate.py", "results/codec-eval-12302019.json",
                        "results/fullday-capacity-12302019.json"},
     "diag": {"scripts/diag_summary.py"},
-    "fuzz": {"scripts/fuzz_results.py"},
+    "fuzz": {"scripts/fuzz_results.py", "scripts/fuzz_host.py"},
 }
 
 

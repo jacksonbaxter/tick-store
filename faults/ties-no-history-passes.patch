@@ -1,8 +1,8 @@
 diff --git a/scripts/check_ties.py b/scripts/check_ties.py
-index 053cde5..76ec654 100644
+index 6543bae..ad71616 100644
 --- a/scripts/check_ties.py
 +++ b/scripts/check_ties.py
-@@ -428,7 +428,7 @@ def judge(repo, path, name, pins, history):
+@@ -430,7 +430,7 @@ def judge(repo, path, name, pins, history):
          return Verdict("pinned", [f"pinned under {key} in the pins file: measured at "
                                    f"{', '.join(counts)}; not judged ({kind.name})"])
      if not history:

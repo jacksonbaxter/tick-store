@@ -1,8 +1,8 @@
 diff --git a/scripts/check_ties.py b/scripts/check_ties.py
-index 053cde5..e747256 100644
+index 6543bae..b402173 100644
 --- a/scripts/check_ties.py
 +++ b/scripts/check_ties.py
-@@ -324,7 +324,7 @@ def changed_paths(repo, base, specs):
+@@ -326,7 +326,7 @@ def changed_paths(repo, base, specs):
      for done in (changed, new):
          if done.returncode != 0:
              raise OSError(f"git: {done.stderr.strip()}")

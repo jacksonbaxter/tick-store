@@ -252,7 +252,9 @@ KINDS = (
     Kind("fuzz", ("fuzz-g3-*.json",),
          measured=tuple((path, "what a fuzz binary is built from or launched with: "
                                "check_fuzz.py's TIED_PATHS") for path in check_fuzz.TIED_PATHS),
-         assembled=(("scripts/fuzz_results.py", "assembles the file from the runs' logs"),),
+         assembled=(("scripts/fuzz_results.py", "assembles the file from the runs' logs"),
+                    ("scripts/fuzz_host.py", "writes each host's facts, which the header "
+                                             "holds, on that host after its launch")),
          excluded=tuple((spec.split(")", 1)[1], "check_fuzz.py's NOT_TIED: fuzz/'s prose")
                         for spec in check_fuzz.NOT_TIED),
          left_out=(("scripts/check.sh", "check_fuzz.py's reason: its fuzz steps read "

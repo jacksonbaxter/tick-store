@@ -1,5 +1,5 @@
 diff --git a/scripts/check_ties.py b/scripts/check_ties.py
-index 053cde5..0b68fcf 100644
+index 6543bae..e6a9758 100644
 --- a/scripts/check_ties.py
 +++ b/scripts/check_ties.py
 @@ -184,7 +184,7 @@ KINDS = (
