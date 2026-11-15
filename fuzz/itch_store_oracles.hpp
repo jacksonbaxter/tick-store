@@ -84,7 +84,7 @@ inline constexpr std::uint64_t kFuzzMaxStoreValues = std::uint64_t{7} * (codec::
 // records of 4,096 bytes (4,197,424 stated), 1,391 ms for 16,780,336 stated, 5,564 ms for
 // 67,110,960, which a file of 7,884 bytes states. The dearest file within it, the cap's add
 // orders beside raw bytes to the limit, takes 462 ms through fuzz_itch_store.
-inline constexpr std::uint64_t kFuzzComparedStoreValues = 4 * codec::kMaxBlockValues;
+inline constexpr std::uint64_t kFuzzComparedStoreValues = std::uint64_t{4} * codec::kMaxBlockValues;
 inline constexpr StoreBounds kStoreFuzzBounds{.stated_values = kFuzzMaxStoreValues,
                                               .compared_values = kFuzzComparedStoreValues};
 
