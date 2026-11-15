@@ -97,9 +97,25 @@ generated source linked into every benchmark and the codec evaluation tools, so 
 differ between any two commits, and comparing the other objects would need both commits built in
 one folder with one toolchain and would still say nothing of the Python harness that runs the
 measurements), `scripts/render_results.py --check`,
-which fails if the headline above or any table of RESULTS.md differs from a fresh render,
-actionlint, and a check of what git tracks: no home path, no data file, nothing over 1 MB but
-the named results. No step loads a whole day. `ItchRealDay` reads the first 2 million messages.
+which fails if the first screen's generated part or any table of RESULTS.md differs from a fresh
+render, actionlint, and a check of what git tracks: no home path, no data file, nothing over 1 MB
+but the named results. No step loads a whole day. `ItchRealDay` reads the first 2 million messages.
+
+`render_results.py --check` also holds the first screen to its rules. The pitch runs to at most
+`max_words` words, 100, headings left out. Each figure in it is the one the results give now,
+and any other number is a text `scripts/targets.json` lists with its reason. Each sentence listed
+there under `claims` must hold on the results, and a word that ranks or judges, such as fastest,
+least or below, must sit inside a claim or a figure's words, so a new results file that turns a
+verdict stops the check and names the sentence to change. Each table row says what it is, then
+its bar and the bar's source, then what was measured, from a template whose figures are named
+values read from the results files: a template that types a figure, names a value it is not
+given, or is given one it does not name stops the render. The line under the table names every
+part of a target on the screen that the table leaves out, and every other target, that is missed
+or not judged; it is checked apart from the code that writes it, and the table must hold a miss.
+The whole screen names no target id and no query's name, and introduces each machine once, by
+what it is. What it does not check is that the prose is true beyond those figures and claims: a
+sentence that misleads without a ranking word, a plain name that misdescribes its target, or a
+bar whose words drift from its target in `BENCHMARKS.md` would all pass.
 
 A skip is never a pass. A step that cannot run shows as `SKIP`, as `py-compare` does with no
 `.venv`, and a test skipped inside a passing step is named in that row. `ItchRealDay` skips

@@ -5429,6 +5429,77 @@ apply; on CI it would add both builds to the repo job. It would catch less than 
 comparison does on purpose: a change that leaves every object identical, such as a comment,
 would pass. Raw logs are kept outside the repository.
 
+### The README's first screen
+
+2026-11-14. The README's first screen is rebuilt to the page rules: about 100 words of prose at
+most before the table, four or five rows with a miss anyone can read, no target id and no
+query's name, each row's bar and its source before any measured figure, each machine introduced
+once by what it is, at most one link a paragraph. The pitch is 91 words, headings left out.
+
+**The table.** Five rows, columns What, Bar (source), Measured and Result: the round trip on
+both days (met), disk on the store flushed against Parquet's smallest setup (met), one hour of
+one stock warm (met), one millisecond of every stock warm (missed), and one-thread ingest
+against Nasdaq's peak, 2.73 M messages/s from the bandwidth report (missed, 1.376 M). The two
+query rows are single parts of QL-4 on Linux, the ingest row WT-2 on Linux's class A part, so
+each verdict is that part's alone. A row's Measured cell is a short template in
+`scripts/targets.json` whose figures are named values, each an expression on the results files
+of the parts the row shows, so the disk row's 1.76 GB is the allocated size from the comparison
+file while the pitch's 1.76 GB is the store's own bytes, 1,758,240,768 against 1,758,234,758.
+Under the table one generated sentence gives WT-2 on the laptop, 3.215 M messages/s, met. The
+line under that names, in plain words with each host's short name, every left-out part of a
+target the screen shows and every other target that is missed or not judged, and counts the
+rest: today 4 more targets and 5 more parts met. G-3, not judged, is named there rather than
+given a row. The old line above the table, which called the hosts Linux and macOS, is gone; the
+line under the table says it is generated and links RESULTS.md.
+
+**The checks.** `render_results.py --check` now stops on a pitch over `max_words`; on a word that
+ranks or judges (fastest, least, below and the like) outside every claim and every figure's
+words, naming the sentence; on a claim whose verdict the results turn, naming its sentence; on
+a headline row without its what, bar, source or measured template; on a template that types a
+figure, names a value it is not given, or is given one it never names; on a target or a left-out
+part with no plain name; on a line under the table that leaves out a part or a target that is
+missed or not judged, checked by walking the targets apart from the code that writes the line;
+and on a first screen that names a target id or a query, introduces a host other than once, uses
+a host's short name before its introduction, or calls a host Linux or macOS after it. Texts in
+`scripts/targets.json` that reach the screen may hold no digit but a host's introduction, so an
+id typed there is refused as a typed figure before the screen check sees it. Five claims tie the
+pitch's outcomes to verdicts: bit-exact to G-1 met, the least disk to CR-2 on Linux met, fastest
+of the four default setups to QL-4 on Linux's four one-stock parts met, ArcticDB or QuestDB
+fastest to Q1 and Q4 warm and cold, and one thread below Nasdaq's peak to WT-2 on Linux missed.
+The pitch's four other figures and their claim went with the sentences that held them, and so
+did the not_results "SHA-256", "(Q1)" to "(Q4)", "8.59 M", "32 workers on 32 vCPUs" and "WT-1";
+"2018", the year of the Linux host's processor, was added.
+
+What the checks do not see: that the prose is true beyond its figures and its claims. A sentence
+that misleads without a ranking word, a plain name or a bar whose words drift from the target in
+`BENCHMARKS.md`, or a name found inside a longer name in the line under the table, would pass.
+
+**Where it differs from the proposal.** The query rows read "One hour of one stock, warm" and
+"One millisecond of every stock, warm", with the bar "fastest of the four default setups, by
+median and tail" and the cell "median ... ms", since QL-4 judges each part on its median and its
+tail figure and the proposal's "warm median" would have read as the median alone. The round-trip
+row's cell says "stream hashes equal" from the files' hashes, and its 0 is the sum of the three
+files' mismatched records. The sentence under the table puts the bar first: "Against the same
+bar, one thread on an Apple M4 Max laptop, unpinned, ingests 3.215 M messages/s: met." The line
+under the table names every target that is missed or not judged, as decided, so it runs to
+about 190 words below the table.
+
+**Faults.** Eight are new: `readme-pitch-claim-tie-dropped` (a claim taken out, the ranking word
+caught), `render-pitch-word-limit-removed`, `headline-fuzz-row-names-its-id` (G-3 added back as
+a row, whose verdict from the results names its id), `readme-first-screen-host-by-system`,
+`headline-template-typed-figure`, `headline-template-unnamed-value`,
+`headline-row-without-a-source` and `headline-left-out-drops-a-miss`. Three mutations moved with
+the README (`readme-pitch-figure-edited` now raises the ratio, `readme-pitch-unchecked-figure`,
+`readme-headline-hand-edit` on the ingest row) and three patches were regenerated
+(`headline-verdict-all-parts`, `render-pitch-claim-unchecked`,
+`render-pitch-shared-format-accepted`). `prove_checks.py --only`, through `heavy.sh`, at
+`bca62d9`'s tree: those 14, and `readme-pitch-store-figures-swapped`,
+`readme-pitch-claim-reworded`, `readme-headline-markers-removed`, `readme-keeps-a-results-block`
+and `headline-without-a-miss`, 19 PROVEN, and `control-comment-only` UNDETECTED, as expected.
+`results/check-proofs.json` was restored from git. The other renderer patches apply at their new
+lines and touch code this change left alone, so they wait for the next full re-proof. The fault
+logs are kept outside the repository.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
