@@ -301,9 +301,11 @@ INSTANTIATE_TEST_SUITE_P(
 // Huffman codes, its indices, under one transform, with the scale, re-encoded by hand from
 // what the encoder wrote, since a valid block may carry any. Their values are dense, as a
 // real column's, so the blocks are far larger than -max_len and no fuzz target reaches
-// them. Each point is one test, so check.sh's limit for one test holds each alone.
-static_assert(codec::oracle::kPforFuzzBounds.decoded_values >= codec::kMaxBlockValues &&
-                  codec::oracle::kRleFuzzBounds.decoded_values >= codec::kMaxBlockValues,
+// them. Each point is one test, so check.sh's limit for one test holds each alone. The sizes
+// follow the dictionary's cap constant (kDictFuzzDecodedValues); at a cap of one maximal block
+// there are none.
+static_assert(codec::oracle::kPforFuzzDecodedValues >= codec::kMaxBlockValues &&
+                  codec::oracle::kRleFuzzDecodedValues >= codec::kMaxBlockValues,
               "a codec cap below one maximal block needs its sizes in the grid");
 
 struct GridPoint {
@@ -332,7 +334,7 @@ struct GridPoint {
 
 [[nodiscard]] std::vector<GridPoint> grid_points() {
     std::vector<GridPoint> points;
-    for (const std::size_t values : grid_sizes(codec::oracle::kDictFuzzBounds.decoded_values)) {
+    for (const std::size_t values : grid_sizes(codec::oracle::kDictFuzzDecodedValues)) {
         for (const auto mode : {codec::DictMode::ranked_pfor, codec::DictMode::ranked_huffman,
                                 codec::DictMode::sorted_move_to_front}) {
             for (const auto transform :
@@ -455,6 +457,8 @@ std::string grid_name(const ::testing::TestParamInfo<GridPoint>& info) {
 // Not among the scalar-capped parts (tests/unit/CMakeLists.txt): there the chosen set is the
 // scalar set, so the kernel comparison would compare the scalar set with itself.
 INSTANTIATE_TEST_SUITE_P(Grid, OracleGrid, ::testing::ValuesIn(grid_points()), grid_name);
+// A cap of one maximal block leaves the grid no sizes.
+GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(OracleGrid);
 
 TEST(FuzzOracles, PassEveryFixtureWholeAndCutAtEveryLength) {
     for (const auto& f : fixtures()) {

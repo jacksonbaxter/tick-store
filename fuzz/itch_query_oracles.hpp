@@ -163,11 +163,14 @@ struct QueryBounds {
 // aggregates and the share sum) is still asked twice over every row.
 inline constexpr std::size_t kQueryPastBudgetRequests = 2;
 
-// The fuzz target's bounds. The bar is 0.5 s an execution on the Mac; the cap and the compare
-// limit are 0.45 s of their measures, so a file whose time is up to a ninth above the envelope
-// of the files timed still meets it. Within the budget the whole check takes the repeat ask on
-// every request, at most 1.19 times the work on the files timed (the day with a raw record
-// every 64 in one segment), so the budget is 0.375 s: 445 ms at most.
+// The fuzz target's bounds. The bar is the ruling's: the costliest input takes at most 5 s an
+// execution on the Linux host with its sibling cpu busy (fuzz/README.md, "Bounds"). These
+// values were set to a design proxy for it, 0.5 s an execution on the Mac, and are to be set
+// again from timings on the Linux host: the cap and the compare limit are 0.45 s of their
+// measures, so a file whose time is up to a ninth above the envelope of the files timed still
+// meets the proxy. Within the budget the whole check takes the repeat ask on every request, at
+// most 1.19 times the work on the files timed (the day with a raw record every 64 in one
+// segment), so the budget is 0.375 s: 445 ms at most.
 inline constexpr std::uint64_t kQueryFuzzWork = 450'000'000;
 inline constexpr std::uint64_t kQueryFuzzCrossCheckedWork = 375'000'000;
 inline constexpr std::uint64_t kQueryFuzzComparedWork = 450'000'000;
@@ -357,25 +360,34 @@ struct ColumnForm {
         }
         out.rows.emplace_back(std::move(rows));
         if (request.locate.has_value()) {
-            std::vector<MinuteBucket> minutes;
+            // The adds in the window, sorted by minute and then folded, so the cost is the
+            // sort's whatever order the times come in (REVIEW-2, B5 (b)).
+            std::vector<const QueryRow*> adds;
             for (const QueryRow& row : all) {
-                if (!in_window(row) || request.locate != row.locate ||
-                    (row.msg_type != 'A' && row.msg_type != 'F')) {
-                    continue;
+                if (in_window(row) && request.locate == row.locate &&
+                    (row.msg_type == 'A' || row.msg_type == 'F')) {
+                    adds.push_back(&row);
                 }
-                const std::uint64_t minute = (row.ts_ns / kNanosPerMinute) * kNanosPerMinute;
-                auto slot = std::ranges::lower_bound(minutes, minute, {}, &MinuteBucket::minute_ns);
-                if (slot == minutes.end() || slot->minute_ns != minute) {
-                    slot = minutes.insert(slot, MinuteBucket{.minute_ns = minute,
-                                                             .count = 0,
-                                                             .shares = 0,
-                                                             .min_price = row.price,
-                                                             .max_price = row.price});
+            }
+            const auto minute_of = [](const QueryRow* row) {
+                return (row->ts_ns / kNanosPerMinute) * kNanosPerMinute;
+            };
+            std::ranges::stable_sort(adds, {}, minute_of);
+            std::vector<MinuteBucket> minutes;
+            for (const QueryRow* row : adds) {
+                const std::uint64_t minute = minute_of(row);
+                if (minutes.empty() || minutes.back().minute_ns != minute) {
+                    minutes.push_back(MinuteBucket{.minute_ns = minute,
+                                                   .count = 0,
+                                                   .shares = 0,
+                                                   .min_price = row->price,
+                                                   .max_price = row->price});
                 }
-                ++slot->count;
-                slot->shares += row.shares;
-                slot->min_price = std::min<std::uint64_t>(slot->min_price, row.price);
-                slot->max_price = std::max<std::uint64_t>(slot->max_price, row.price);
+                MinuteBucket& bucket = minutes.back();
+                ++bucket.count;
+                bucket.shares += row->shares;
+                bucket.min_price = std::min<std::uint64_t>(bucket.min_price, row->price);
+                bucket.max_price = std::max<std::uint64_t>(bucket.max_price, row->price);
             }
             out.minutes.emplace_back(std::move(minutes));
         } else {

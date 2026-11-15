@@ -9,7 +9,9 @@
 // bound again. FuzzRegression/BoundSeeds.PassTheWholeCheck replays each through its oracle
 // with no bounds, so what the bounds leave out is still checked on them, and holds each to
 // the side of the bounds it was built for: for a codec seed, how many of its blocks fall in
-// each tier.
+// each tier. Each seed is built from the bound constants it stands for, its sizes found by
+// search where they depend on them, so it follows a new value; a value its shape cannot
+// follow fails a static_assert or the seed's build, saying so.
 //
 // Every block here comes from the real encoder or is a nested block of the real encoder's
 // framed by hand where the encoder would choose another form, and every store comes from
@@ -38,6 +40,7 @@
 #include <span>
 #include <stdexcept>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace tick_store::bound_seeds {
@@ -144,16 +147,41 @@ template <class Encode>
     return framed(count, rewritten);
 }
 
-// The dictionary target's costliest input: that block filling the cap, 2^18 values (1,458
-// bytes), whose first 5,123 take the budget, then one of the 2^18 values left to the compare
-// limit, 2^19, past the cap and so decoded by both kernel sets and compared; then the tail.
-// The unit test takes both whole.
+// The dictionary target's costliest input: that block filling the cap, whose first values
+// take the budget, then such blocks past the cap, each as many values as the compare limit and
+// then the decode limit leave, at most a maximal block, while -max_len holds them (the last cut
+// to the values that fit), so the fuzz target decodes each by both kernel sets and compares,
+// then decodes the rest once; then the tail. The unit test takes them all whole.
 [[nodiscard]] inline Bytes dictionary_seed() {
-    const std::size_t cap = codec::oracle::kDictFuzzBounds.decoded_values;
-    return with_part_two_tail(
-        joined(move_to_front_block(cap),
-               move_to_front_block(codec::oracle::kDictFuzzBounds.compared_values - cap)),
-        kSmallMaxLen);
+    const codec::oracle::OracleBounds& bounds = codec::oracle::kDictFuzzBounds;
+    const std::size_t cap = std::min(std::size_t{codec::kMaxBlockValues}, bounds.decoded_values);
+    Bytes column = move_to_front_block(cap);
+    std::size_t seen = cap;
+    const std::size_t room = kSmallMaxLen - codec::kBlockHeaderSize;
+    for (const std::size_t limit : {bounds.compared_values, bounds.single_decoded_values}) {
+        while (seen < limit && column.size() < room) {
+            std::size_t count = std::min(std::size_t{codec::kMaxBlockValues}, limit - seen);
+            if (column.size() + move_to_front_block(count).size() > room) {
+                std::size_t low = 0;
+                std::size_t high = count;
+                while (low < high) {
+                    const std::size_t middle = low + ((high - low + 1) / 2);
+                    if (column.size() + move_to_front_block(middle).size() <= room) {
+                        low = middle;
+                    } else {
+                        high = middle - 1;
+                    }
+                }
+                count = low;
+            }
+            if (count == 0) {
+                break;
+            }
+            column = joined(column, move_to_front_block(count));
+            seen += count;
+        }
+    }
+    return with_part_two_tail(std::move(column), kSmallMaxLen);
 }
 
 // A run-length block of `values` values in `runs` maximal runs, the first runs - 1 of one value
@@ -179,9 +207,9 @@ template <class Encode>
 
 // The run-length target's costliest input: a block of kMaxBlockValues runs of one value,
 // the dearest to decode (11,302 bytes), within the cap; then a maximal block with as many
-// runs as the bytes left hold beside a block header, 467,968, past the cap, which the fuzz
-// target does not examine and the unit test takes whole, as it would a compare tier's
-// dearest block; then the tail, here a header alone.
+// runs as the bytes left hold beside a block header, past the cap, the dearest block there to
+// decode twice: the fuzz target compares it when the compare limit reaches it and otherwise
+// does not examine it, and the unit test takes it whole; then the tail, here a header alone.
 [[nodiscard]] inline Bytes run_length_seed() {
     const Bytes dear = run_length_runs_block(codec::kMaxBlockValues, codec::kMaxBlockValues);
     std::size_t low = 1;
@@ -223,7 +251,7 @@ template <class Encode>
 // kernel sets and compares, its delta pass summing every vector; then the tail.
 [[nodiscard]] inline Bytes pfor_delta_past_cap_seed() {
     const std::size_t first_values =
-        std::min(std::size_t{codec::kMaxBlockValues}, codec::oracle::kPforFuzzBounds.decoded_values);
+        std::min(std::size_t{codec::kMaxBlockValues}, codec::oracle::kPforFuzzDecodedValues);
     const Bytes zeros = encoded([&](Bytes& out) {
         return codec::encode_pfor_block(
             Words(first_values, 0),
@@ -253,8 +281,11 @@ template <class Encode>
 // of a block's run count against its values can see it, 100,000 values past the budget.
 [[nodiscard]] inline Bytes run_length_repeat_seed() {
     constexpr std::size_t kRepeatAt = 100'000;
+    static_assert(codec::oracle::kRleFuzzDecodedValues > kRepeatAt &&
+                      codec::oracle::kRleFuzzCrossCheckedValues < kRepeatAt,
+                  "the repeat must fall within run-length's cap and past its budget");
     const std::size_t runs =
-        std::min(std::size_t{codec::kMaxBlockValues}, codec::oracle::kRleFuzzBounds.decoded_values);
+        std::min(std::size_t{codec::kMaxBlockValues}, codec::oracle::kRleFuzzDecodedValues);
     Words values(runs);
     for (std::size_t i = 0; i < runs; ++i) {
         values[i] = 7 * (1'000 + i);
@@ -410,10 +441,9 @@ template <class Encode>
 
 // ITCH store: the most add orders -max_len holds beside one more segment, 3,840 in 60
 // segments of kFuzzMaxSegmentRecords, then that segment: 64 raw records of `raw_bytes` bytes,
-// zstd holding them in a few hundred bytes. Typed records cost the most a value, about 4.4
-// microseconds on the Mac in the one-off tool, but -max_len holds them to about 36,000
-// values; raw bytes cost about 0.37 and reach the cap in under 700 bytes (fuzz/README.md,
-// "Bounds").
+// zstd holding them in a few hundred bytes. Typed records cost the most a value, but -max_len
+// holds them to about 36,000 values; raw bytes cost far less a value and reach the cap in
+// under 700 bytes (fuzz/README.md, "Bounds").
 [[nodiscard]] inline Bytes adds_then_raw_segment(std::size_t raw_bytes) {
     std::vector<itch::Message> records;
     constexpr std::uint32_t kAdds = 60 * store::oracle::kFuzzMaxSegmentRecords;
@@ -434,15 +464,53 @@ template <class Encode>
     return written(records, store::oracle::kFuzzMaxSegmentRecords);
 }
 
-// Within the cap: raw records of 13,785 bytes, as many raw bytes as the cap leaves room for,
-// 917,475 values in all and 68,986 bytes.
-[[nodiscard]] inline Bytes itch_store_seed() { return adds_then_raw_segment(13'785); }
+// The values a store file's segments state in all (store::oracle::detail::stated_values).
+[[nodiscard]] inline std::uint64_t stated_store_values(const Bytes& file) {
+    const auto reader = store::ItchStoreReader::open_bytes(file);
+    if (!reader.has_value()) {
+        throw std::runtime_error("a bound seed's store did not open");
+    }
+    return store::oracle::detail::stated_values(*reader);
+}
 
-// ITCH store, past the cap: the same add orders, then 64 raw records of 64,985 bytes, as many
-// as the compare limit leaves room for, 4,194,275 values in all. Past the cap a file is only
-// read twice; raw bytes are the only way past the cap in -max_len, so the dearest file there
-// holds as many typed records as the bytes left allow beside raw bytes to the limit.
-[[nodiscard]] inline Bytes itch_store_compared_seed() { return adds_then_raw_segment(64'985); }
+// adds_then_raw_segment with the most raw bytes a record whose file states at most `limit`
+// values in at most kLargeMaxLen bytes. Each raw byte is one value in each of the 64 records,
+// so the stated values rise by 64 a raw byte: the count is solved from one and two raw bytes,
+// then stepped to the exact edge. A limit that one segment of raw records cannot reach is
+// refused, since the file would then not be the dearest the limit allows.
+[[nodiscard]] inline Bytes adds_then_raw_to(std::uint64_t limit) {
+    const auto fits = [&](std::size_t raw) {
+        const Bytes file = adds_then_raw_segment(raw);
+        return file.size() <= kLargeMaxLen && stated_store_values(file) <= limit;
+    };
+    if (fits(itch::kMaxPayloadSize)) {
+        throw std::runtime_error("a store bound past what one raw segment states: extend the seed");
+    }
+    const std::uint64_t one = stated_store_values(adds_then_raw_segment(1));
+    const std::uint64_t step = stated_store_values(adds_then_raw_segment(2)) - one;
+    std::size_t raw = limit < one || step == 0 ? 1 : 1 + static_cast<std::size_t>((limit - one) / step);
+    raw = std::min<std::size_t>(raw, itch::kMaxPayloadSize);
+    while (raw > 1 && !fits(raw)) {
+        --raw;
+    }
+    while (raw < itch::kMaxPayloadSize && fits(raw + 1)) {
+        ++raw;
+    }
+    return adds_then_raw_segment(raw);
+}
+
+// Within the cap: as many raw bytes as the cap leaves room for.
+[[nodiscard]] inline Bytes itch_store_seed() {
+    return adds_then_raw_to(store::oracle::kFuzzMaxStoreValues);
+}
+
+// ITCH store, past the cap: the same add orders, then raw bytes to the compare limit. Past the
+// cap a file is only read twice; raw bytes are the only way past the cap in -max_len, so the
+// dearest file there holds as many typed records as the bytes left allow beside raw bytes to
+// the limit.
+[[nodiscard]] inline Bytes itch_store_compared_seed() {
+    return adds_then_raw_to(store::oracle::kFuzzComparedStoreValues);
+}
 
 // The day in segments of `segment_records`, the query target's cap unless given, with a raw
 // record of 9 bytes every `raw_every` records, so no segment is plain and the indexed path
@@ -462,24 +530,99 @@ template <class Encode>
 
 // The ITCH query seeds are files on the envelope of the query measures
 // (itch_query_oracles.hpp): of the 70 files timed, one whose time is the most of its work in
-// the measure of its tier, with as many records as that tier's limit allows (fuzz/README.md,
-// "Bounds").
+// the measure of its tier, with as many records as that tier's limit and -max_len allow
+// (fuzz/README.md, "Bounds").
 //
+// raw_spotted_day with the most records whose work in `weights` is at most `limit`, in at most
+// kQueryMaxLen bytes; both grow with the records, so the search doubles the count until it
+// fails and then halves the range.
+[[nodiscard]] inline Bytes raw_spotted_day_to(
+    const store::oracle::WorkWeights& weights, std::uint64_t limit, std::size_t raw_every,
+    std::uint32_t segment_records = store::oracle::kQueryFuzzMaxSegmentRecords) {
+    const auto fits = [&](const Bytes& file) {
+        if (file.size() > kQueryMaxLen) {
+            return false;
+        }
+        const auto reader = store::ItchStoreReader::open_bytes(file);
+        if (!reader.has_value()) {
+            throw std::runtime_error("a bound seed's store did not open");
+        }
+        return store::oracle::query_work(*reader, weights) <= limit;
+    };
+    std::size_t low = 1;
+    std::size_t high = 2;
+    while (fits(raw_spotted_day(high, raw_every, segment_records))) {
+        low = high;
+        high *= 2;
+    }
+    high -= 1;
+    while (low < high) {
+        const std::size_t middle = low + ((high - low + 1) / 2);
+        if (fits(raw_spotted_day(middle, raw_every, segment_records))) {
+            low = middle;
+        } else {
+            high = middle - 1;
+        }
+    }
+    return raw_spotted_day(low, raw_every, segment_records);
+}
+
 // Within the cap and past the budget: the plain day in one segment, on the whole check's
-// envelope (its time 0.993 of its work), 10,537 records, the most whose work is within the
-// cap (449,976,400), 75,410 bytes.
-[[nodiscard]] inline Bytes itch_query_seed() { return raw_spotted_day(10'537, 0); }
+// envelope (its time 0.993 of its work), to the cap.
+[[nodiscard]] inline Bytes itch_query_seed() {
+    return raw_spotted_day_to(store::oracle::kWholeCheckWork, store::oracle::kQueryFuzzWork, 0);
+}
 
 // Within the budget: the day with a raw record every 64, in one segment, whose whole check
 // with the repeat ask on every request is the most above its work of the files timed (1.19
-// times), 2,926 records, the most whose work is within the budget (374,890,000).
-[[nodiscard]] inline Bytes itch_query_budget_seed() { return raw_spotted_day(2'926, 64); }
+// times), to the budget.
+[[nodiscard]] inline Bytes itch_query_budget_seed() {
+    return raw_spotted_day_to(store::oracle::kWholeCheckWork,
+                              store::oracle::kQueryFuzzCrossCheckedWork, 64);
+}
 
 // Past the cap, within the compare limit: the day with a raw record every 4 in segments of one
-// record, whose two indexed asks are 0.999 of their work, 144 records, the most whose
-// compared-asks work is within the limit (441,477,600), 130,711 bytes; its whole-check work,
-// 1,237,068,000, is past the cap.
-[[nodiscard]] inline Bytes itch_query_compared_seed() { return raw_spotted_day(144, 4, 1); }
+// record, whose two indexed asks are 0.999 of their work, to the compare limit or -max_len,
+// whichever it meets first; its whole-check work is past the cap.
+[[nodiscard]] inline Bytes itch_query_compared_seed() {
+    return raw_spotted_day_to(store::oracle::kComparedAsksWork,
+                              store::oracle::kQueryFuzzComparedWork, 4, 1);
+}
+
+// Falling minutes (REVIEW-2, B5 (b)): add orders on locate 0 in one plain segment, each a
+// minute before the one before from the largest 48-bit time down, as many as 48 bits hold
+// minutes, 4,691, so every minute aggregate asked over them, the product's and the oracle's,
+// opens each row's minute before every one already held.
+[[nodiscard]] inline Bytes itch_query_falling_minutes_seed() {
+    constexpr std::uint64_t kTop = (std::uint64_t{1} << 48U) - 1;
+    constexpr std::uint64_t kMinute = 60'000'000'000ULL;
+    std::vector<itch::Message> records;
+    for (std::uint64_t i = 0; i * kMinute <= kTop; ++i) {
+        records.emplace_back(itch::AddOrder{
+            itch::MessageHeader{0, 0, kTop - (i * kMinute)}, 1 + i, std::byte{'B'}, 100,
+            itch::Stock{std::byte{'A'}, std::byte{'A'}, std::byte{'P'}, std::byte{'L'},
+                        std::byte{' '}, std::byte{' '}, std::byte{' '}, std::byte{' '}},
+            itch::Price4{1'000'000}});
+    }
+    return written(records, store::oracle::kQueryFuzzMaxSegmentRecords);
+}
+
+// Run-length past the cap filled with the blocks dearest a byte to decode twice: the dearest
+// maximal block within the cap, then maximal blocks of one run as many as the compare limit
+// takes and one more past it, while -max_len holds them. Blocks past that cost the fuzz target
+// nothing and the unit test's whole check over a second each, so they are left out.
+inline constexpr std::size_t kOneRunBlocksCompared =
+    (codec::oracle::kRleFuzzComparedValues - codec::oracle::kRleFuzzDecodedValues) / codec::kMaxBlockValues;
+[[nodiscard]] inline Bytes run_length_one_run_blocks_seed() {
+    Bytes column = run_length_runs_block(codec::kMaxBlockValues, codec::kMaxBlockValues);
+    const Bytes one_run = run_length_runs_block(codec::kMaxBlockValues, 1);
+    for (std::size_t i = 0; i <= kOneRunBlocksCompared &&
+                            column.size() + one_run.size() + codec::kBlockHeaderSize <= kSmallMaxLen;
+         ++i) {
+        column = joined(column, one_run);
+    }
+    return with_part_two_tail(std::move(column), kSmallMaxLen);
+}
 
 // Which side of its target's bounds a seed was built for, which the unit test holds it to.
 enum class Side : std::uint8_t {
@@ -528,24 +671,53 @@ struct BoundSeed {
     CodecTiers tiers{};
 };
 
+// The tiers a seed of a codec's dearest block within the cap and a maximal block after it
+// falls in: the second compared where the compare limit reaches it, else not examined.
+[[nodiscard]] constexpr CodecTiers maximal_after_cap(std::size_t cap, std::size_t compare_limit) {
+    return compare_limit >= cap + codec::kMaxBlockValues ? CodecTiers{.within_cap = 1, .compared = 1}
+                                                         : CodecTiers{.within_cap = 1, .not_examined = 1};
+}
+
+// The tiers of run_length_one_run_blocks_seed's blocks: the dearest block within the cap, the
+// one-run blocks the compare limit takes, then one not examined; -max_len holds 103 beside the
+// dearest block.
+[[nodiscard]] constexpr CodecTiers one_run_blocks_tiers() {
+    constexpr std::size_t kFit = 103;
+    static_assert(codec::oracle::kRleFuzzDecodedValues == codec::kMaxBlockValues &&
+                      codec::oracle::kRleFuzzComparedValues ==
+                          codec::oracle::kRleFuzzBounds.single_decoded_values,
+                  "one_run_blocks_tiers assumes a cap of one maximal block and no decode-once tier");
+    const std::size_t compared = std::min(kFit, kOneRunBlocksCompared);
+    return CodecTiers{.within_cap = 1, .compared = compared, .not_examined = compared < kFit ? 1U : 0U};
+}
+
 // One line each in fuzz/bound_seeds.txt, in this order.
-inline constexpr std::array<BoundSeed, 13> kBoundSeeds{{
+inline constexpr std::array<BoundSeed, 15> kBoundSeeds{{
     {"fuzz_dictionary", "dictionary", "bound-costliest", kSmallMaxLen, Side::codec_tiers,
      &dictionary_seed, &codec::oracle::check_dict_column, &codec::oracle::kDictCodec,
-     &codec::oracle::kDictFuzzBounds, CodecTiers{.within_cap = 1, .compared = 1}},
+     &codec::oracle::kDictFuzzBounds,
+     codec::oracle::kDictFuzzComparedValues > codec::oracle::kDictFuzzDecodedValues
+         ? CodecTiers{.within_cap = 1, .compared = 1}
+         : CodecTiers{.within_cap = 1}},
     {"fuzz_run_length", "run_length", "bound-costliest", kSmallMaxLen, Side::codec_tiers,
      &run_length_seed, &codec::oracle::check_rle_column, &codec::oracle::kRleCodec,
-     &codec::oracle::kRleFuzzBounds, CodecTiers{.within_cap = 1, .not_examined = 1}},
+     &codec::oracle::kRleFuzzBounds,
+     maximal_after_cap(codec::oracle::kRleFuzzDecodedValues, codec::oracle::kRleFuzzComparedValues)},
+    {"fuzz_run_length", "run_length", "bound-one-run-blocks", kSmallMaxLen, Side::codec_tiers,
+     &run_length_one_run_blocks_seed, &codec::oracle::check_rle_column, &codec::oracle::kRleCodec,
+     &codec::oracle::kRleFuzzBounds, one_run_blocks_tiers()},
     {"fuzz_run_length", "run_length", "bound-repeated-run-value", kSmallMaxLen,
      Side::codec_tiers, &run_length_repeat_seed, &codec::oracle::check_rle_column,
      &codec::oracle::kRleCodec, &codec::oracle::kRleFuzzBounds,
      CodecTiers{.first_refused_within_cap = true}},
     {"fuzz_pfor", "pfor", "bound-costliest", kSmallMaxLen, Side::codec_tiers, &pfor_seed,
      &codec::oracle::check_pfor_column, &codec::oracle::kPforCodec,
-     &codec::oracle::kPforFuzzBounds, CodecTiers{.within_cap = 1, .compared = 1}},
+     &codec::oracle::kPforFuzzBounds,
+     maximal_after_cap(codec::oracle::kPforFuzzDecodedValues, codec::oracle::kPforFuzzComparedValues)},
     {"fuzz_pfor", "pfor", "bound-delta-past-cap", kSmallMaxLen, Side::codec_tiers,
      &pfor_delta_past_cap_seed, &codec::oracle::check_pfor_column, &codec::oracle::kPforCodec,
-     &codec::oracle::kPforFuzzBounds, CodecTiers{.within_cap = 1, .compared = 1}},
+     &codec::oracle::kPforFuzzBounds,
+     maximal_after_cap(codec::oracle::kPforFuzzDecodedValues, codec::oracle::kPforFuzzComparedValues)},
     {"fuzz_stream_vbyte", "stream_vbyte", "bound-costliest", kLargeMaxLen, Side::unbounded,
      &stream_vbyte_seed, &codec::oracle::check_svb_column},
     {"fuzz_gorilla_timestamps", "gorilla_timestamps", "bound-costliest", kLargeMaxLen,
@@ -562,6 +734,8 @@ inline constexpr std::array<BoundSeed, 13> kBoundSeeds{{
      Side::within_query_budget, &itch_query_budget_seed, &store::oracle::check_itch_query},
     {"fuzz_itch_query", "itch_query", "bound-costliest-compared", kQueryMaxLen,
      Side::query_compared, &itch_query_compared_seed, &store::oracle::check_itch_query},
+    {"fuzz_itch_query", "itch_query", "bound-falling-minutes", kQueryMaxLen,
+     Side::within_query_budget, &itch_query_falling_minutes_seed, &store::oracle::check_itch_query},
 }};
 
 }  // namespace tick_store::bound_seeds

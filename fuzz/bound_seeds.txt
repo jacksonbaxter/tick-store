@@ -1,5 +1,6 @@
 fuzz_dictionary dictionary/bound-costliest
 fuzz_run_length run_length/bound-costliest
+fuzz_run_length run_length/bound-one-run-blocks
 fuzz_run_length run_length/bound-repeated-run-value
 fuzz_pfor pfor/bound-costliest
 fuzz_pfor pfor/bound-delta-past-cap
@@ -11,3 +12,4 @@ fuzz_itch_store itch_store/bound-costliest-compared
 fuzz_itch_query itch_query/bound-costliest
 fuzz_itch_query itch_query/bound-costliest-within-budget
 fuzz_itch_query itch_query/bound-costliest-compared
+fuzz_itch_query itch_query/bound-falling-minutes
