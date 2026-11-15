@@ -5284,6 +5284,142 @@ The round trip of `10302019` on macOS is owed again, and with it `store-size-103
 said no later commit changes; TASKS says why this one does. Raw logs are in
 `phase4-raw/fix-g2-plan/` and `phase4-raw/freeze-findings/g2-planner/`.
 
+### The results files tied to their code
+
+2026-11-14. The freeze's claim, that the figures measured at `ede0176` stand at a later commit,
+rested on a diff someone ran by hand: TASKS lists the paths, and `git diff --stat ede0176..HEAD
+--` them "prints only `scripts/g2_plan.py`". Only G-3's file was tied to its code by a check
+(`check_fuzz.py`'s `TIED_PATHS`). Now `scripts/check_ties.py`, check.sh's `check-ties` step,
+which CI's repo job runs on both hosts, does it for every file under `results/`.
+
+**What it compares.** Each value of a key `commit` or `source_commit` anywhere in a file is a
+commit it was measured at; a file with several, such as the capacity check's one per system, is
+compared with each. Its kind, by its name, gives two lists of paths, each path with its reason,
+and git's tree content is compared, as `check_fuzz.py` compares it: committed or not, new files
+included. The measured paths, what was built and run when the figure was taken, are compared
+with the commit the file names. The assembled paths, what turned the run's raw output into the
+file afterwards and the committed results it copies, are compared with the last commit that
+wrote the file, since an assembler may run later than the commit it names: `diag_summary.py`
+did not exist at `ede0176`, where the diagnostic runs were made. The input pins of
+`scripts/data_pins.json`, `days` and `slices`, are compared member by member, so the exemption
+pins beside them, which run nothing, do not count. `python3 -I scripts/check_ties.py --table`
+prints the whole table with every reason; in short:
+
+| Kind | Files | Measured, against the commit named | Assembled, against the commit that wrote the file |
+|---|---|---|---|
+| bench | `bench/*.json` | the build (`src/`, `include/`, `cmake/`, `CMakeLists.txt`, `CMakePresets.json`), `bench/`, `scripts/run_bench.py`, input pins | |
+| compare | `compare/*.json` | the build, `tools/`, all of `compare/`, `scripts/run_bench.py`, `scripts/store_results.py`, `scripts/build_preset.py` (which `compare/run.py` imports), input pins | |
+| capacity | `fullday-capacity-*.json` | the build, `tools/`, `compare/`, input pins | |
+| census | `census-*.json` | the build, `tools/`, input pins | |
+| codec-eval | `codec-eval-*.json` | the build, `tools/`, input pins | `scripts/codec_eval_results.py`, `scripts/build_preset.py`, `scripts/store_results.py` |
+| roundtrip | `roundtrip-*.json` | the build, `tools/`, input pins | `scripts/store_results.py`, `scripts/build_preset.py` |
+| store-size | `store-size-*.json` | the build, `tools/`, input pins | the same, and `results/fullday-capacity-12302019.json`, whose stored bytes CR-2 copies |
+| store-estimate | `store-estimate.json` | its commits are the codec evaluation files', so theirs | `scripts/store_estimate.py`, `results/codec-eval-*.json`, the capacity file |
+| coverage | `coverage.json` | the build, `tests/unit/`, `fuzz/` (the oracle headers the tests include and the gate requires), `scripts/coverage.sh`, `scripts/coverage_report.py` | |
+| diag | `diag/*.json` | the build, `tools/`, `bench/`, `scripts/run_bench.py`, input pins | `scripts/diag_summary.py` |
+| fuzz | `fuzz-g3-*.json` | `check_fuzz.py`'s `TIED_PATHS` and `NOT_TIED`, imported, not copied | `scripts/fuzz_results.py`, `scripts/fuzz_host.py` |
+| proofs | `check-proofs.json` | everything outside `prove_checks.py`'s `NOT_CODE`, the prover's own key | |
+
+Prose (`*.md`) inside the paths is excluded. Left out, each with its reason in the table: the
+validators, which judge a file as committed at every run and make no figure; `render_results.py`,
+`targets.json` and `BENCHMARKS.md`, which judge at HEAD; `tests/unit/` and `tests/cmake/` for
+everything but coverage, since nothing in them is linked into a tool or benchmark; `fuzz/` for
+everything but coverage and G-3; `scripts/fetch_data.py`, whose day is held by the input pins
+and each file's input SHA-256; the census files' hand-added fields, which no tracked script
+writes; and `scripts/g2_plan.py`. It chooses which bytes G-2 flips, and the flips and their seed
+are recorded in the round-trip file itself; `tests/scripts/test_g2_plan.py` reproduces both
+days' plans, so `7a352ad` and `1d234ee`, which changed it after the freeze, do not untie the
+second day's rerun at `ede0176`'s binaries with the corrected planner. Those two tests hold the
+layouts and offsets as constants copied from the files, not read from them.
+
+**Pins.** A file an existing pin declares is reported as pinned, with its commit and how many of
+its measured paths changed since, and is not judged: each validator's own key, only the names
+that validator lets be pinned there, and only by the SHA-256 of the file's bytes, the four
+protocol 1 comparison files under `protocol_1_comparison_files`, the three round-trip files under
+`roundtrip_files_before_exit_codes` and G-3's file under `fuzz_g3_file_before_the_tie`. The check
+adds no pin and no exemption, and a pin of one kind holds for no other; once TASKS removes those
+keys, it judges the files with no change.
+
+**Exit codes.** 0 if every file is unchanged or pinned; 1 if any file differs, names no commit,
+names one git cannot read, has no kind in the table, or names a commit a full clone does not hold;
+2 on a usage error; 3, "not judged", if nothing failed but some commit could not be compared for
+want of history. On a tree exported with git archive, as the Linux host's is, every file not
+pinned says "not judged: no history here", the step exits 3, check.sh reports `SKIP` with that
+reason, and `--no-skips` turns it into `FAIL`; a file that names no commit still fails there. A
+shallow clone that lacks a file's commit leaves that file not judged in the same way, and says to
+fetch it whole. CI's checkout has fetched the whole history for every job since `aef1843`; in
+run 43632853716 the checkout took 3 s on macOS and 2 s on Linux, and the step itself takes about
+a second.
+
+**Today, at `38df3c0`.** 23 files: none unchanged, 8 pinned, 15 differ, none of no kind, none
+naming no commit, none whose commit this clone lacks. The step fails, exit 1, and so does CI's
+repo job on both hosts, until every file no pin declares is measured at the code HEAD holds.
+Nothing was loosened to pass it.
+
+| File | Commit | Outcome |
+|---|---|---|
+| `bench/Linux-column_decode-bcbf8738d892.json`, `bench/macOS-column_decode-bcbf8738d892.json`, `bench/macOS-simd_kernel-bcbf8738d892.json` | `bcbf873` | differ: 61 measured paths |
+| `bench/Linux-itch_codec-1b7cfe196483.json` | `1b7cfe1` | differs: 107 |
+| `bench/macOS-itch_codec-ad2bab57a412.json` | `ad2bab5` | differs: 107 |
+| `census-10302019.json`, `census-12302019.json` | `ac0d641` | differ: 127 |
+| `check-proofs.json` | `5a810a2` | differs: 157 |
+| `codec-eval-10302019.json`, `codec-eval-12302019.json` | `0d55bfe` | differ: 98 measured; assembled since `e61dbce`: `build_preset.py`, `codec_eval_results.py`, `store_results.py` |
+| `coverage.json` | `4302ce8` | differs: 121 |
+| `fullday-capacity-12302019.json` | `87a5bb8`, `9c8b09f` | differs: 128 at each |
+| `store-estimate.json` | `0d55bfe` | differs: 98 |
+| `store-size-10302019.json`, `store-size-12302019.json` | `1669ae0` | differ: 65 measured; assembled since `cd71a2c`: `build_preset.py`, `store_results.py` |
+| the four `compare/` files | `67ae574`, `2503d1e` | pinned, protocol 1: 82 measured paths changed since |
+| `fuzz-g3-ea1dde4c02e4.json` | `ea1dde4` | pinned, before the tie: 63 |
+| `roundtrip-10302019.json`, `roundtrip-12302019.json`, `roundtrip-12302019-linux.json` | `1669ae0` | pinned, before the exit codes: 65 |
+
+No file names no commit. Compared with `ede0176` instead, every kind's measured paths are
+unchanged at HEAD; only the prover's key differs, since scripts and their tests changed. So the
+freeze's files, committed as measured, pass. What would still fail then: `check-proofs.json`
+until every fault is proven again at the final code; the census and capacity files, which the
+freeze does not measure again, until they are measured again or a decision is recorded for them;
+`store-estimate.json` until `store_estimate.py` is run again on the freeze's codec evaluation
+files; any `results/bench/` file the freeze did not replace; and the coverage and G-3 files until
+the second commit's runs replace them.
+
+**Shown failing.** `tests/scripts/test_check_ties.py` builds a small git repository of its own
+under `build/`, with one file in each measured place and a results file of every kind, and holds
+its own copy of what each kind must measure: a change in each measured path fails every kind
+that measures it and names the file, the commit and the path; a change in each assembled path
+after the file was written fails it, and one before passes; prose, faults and the prover change
+no figure, and other scripts and tests untie only the proofs; pinned files are reported and not
+judged, and a pin of other bytes, another name or another kind holds nothing; a file naming no
+commit, an unreadable commit, a file of no kind, a commit a full clone lacks, a shallow clone and
+an exported tree each get their verdict. `test_check_sh.py` shows the step skipping on an export
+and failing under `--no-skips`. Faults `ties-kind-dropped`, `ties-path-dropped`,
+`ties-difference-ignored`, `ties-missing-commit-passes`, `ties-no-history-passes`,
+`ties-assembled-ignored`, `ties-pin-by-name` and `check-sh-untied-results-pass` were each PROVEN
+with `--only` through heavy.sh at `f2c3ec4`, and `ties-kind-dropped` and
+`ties-assembled-ignored` again at `38df3c0`; `results/check-proofs.json` was restored from git
+after each run. The step's own fault, `ties-measured-code-changed`, a library source changed
+after every results file's commit, is BASELINE FAILED today, since the step fails on the clean
+tree; it can be proven once every file no pin declares is measured at the code HEAD holds.
+
+**Could the built objects be compared too?** Not as the build stands, and not implemented.
+`cmake/BuildInfo.cmake` generates `build_info.cpp` on every build with the commit, whether the
+tree was dirty and where the commit came from, and links it into `tick_store_bench_support`,
+which every benchmark and `tick_codec_eval` link, so their binaries differ between any two
+commits by construction. Nothing maps source paths (no `-ffile-prefix-map` or
+`-fdebug-prefix-map`). The Release bench build has no debug information, and the dependencies'
+`__FILE__` uses read here, Google Benchmark's `BM_CHECK` and zstd's `RAWLOG`, compile out under
+`NDEBUG` and zstd's default debug level, so a build of one commit in two folders may be
+byte-identical apart from `build_info.cpp`, but nobody has shown it: that would come first, by
+building one commit twice. The debug builds (coverage, fuzz) carry the build folder in their
+DWARF, and the Mac and the Linux host build for different targets, so objects are only ever
+compared within one host. A comparison would build
+the bench preset at the named commit and at HEAD in the same folder with the same toolchain,
+and compare every object file but `build_info.cpp.o`, or the linked binaries with that
+translation unit's bytes masked, and it would say nothing of the Python harness and scripts,
+which stay a source comparison. The cost is two bench-preset builds per commit compared, a few
+minutes each on the Mac, and longer on the Linux host, where heavy.sh and the measurement lock
+apply; on CI it would add both builds to the repo job. It would catch less than the source
+comparison does on purpose: a change that leaves every object identical, such as a comment,
+would pass. Raw logs: `phase4-raw/ties/`.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from

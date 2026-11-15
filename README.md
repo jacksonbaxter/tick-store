@@ -102,7 +102,10 @@ The steps: the `dev` build with `-Wall -Wextra -Werror` and its tests, G-1 and G
 `tick_roundtrip` on a small generated stream, with bit 1 of every byte of its store's footer
 flipped in turn against G-2's rule, the `asan-ubsan` and `tsan` builds and their
 tests, clang-tidy over all our C++, each libFuzzer target, coverage, the Python tests,
-`scripts/check_results.py`, `scripts/check_compare.py`, `scripts/render_results.py --check`,
+`scripts/check_results.py`, `scripts/check_compare.py`, `scripts/check_ties.py`, which fails
+a results file once anything its figures were built and run from differs from the commit it
+names (a file a validator's pin declares is reported as pinned, and a tree with no git history
+is not judged), `scripts/render_results.py --check`,
 which fails if the headline above or any table of RESULTS.md differs from a fresh render,
 actionlint, and a check of what git tracks: no home path, no data file, nothing over 1 MB but
 the named results. No step loads a whole day. `ItchRealDay` reads the first 2 million messages.
