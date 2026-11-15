@@ -49,13 +49,17 @@
 // 65,535 bytes, 26 million values, and both paths decode every segment a request reaches
 // for each request. And a day of typed records with a few raw ones, 131,072 bytes and
 // 18,334 records, takes about 2.5 s on the Mac, every segment not plain, so the indexed path
-// decodes as much as the exact one, three times over. So the fuzz target passes
-// kQueryFuzzBounds: a cap on the values a file's segments state, a file stating more opened
-// but not queried, and a budget on the repeat ask, the indexed path asked a second time on
-// the kernel set. The ask with the scalar set forced takes every request on every file
-// within the cap. Called without bounds, as the unit suite calls it,
-// the check queries every file within the segment cap with every request on every check
-// (fuzz/README.md, "Bounds").
+// decodes as much as the exact one, three times over; and a file of small segments states
+// a few thousand values and still takes half a second, each segment's columns decoded on
+// their own for every request. So the fuzz target passes kQueryFuzzBounds, in the work a
+// file's directory says each part of the check will take (query_work): a cap, within which
+// a file takes the whole check; a budget on the repeat ask, the indexed path asked a second
+// time on the kernel set; and past the cap, a compare limit, within which the indexed path
+// is asked every request on the kernel set and with the scalar set forced and the answers
+// compared, and past which the file is opened and not queried. Within the cap the ask with
+// the scalar set forced takes every request. Called without bounds, as the unit suite calls
+// it, the check queries every file within the segment cap with every request on every
+// check (fuzz/README.md, "Bounds").
 
 #include "container_oracles.hpp"
 #include "itch_store_oracles.hpp"
@@ -81,42 +85,39 @@ namespace tick_store::store::oracle {
 
 inline constexpr std::uint32_t kQueryFuzzMaxSegmentRecords = kPieceValues + kSeekGroupRecords + 7;
 
-// How much of one file the check queries, in the work its directory alone says the check
-// will take (query_work). The defaults query every file within the segment cap, with every
-// request on every check.
-struct QueryBounds {
-    // The cap: a file whose work is at most this takes the whole check.
-    std::uint64_t work = std::numeric_limits<std::uint64_t>::max();
-    // The repeat ask, the indexed path asked again on the kernel set, takes every request
-    // while the work is at most this, and the first kQueryPastBudgetRequests past it. Never
-    // budgeted within the cap: each path's answers to every request, once, the indexed
-    // path's answers with the scalar kernel set forced, and their comparisons with each
-    // other and with the column form.
-    std::uint64_t cross_checked_work = std::numeric_limits<std::uint64_t>::max();
-    // The compare limit: past the cap, a file whose work is at most this is still asked
-    // every request by the indexed path on the chosen kernel set and with the scalar set
-    // forced, and the answers compared. Nothing else is checked on it, and past this
-    // nothing is asked.
-    std::uint64_t compared_work = std::numeric_limits<std::uint64_t>::max();
+// What a part of the check costs a file, estimated from its directory alone: an amount for
+// each piece (one column's codec block in one segment) and for each value the pieces state,
+// more in a segment that is not plain, where both paths map every record through the column
+// form and seed each raw row's time from the rows before it. Values are what the decoders may
+// be asked for at most, since a column is decoded only to its stated count. Saturates.
+//
+// The weights are nanoseconds of the Mac's fuzz build, fitted to 72 files timed one
+// execution each at load1 under 5 (fuzz/README.md, "Bounds"): days of typed records with a
+// raw one every 4 or 64 records or none, at segment sizes from 1 to the cap and at full and a
+// quarter -max_len, raw records of 1,000 bytes, and files built against an earlier measure,
+// days of one record type each (deletes, cancels, executions, system events), the types
+// stating the fewest values a record. For each pair (plain, other) the weights are the pair
+// with the least total over the files that puts every file's time at or below its work,
+// rounded up; the files on that envelope are the seeds bound_seeds.hpp builds.
+struct WorkWeights {
+    std::uint64_t plain_piece;
+    std::uint64_t plain_value;
+    std::uint64_t piece;
+    std::uint64_t value;
 };
 
-// The requests the repeat ask takes past the budget: the first window's, the whole file,
-// with no locate and at locate 0, so every kind of answer (rows, locate counts, minute
-// aggregates and the share sum) is still asked twice over every row.
-inline constexpr std::size_t kQueryPastBudgetRequests = 2;
+// The whole check with the repeat ask on two requests: on the envelope, a day of 4,587 typed
+// records in one plain segment (166.8 ms), the same day with a raw record every 64 (427.5 ms),
+// and one with a raw record every 4 in segments of one record (1,134.8 ms).
+inline constexpr WorkWeights kWholeCheckWork{
+    .plain_piece = 550'000, .plain_value = 4'500, .piece = 1'700'000, .value = 11'000};
+// The indexed path asked every request on the kernel set and with the scalar set forced: on
+// the envelope, the plain day of 4,587 records (25.5 ms), the day of 18,548 records with a raw
+// one every 64 (937.3 ms), and the day with a raw record every 4 in segments of one (421.7 ms).
+inline constexpr WorkWeights kComparedAsksWork{
+    .plain_piece = 18'000, .plain_value = 750, .piece = 2'600'000, .value = 6'300};
 
-// What the check costs a file, from its directory: each segment a fixed amount and an amount
-// for each value its columns state, more for a segment that is not plain, where both paths
-// map every record and seed each raw row's time from the rows before it. In microseconds of
-// the whole check (the repeat ask on two requests) on the Mac's fuzz build: the least
-// weights above every file timed (fuzz/README.md, "Bounds"). Values are what the decoders
-// may be asked for at most, since a column is decoded only to its stated count. Saturates.
-inline constexpr std::uint64_t kQueryPlainSegmentWork = 8'000;
-inline constexpr std::uint64_t kQueryPlainValueWork = 4;
-inline constexpr std::uint64_t kQuerySegmentWork = 24'000;
-inline constexpr std::uint64_t kQueryValueWork = 12;
-
-[[nodiscard]] inline std::uint64_t query_work(const ItchStoreReader& reader) {
+[[nodiscard]] inline std::uint64_t query_work(const ItchStoreReader& reader, const WorkWeights& weights) {
     constexpr std::uint64_t kMost = std::numeric_limits<std::uint64_t>::max();
     const auto add = [](std::uint64_t a, std::uint64_t b) { return b > kMost - a ? kMost : a + b; };
     const auto times = [](std::uint64_t a, std::uint64_t b) {
@@ -125,21 +126,50 @@ inline constexpr std::uint64_t kQueryValueWork = 12;
     std::uint64_t work = 0;
     for (std::uint64_t s = 0; s < reader.segment_count(); ++s) {
         const SegmentEntry& segment = reader.segment(s);
+        std::uint64_t pieces = 0;
         std::uint64_t values = 0;
-        for (const std::uint32_t column : segment.values) {
-            values = add(values, column);
+        for (std::size_t c = 0; c < segment.values.size(); ++c) {
+            pieces = add(pieces, segment.pieces[c]);
+            values = add(values, segment.values[c]);
         }
-        work = segment.summary.plain
-                   ? add(work, add(kQueryPlainSegmentWork, times(kQueryPlainValueWork, values)))
-                   : add(work, add(kQuerySegmentWork, times(kQueryValueWork, values)));
+        const bool plain = segment.summary.plain;
+        work = add(work, add(times(plain ? weights.plain_piece : weights.piece, pieces),
+                             times(plain ? weights.plain_value : weights.value, values)));
     }
     return work;
 }
 
-// The fuzz target's bounds. PROVISIONAL: set from the measurements.
-inline constexpr std::uint64_t kQueryFuzzWork = 500'000;
-inline constexpr std::uint64_t kQueryFuzzCrossCheckedWork = 400'000;
-inline constexpr std::uint64_t kQueryFuzzComparedWork = 1'000'000;
+// How much of one file the check queries, in the work its directory says each part will take.
+// The defaults query every file within the segment cap, with every request on every check.
+struct QueryBounds {
+    // The cap, in kWholeCheckWork: a file whose work is at most this takes the whole check.
+    std::uint64_t work = std::numeric_limits<std::uint64_t>::max();
+    // The budget, in kWholeCheckWork: the repeat ask, the indexed path asked again on the
+    // kernel set, takes every request while the work is at most this, and the first
+    // kQueryPastBudgetRequests past it. Never budgeted within the cap: each path's answers to
+    // every request, once, the indexed path's answers with the scalar kernel set forced, and
+    // their comparisons with each other and with the column form.
+    std::uint64_t cross_checked_work = std::numeric_limits<std::uint64_t>::max();
+    // The compare limit, in kComparedAsksWork: past the cap, a file whose work in that
+    // measure is at most this is still asked every request by the indexed path on the chosen
+    // kernel set and with the scalar set forced, and the answers compared. Nothing else is
+    // checked on it, and past this nothing is asked.
+    std::uint64_t compared_work = std::numeric_limits<std::uint64_t>::max();
+};
+
+// The requests the repeat ask takes past the budget: the first window's, the whole file,
+// with no locate and at locate 0, so every kind of answer (rows, locate counts, minute
+// aggregates and the share sum) is still asked twice over every row.
+inline constexpr std::size_t kQueryPastBudgetRequests = 2;
+
+// The fuzz target's bounds. The bar is 0.5 s an execution on the Mac; the cap and the compare
+// limit are 0.4 s of their measures, so a file whose time is up to a quarter above the
+// envelope of the files timed still meets it. Within the budget the whole check takes the
+// repeat ask on every request, at most 1.25 times the work on the files timed (a day with a
+// raw record every 64 in one segment), so the budget is 0.3 s: 375 ms at most.
+inline constexpr std::uint64_t kQueryFuzzWork = 400'000'000;
+inline constexpr std::uint64_t kQueryFuzzCrossCheckedWork = 300'000'000;
+inline constexpr std::uint64_t kQueryFuzzComparedWork = 400'000'000;
 inline constexpr QueryBounds kQueryFuzzBounds{.work = kQueryFuzzWork,
                                               .cross_checked_work = kQueryFuzzCrossCheckedWork,
                                               .compared_work = kQueryFuzzComparedWork};
@@ -400,13 +430,13 @@ template <class T>
     if (reader->header().segment_records > kQueryFuzzMaxSegmentRecords) {
         return nullptr;
     }
-    const std::uint64_t work = query_work(*reader);
+    const std::uint64_t work = query_work(*reader, kWholeCheckWork);
     const auto requests = query_detail::requests_for(*reader, file);
     const std::span<const query_detail::Request> all{requests};
     if (work > bounds.work) {
         // Past the cap, up to the compare limit: every request asked of the indexed path by
         // the chosen kernel set and with the scalar set forced, and the answers compared.
-        if (work > bounds.compared_work) {
+        if (query_work(*reader, kComparedAsksWork) > bounds.compared_work) {
             return nullptr;
         }
         const query_detail::Answers kernels = query_detail::answer(*reader, QueryPath::indexed, all);

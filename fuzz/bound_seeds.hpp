@@ -442,27 +442,38 @@ template <class Encode>
 // holds as many typed records as the bytes left allow beside raw bytes to the limit.
 [[nodiscard]] inline Bytes itch_store_compared_seed() { return adds_then_raw_segment(64'985); }
 
-// The day with a raw record of 9 bytes every `raw_every` records, so no segment is plain and
-// the indexed path decodes every record it reaches, as much as the exact path does.
+// The day in segments of the query target's cap, with a raw record of 9 bytes every
+// `raw_every` records, so no segment is plain and the indexed path decodes every record it
+// reaches, as much as the exact path does; with none if `raw_every` is 0.
 [[nodiscard]] inline Bytes raw_spotted_day(std::size_t records, std::size_t raw_every) {
     std::vector<itch::Message> day = day_messages(records);
     Bytes unknown(9, std::byte{0xA5});
     unknown.front() = std::byte{'z'};
-    for (std::size_t i = 0; i < day.size(); i += raw_every) {
+    for (std::size_t i = 0; raw_every != 0 && i < day.size(); i += raw_every) {
         day[i] = itch::RawMessage{.bytes = unknown, .reason = itch::RawReason::unknown_type};
     }
     return written(day, store::oracle::kQueryFuzzMaxSegmentRecords);
 }
 
-// ITCH query, past the budget: the most of that day the cap holds, 18,342 records with a
-// raw one every 64, in one segment, 135,165 values in 129,649 bytes. Typed records outside
-// plain segments cost the most a value, so this is dearer than add orders, denser in bytes,
-// to the same cap, or raw bytes to it (fuzz/README.md, "Bounds").
-[[nodiscard]] inline Bytes itch_query_seed() { return raw_spotted_day(18'342, 64); }
+// The ITCH query seeds are the files on the envelope of the query measures
+// (itch_query_oracles.hpp): of the 72 files timed, the one whose time is the most of its work
+// in the measure of its tier, with as many records as that tier's limit allows
+// (fuzz/README.md, "Bounds").
+//
+// Within the cap and past the budget: the plain day in one segment, on the whole check's
+// envelope (its time 0.995 of its work), 11,647 records, the most whose work is within the
+// cap (399,966,500), 83,345 bytes.
+[[nodiscard]] inline Bytes itch_query_seed() { return raw_spotted_day(11'647, 0); }
 
-// ITCH query, within the budget: the most of the day with a raw record every 4,500 whose
-// file states no more values than the budget, 9,504 records and 69,632 values.
-[[nodiscard]] inline Bytes itch_query_budget_seed() { return raw_spotted_day(9'504, 4'500); }
+// Within the budget: the day with a raw record every 64, in one segment, whose whole check
+// with the repeat ask on every request is the most above its work of the files timed (1.25
+// times), 3,034 records, the most whose work is within the budget (299,969,000).
+[[nodiscard]] inline Bytes itch_query_budget_seed() { return raw_spotted_day(3'034, 64); }
+
+// Past the cap, within the compare limit: the same day, whose two indexed asks are 0.984 of
+// their work, 6,867 records, the most whose compared-asks work is within the limit
+// (399,984,800); its whole-check work, 610,356,000, is past the cap.
+[[nodiscard]] inline Bytes itch_query_compared_seed() { return raw_spotted_day(6'867, 64); }
 
 // Which side of its target's bounds a seed was built for, which the unit test holds it to.
 enum class Side : std::uint8_t {
@@ -512,7 +523,7 @@ struct BoundSeed {
 };
 
 // One line each in fuzz/bound_seeds.txt, in this order.
-inline constexpr std::array<BoundSeed, 12> kBoundSeeds{{
+inline constexpr std::array<BoundSeed, 13> kBoundSeeds{{
     {"fuzz_dictionary", "dictionary", "bound-costliest", kSmallMaxLen, Side::codec_tiers,
      &dictionary_seed, &codec::oracle::check_dict_column, &codec::oracle::kDictCodec,
      &codec::oracle::kDictFuzzBounds, CodecTiers{.within_cap = 1, .compared = 1}},
@@ -543,6 +554,8 @@ inline constexpr std::array<BoundSeed, 12> kBoundSeeds{{
      &itch_query_seed, &store::oracle::check_itch_query},
     {"fuzz_itch_query", "itch_query", "bound-costliest-within-budget", kQueryMaxLen,
      Side::within_query_budget, &itch_query_budget_seed, &store::oracle::check_itch_query},
+    {"fuzz_itch_query", "itch_query", "bound-costliest-compared", kQueryMaxLen,
+     Side::query_compared, &itch_query_compared_seed, &store::oracle::check_itch_query},
 }};
 
 }  // namespace tick_store::bound_seeds

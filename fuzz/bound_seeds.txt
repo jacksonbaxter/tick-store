@@ -10,3 +10,4 @@ fuzz_itch_store itch_store/bound-costliest
 fuzz_itch_store itch_store/bound-costliest-compared
 fuzz_itch_query itch_query/bound-costliest
 fuzz_itch_query itch_query/bound-costliest-within-budget
+fuzz_itch_query itch_query/bound-costliest-compared

@@ -243,7 +243,8 @@ TEST_P(BoundSeeds, PassTheWholeCheck) {
         const auto reader = store::ItchStoreReader::open_bytes(bytes);
         ASSERT_TRUE(reader.has_value());
         const std::uint64_t stated = store::oracle::detail::stated_values(*reader);
-        const std::uint64_t work = store::oracle::query_work(*reader);
+        const std::uint64_t work = store::oracle::query_work(*reader, store::oracle::kWholeCheckWork);
+        const std::uint64_t compared = store::oracle::query_work(*reader, store::oracle::kComparedAsksWork);
         switch (seed.side) {
             case Side::within_store_cap:
                 EXPECT_LE(stated, store::oracle::kStoreFuzzBounds.stated_values);
@@ -261,7 +262,7 @@ TEST_P(BoundSeeds, PassTheWholeCheck) {
                 break;
             case Side::query_compared:
                 EXPECT_GT(work, store::oracle::kQueryFuzzBounds.work);
-                EXPECT_LE(work, store::oracle::kQueryFuzzBounds.compared_work);
+                EXPECT_LE(compared, store::oracle::kQueryFuzzBounds.compared_work);
                 break;
             case Side::codec_tiers:
             case Side::unbounded:
