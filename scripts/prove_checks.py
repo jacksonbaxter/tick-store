@@ -273,14 +273,15 @@ def hand_edit_compare_value():
 
 
 def hand_edit_headline_value():
-    """WT-1 in the README's headline, its figure raised past the target and the verdict met."""
-    edit_table_cells("README.md", "| [WT-1](RESULTS.md#targets),", {1: "9.000 M records/s",
-                                                                   3: "met"})
+    """The README's headline, its one-thread ingest typed past the bar and the verdict met."""
+    edit_table_cells("README.md", "| One-thread ingest |", {2: "9.000 M messages/s", 3: "met"})
 
 
 def hand_edit_pitch_figure():
-    """The README's pitch, its one-thread ingest raised by hand (review E-9)."""
-    edit_text("README.md", "reaches 1.376 M records/s", "reaches 2.376 M records/s")
+    """The README's pitch, its compression ratio raised by hand (review E-9)."""
+    document = json.loads((TREE / "results" / "store-size-12302019.json").read_text())
+    ratio = document["ratio"]
+    edit_text("README.md", f"{ratio:.2f} times smaller", f"{ratio + 1:.2f} times smaller")
 
 
 def swap_pitch_store_sizes():
@@ -300,7 +301,63 @@ def reword_a_pitch_claim():
 
 def type_an_unchecked_pitch_figure():
     """A figure typed into the README's pitch that no row of its check covers (review E-9)."""
-    edit_text("README.md", "It misses targets too.", "It is 42 times faster. It misses targets too.")
+    edit_text("README.md", "It answers queries", "It is 42 times faster. It answers queries")
+
+
+def drop_a_pitch_claims_tie():
+    """The claim that ties the pitch's one-thread ingest, below Nasdaq's peak, to its verdict
+    taken out of scripts/targets.json, so the sentence ranks with nothing to hold it to."""
+    def change(document):
+        document["pitch"]["claims"] = [claim for claim in document["pitch"]["claims"]
+                                       if "Nasdaq's peak" not in claim["text"]]
+    edit_json("scripts/targets.json", change)
+
+
+def show_the_fuzz_row():
+    """The fuzz target added to the headline's table, as the proposal for the first screen
+    considered: its verdict cell, written from the results, names its id."""
+    def change(document):
+        document["headline"]["rows"].append({
+            "id": "G-3", "host": "any", "what": "Fuzzing",
+            "bar": "every target clean for half an hour", "source": "the project's gate",
+            "measured": "{clean} targets clean",
+            "values": {"clean": {"value": {"path": ["summary", "macOS", "targets_clean"]},
+                                 "format": "{:,}"}}})
+    edit_json("scripts/targets.json", change)
+
+
+def call_a_host_by_its_system():
+    """The pitch calling the Linux host "Linux" again past its introduction."""
+    edit_text("README.md", "it takes the least disk of the four",
+              "it takes the least disk of the four on Linux")
+
+
+def headline_row(document, what):
+    return next(row for row in document["headline"]["rows"] if row["what"] == what)
+
+
+def type_a_figure_into_a_template():
+    """The disk row's measured template with Parquet's size typed in, not read."""
+    def change(document):
+        row = headline_row(document, "Disk, store flushed")
+        row["measured"] = row["measured"].replace("{parquet}", "3.19")
+    edit_json("scripts/targets.json", change)
+
+
+def give_a_template_a_value_it_does_not_name():
+    """The one-thread ingest row given its flushed rate, which its template never shows."""
+    def change(document):
+        headline_row(document, "One-thread ingest")["values"]["flushed"] = {
+            "value": {"path": ["systems", "tickstore", "variants", "@headline", "classes", "B",
+                               "write", "records_per_second_median"]},
+            "scale": 1e-6, "format": "{:.3f}"}
+    edit_json("scripts/targets.json", change)
+
+
+def drop_a_rows_source():
+    """The one-thread ingest row without the source of its bar."""
+    edit_json("scripts/targets.json",
+              lambda document: headline_row(document, "One-thread ingest").pop("source"))
 
 
 def drop_headline_markers():
@@ -1245,9 +1302,8 @@ FAULTS = (
           "(__main__.RenderLowestTest"),
     # Review E-9: the README's pitch figures are checked against the results.
     Fault("readme-pitch-figure-edited", "render-check", "a hand edit of a figure in the "
-          "README's pitch: tick-store's one-thread ingest shown as 2.376 M records/s",
-          EXIT_RENDER_REFUSED, "the README's pitch does not state '1.376 M records/s'",
-          hand_edit_pitch_figure),
+          "README's pitch: the compression ratio raised by one", EXIT_RENDER_REFUSED,
+          "the README's pitch does not state '268,744,780 messages and", hand_edit_pitch_figure),
     Fault("readme-pitch-unchecked-figure", "render-check", "a figure typed into the README's "
           "pitch that nothing checks", EXIT_RENDER_REFUSED,
           "a figure in the README's pitch that nothing checks: '42'",
@@ -1270,6 +1326,37 @@ FAULTS = (
           "still passes", CHECK_FAILED,
           "FAIL: test_a_claim_the_results_no_longer_bear_out_stops_the_check "
           "(__main__.RenderPitchTest"),
+    # The first screen's rules: a ranking keeps its tie, the prose stays short, the table names
+    # no id and types no figure, and the line under it hides no miss.
+    Fault("readme-pitch-claim-tie-dropped", "render-check", "the claim tying the pitch's "
+          "one-thread ingest, below Nasdaq's peak, to its verdict taken out of targets.json",
+          EXIT_RENDER_REFUSED, "the README's pitch ranks or judges with 'below' in the sentence",
+          drop_a_pitch_claims_tie),
+    Fault("render-pitch-word-limit-removed", "py-scripts", "render_results.py stops holding "
+          "the pitch to its max_words, so the prose before the table can grow unseen",
+          CHECK_FAILED, "FAIL: test_a_pitch_over_its_word_limit_stops_the_check "
+          "(__main__.RenderPitchTest"),
+    Fault("headline-fuzz-row-names-its-id", "render-check", "the fuzz target added to the "
+          "headline's table, whose verdict cell, written from the results, names its id",
+          EXIT_RENDER_REFUSED, "the README's first screen names 'G-3'", show_the_fuzz_row),
+    Fault("readme-first-screen-host-by-system", "render-check", "the pitch calling the Linux "
+          "host Linux again past its introduction", EXIT_RENDER_REFUSED,
+          "the README's first screen calls a host 'Linux' past its introduction",
+          call_a_host_by_its_system),
+    Fault("headline-template-typed-figure", "render-check", "the disk row's measured template "
+          "with Parquet's size typed in where the results file holds it", EXIT_RENDER_REFUSED,
+          "types the figure '3.19' by hand", type_a_figure_into_a_template),
+    Fault("headline-template-unnamed-value", "render-check", "the one-thread ingest row given "
+          "a value its template never names", EXIT_RENDER_REFUSED,
+          "takes the value 'flushed' and names it nowhere",
+          give_a_template_a_value_it_does_not_name),
+    Fault("headline-row-without-a-source", "render-check", "the one-thread ingest row without "
+          "the source of its bar", EXIT_RENDER_REFUSED,
+          "no source: each row says what it is, then its bar and where the bar comes from",
+          drop_a_rows_source),
+    Fault("headline-left-out-drops-a-miss", "render-check", "render_results.py leaves the "
+          "missed parts of the targets on the screen out of the line under the table",
+          EXIT_RENDER_REFUSED, "the line under the table does not name"),
     # Review RG-6: G-3's file from before the tie is not judged at this code.
     Fault("render-g3-before-the-tie-judged", "py-scripts", "render_results.py judges G-3 met on "
           "the file made before G-3 was tied to the code, which judged an older commit",
@@ -1308,8 +1395,8 @@ FAULTS = (
           "RESULTS.md's comparison block: tick-store's full-day Q2 warm median shown as 1.00 ms",
           CHECK_FAILED, "the table in RESULTS.md is stale or was edited by hand",
           hand_edit_compare_value),
-    Fault("readme-headline-hand-edit", "render-check", "a hand edit of a value in the README's "
-          "headline: WT-1 shown as 9.000 M records/s and met", CHECK_FAILED,
+    Fault("readme-headline-hand-edit", "render-check", "a hand edit of a figure in the "
+          "README's headline: one-thread ingest typed as 9.000 M messages/s and met", CHECK_FAILED,
           "the table in README.md is stale or was edited by hand", hand_edit_headline_value),
     Fault("readme-headline-markers-removed", "render-check", "the README without its headline "
           "markers, so no headline would be rendered or checked", EXIT_RENDER_REFUSED,
@@ -1324,8 +1411,8 @@ FAULTS = (
           "no row is a missed target", headline_without_a_miss),
     Fault("headline-verdict-all-parts", "py-scripts", "render_results.py judges a headline row "
           "that shows some of its parts on all of them, so its verdict is not the shown parts'",
-          CHECK_FAILED, "FAIL: test_a_row_of_some_parts_names_the_rest_below "
-          "(__main__.RenderHeadlineTest"),
+          CHECK_FAILED, "FAIL: test_a_row_of_some_parts_is_judged_on_them_and_names_the_rest_"
+          "below (__main__.RenderHeadlineTest"),
     Fault("actionlint-broken-workflow", "actionlint", "the workflow names a matrix key that does "
           "not exist", CHECK_FAILED, "no_such_key", break_workflow),
     Fault("hygiene-home-path", "hygiene", "a tracked file holds a home path", CHECK_FAILED,

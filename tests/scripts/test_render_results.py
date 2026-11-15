@@ -761,7 +761,7 @@ class RenderWriteTest(Scratch):
         self.assertIn("| missed |", self.row((13.0, 0.1), theirs))
 
 
-PITCH = {"figures": [
+PITCH = {"max_words": 30, "figures": [
     {"file": "results/day-*.json", "values": [{"path": ["one"]}, {"path": ["two"]}],
      "format": "{:.1f} and {:.1f} bits"},
     {"file": "results/day-*.json",
@@ -856,9 +856,57 @@ class RenderPitchTest(Scratch):
     def test_a_claim_on_a_verdict_the_results_reverse_stops_the_check(self):
         claim = {"text": "it keeps", "target": {"id": "T-3", "host": "any", "parts": ["two"],
                                                 "verdict": "met"}}
-        self.write_pitch({**PITCH, "claims": [claim]})
+        self.write_pitch({**PITCH, "claims": [claim, PITCH["claims"][1]]})
         self.assert_claim_refused("the README's pitch says 'it keeps', and the results do not "
                                   "bear it out: T-3 on any is missed, not met")
+
+    def test_a_claim_whose_verdict_changes_names_its_sentence(self):
+        # A new results file that turns a verdict stops the check at the sentence to change.
+        document = json.loads(json.dumps(TARGET_DOCUMENT))
+        document["one"] = 3.5
+        self.day.write_text(json.dumps(document), encoding="utf-8")
+        self.readme.write_text(PITCH_README.replace("2.0 and", "3.5 and"), encoding="utf-8")
+        self.assert_claim_refused("T-3 on any is missed, not met; change the sentence 'Written "
+                                  "in C++23, it keeps 3.5 and 4.0 bits, and answers in 7.25 ms; "
+                                  "its other variant is faster.'")
+
+    # The first screen's rules: a ranking keeps its tie, and the prose stays short.
+
+    def test_a_ranking_whose_claim_is_dropped_stops_the_check(self):
+        self.write_pitch({**PITCH, "claims": PITCH["claims"][:1]})
+        self.assert_claim_refused("the README's pitch ranks or judges with 'faster' in the "
+                                  "sentence 'Written in C++23, it keeps 2.0 and 4.0 bits, and "
+                                  "answers in 7.25 ms; its other variant is faster.', and no "
+                                  "claim in scripts/targets.json ties those words to the results")
+
+    def test_a_ranking_word_inside_a_figures_words_needs_no_claim(self):
+        pitch = json.loads(json.dumps(PITCH))
+        pitch["figures"][0]["format"] = "{:.1f} and {:.1f} bits, fewer and lower"
+        self.write_pitch(pitch)
+        self.readme.write_text(PITCH_README.replace("4.0 bits,", "4.0 bits, fewer and lower,"),
+                               encoding="utf-8")
+        self.assertEqual(self.render().returncode, 0)
+        result = self.render("--check")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_a_pitch_over_its_word_limit_stops_the_check(self):
+        self.write_pitch({**PITCH, "max_words": 16})
+        self.assert_claim_refused("the README's pitch runs to 20 words before the table, over "
+                                  "its 16")
+
+    def test_the_word_limit_leaves_out_headings_and_counts_the_rest(self):
+        self.write_pitch({**PITCH, "max_words": 20})
+        self.readme.write_text(PITCH_README.replace("# Title", "# A title of many words here"),
+                               encoding="utf-8")
+        self.assertEqual(self.render().returncode, 0)
+        result = self.render("--check")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.readme.write_text(PITCH_README.replace("More.", "More words."), encoding="utf-8")
+        self.assert_claim_refused("runs to 21 words before the table, over its 20")
+
+    def test_a_pitch_with_no_word_limit_is_refused(self):
+        self.write_pitch({key: value for key, value in PITCH.items() if key != "max_words"})
+        self.assert_claim_refused("pitch: no max_words")
 
     def test_a_claim_whose_words_the_pitch_no_longer_holds_stops_the_check(self):
         self.readme.write_text(PITCH_README.replace("its other variant is\nfaster",
@@ -873,12 +921,13 @@ class RenderPitchTest(Scratch):
         fastest = {"systems": ["s", "t"], "queries": ["A"], "kinds": ["warm"],
                    "field": "median_us", "one_of": ["t"]}
         claim = {"text": "answers in", "file": "results/rank-*.json", "fastest": fastest}
-        self.write_pitch({**PITCH, "claims": [claim]})
+        self.write_pitch({**PITCH, "claims": [PITCH["claims"][1], claim]})
         self.assertEqual(self.render().returncode, 0)
         result = self.render("--check")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.write_pitch({**PITCH, "claims": [{**claim, "fastest": {**fastest,
-                                                                     "queries": ["A", "B"]}}]})
+        self.write_pitch({**PITCH, "claims": [PITCH["claims"][1],
+                                              {**claim, "fastest": {**fastest,
+                                                                    "queries": ["A", "B"]}}]})
         self.assert_claim_refused("the results do not bear it out: B warm: s has the lowest "
                                   "median_us")
 
@@ -919,12 +968,47 @@ class RenderPreTieTest(Scratch):
 
 HEADLINE_BEGIN = "<!-- headline:begin, generated by scripts/render_results.py, do not edit -->"
 HEADLINE_END = "<!-- headline:end -->"
-HEADLINE_README = f"# Title\n\nPitch.\n\n{HEADLINE_BEGIN}\n{HEADLINE_END}\n\nAfter.\n"
-HEADLINE = {"rows": [
-    {"id": "T-1", "host": "Linux", "name": "latency"},
-    {"id": "T-3", "host": "any", "name": "bits", "parts": ["one"]},
-    {"id": "T-4", "host": "Linux", "name": "order"},
-]}
+HEADLINE_README = (f"# Title\n\nPitch, on a pinned box running Linux.\n\n{HEADLINE_BEGIN}\n"
+                   f"{HEADLINE_END}\n\nAfter.\n")
+MS = {"value": {"path": ["systems", "s", "variants", "@headline", "ms"]}, "format": "{:.2f}"}
+HEADLINE = {
+    "hosts": {"Linux": {"introduced": "a pinned box running Linux", "then": "the box"},
+              "macOS": {"introduced": "a laptop on macOS", "then": "the laptop"},
+              "both": "both machines"},
+    "rows": [
+        {"id": "T-1", "host": "Linux", "what": "Latency", "bar": "at most {bar} ms",
+         "source": "a paper", "measured": "{ms} ms",
+         "values": {"bar": {"target": "at_most", "format": "{:.2f}"}, "ms": MS}},
+        {"id": "T-3", "host": "any", "parts": ["one"], "what": "Bits", "bar": "at most {bar} bits",
+         "source": "a codec", "measured": "{bits} bits",
+         "values": {"bar": {"target": "at_most", "format": "{:.1f}"},
+                    "bits": {"value": {"path": ["one"]}, "format": "{:.1f}"}}},
+        {"id": "T-4", "host": "Linux", "what": "Order", "bar": "lower than the other",
+         "source": "our own bar", "measured": "{one} against {two}",
+         "values": {"one": {"value": {"path": ["one"]}, "format": "{:.3f}"},
+                    "two": {"value": {"path": ["two"]}, "format": "{:.3f}"}}}],
+    "under": {"id": "T-2", "host": "macOS", "text": "On a laptop on macOS it takes {ms} ms: {verdict}.",
+              "values": {"ms": MS}},
+    "names": [
+        {"id": "T-1", "host": "Linux", "name": "latency"},
+        {"id": "T-2", "host": "macOS", "name": "latency"},
+        {"id": "T-3", "host": "any", "name": "bits", "parts": {"one": "bits of one",
+                                                               "two": "bits of two"}},
+        {"id": "T-4", "host": "Linux", "name": "order"},
+        {"id": "T-5", "host": "macOS", "name": "the four"},
+        {"id": "T-6", "host": "Linux", "name": "kernel time"}]}
+LEFT_OUT_LINE = ("Not shown above. Missed: bits of two. Not judged: on the box, kernel time; on "
+                 "the laptop, the four. Met: 0 more targets and 0 more parts of those above. "
+                 "Generated from the results files; every target, its parts and its results "
+                 "file: [RESULTS.md](RESULTS.md#targets).")
+
+
+def with_row(index, **changes):
+    """HEADLINE with one of its rows changed, a key given None taken out."""
+    headline = json.loads(json.dumps(HEADLINE))
+    row = {**headline["rows"][index], **changes}
+    headline["rows"][index] = {key: value for key, value in row.items() if value is not None}
+    return headline
 
 
 class RenderHeadlineTest(Scratch):
@@ -948,52 +1032,201 @@ class RenderHeadlineTest(Scratch):
         text = self.readme.read_text(encoding="utf-8")
         return text[text.index(HEADLINE_BEGIN):text.index(HEADLINE_END)]
 
-    def headline_row(self, ident):
+    def headline_row(self, what):
         return next(line for line in self.headline().splitlines()
-                    if line.startswith(f"| [{ident}](RESULTS.md#targets),"))
+                    if line.startswith(f"| {what} |"))
 
     def targets_row(self, ident, host):
         text = self.results_md.read_text(encoding="utf-8")
         block = text[text.index(TARGETS_BEGIN):text.index(TARGETS_END)]
         return next(line for line in block.splitlines() if line.startswith(f"| {ident} | {host} |"))
 
-    def test_each_row_is_the_targets_rows_figure_and_verdict(self):
+    def refused(self, expected, *flags):
+        result = self.render(*flags)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn(expected, result.stderr)
+        self.assertEqual(self.readme.read_text(encoding="utf-8"), HEADLINE_README)
+
+    def test_each_row_says_what_it_is_then_its_bar_and_source_then_what_was_measured(self):
         result = self.render()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.headline_row("T-1"),
-                         "| [T-1](RESULTS.md#targets), latency: at most 5.00 ms | 7.25 ms | "
-                         "Linux | missed |")
+        lines = self.headline().splitlines()
+        self.assertEqual(lines[1], "| What | Bar (source) | Measured | Result |")
+        self.assertEqual(self.headline_row("Latency"),
+                         "| Latency | at most 5.00 ms (a paper) | 7.25 ms | missed |")
         self.assertIn("| 7.25 ms | missed |", self.targets_row("T-1", "Linux"))
-        self.assertIn("| 2.000 against 4.000 | Linux | met |", self.headline_row("T-4"))
-        self.assertIn("| 2.000 against 4.000 | met |", self.targets_row("T-4", "Linux"))
+        self.assertEqual(self.headline_row("Order"),
+                         "| Order | lower than the other (our own bar) | 2.000 against 4.000 | "
+                         "met |")
         self.assertEqual(self.render("--check").returncode, 0)
+
+    def test_a_row_without_its_bar_or_source_is_refused(self):
+        for key in ("what", "bar", "source", "measured"):
+            with self.subTest(key=key):
+                self.write_targets(with_row(0, **{key: None}))
+                self.refused(f"headline T-1 on Linux: no {key}: each row says what it is, then "
+                             "its bar and where the bar comes from, before what was measured")
 
     def test_the_headline_does_not_call_a_tail_figure_p99(self):
         self.render()
-        self.assertNotIn("median / p99", self.headline())
-        self.assertIn("A pair of latencies is the median / the tail figure, which the pair "
-                      "names with its number of runs.", self.headline())
+        self.assertNotIn("p99", self.headline())
 
-    def test_a_row_of_some_parts_names_the_rest_below(self):
+    def test_a_row_of_some_parts_is_judged_on_them_and_names_the_rest_below(self):
         self.render()
-        # The host of an "any" row is the one its results file records.
-        self.assertEqual(self.headline_row("T-3"),
-                         "| [T-3](RESULTS.md#targets), bits: at most 3.0 bits | 2.0 bits | "
-                         "macOS | met |")
-        self.assertIn("Not shown above: T-3 on any, two missed.", self.headline())
+        self.assertEqual(self.headline_row("Bits"),
+                         "| Bits | at most 3.0 bits (a codec) | 2.0 bits | met |")
+        self.assertIn("Not shown above. Missed: bits of two.", self.headline())
+
+    def test_the_line_under_the_table_names_every_miss_and_counts_the_met(self):
+        self.render()
+        self.assertEqual(self.headline().splitlines()[-1], LEFT_OUT_LINE)
 
     def test_a_part_another_row_shows_is_not_named_as_left_out(self):
         headline = json.loads(json.dumps(HEADLINE))
-        headline["rows"].append({"id": "T-3", "host": "any", "name": "more", "parts": ["two"]})
+        headline["rows"].append({**headline["rows"][1], "parts": ["two"], "what": "More bits"})
         self.write_targets(headline)
         self.assertEqual(self.render().returncode, 0)
-        self.assertNotIn("Not shown above", self.headline())
+        self.assertNotIn("bits of two", self.headline())
+        self.assertIn("Met: 0 more targets and 0 more parts", self.headline())
+
+    def test_a_met_target_left_out_is_counted_not_named(self):
+        headline = json.loads(json.dumps(HEADLINE))
+        del headline["under"]
+        self.write_targets(headline)
+        self.readme.write_text(HEADLINE_README.replace("Linux.", "Linux, and a laptop on macOS."),
+                               encoding="utf-8")
+        result = self.render()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Met: 1 more target and 0 more parts", self.headline())
+        self.assertNotIn("latency", self.headline())
+
+    def test_a_target_or_a_left_out_part_with_no_plain_name_is_refused(self):
+        headline = json.loads(json.dumps(HEADLINE))
+        headline["names"] = [entry for entry in headline["names"] if entry["id"] != "T-6"]
+        self.write_targets(headline)
+        self.refused("headline: no plain name for T-6 on Linux")
+        headline = json.loads(json.dumps(HEADLINE))
+        del headline["names"][2]["parts"]["two"]
+        self.write_targets(headline)
+        self.refused("headline: no plain name for the part 'two' of T-3 on any")
+
+    def test_the_line_is_checked_apart_from_the_code_that_writes_it(self):
+        # The code that writes the line drops every miss: the check walks the targets itself.
+        writes = RENDER.left_out_items
+
+        def dropping(*arguments):
+            items, met_targets, met_parts = writes(*arguments)
+            return {**items, "missed": []}, met_targets, met_parts
+        self.addCleanup(setattr, RENDER, "left_out_items", writes)
+        RENDER.left_out_items = dropping
+        with self.assertRaises(RENDER.TargetError) as caught:
+            RENDER.render_headline(self.targets, self.tree)
+        self.assertIn("the line under the table does not name 'bits of two', which is missed "
+                      "(T-3 on any), and a headline never hides a miss", str(caught.exception))
+
+    def test_the_sentence_under_the_table_gives_its_figure_and_verdict(self):
+        self.render()
+        self.assertIn("\n\nOn a laptop on macOS it takes 7.25 ms: met.\n\nNot shown above.",
+                      self.headline())
+
+    def test_the_sentence_under_the_table_must_give_its_verdict(self):
+        headline = json.loads(json.dumps(HEADLINE))
+        headline["under"]["text"] = "On a laptop on macOS it takes {ms} ms."
+        self.write_targets(headline)
+        self.refused("the sentence under the table takes the value 'verdict' and names it "
+                     "nowhere")
+
+    # A template's figures are named values read from the results, never typed.
+
+    def test_a_template_naming_no_value_it_is_given_is_refused(self):
+        self.write_targets(with_row(0, measured="{ms} ms, {other} ms"))
+        self.refused("headline T-1 on Linux: its bar and measured names {other}, and gives no "
+                     "value for it")
+
+    def test_a_value_the_template_does_not_name_is_refused(self):
+        values = {**HEADLINE["rows"][0]["values"], "two": {"value": {"path": ["two"]},
+                                                           "format": "{:.1f}"}}
+        self.write_targets(with_row(0, values=values))
+        self.refused("headline T-1 on Linux: its bar and measured takes the value 'two' and "
+                     "names it nowhere")
+
+    def test_a_figure_typed_into_a_template_is_refused(self):
+        for key, text in (("measured", "{ms} ms against 9.5 ms"), ("bar", "at most {bar} ms of 30"),
+                          ("what", "Latency of 30 runs")):
+            with self.subTest(key=key):
+                self.write_targets(with_row(0, **{key: text}))
+                self.refused("by hand; give it as a named value read from the results")
+
+    def test_values_over_several_files_say_how_they_are_taken_together(self):
+        parts = [{"file": "results/day-*.json", "path": ["one"]},
+                 {"file": "results/other-*.json", "path": ["one"]}]
+        documents = [(Path(f"results/{name}.json"), document) for name, document in
+                     (("day-0123", {"one": 2, "ok": True}), ("other-0123", {"one": 3, "ok": False}))]
+        judged = [("a", "", True, path, document) for path, document in documents]
+        self.assertEqual(len(parts), 2)
+        value = {"value": {"path": ["one"]}, "format": "{:,}"}
+        with self.assertRaises(RENDER.TargetError) as caught:
+            RENDER.headline_value(value, {}, judged, "n")
+        self.assertIn("{n} reads 2 files; say with over how to take them together",
+                      str(caught.exception))
+        self.assertEqual(RENDER.headline_value({**value, "over": "sum"}, {}, judged, "n"), "5")
+        words = {"value": {"path": ["ok"]}, "over": "all",
+                 "words": {"true": "all equal", "false": "one differs"}}
+        self.assertEqual(RENDER.headline_value(words, {}, judged, "w"), "one differs")
+        self.assertEqual(RENDER.headline_value(words, {}, judged[:1], "w"), "all equal")
+
+    def test_the_lowest_system_and_its_value_are_read_from_the_headline_variants(self):
+        spec = {"systems": ["s", "t"], "path": ["queries", "A", "warm", "median_us"]}
+        self.assertEqual(RENDER.evaluate({"lowest_system": spec}, RANKED_DOCUMENT), "t")
+        self.assertEqual(RENDER.evaluate({"lowest_value": spec}, RANKED_DOCUMENT), 3.0)
+        label = {"value": {"lowest_system": spec}, "label": "system"}
+        with self.assertRaises(RENDER.TargetError):
+            RENDER.headline_value(label, {}, [("a", "", True, Path("x"), RANKED_DOCUMENT)], "s")
+
+    # The first screen names no id and calls each host by what it is.
+
+    def test_no_target_id_or_query_name_is_on_the_first_screen(self):
+        for text, name in (("Pitch (T-1)", "T-1"), ("Pitch, Q2 and", "Q2")):
+            with self.subTest(name=name):
+                readme = HEADLINE_README.replace("Pitch,", text)
+                self.readme.write_text(readme, encoding="utf-8")
+                result = self.render()
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn(f"the README's first screen names {name!r}; say in words what it "
+                              "is", result.stderr)
+        # A text of scripts/targets.json is refused for an id's digits before the screen is.
+        self.readme.write_text(HEADLINE_README, encoding="utf-8")
+        self.write_targets(with_row(0, what="Latency as T-6 has it"))
+        self.refused("its what 'Latency as T-6 has it' types the figure '6' by hand")
+
+    def test_an_id_inside_a_longer_word_is_no_id(self):
+        self.readme.write_text(HEADLINE_README.replace("Pitch,", "Pitch, T-10 and Q22,"),
+                               encoding="utf-8")
+        result = self.render()
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_each_host_is_introduced_once_and_never_called_by_its_system_after(self):
+        for readme, expected in (
+                (HEADLINE_README.replace("Pitch,", "Pitch, on Linux,"),
+                 "calls a host 'Linux' past its introduction; call it 'the box'"),
+                (HEADLINE_README.replace("Pitch,", "Pitch, on the box,"),
+                 "calls a host 'the box' before it introduces it as 'a pinned box running "
+                 "Linux'"),
+                (HEADLINE_README.replace("Pitch,", "Pitch, a pinned box running Linux,"),
+                 "introduces the host Linux as 'a pinned box running Linux' 2 times"),
+                (HEADLINE_README.replace(", on a pinned box running Linux", ""),
+                 "introduces the host Linux as 'a pinned box running Linux' 0 times")):
+            with self.subTest(readme=readme):
+                self.readme.write_text(readme, encoding="utf-8")
+                result = self.render()
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn(expected, result.stderr)
 
     def test_a_hand_edit_in_the_headline_is_stale(self):
         self.render()
         text = self.readme.read_text(encoding="utf-8")
-        self.readme.write_text(text.replace("| 7.25 ms | Linux | missed |",
-                                            "| 4.25 ms | Linux | met |"), encoding="utf-8")
+        self.readme.write_text(text.replace("| 7.25 ms | missed |", "| 4.25 ms | met |"),
+                               encoding="utf-8")
         result = self.render("--check")
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn("the table in README.md is stale or was edited by hand", result.stderr)
@@ -1019,33 +1252,26 @@ class RenderHeadlineTest(Scratch):
         self.assertIn("RESULTS.md is stale", result.stderr)
         self.assertIn("README.md is stale", result.stderr)
         self.render()
-        self.assertIn("| 6.00 ms | Linux | missed |", self.headline_row("T-1"))
+        self.assertIn("| 6.00 ms | missed |", self.headline_row("Latency"))
+        self.assertIn("it takes 6.00 ms: met.", self.headline())
 
     def test_a_headline_with_no_missed_target_fails(self):
-        self.write_targets({"rows": [{"id": "T-2", "host": "macOS", "name": "met only"}]})
-        result = self.render()
-        self.assertEqual(result.returncode, 2, result.stderr)
-        self.assertIn("no row is a missed target", result.stderr)
-        self.assertEqual(self.readme.read_text(encoding="utf-8"), HEADLINE_README)
+        headline = json.loads(json.dumps(HEADLINE))
+        headline["rows"] = headline["rows"][1:]
+        self.write_targets(headline)
+        self.refused("no row is a missed target")
         self.assertEqual(self.results_md.read_text(encoding="utf-8"), WITH_TARGETS)
 
     def test_a_headline_row_must_exist_have_a_figure_and_its_parts(self):
-        for row, message in (({"id": "T-9", "host": "Linux"}, "no such row in the targets"),
-                             ({"id": "T-5", "host": "macOS"}, "needs a figure"),
-                             ({"id": "T-3", "host": "any", "parts": ["three"]}, "no part")):
-            with self.subTest(row=row):
-                self.write_targets({"rows": [*HEADLINE["rows"], {**row, "name": "n"}]})
-                result = self.render()
-                self.assertEqual(result.returncode, 2, result.stderr)
-                self.assertIn(message, result.stderr)
-
-    def test_an_any_row_needs_a_host_in_its_file(self):
-        document = json.loads(json.dumps(TARGET_DOCUMENT))
-        del document["host"]
-        self.day.write_text(json.dumps(document), encoding="utf-8")
-        result = self.render()
-        self.assertEqual(result.returncode, 2, result.stderr)
-        self.assertIn("headline T-3 on any: no host recorded", result.stderr)
+        row = HEADLINE["rows"][0]
+        for changes, message in (({"id": "T-9"}, "no such row in the targets"),
+                                 ({"id": "T-5", "host": "macOS"}, "needs a figure"),
+                                 ({"id": "T-3", "host": "any", "parts": ["three"]}, "no part")):
+            with self.subTest(changes=changes):
+                headline = json.loads(json.dumps(HEADLINE))
+                headline["rows"].append({**row, **changes})
+                self.write_targets(headline)
+                self.refused(message)
 
     def test_the_readme_may_not_hold_a_results_md_block(self):
         for begin, end in ((TARGETS_BEGIN, TARGETS_END), (BEGIN, END),

@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1221,7 +1221,7 @@
+             kind = verdict_class([part])
+             if kind == "met":
+                 met_parts += 1
+-            else:
++            elif kind != "missed":
+                 items[kind].append((row["host"], name))
+     return items, met_targets, met_parts
+ 
