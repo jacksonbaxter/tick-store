@@ -1,0 +1,13 @@
+diff --git a/scripts/check_ties.py b/scripts/check_ties.py
+index 053cde5..108e5fd 100644
+--- a/scripts/check_ties.py
++++ b/scripts/check_ties.py
+@@ -438,7 +438,7 @@ def judge(repo, path, name, pins, history):
+         if full is None:
+             missing = check_fuzz.missing_from_full_history(repo, commit)
+             if missing:
+-                problems.append(missing)
++                same.append(commit[:12])
+             else:
+                 unjudged.append(f"not judged: {check_fuzz.history_problem(repo, commit)}")
+             continue

@@ -1,0 +1,13 @@
+diff --git a/scripts/check_ties.py b/scripts/check_ties.py
+index 053cde5..3caf544 100644
+--- a/scripts/check_ties.py
++++ b/scripts/check_ties.py
+@@ -176,7 +176,7 @@ KINDS = (
+          pin_members=INPUT_PINS,
+          excluded=PROSE_IN_PATHS,
+          left_out=(VALIDATORS, RENDER, PROSE, TESTS_UNIT, OTHER_BUILDS, FETCH)),
+-    Kind("census", ("census-*.json",),
++    Kind("census-dropped", ("census-dropped-*.json",),
+          measured=(*BUILT, TOOLS),
+          pin_members=INPUT_PINS,
+          excluded=PROSE_IN_PATHS,

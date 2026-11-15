@@ -1,0 +1,9 @@
+diff --git a/src/itch/frame.cpp b/src/itch/frame.cpp
+index 483bd1e..06d61c7 100644
+--- a/src/itch/frame.cpp
++++ b/src/itch/frame.cpp
+@@ -25,3 +25,4 @@ std::string to_string(const FrameStop& stop) {
+ }
+ 
+ }  // namespace tick_store::itch
++// a change after every results file was measured

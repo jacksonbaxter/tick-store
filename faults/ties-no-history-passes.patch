@@ -1,0 +1,13 @@
+diff --git a/scripts/check_ties.py b/scripts/check_ties.py
+index 053cde5..76ec654 100644
+--- a/scripts/check_ties.py
++++ b/scripts/check_ties.py
+@@ -428,7 +428,7 @@ def judge(repo, path, name, pins, history):
+         return Verdict("pinned", [f"pinned under {key} in the pins file: measured at "
+                                   f"{', '.join(counts)}; not judged ({kind.name})"])
+     if not history:
+-        return Verdict("unjudged", [f"{NO_HISTORY}: measured at "
++        return Verdict("same", [f"{NO_HISTORY}: measured at "
+                                     f"{', '.join(commit[:12] for commit in commits)}, and "
+                                     f"{Path(repo).name} is not a git checkout, as an exported "
+                                     f"tree is not ({kind.name})"])

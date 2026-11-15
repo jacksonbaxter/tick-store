@@ -1,0 +1,13 @@
+diff --git a/scripts/check_ties.py b/scripts/check_ties.py
+index 053cde5..de898aa 100644
+--- a/scripts/check_ties.py
++++ b/scripts/check_ties.py
+@@ -382,7 +382,7 @@ def pinned(kind, path, data, pins):
+     name = Path(path).name
+     if names is not None and name not in names:
+         return None
+-    if entries.get(name) == hashlib.sha256(data).hexdigest():
++    if name in entries:
+         return key
+     return None
+ 

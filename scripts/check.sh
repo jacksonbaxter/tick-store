@@ -48,7 +48,7 @@ fuzz-itch-frame fuzz-itch-message fuzz-itch-query fuzz-itch-store fuzz-pfor fuzz
 fuzz-stream-vbyte fuzz-stub-store"
 ALL_STEPS="dev-build dev-test oracle asan-build asan-test tsan-build tsan-test clang-tidy
 fuzz-build $FUZZ_TARGETS coverage py-scripts py-compare check-results check-compare
-render-check actionlint hygiene"
+check-ties render-check actionlint hygiene"
 JOBS=6
 TEST_TIMEOUT=900
 
@@ -483,6 +483,20 @@ run_validator() {
 
 step_check_results() { run_validator scripts/check_results.py results/bench; }
 step_check_compare() { run_validator scripts/check_compare.py results/compare; }
+# Every results file against the code it was measured at: check_ties.py compares what each kind
+# of figure builds and runs between the commit the file names and this tree, and fails on any
+# difference. It exits 3 when it could compare nothing for want of git history, as in an exported
+# tree, or a shallow clone that lacks a file's commit: no pass, so a skip.
+step_check_ties() {
+    python3 -I scripts/check_ties.py
+    local code=$?
+    NOTE=$(sed -n 's/^check_ties: \([0-9]* files: .*\)/\1/p' "$1" | tail -n 1)
+    if [[ $code -eq 3 ]]; then
+        skip_step "not judged: no history here to compare the results files' commits with"
+        return 0
+    fi
+    return "$code"
+}
 # render_results.py exits 3 when every check passed but G-3's file could not be tied to the code
 # it judged, for want of git history: an exported tree, or a shallow clone. That is no pass.
 step_render_check() {

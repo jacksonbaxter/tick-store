@@ -1394,6 +1394,41 @@ FAULTS = (
     Fault("coverage-required-removed", "coverage", "bench_support_test.cpp dropped from the "
           "tests, so the guard and the round-trip check lose their only callers", CHECK_FAILED,
           "REQUIRED FUNCTION NOT REACHED: verify_round_trip"),
+    # check_ties.py: every results file against the code it was measured at.
+    Fault("ties-kind-dropped", "py-scripts", "check_ties.py's table loses the census kind, so "
+          "a census file has no measured paths", CHECK_FAILED,
+          "FAIL: test_unchanged_code_passes_for_every_kind (__main__.SameContent"),
+    Fault("ties-path-dropped", "py-scripts", "check_ties.py's codec-eval kind loses tools/, "
+          "where tick_codec_eval is built", CHECK_FAILED,
+          "FAIL: test_a_change_in_each_measured_path_fails_every_kind_that_measures_it "
+          "(__main__.MeasuredChange"),
+    Fault("ties-difference-ignored", "py-scripts", "check_ties.py takes a committed difference "
+          "in a measured path as equal, seeing new files alone", CHECK_FAILED,
+          "FAIL: test_a_change_in_each_measured_path_fails_every_kind_that_measures_it "
+          "(__main__.MeasuredChange"),
+    Fault("ties-missing-commit-passes", "py-scripts", "check_ties.py passes a file whose commit "
+          "a full clone does not hold", CHECK_FAILED,
+          "FAIL: test_a_commit_a_full_clone_lacks_fails (__main__.MissingCommit"),
+    Fault("ties-no-history-passes", "py-scripts", "check_ties.py passes every file of a tree "
+          "with no history to compare with", CHECK_FAILED,
+          "FAIL: test_an_exported_tree_is_not_judged_and_says_so (__main__.NoHistory"),
+    Fault("ties-assembled-ignored", "py-scripts", "check_ties.py never compares what assembled "
+          "a file since the commit that wrote it", CHECK_FAILED,
+          "FAIL: test_a_change_to_what_assembled_a_file_after_it_was_written_fails_it "
+          "(__main__.AssembledChange"),
+    Fault("ties-pin-by-name", "py-scripts", "check_ties.py takes a file as pinned by its name, "
+          "whatever its bytes", CHECK_FAILED,
+          "FAIL: test_a_pin_of_other_bytes_does_not_hold (__main__.Pinned"),
+    Fault("check-sh-untied-results-pass", "py-scripts", "check.sh passes check-ties where no "
+          "history let it compare anything", CHECK_FAILED,
+          "FAIL: test_results_files_with_no_history_to_tie_them_skip_and_fail_under_no_skips "
+          "(__main__.CheckScript"),
+    # The step itself on a measured file changed after every results file's commit. Its
+    # baseline passes only once every results file no pin declares is measured at the code
+    # HEAD holds (docs/NOTES.md, The results files tied to their code).
+    Fault("ties-measured-code-changed", "check-ties", "a library source changed after the "
+          "commit every results file names", CHECK_FAILED,
+          "what it measures changed since: src/itch/frame.cpp"),
     Fault("control-comment-only", "render-check", "a comment, which no check should notice",
           0, "", control=True),
 )

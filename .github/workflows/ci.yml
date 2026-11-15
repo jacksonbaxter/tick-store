@@ -58,10 +58,11 @@ jobs:
           - { name: fuzz-codecs, only: "fuzz-dictionary,fuzz-gorilla-timestamps,fuzz-gorilla-xor,fuzz-pfor,fuzz-run-length,fuzz-stream-vbyte" }
           - { name: fuzz-stores, only: "fuzz-columns,fuzz-container,fuzz-itch-frame,fuzz-itch-message,fuzz-itch-query,fuzz-itch-store,fuzz-stub-store" }
           - { name: coverage, only: "coverage" }
-          - { name: repo, only: "py-scripts,py-compare,check-results,check-compare,render-check,actionlint,hygiene" }
+          - { name: repo, only: "py-scripts,py-compare,check-results,check-compare,check-ties,render-check,actionlint,hygiene" }
     steps:
-      # The whole history, not the default single commit: check_fuzz.py, in render-check,
-      # compares the code with the commit G-3's file was made at, which a later commit holds.
+      # The whole history, not the default single commit: check_fuzz.py, in render-check, and
+      # check_ties.py, in check-ties, compare the code with the commit each results file was
+      # measured at, which a later commit holds.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false

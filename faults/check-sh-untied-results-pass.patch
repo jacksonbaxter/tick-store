@@ -1,0 +1,12 @@
+diff --git a/scripts/check.sh b/scripts/check.sh
+index 12e9731..e570838 100755
+--- a/scripts/check.sh
++++ b/scripts/check.sh
+@@ -492,7 +492,6 @@ step_check_ties() {
+     local code=$?
+     NOTE=$(sed -n 's/^check_ties: \([0-9]* files: .*\)/\1/p' "$1" | tail -n 1)
+     if [[ $code -eq 3 ]]; then
+-        skip_step "not judged: no history here to compare the results files' commits with"
+         return 0
+     fi
+     return "$code"

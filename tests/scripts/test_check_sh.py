@@ -193,6 +193,22 @@ class CheckScript(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stdout)
         self.assertIn("made before the tie and pinned, so not tied", done.stdout)
 
+    def test_results_files_with_no_history_to_tie_them_skip_and_fail_under_no_skips(self):
+        # An exported tree has no history to compare the results files' commits with: the
+        # step says so, is no pass, and fails where every step must run.
+        script = str(self.exported_copy() / "scripts" / "check.sh")
+        done = subprocess.run([script, "--log-dir", str(self.logs), "--only", "check-ties"],
+                              capture_output=True, text=True, env=self.env)
+        self.assertEqual(done.returncode, 0, done.stdout)
+        self.assertEqual(self.summary(), {"check-ties": "SKIP"})
+        self.assertIn("not judged: no history here", done.stdout)
+        self.assertIn("not judged: no history here: measured at",
+                      (self.logs / "check-ties.log").read_text())
+        done = subprocess.run([script, "--no-skips", "--log-dir", str(self.logs), "--only",
+                               "check-ties"], capture_output=True, text=True, env=self.env)
+        self.assertEqual(done.returncode, 1, done.stdout)
+        self.assertEqual(self.summary(), {"check-ties": "FAIL"})
+
     def workflow_runs(self, text=None):
         """The workflow's check.sh command lines: every line that names it outside a comment,
         however it is called (review RP-15)."""
