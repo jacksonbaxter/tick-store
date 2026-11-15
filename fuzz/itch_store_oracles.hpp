@@ -26,9 +26,11 @@
 // That cap leaves the work unbounded: 759 bytes, zstd standing in for the raw bytes, hold
 // a segment of 64 records of 65,535 raw bytes, 4,194,240 values, and every value is
 // decoded five times and encoded twice here. So the fuzz target also passes kStoreFuzzBounds, which caps the values a
-// file's segments state in all, from the directory alone; a file stating more is treated
-// as one over the segment cap. Called without bounds, as the unit suite calls it, the
-// check decodes every file within the segment cap (fuzz/README.md, "Bounds").
+// file's segments state in all, from the directory alone. A file stating more, up to a
+// compare limit, is only read whole twice, by the chosen kernel set and by the scalar set,
+// and the two reads compared; one stating more than that is opened and nothing more. Called
+// without bounds, as the unit suite calls it, the check decodes every file within the
+// segment cap (fuzz/README.md, "Bounds").
 
 #include "container_oracles.hpp"
 #include "tick_store/codec/block.hpp"
@@ -72,11 +74,17 @@ struct StoreBounds {
 // The fuzz target's cap: one largest codec block's values, 1,048,576. A segment's raw bytes
 // may then reach 15 records of the largest payload, or 64 records of 16,380 bytes, and the
 // dearest file built within it, 3,840 add orders beside a segment of raw bytes to the cap
-// (bound_seeds.hpp), takes about 0.5 s on the Mac. Files of
-// typed records stay far below it at -max_len: the densest built, 70,000 bytes of add
-// orders in segments of 64, state 35,624 values.
+// (bound_seeds.hpp), takes 409 ms on the Mac. Files of typed records stay far below it at
+// -max_len: the densest built, 70,000 bytes of add orders in segments of 64, state 35,624
+// values, and files of small segments cost 65 to 83 ms whole.
 inline constexpr std::uint64_t kFuzzMaxStoreValues = codec::kMaxBlockValues;
-inline constexpr StoreBounds kStoreFuzzBounds{.stated_values = kFuzzMaxStoreValues};
+// The compare limit: four largest blocks' values, 4,194,304. The two whole reads cost about
+// 84 ns a stated value on the Mac: 351 ms for 16 segments of 64 raw records of 4,096 bytes
+// (4,197,424 stated), 1,391 ms for 16,780,336 stated, 5,564 ms for 67,110,960, which a
+// file of 7,884 bytes states.
+inline constexpr std::uint64_t kFuzzComparedStoreValues = 4 * codec::kMaxBlockValues;
+inline constexpr StoreBounds kStoreFuzzBounds{.stated_values = kFuzzMaxStoreValues,
+                                              .compared_values = kFuzzComparedStoreValues};
 
 namespace detail {
 

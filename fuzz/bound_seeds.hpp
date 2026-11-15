@@ -1,19 +1,20 @@
 #pragma once
 
 // The costliest valid input each bounded fuzz target, and each codec target, takes at its
-// -max_len, in time and in memory, as fuzz/README.md, "Bounds", derives them, and one
-// maximal PFOR delta block that puts the delta kernel past the budget. generate_seeds
-// writes each into its target's seeds under its name here, fuzz/bound_seeds.txt lists them so
-// a runner can time each one alone, and every replay of the seeds (scripts/check.sh's fuzz
-// steps, CI, a G-3 run) shows the bound again. FuzzRegression/BoundSeeds.PassTheWholeCheck
-// replays each through its oracle with no bounds, so what the bounds leave out is still
-// checked on them, and holds each to the side of the bounds it was built for.
+// -max_len, in time and in memory, as fuzz/README.md, "Bounds", derives them: for each
+// bounded target the dearest input its tiers allow, timed whole, and inputs that put a
+// kernel or a check in a named tier. generate_seeds writes each into its target's seeds
+// under its name here, fuzz/bound_seeds.txt lists them so a runner can time each one alone,
+// and every replay of the seeds (scripts/check.sh's fuzz steps, CI, a G-3 run) shows the
+// bound again. FuzzRegression/BoundSeeds.PassTheWholeCheck replays each through its oracle
+// with no bounds, so what the bounds leave out is still checked on them, and holds each to
+// the side of the bounds it was built for: for a codec seed, how many of its blocks fall in
+// each tier.
 //
-// Every valid block here comes from the real encoder, and every store from the real writer
-// (Z4). Where the costliest codec input is two maximal blocks followed by bytes for part 2,
-// the fuzz target takes the first and stops at the second, past its cap, and the unit test
-// takes both; the bytes for part 2 start with a block header stating no values, which every
-// decoder refuses at once.
+// Every block here comes from the real encoder or is a nested block of the real encoder's
+// framed by hand where the encoder would choose another form, and every store comes from
+// the real writer (Z4). A codec input ends with bytes for part 2 that start with a block
+// header stating no values, which every decoder refuses at once.
 
 #include "codec_oracles.hpp"
 #include "itch_query_oracles.hpp"
@@ -413,7 +414,7 @@ template <class Encode>
 // all 1,048,419 values and 68,990 bytes. Typed records cost the most a value, about 4.4
 // microseconds on the Mac, but -max_len holds them to about 36,000 values; raw bytes cost
 // about 0.37 and reach the cap in under 700 bytes (fuzz/README.md, "Bounds").
-[[nodiscard]] inline Bytes itch_store_seed() {
+[[nodiscard]] inline Bytes adds_then_raw_segment(std::size_t raw_bytes) {
     std::vector<itch::Message> records;
     constexpr std::uint32_t kAdds = 60 * store::oracle::kFuzzMaxSegmentRecords;
     records.reserve(std::size_t{kAdds} + store::oracle::kFuzzMaxSegmentRecords);
@@ -425,13 +426,21 @@ template <class Encode>
                         std::byte{' '}, std::byte{' '}, std::byte{' '}, std::byte{' '}},
             itch::Price4{1'000'000}});
     }
-    const Bytes payload(15'831, std::byte{0});
+    const Bytes payload(raw_bytes, std::byte{0});
     for (std::uint32_t i = 0; i < store::oracle::kFuzzMaxSegmentRecords; ++i) {
         records.emplace_back(
             itch::RawMessage{.bytes = payload, .reason = itch::RawReason::unknown_type});
     }
     return written(records, store::oracle::kFuzzMaxSegmentRecords);
 }
+
+[[nodiscard]] inline Bytes itch_store_seed() { return adds_then_raw_segment(15'831); }
+
+// ITCH store, past the cap: the same add orders, then 64 raw records of 64,985 bytes, as many
+// as the compare limit leaves room for, 4,194,275 values in all. Past the cap a file is only
+// read twice; raw bytes are the only way past the cap in -max_len, so the dearest file there
+// holds as many typed records as the bytes left allow beside raw bytes to the limit.
+[[nodiscard]] inline Bytes itch_store_compared_seed() { return adds_then_raw_segment(64'985); }
 
 // The day with a raw record of 9 bytes every `raw_every` records, so no segment is plain and
 // the indexed path decodes every record it reaches, as much as the exact path does.
@@ -503,7 +512,7 @@ struct BoundSeed {
 };
 
 // One line each in fuzz/bound_seeds.txt, in this order.
-inline constexpr std::array<BoundSeed, 11> kBoundSeeds{{
+inline constexpr std::array<BoundSeed, 12> kBoundSeeds{{
     {"fuzz_dictionary", "dictionary", "bound-costliest", kSmallMaxLen, Side::codec_tiers,
      &dictionary_seed, &codec::oracle::check_dict_column, &codec::oracle::kDictCodec,
      &codec::oracle::kDictFuzzBounds, CodecTiers{.within_cap = 1, .compared = 1}},
@@ -528,6 +537,8 @@ inline constexpr std::array<BoundSeed, 11> kBoundSeeds{{
      &gorilla_xor_seed, &codec::oracle::check_xor_column},
     {"fuzz_itch_store", "itch_store", "bound-costliest", kLargeMaxLen, Side::within_store_cap,
      &itch_store_seed, &store::oracle::check_itch_store},
+    {"fuzz_itch_store", "itch_store", "bound-costliest-compared", kLargeMaxLen,
+     Side::store_compared, &itch_store_compared_seed, &store::oracle::check_itch_store},
     {"fuzz_itch_query", "itch_query", "bound-costliest", kQueryMaxLen, Side::past_query_budget,
      &itch_query_seed, &store::oracle::check_itch_query},
     {"fuzz_itch_query", "itch_query", "bound-costliest-within-budget", kQueryMaxLen,
