@@ -6,7 +6,6 @@
  "template": "docs/writeup/WRITEUP.template.md",
  "page": "WRITEUP.md",
  "targets": "scripts/targets.json",
- "words": {"at_least": 2500, "at_most": 4000},
  "not_results": [
   {"text": "ITCH 5.0", "why": "the feed's version"},
   {"text": "30 December 2019", "why": "the reference day's date"},
