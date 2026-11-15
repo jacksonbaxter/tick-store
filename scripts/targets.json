@@ -3,11 +3,12 @@
  "what": "Every target of BENCHMARKS.md, each stated host a row: the target, where its figure is read in a committed results file, and how it is judged. scripts/render_results.py reads only this file and the results files, computes each verdict from the value and the target, and writes RESULTS.md's Targets block. A row with no figure says why; nothing here is a figure.",
  "expressions": "A value is {\"path\": [...]}, keys into the part's file, where \"@headline\" is the headline_variant of the object above; {\"case\": name, \"field\": [...]}, a bench results case; {\"cases_median\": pattern, \"field\": [...]}, the median of a field over every case the pattern matches; {\"best\": column, \"family\": f, \"not_family\": f}, the fewest bits a value of any exact codec of a codec-eval column; {\"codec\": name, \"column\": column, \"field\": f}; {\"store_bits\": [columns], \"per\": column}, a store-size file's bits a value over those columns; {\"min_variant\": [system, path...]}, the smallest over a comparison system's variants; {\"lowest_system\" | \"lowest_value\": {\"systems\": [...], \"path\": [...]}}, the system whose headline variant holds the lowest value at that path, or that value; {\"engine_only\": [path to a write]}, its engine-only seconds, a protocol 2 file's engine_only_seconds_median or a single repetition's seconds less its python_seconds, and not judged where neither is kept; {\"div\" | \"mul\": [a, b]} with numbers as constants.",
  "headline": {
-  "what": "The README's first screen below its pitch: a table of rows, the sentence under it, and the line that names what the table leaves out. Each row names a row of rows by id and host, and \"parts\", if given, the only parts it shows; it is judged exactly as in the Targets block, on those parts. Its cells are what it is, in plain words, its bar and that bar's source, a short measured template and the verdict. Every {name} in a bar, a template or the sentence under the table is one of the row's values, and every value is named: an expression on the results files of the parts shown, scaled and put through format, summed or all true over them with over, put in words with words, or a system's name with label; {\"target\": comparator} is the row's own target value. No text here types a figure, a target id or a query's name. The headline must hold a missed target. The line under the table names, in plain words, every left-out part of a target the screen shows and every other target that is missed or not judged, by its name under names and the host phrases of hosts, and counts the met ones.",
+  "what": "The README's first screen below its pitch: a table of rows, the sentence under it, and the line that names what the table leaves out. Each row names a row of rows by id and host, and \"parts\", if given, the only parts it shows; it is judged exactly as in the Targets block, on those parts. Its cells are what it is, in plain words, its bar and that bar's source, a short measured template and the verdict. Every {name} in a bar, a template or the sentence under the table is one of the row's values, and every value is named: an expression on the results files of the parts shown, scaled and put through format, summed or all true over them with over, put in words with words, or a system's name with label; {\"target\": comparator} is the row's own target value. No text here types a figure, a target id or a query's name. The headline must hold a missed target. The line under the table names, in plain words, by its name under names and the host phrases of hosts, each left-out part of a target with a row on the screen that is missed, missed in part or not judged, and counts the met ones; every other row of rows, a target on a host as in the full table, it counts by verdict, naming among its count each target of name_among_counts that is not met. What the screen shows, names and counts must add up to every row of rows and every part of the targets it shows.",
   "hosts": {
    "Linux": {"introduced": "a 2018 four-core AMD Ryzen running Linux", "then": "the Ryzen"},
    "macOS": {"introduced": "an Apple M4 Max laptop", "then": "the laptop"},
    "both": "both machines"},
+  "name_among_counts": [{"id": "G-3", "host": "any"}],
   "rows": [
    {"id": "G-1", "host": "any", "what": "Round trip, both days", "bar": "every message bit-exact, stream hashes equal", "source": "the project's correctness gate",
     "measured": "{differ} messages differ; {hashes}",
@@ -39,7 +40,7 @@
   "names": [
    {"id": "G-1", "host": "any", "name": "the round trip", "parts": {"12302019 macOS": "the reference day's round trip", "12302019 Linux": "the reference day's round trip", "10302019 macOS": "the second day's round trip"}},
    {"id": "G-2", "host": "any", "name": "a flipped bit caught"},
-   {"id": "G-3", "host": "any", "name": "fuzzing for half an hour a target"},
+   {"id": "G-3", "host": "any", "name": "fuzzing"},
    {"id": "G-4", "host": "any", "name": "Gorilla built and measured"},
    {"id": "CR-1", "host": "any", "name": "store ratio beating gzip"},
    {"id": "CR-2", "host": "Linux", "name": "disk against the other three", "parts": {"against Parquet": "disk against Parquet", "against ArcticDB": "disk against ArcticDB", "against QuestDB": "disk against QuestDB"}},
@@ -61,8 +62,8 @@
    {"id": "DS-9", "host": "Linux", "name": "timestamp decode time"},
    {"id": "WT-1", "host": "Linux", "name": "one-thread ingest against QuestDB's published rate"},
    {"id": "WT-1", "host": "macOS", "name": "one-thread ingest against QuestDB's published rate"},
-   {"id": "WT-2", "host": "Linux", "name": "one-thread ingest", "parts": {"class A": "one-thread ingest", "class B": "one-thread ingest flushed to disk"}},
-   {"id": "WT-2", "host": "macOS", "name": "one-thread ingest", "parts": {"class A": "one-thread ingest", "class B": "one-thread ingest flushed to disk"}},
+   {"id": "WT-2", "host": "Linux", "name": "one-thread ingest", "parts": {"class A": "one-thread ingest", "class B": "flushed one-thread ingest"}},
+   {"id": "WT-2", "host": "macOS", "name": "one-thread ingest", "parts": {"class A": "one-thread ingest", "class B": "flushed one-thread ingest"}},
    {"id": "WT-3", "host": "Linux", "name": "unflushed write time against each system"},
    {"id": "WT-3", "host": "macOS", "name": "unflushed write time against each system"},
    {"id": "WT-4", "host": "Linux", "name": "flushed write time against each system"},
@@ -73,11 +74,11 @@
    {"id": "QL-3", "host": "Linux", "name": "one millisecond of every stock cold against a published time"},
    {"id": "QL-3", "host": "macOS", "name": "one millisecond of every stock cold against a published time"},
    {"id": "QL-4", "host": "Linux", "name": "fastest of the four on every query", "parts": {
-     "Q1 warm": "fastest warm on one second of every stock at the open", "Q1 cold": "fastest cold on one second of every stock at the open",
+     "Q1 warm": "fastest warm on the open's first second", "Q1 cold": "fastest cold on the open's first second",
      "Q2 warm": "fastest warm on one hour of one stock", "Q2 cold": "fastest cold on one hour of one stock",
-     "Q3 warm": "fastest warm on one stock's per-minute aggregate", "Q3 cold": "fastest cold on one stock's per-minute aggregate",
+     "Q3 warm": "fastest warm on one stock's minute bars", "Q3 cold": "fastest cold on one stock's minute bars",
      "Q4 warm": "fastest warm on one millisecond of every stock", "Q4 cold": "fastest cold on one millisecond of every stock",
-     "Q5 warm": "fastest warm on a full-day scan of one column", "Q5 cold": "fastest cold on a full-day scan of one column"}},
+     "Q5 warm": "fastest warm on a full-day column scan", "Q5 cold": "fastest cold on a full-day column scan"}},
    {"id": "QL-4", "host": "macOS", "name": "fastest of the four on every query"}
   ]
  },

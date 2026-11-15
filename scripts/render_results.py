@@ -1194,22 +1194,24 @@ def plain_names(definitions, hosts):
 
 
 def left_out_items(definitions, root, shown, names):
-    """What the line under the table names: per verdict class, (host, plain name) of each part
-    of a target the screen shows and leaves out, those targets first, then of each other target;
-    and the counts of the targets and the parts met."""
+    """What the line under the table holds: per verdict class, (host, plain name) of each part
+    of a target with a row on the screen that the screen leaves out and that is not met; the
+    count of those met; and, for every other row of the targets, the count of each verdict
+    class, with the plain name of each target the headline asks to name among its count."""
     items = {kind: [] for kind in LEFT_OUT_HEADS}
-    met_targets = met_parts = 0
-    rows = definitions["rows"]
-    for row in ([row for row in rows if (row["id"], row["host"]) in shown] +
-                [row for row in rows if (row["id"], row["host"]) not in shown]):
+    met_parts = 0
+    counts = {kind: 0 for kind in COUNT_ORDER}
+    named = {kind: [] for kind in COUNT_ORDER}
+    asked = {(entry["id"], entry["host"]) for entry in
+             definitions["headline"].get("name_among_counts", [])}
+    for row in definitions["rows"]:
         key = (row["id"], row["host"])
         parts, _ = judged_parts(row, root)
         if key not in shown:
             kind = verdict_class(parts)
-            if kind == "met":
-                met_targets += 1
-            else:
-                items[kind].append((row["host"], names[key]["name"]))
+            counts[kind] += 1
+            if key in asked and kind != "met":
+                named[kind].append(names[key]["name"])
             continue
         for part in parts:
             if part[0] in shown[key]:
@@ -1223,7 +1225,7 @@ def left_out_items(definitions, root, shown, names):
                 met_parts += 1
             else:
                 items[kind].append((row["host"], name))
-    return items, met_targets, met_parts
+    return items, met_parts, counts, named
 
 
 def host_groups(found, hosts):
@@ -1246,44 +1248,85 @@ def host_groups(found, hosts):
     return "; ".join(groups)
 
 
-def counted(count, word):
-    return f"{count} more {word}" + ("" if count == 1 else "s")
+# The verdict classes of the count of the other rows, in the order the line gives them.
+COUNT_ORDER = ("met", "missed", "missed in part", "not judged", "not judged in part")
+# What the count of the other rows counts: rows of the Targets block, a target on a host each.
+COUNTED = "target-and-machine rows of the [full table]"
+COUNT_CLAUSE = re.compile(r"Of the other (\d+) " + re.escape(COUNTED) + r"\(" +
+                          re.escape(TARGETS_ANCHOR) + r"\): (.*)\.$")
 
 
-def left_out_line(items, met_targets, met_parts, hosts):
+def left_out_line(items, met_parts, counts, named, hosts):
     sentences = [f"{LEFT_OUT_HEADS[kind]}: {host_groups(found, hosts)}."
                  for kind, found in items.items() if found]
+    if met_parts:
+        sentences.append(f"Met: {met_parts} more of their {'part' if met_parts == 1 else 'parts'}.")
+    pieces = [f"{counts[kind]} {kind}" + (f", {' and '.join(named[kind])} among them"
+                                         if named[kind] else "")
+              for kind in COUNT_ORDER if counts[kind]]
     return " ".join(["Not shown above.", *sentences,
-                     f"Met: {counted(met_targets, 'target')} and "
-                     f"{counted(met_parts, 'part')} of those above.",
-                     "Generated from the results files; every target, its parts and its results "
-                     f"file: [RESULTS.md]({TARGETS_ANCHOR})."])
+                     f"Of the other {sum(counts.values())} {COUNTED}({TARGETS_ANCHOR}): "
+                     + ", ".join(pieces) + "."])
 
 
 def check_left_out(line, definitions, root, shown, names):
-    """The line under the table names each left-out part of a target the screen shows, and each
-    other target, that is missed or not judged, under its verdict. It is walked here apart from
-    the code that writes the line, so a miss that code drops stops the render: a headline never
-    hides a miss."""
+    """The line under the table, walked here apart from the code that writes it: it names each
+    left-out part of a target with a row on the screen that is missed or not judged, under its
+    verdict; its count of each verdict over the other rows is the targets' own; and what the
+    screen shows, names and counts adds up to every row of the targets and every part of the
+    targets it shows, so nothing drops out unseen. A headline never hides a miss."""
     sentences = {}
     for sentence in line.split(". "):
         head = sentence.split(":", 1)[0]
-        if head in LEFT_OUT_HEADS.values():
+        if head in [*LEFT_OUT_HEADS.values(), "Met"]:
             sentences[head] = sentence
+    clause = COUNT_CLAUSE.search(line)
+    if clause is None:
+        raise TargetError("the line under the table gives no count of the other rows")
+    others, stated = int(clause.group(1)), {}
+    for piece in clause.group(2).split(", "):
+        found = re.fullmatch(r"(\d+) (.+)", piece)
+        if found and found.group(2) in COUNT_ORDER:
+            stated[found.group(2)] = int(found.group(1))
+    met = re.fullmatch(r"Met: (\d+) more of their parts?", sentences.get("Met", "Met: 0 more of "
+                                                                          "their parts"))
+    expected, named_parts, shown_parts_count, total_parts, met_parts = {}, 0, 0, 0, 0
     for row in definitions["rows"]:
         key = (row["id"], row["host"])
         parts, _ = judged_parts(row, root)
-        if key in shown:
-            wanted = [(names[key].get("parts", {}).get(part[0]), [part]) for part in parts
-                      if part[0] not in shown[key]]
-        else:
-            wanted = [(names[key]["name"], parts)]
-        for name, judged in wanted:
-            kind = verdict_class(judged)
-            if kind != "met" and f" {name}" not in sentences.get(LEFT_OUT_HEADS[kind], ""):
+        if key not in shown:
+            kind = verdict_class(parts)
+            expected[kind] = expected.get(kind, 0) + 1
+            continue
+        total_parts += len(parts)
+        for part in parts:
+            if part[0] in shown[key]:
+                shown_parts_count += 1
+                continue
+            kind = verdict_class([part])
+            if kind == "met":
+                met_parts += 1
+                continue
+            name = names[key].get("parts", {}).get(part[0])
+            if f" {name}" not in sentences.get(LEFT_OUT_HEADS[kind], ""):
                 raise TargetError(f"the line under the table does not name {name!r}, which is "
                                   f"{kind} ({key[0]} on {key[1]}), and a headline never hides "
                                   "a miss")
+            named_parts += 1
+    if stated != expected:
+        raise TargetError(f"the line under the table counts the other rows as {stated}, and the "
+                          f"targets give {expected}")
+    stated_met = int(met.group(1)) if met else -1
+    if stated_met != met_parts:
+        raise TargetError(f"the line under the table counts {stated_met} more parts met, and "
+                          f"the targets give {met_parts}")
+    if len(shown) + others != len(definitions["rows"]) or sum(stated.values()) != others:
+        raise TargetError(f"the screen shows {len(shown)} rows and counts {others} others, "
+                          f"{sum(stated.values())} by verdict, of the targets' "
+                          f"{len(definitions['rows'])}")
+    if shown_parts_count + named_parts + stated_met != total_parts:
+        raise TargetError(f"the screen shows {shown_parts_count} parts of its targets, names "
+                          f"{named_parts} and counts {stated_met} met, of their {total_parts}")
 
 
 def headline_cells(entry, rows, root, hosts):
@@ -1340,8 +1383,8 @@ def render_headline(definitions_path, root):
                                  "the sentence under the table",
                                  {"verdict": verdict_of(parts)})[0]]
         names = plain_names(definitions, hosts)
-        items, met_targets, met_parts = left_out_items(definitions, root, shown, names)
-        line = left_out_line(items, met_targets, met_parts, hosts)
+        items, met_parts, counts, named = left_out_items(definitions, root, shown, names)
+        line = left_out_line(items, met_parts, counts, named, hosts)
         check_left_out(line, definitions, root, shown, names)
     except (TargetError, KeyError, TypeError, ValueError, ZeroDivisionError) as error:
         raise TargetError(f"headline: {error}") from error

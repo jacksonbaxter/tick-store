@@ -5447,18 +5447,27 @@ of the parts the row shows, so the disk row's 1.76 GB is the allocated size from
 file while the pitch's 1.76 GB is the store's own bytes, 1,758,240,768 against 1,758,234,758.
 Under the table one generated sentence gives WT-2 on the laptop, 3.215 M messages/s, met. The
 line under that names, in plain words with each host's short name, every left-out part of a
-target the screen shows and every other target that is missed or not judged, and counts the
-rest: today 4 more targets and 5 more parts met. G-3, not judged, is named there rather than
-given a row. The old line above the table, which called the hosts Linux and macOS, is gone; the
-line under the table says it is generated and links RESULTS.md.
+target with a row on the screen that is missed, missed in part or not judged, so no row hides a
+miss of its own target, and counts the met ones; every other row of the Targets block, a target
+on a machine as the full table counts them, it counts by verdict, naming fuzzing among the
+not judged while it is not judged, since a reader will look for it. Today: five parts named,
+five met, and of the other 32 target-and-machine rows 4 met, 14 missed, 7 missed in part and
+7 not judged, in 69 words. G-3 has no row. The old line above the table, which called the hosts
+Linux and macOS, is gone.
+
+The line first named every missed or not-judged target, about 190 words under the table. It was
+shortened, on the coordinator's call, because the first screen is read in a minute and a half:
+the full list is one link away, and the counts say how much is behind it.
 
 **The checks.** `render_results.py --check` now stops on a pitch over `max_words`; on a word that
 ranks or judges (fastest, least, below and the like) outside every claim and every figure's
 words, naming the sentence; on a claim whose verdict the results turn, naming its sentence; on
 a headline row without its what, bar, source or measured template; on a template that types a
 figure, names a value it is not given, or is given one it never names; on a target or a left-out
-part with no plain name; on a line under the table that leaves out a part or a target that is
-missed or not judged, checked by walking the targets apart from the code that writes the line;
+part with no plain name; on a line under the table that leaves out a missed or not-judged part
+of a target with a row, whose counts are not the targets' own, or in which what is shown, named
+and counted does not add up to every row of the full table and every part of the targets shown,
+each checked by walking the targets apart from the code that writes the line;
 and on a first screen that names a target id or a query, introduces a host other than once, uses
 a host's short name before its introduction, or calls a host Linux or macOS after it. Texts in
 `scripts/targets.json` that reach the screen may hold no digit but a host's introduction, so an
@@ -5472,7 +5481,8 @@ did the not_results "SHA-256", "(Q1)" to "(Q4)", "8.59 M", "32 workers on 32 vCP
 
 What the checks do not see: that the prose is true beyond its figures and its claims. A sentence
 that misleads without a ranking word, a plain name or a bar whose words drift from the target in
-`BENCHMARKS.md`, or a name found inside a longer name in the line under the table, would pass.
+`BENCHMARKS.md`, or a name found inside a longer name in the line under the table, would pass. The counts say
+how many rows have each verdict, not which.
 
 **Where it differs from the proposal.** The query rows read "One hour of one stock, warm" and
 "One millisecond of every stock, warm", with the bar "fastest of the four default setups, by
@@ -5481,8 +5491,8 @@ tail figure and the proposal's "warm median" would have read as the median alone
 row's cell says "stream hashes equal" from the files' hashes, and its 0 is the sum of the three
 files' mismatched records. The sentence under the table puts the bar first: "Against the same
 bar, one thread on an Apple M4 Max laptop, unpinned, ingests 3.215 M messages/s: met." The line
-under the table names every target that is missed or not judged, as decided, so it runs to
-about 190 words below the table.
+under the table first named every target that is missed or not judged, as decided then; it was
+shortened as above.
 
 **Faults.** Eight are new: `readme-pitch-claim-tie-dropped` (a claim taken out, the ranking word
 caught), `render-pitch-word-limit-removed`, `headline-fuzz-row-names-its-id` (G-3 added back as

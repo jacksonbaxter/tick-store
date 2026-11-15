@@ -1357,6 +1357,9 @@ FAULTS = (
     Fault("headline-left-out-drops-a-miss", "render-check", "render_results.py leaves the "
           "missed parts of the targets on the screen out of the line under the table",
           EXIT_RENDER_REFUSED, "the line under the table does not name"),
+    Fault("headline-left-out-miscounted", "render-check", "render_results.py counts the other "
+          "targets missed in part as met in the line under the table", EXIT_RENDER_REFUSED,
+          "the line under the table counts the other rows as"),
     # Review RG-6: G-3's file from before the tie is not judged at this code.
     Fault("render-g3-before-the-tie-judged", "py-scripts", "render_results.py judges G-3 met on "
           "the file made before G-3 was tied to the code, which judged an older commit",

@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1209,7 +1209,7 @@
+         parts, _ = judged_parts(row, root)
+         if key not in shown:
+             kind = verdict_class(parts)
+-            counts[kind] += 1
++            counts["met" if kind == "missed in part" else kind] += 1
+             if key in asked and kind != "met":
+                 named[kind].append(names[key]["name"])
+             continue

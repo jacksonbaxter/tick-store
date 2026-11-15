@@ -18,7 +18,7 @@ ArcticDB or QuestDB is fastest, and one thread ingests below Nasdaq's peak messa
 
 Against the same bar, one thread on an Apple M4 Max laptop, unpinned, ingests 3.215 M messages/s: met.
 
-Not shown above. Missed: on both machines, price column decode rate, one-thread ingest against QuestDB's published rate, one hour of one stock against a published time, one stock's per-minute aggregate against a published time, one millisecond of every stock cold against a published time; on the Ryzen, one-thread ingest flushed to disk, fastest warm on one second of every stock at the open, fastest cold on one second of every stock at the open, fastest cold on one millisecond of every stock, fastest warm on a full-day scan of one column, Gorilla decode cycles, unflushed write time against each system; on the laptop, Gorilla price decode time, block delta decode rate. Missed in part: timestamp bits a value, add-order price bits a value, integer codecs against Gorilla on prices, order reference bits a value, share count bits a value; on the Ryzen, flushed write time against each system; on the laptop, layout speed-up over Gorilla. Not judged: fuzzing for half an hour a target; on both machines, timestamp decode time; on the Ryzen, block delta decode cycles, layout speed-up over Gorilla; on the laptop, unflushed write time against each system, fastest of the four on every query. Met: 4 more targets and 5 more parts of those above. Generated from the results files; every target, its parts and its results file: [RESULTS.md](RESULTS.md#targets).
+Not shown above. Missed: on the Ryzen, flushed one-thread ingest, fastest warm on the open's first second, fastest cold on the open's first second, fastest cold on one millisecond of every stock, fastest warm on a full-day column scan. Met: 5 more of their parts. Of the other 32 target-and-machine rows of the [full table](RESULTS.md#targets): 4 met, 14 missed, 7 missed in part, 7 not judged, fuzzing among them.
 <!-- headline:end -->
 
 ## What it is
@@ -110,8 +110,10 @@ verdict stops the check and names the sentence to change. Each table row says wh
 its bar and the bar's source, then what was measured, from a template whose figures are named
 values read from the results files: a template that types a figure, names a value it is not
 given, or is given one it does not name stops the render. The line under the table names every
-part of a target on the screen that the table leaves out, and every other target, that is missed
-or not judged; it is checked apart from the code that writes it, and the table must hold a miss.
+part of a target with a row on the screen that the table leaves out and that is missed or not
+judged, and counts every other target-and-machine row by verdict. It is checked apart from the
+code that writes it: each such part named, each count the targets' own, and what is shown, named
+and counted adding up to the whole table. The table must hold a miss.
 The whole screen names no target id and no query's name, and introduces each machine once, by
 what it is. What it does not check is that the prose is true beyond those figures and claims: a
 sentence that misleads without a ranking word, a plain name that misdescribes its target, or a

@@ -997,10 +997,8 @@ HEADLINE = {
         {"id": "T-4", "host": "Linux", "name": "order"},
         {"id": "T-5", "host": "macOS", "name": "the four"},
         {"id": "T-6", "host": "Linux", "name": "kernel time"}]}
-LEFT_OUT_LINE = ("Not shown above. Missed: bits of two. Not judged: on the box, kernel time; on "
-                 "the laptop, the four. Met: 0 more targets and 0 more parts of those above. "
-                 "Generated from the results files; every target, its parts and its results "
-                 "file: [RESULTS.md](RESULTS.md#targets).")
+LEFT_OUT_LINE = ("Not shown above. Missed: bits of two. Of the other 2 target-and-machine rows of "
+                 "the [full table](RESULTS.md#targets): 2 not judged.")
 
 
 def with_row(index, **changes):
@@ -1087,7 +1085,7 @@ class RenderHeadlineTest(Scratch):
         self.write_targets(headline)
         self.assertEqual(self.render().returncode, 0)
         self.assertNotIn("bits of two", self.headline())
-        self.assertIn("Met: 0 more targets and 0 more parts", self.headline())
+        self.assertIn("Not shown above. Of the other 2 target-and-machine rows", self.headline())
 
     def test_a_met_target_left_out_is_counted_not_named(self):
         headline = json.loads(json.dumps(HEADLINE))
@@ -1097,7 +1095,8 @@ class RenderHeadlineTest(Scratch):
                                encoding="utf-8")
         result = self.render()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("Met: 1 more target and 0 more parts", self.headline())
+        self.assertIn("Of the other 3 target-and-machine rows of the [full table]"
+                      "(RESULTS.md#targets): 1 met, 2 not judged.", self.headline())
         self.assertNotIn("latency", self.headline())
 
     def test_a_target_or_a_left_out_part_with_no_plain_name_is_refused(self):
@@ -1115,14 +1114,52 @@ class RenderHeadlineTest(Scratch):
         writes = RENDER.left_out_items
 
         def dropping(*arguments):
-            items, met_targets, met_parts = writes(*arguments)
-            return {**items, "missed": []}, met_targets, met_parts
+            items, met_parts, counts, named = writes(*arguments)
+            return {**items, "missed": []}, met_parts, counts, named
         self.addCleanup(setattr, RENDER, "left_out_items", writes)
         RENDER.left_out_items = dropping
         with self.assertRaises(RENDER.TargetError) as caught:
             RENDER.render_headline(self.targets, self.tree)
         self.assertIn("the line under the table does not name 'bits of two', which is missed "
                       "(T-3 on any), and a headline never hides a miss", str(caught.exception))
+
+    def check_line(self, line, shown=None):
+        definitions = json.loads(self.targets.read_text(encoding="utf-8"))
+        shown = shown or {("T-1", "Linux"): {"q"}, ("T-3", "any"): {"one"},
+                          ("T-4", "Linux"): {"against r"}, ("T-2", "macOS"): {"q"}}
+        names = RENDER.plain_names(definitions, HEADLINE["hosts"])
+        with self.assertRaises(RENDER.TargetError) as caught:
+            RENDER.check_left_out(line, definitions, self.tree, shown, names)
+        return str(caught.exception)
+
+    def test_a_count_the_writer_gets_wrong_is_refused(self):
+        writes = RENDER.left_out_items
+
+        def miscounting(*arguments):
+            items, met_parts, counts, named = writes(*arguments)
+            return items, met_parts, {**counts, "met": 1, "not judged": 1}, named
+        self.addCleanup(setattr, RENDER, "left_out_items", writes)
+        RENDER.left_out_items = miscounting
+        with self.assertRaises(RENDER.TargetError) as caught:
+            RENDER.render_headline(self.targets, self.tree)
+        self.assertIn("the line under the table counts the other rows as {'met': 1, 'not "
+                      "judged': 1}, and the targets give {'not judged': 2}",
+                      str(caught.exception))
+
+    def test_what_is_shown_named_and_counted_adds_up_to_the_whole_table(self):
+        self.assertIn("the screen shows 4 rows and counts 3 others, 2 by verdict, of the "
+                      "targets' 6", self.check_line(LEFT_OUT_LINE.replace("other 2", "other 3")))
+        self.assertIn("counts 1 more parts met, and the targets give 0", self.check_line(
+            LEFT_OUT_LINE.replace("Of the", "Met: 1 more of their part. Of the")))
+        self.assertIn("gives no count of the other rows",
+                      self.check_line(LEFT_OUT_LINE.split(" Of the")[0]))
+
+    def test_a_target_asked_for_is_named_among_its_count(self):
+        headline = json.loads(json.dumps(HEADLINE))
+        headline["name_among_counts"] = [{"id": "T-6", "host": "Linux"}]
+        self.write_targets(headline)
+        self.assertEqual(self.render().returncode, 0)
+        self.assertIn(": 2 not judged, kernel time among them.", self.headline())
 
     def test_the_sentence_under_the_table_gives_its_figure_and_verdict(self):
         self.render()
