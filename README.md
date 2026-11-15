@@ -105,7 +105,11 @@ tests, clang-tidy over all our C++, each libFuzzer target, coverage, the Python 
 `scripts/check_results.py`, `scripts/check_compare.py`, `scripts/check_ties.py`, which fails
 a results file once anything its figures were built and run from differs from the commit it
 names (a file a validator's pin declares is reported as pinned, and a tree with no git history
-is not judged), `scripts/render_results.py --check`,
+is not judged; it compares sources, not built objects, since the build compiles the commit into a
+generated source linked into every benchmark and the codec evaluation tools, so their binaries
+differ between any two commits, and comparing the other objects would need both commits built in
+one folder with one toolchain and would still say nothing of the Python harness that runs the
+measurements), `scripts/render_results.py --check`,
 which fails if the headline above or any table of RESULTS.md differs from a fresh render,
 actionlint, and a check of what git tracks: no home path, no data file, nothing over 1 MB but
 the named results. No step loads a whole day. `ItchRealDay` reads the first 2 million messages.

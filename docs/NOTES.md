@@ -629,7 +629,9 @@ Measured costs:
 - The other price columns follow file order, with the best integer codec, then the best Gorilla, which is the integer as a double,
   then Gorilla on dollars. `U` is 15.53, 23.48, 55.29 and 15.30, 23.63, 55.52. `C` is 14.68, 18.17, 43.86 and 14.57, 17.89, 43.79.
   `P` is 16.82, 22.52, 50.74 and 16.42, 21.81, 50.12. The best integer codec is `pfor-for-scaled` on each. The MWCB levels are three
-  values a day, too few to judge.
+  values a day, too few to judge; on them Gorilla on the integer as a double is the smallest of
+  every codec, the one column where Gorilla wins. Of the columns with real volume, Gorilla comes
+  closest on timestamps in file order, not on prices.
 
 **Per-locate figures exclude the permutation back to file order.** The tool estimates what it would cost:
 
@@ -1823,9 +1825,9 @@ Raw outputs, per case, are kept with the logs (`decode-targets/mac/`, `decode-ta
   `simd_kernel_bench`; on debian with `--slice-path` to the slice there.
 
 **The Linux kernel file was refused twice.** Both runs of `simd_kernel_bench` on debian finished all 314 cases and failed
-`check_results.py` on the sibling rule: 4 cases over 5% in the first run (5.2% to 8.5%), 7 in the rerun (5.4% to 9.4%), the rest
-under. A kernel case lasts about 1.1 s, so its window is about 117 jiffies of cpu5 and 6 busy jiffies pass the limit. During the
-first run another project's test job (`aadp_run_oracle` under `ctest`) was using most cores; during the rerun the load was 0.86
+`check_results.py` on the sibling rule: 19 cases over 5% in the first run (5.1% to 12.3%), 11 in the rerun (5.4% to 12.6%), the
+rest under, as the validator listed them. A kernel case lasts about 1.1 s, so its window is about 117 jiffies of cpu5 and 6 busy
+jiffies pass the limit. During the first run another project's test job, run by `ctest`, was using most cores; during the rerun the load was 0.86
 to 1.44 and nothing else was seen. Six idle one-second commands under `measure.sh` read cpu5 at 0%, 0%, 0%, 1.68%, 0% and 2.52%,
 so the wrapper's own start and end are not enough by themselves; what took cpu5 in the rerun is not established. The rule says
 rerun once, so there is no reported Linux kernel file, and DS-4 has no reported figure. The two refused runs agree closely, and
@@ -1840,7 +1842,7 @@ their figures below are labelled as refused: they are what the pinned host measu
 | DS-3 | 64-bit delta decode at least 3.6 G values/s | 3.35 G values/s, median over widths 0 to 64, two passes; fused 3.27 | macOS, NEON | Missed by 7.0% |
 | DS-4 | Same kernel at most 0.377 cycles a value | No reported figure. Refused runs: 2.716 and 2.720 cycles a value fused, 2.950 and 2.955 two passes | Linux, AVX2 | Not judged: no reported file. The refused runs miss by 7.2 times |
 | DS-5 | Price block decode at least 4,605 MB/s of 8-byte values | 3,674 MB/s (CV 0.86%) on macOS; 1,280 MB/s (CV 0.66%), 22.3 cycles and 47.0 instructions a value, on Linux | macOS NEON, Linux AVX2 | Missed on both: by 20.2% and 3.6 times |
-| DS-6 | Layout at least 14 times faster than Gorilla on the same column | Timestamps 16.06 times (9.650 against 0.601 ns); prices 3.86 times (8.393 against 2.177 ns) | macOS, NEON | Met on timestamps, missed on prices |
+| DS-6 | Layout at least 14 times faster than Gorilla on the same column | Timestamps 16.06 times (9.650 against 0.601 ns); prices 3.85 times (8.393 against 2.177 ns) | macOS, NEON | Met on timestamps, missed on prices |
 | DS-7 | Layout speedup over Gorilla, no published figure | Timestamps 7.58 times (22.204 against 2.931 ns); prices 3.29 times (20.558 against 6.252 ns) | Linux, AVX2 | Measured, no target figure |
 | DS-8 | Delta-of-delta reconstruct at least 8.20 GB/s of 32-bit values | 2.94 G values/s, 11.77 GB/s counted as 32-bit values, the restore copy included | macOS, scalar code, as every set runs it | Met, 1.44 times over the figure |
 | DS-9 | Delta-of-delta decode with bit parsing, no published figure | Gorilla: 9.650 ns a value on macOS, 22.204 ns and 79.5 cycles on Linux. PFOR delta-of-delta: 0.880 and 3.151 ns | macOS NEON, Linux AVX2 | Measured, no target figure |
@@ -2445,11 +2447,15 @@ full-day verdict.
   measured (TASKS).
 - **WT-3, class A against each system, tick-store's ingest including ITCH parsing:** missed
   against Parquet, 195.3 s against 158.4, by 36.8 s; missed against ArcticDB, 120.1 s, by 75.2
-  s; met against QuestDB, 273.6 s, by 78.3 s.
+  s; met against QuestDB, 273.6 s, by 78.3 s. That verdict is on the total clock alone; judged
+  on both clocks since RF-3, WT-3 is missed against all three, QuestDB included ("Write targets
+  on both clocks (RF-3)", below).
 - **WT-4, class B against each system, at each one's stated flush:** met against Parquet,
   188.9 s against 266.3, by 77.4 s, though Parquet `none-rg1Mi` wrote class B in 153.8 s; missed
   against ArcticDB, 123.6 s, by 65.3 s; met against QuestDB, 1,269.2 s, by 1,080.3 s, but QuestDB's
   class B is not like-for-like and its durability proof failed, so that win proves little.
+  Judged on both clocks since RF-3, WT-4 is met against QuestDB only and missed against Parquet,
+  whose engine-only write is shorter ("Write targets on both clocks (RF-3)", below).
 - **QL-1, missed.** Q2 warm median 74.32 ms against 16.9 ms, 57.42 ms over, 4.4 times. Q2
   returns 739,944 records of the busiest locate through `tools/tick_query` and Python; the
   target returns 52 rows from a 1.5 M-row store.
@@ -2473,8 +2479,8 @@ full-day verdict.
     846.57 / 863.12.
 
   Q1 and Q4 decode the segment's whole locate column, as on the slice; `v3-seg1Mi` cuts them to
-  115.88 and 51.40 ms warm and is still not lowest. Q5 unpacks 268.7 M share values from ranked
-  PFOR, where QuestDB sums a fixed-width column it maps; the sum over ranks in TASKS is not
+  115.88 and 51.40 ms warm and is still not lowest. Q5 decodes 152,004,760 values
+  (`queries.Q5.scan.values_decoded`), its share column from ranked PFOR, where QuestDB sums a fixed-width column it maps; the sum over ranks in TASKS is not
   built. Q5 warm here, 907.64 ms, is in line with the 911.95 ms measured on `debian` at
   iteration for the final layout (`1669ae0`); the 280 ms there was the Mac's.
 
@@ -2563,8 +2569,8 @@ file, a missing file and a missing field. Fault `targets-at-most-reversed` judge
 the wrong way round and fails the tests.
 
 Every value read agrees with the verdicts in docs/NOTES.md except one. DS-6 prices read 3.85 times from
-the file, where "Decode targets under measure.sh" gave 3.86, computed from rounded figures. The
-verdict, missed against 14, is the same.
+the file, where "Decode targets under measure.sh" gave 3.86, computed from rounded figures; that
+table now gives the file's 3.85. The verdict, missed against 14, is the same.
 
 The CR rows add the store as built (`results/store-size-12302019.json`) to the per-codec figures
 docs/NOTES.md judged. Three targets met by a codec in the estimate are missed by the store's own
@@ -2963,8 +2969,13 @@ python3 -I scripts/fuzz_host.py --build build/fuzz --host macOS --out $RAW/mac/h
 python3 -I scripts/fuzz_host.py --build $P/build/fuzz --host Linux --level avx2 \
     --out $P/logs/g3-F/host.json \
     --concurrency "three targets at once, each pinned with taskset to one of cpu2, cpu6 and cpu7, in one heavy.sh job; cpu4 and cpu5 left alone, no measurement running" \
-    --peak-memory "libFuzzer's peak_rss_mb, and the fuzzer's VmHWM read from /proc every 5 s; this host has no GNU time"
+    --peak-memory "libFuzzer's peak_rss_mb, and the fuzzer's VmHWM read from the kernel's status file for the process every 5 s; this host has no GNU time"
 ```
+
+The Linux text does not name `/proc`: `fuzz_host.py` refuses any absolute path in the file it
+writes, and reads `/proc` in that text as one, so it says the same fact without the path.
+`scripts/fuzz_g3.py` is what reads `VmHWM`, from `/proc/<pid>/status`; `fuzz_host.py` only
+copies the sentence it is given.
 
 `default_kernel_level` comes out `neon` on the Mac and `avx2` on `debian`. The Linux logs come to the Mac with `scp -r` from the host's `logs/g3-F` into
 `$RAW/linux`, and one file is made from both:
@@ -4665,7 +4676,7 @@ stated:
 ### DS-4: a longer kernel case, one trial, and the rule for the freeze
 
 **The order of events.** The window was chosen first. Five complete Linux kernel runs had been
-refused for cpu5 over 5% busy in 4 to 13 of 314 cases of about 1.1 s ("DS-4: three more
+refused for cpu5 over 5% busy in 7 to 19 of 314 cases of about 1.1 s ("DS-4: three more
 refusals"). At that length, 6 jiffies on the sibling put a case over the limit. The open TASKS
 item asked for a case long enough that a stray jiffy is not 1% of its window, with the rule
 unchanged. `28c8269` made each pass of `simd_kernel_bench` whole rounds of 8,192 calls, enough

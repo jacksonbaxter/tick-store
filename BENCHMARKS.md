@@ -1,6 +1,6 @@
 # tick-store benchmarks and targets
 
-Status: Phase 3. The decode targets, DS-1 to DS-9, are measured under `measure.sh` at `bcbf873`, with verdicts under "Measured decode results": DS-6 is met on timestamps and missed on prices, DS-8 is met, DS-1, DS-2, DS-3 and DS-5 are missed, DS-7 and DS-9 are reported with no target figure, and DS-4 has no reported figure because the Linux kernel file was refused five times by the sibling rule, twice at `bcbf873` and three times at `b053aff`. The other targets' verdicts are under "Measured results for the other targets", on Linux from the full day at `67ae574` and on macOS from a full day of tick-store alone. Of the targets judged on the measured hosts, CR-1, CR-2, G-1, G-2, G-3, G-4, DS-8 and WT-2 on macOS are met. WT-1, QL-1, QL-2 and QL-3 are missed on both hosts, and WT-2 is missed on Linux. CR-3 to CR-7, DS-6, WT-3, WT-4 and QL-4 are met on some of their cases and missed on others. G-3 is met from 30-minute runs of every fuzz target at `ea1dde4`, whose store code is unchanged since `67ae574`. WT-3 and QL-4 are not judged on macOS. Every source figure below is a published figure, or
+Status: Phase 3. The decode targets, DS-1 to DS-9, are measured under `measure.sh` at `bcbf873`, with verdicts under "Measured decode results": DS-6 is met on timestamps and missed on prices, DS-8 is met, DS-1, DS-2, DS-3 and DS-5 are missed, DS-7 and DS-9 are reported with no target figure, and DS-4 has no reported figure because the Linux kernel file was refused five times by the sibling rule, twice at `bcbf873` and three times at `b053aff`. The other targets' verdicts are under "Measured results for the other targets", on Linux from the full day at `67ae574` and on macOS from a full day of tick-store alone. Of the targets judged on the measured hosts, CR-1, CR-2, G-1, G-2, G-4, DS-8 and WT-2 on macOS are met. WT-1, QL-1, QL-2 and QL-3 are missed on both hosts, and WT-2 and WT-3 are missed on Linux. CR-3 to CR-7, DS-6, WT-4 and QL-4 are met on some of their cases and missed on others. G-3 is not judged on this code: its 30-minute runs of every fuzz target were made at `ea1dde4`, before G-3 was tied to the code it judged, and each timed run held its corpus replay. WT-3 and QL-4 are not judged on macOS. Every source figure below is a published figure, or
 arithmetic on one, used as a target or as context. The exceptions are the file facts in CR-1 and Data, which come from the downloaded
 files. A research subagent opened each source, and the `Checked` column records that the project session then opened it too and
 recomputed any derived figure from the raw values.
@@ -24,7 +24,7 @@ Results from the two hosts are kept apart and never mixed.
 | Label | Machine | Measurement limits |
 |---|---|---|
 | macOS | Apple M4 Max, 12 P and 4 E cores, 64 GiB, macOS 27.2, APFS on internal SSD | No pinning. 24 MHz timer, about 42 ns per tick. Results are unpinned and have no hardware counters. NEON only: no SVE, no bit-deposit instructions. Run under the machine's measurement lock (`measure.sh`). |
-| Linux | `debian`: AMD Ryzen Embedded V1605B (Zen 1), 4 cores and 8 threads, 2.0 GHz base, 4 MB L3, 15 GB RAM, Debian 13, kernel 6.12 | Pin with `taskset -c 4`, `cpu5` idle. Boost stays on and the clock is free to move, so no run used a fixed clock; the reported benchmark runs averaged 3.56 to 3.58 GHz in their timed passes. TSC resolution about 10 ns. `perf` `:u` events only. AVX2 runs as two 128-bit halves; PEXT and PDEP are microcoded. Run under `~/quant-projects/bin/measure.sh`. Headline pinned numbers come from here. |
+| Linux | AMD Ryzen Embedded V1605B (Zen 1), 4 cores and 8 threads, 2.0 GHz base, 4 MB L3, 15 GB RAM, Debian 13, kernel 6.12 | Pin with `taskset -c 4`. Nothing keeps its SMT sibling, `cpu5`, idle: each run records how busy `cpu5` was, case by case or system by system, and the validators refuse a run with it over 5% busy in any of them. Boost stays on and the clock is free to move, so no run used a fixed clock; the reported benchmark runs averaged 3.56 to 3.58 GHz in their timed passes. TSC resolution about 10 ns. `perf` `:u` events only. AVX2 runs as two 128-bit halves; PEXT and PDEP are microcoded. Run under the host's measurement lock (`measure.sh`). Headline pinned numbers come from here. |
 
 ## Definitions
 
@@ -103,7 +103,7 @@ timestamps in file order. Every rate is the median of ten timed passes.
 | DS-5 | `store_decode/add_price`: the store's chunks of the price column from `encode_column`, PFOR delta with an adaptive scale and zstd where smaller, decoded by `decode_column` piece by piece as the reader does | MB/s of 8-byte values, the median values a second times 8 | both |
 | DS-6 | Timestamps: `gorilla_dod/timestamp` against `pfor_delta/timestamp`, the same values. Prices: `gorilla_xor/add_price` against `store_decode/add_price`, the same values | Gorilla's ns a value over the layout's, from one results file. Judged on each column | macOS |
 | DS-7 | As DS-6 | As DS-6, with the instruction set | Linux |
-| DS-8 | `dod_reconstruct/scalar`: `delta_of_delta_decode`, the two running sums PFOR runs after unpacking, on 1,024 values, no bit parsing. Each call restores its input from a copy, and `restore_copy/scalar` times that copy alone | GB/s counted as 32-bit values, values a second times 4, since the source counts 32-bit values and ours are 64-bit lanes | macOS |
+| DS-8 | `dod_reconstruct/scalar`: `delta_of_delta_decode`, the two running sums PFOR's delta-of-delta transform runs after unpacking, a transform the store's writer never chooses, on 1,024 values, no bit parsing. Each call restores its input from a copy, and `restore_copy/scalar` times that copy alone | GB/s counted as 32-bit values, values a second times 4, since the source counts 32-bit values and ours are 64-bit lanes | macOS |
 | DS-9 | `gorilla_dod/timestamp`, Gorilla's bit parsing; `pfor_dod/timestamp`, delta-of-delta on the vector layout | ns a value and values a second, with the instruction set | both |
 
 ### Measured decode results
@@ -113,7 +113,7 @@ At `bcbf873`, the cases above through `scripts/run_bench.py` under each host's `
 `simd_kernel_bench`. macOS is the M4 Max, NEON, unpinned, no counters, at load 1.26 to 3.92 at the start of a case. Linux is Zen 1,
 AVX2, pinned to cpu4 with `cycles:u`, at load 1.27 to 1.49 at the start of a case, cpu5 at most 1.12% busy. Results: `results/bench/macOS-column_decode-bcbf8738d892.json`,
 `results/bench/macOS-simd_kernel-bcbf8738d892.json`, `results/bench/Linux-column_decode-bcbf8738d892.json`. The Linux kernel file
-does not exist: two complete runs were refused for cpu5 over 5% busy in 4 and in 7 of 314 cases (docs/NOTES.md, "Decode targets under
+does not exist: two complete runs were refused for cpu5 over 5% busy in 19 and in 11 of 314 cases (docs/NOTES.md, "Decode targets under
 measure.sh"), and three more at `b053aff` in 9, 7 and 13 (docs/NOTES.md, "DS-4: three more refusals"). Gaps and reasons are there too.
 
 | ID | Measured | Host, instruction set | Verdict |
@@ -123,7 +123,7 @@ measure.sh"), and three more at `b053aff` in 9, 7 and 13 (docs/NOTES.md, "DS-4: 
 | DS-3 | 3.35 G values/s, two passes, median of 65 widths | macOS, NEON | Missed: 7.0% under 3.6 |
 | DS-4 | No reported figure. The five refused runs read 2.714 to 2.720 cycles a value, fused | Linux, AVX2 | Not judged. The refused runs are 7.2 times the 0.377 cycles |
 | DS-5 | 3,674 MB/s on macOS, 1,280 MB/s on Linux | macOS NEON, Linux AVX2 | Missed on both: 20.2% under 4,605, and 3.6 times under |
-| DS-6 | Timestamps 16.06 times; prices 3.86 times | macOS, NEON | Met on timestamps, missed on prices |
+| DS-6 | Timestamps 16.06 times; prices 3.85 times | macOS, NEON | Met on timestamps, missed on prices |
 | DS-7 | Timestamps 7.58 times; prices 3.29 times | Linux, AVX2 | No published figure |
 | DS-8 | 11.77 GB/s counted as 32-bit values, 2.94 G values/s | macOS, scalar code in every set | Met: 1.44 times the 8.20 GB/s |
 | DS-9 | Gorilla 9.650 ns a value on macOS, 22.204 ns on Linux; PFOR delta-of-delta 0.880 and 3.151 ns | macOS NEON, Linux AVX2 | No published figure |
@@ -164,7 +164,7 @@ from `results/codec-eval-12302019.json` and `results/store-size-12302019.json`.
 |---|---|---|---|
 | G-1 | Any | Bit-exact on 12302019 on both hosts and 10302019 on macOS, both stream hashes equal | Met |
 | G-2 | Any | A flipped bit is caught in a data block and in the footer, with CRCs on and off | Met |
-| G-3 | Any | All 13 targets clean for at least 1,801 s on macOS (NEON), and on Linux at AVX2 the 6 whose decode reaches the SIMD kernels, each comparing its kernel set with the scalar set inside the run, and the 3 that verify CRC32C through the SSE4.2 kernel, 7 targets in all, each clean for at least 1,801 s, at `ea1dde4` (`results/fuzz-g3-ea1dde4c02e4.json`) | Met |
+| G-3 | Any | All 13 targets clean for at least 1,801 s on macOS (NEON), and on Linux at AVX2 the 6 whose decode reaches the SIMD kernels, each comparing its kernel set with the scalar set inside the run, and the 3 that verify CRC32C through the SSE4.2 kernel, 7 targets in all, each clean for at least 1,801 s, at `ea1dde4` (`results/fuzz-g3-ea1dde4c02e4.json`) | Not judged on this code: the file was made at `ea1dde4`, before G-3 was tied to the code it judged, and each timed run held its corpus replay |
 | G-4 | Any | Gorilla delta-of-delta and XOR built, exact, and measured | Met |
 | CR-1 | Any | 4.6930 | Met |
 | CR-2 | Linux | 1,758,240,768 bytes, against Parquet's smallest 3,191,406,592, ArcticDB's 5,666,115,584, QuestDB's 22,897,786,880 | Met |
@@ -177,9 +177,9 @@ from `results/codec-eval-12302019.json` and `results/store-size-12302019.json`.
 | WT-1 | macOS | 3.215 M records/s, class A | Missed, 37.4% of 8.59 M |
 | WT-2 | Linux | 1.376 M messages/s class A, 1.423 M class B | Missed |
 | WT-2 | macOS | 3.215 M messages/s class A, 3.208 M class B | Met, 17.6% and 17.4% over 2,732,762 |
-| WT-3 | Linux | 195.3 s, against Parquet 158.4, ArcticDB 120.1, QuestDB 273.6 | Met against QuestDB only |
+| WT-3 | Linux | Total 195.3 s, against Parquet 158.4, ArcticDB 120.1, QuestDB 273.6; engine-only 195.0 s, against 81.1, 34.6 and 151.0 | Missed against all three: met against a system only if no slower on both clocks |
 | WT-3 | macOS | No four-system day: it runs on Linux only | Not judged |
-| WT-4 | Linux | 188.9 s, against Parquet 266.3, ArcticDB 123.6, QuestDB 1,269.2 (not like-for-like) | Met against Parquet and QuestDB; missed against ArcticDB |
+| WT-4 | Linux | Total 188.9 s, against Parquet 266.3, ArcticDB 123.6, QuestDB 1,269.2 (not like-for-like); engine-only 188.5 s, against 98.4, 42.6 and 1,137.3 | Met against QuestDB only, not like-for-like; missed against Parquet and ArcticDB |
 | QL-1 | Linux | Q2 warm median 74.32 ms | Missed, 4.4 times 16.9 ms |
 | QL-1 | macOS | Q2 warm median 25.79 ms | Missed, 1.53 times 16.9 ms |
 | QL-2 | Linux | Q3 warm median 35.81 ms | Missed against 0.41 ms |
