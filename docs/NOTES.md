@@ -5507,8 +5507,12 @@ the README (`readme-pitch-figure-edited` now raises the ratio, `readme-pitch-unc
 `readme-pitch-claim-reworded`, `readme-headline-markers-removed`, `readme-keeps-a-results-block`
 and `headline-without-a-miss`, 19 PROVEN, and `control-comment-only` UNDETECTED, as expected.
 `results/check-proofs.json` was restored from git. The other renderer patches apply at their new
-lines and touch code this change left alone, so they wait for the next full re-proof. The fault
-logs are kept outside the repository.
+lines and touch code this change left alone, so they wait for the next full re-proof. After the
+line was shortened, at `c4bf3b7`, `headline-left-out-drops-a-miss`, regenerated for the new
+writer, and `headline-left-out-miscounted`, new, which counts the other targets missed in part as
+met, were PROVEN with `--only` through `heavy.sh`: the first stops on "does not name 'flushed
+one-thread ingest', which is missed", the second on counts of 11 met against the targets' 4.
+`results/check-proofs.json` was restored again. The fault logs are kept outside the repository.
 
 ## Process notes
 
