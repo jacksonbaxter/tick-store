@@ -5514,6 +5514,57 @@ met, were PROVEN with `--only` through `heavy.sh`: the first stops on "does not 
 one-thread ingest', which is missed", the second on counts of 11 met against the targets' 4.
 `results/check-proofs.json` was restored again. The fault logs are kept outside the repository.
 
+### The essay's figures
+
+2026-11-14. WRITEUP.md will be rendered, not typed. `docs/writeup/WRITEUP.template.md` is the
+essay with a `{{name}}` token for every figure, verdict, bar, code constant and results link, 310
+in all, and `docs/writeup/figures.json` defines each one: the kind of results file and its host,
+a pattern with `*` where the commit goes, the field or the computation in `targets.json`'s
+expressions and a few of the list's own, the format, and a line of what it is.
+`scripts/render_writeup.py` fills the page in, and `--check`, the step `writeup-check` beside
+`render-check` and in CI's repo job, compares the committed page with a fresh render. The
+template differs from the draft in four places only: its trace sentence names the script and
+the list; the boost sentence says the Zen 1 is shared with other work, its settings were not
+mine to change, and no run had boost off; numbers it typed are tokens (the code's byte sizes and
+limits, the segment sizes, the run counts, the bars, the measured commit); and the results links
+are path tokens.
+
+**Tokens by kind.** Of the 310, 57 read the Zen 1's four-system day and 6 the M4's
+tick-store-alone day, 33 the codec evaluation, 23 the store sizes, 26 the column-decode
+benchmarks (20 Zen 1, 6 M4), 15 the kernel benchmarks (11 M4, 4 Zen 1), 10 the ITCH codec
+benchmark, 26 the diagnostics (11 counters, 8 writer, 6 price decode, 1 query), 7 the fuzz file,
+3 the prover's record, 2 the round trip and 4 the pending kinds; 30 are code constants, 16 bars,
+15 verdicts, 7 counts of the tree's lines or rows, 1 the figure list's own path, and 29 are
+computed from other tokens. Verdicts go through
+`render_results.py`'s `judged_parts` and `verdict_class` (or `verdict_of` for WT-4's parts), so
+the essay cannot word a verdict the Targets block does not give.
+
+**Today.** `--check` exits 3, not judged: 35 of 310 tokens have no results file yet, diag-counters
+11, diag-writer 8, diag-price 6, diag-query 1, the Zen 1 kernel file 5, and three kinds marked
+pending because no committed file records them yet: the fuzz input that stopped the seventh Zen 1
+target (2), the fuzz oracle's bound (1) and the refused Zen 1 kernel runs (1). check.sh shows it
+as `SKIP`, and under `--no-skips`, as CI runs it, `FAIL`, so the repo job fails on writeup-check
+as well as check-ties until the measurements land. A dry render of what resolves runs to 3,989
+words, each waiting token counted as one, against the limit of 4,000. Against the figures the
+draft was written against, 194 resolving tokens agree and these differ: the faults listed in
+`prove_checks.py` are 276 (283 with this change), not 244; `docs/REVIEW.md` has 149 rows, not
+148; the measured commit resolves to the Zen 1 day's file now committed, `67ae574`, where the
+draft names the freeze's `ede0176`, which is right once the freeze's file replaces it; WT-4 reads
+as `render_results.py` words it by part. The diagnostics summary names groups other than the
+draft's: the writer's dictionary group is `dictionary_encode`, and the price decode has no
+separate patches or scale-and-range group, so those two tokens read `pfor_block_decode` and
+`store_column_decode`, and the template's D4 sentence must match them or take its replacement.
+
+**Faults.** Eight are new. `writeup-typed-number-unchecked`, `writeup-two-files-accepted`,
+`writeup-page-not-compared`, `writeup-not-judged-passes`, `check-sh-writeup-not-judged-passes`,
+`writeup-verdict-own-code` and `writeup-constant-found-twice-accepted`, each in `py-scripts`,
+were PROVEN with `--only` through `heavy.sh`, two or three at a time, about 4 minutes a fault.
+`writeup-two-files-accepted` first went undetected: the verdict token reads the same files
+through `render_results.py`, which refused for it, so its test now names the first token that
+reads the kind. `writeup-template-not-rendered`, on `writeup-check` itself, is BASELINE FAILED
+until WRITEUP.md is rendered, as expected; `control-comment-only` stayed UNDETECTED.
+`results/check-proofs.json` was restored from git after each run.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from

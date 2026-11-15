@@ -98,7 +98,9 @@ differ between any two commits, and comparing the other objects would need both 
 one folder with one toolchain and would still say nothing of the Python harness that runs the
 measurements), `scripts/render_results.py --check`,
 which fails if the first screen's generated part or any table of RESULTS.md differs from a fresh
-render, actionlint, and a check of what git tracks: no home path, no data file, nothing over 1 MB
+render, `scripts/render_writeup.py --check`, which fails if the essay, `WRITEUP.md`, differs from a
+fresh render of its template and figure list and is not judged until every results file it reads
+is committed, actionlint, and a check of what git tracks: no home path, no data file, nothing over 1 MB
 but the named results. No step loads a whole day. `ItchRealDay` reads the first 2 million messages.
 
 `render_results.py --check` also holds the first screen to its rules. The pitch runs to at most
@@ -118,6 +120,21 @@ The whole screen names no target id and no query's name, and introduces each mac
 what it is. What it does not check is that the prose is true beyond those figures and claims: a
 sentence that misleads without a ranking word, a plain name that misdescribes its target, or a
 bar whose words drift from its target in `BENCHMARKS.md` would all pass.
+
+`render_writeup.py` holds the essay to `docs/writeup/figures.json`, its figure list. Every figure,
+verdict and results link in `docs/writeup/WRITEUP.template.md` is a token the list defines: the
+results file by kind and host, never by a name with a commit in it, so a file measured again still
+resolves; the field or computation; the format; and a line of what it is. A verdict is
+`render_results.py`'s own, a bar is the target's value, and a size the essay takes from the code
+is read from the source by a pattern that must match one line. The render stops on a token the list
+lacks, an entry the template never uses, a kind that matches two files, a value outside its
+format, a constant that moved or changed form, or a number typed in the template that the list
+does not declare a non-result with its reason. The essay must run 2,500 to 4,000 words and open
+with its conclusion. Until every file it reads is committed there is no `WRITEUP.md`, and the step
+is not judged, naming how many tokens wait, which is a failure under `--no-skips`; once the page
+exists, a missing file or a page that differs from a fresh render fails. What it does not check is
+that the prose is true beyond its figures and verdicts: a sentence can misread a right figure, and
+a number written in words is not seen.
 
 A skip is never a pass. A step that cannot run shows as `SKIP`, as `py-compare` does with no
 `.venv`, and a test skipped inside a passing step is named in that row. `ItchRealDay` skips
