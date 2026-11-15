@@ -284,6 +284,14 @@ def hand_edit_pitch_figure():
     edit_text("README.md", f"{ratio:.2f} times smaller", f"{ratio + 1:.2f} times smaller")
 
 
+def reword_the_writeup_template():
+    """The essay's template reworded and WRITEUP.md not rendered again. The page is rendered
+    once every results file it reads is committed; until then writeup-check is not judged, so
+    this fault's baseline does not pass and the prover records it as such."""
+    edit_text("docs/writeup/WRITEUP.template.md", "gives every message back bit-exact",
+              "gives every message back bit-exact, by hand")
+
+
 def swap_pitch_store_sizes():
     """The README's pitch with the source's size and the store's in each other's places, both
     still figures the results give (review RG-4)."""
@@ -1519,6 +1527,34 @@ FAULTS = (
     Fault("ties-measured-code-changed", "check-ties", "a library source changed after the "
           "commit every results file names", CHECK_FAILED,
           "what it measures changed since: src/itch/frame.cpp"),
+    # The essay's render, scripts/render_writeup.py, and its step.
+    Fault("writeup-typed-number-unchecked", "py-scripts", "render_writeup.py lets a number typed "
+          "in the essay's template through", CHECK_FAILED,
+          "FAIL: test_a_typed_number_in_the_template (__main__.Refuses"),
+    Fault("writeup-two-files-accepted", "py-scripts", "render_writeup.py reads the first of two "
+          "results files a token's kind matches", CHECK_FAILED,
+          "FAIL: test_a_kind_that_matches_two_files (__main__.Refuses"),
+    Fault("writeup-page-not-compared", "py-scripts", "render_writeup.py --check passes a "
+          "WRITEUP.md it never compares with a fresh render", CHECK_FAILED,
+          "FAIL: test_a_hand_edited_number_in_the_page_fails_check (__main__.Renders"),
+    Fault("writeup-not-judged-passes", "py-scripts", "render_writeup.py --check exits 0 while "
+          "tokens still wait for their results files", CHECK_FAILED,
+          "FAIL: test_a_token_whose_kind_is_still_to_come_is_not_judged (__main__.NotJudged"),
+    Fault("check-sh-writeup-not-judged-passes", "py-scripts", "check.sh passes writeup-check "
+          "when the essay could not be judged", CHECK_FAILED,
+          "FAIL: test_check_sh_reports_not_judged_as_a_skip_and_a_failure_under_no_skips "
+          "(__main__.NotJudged"),
+    Fault("writeup-verdict-own-code", "py-scripts", "render_writeup.py words a verdict by its "
+          "own rule, apart from render_results.py's verdict_class", CHECK_FAILED,
+          "FAIL: test_the_verdict_is_render_results_own_code (__main__.Renders"),
+    Fault("writeup-constant-found-twice-accepted", "py-scripts", "render_writeup.py reads a code "
+          "constant from the first of two lines its pattern matches", CHECK_FAILED,
+          "FAIL: test_a_constant_found_twice (__main__.Refuses"),
+    # The step itself on the committed page. Its baseline passes only once WRITEUP.md is
+    # rendered, when every results file it reads is committed (docs/TASKS.md).
+    Fault("writeup-template-not-rendered", "writeup-check", "the essay's template reworded "
+          "and WRITEUP.md not rendered again", CHECK_FAILED,
+          "WRITEUP.md differs from a fresh render", mutate=reword_the_writeup_template),
     Fault("control-comment-only", "render-check", "a comment, which no check should notice",
           0, "", control=True),
 )

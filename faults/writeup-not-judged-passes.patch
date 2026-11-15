@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 6d3e0dc..a731bed 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -811,7 +811,7 @@ def main(argv=None):
+             print(f"render_writeup: {line}")
+         print(f"render_writeup: {page_name} does not exist yet; it is rendered once every token "
+               "resolves")
+-        return EXIT_UNJUDGED
++        return EXIT_OK
+     if rendered.waiting:
+         names = ", ".join(sorted(rendered.waiting)[:8])
+         print(f"render_writeup: {page_name} exists, and {len(rendered.waiting)} of its tokens have "

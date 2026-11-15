@@ -212,7 +212,9 @@ class Refuses(Tree):
 
     def test_a_kind_that_matches_two_files(self):
         self.write("results/bench/macOS-demo-fedcba987654.json", json.dumps(RESULTS))
-        self.refused("results/bench/macOS-demo-*.json matches 2 files")
+        # The first token to read the kind refuses, not only the verdict, which
+        # render_results.py judges on the same files.
+        self.refused("{{speed}}: results/bench/macOS-demo-*.json matches 2 files")
 
     def test_a_kind_named_by_a_commit(self):
         self.figures["kinds"]["demo"]["files"]["macOS"] = RESULT

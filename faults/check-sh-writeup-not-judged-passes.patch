@@ -1,0 +1,12 @@
+diff --git a/scripts/check.sh b/scripts/check.sh
+index d70d0c4..985beee 100755
+--- a/scripts/check.sh
++++ b/scripts/check.sh
+@@ -519,7 +519,6 @@ step_writeup_check() {
+     if [[ $code -eq 3 ]]; then
+         local reason
+         reason=$(sed -n 's/^render_writeup: \(not judged: .*\)/\1/p' "$1" | head -n 1)
+-        skip_step "WRITEUP.md ${reason:-not judged: render_writeup.py exited 3}"
+         return 0
+     fi
+     return "$code"

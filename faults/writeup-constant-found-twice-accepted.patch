@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 6d3e0dc..aea6421 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -409,7 +409,7 @@ def constant(spec, context):
+     """A constant from a source file: the one line its pattern matches, group 1 its value."""
+     text = source_text(context, spec["source"])
+     found = list(re.finditer(spec["pattern"], text, re.MULTILINE))
+-    if len(found) != 1:
++    if not found:
+         raise Refused(f"{{{{{context.name}}}}}: {spec['pattern']!r} matches {len(found)} lines "
+                       f"of {spec['source']}, not one: the constant moved or changed form, so "
+                       "the figure list must say again where it is")

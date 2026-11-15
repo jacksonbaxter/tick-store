@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 6d3e0dc..b773fa8 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -218,7 +218,7 @@ class Resolver:
+         """The one results file of a kind on a host, or Waiting if there is none yet."""
+         pattern = self.pattern_of(kind, host, name)
+         try:
+-            path = render_results.target_file(self.root, pattern)
++            path = next(iter(sorted(self.root.glob(pattern))), None)
+         except render_results.TargetError as error:
+             raise Refused(f"{{{{{name}}}}}: {error}, and a token reads one") from error
+         if path is None:

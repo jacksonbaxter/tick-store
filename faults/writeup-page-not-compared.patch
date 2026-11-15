@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 6d3e0dc..74dd989 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -827,7 +827,7 @@ def main(argv=None):
+             print(f"render_writeup: every token resolves, and there is no {page_name}: render it",
+                   file=sys.stderr)
+             return EXIT_STALE
+-        if page.read_text(encoding="utf-8") != rendered.text:
++        if not page.read_text(encoding="utf-8"):
+             print(f"render_writeup: {page_name} differs from a fresh render: it is stale or was "
+                   "edited by hand. Render it again.", file=sys.stderr)
+             return EXIT_STALE
