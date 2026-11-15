@@ -48,7 +48,7 @@ fuzz-itch-frame fuzz-itch-message fuzz-itch-query fuzz-itch-store fuzz-pfor fuzz
 fuzz-stream-vbyte fuzz-stub-store"
 ALL_STEPS="dev-build dev-test oracle asan-build asan-test tsan-build tsan-test clang-tidy
 fuzz-build $FUZZ_TARGETS coverage py-scripts py-compare check-results check-compare
-check-ties render-check actionlint hygiene"
+check-ties render-check writeup-check actionlint hygiene"
 JOBS=6
 TEST_TIMEOUT=900
 
@@ -505,6 +505,21 @@ step_render_check() {
     NOTE=$(sed -n 's/^fuzz-g3-[0-9a-f]*\.json: ok, //p' "$1" | head -n 1)
     if [[ $code -eq 3 ]]; then
         skip_step "G-3's results file could not be tied to the code it judged: no git history"
+        return 0
+    fi
+    return "$code"
+}
+
+# Until every results file the essay reads is committed, WRITEUP.md is not rendered and the step
+# cannot judge it: render_writeup.py says how many tokens wait, and that is a skip, never a pass.
+step_writeup_check() {
+    python3 -I scripts/render_writeup.py --check
+    local code=$?
+    NOTE=$(sed -n 's/^render_writeup: \(WRITEUP.md is current.*\)/\1/p' "$1" | tail -n 1)
+    if [[ $code -eq 3 ]]; then
+        local reason
+        reason=$(sed -n 's/^render_writeup: \(not judged: .*\)/\1/p' "$1" | head -n 1)
+        skip_step "WRITEUP.md ${reason:-not judged: render_writeup.py exited 3}"
         return 0
     fi
     return "$code"
