@@ -1,0 +1,12 @@
+diff --git a/scripts/diag_summary.py b/scripts/diag_summary.py
+--- a/scripts/diag_summary.py
++++ b/scripts/diag_summary.py
+@@ -1118,7 +1118,7 @@
+             raise Refused(f"--commit {args.commit!r} is not 40 hex digits")
+         kind, document = summarise(args.folder, args.commit, args.iteration)
+         out = args.out or RESULTS / f"{kind}-{DAY}-{args.commit[:12]}.json"
+-        if args.iteration and RESULTS_ROOT.resolve() in out.resolve().parents:
++        if args.iteration and RESULTS.resolve() in out.resolve().parents:
+             raise Refused("an iteration summary is never written under results/")
+         text = json.dumps(document, indent=1) + "\n"
+         refuse_leaks(text, args.forbid)

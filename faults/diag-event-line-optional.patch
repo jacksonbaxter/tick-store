@@ -1,0 +1,12 @@
+diff --git a/scripts/diag_summary.py b/scripts/diag_summary.py
+--- a/scripts/diag_summary.py
++++ b/scripts/diag_summary.py
+@@ -640,7 +640,7 @@
+     """A report the summary takes shares from: its event named, each line's samples and period
+     given, and its event count, as the runner's -n --show-total-period reports have them."""
+     name = report["name"]
+-    if report["event"] is None:
++    if False:
+         raise Refused(f"{name}: no '# Samples: ... of event' line, so the event it counts is "
+                       "not known")
+     missing = [column for column in INTEGER_COLUMNS if column not in report["columns"]]

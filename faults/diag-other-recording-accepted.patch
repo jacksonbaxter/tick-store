@@ -1,0 +1,12 @@
+diff --git a/scripts/diag_summary.py b/scripts/diag_summary.py
+--- a/scripts/diag_summary.py
++++ b/scripts/diag_summary.py
+@@ -700,7 +700,7 @@
+                       f"{LOST_AT_MOST:.1%} of them, so the shares are not the run's")
+     block["lost_samples_at_most"] = f"{LOST_AT_MOST:.1%} of the samples kept and lost"
+     children = report_file(folder, f"{stem}-children.txt", required=False)
+-    if children:
++    if False:
+         same_recording(self_report, children)
+     block["inclusive"] = (inclusive(kind, children, limit_of(facts, f"{stem}-children.txt"))
+                           if children else None)

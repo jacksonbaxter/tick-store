@@ -1,0 +1,12 @@
+diff --git a/scripts/diag_summary.py b/scripts/diag_summary.py
+--- a/scripts/diag_summary.py
++++ b/scripts/diag_summary.py
+@@ -876,7 +876,7 @@
+             raise Refused(f"perf stat did not report {event}")
+         if "value" not in counter:
+             raise Refused(f"perf stat did not count {event}: {counter['reason']}")
+-        if counter["coverage_percent"] < 100.0:
++        if False:
+             raise Refused(f"perf stat counted {event} {counter['coverage_percent']:.2f}% of the "
+                           "time, multiplexed, so its total is perf's estimate")
+         out[key] = int(counter["value"])

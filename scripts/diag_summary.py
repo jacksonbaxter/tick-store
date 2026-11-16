@@ -28,8 +28,21 @@ It refuses, exit 1, input it cannot account for: a report with no samples, a com
 --commit, self shares that do not sum to 100 within the report's rounding, or whose periods do
 not add up to its event count, a line it cannot read, a build other than the bench preset, a
 query answer that is an error or ran other kernels than its cap allows, and output that would
-hold an absolute path, this machine's name or user, or a --forbid word. A smoke's folder is
-iteration only: it is refused unless --iteration is given, and never written under results/.
+hold an absolute path, this machine's name or user, or a --forbid word. A profile is tied to its
+recording: its self report must name its event, give each line's samples and period and the
+event count, and hold every sample perf record says it wrote; more than LOST_AT_MOST of the
+samples lost is refused; the children and source-file reports must be of the same recording,
+the same event, sample count and event count. An inclusive share that two entries would add up
+is refused, and so are query runs on different stores, a counter perf multiplexed, an AVX2 run
+whose answers ran no AVX2 kernel where its scalar twin ran kernels, and answers whose rows or
+digest differ between the levels or the rounds. A smoke's folder is iteration only: it is
+refused unless --iteration is given, and never written anywhere under results/.
+
+What the raw output may not hold is not guessed: a report with no lost-samples line, a recording
+whose sample count perf record did not print, or a query whose answers give no kernel runs or no
+digest leaves that fact out, listed in the summary's not_established with the path it covers
+and why, and the ratio it would need is null. scripts/render_writeup.py refuses a token that
+reads a path so listed.
 
 Standard library only, with scripts/run_bench.py's own readings of /proc/stat, the load lines
 and the boost state, so D3 reads them as the benchmarks do.
@@ -52,13 +65,17 @@ import run_bench  # noqa: E402
 
 SCHEMA = "tick-store-diag-1"
 DAY = "12302019"
-RESULTS = REPO_ROOT / "results" / "diag"
+RESULTS_ROOT = REPO_ROOT / "results"
+RESULTS = RESULTS_ROOT / "diag"
 PRESET = "bench"
 CORE = run_bench.LINUX_CORE
 TOP_UNMATCHED = 10
 SYMBOL_CHARS = 120
 # A printed percentage is rounded to two places, so each line is off by at most half a unit.
 HALF_UNIT = 0.005
+# The most of a recording's samples that may be lost, kept plus lost, before its shares are no
+# longer the run's: perf drops samples in bursts, so the loss is not spread evenly.
+LOST_AT_MOST = 0.001
 # An absolute path: a slash that starts a word or follows = , ; or ( , not one inside a URL.
 ABSOLUTE = re.compile(r"(?<![\w:/.~-])/[^\s,;:()'\"]+")
 # A path in a command: from a slash at a word's start, or after = : , or a quote, to the next
@@ -74,20 +91,20 @@ ABOVE = {"scalar": ("neon", "avx2"), "avx2": ("neon",)}
 
 STATEMENTS = {
     "writer-profile": (
-        "A diagnostic, one run at the freeze commit, judging no target: the writer's sampled "
+        "A diagnostic, one run at commit {commit}, judging no target: the writer's sampled "
         "user-mode cycles (cycles:u) while it stores the whole day, as shares by group of "
         "functions. Shares of samples, not times; no time is reported."),
     "query-profile": (
-        "A diagnostic, one run at the freeze commit, judging no target: each query process's "
+        "A diagnostic, one run at commit {commit}, judging no target: each query process's "
         "sampled user-mode cycles (cycles:u), store open, engine and digest together, as shares "
         "by group of functions. Shares of samples, not times; no time is reported."),
     "counters-simd": (
-        "A diagnostic, one run at the freeze commit, judging no target: user-mode counter totals "
+        "A diagnostic, one run at commit {commit}, judging no target: user-mode counter totals "
         "of the write and of each query process under measure.sh on cpu4, and each query's "
         "engine times at AVX2 and capped to scalar, read from the query tool's own answer "
         "lines (engine_ns), not from wall time. Those engine times are the only times here."),
     "price-decode-profile": (
-        "A diagnostic, one run at the freeze commit, judging no target: the sampled user-mode "
+        "A diagnostic, one run at commit {commit}, judging no target: the sampled user-mode "
         "cycles (cycles:u) of the price column's decode, store_decode/add_price, recorded only "
         "inside column_decode_bench's timed passes, as shares by group of functions. Shares of "
         "samples, not times; no time is reported."),
@@ -273,6 +290,8 @@ WORD_COLUMNS = ("Command", "Shared Object")
 REST_COLUMNS = ("Source File", "Source:Line")
 KNOWN_COLUMNS = PERCENT_COLUMNS + INTEGER_COLUMNS + WORD_COLUMNS + REST_COLUMNS + ("Symbol",)
 DATA_LINE = re.compile(r"^\s*\d+\.\d+%")
+# perf pads a count with no unit with a space: "# Samples: 827  of event 'cycles:u'".
+SAMPLES_LINE = re.compile(r"# Samples: (\S+)\s+of event '([^']+)'")
 RECORDED = re.compile(r"Captured and wrote .*\((\d+) samples\)")
 
 
@@ -285,8 +304,29 @@ class Refused(Exception):
 def function_name(symbol):
     """The qualified name of a demangled symbol: its return type and parameters dropped. A
     space or a parenthesis inside template arguments, (anonymous namespace), decltype(auto) or
-    an operator's name does not end it."""
+    an operator's name does not end it. A lambda or class local to a function is named by that
+    function, as f(int)::$_0::operator()() is by f, so its samples go to f's group."""
     text = symbol.strip()
+    start, end = name_bounds(text)
+    return text[start:end]
+
+
+def local_to_function(symbol):
+    """Whether the symbol is a lambda or class local to a function, f(int)::$_0::operator()(),
+    which runs inside f: its own entry is never added to f's inclusive share."""
+    text = symbol.strip()
+    _start, end = name_bounds(text)
+    depth = 0
+    for index in range(end, len(text)):
+        depth += {"(": 1, ")": -1}.get(text[index], 0)
+        if depth == 0:
+            return text.startswith("::", index + 1)
+    return False
+
+
+def name_bounds(text):
+    """Where the qualified name runs in a demangled symbol: its start, and the index of the
+    parameter list's parenthesis, or the text's end."""
     depth = 0
     start = 0
     index = 0
@@ -310,11 +350,11 @@ def function_name(symbol):
         elif char in ">]}":
             depth = max(0, depth - 1)
         elif char == "(" and depth == 0:
-            return text[start:index]
+            return start, index
         elif char == " " and depth == 0:
             start = index + 1
         index += 1
-    return text[start:]
+    return start, len(text)
 
 
 def column_names(line):
@@ -352,7 +392,7 @@ def parse_report(text, name):
     pattern = None
     for number, line in enumerate(text.splitlines(), 1):
         if line.startswith("#"):
-            match = re.match(r"# Samples: (\S+) of event '([^']+)'", line)
+            match = SAMPLES_LINE.match(line)
             if match:
                 report["samples_header"], report["event"] = match.group(1), match.group(2)
             match = re.match(r"# Event count \(approx\.\): (\d+)", line)
@@ -494,9 +534,14 @@ def inclusive(kind, report, limit):
     out = {}
     for label, pattern in INCLUSIVE[kind]:
         compiled = re.compile(pattern)
-        found = [row["Children"] for row in report["rows"]
-                 if "Children" in row and compiled.match(function_name(row["key"]))]
-        out[label] = round(sum(found), 3) if found else None
+        found = [row for row in report["rows"]
+                 if "Children" in row and compiled.match(function_name(row["key"]))
+                 and not local_to_function(row["key"])]
+        if len(found) > 1:
+            # One function may call another, so their inclusive shares do not add up.
+            raise Refused(f"{report['name']}: {len(found)} entries match the inclusive share "
+                          f"{label!r}: " + "; ".join(row["key"][:60] for row in found))
+        out[label] = round(found[0]["Children"], 3) if found else None
     return {"limit_percent": limit, "note": "null: under the report's limit, or not called",
             "children_share_percent": out}
 
@@ -591,27 +636,85 @@ def build_block(facts):
             "note": strip_paths(fact(facts, "build_note"))}
 
 
+def require_counts(report):
+    """A report the summary takes shares from: its event named, each line's samples and period
+    given, and its event count, as the runner's -n --show-total-period reports have them."""
+    name = report["name"]
+    if report["event"] is None:
+        raise Refused(f"{name}: no '# Samples: ... of event' line, so the event it counts is "
+                      "not known")
+    missing = [column for column in INTEGER_COLUMNS if column not in report["columns"]]
+    if missing:
+        raise Refused(f"{name}: no {' or '.join(missing)} column, so its shares cannot be tied "
+                      "to the recording: make it with -n --show-total-period")
+    if report["event_count"] is None:
+        raise Refused(f"{name}: no '# Event count' line, so its periods cannot be checked")
+
+
+def same_recording(main, other):
+    """A children or source-file report must be of the self report's recording."""
+    if other["event"] is None or other["event_count"] is None:
+        raise Refused(f"{other['name']}: no sample or event count line, so it is not shown to "
+                      f"be of {main['name']}'s recording")
+    for key, what in (("event", "event"), ("samples_header", "sample count"),
+                      ("event_count", "event count")):
+        if other[key] != main[key]:
+            raise Refused(f"{other['name']}: its {what} is {other[key]}, and "
+                          f"{main['name']}'s is {main[key]}, so it is another recording's")
+
+
 def profile_block(facts, folder, kind, stem, record_stem):
+    """A profile's shares and its tie to its recording. Returns the block and what of the tie
+    the raw output does not establish, as (what, why) pairs."""
     self_report = report_file(folder, f"{stem}-self.txt")
-    if self_report["event"] not in (None, fact(facts, "event")):
+    require_counts(self_report)
+    if self_report["event"] != fact(facts, "event"):
         raise Refused(f"{stem}-self.txt counts {self_report['event']}, not "
                       f"{fact(facts, 'event')}")
     block = {
         "samples_recorded": recorded_samples(folder, record_stem),
-        "samples_in_report": (sum(row["Samples"] for row in self_report["rows"])
-                              if "Samples" in self_report["columns"] else None),
+        "samples_in_report": sum(row["Samples"] for row in self_report["rows"]),
         "samples_header": self_report["samples_header"],
         "lost_samples": self_report["lost"],
         "groups": grouped(kind, self_report),
     }
-    if block["samples_recorded"] == 0:
+    missing = []
+    recorded = block["samples_recorded"]
+    if recorded == 0:
         raise Refused(f"{record_stem}.err says perf recorded no samples")
+    if recorded is None:
+        missing.append(("the recording's sample count", f"{record_stem}.err holds no perf "
+                        "record line with its sample count, so the report is not shown to "
+                        "hold the whole recording"))
+    elif recorded != block["samples_in_report"]:
+        raise Refused(f"{stem}-self.txt holds {block['samples_in_report']} samples, and "
+                      f"{record_stem}.err says perf recorded {recorded}, so it is not that "
+                      "recording's whole report")
+    lost = block["lost_samples"]
+    if lost is None:
+        missing.append(("the samples lost", f"{stem}-self.txt has no '# Total Lost Samples' "
+                        "line, so the samples perf dropped are not known"))
+    elif lost > LOST_AT_MOST * (block["samples_in_report"] + lost):
+        raise Refused(f"{stem}-self.txt: perf lost {lost} samples beside the "
+                      f"{block['samples_in_report']} it kept, more than "
+                      f"{LOST_AT_MOST:.1%} of them, so the shares are not the run's")
+    block["lost_samples_at_most"] = f"{LOST_AT_MOST:.1%} of the samples kept and lost"
     children = report_file(folder, f"{stem}-children.txt", required=False)
+    if children:
+        same_recording(self_report, children)
     block["inclusive"] = (inclusive(kind, children, limit_of(facts, f"{stem}-children.txt"))
                           if children else None)
     srcfile = report_file(folder, f"{stem}-srcfile.txt", required=False)
+    if srcfile:
+        require_counts(srcfile)
+        same_recording(self_report, srcfile)
     block["source_files"] = source_files(srcfile) if srcfile else None
-    return block
+    return block, missing
+
+
+def not_established(path, missing):
+    """Entries of a summary's not_established list, each with the path it covers."""
+    return [{"path": path, "what": what, "why": why} for what, why in missing]
 
 
 def common(facts, folder, commit, kind):
@@ -621,8 +724,9 @@ def common(facts, folder, commit, kind):
         raise Refused(f"the run is at {fact(facts, 'commit')}, not the commit given, {commit}")
     return {"schema": SCHEMA, "kind": kind, "day": DAY, "commit": commit,
             "host": fact(facts, "host"), "measurement": "diagnostic",
-            "statement": STATEMENTS[kind], "runs": 1, "input": fact(facts, "input"),
-            "build": build_block(facts), "wrapper": fact(facts, "wrapper")}
+            "statement": STATEMENTS[kind].format(commit=commit[:12]), "runs": 1,
+            "input": fact(facts, "input"), "build": build_block(facts),
+            "wrapper": fact(facts, "wrapper"), "not_established": []}
 
 
 def profile_header(facts):
@@ -665,7 +769,9 @@ def writer_profile(facts, folder, commit):
     out.update(profile_header(facts))
     ingest = json.loads((folder / "ingest.json").read_text(encoding="utf-8"))
     out["records"] = ingest["records"]
-    out.update(profile_block(facts, folder, "writer-profile", "writer", "perf-record"))
+    block, missing = profile_block(facts, folder, "writer-profile", "writer", "perf-record")
+    out.update(block)
+    out["not_established"] += not_established([], missing)
     out["group_table"] = group_table("writer-profile")
     out["store_layout"] = layout_block(folder)
     out["commands"] = commands(facts, "record_command", "report_command")
@@ -681,6 +787,18 @@ def answers_of(path, name):
         if "error" in answer:
             raise Refused(f"{name}: an answer is an error: {answer['error']}")
     return lines[0], answers
+
+
+STORE_KEYS = ("records", "segments", "store_version", "segment_records")
+
+
+def same_store(store, ready, name, keys=STORE_KEYS):
+    """Every query run opens the one store: its ready line's store facts are the first's."""
+    facts = {key: ready.get(key) for key in keys}
+    if store is not None and facts != store:
+        raise Refused(f"{name}: the tool opened a store of {facts}, and the first run's is "
+                      f"{store}")
+    return facts
 
 
 def constant(answers, key):
@@ -700,15 +818,15 @@ def query_profile(facts, folder, commit):
         requested = len(json_lines(folder / f"{name}.jsonl"))
         if len(answers) != requested:
             raise Refused(f"{name}: {len(answers)} answers to {requested} requests")
-        store = store or {key: ready.get(key) for key in
-                          ("records", "segments", "store_version", "segment_records",
-                           "kernel_level")}
+        store = same_store(store, ready, f"{name}.out", STORE_KEYS + ("kernel_level",))
         entry = {"name": name, "repetitions": len(answers),
                  "values_decoded": constant(answers, "values_decoded"),
                  "segments": constant(answers, "segments"),
                  "kernel_runs": constant(answers, "kernel_runs")}
-        entry.update(profile_block(facts, folder, "query-profile", name,
-                                   f"{name}-perf-record"))
+        block, missing = profile_block(facts, folder, "query-profile", name,
+                                       f"{name}-perf-record")
+        entry.update(block)
+        out["not_established"] += not_established(["queries", {"name": name}], missing)
         shares = (entry["inclusive"] or {}).get("children_share_percent", {})
         if shares.get("engine") is not None and shares.get("digest") is not None:
             entry["engine_share_percent"] = shares["engine"]
@@ -758,6 +876,9 @@ def counter_block(counters):
             raise Refused(f"perf stat did not report {event}")
         if "value" not in counter:
             raise Refused(f"perf stat did not count {event}: {counter['reason']}")
+        if counter["coverage_percent"] < 100.0:
+            raise Refused(f"perf stat counted {event} {counter['coverage_percent']:.2f}% of the "
+                          "time, multiplexed, so its total is perf's estimate")
         out[key] = int(counter["value"])
         out[f"{key}_coverage_percent"] = counter["coverage_percent"]
     task = seconds_of(counters.get("task-clock"))
@@ -795,6 +916,14 @@ def busy(folder, before, after, sibling):
     return round(100.0 * (busy_after - busy_before) / (total_after - total_before), 3)
 
 
+def answer_identity(answer):
+    """What an answer says, apart from how long it took: its kind, rows and digest, or None
+    where it gives no rows or digest."""
+    if answer.get("rows") is None or not answer.get("sha256"):
+        return None
+    return (answer.get("name"), answer.get("kind"), answer["rows"], answer["sha256"])
+
+
 def counters_simd(facts, folder, commit):
     out = common(facts, folder, commit, "counters-simd")
     out["events"] = fact(facts, "events")
@@ -826,6 +955,11 @@ def counters_simd(facts, folder, commit):
     out["write"] = write
     runs = []
     pooled = {}
+    store = None
+    # Per query: the answers of its first file, and why its ratio is not established.
+    first_answers = {}
+    unshown = {name: [] for name in QUERIES}
+    kernels = {}
     for round_number in (1, 2):
         for level in LEVELS:
             for name in QUERIES:
@@ -833,15 +967,36 @@ def counters_simd(facts, folder, commit):
                 ready, answers = answers_of(folder / f"{stem}.out", f"{stem}.out")
                 if ready.get("kernel_level") != level:
                     raise Refused(f"{stem}: asked for {level}, the tool ran {ready.get('kernel_level')}")
+                store = same_store(store, ready, f"{stem}.out")
                 requested = len(json_lines(folder / f"{name}.jsonl"))
                 if len(answers) != requested or requested < 2:
                     raise Refused(f"{stem}: {len(answers)} answers to {requested} requests")
+                identities = [answer_identity(answer) for answer in answers]
+                if any(identity is None for identity in identities):
+                    unshown[name].append(("the levels' answers alike", f"{stem}: an answer "
+                                          "gives no rows or sha256, so AVX2 and scalar are not "
+                                          "shown to answer alike"))
+                elif name not in first_answers:
+                    first_answers[name] = (stem, identities)
+                elif identities != first_answers[name][1]:
+                    at = next(index for index, (one, two) in enumerate(
+                        zip(identities, first_answers[name][1])) if one != two)
+                    raise Refused(f"{stem}: answer {at + 1} is {identities[at]}, and "
+                                  f"{first_answers[name][0]}'s is {first_answers[name][1][at]}: "
+                                  "the levels or the rounds answer differently")
                 timed = answers[1:]
+                if any(not isinstance(answer.get("kernel_runs"), dict) for answer in timed):
+                    unshown[name].append(("the kernels each level ran", f"{stem}: an answer "
+                                          "gives no kernel_runs, so its cap is not shown to "
+                                          "hold"))
                 for answer in timed:
                     other = {lv: n for lv, n in (answer.get("kernel_runs") or {}).items()
                              if lv in ABOVE[level] and n}
                     if other:
                         raise Refused(f"{stem}: capped to {level}, an answer ran {other}")
+                kernels[(name, level, round_number)] = (
+                    sum((answer.get("kernel_runs") or {}).get(level, 0) for answer in timed),
+                    sum(sum((answer.get("kernel_runs") or {}).values()) for answer in timed))
                 engine = [answer["engine_ns"] for answer in timed]
                 pooled.setdefault((name, level), []).extend(engine)
                 values = constant(timed, "values_decoded")
@@ -859,13 +1014,30 @@ def counters_simd(facts, folder, commit):
                              "sibling_busy_percent": busy(folder, f"{stem}.stat0",
                                                           f"{stem}.stat1", sibling)})
     out["queries"] = runs
-    out["simd_change"] = [
-        {"name": name,
-         "avx2_engine_ms_median": round(statistics.median(pooled[(name, "avx2")]) / 1e6, 4),
-         "scalar_engine_ms_median": round(statistics.median(pooled[(name, "scalar")]) / 1e6, 4),
-         "avx2_over_scalar_median": round(statistics.median(pooled[(name, "avx2")])
-                                          / statistics.median(pooled[(name, "scalar")]), 4)}
-        for name in QUERIES]
+    out["store"] = store
+    for name in QUERIES:
+        for round_number in (1, 2):
+            avx2, _ = kernels[(name, "avx2", round_number)]
+            _, scalar = kernels[(name, "scalar", round_number)]
+            if avx2 == 0 and scalar > 0:
+                raise Refused(f"{name}-avx2-{round_number}: no answer ran an AVX2 kernel, and "
+                              f"{name}-scalar-{round_number}'s ran {scalar}, so the AVX2 run "
+                              "measured scalar code")
+            if avx2 == 0 and scalar == 0 and not unshown[name]:
+                unshown[name].append(("a SIMD change", f"{name}: neither level ran a kernel in "
+                                      f"round {round_number}, so the two run the same code"))
+    out["simd_change"] = []
+    for name in QUERIES:
+        ratio = round(statistics.median(pooled[(name, "avx2")])
+                      / statistics.median(pooled[(name, "scalar")]), 4)
+        out["simd_change"].append({
+            "name": name,
+            "avx2_engine_ms_median": round(statistics.median(pooled[(name, "avx2")]) / 1e6, 4),
+            "scalar_engine_ms_median": round(statistics.median(pooled[(name, "scalar")]) / 1e6,
+                                             4),
+            "avx2_over_scalar_median": None if unshown[name] else ratio})
+        out["not_established"] += not_established(["simd_change", {"name": name}],
+                                                  unshown[name])
     out["sibling_busy_percent"] = {
         "core": CORE, "sibling": sibling, "method": run_bench.SIBLING_METHOD,
         "holds": holds,
@@ -887,8 +1059,10 @@ def price_decode_profile(facts, folder, commit):
     out["case"] = bench["case"]
     out["isa"] = bench["build"]["isa"]
     out["values"] = bench["verification"]["values"]
-    out.update(profile_block(facts, folder, "price-decode-profile", "price-decode",
-                             "perf-record"))
+    block, missing = profile_block(facts, folder, "price-decode-profile", "price-decode",
+                                   "perf-record")
+    out.update(block)
+    out["not_established"] += not_established([], missing)
     out["group_table"] = group_table("price-decode-profile")
     out["commands"] = commands(facts, "record_command", "report_command")
     return out
@@ -944,7 +1118,7 @@ def main(argv=None):
             raise Refused(f"--commit {args.commit!r} is not 40 hex digits")
         kind, document = summarise(args.folder, args.commit, args.iteration)
         out = args.out or RESULTS / f"{kind}-{DAY}-{args.commit[:12]}.json"
-        if args.iteration and RESULTS in out.resolve().parents:
+        if args.iteration and RESULTS_ROOT.resolve() in out.resolve().parents:
             raise Refused("an iteration summary is never written under results/")
         text = json.dumps(document, indent=1) + "\n"
         refuse_leaks(text, args.forbid)

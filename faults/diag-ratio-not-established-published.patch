@@ -1,0 +1,12 @@
+diff --git a/scripts/diag_summary.py b/scripts/diag_summary.py
+--- a/scripts/diag_summary.py
++++ b/scripts/diag_summary.py
+@@ -1035,7 +1035,7 @@
+             "avx2_engine_ms_median": round(statistics.median(pooled[(name, "avx2")]) / 1e6, 4),
+             "scalar_engine_ms_median": round(statistics.median(pooled[(name, "scalar")]) / 1e6,
+                                              4),
+-            "avx2_over_scalar_median": None if unshown[name] else ratio})
++            "avx2_over_scalar_median": ratio})
+         out["not_established"] += not_established(["simd_change", {"name": name}],
+                                                   unshown[name])
+     out["sibling_busy_percent"] = {

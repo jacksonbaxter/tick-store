@@ -800,6 +800,50 @@ FAULTS = (
           "untimed first answer among D3's engine times", CHECK_FAILED,
           "FAIL: test_the_counters_summary_reads_engine_times_from_the_answers "
           "(__main__.Summaries"),
+    # Review DX-6, DX-7, DX-9, DX-12: a profile tied to its recording, the SIMD ratio to what
+    # each level ran, an iteration summary kept out of results/, and what is not established
+    # never stated by the essay.
+    Fault("diag-recording-count-unchecked", "py-scripts", "diag_summary.py takes a self report "
+          "that holds fewer samples than perf record says it wrote", CHECK_FAILED,
+          "FAIL: test_a_report_short_of_its_recording_is_refused (__main__.Recording"),
+    Fault("diag-lost-samples-accepted", "py-scripts", "diag_summary.py takes a recording that "
+          "lost more samples than it kept", CHECK_FAILED,
+          "FAIL: test_samples_lost_beyond_the_bound_are_refused (__main__.Recording"),
+    Fault("diag-event-line-optional", "py-scripts", "diag_summary.py takes a self report that "
+          "names no event as a report of any event", CHECK_FAILED,
+          "FAIL: test_a_report_that_names_no_event_is_refused (__main__.Recording"),
+    Fault("diag-other-recording-accepted", "py-scripts", "diag_summary.py takes inclusive "
+          "shares from a children report of another event and sample count", CHECK_FAILED,
+          "FAIL: test_a_children_or_source_file_report_of_another_recording_is_refused "
+          "(__main__.Recording"),
+    Fault("diag-inclusive-added-up", "py-scripts", "diag_summary.py adds the inclusive shares "
+          "of two entry points that may nest", CHECK_FAILED,
+          "FAIL: test_two_entries_of_one_share_are_refused (__main__.Inclusive"),
+    Fault("diag-avx2-without-avx2-accepted", "py-scripts", "diag_summary.py publishes the "
+          "AVX2-over-scalar ratio of AVX2 runs that ran no AVX2 kernel", CHECK_FAILED,
+          "FAIL: test_an_avx2_run_that_ran_no_avx2_kernel_is_refused (__main__.SimdChange"),
+    Fault("diag-answers-differ-accepted", "py-scripts", "diag_summary.py compares the engine "
+          "times of levels whose answers differ", CHECK_FAILED,
+          "FAIL: test_levels_or_rounds_that_answer_differently_are_refused "
+          "(__main__.SimdChange"),
+    Fault("diag-ratio-not-established-published", "py-scripts", "diag_summary.py publishes a "
+          "ratio it lists as not established, for answers that give no kernel runs",
+          CHECK_FAILED,
+          "FAIL: test_answers_with_no_kernel_runs_leave_the_ratio_not_established "
+          "(__main__.SimdChange"),
+    Fault("diag-store-unchecked", "py-scripts", "diag_summary.py takes query runs that opened "
+          "different stores", CHECK_FAILED,
+          "FAIL: test_query_runs_on_other_stores_are_refused (__main__.Refusals"),
+    Fault("diag-multiplexed-accepted", "py-scripts", "diag_summary.py takes a counter perf "
+          "multiplexed, its total an estimate", CHECK_FAILED,
+          "FAIL: test_a_counter_missing_not_counted_or_multiplexed_is_refused "
+          "(__main__.Refusals"),
+    Fault("diag-iteration-under-results", "py-scripts", "diag_summary.py writes an iteration "
+          "summary anywhere under results/ but results/diag/", CHECK_FAILED,
+          "FAIL: test_a_smoke_is_iteration_only (__main__.Summaries"),
+    Fault("writeup-not-established-read", "py-scripts", "render_writeup.py states a figure its "
+          "results file lists as not established", CHECK_FAILED,
+          "FAIL: test_a_path_its_file_lists_as_not_established (__main__.Refuses"),
     # E-10's leftover: the comparison reads boost before its first system and after its last.
     Fault("compare-turbo-read-once-accepted", "py-scripts", "check_compare.py takes a protocol "
           "2 Linux document whose boost was read once, after the run, with no reading before "

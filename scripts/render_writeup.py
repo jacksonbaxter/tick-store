@@ -18,7 +18,9 @@ line, so a constant that moves or changes form stops the render.
 
 The render stops, exit 2, on a token the list does not define, an entry of the list the template
 never uses, a file kind that names a commit, a token whose kind matches two files, a value that
-does not fit its format, a constant whose pattern does not match exactly once, and any number in
+does not fit its format, a constant whose pattern does not match exactly once, a token that reads
+a path its results file lists under not_established (a diagnostic summary's, for what the run's
+raw output could not show), and any number in
 the template's prose that is not a token, unless it is one of the list's not_results, each with
 the reason it is no result (a date, a version, a processor's name). Digits inside a name, as in
 AVX2, M4 or Q1, are not numbers to it. HTML comments are notes for whoever edits the template:
@@ -279,6 +281,7 @@ class Resolver:
                 if "value" not in entry:
                     raise Refused(f"{{{{{name}}}}}: its entry gives no value, bar, verdict or "
                                   "path")
+                refuse_not_established(context, entry["value"])
                 value = evaluate(entry["value"], context)
         except Waiting as waiting:
             self.raw_values[name] = waiting
@@ -310,6 +313,47 @@ class Resolver:
             row = self.target_row(entry["bar"], name)
             text = f"{COMPARATOR_SIGN[bar_comparator(row, name)]} {text}"
         return text
+
+
+# The keys of the figure list's forms whose list is a path into the entry's document.
+PATH_KEYS = ("path", "where", "items", "count")
+
+
+def read_paths(expression):
+    """Every path into the document an expression reads."""
+    if isinstance(expression, dict):
+        found = [value for key, value in expression.items()
+                 if key in PATH_KEYS and isinstance(value, list)]
+        return found + [path for value in expression.values() for path in read_paths(value)]
+    if isinstance(expression, list):
+        return [path for value in expression for path in read_paths(value)]
+    return []
+
+
+def covers(listed, path):
+    """Whether a path the file lists as not established and a path a token reads overlap: one
+    is the start of the other."""
+    return all(one == two for one, two in zip(listed, path))
+
+
+def refuse_not_established(context, expression):
+    """A results file lists, under not_established, what its raw output could not show, with
+    the path it covers. A token that reads such a path would state as fact what the run does
+    not establish: it is refused, with the file's reason."""
+    document = context.document
+    if not isinstance(document, dict) or "not_established" not in document:
+        return
+    listed = document["not_established"]
+    if not isinstance(listed, list) or any(not isinstance(item, dict)
+                                           or not isinstance(item.get("path"), list)
+                                           for item in listed):
+        raise Refused(f"{{{{{context.name}}}}}: its file's not_established is no list of "
+                      "entries each with a path")
+    for item in listed:
+        for path in read_paths(expression):
+            if covers(item["path"], path):
+                raise Refused(f"{{{{{context.name}}}}} reads {path}, and its file says "
+                              f"{item.get('what')} is not established there: {item.get('why')}")
 
 
 def check_pattern(kind, pattern):

@@ -307,6 +307,28 @@ class Refuses(Tree):
         self.refused("{{count}} is false on these results, and the template's sentence holds "
                      "only if it is true")
 
+    def test_a_path_its_file_lists_as_not_established(self):
+        # Review DX-6, DX-7: a diagnostic summary lists what its raw output could not show; a
+        # token that reads it is refused, one that reads around it is not.
+        self.figures["figures"]["speed"]["value"] = {"path": ["items", {"name": "a"}, "median"]}
+        self.save()
+        items = {"items": [{"name": "a", "median": 1234.5}, {"name": "b", "median": 99.0}]}
+        reason = {"what": "the kernels each level ran", "why": "an answer gives no kernel_runs"}
+        self.write(RESULT, json.dumps(dict(RESULTS, **items, not_established=[
+            dict(reason, path=["items", {"name": "b"}])])))
+        self.assertEqual(self.run_script().returncode, 0)
+        self.write(RESULT, json.dumps(dict(RESULTS, **items, not_established=[
+            dict(reason, path=["items", {"name": "a"}])])))
+        self.refused("{{speed}} reads ['items', {'name': 'a'}, 'median'], and its file says the "
+                     "kernels each level ran is not established there: an answer gives no "
+                     "kernel_runs")
+        # A file-wide entry covers every token of the file.
+        self.write(RESULT, json.dumps(dict(RESULTS, **items, not_established=[
+            dict(reason, path=[])])))
+        self.refused("{{speed}} reads", "is not established there")
+        self.write(RESULT, json.dumps(dict(RESULTS, **items, not_established={"x": 1})))
+        self.refused("its file's not_established is no list of entries each with a path")
+
     def test_an_essay_too_short(self):
         self.edit("docs/writeup/WRITEUP.template.md", FILLER, "Short.")
         self.refused("outside its 2,500 to 4,000")

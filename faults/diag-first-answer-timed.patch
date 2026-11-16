@@ -1,13 +1,12 @@
 diff --git a/scripts/diag_summary.py b/scripts/diag_summary.py
-index 1931c78..c4415c8 100644
 --- a/scripts/diag_summary.py
 +++ b/scripts/diag_summary.py
-@@ -836,7 +836,7 @@ def counters_simd(facts, folder, commit):
-                 requested = len(json_lines(folder / f"{name}.jsonl"))
-                 if len(answers) != requested or requested < 2:
-                     raise Refused(f"{stem}: {len(answers)} answers to {requested} requests")
+@@ -984,7 +984,7 @@
+                     raise Refused(f"{stem}: answer {at + 1} is {identities[at]}, and "
+                                   f"{first_answers[name][0]}'s is {first_answers[name][1][at]}: "
+                                   "the levels or the rounds answer differently")
 -                timed = answers[1:]
 +                timed = answers
-                 for answer in timed:
-                     other = {lv: n for lv, n in (answer.get("kernel_runs") or {}).items()
-                              if lv in ABOVE[level] and n}
+                 if any(not isinstance(answer.get("kernel_runs"), dict) for answer in timed):
+                     unshown[name].append(("the kernels each level ran", f"{stem}: an answer "
+                                           "gives no kernel_runs, so its cap is not shown to "

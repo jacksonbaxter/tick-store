@@ -1,0 +1,12 @@
+diff --git a/scripts/diag_summary.py b/scripts/diag_summary.py
+--- a/scripts/diag_summary.py
++++ b/scripts/diag_summary.py
+@@ -537,7 +537,7 @@
+         found = [row for row in report["rows"]
+                  if "Children" in row and compiled.match(function_name(row["key"]))
+                  and not local_to_function(row["key"])]
+-        if len(found) > 1:
++        if False:
+             # One function may call another, so their inclusive shares do not add up.
+             raise Refused(f"{report['name']}: {len(found)} entries match the inclusive share "
+                           f"{label!r}: " + "; ".join(row["key"][:60] for row in found))

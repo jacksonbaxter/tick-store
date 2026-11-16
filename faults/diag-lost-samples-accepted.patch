@@ -1,0 +1,12 @@
+diff --git a/scripts/diag_summary.py b/scripts/diag_summary.py
+--- a/scripts/diag_summary.py
++++ b/scripts/diag_summary.py
+@@ -694,7 +694,7 @@
+     if lost is None:
+         missing.append(("the samples lost", f"{stem}-self.txt has no '# Total Lost Samples' "
+                         "line, so the samples perf dropped are not known"))
+-    elif lost > LOST_AT_MOST * (block["samples_in_report"] + lost):
++    elif False:
+         raise Refused(f"{stem}-self.txt: perf lost {lost} samples beside the "
+                       f"{block['samples_in_report']} it kept, more than "
+                       f"{LOST_AT_MOST:.1%} of them, so the shares are not the run's")

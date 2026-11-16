@@ -8,11 +8,16 @@ The writer's reports in tests/scripts/diag_fixtures/ are the feasibility probe's
 the freeze), cut down: writer-self.txt holds every line of its flat profile at 0.01% or more,
 writer-children.txt its call-graph profile's first 24 lines, writer-dso-top.txt its first 29
 lines with the shared object. The probe kept the lines and not perf's header, so each file has
-perf's header put back in perf's own form (the sample counts are the probe's). The other kinds'
-inputs, which no probe made, are written here in the form the tools print: perf report with its
-sample and period columns, perf stat -x, lines, tools/tick_query's ready and answer lines,
-/proc/stat lines and measure.sh's load lines. Each test writes its folder under the repo's
-gitignored build/ directory.
+perf's header put back in perf's own form (the sample counts are the probe's). The probe's flat
+and call-graph profiles came from two recordings, and its flat profile has no sample or period
+column, which a summary now needs to tie its shares to the recording: so the writer's folder
+holds the probe's lines with samples and periods made in proportion to its percentages, its
+percentages computed again from them, and its children report given the same recording's
+header. The other kinds' inputs, which no probe made, are written here in the form the tools
+print: perf report with its sample and period columns, perf stat -x, lines, tools/tick_query's
+ready and answer lines, /proc/stat lines and measure.sh's load lines. Each test writes its
+folder under the repo's gitignored build/ directory, and a summary written by a test that
+fails goes to that folder's own results/, never the repo's.
 """
 
 import gzip
@@ -25,6 +30,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = REPO_ROOT / "tests" / "scripts" / "diag_fixtures"
@@ -161,26 +167,65 @@ def row(symbol, dso=None, level="."):
     return {"key": diag_summary.re.sub(r"(?:\s+-)+$", "", symbol), "dso": dso, "level": level}
 
 
+def header(samples="1K", event="cycles:u", event_count=1000000, lost=0):
+    """perf report --stdio's header, as perf prints it: a count with no unit is padded."""
+    pad = "" if samples[-1:].isalpha() else " "
+    return ["# To display the perf.data header info, please use --header/--header-only options.",
+            "#", "#", f"# Total Lost Samples: {lost}", "#",
+            f"# Samples: {samples}{pad} of event '{event}'",
+            f"# Event count (approx.): {event_count}", "#"]
+
+
 def report_text(rows, columns=("Overhead", "Samples", "Period", "Shared Object", "Symbol"),
-                event_count=None, samples="1K", event="cycles:u"):
+                event_count=None, samples="1K", event="cycles:u", lost=0):
     """A perf report --stdio of these rows: (percent, samples, period, dso, symbol)."""
     total = event_count if event_count is not None else sum(r[2] for r in rows)
-    lines = ["# To display the perf.data header info, please use --header/--header-only options.",
-             "#", "#", "# Total Lost Samples: 0", "#",
-             f"# Samples: {samples} of event '{event}'",
-             f"# Event count (approx.): {total}", "#",
-             "# " + "  ".join(columns), "# ........", "#"]
+    lines = header(samples, event, total, lost) + ["# " + "  ".join(columns), "# ........", "#"]
     for percent, count, period, dso, symbol in rows:
         lines.append(f"    {percent:6.2f}%  {count:>12}  {period:>12}  {dso:<17}  [.] {symbol}")
     return "\n".join(lines) + "\n"
 
 
-def children_text(rows):
-    lines = ["# Samples: 1K of event 'cycles:u'", "#",
-             "# Children      Self       Samples  Shared Object  Symbol", "# ........", "#"]
+def children_text(rows, samples="1K", event="cycles:u", event_count=1000000):
+    lines = header(samples, event, event_count) + [
+        "# Children      Self       Samples  Shared Object  Symbol", "# ........", "#"]
     for children, own, count, dso, symbol in rows:
         lines.append(f"    {children:6.2f}%  {own:6.2f}%  {count:>12}  {dso:<14}  [.] {symbol}")
     return "\n".join(lines) + "\n"
+
+
+PROBE_SAMPLES = 23652
+PROBE_PERIOD = 2000003
+
+
+def probe_with_counts():
+    """The probe's flat profile with sample and period columns: its samples, the 23,652 perf
+    record wrote, shared out in proportion to its printed percentages, each sample's period
+    PROBE_PERIOD, and each percentage computed again from the periods, as perf would print it."""
+    report = diag_summary.parse_report((FIXTURES / "writer-self.txt").read_text(), "probe")
+    weights = [r["Overhead"] for r in report["rows"]]
+    exact = [PROBE_SAMPLES * w / sum(weights) for w in weights]
+    counts = [int(x) for x in exact]
+    for index in sorted(range(len(exact)), key=lambda i: counts[i] - exact[i])[
+            :PROBE_SAMPLES - sum(counts)]:
+        counts[index] += 1
+    total = PROBE_SAMPLES * PROBE_PERIOD
+    lines = header("23K", event_count=total) + [
+        "# Overhead       Samples        Period  Shared Object         Symbol", "# ........", "#"]
+    for r, count in zip(report["rows"], counts):
+        lines.append(f"    {100.0 * count / PROBE_SAMPLES:5.2f}%  {count:>12}  "
+                     f"{count * PROBE_PERIOD:>12}  {r['dso'] or 'tick_roundtrip':<20}  "
+                     f"[{r['level']}] {r['key']}")
+    return "\n".join(lines) + "\n", total
+
+
+def probe_children(event_count):
+    """The probe's call-graph lines under the flat profile's recording's header."""
+    text = (FIXTURES / "writer-children.txt").read_text()
+    text = text.replace("# Samples: 5K of event 'cycles:u'",
+                        f"# Samples: 23K of event 'cycles:u'\n# Event count (approx.): "
+                        f"{event_count}")
+    return text
 
 
 QUERY_ROWS = [
@@ -283,9 +328,9 @@ def writer_folder(root, self_text=None):
                         ("writer-children.txt", "--children -g none -n --percent-limit 0.5")):
         folder.fact("report_command", f"perf report -i {HOME}/run/perf-data/writer.data "
                                       f"--stdio {extra} --sort dso,sym >{stem}")
-    folder.write("writer-self.txt", self_text if self_text is not None
-                 else (FIXTURES / "writer-self.txt").read_text())
-    shutil.copy(FIXTURES / "writer-children.txt", folder.path / "writer-children.txt")
+    counted, total = probe_with_counts()
+    folder.write("writer-self.txt", self_text if self_text is not None else counted)
+    folder.write("writer-children.txt", probe_children(total))
     folder.write("perf-record.err", RECORDED)
     folder.write("ingest.json", json.dumps(INGEST))
     layout = {"segments": 2, "segment_records": 4194304, "records": 6125294,
@@ -416,7 +461,7 @@ def price_folder(root, built=COMMIT):
     folder.fact("input", "store_decode/add_price on the slice 12302019-open, the timed passes")
     folder.write("price-decode-self.txt", report_text(PRICE_ROWS))
     folder.write("price-decode-srcfile.txt", SRCFILE)
-    folder.write("perf-record.err", RECORDED.replace("23652", "8000"))
+    folder.write("perf-record.err", RECORDED.replace("23652", "1000"))
     folder.write("report.json", json.dumps({
         "case": "store_decode/add_price",
         "build": {"commit": built, "isa": "x86-64 baseline, avx2 kernels"},
@@ -562,6 +607,10 @@ class Reports(Base):
         self.assertEqual(len(report["rows"]), 85)
         with self.assertRaisesRegex(diag_summary.Refused, "not 100 within"):
             diag_summary.self_shares(report)
+        # The same cut of the folder's report, with its samples and periods.
+        counted = probe_with_counts()[0]
+        kept = [line for line in counted.splitlines()
+                if not diag_summary.DATA_LINE.match(line) or float(line.split("%")[0]) >= 0.05]
         folder = writer_folder(self.root, self_text="\n".join(kept) + "\n").finish()
         self.assertRefused(folder, "not 100 within")
 
@@ -654,11 +703,19 @@ class Summaries(Base):
         code, document, stderr = self.run_main(path, "--iteration")
         self.assertEqual(code, 0, stderr)
         self.assertIn("iteration only", document["measurement"])
-        with redirect_stderr(io.StringIO()) as err:
-            code = diag_summary.main([str(path), "--commit", COMMIT, "--iteration", "--out",
-                                      str(diag_summary.RESULTS / "smoke-test.json")])
-        self.assertEqual(code, 1, err.getvalue())
-        self.assertFalse((diag_summary.RESULTS / "smoke-test.json").exists())
+        # Review DX-8, DX-9: never anywhere under results/, results/diag/ or not. The guard is
+        # shown on this test's own results/, so a broken one writes nothing into the repo's.
+        results = self.root / "results"
+        with mock.patch.object(diag_summary, "RESULTS_ROOT", results), \
+                mock.patch.object(diag_summary, "RESULTS", results / "diag"):
+            for out in (results / "diag" / "smoke-test.json", results / "smoke-test.json",
+                        results / "bench" / "smoke-test.json"):
+                with redirect_stderr(io.StringIO()) as err, redirect_stdout(io.StringIO()):
+                    code = diag_summary.main([str(path), "--commit", COMMIT, "--iteration",
+                                              "--out", str(out)])
+                self.assertEqual(code, 1, out)
+                self.assertIn("never written under results/", err.getvalue())
+                self.assertFalse(out.exists(), out)
 
     def test_the_queries_summary(self):
         code, document, stderr = self.run_main(query_folder(self.root).finish())
@@ -733,7 +790,8 @@ class Summaries(Base):
         self.assertEqual((shares["zstd"], shares["pfor_block_decode"],
                           shares["store_column_decode"], shares["libc"]), (45.0, 30.0, 15.0, 10.0))
         self.assertEqual(document["case"], "store_decode/add_price")
-        self.assertEqual(document["samples_recorded"], 8000)
+        self.assertEqual((document["samples_recorded"], document["samples_in_report"]),
+                         (1000, 1000))
         self.assertIsNone(document["inclusive"])
         self.assertEqual([(f["file"], f["self_share_percent"]) for f in document["source_files"]],
                          [("zstd_decompress_block.c", 45.0), ("pfor.cpp", 30.0),
@@ -743,6 +801,296 @@ class Summaries(Base):
         empty = self.root / "empty"
         empty.mkdir()
         self.assertRefused(empty, "no facts.txt")
+
+
+def edit_answers(folder, stem, change, first=False):
+    """Each answer line of {stem}.out changed; the ready line kept, and the untimed first answer
+    too unless first."""
+    lines = [json.loads(line) for line in (folder.path / f"{stem}.out").read_text().splitlines()]
+    kept = 1 if first else 2
+    lines = lines[:kept] + [change(dict(line)) for line in lines[kept:]]
+    folder.write(f"{stem}.out", "\n".join(json.dumps(line) for line in lines) + "\n")
+
+
+def every_run(levels=diag_summary.LEVELS):
+    return [(name, level, round_number) for name in diag_summary.QUERIES
+            for level in levels for round_number in (1, 2)]
+
+
+class Recording(Base):
+    """Review DX-7: a profile is tied to its recording."""
+
+    def query(self, change):
+        folder = query_folder(self.root)
+        for name in diag_summary.QUERIES:
+            change(folder, name)
+        return folder.finish()
+
+    def test_a_count_with_no_unit_is_read_with_its_event(self):
+        # perf pads a count under a thousand: "# Samples: 827  of event 'cycles:u'".
+        report = diag_summary.parse_report(report_text(QUERY_ROWS, samples="827"), "small")
+        self.assertEqual((report["samples_header"], report["event"]), ("827", "cycles:u"))
+
+    def test_a_report_that_names_no_event_is_refused(self):
+        def drop(folder, name):
+            folder.write(f"{name}-self.txt", "\n".join(
+                line for line in report_text(QUERY_ROWS).splitlines()
+                if not line.startswith("# Samples")) + "\n")
+        self.assertRefused(self.query(drop), "no '# Samples: ... of event' line")
+
+    def test_a_report_of_another_event_is_refused(self):
+        def other(folder, name):
+            folder.write(f"{name}-self.txt", report_text(QUERY_ROWS, event="instructions:u"))
+        self.assertRefused(self.query(other), "Q1-self.txt counts instructions:u, not cycles:u")
+
+    def test_a_report_with_no_sample_or_period_column_or_event_count_is_refused(self):
+        def percent_only(folder, name):
+            text = report_text([(r[0], r[1], r[2], r[3], r[4]) for r in QUERY_ROWS])
+            folder.write(f"{name}-self.txt", "\n".join(
+                line if not line.startswith("    ") else line[:13] + line[41:]
+                for line in text.splitlines()).replace(
+                    "# Overhead  Samples  Period  Shared Object", "# Overhead  Shared Object")
+                + "\n")
+        self.assertRefused(self.query(percent_only), "no Samples or Period column")
+
+        def no_count(folder, name):
+            folder.write(f"{name}-self.txt", "\n".join(
+                line for line in report_text(QUERY_ROWS).splitlines()
+                if not line.startswith("# Event count")) + "\n")
+        self.assertRefused(self.query(no_count), "no '# Event count' line")
+
+    def test_a_report_short_of_its_recording_is_refused(self):
+        def more(folder, name):
+            folder.write(f"{name}-perf-record.err", RECORDED.replace("23652", "50000"))
+        self.assertRefused(self.query(more), "Q1-self.txt holds 1000 samples, and "
+                           "Q1-perf-record.err says perf recorded 50000")
+
+    def test_a_recording_of_no_samples_is_refused(self):
+        def none(folder, name):
+            folder.write(f"{name}-perf-record.err", RECORDED.replace("23652", "0"))
+        self.assertRefused(self.query(none), "Q1-perf-record.err says perf recorded no samples")
+
+    def test_samples_lost_beyond_the_bound_are_refused(self):
+        def lost(count):
+            def change(folder, name):
+                folder.write(f"{name}-self.txt", report_text(QUERY_ROWS, lost=count))
+            return change
+        self.assertRefused(self.query(lost(5000)), "perf lost 5000 samples beside the 1000")
+        self.assertRefused(self.query(lost(2)), "perf lost 2 samples")
+        code, document, stderr = self.run_main(self.query(lost(1)))
+        self.assertEqual(code, 0, stderr)
+        self.assertEqual(document["queries"][0]["lost_samples"], 1)
+
+    def test_a_children_or_source_file_report_of_another_recording_is_refused(self):
+        for keyword, words in (({"event": "instructions:u"}, "its event is instructions:u"),
+                               ({"samples": "90K"}, "its sample count is 90K"),
+                               ({"event_count": 999}, "its event count is 999")):
+            def other(folder, name, keyword=keyword):
+                folder.write(f"{name}-children.txt", children_text(QUERY_CHILDREN, **keyword))
+            self.assertRefused(self.query(other), words)
+        folder = query_folder(self.root)
+        folder.write("Q5-children.txt", children_text(QUERY_CHILDREN).replace(
+            "# Event count (approx.): 1000000\n", ""))
+        self.assertRefused(folder.finish(), "Q5-children.txt: no sample or event count line, so "
+                           "it is not shown to be of Q5-self.txt's recording")
+        folder = price_folder(self.root)
+        folder.write("price-decode-srcfile.txt", SRCFILE.replace("cycles:u", "instructions:u"))
+        self.assertRefused(folder.finish(), "price-decode-srcfile.txt: its event is instructions:u")
+        folder = price_folder(self.root)
+        folder.write("price-decode-srcfile.txt", SRCFILE.replace(
+            "# Event count (approx.): 1000000\n", ""))
+        self.assertRefused(folder.finish(), "no '# Event count' line")
+
+    def test_what_the_raw_output_does_not_hold_is_listed_not_established(self):
+        folder = query_folder(self.root)
+        (folder.path / "Q2-perf-record.err").unlink()
+        code, document, stderr = self.run_main(folder.finish())
+        self.assertEqual(code, 0, stderr)
+        self.assertIsNone(document["queries"][1]["samples_recorded"])
+        self.assertEqual([(item["path"], item["what"]) for item in document["not_established"]],
+                         [(["queries", {"name": "Q2"}], "the recording's sample count")])
+        text = probe_with_counts()[0].replace("# Total Lost Samples: 0\n", "")
+        code, document, stderr = self.run_main(writer_folder(self.root, self_text=text).finish())
+        self.assertEqual(code, 0, stderr)
+        self.assertIsNone(document["lost_samples"])
+        self.assertEqual([(item["path"], item["what"]) for item in document["not_established"]],
+                         [([], "the samples lost")])
+        self.assertIn("Total Lost Samples", document["not_established"][0]["why"])
+
+    def test_a_clean_summary_lists_nothing_not_established(self):
+        for folder in (writer_folder, query_folder, counters_folder, price_folder):
+            code, document, stderr = self.run_main(folder(self.root).finish())
+            self.assertEqual(code, 0, stderr)
+            self.assertEqual(document["not_established"], [], folder.__name__)
+
+
+class Inclusive(Base):
+    """Review DX-12: inclusive shares are never added up."""
+
+    def test_two_entries_of_one_share_are_refused(self):
+        rows = QUERY_CHILDREN + [(58.0, 0.5, 5, "tick_query", "tick_store::store::ItchQuery::"
+                                  "locate_counts(unsigned long)")]
+        folder = query_folder(self.root)
+        folder.write("Q4-children.txt", children_text(rows))
+        self.assertRefused(folder.finish(), "Q4-children.txt: 2 entries match the inclusive "
+                           "share 'engine'")
+
+    def test_a_lambda_of_the_function_is_not_added_to_its_share(self):
+        lam = ("tick_store::store::ItchQuery::rows(unsigned long, unsigned long, std::__1::"
+               "optional<unsigned short>)::$_0::operator()(tick_store::store::QueryRow const&) "
+               "const")
+        self.assertEqual(diag_summary.function_name(lam), "tick_store::store::ItchQuery::rows")
+        self.assertTrue(diag_summary.local_to_function(lam))
+        self.assertFalse(diag_summary.local_to_function(QUERY_CHILDREN[1][4]))
+        self.assertFalse(diag_summary.local_to_function("operator new(unsigned long)"))
+        folder = query_folder(self.root)
+        folder.write("Q1-children.txt", children_text(
+            QUERY_CHILDREN + [(1.76, 0.59, 53, "tick_query", lam)]))
+        code, document, stderr = self.run_main(folder.finish())
+        self.assertEqual(code, 0, stderr)
+        self.assertEqual(document["queries"][0]["engine_share_percent"], 60.0)
+
+
+class SimdChange(Base):
+    """Review DX-6: the AVX2-over-scalar ratio is SIMD's change or it is not published."""
+
+    def test_an_avx2_run_that_ran_no_avx2_kernel_is_refused(self):
+        folder = counters_folder(self.root)
+        for name, level, round_number in every_run(("avx2",)):
+            edit_answers(folder, f"{name}-{level}-{round_number}", lambda answer: dict(
+                answer, kernel_runs={"scalar": 1200, "neon": 0, "avx2": 0}), first=True)
+        self.assertRefused(folder.finish(), "Q1-avx2-1: no answer ran an AVX2 kernel, and "
+                           "Q1-scalar-1's ran 3600")
+
+    def test_answers_with_no_kernel_runs_leave_the_ratio_not_established(self):
+        folder = counters_folder(self.root)
+        edit_answers(folder, "Q3-scalar-2", lambda answer: {
+            key: value for key, value in answer.items() if key != "kernel_runs"})
+        code, document, stderr = self.run_main(folder.finish())
+        self.assertEqual(code, 0, stderr)
+        change = {entry["name"]: entry for entry in document["simd_change"]}
+        self.assertIsNone(change["Q3"]["avx2_over_scalar_median"])
+        self.assertEqual(change["Q2"]["avx2_over_scalar_median"], 1.0)
+        self.assertEqual([(item["path"], item["what"]) for item in document["not_established"]],
+                         [(["simd_change", {"name": "Q3"}], "the kernels each level ran")])
+
+    def test_neither_level_running_a_kernel_leaves_the_ratio_not_established(self):
+        folder = counters_folder(self.root)
+        for name, level, round_number in every_run():
+            if name == "Q5":
+                edit_answers(folder, f"{name}-{level}-{round_number}", lambda answer: dict(
+                    answer, kernel_runs={"scalar": 0, "neon": 0, "avx2": 0}), first=True)
+        code, document, stderr = self.run_main(folder.finish())
+        self.assertEqual(code, 0, stderr)
+        self.assertIsNone(document["simd_change"][4]["avx2_over_scalar_median"])
+        self.assertEqual(document["not_established"][0]["what"], "a SIMD change")
+
+    def test_levels_or_rounds_that_answer_differently_are_refused(self):
+        folder = counters_folder(self.root)
+        edit_answers(folder, "Q1-scalar-1", lambda answer: dict(answer, rows=5,
+                                                                sha256="cd" * 32))
+        self.assertRefused(folder.finish(), "Q1-scalar-1: answer 2 is")
+        folder = counters_folder(self.root)
+        edit_answers(folder, "Q2-avx2-2", lambda answer: dict(answer, sha256="cd" * 32))
+        self.assertRefused(folder.finish(), "the levels or the rounds answer differently")
+
+    def test_answers_with_no_digest_leave_the_ratio_not_established(self):
+        folder = counters_folder(self.root)
+        edit_answers(folder, "Q4-avx2-1", lambda answer: {
+            key: value for key, value in answer.items() if key != "sha256"})
+        code, document, stderr = self.run_main(folder.finish())
+        self.assertEqual(code, 0, stderr)
+        self.assertIsNone(document["simd_change"][3]["avx2_over_scalar_median"])
+        self.assertEqual(document["not_established"][0]["what"], "the levels' answers alike")
+
+
+class Refusals(Base):
+    """Review DX-8: a test for each refusal no test held."""
+
+    def test_a_query_file_whose_first_line_is_no_ready_line_is_refused(self):
+        folder = query_folder(self.root)
+        folder.write("Q2.out", "\n".join(json.dumps(answer("Q2", 74000000)) for _ in range(4))
+                     + "\n")
+        self.assertRefused(folder.finish(), "Q2.out: the query tool's first line is not its "
+                           "ready line")
+        folder = counters_folder(self.root)
+        lines = (folder.path / "Q4-scalar-2.out").read_text().splitlines()
+        folder.write("Q4-scalar-2.out", "\n".join(lines[1:]) + "\n")
+        self.assertRefused(folder.finish(), "Q4-scalar-2.out: the query tool's first line")
+
+    def test_answers_that_are_not_one_to_each_request_are_refused(self):
+        folder = query_folder(self.root)
+        request = json.loads((folder.path / "Q2.jsonl").read_text().splitlines()[0])
+        folder.write("Q2.jsonl", (json.dumps(request) + "\n") * 4)
+        self.assertRefused(folder.finish(), "Q2: 3 answers to 4 requests")
+        folder = counters_folder(self.root)
+        request = json.loads((folder.path / "Q3.jsonl").read_text().splitlines()[0])
+        folder.write("Q3.jsonl", (json.dumps(request) + "\n") * 5)
+        self.assertRefused(folder.finish(), "Q3-avx2-1: 4 answers to 5 requests")
+        # One request is the untimed one alone: no engine time is left.
+        folder = counters_folder(self.root, engines={"avx2": [999000000],
+                                                     "scalar": [999000000]})
+        folder.write("Q1.jsonl", json.dumps(request) + "\n")
+        self.assertRefused(folder.finish(), "Q1-avx2-1: 1 answers to 1 requests")
+
+    def test_query_runs_on_other_stores_are_refused(self):
+        folder = query_folder(self.root)
+        folder.write("Q3.out", "\n".join(json.dumps(line) for line in
+                                         [dict(READY, records=1, segments=1)]
+                                         + [answer("Q3", 74000000)] * 3) + "\n")
+        self.assertRefused(folder.finish(), "Q3.out: the tool opened a store of")
+        folder = counters_folder(self.root)
+        lines = (folder.path / "Q5-scalar-1.out").read_text().splitlines()
+        lines[0] = json.dumps(dict(READY, kernel_level="scalar", records=1))
+        folder.write("Q5-scalar-1.out", "\n".join(lines) + "\n")
+        self.assertRefused(folder.finish(), "Q5-scalar-1.out: the tool opened a store of")
+
+    def test_a_topology_without_one_sibling_is_refused(self):
+        for cpus, count in (("4\n", 0), ("4-6\n", 2)):
+            folder = counters_folder(self.root)
+            folder.write("topology.txt", cpus)
+            self.assertRefused(folder.finish(), f"topology.txt names {count} siblings of cpu4")
+
+    def test_a_window_in_which_no_jiffies_passed_is_refused(self):
+        folder = counters_folder(self.root)
+        folder.write("Q2-avx2-1.stat1", stat_lines(300, 3000))
+        self.assertRefused(folder.finish(), "no jiffies passed on cpu5 between Q2-avx2-1.stat0 "
+                           "and Q2-avx2-1.stat1")
+
+    def test_a_counter_missing_not_counted_or_multiplexed_is_refused(self):
+        values = dict(cycles=640000000000, instructions=1400000000000, branches=200000000000,
+                      misses=1000000000, task=200000.0, user=180000000000, system=20000000000,
+                      run=200000000000)
+        text = PERF_STAT.format(**values)
+        for edited, words in (
+                ("\n".join(line for line in text.splitlines() if ",branches:u," not in line),
+                 "perf stat did not report branches:u"),
+                (text.replace("640000000000,,cycles:u", "<not counted>,,cycles:u"),
+                 "perf stat did not count cycles:u: perf said <not counted>"),
+                (text.replace("instructions:u,200000000000,100.00", "instructions:u,"
+                              "200000000000,12.00"),
+                 "perf stat counted instructions:u 12.00% of the time, multiplexed")):
+            folder = counters_folder(self.root)
+            folder.write("write.perf", edited)
+            self.assertRefused(folder.finish(), words)
+
+    def test_a_commit_that_is_not_forty_hex_digits_is_refused(self):
+        self.assertRefused(writer_folder(self.root).finish(), "is not 40 hex digits",
+                           commit=COMMIT[:12])
+
+    def test_this_machines_name_or_user_is_refused(self):
+        for patched in ("gethostname", "getuser"):
+            folder = writer_folder(self.root)
+            folder.fact("input", "the day, staged by buildhostx")
+            module = diag_summary.socket if patched == "gethostname" else diag_summary.getpass
+            with mock.patch.object(module, patched, return_value="buildhostx"):
+                self.assertRefused(folder.finish(), "the name 'buildhostx'")
+
+    def test_the_statement_names_the_commit_it_was_run_at(self):
+        code, document, stderr = self.run_main(writer_folder(self.root).finish())
+        self.assertEqual(code, 0, stderr)
+        self.assertIn(f"one run at commit {COMMIT[:12]}", document["statement"])
+        self.assertNotIn("freeze", document["statement"])
 
 
 class CommandLine(unittest.TestCase):
