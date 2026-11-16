@@ -558,6 +558,19 @@ FAULTS = (
           "past the cap is", EXIT_LIBFUZZER,
           "check_pfor_column: past the cap, a refused block changed the output",
           arguments=FUZZ_ARGUMENTS),
+    # Past the dictionary's cap the compare tier reaches a maximal block, and past run-length's
+    # it reaches the blocks after the first.
+    Fault("dict-mtf-chosen-set-past-2p19", "fuzz-dictionary", "under the chosen kernel set, not "
+          "the scalar one, a move-to-front block of more than 2^19 values decodes its last value "
+          "to the entry beside it, as the named seed's maximal block past the cap is",
+          EXIT_LIBFUZZER,
+          "check_dict_column: past the cap, the kernel set and the scalar set decoded a block "
+          "differently",
+          arguments=FUZZ_ARGUMENTS),
+    Fault("rle-overread-later-block", "fuzz-run-length", "the run-length decoder reads the byte "
+          "after a maximal block of fewer runs than values, as the named seed's second block, "
+          "past the cap, is", EXIT_LIBFUZZER, "AddressSanitizer: heap-buffer-overflow",
+          arguments=FUZZ_ARGUMENTS),
     Fault("fuzz-dictionary-repeated-entry", "fuzz-dictionary", "the dictionary decoder stops "
           "refusing a ranked dictionary that holds one value twice", EXIT_LIBFUZZER,
           "check_dict_column:", arguments=FUZZ_ARGUMENTS),

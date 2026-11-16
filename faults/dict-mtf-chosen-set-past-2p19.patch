@@ -1,0 +1,24 @@
+diff --git a/src/codec/dictionary.cpp b/src/codec/dictionary.cpp
+--- a/src/codec/dictionary.cpp
++++ b/src/codec/dictionary.cpp
+@@ -5,6 +5,7 @@
+ #include "tick_store/codec/byte_cursor.hpp"
+ #include "tick_store/codec/codec_error.hpp"
+ #include "tick_store/codec/pfor.hpp"
++#include "tick_store/codec/simd.hpp"
+ 
+ #include <algorithm>
+ #include <array>
+@@ -622,6 +623,12 @@
+             list.front() = index;
+             value = index;
+         }
++        // Planted: under the chosen kernel set, not the scalar one, a move-to-front block of
++        // more than 2^19 values decodes its last value to the entry beside it.
++        if (count > (std::size_t{1} << 19U) && entry_count > 1 &&
++            &simd::active_kernels() != simd::kernels_for(simd::KernelLevel::scalar)) {
++            indices.back() = indices.back() == 0 ? 1 : indices.back() - 1;
++        }
+     }
+ 
+     // Uses per entry, counted four ways at once so a run of one entry does not wait on

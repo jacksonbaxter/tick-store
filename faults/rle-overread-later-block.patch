@@ -1,0 +1,15 @@
+diff --git a/src/codec/run_length.cpp b/src/codec/run_length.cpp
+--- a/src/codec/run_length.cpp
++++ b/src/codec/run_length.cpp
+@@ -169,6 +169,11 @@
+         return std::unexpected(
+             codec_error(CodecErrorKind::bad_count, "rle run lengths", lengths_at, count, total));
+     }
++    // Planted: a maximal block of fewer runs than values reads the byte after its own.
++    if (count == kMaxBlockValues && run_count < count) {
++        const volatile std::byte* past = block.data() + kBlockHeaderSize + header->payload_bytes;
++        static_cast<void>(*past);
++    }
+     reserve_for_block(out, header->count);
+     for (std::size_t i = 0; i < run_count; ++i) {
+         out.insert(out.end(), run_lengths[i] + 1U, run_values[i]);
