@@ -543,8 +543,8 @@ FAULTS = (
           arguments=FUZZ_ARGUMENTS),
     Fault("neon-unpack-past-max-len", "dev-test", "the NEON vector unpack changes a value once "
           "a block's full vectors pass 131,072 packed bytes, more than any -max_len holds",
-          EXIT_CTEST, "OracleGrid.PassTheWholeCheck/ranked_pfor_none_1048576 (Failed)",
-          arguments=("--test-regex", "OracleGrid.PassTheWholeCheck/ranked_pfor_none_1048576$")),
+          EXIT_CTEST, "OracleGrid.PassTheWholeCheck/ranked_pfor_none_scaled_1048576 (Failed)",
+          arguments=("--test-regex", "OracleGrid.PassTheWholeCheck/ranked_pfor_none_scaled_1048576$")),
     # Past the cap the chosen kernel set decodes a block from an exact copy of its bytes, so a
     # read past the block is seen where the input's next bytes would hide it; and a refused
     # block there must leave the output alone.

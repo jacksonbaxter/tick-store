@@ -308,14 +308,20 @@ struct QueryBounds {
 // aggregates and the share sum) is still asked twice over every row.
 inline constexpr std::size_t kQueryPastBudgetRequests = 2;
 
-// The fuzz target's bounds. The bar is the ruling's: the costliest input takes at most 5 s an
-// execution on the Linux host with its sibling cpu busy (fuzz/README.md, "Bounds"). These
-// values were set to a design proxy for it, 0.5 s an execution on the Mac, and are to be set
-// again from timings on the Linux host: the cap and the compare limit are 0.45 s of their
-// measures, so a file up to a ninth above the envelope of the files fitted still meets the
-// proxy, more than the held-out files came to (above). Within the budget the whole check takes
-// the repeat ask on every request, at most 1.225 times the work on the files fitted, so the
-// budget is 0.5 s over 1.225 and the same ninth, rounded down to 0.365 s: 447 ms at most.
+// The fuzz target's bounds. The bar is 5 s an execution on the Linux host with its sibling cpu
+// busy, half of -timeout (fuzz/README.md, "Bounds"). A bound is taken when every named query
+// seed takes at most 4.0 s in the worst of five executions under the worst placement measured,
+// the sibling running a fuzzer: a margin over the spread measured there, about 10%, and wider
+// than the codecs' 4.5 s, since these seeds come from a fitted measure, not a construction of
+// the format's worst case. Linux took 6.8 times the Mac's time an execution on the query seeds
+// (6.2 on falling minutes), so every seed is held under 585 ms an execution through the target
+// on the Mac. The limits are in ns of the measures: the cap and the compare limit 450M, a ninth
+// under 0.5 s, so a file up to a ninth above the envelope of the files fitted still takes at
+// most 0.5 s, more than the held-out files came to (above). Within the budget the whole check
+// takes the repeat ask on every request, at most 1.225 times the work on the files fitted, so
+// the budget is 0.5 s over 1.225 and the same ninth, rounded down: 365M, 447 ms at most. The
+// named seeds at these limits take at most 422 ms an execution through the target on the
+// Mac (fuzz build, -detect_leaks=0, each run started with load1 under 5, the median of three).
 inline constexpr std::uint64_t kQueryFuzzWork = 450'000'000;
 inline constexpr std::uint64_t kQueryFuzzCrossCheckedWork = 365'000'000;
 inline constexpr std::uint64_t kQueryFuzzComparedWork = 450'000'000;

@@ -158,8 +158,7 @@ template <class Encode>
 // then the decode limit leave, at most a maximal block, while -max_len holds them (the last cut
 // to the values that fit), so the fuzz target decodes each by both kernel sets and compares,
 // then decodes the rest once; then the tail. The unit test takes them all whole.
-[[nodiscard]] inline Bytes dictionary_seed() {
-    const codec::oracle::OracleBounds& bounds = codec::oracle::kDictFuzzBounds;
+[[nodiscard]] inline Bytes dictionary_seed_at(const codec::oracle::OracleBounds& bounds) {
     const std::size_t cap = std::min(std::size_t{codec::kMaxBlockValues}, bounds.decoded_values);
     Bytes column = move_to_front_block(cap);
     std::size_t seen = cap;
@@ -189,6 +188,7 @@ template <class Encode>
     }
     return with_part_two_tail(std::move(column), kSmallMaxLen);
 }
+[[nodiscard]] inline Bytes dictionary_seed() { return dictionary_seed_at(codec::oracle::kDictFuzzBounds); }
 
 // A run-length block of `values` values in `runs` maximal runs, the first runs - 1 of one value
 // each and the last the rest, hand-built with the dearest nested blocks timed: run values
@@ -1019,14 +1019,27 @@ struct BoundSeed {
     return CodecTiers{.within_cap = 1, .compared = compared, .not_examined = compared < kFit ? 1U : 0U};
 }
 
+// The tiers of dictionary_seed's blocks: the cap's block, then a block for each maximal
+// block's values or part of one the compare limit and then the decode limit leave. -max_len
+// holds the cap's block and two maximal blocks of it beside the tail, so the limits may reach
+// no further past the cap.
+[[nodiscard]] constexpr CodecTiers dictionary_tiers() {
+    constexpr std::size_t kCap = codec::oracle::kDictFuzzDecodedValues;
+    constexpr std::size_t kCompared = codec::oracle::kDictFuzzComparedValues;
+    constexpr std::size_t kOnce = codec::oracle::kDictFuzzSingleDecodedValues;
+    static_assert(kCap < codec::kMaxBlockValues && kOnce <= kCap + (2 * codec::kMaxBlockValues),
+                  "dictionary_tiers assumes a cap below one maximal block and limits -max_len holds");
+    const auto blocks = [](std::size_t values) {
+        return (values + codec::kMaxBlockValues - 1) / codec::kMaxBlockValues;
+    };
+    return CodecTiers{.within_cap = 1, .compared = blocks(kCompared - kCap), .decoded_once = blocks(kOnce - kCompared)};
+}
+
 // One line each in fuzz/bound_seeds.txt, in this order.
 inline constexpr std::array<BoundSeed, 17> kBoundSeeds{{
     {"fuzz_dictionary", "dictionary", "bound-costliest", kSmallMaxLen, Side::codec_tiers,
      &dictionary_seed, &codec::oracle::check_dict_column, &codec::oracle::kDictCodec,
-     &codec::oracle::kDictFuzzBounds,
-     codec::oracle::kDictFuzzComparedValues > codec::oracle::kDictFuzzDecodedValues
-         ? CodecTiers{.within_cap = 1, .compared = 1}
-         : CodecTiers{.within_cap = 1}},
+     &codec::oracle::kDictFuzzBounds, dictionary_tiers()},
     {"fuzz_run_length", "run_length", "bound-costliest", kSmallMaxLen, Side::codec_tiers,
      &run_length_seed, &codec::oracle::check_rle_column, &codec::oracle::kRleCodec,
      &codec::oracle::kRleFuzzBounds,

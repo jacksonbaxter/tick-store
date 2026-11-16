@@ -305,12 +305,14 @@ INSTANTIATE_TEST_SUITE_P(
 // every re-encode, the block checks and the column checks on all its values. PFOR's and
 // run-length's caps are one maximal block, so only the dictionary has such sizes. Its blocks
 // come in each mode, and each carries every nested PFOR block, its dictionary and, but for
-// Huffman codes, its indices, under one transform, with the scale, re-encoded by hand from
-// what the encoder wrote, since a valid block may carry any. Their values are dense, as a
+// Huffman codes, its indices, under one transform, with the adaptive scale or without it,
+// re-encoded by hand from what the encoder wrote, since a valid block may carry any. Their values are dense, as a
 // real column's, so the blocks are far larger than -max_len and no fuzz target reaches
 // them. Each point is one test, so check.sh's limit for one test holds each alone. The sizes
 // follow the dictionary's cap constant (kDictFuzzDecodedValues); at a cap of one maximal block
-// there are none.
+// there are none. fuzz_dictionary compares the kernel sets on blocks of these sizes too, since
+// its compare limit reaches a maximal block past the cap; the grid runs every other check on
+// them.
 static_assert(codec::oracle::kPforFuzzDecodedValues >= codec::kMaxBlockValues &&
                   codec::oracle::kRleFuzzDecodedValues >= codec::kMaxBlockValues,
               "a codec cap below one maximal block needs its sizes in the grid");
@@ -318,6 +320,7 @@ static_assert(codec::oracle::kPforFuzzDecodedValues >= codec::kMaxBlockValues &&
 struct GridPoint {
     codec::DictMode mode;
     codec::IntTransform transform;
+    bool scale;
     std::size_t values;
 };
 
@@ -347,7 +350,9 @@ struct GridPoint {
             for (const auto transform :
                  {codec::IntTransform::none, codec::IntTransform::delta,
                   codec::IntTransform::delta_of_delta, codec::IntTransform::head_delta}) {
-                points.push_back({mode, transform, values});
+                for (const bool scale : {true, false}) {
+                    points.push_back({mode, transform, scale, values});
+                }
             }
         }
     }
@@ -361,9 +366,10 @@ struct GridPoint {
     return x ^ (x >> 31U);
 }
 
-// Values the mode wins on. Ranked PFOR, which the encoder is held to: 50,000 values, near
-// uniform. Ranked Huffman: a few values, each half as frequent as the one before.
-// Move-to-front: 700 values, each repeated before the next.
+// Values the mode wins on, each a multiple of 7, so the dictionary's entries take a scale where
+// it is allowed. Ranked PFOR, which the encoder is held to: 50,000 values, near uniform. Ranked
+// Huffman: a few values, each half as frequent as the one before. Move-to-front: 700 values,
+// each repeated before the next.
 [[nodiscard]] std::vector<std::uint64_t> grid_values(codec::DictMode mode, std::size_t count) {
     std::vector<std::uint64_t> values(count);
     for (std::size_t i = 0; i < count; ++i) {
@@ -373,11 +379,11 @@ struct GridPoint {
                 values[i] = 7 * (noise % 50'000);
                 break;
             case codec::DictMode::ranked_huffman:
-                values[i] = 1'000 + static_cast<std::uint64_t>(
-                                        std::countr_zero(noise | (std::uint64_t{1} << 40U)));
+                values[i] = 7 * (1'000 + static_cast<std::uint64_t>(
+                                             std::countr_zero(noise | (std::uint64_t{1} << 40U))));
                 break;
             case codec::DictMode::sorted_move_to_front:
-                values[i] = 1'000 + ((i / 3) % 700) + (noise % 2);
+                values[i] = 7 * (1'000 + ((i / 3) % 700) + (noise % 2));
                 break;
         }
     }
@@ -393,14 +399,15 @@ struct GridPoint {
 }
 
 // The nested PFOR block at the front of `nested`, decoded and written again under
-// `transform` with the scale, appended to `out`; returns the bytes it took, or 0 if refused.
+// `transform`, with the adaptive scale if `scale`, appended to `out`; returns the bytes it
+// took, or 0 if refused.
 [[nodiscard]] std::size_t rewrite_nested(std::span<const std::byte> nested,
-                                         codec::IntTransform transform, Bytes& out) {
+                                         codec::IntTransform transform, bool scale, Bytes& out) {
     std::vector<std::uint64_t> values;
     const auto taken = codec::decode_pfor_block(nested, values);
     if (!taken.has_value() ||
         !codec::encode_pfor_block(
-             values, codec::PforOptions{.transform = transform, .adaptive_scale = true, .patch = true},
+             values, codec::PforOptions{.transform = transform, .adaptive_scale = scale, .patch = true},
              out)
              .has_value()) {
         return 0;
@@ -426,7 +433,7 @@ TEST_P(OracleGrid, PassTheWholeCheck) {
     // The mode byte and the entry count, then each nested block under the transform.
     Bytes rewritten(payload.begin(), payload.begin() + kDictionaryAt);
     std::vector<std::size_t> nested_at{rewritten.size()};
-    const std::size_t dictionary = rewrite_nested(payload.subspan(kDictionaryAt), point.transform, rewritten);
+    const std::size_t dictionary = rewrite_nested(payload.subspan(kDictionaryAt), point.transform, point.scale, rewritten);
     ASSERT_NE(dictionary, 0U);
     if (point.mode == codec::DictMode::ranked_huffman) {
         rewritten.insert(rewritten.end(), payload.begin() + static_cast<std::ptrdiff_t>(kDictionaryAt + dictionary),
@@ -434,7 +441,7 @@ TEST_P(OracleGrid, PassTheWholeCheck) {
     } else {
         nested_at.push_back(rewritten.size());
         const std::size_t indices =
-            rewrite_nested(payload.subspan(kDictionaryAt + dictionary), point.transform, rewritten);
+            rewrite_nested(payload.subspan(kDictionaryAt + dictionary), point.transform, point.scale, rewritten);
         ASSERT_EQ(kDictionaryAt + dictionary + indices, payload.size());
     }
     const Bytes block = bound_seeds::framed(point.values, rewritten);
@@ -449,7 +456,7 @@ TEST_P(OracleGrid, PassTheWholeCheck) {
     EXPECT_EQ(text(codec::oracle::check_dict_column(exact_copy(block))), "");
 }
 
-// The test's name: the mode, the nested blocks' transform and the block's values.
+// The test's name: the mode, the nested blocks' transform and scale, and the block's values.
 std::string grid_name(const ::testing::TestParamInfo<GridPoint>& info) {
     static constexpr std::array<std::string_view, 3> kModes{"ranked_pfor", "ranked_huffman",
                                                             "move_to_front"};
@@ -457,8 +464,8 @@ std::string grid_name(const ::testing::TestParamInfo<GridPoint>& info) {
                                                                  "head_delta"};
     const GridPoint& point = info.param;
     return std::string{kModes.at(static_cast<std::size_t>(point.mode))} + "_" +
-           std::string{kTransforms.at(static_cast<std::size_t>(point.transform))} + "_" +
-           std::to_string(point.values);
+           std::string{kTransforms.at(static_cast<std::size_t>(point.transform))} +
+           (point.scale ? "_scaled_" : "_unscaled_") + std::to_string(point.values);
 }
 
 // Not among the scalar-capped parts (tests/unit/CMakeLists.txt): there the chosen set is the

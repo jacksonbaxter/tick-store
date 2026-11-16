@@ -151,16 +151,18 @@ inline constexpr std::size_t kPastBudgetValues = kOracleBlockSizes[1];
 
 // The fuzz targets' bounds, for the codecs whose blocks hold up to kMaxBlockValues values
 // in a few bytes (dictionary, run-length, PFOR at width 0). Each bound is one constant below,
-// with the figures it was set from beside it. The bar is the ruling's: each target's costliest
-// input takes at most 5 s an execution on the Linux host with its sibling cpu busy, half of
-// -timeout (fuzz/README.md, "Bounds"). These values were set to a design proxy for it, 0.5 s
-// an execution on the Mac, and are to be set again from timings on the Linux host. Every
-// figure is ms of one execution through the fuzz target on the Mac (fuzz build, -detect_leaks=0,
-// each run started with load1 under 5, the median of three; not the worst run, and not on an
-// idle machine) of the costliest input at the bounds named. To repeat one: set the constants,
-// build the fuzz preset, which writes the named seeds from them (bound_seeds.hpp), and run the
-// seed once through its target. The store writes codec blocks of kDefaultBlockValues values,
-// far inside each cap.
+// with the figures it was set from beside it. The bar is 5 s an execution on the Linux host
+// with its sibling cpu busy, half of -timeout (fuzz/README.md, "Bounds"). A bound is taken when
+// its target's costliest input, a named seed built from these constants (bound_seeds.hpp), takes
+// at most 4.5 s in the worst of five executions under the worst placement measured, the sibling
+// running a fuzzer: a margin over the spread measured there, about 10%. Linux took 5.3 to 5.9
+// times the Mac's time an execution on the dictionary's seeds, 7.0 on run-length's and 6.9 on
+// PFOR's, so the Mac figures below are held under 700, 630 and 650 ms. Each is ms of one
+// execution through the fuzz target on the Mac (fuzz build, -detect_leaks=0, each run started
+// with load1 under 5, the median of three) of the costliest input at the bounds named, from
+// builds of the target at those bounds. To repeat one: set the constants, build the fuzz preset,
+// which writes the named seeds, and run the seed once through its target. The store writes
+// codec blocks of kDefaultBlockValues values, far inside each cap.
 
 // A budget of `blocks` blocks: that many at the largest oracle block size, then
 // kOracleLongBlock values and `extra` more, so that at each oracle block size (3, 64 and
@@ -179,11 +181,11 @@ inline constexpr std::size_t kPforFuzzDecodedValues = kMaxBlockValues;
 // PFOR's compare limit: none, every block past the cap is compared. -max_len holds at most
 // three maximal blocks, each at least 5,131 bytes.
 inline constexpr std::size_t kPforFuzzComparedValues = std::numeric_limits<std::size_t>::max();
-// PFOR's budget: three blocks, 13,315 values (ragged 1, 3 and 1,027). The costliest input, the
+// PFOR's budget: four blocks, 17,410 values (ragged 1, 2 and 1,026). The costliest input, the
 // dearest maximal block, 7 i^2 under delta of delta with the scale, then a maximal head-delta
-// block with the scale, compared, takes 466 ms; with four blocks (17,410 values) 550, two 375,
-// one 294.
-inline constexpr std::size_t kPforFuzzCrossCheckedValues = ragged_budget(3, 2);
+// block with the scale, compared, takes 545 ms; on Linux it took 3,684 ms, the worst of five
+// under the worst placement.
+inline constexpr std::size_t kPforFuzzCrossCheckedValues = ragged_budget(4, 1);
 inline constexpr OracleBounds kPforFuzzBounds{.decoded_values = kPforFuzzDecodedValues,
                                               .compared_values = kPforFuzzComparedValues,
                                               .single_decoded_values = kPforFuzzComparedValues,
@@ -191,35 +193,43 @@ inline constexpr OracleBounds kPforFuzzBounds{.decoded_values = kPforFuzzDecoded
 
 // Run-length's cap: one maximal block, the format's largest.
 inline constexpr std::size_t kRleFuzzDecodedValues = kMaxBlockValues;
-// Run-length's compare limit: the cap, so nothing past the cap is examined. The 5 KB -max_len
-// leaves beside the dearest maximal block (2^20 runs of one value, 11,302 bytes) still hold a
-// maximal block of 467,968 runs or about 100 one-run blocks; with a compare tier to 9 x 2^20
-// values, which stops those at eight, the costliest input takes 617 ms at a budget of four
-// blocks, 557 at two and 526 at one; without it 541, 481 and 451. Past the cap the nested
-// blocks are PFOR blocks, which fuzz_pfor compares at every size.
-inline constexpr std::size_t kRleFuzzComparedValues = kRleFuzzDecodedValues;
-// Run-length's budget: two blocks, 9,218 values (ragged 2, 2 and 1,026): 481 ms, above.
-inline constexpr std::size_t kRleFuzzCrossCheckedValues = ragged_budget(2, 1);
+// Run-length's compare limit: nine maximal blocks' values from the input's start, so the
+// blocks past the cap are decoded by both kernel sets and compared up to eight maximal
+// blocks. The 5 KB -max_len leaves beside the dearest maximal block (2^20 runs of one value,
+// 11,302 bytes) hold a maximal block of 467,968 runs, or about 100 one-run blocks, of which
+// the limit compares eight. Past it a block is not examined; its nested blocks are PFOR
+// blocks, which fuzz_pfor compares at every size.
+inline constexpr std::size_t kRleFuzzComparedValues = std::size_t{9} * kMaxBlockValues;
+// Run-length's budget: four blocks, 17,410 values (ragged 1, 2 and 1,026). The costliest
+// input, the dearest maximal block and then the 467,968-run block compared, takes 611 ms,
+// and the dearest block with eight one-run blocks compared 584; on Linux they took 4,334
+// and 4,127 ms, the worst of five under the worst placement.
+inline constexpr std::size_t kRleFuzzCrossCheckedValues = ragged_budget(4, 1);
 inline constexpr OracleBounds kRleFuzzBounds{.decoded_values = kRleFuzzDecodedValues,
                                              .compared_values = kRleFuzzComparedValues,
                                              .single_decoded_values = kRleFuzzComparedValues,
                                              .cross_checked_values = kRleFuzzCrossCheckedValues};
 
-// The dictionary's cap: 2^18 values, below one maximal block. The dearest block, values cycling
+// The dictionary's cap: 2^18 values, the one cap below a maximal block, so that beside it the
+// compare tier reaches a maximal block within the bar. The dearest block, values cycling
 // through 2,048 under move-to-front with every rank the last, its ranks under head delta with
-// the scale, to the cap, then a block to the compare limit, takes, by cap and compare limit:
-// 2^18 and 2^19 484 ms, 3 x 2^18 546, 2^20 613; 3 x 2^16 and 2^19 460, 3 x 2^18 522, 2^20 581;
-// 2^17 and 2^20 557. At a cap of one maximal block it has not been timed through the target.
-// The unit suite's grid checks blocks from just past the cap to 2^20 values whole
-// (fuzz_regression_test.cpp, OracleGrid).
+// the scale, fills it. The unit suite's grid checks blocks from just past the cap to 2^20
+// values whole (fuzz_regression_test.cpp, OracleGrid).
 inline constexpr std::size_t kDictFuzzDecodedValues = std::size_t{1} << 18U;
-// The dictionary's compare limit, in values from the input's start: 2^19 (above).
-inline constexpr std::size_t kDictFuzzComparedValues = std::size_t{1} << 19U;
-// The dictionary's decode limit: past the compare limit nothing is examined.
+// The dictionary's compare limit, in values from the input's start: the cap and one maximal
+// block, so every block of up to 2^20 values the input starts with or holds just past the cap
+// is decoded by both kernel sets and compared. The costliest input, the cap's block and then a
+// maximal block of it, compared, takes 670 ms; from builds of the target at other limits,
+// a quarter of a maximal block further took 733 ms, past the 700, and 2^20 values 605 ms.
+inline constexpr std::size_t kDictFuzzComparedValues = kDictFuzzDecodedValues + kMaxBlockValues;
+// The dictionary's decode limit: the compare limit, so past it a block is not examined. A
+// decode-once tier of a quarter of a maximal block more took the costliest input to 704 ms,
+// past the 700, and one of a maximal block to 782 ms.
 inline constexpr std::size_t kDictFuzzSingleDecodedValues = kDictFuzzComparedValues;
 // The dictionary's budget: one block, 5,123 values (ragged 2, 3 and 1,027), so one block
-// boundary and one partial block are still exercised at each oracle block size: 484 ms, above.
-// A second block has not been timed through the target at these bounds.
+// boundary and one partial block are still exercised at each oracle block size. It is the one
+// budget below four blocks, so that the compare tier reaches a maximal block within the bar
+// (fuzz/README.md, "Bounds").
 inline constexpr std::size_t kDictFuzzCrossCheckedValues = ragged_budget(1, 2);
 inline constexpr OracleBounds kDictFuzzBounds{.decoded_values = kDictFuzzDecodedValues,
                                               .compared_values = kDictFuzzComparedValues,
@@ -235,6 +245,11 @@ static_assert(kPforFuzzDecodedValues <= kPforFuzzComparedValues &&
                   kDictFuzzDecodedValues <= kDictFuzzComparedValues &&
                   kDictFuzzComparedValues <= kDictFuzzSingleDecodedValues,
               "a limit below the one before it");
+static_assert(kPforFuzzCrossCheckedValues >= 4 * kOracleBlockSizes[2] &&
+                  kRleFuzzCrossCheckedValues >= 4 * kOracleBlockSizes[2],
+              "a budget of PFOR or run-length below four blocks at the largest oracle block size");
+static_assert(kDictFuzzComparedValues >= kDictFuzzDecodedValues + kMaxBlockValues,
+              "the dictionary's compare tier must reach a maximal block just past its cap");
 
 // The kernel-against-scalar oracle for one block: decodes `input` again with the scalar
 // set and compares with what the chosen set gave, `result` into `decoded`.

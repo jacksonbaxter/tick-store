@@ -71,23 +71,24 @@ struct StoreBounds {
     std::uint64_t compared_values = std::numeric_limits<std::uint64_t>::max();
 };
 
-// The fuzz target's bounds. The bar is the ruling's: the costliest input takes at most 5 s an
-// execution on the Linux host with its sibling cpu busy (fuzz/README.md, "Bounds"). These
-// values were set to a design proxy for it, 0.5 s an execution on the Mac, and are to be set
-// again from timings on the Linux host. Each figure is ms of one execution through
-// fuzz_itch_store on the Mac (fuzz build, -detect_leaks=0, each run started with load1 under
-// 5, the median of three) of the dearest file at the bound named, which bound_seeds.hpp builds
-// from these constants.
+// The fuzz target's bounds. The bar is 5 s an execution on the Linux host with its sibling cpu
+// busy, half of -timeout (fuzz/README.md, "Bounds"). A bound is taken when the dearest file at
+// it, a named seed bound_seeds.hpp builds from these constants, takes at most 4.5 s in the
+// worst of five executions under the worst placement measured, the sibling running a fuzzer: a
+// margin over the spread measured there, about 10%. Linux took 7.5 to 7.8 times the Mac's time
+// an execution on the store's seeds, so the Mac figures are held under 575 ms. Each is ms of one
+// execution through fuzz_itch_store on the Mac (fuzz build, -detect_leaks=0, each run started
+// with load1 under 5, the median of three).
 //
-// The cap: seven eighths of one largest codec block's values, 917,504. The dearest file within
-// it, 3,840 add orders beside a segment of 64 raw records, as many raw bytes as the cap leaves
-// room for, takes 466 ms; at a cap of one largest block's values, 2^20, 516, and at 3 x 2^18
-// 424. Typed records cost the most a value, but -max_len holds them to about 36,000 values:
-// the densest built, 70,000 bytes of add orders in segments of 64, state 35,624.
-inline constexpr std::uint64_t kFuzzMaxStoreValues = std::uint64_t{7} * (codec::kMaxBlockValues / 8);
+// The cap: one largest codec block's values, 2^20. The dearest file within it, 3,840 add
+// orders beside a segment of 64 raw records, as many raw bytes as the cap leaves room for,
+// takes 509 ms; on Linux it took 3,786 ms, the worst of five under the worst placement.
+// Typed records cost the most a value, but -max_len holds them to about 36,000 values: the
+// densest built, 70,000 bytes of add orders in segments of 64, state 35,624.
+inline constexpr std::uint64_t kFuzzMaxStoreValues = codec::kMaxBlockValues;
 // The compare limit: four largest blocks' values, 4,194,304. The dearest file within it, the
-// cap's add orders beside raw bytes to the limit, takes 467 ms. Past it a file of 7,884 bytes
-// states 67,110,960 values.
+// cap's add orders beside raw bytes to the limit, takes 461 ms; on Linux 3,370 ms. Past
+// it a file of 7,884 bytes states 67,110,960 values.
 inline constexpr std::uint64_t kFuzzComparedStoreValues = std::uint64_t{4} * codec::kMaxBlockValues;
 inline constexpr StoreBounds kStoreFuzzBounds{.stated_values = kFuzzMaxStoreValues,
                                               .compared_values = kFuzzComparedStoreValues};
