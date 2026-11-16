@@ -190,7 +190,9 @@ TEST(FuzzRegression, BoundSeedsAreTheListedOnes) {
 
 // The tiers a codec input's blocks fall in under `bounds`, walked as check_as_column walks
 // them: within the cap while the values before a block and its stated count stay within it,
-// then compared, then decoded once, by the same values; a refused block ends the walk.
+// then compared, then decoded once, by the same values; a refused block ends the walk, and
+// is noted where it is the first, within the cap, or where it states values and is past the
+// cap within the compare limit (not the tail's header, which states none).
 bound_seeds::CodecTiers tiers_of(const codec::oracle::CodecUnderTest& codec,
                                  std::span<const std::byte> input,
                                  const codec::oracle::OracleBounds& bounds) {
@@ -205,6 +207,8 @@ bound_seeds::CodecTiers tiers_of(const codec::oracle::CodecUnderTest& codec,
         const auto taken = codec.decode_block(rest, values);
         if (!taken.has_value()) {
             tiers.first_refused_within_cap = offset == 0 && after <= bounds.decoded_values;
+            tiers.refused_compared = after > seen && (capped || after > bounds.decoded_values) &&
+                                     after <= bounds.compared_values;
             break;
         }
         capped = capped || after > bounds.decoded_values;
@@ -240,7 +244,10 @@ TEST_P(BoundSeeds, PassTheWholeCheck) {
         ASSERT_NE(seed.bounds, nullptr);
         EXPECT_EQ(tiers_of(*seed.codec, bytes, *seed.bounds), seed.tiers);
     } else if (seed.side != Side::unbounded) {
-        const auto reader = store::ItchStoreReader::open_bytes(bytes);
+        // Read as the fuzz targets read them, with CRCs recomputed: a query seed's footer CRC
+        // field holds the width that steers its last request (bound_seeds::dearest_steering).
+        const std::vector<std::byte> fixed = store::oracle::fixed_checksums(bytes);
+        const auto reader = store::ItchStoreReader::open_bytes(fixed);
         ASSERT_TRUE(reader.has_value());
         const std::uint64_t stated = store::oracle::detail::stated_values(*reader);
         const std::uint64_t work = store::oracle::query_work(*reader, store::oracle::kWholeCheckWork);

@@ -4,6 +4,7 @@ fuzz_run_length run_length/bound-one-run-blocks
 fuzz_run_length run_length/bound-repeated-run-value
 fuzz_pfor pfor/bound-costliest
 fuzz_pfor pfor/bound-delta-past-cap
+fuzz_pfor pfor/bound-refused-past-cap
 fuzz_stream_vbyte stream_vbyte/bound-costliest
 fuzz_gorilla_timestamps gorilla_timestamps/bound-costliest
 fuzz_gorilla_xor gorilla_xor/bound-costliest
@@ -13,3 +14,4 @@ fuzz_itch_query itch_query/bound-costliest
 fuzz_itch_query itch_query/bound-costliest-within-budget
 fuzz_itch_query itch_query/bound-costliest-compared
 fuzz_itch_query itch_query/bound-falling-minutes
+fuzz_itch_query itch_query/bound-move-to-front

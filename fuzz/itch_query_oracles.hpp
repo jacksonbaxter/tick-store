@@ -63,6 +63,7 @@
 
 #include "container_oracles.hpp"
 #include "itch_store_oracles.hpp"
+#include "tick_store/codec/dictionary.hpp"
 #include "tick_store/codec/simd.hpp"
 #include "tick_store/itch/codec.hpp"
 #include "tick_store/store/columns.hpp"
@@ -79,65 +80,209 @@
 #include <limits>
 #include <optional>
 #include <span>
+#include <utility>
 #include <vector>
 
 namespace tick_store::store::oracle {
 
 inline constexpr std::uint32_t kQueryFuzzMaxSegmentRecords = kPieceValues + kSeekGroupRecords + 7;
 
-// What a part of the check costs a file, estimated from its directory alone: an amount for
-// each piece (one column's codec block in one segment) and for each value the pieces state,
-// more in a segment that is not plain, where both paths map every record through the column
-// form and seed each raw row's time from the rows before it. Values are what the decoders may
+// What a part of the check costs a file, estimated from what it states before anything is
+// decoded (query_census): an amount for each piece (one column's codec block in one segment)
+// and each value the pieces state, for each codec block the pieces hold, for a dictionary block
+// in the Huffman mode and its values, and for each value times entries of a move-to-front
+// block, each more in a segment that is not plain, where both paths map every record through
+// the column form and seed each raw row's time from the rows before it; and an amount for each
+// bucket move the product's minute aggregate may make a call. Values are what the decoders may
 // be asked for at most, since a column is decoded only to its stated count. Saturates.
-//
-// The weights are nanoseconds of one execution through fuzz_itch_query on the Mac (fuzz build,
-// -detect_leaks=0, load1 under 5, the median of three runs), fitted to 70 files timed through
-// builds of the target at other bounds: days of typed records with a raw one every 4 or 64
-// records or none, at segment sizes from 1 to the cap and at full and a quarter -max_len, raw
-// records of 1,000 bytes, and files built against an earlier measure, days of one record type
-// each (deletes, cancels, executions, system events), the types stating the fewest values a
-// record. For each pair (plain, other) the weights are the pair with the least total over the
-// files that puts every file's time at or below its work, rounded up to two figures; the files
-// on that envelope are the seeds bound_seeds.hpp builds.
+struct SegmentWeights {
+    std::uint64_t segment = 0;
+    std::uint64_t piece = 0;
+    std::uint64_t value = 0;
+    std::uint64_t block = 0;
+    std::uint64_t huffman_block = 0;
+    std::uint64_t huffman_value = 0;
+    std::uint64_t moved_entry = 0;
+};
 struct WorkWeights {
-    std::uint64_t plain_piece;
-    std::uint64_t plain_value;
-    std::uint64_t piece;
-    std::uint64_t value;
+    SegmentWeights plain;
+    SegmentWeights other;
+    std::uint64_t minute_move = 0;
 };
 
-// The whole check with the repeat ask on two requests: on the envelope, a day of system events
-// in segments of 16 (1,074 ms, 0.996 of its work), the day of 4,587 typed records in one plain
-// segment (205 ms, 0.993) and a day of identical system events in segments of one (0.990).
-inline constexpr WorkWeights kWholeCheckWork{
-    .plain_piece = 610'000, .plain_value = 5'600, .piece = 1'600'000, .value = 15'000};
-// The indexed path asked every request on the kernel set and with the scalar set forced: on
-// the envelope, the day with a raw record every 4 in segments of one record (452 ms, 0.999)
-// and the plain day of 4,587 records (33 ms, 0.999).
-inline constexpr WorkWeights kComparedAsksWork{
-    .plain_piece = 24'000, .plain_value = 960, .piece = 2'600'000, .value = 8'100};
+// The most distinct minutes 48-bit times hold: 2^48 ns over 60 s, rounded up.
+inline constexpr std::uint64_t kMostMinutes = ((std::uint64_t{1} << 48U) / 60'000'000'000ULL) + 1;
 
-[[nodiscard]] inline std::uint64_t query_work(const ItchStoreReader& reader, const WorkWeights& weights) {
+// What the measure counts in one kind of segment, plain or not. Pieces and values come from
+// the directory; the rest from the pieces' codec block headers, read as the indexed path
+// reads them on opening a piece (REVIEW-2, B5), since a piece may hold any number of codec
+// blocks, each with a cost of its own on every decode, and a dictionary block's mode sets
+// what a value costs. Counted up to the first header the indexed path would refuse in each
+// piece, since nothing past it in that piece is decoded.
+struct SegmentCounts {
+    // Segments, each read whole on its own by the exact path and the column form, and opened by
+    // the indexed path for each request whose window may hold it: a segment of raw records
+    // alone has no times, so every request may.
+    std::uint64_t segments = 0;
+    std::uint64_t pieces = 0;
+    std::uint64_t values = 0;
+    // Codec blocks over every coded piece.
+    std::uint64_t blocks = 0;
+    // Dictionary blocks in the Huffman mode, whose decoder builds its lookup tables on each
+    // decode, and their values, whose codes may run past the tables.
+    std::uint64_t huffman_blocks = 0;
+    std::uint64_t huffman_values = 0;
+    // For each move-to-front block, its values times its entries (at most
+    // kDictMtfMaxEntries): what the decoder may move, every value's rank the last.
+    std::uint64_t moved_entries = 0;
+};
+struct QueryCensus {
+    SegmentCounts plain;
+    SegmentCounts other;
+    // The product's minute aggregate keeps a sorted vector of buckets, and a row whose minute
+    // comes before the last moves every later bucket (ItchQuery::minute_aggregate, a finding
+    // the oracle does not change). The buckets of one call are at most the distinct minutes of
+    // the file's typed records, at most kMostMinutes, so this bounds its moves a call: the
+    // square of the lesser of the typed records and kMostMinutes.
+    std::uint64_t minute_moves = 0;
+};
+
+[[nodiscard]] inline QueryCensus query_census(const ItchStoreReader& reader) {
     constexpr std::uint64_t kMost = std::numeric_limits<std::uint64_t>::max();
-    const auto add = [](std::uint64_t a, std::uint64_t b) { return b > kMost - a ? kMost : a + b; };
-    const auto times = [](std::uint64_t a, std::uint64_t b) {
-        return a != 0 && b > kMost / a ? kMost : a * b;
+    const auto add = [](std::uint64_t& to, std::uint64_t b) { to = b > kMost - to ? kMost : to + b; };
+    const auto le = [](std::span<const std::byte> bytes, std::size_t at, std::size_t width) {
+        std::uint64_t value = 0;
+        for (std::size_t i = 0; i < width; ++i) {
+            value |= std::to_integer<std::uint64_t>(bytes[at + i]) << (8U * i);
+        }
+        return value;
     };
-    std::uint64_t work = 0;
+    QueryCensus census;
+    std::uint64_t typed = 0;
     for (std::uint64_t s = 0; s < reader.segment_count(); ++s) {
         const SegmentEntry& segment = reader.segment(s);
-        std::uint64_t pieces = 0;
-        std::uint64_t values = 0;
-        for (std::size_t c = 0; c < segment.values.size(); ++c) {
-            pieces = add(pieces, segment.pieces[c]);
-            values = add(values, segment.values[c]);
+        SegmentCounts& counts = segment.summary.plain ? census.plain : census.other;
+        add(counts.segments, 1);
+        add(typed, segment.summary.typed_records);
+        for (std::size_t c = 0; c < segment.pieces.size(); ++c) {
+            add(counts.pieces, segment.pieces[c]);
+            add(counts.values, segment.values[c]);
+            const auto column = static_cast<Column>(c);
+            const ColumnInfo& info = column_info(column);
+            if (info.codec == ColumnCodec::raw_bytes) {
+                continue;
+            }
+            for (std::uint64_t p = 0; p < segment.pieces[c]; ++p) {
+                const auto view = reader.column_view(s, column, p);
+                if (!view.has_value() || view->block == kNoIndex) {
+                    continue;
+                }
+                const auto unwrapped = unwrap_column(column, view->codec, view->payload, view->values);
+                if (!unwrapped.has_value()) {
+                    continue;
+                }
+                const std::span<const std::byte> bytes = unwrapped->bytes();
+                std::size_t at = 0;
+                while (bytes.size() - at >= codec::kBlockHeaderSize) {
+                    const std::uint64_t count = le(bytes, at, 4);
+                    const std::uint64_t payload = le(bytes, at + 4, 4);
+                    if (count == 0 || payload > bytes.size() - at - codec::kBlockHeaderSize) {
+                        break;
+                    }
+                    add(counts.blocks, 1);
+                    constexpr std::size_t kModeAndEntries = 5;
+                    if (info.codec == ColumnCodec::dictionary && payload >= kModeAndEntries) {
+                        const std::size_t mode_at = at + codec::kBlockHeaderSize;
+                        const auto mode = static_cast<codec::DictMode>(le(bytes, mode_at, 1));
+                        const std::uint64_t entries = le(bytes, mode_at + 1, 4);
+                        if (mode == codec::DictMode::ranked_huffman) {
+                            add(counts.huffman_blocks, 1);
+                            add(counts.huffman_values, count);
+                        } else if (mode == codec::DictMode::sorted_move_to_front) {
+                            add(counts.moved_entries, count * std::min(entries, codec::kDictMtfMaxEntries));
+                        }
+                    }
+                    at += codec::kBlockHeaderSize + static_cast<std::size_t>(payload);
+                }
+            }
         }
-        const bool plain = segment.summary.plain;
-        work = add(work, add(times(plain ? weights.plain_piece : weights.piece, pieces),
-                             times(plain ? weights.plain_value : weights.value, values)));
     }
+    const std::uint64_t minutes = std::min(typed, kMostMinutes);
+    census.minute_moves = minutes * minutes;
+    return census;
+}
+
+// The weights, in ns on the Mac, fitted to 194 files timed through builds of this target at
+// other bounds (the fuzz preset, -detect_leaks=0 so libFuzzer runs the file once, each run
+// started at load1 under 8, the median of three; a file's time is libFuzzer's "Executed ... in
+// N ms"), each build with the steered request's window over the file's whole time range, the
+// dearest any trailer can give it (requests_for): kWholeCheckWork to the whole check with the
+// repeat ask on kQueryPastBudgetRequests (budget 0), kComparedAsksWork to the two indexed asks
+// alone (cap 0). Each is the least set, by the mean of work over time, that puts every file's
+// time at or below its work, with each weight in a segment that is not plain at least its plain
+// one and the minute move's at least the order's own cost through the target: 4,691 add orders
+// on locate 0 a minute apart, falling from the largest 48-bit time, then repeats, less the same
+// census with the minutes rising, over 22.0M moves (6.1 ns whole, 3.8 compared). Rounded up to
+// two figures. The files are days of typed records with raw ones every 1 to 400 records at
+// segment sizes 1 to the cap; days of one cheap record type; add orders on locate 0; falling
+// minutes; dictionary columns rewritten as move-to-front blocks over 2,048 entries or as Huffman
+// blocks of long codes or of two values; every coded column cut into blocks of 1 to 64 values;
+// and mixes of those, at sizes from a quarter of the budget to the compare limit. Two sets of 22
+// and 20 of them, of shapes the fit had not seen, were first held out. The first came to 1.53
+// times the weights fitted without it (one-record segments of raw records alone, which every
+// request may reach), which the term per segment answers; fitted again with that term and half
+// the set, the other half came to 1.22 (a small day with its share columns move-to-front). The
+// second, against the weights fitted to everything before it, came to at most 1.061 whole and
+// 1.046 compared, and 1.10 times the fitted envelope with the repeat ask on every request. Both
+// sets are in the fit now. The highest on the files fitted: the whole check 0.991 of its work (add
+// orders on locate 0, every column in one-value blocks), the compared asks 0.993 (falling
+// minutes with Huffman blocks of two values), with the repeat ask on every request 1.225 (a
+// small day with a raw record every 8, its share columns move-to-front).
+inline constexpr WorkWeights kWholeCheckWork{
+    .plain = {.segment = 9'800'000,
+              .piece = 38'000,
+              .value = 8'900,
+              .block = 45'000,
+              .huffman_block = 1'600'000},
+    .other = {.segment = 9'800'000,
+              .piece = 1'900'000,
+              .value = 15'000,
+              .block = 72'000,
+              .huffman_block = 2'700'000,
+              .moved_entry = 5},
+    .minute_move = 7};
+inline constexpr WorkWeights kComparedAsksWork{
+    .plain = {.value = 2'000, .block = 27'000, .huffman_block = 660'000, .moved_entry = 1},
+    .other = {.segment = 9'200'000,
+              .piece = 1'100'000,
+              .value = 8'200,
+              .block = 47'000,
+              .huffman_block = 1'700'000,
+              .moved_entry = 8},
+    .minute_move = 4};
+
+[[nodiscard]] inline std::uint64_t query_work(const QueryCensus& census, const WorkWeights& weights) {
+    constexpr std::uint64_t kMost = std::numeric_limits<std::uint64_t>::max();
+    std::uint64_t work = 0;
+    const auto add = [&](std::uint64_t weight, std::uint64_t count) {
+        const std::uint64_t part = weight != 0 && count > kMost / weight ? kMost : weight * count;
+        work = part > kMost - work ? kMost : work + part;
+    };
+    for (const auto& [w, n] : {std::pair{&weights.plain, &census.plain}, std::pair{&weights.other, &census.other}}) {
+        add(w->segment, n->segments);
+        add(w->piece, n->pieces);
+        add(w->value, n->values);
+        add(w->block, n->blocks);
+        add(w->huffman_block, n->huffman_blocks);
+        add(w->huffman_value, n->huffman_values);
+        add(w->moved_entry, n->moved_entries);
+    }
+    add(weights.minute_move, census.minute_moves);
     return work;
+}
+
+[[nodiscard]] inline std::uint64_t query_work(const ItchStoreReader& reader, const WorkWeights& weights) {
+    return query_work(query_census(reader), weights);
 }
 
 // How much of one file the check queries, in the work its directory says each part will take.
@@ -167,12 +312,12 @@ inline constexpr std::size_t kQueryPastBudgetRequests = 2;
 // execution on the Linux host with its sibling cpu busy (fuzz/README.md, "Bounds"). These
 // values were set to a design proxy for it, 0.5 s an execution on the Mac, and are to be set
 // again from timings on the Linux host: the cap and the compare limit are 0.45 s of their
-// measures, so a file whose time is up to a ninth above the envelope of the files timed still
-// meets the proxy. Within the budget the whole check takes the repeat ask on every request, at
-// most 1.19 times the work on the files timed (the day with a raw record every 64 in one
-// segment), so the budget is 0.375 s: 445 ms at most.
+// measures, so a file up to a ninth above the envelope of the files fitted still meets the
+// proxy, more than the held-out files came to (above). Within the budget the whole check takes
+// the repeat ask on every request, at most 1.225 times the work on the files fitted, so the
+// budget is 0.5 s over 1.225 and the same ninth, rounded down to 0.365 s: 447 ms at most.
 inline constexpr std::uint64_t kQueryFuzzWork = 450'000'000;
-inline constexpr std::uint64_t kQueryFuzzCrossCheckedWork = 375'000'000;
+inline constexpr std::uint64_t kQueryFuzzCrossCheckedWork = 365'000'000;
 inline constexpr std::uint64_t kQueryFuzzComparedWork = 450'000'000;
 inline constexpr QueryBounds kQueryFuzzBounds{.work = kQueryFuzzWork,
                                               .cross_checked_work = kQueryFuzzCrossCheckedWork,
@@ -443,13 +588,14 @@ template <class T>
     if (reader->header().segment_records > kQueryFuzzMaxSegmentRecords) {
         return nullptr;
     }
-    const std::uint64_t work = query_work(*reader, kWholeCheckWork);
+    const QueryCensus census = query_census(*reader);
+    const std::uint64_t work = query_work(census, kWholeCheckWork);
     const auto requests = query_detail::requests_for(*reader, file);
     const std::span<const query_detail::Request> all{requests};
     if (work > bounds.work) {
         // Past the cap, up to the compare limit: every request asked of the indexed path by
         // the chosen kernel set and with the scalar set forced, and the answers compared.
-        if (query_work(*reader, kComparedAsksWork) > bounds.compared_work) {
+        if (query_work(census, kComparedAsksWork) > bounds.compared_work) {
             return nullptr;
         }
         const query_detail::Answers kernels = query_detail::answer(*reader, QueryPath::indexed, all);

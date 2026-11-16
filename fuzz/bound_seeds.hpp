@@ -15,7 +15,8 @@
 //
 // Every block here comes from the real encoder or is a nested block of the real encoder's
 // framed by hand where the encoder would choose another form, and every store comes from
-// the real writer (Z4). A codec input ends with bytes for part 2 that start with a block
+// the real writer (Z4), one with its share columns' blocks replaced by such blocks and its
+// container rebuilt by the real builder. A codec input ends with bytes for part 2 that start with a block
 // header stating no values, which every decoder refuses at once.
 
 #include "codec_oracles.hpp"
@@ -30,6 +31,8 @@
 #include "tick_store/codec/stream_vbyte.hpp"
 #include "tick_store/itch/codec.hpp"
 #include "tick_store/itch/message.hpp"
+#include "tick_store/store/container.hpp"
+#include "tick_store/store/itch_store.hpp"
 #include "tick_store/store/itch_store_reader.hpp"
 #include "tick_store/store/itch_store_writer.hpp"
 
@@ -37,8 +40,11 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
+#include <optional>
 #include <span>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -245,32 +251,63 @@ template <class Encode>
         kSmallMaxLen);
 }
 
-// For the fault the kernel-against-scalar check past the cap must see: a first block that
-// takes fuzz_pfor's cap exactly, no transform, so no delta pass decodes it; then a maximal
-// block of rising values by delta, each vector width 0, which the target decodes by both
-// kernel sets and compares, its delta pass summing every vector; then the tail.
-[[nodiscard]] inline Bytes pfor_delta_past_cap_seed() {
-    const std::size_t first_values =
-        std::min(std::size_t{codec::kMaxBlockValues}, codec::oracle::kPforFuzzDecodedValues);
-    const Bytes zeros = encoded([&](Bytes& out) {
+// The PFOR block of `count` zeros with no transform, each vector width 0, so no delta pass
+// decodes it.
+[[nodiscard]] inline Bytes pfor_zeros_block(std::size_t count) {
+    return encoded([&](Bytes& out) {
         return codec::encode_pfor_block(
-            Words(first_values, 0),
+            Words(count, 0),
             codec::PforOptions{
                 .transform = codec::IntTransform::none, .adaptive_scale = false, .patch = true},
             out);
     });
+}
+
+// A maximal block of values rising by one under delta, each vector width 0, so the delta pass
+// sums every vector.
+[[nodiscard]] inline Bytes pfor_rising_delta_block() {
     Words rising(codec::kMaxBlockValues);
     for (std::size_t i = 0; i < rising.size(); ++i) {
         rising[i] = 1'000 + i;
     }
-    const Bytes delta = encoded([&](Bytes& out) {
+    return encoded([&](Bytes& out) {
         return codec::encode_pfor_block(
             rising,
             codec::PforOptions{
                 .transform = codec::IntTransform::delta, .adaptive_scale = false, .patch = true},
             out);
     });
-    return with_part_two_tail(joined(zeros, delta), kSmallMaxLen);
+}
+
+// For the faults the checks past the cap must see: a first block that takes fuzz_pfor's cap
+// exactly, no transform, so no delta pass decodes it; then the maximal rising delta block,
+// which the target decodes by both kernel sets and compares, its delta pass summing every
+// vector, one of the decodes from an exact copy of its bytes; then the tail.
+[[nodiscard]] inline Bytes pfor_delta_past_cap_seed() {
+    const std::size_t first_values =
+        std::min(std::size_t{codec::kMaxBlockValues}, codec::oracle::kPforFuzzDecodedValues);
+    return with_part_two_tail(joined(pfor_zeros_block(first_values), pfor_rising_delta_block()),
+                              kSmallMaxLen);
+}
+
+// Refused past the cap: the same, but the delta block's payload holds one byte more, which
+// the decoder refuses only once it has decoded every value ("pfor block"), so a refusal that
+// changed its output past the cap would show.
+[[nodiscard]] inline Bytes pfor_refused_past_cap_seed() {
+    const std::size_t first_values =
+        std::min(std::size_t{codec::kMaxBlockValues}, codec::oracle::kPforFuzzDecodedValues);
+    Bytes refused = pfor_rising_delta_block();
+    refused.push_back(std::byte{0});
+    constexpr std::size_t kPayloadSizeAt = 4;
+    std::uint64_t payload = 0;
+    for (unsigned i = 0; i < 4; ++i) {
+        payload |= std::to_integer<std::uint64_t>(refused[kPayloadSizeAt + i]) << (8U * i);
+    }
+    ++payload;
+    for (unsigned i = 0; i < 4; ++i) {
+        refused[kPayloadSizeAt + i] = static_cast<std::byte>((payload >> (8U * i)) & 0xFFU);
+    }
+    return with_part_two_tail(joined(pfor_zeros_block(first_values), refused), kSmallMaxLen);
 }
 
 // Refused: a run-length block of one value a run, as many runs as fuzz_run_length's cap
@@ -515,35 +552,270 @@ template <class Encode>
 // The day in segments of `segment_records`, the query target's cap unless given, with a raw
 // record of 9 bytes every `raw_every` records, so no segment is plain and the indexed path
 // decodes every record it reaches, as much as the exact path does; with none if `raw_every`
-// is 0.
+// is 0. The raw records' bytes, a type no message has, live as long as the program, since a
+// RawMessage only views them.
+inline constexpr std::array<std::byte, 9> kUnknownRecord{std::byte{'z'},  std::byte{0xA5}, std::byte{0xA5},
+                                                         std::byte{0xA5}, std::byte{0xA5}, std::byte{0xA5},
+                                                         std::byte{0xA5}, std::byte{0xA5}, std::byte{0xA5}};
+[[nodiscard]] inline std::vector<itch::Message> raw_spotted_messages(std::size_t records, std::size_t raw_every) {
+    std::vector<itch::Message> day = day_messages(records);
+    for (std::size_t i = 0; raw_every != 0 && i < day.size(); i += raw_every) {
+        day[i] = itch::RawMessage{.bytes = kUnknownRecord, .reason = itch::RawReason::unknown_type};
+    }
+    return day;
+}
 [[nodiscard]] inline Bytes raw_spotted_day(
     std::size_t records, std::size_t raw_every,
     std::uint32_t segment_records = store::oracle::kQueryFuzzMaxSegmentRecords) {
-    std::vector<itch::Message> day = day_messages(records);
-    Bytes unknown(9, std::byte{0xA5});
-    unknown.front() = std::byte{'z'};
-    for (std::size_t i = 0; raw_every != 0 && i < day.size(); i += raw_every) {
-        day[i] = itch::RawMessage{.bytes = unknown, .reason = itch::RawReason::unknown_type};
+    return written(raw_spotted_messages(records, raw_every), segment_records);
+}
+
+// `file`, a store from the real writer, with each block `edit` changes (given its column
+// metadata, it may set the block's codec and bytes; it returns whether it changed them), the
+// seek index's maxima for the columns of the changed blocks set by `seek_top` where it gives
+// one (the exact path checks them), and every other block and section as it was; the
+// container is the real builder's.
+template <class Edit, class SeekTop>
+[[nodiscard]] Bytes with_blocks_rewritten(const Bytes& file, Edit&& edit, SeekTop&& seek_top) {
+    using store::Column;
+    const auto parser = store::ContainerParser::open(file);
+    if (!parser.has_value()) {
+        throw std::runtime_error("a bound seed's store did not open");
     }
-    return written(day, segment_records);
+    std::vector<store::ContainerPart> parts;
+    for (std::uint64_t b = 0; b < parser->block_count(); ++b) {
+        const auto view = parser->block(b);
+        if (!view.has_value()) {
+            throw std::runtime_error("a bound seed's store block did not read");
+        }
+        parts.push_back({.section_name = {},
+                         .codec = view->codec,
+                         .metadata = Bytes(view->metadata.begin(), view->metadata.end()),
+                         .bytes = Bytes(view->payload.begin(), view->payload.end())});
+    }
+    std::vector<std::pair<std::uint32_t, Column>> changed;
+    for (store::ContainerPart& part : parts) {
+        const auto metadata = store::parse_column_metadata(part.metadata, 0);
+        if (metadata.has_value() && edit(*metadata, part)) {
+            if (!store::decode_column(metadata->column, part.codec, part.bytes, metadata->values).has_value()) {
+                throw std::runtime_error("a bound seed's rewritten column did not decode");
+            }
+            changed.emplace_back(metadata->segment, metadata->column);
+        }
+    }
+    for (store::ContainerPart& part : parts) {
+        const auto metadata = store::parse_column_metadata(part.metadata, 0);
+        if (!metadata.has_value() || metadata->column != Column::seek) {
+            continue;
+        }
+        auto maxima = store::decode_column(Column::seek, part.codec, part.bytes, metadata->values);
+        if (!maxima.has_value()) {
+            throw std::runtime_error("a bound seed's seek index did not decode");
+        }
+        bool moved = false;
+        for (const auto& [segment, column] : changed) {
+            const std::optional<std::uint64_t> top = seek_top(column);
+            if (segment == metadata->segment && top.has_value() &&
+                static_cast<std::size_t>(column) < maxima->size()) {
+                (*maxima)[static_cast<std::size_t>(column)] = *top;
+                moved = true;
+            }
+        }
+        if (moved) {
+            auto chunks = store::encode_column(Column::seek, *maxima);
+            if (!chunks.has_value() || chunks->size() != 1) {
+                throw std::runtime_error("a bound seed's seek index did not encode");
+            }
+            part.codec = (*chunks)[0].codec;
+            part.bytes = std::move((*chunks)[0].bytes);
+        }
+    }
+    for (std::uint64_t i = 0; i < parser->section_count(); ++i) {
+        const auto info = parser->section_info(i);
+        if (!info.has_value()) {
+            throw std::runtime_error("a bound seed's store section did not read");
+        }
+        const auto view = parser->section(info->name);
+        if (!view.has_value()) {
+            throw std::runtime_error("a bound seed's store section did not read");
+        }
+        parts.push_back({.section_name = std::string{info->name},
+                         .codec = codec::CodecId::raw,
+                         .metadata = {},
+                         .bytes = Bytes(view->bytes.begin(), view->bytes.end())});
+    }
+    auto rebuilt = store::build_container(parts);
+    if (!rebuilt.has_value()) {
+        throw std::runtime_error("a bound seed's store did not rebuild");
+    }
+    return std::move(*rebuilt);
+}
+
+// `file` with the pieces of the five share columns (tracking, add, reduce, replace and trade
+// shares, the dictionary columns) rewritten as the dearest move-to-front blocks (REVIEW-2, B5
+// (c)): each piece's values in blocks of kColumnBlockValues, each move_to_front_block where it
+// has at least kDictMtfMaxEntries values and otherwise the real encoder's block of as many
+// values cycling down from the top entry.
+[[nodiscard]] inline Bytes with_move_to_front_shares(const Bytes& file) {
+    using store::Column;
+    constexpr std::array kShares{Column::tracking, Column::add_shares, Column::reduce_shares,
+                                 Column::replace_shares, Column::trade_shares};
+    constexpr std::uint64_t kTop = codec::kDictMtfMaxEntries - 1;
+    const auto is_share = [&](Column column) { return std::ranges::find(kShares, column) != kShares.end(); };
+    const auto edit = [&](const store::ColumnMetadata& metadata, store::ContainerPart& part) {
+        if (!is_share(metadata.column)) {
+            return false;
+        }
+        Bytes chunk;
+        for (std::size_t done = 0; done < metadata.values; done += store::kColumnBlockValues) {
+            const std::size_t count = std::min<std::size_t>(store::kColumnBlockValues, metadata.values - done);
+            if (count >= codec::kDictMtfMaxEntries) {
+                const Bytes block = move_to_front_block(count);
+                chunk.insert(chunk.end(), block.begin(), block.end());
+                continue;
+            }
+            Words cycling(count);
+            for (std::size_t i = 0; i < count; ++i) {
+                cycling[i] = kTop - i;
+            }
+            if (!codec::encode_dict(cycling, count, chunk).has_value()) {
+                throw std::runtime_error("a bound seed's encoder refused its values");
+            }
+        }
+        part.codec = codec::CodecId::dictionary;
+        part.bytes = std::move(chunk);
+        return true;
+    };
+    return with_blocks_rewritten(file, edit, [&](Column) { return std::optional<std::uint64_t>{kTop}; });
+}
+
+// `file` with every coded column's pieces written again by its codec's real encoder in blocks
+// of `per` values, the dictionary columns held to ranked PFOR (REVIEW-2, B5 (a)): many codec
+// blocks a piece, each with its decoders' fixed cost. The values, and so the seek index, are
+// as they were.
+[[nodiscard]] inline Bytes with_small_blocks(const Bytes& file, std::size_t per) {
+    using store::ColumnCodec;
+    const auto edit = [&](const store::ColumnMetadata& metadata, store::ContainerPart& part) {
+        const store::ColumnInfo& info = store::column_info(metadata.column);
+        if (info.codec == ColumnCodec::raw_bytes) {
+            return false;
+        }
+        const auto values = store::decode_column(metadata.column, part.codec, part.bytes, metadata.values);
+        if (!values.has_value()) {
+            throw std::runtime_error("a bound seed's column did not decode");
+        }
+        Bytes chunk;
+        bool encoded = false;
+        if (info.codec == ColumnCodec::dictionary) {
+            encoded = codec::encode_dict(*values, per, chunk, nullptr, codec::kDictRankedPforOnly).has_value();
+            part.codec = codec::CodecId::dictionary;
+        } else if (info.codec == ColumnCodec::run_length) {
+            encoded = codec::encode_rle(*values, per, chunk).has_value();
+            part.codec = codec::CodecId::run_length;
+        } else {
+            const codec::PforOptions options{
+                .transform = info.codec == ColumnCodec::pfor_head_delta ? codec::IntTransform::head_delta
+                             : info.codec == ColumnCodec::pfor_for || info.codec == ColumnCodec::pfor_for_scaled
+                                 ? codec::IntTransform::none
+                                 : codec::IntTransform::delta,
+                .adaptive_scale = info.codec == ColumnCodec::pfor_for_scaled ||
+                                  info.codec == ColumnCodec::pfor_delta_scaled};
+            encoded = codec::encode_pfor(*values, per, options, chunk).has_value();
+            part.codec = codec::CodecId::pfor;
+        }
+        if (!encoded) {
+            throw std::runtime_error("a bound seed's encoder refused its values");
+        }
+        part.bytes = std::move(chunk);
+        return true;
+    };
+    return with_blocks_rewritten(file, edit, [](store::Column) { return std::optional<std::uint64_t>{}; });
+}
+
+// The time range the query oracle's requests span (requests_for): the least and the most time
+// of the segments that hold typed records.
+[[nodiscard]] inline std::pair<std::uint64_t, std::uint64_t> query_time_range(const Bytes& file) {
+    const Bytes fixed = store::oracle::fixed_checksums(file);
+    const auto reader = store::ItchStoreReader::open_bytes(fixed);
+    if (!reader.has_value()) {
+        throw std::runtime_error("a bound seed's store did not open");
+    }
+    std::uint64_t low = std::numeric_limits<std::uint64_t>::max();
+    std::uint64_t high = 0;
+    for (std::uint64_t k = 0; k < reader->segment_count(); ++k) {
+        const store::SegmentSummary& summary = reader->segment(k).summary;
+        if (summary.typed_records != 0) {
+            low = std::min(low, summary.min_time);
+            high = std::max(high, summary.max_time);
+        }
+    }
+    return {low, high};
+}
+
+// `records` written in segments of `segment_records`, then `finish` on the file, under the
+// dearest steering a file's last bytes can give the query oracle. Its steered request
+// (requests_for) starts at the least time plus the trailer's last 8 bytes, its magic, modulo
+// the range, and runs for the 8 bytes before them, the footer CRC and the reserved zeros, modulo
+// the range and 2. The oracle reads a file with its CRCs recomputed, so a fuzzed file may hold
+// any CRC there, and any times: the dearest steering is a window over the whole range, one more
+// set of requests asking every row. Where the range is under 2^32 ns, so the CRC can say it, the
+// records get one more system event, at the time a little past the last that leaves the start
+// nearest the least time, and the footer CRC field the width that reaches the last; the
+// steered window is then checked. A wider range is left as written.
+template <class Finish>
+[[nodiscard]] Bytes dearest_steering(std::vector<itch::Message> records, std::uint32_t segment_records,
+                                     Finish&& finish) {
+    constexpr std::uint64_t kTried = std::uint64_t{1} << 16U;
+    Bytes file = finish(written(records, segment_records));
+    const auto [low, high] = query_time_range(file);
+    if (low > high || high - low >= (std::uint64_t{1} << 32U) - kTried - 1) {
+        return file;
+    }
+    const std::uint64_t magic = store::oracle::query_detail::tail_word(file, 0);
+    std::uint64_t last = high;
+    for (std::uint64_t time = high; time <= high + kTried; ++time) {
+        if (magic % (time - low + 1) < magic % (last - low + 1)) {
+            last = time;
+        }
+    }
+    if (last != high) {
+        records.emplace_back(itch::SystemEvent{itch::MessageHeader{0, 0, last}, std::byte{'Q'}});
+        file = finish(written(records, segment_records));
+    }
+    const auto width = static_cast<std::uint32_t>(last - low + 1);
+    const std::size_t crc_at = file.size() - store::kTrailerSize + store::kTrailerFooterCrc;
+    for (std::size_t i = 0; i < 4; ++i) {
+        file[crc_at + i] = static_cast<std::byte>((width >> (8U * i)) & 0xFFU);
+    }
+    const Bytes fixed = store::oracle::fixed_checksums(file);
+    const auto reader = store::ItchStoreReader::open_bytes(fixed);
+    if (!reader.has_value() || query_time_range(file) != std::pair{low, last}) {
+        throw std::runtime_error("a bound seed's steering changed its time range");
+    }
+    const auto requests = store::oracle::query_detail::requests_for(*reader, file);
+    const store::oracle::query_detail::Request& steered = requests.at((requests.size() / 4) * 3);
+    if (steered.end <= last || steered.start - low > (last - low) / 1'000) {
+        throw std::runtime_error("a bound seed's steered window does not span its times");
+    }
+    return file;
 }
 
 // The ITCH query seeds are files on the envelope of the query measures
-// (itch_query_oracles.hpp): of the 70 files timed, one whose time is the most of its work in
-// the measure of its tier, with as many records as that tier's limit and -max_len allow
-// (fuzz/README.md, "Bounds").
+// (itch_query_oracles.hpp): of the shapes timed, those whose time is the most of their work in
+// the measure of their tier and that reach the tier's limit within -max_len, with as many
+// records as the limit and -max_len allow (fuzz/README.md, "Bounds").
 //
-// raw_spotted_day with the most records whose work in `weights` is at most `limit`, in at most
-// kQueryMaxLen bytes; both grow with the records, so the search doubles the count until it
-// fails and then halves the range.
-[[nodiscard]] inline Bytes raw_spotted_day_to(
-    const store::oracle::WorkWeights& weights, std::uint64_t limit, std::size_t raw_every,
-    std::uint32_t segment_records = store::oracle::kQueryFuzzMaxSegmentRecords) {
+// The file `make` builds of the most records whose work in `weights` is at most `limit`, in
+// at most kQueryMaxLen bytes; both grow with the records, so the search doubles the count
+// until it fails and then halves the range.
+template <class Make>
+[[nodiscard]] Bytes grown_to(const store::oracle::WorkWeights& weights, std::uint64_t limit, Make&& make) {
     const auto fits = [&](const Bytes& file) {
         if (file.size() > kQueryMaxLen) {
             return false;
         }
-        const auto reader = store::ItchStoreReader::open_bytes(file);
+        const Bytes fixed = store::oracle::fixed_checksums(file);
+        const auto reader = store::ItchStoreReader::open_bytes(fixed);
         if (!reader.has_value()) {
             throw std::runtime_error("a bound seed's store did not open");
         }
@@ -551,53 +823,89 @@ template <class Encode>
     };
     std::size_t low = 1;
     std::size_t high = 2;
-    while (fits(raw_spotted_day(high, raw_every, segment_records))) {
+    while (fits(make(high))) {
         low = high;
         high *= 2;
     }
     high -= 1;
     while (low < high) {
         const std::size_t middle = low + ((high - low + 1) / 2);
-        if (fits(raw_spotted_day(middle, raw_every, segment_records))) {
+        if (fits(make(middle))) {
             low = middle;
         } else {
             high = middle - 1;
         }
     }
-    return raw_spotted_day(low, raw_every, segment_records);
+    return make(low);
 }
 
-// Within the cap and past the budget: the plain day in one segment, on the whole check's
-// envelope (its time 0.993 of its work), to the cap.
+// Within the cap and past the budget: add orders on locate 0 a millisecond apart, a segment
+// of one record each, to the cap: of the shapes timed whose steered request can span them, the
+// most of its work (0.990).
+[[nodiscard]] inline std::vector<itch::Message> adds_on_locate_zero(std::size_t records) {
+    std::vector<itch::Message> out;
+    out.reserve(records);
+    for (std::uint64_t i = 0; i < records; ++i) {
+        out.emplace_back(itch::AddOrder{
+            itch::MessageHeader{0, 0, 34'200'000'000'000ULL + (i * 1'000'000)}, 1 + i, std::byte{'B'}, 100,
+            itch::Stock{std::byte{'A'}, std::byte{'A'}, std::byte{'P'}, std::byte{'L'},
+                        std::byte{' '}, std::byte{' '}, std::byte{' '}, std::byte{' '}},
+            itch::Price4{1'000'000}});
+    }
+    return out;
+}
 [[nodiscard]] inline Bytes itch_query_seed() {
-    return raw_spotted_day_to(store::oracle::kWholeCheckWork, store::oracle::kQueryFuzzWork, 0);
+    return grown_to(store::oracle::kWholeCheckWork, store::oracle::kQueryFuzzWork, [](std::size_t records) {
+        return dearest_steering(adds_on_locate_zero(records), 1, [](Bytes file) { return file; });
+    });
 }
 
-// Within the budget: the day with a raw record every 64, in one segment, whose whole check
-// with the repeat ask on every request is the most above its work of the files timed (1.19
-// times), to the budget.
+// Within the budget: the day with a raw record every 16 in one segment, every coded column in
+// blocks of 8 values (with_small_blocks), whose whole check with the repeat ask on every
+// request is the most above its work of the shapes timed that the real encoders write and whose
+// steered request can span them (1.173 times), to the budget.
 [[nodiscard]] inline Bytes itch_query_budget_seed() {
-    return raw_spotted_day_to(store::oracle::kWholeCheckWork,
-                              store::oracle::kQueryFuzzCrossCheckedWork, 64);
+    return grown_to(store::oracle::kWholeCheckWork, store::oracle::kQueryFuzzCrossCheckedWork,
+                    [](std::size_t records) {
+                        return dearest_steering(raw_spotted_messages(records, 16),
+                                                store::oracle::kQueryFuzzMaxSegmentRecords,
+                                                [](const Bytes& file) { return with_small_blocks(file, 8); });
+                    });
 }
 
-// Past the cap, within the compare limit: the day with a raw record every 4 in segments of one
-// record, whose two indexed asks are 0.999 of their work, to the compare limit or -max_len,
-// whichever it meets first; its whole-check work is past the cap.
+// Past the cap, within the compare limit: the day with a raw record every 3 in segments of one
+// record, whose two indexed asks are the most of their work of the shapes timed that the real
+// writer makes and whose steered request can span them (0.941), to the compare limit or
+// -max_len, whichever it meets first; its whole-check work is past the cap.
 [[nodiscard]] inline Bytes itch_query_compared_seed() {
-    return raw_spotted_day_to(store::oracle::kComparedAsksWork,
-                              store::oracle::kQueryFuzzComparedWork, 4, 1);
+    return grown_to(store::oracle::kComparedAsksWork, store::oracle::kQueryFuzzComparedWork,
+                    [](std::size_t records) {
+                        return dearest_steering(raw_spotted_messages(records, 3), 1, [](Bytes file) { return file; });
+                    });
+}
+
+// Move-to-front within the budget (REVIEW-2, B5 (c)): the day with a raw record every 4 in one
+// segment, its share columns as move-to-front blocks over 2,048 entries, to the budget.
+[[nodiscard]] inline Bytes itch_query_move_to_front_seed() {
+    return grown_to(store::oracle::kWholeCheckWork, store::oracle::kQueryFuzzCrossCheckedWork,
+                    [](std::size_t records) {
+                        return dearest_steering(raw_spotted_messages(records, 4),
+                                                store::oracle::kQueryFuzzMaxSegmentRecords,
+                                                &with_move_to_front_shares);
+                    });
 }
 
 // Falling minutes (REVIEW-2, B5 (b)): add orders on locate 0 in one plain segment, each a
-// minute before the one before from the largest 48-bit time down, as many as 48 bits hold
-// minutes, 4,691, so every minute aggregate asked over them, the product's and the oracle's,
-// opens each row's minute before every one already held.
-[[nodiscard]] inline Bytes itch_query_falling_minutes_seed() {
+// minute before the one before from the largest 48-bit time down, so every minute aggregate
+// asked over them, the product's and the oracle's, opens each row's minute before every one
+// already held: as many as 48 bits hold minutes (kMostMinutes), or the most whose whole-check
+// work stays within the cap, whichever is fewer.
+[[nodiscard]] inline Bytes falling_minutes(std::size_t minutes) {
     constexpr std::uint64_t kTop = (std::uint64_t{1} << 48U) - 1;
     constexpr std::uint64_t kMinute = 60'000'000'000ULL;
+    static_assert(kTop / kMinute + 1 == store::oracle::kMostMinutes);
     std::vector<itch::Message> records;
-    for (std::uint64_t i = 0; i * kMinute <= kTop; ++i) {
+    for (std::uint64_t i = 0; i < std::min<std::uint64_t>(minutes, store::oracle::kMostMinutes); ++i) {
         records.emplace_back(itch::AddOrder{
             itch::MessageHeader{0, 0, kTop - (i * kMinute)}, 1 + i, std::byte{'B'}, 100,
             itch::Stock{std::byte{'A'}, std::byte{'A'}, std::byte{'P'}, std::byte{'L'},
@@ -605,6 +913,17 @@ template <class Encode>
             itch::Price4{1'000'000}});
     }
     return written(records, store::oracle::kQueryFuzzMaxSegmentRecords);
+}
+[[nodiscard]] inline Bytes itch_query_falling_minutes_seed() {
+    Bytes all = falling_minutes(store::oracle::kMostMinutes);
+    const auto reader = store::ItchStoreReader::open_bytes(all);
+    if (!reader.has_value()) {
+        throw std::runtime_error("a bound seed's store did not open");
+    }
+    if (store::oracle::query_work(*reader, store::oracle::kWholeCheckWork) <= store::oracle::kQueryFuzzWork) {
+        return all;
+    }
+    return grown_to(store::oracle::kWholeCheckWork, store::oracle::kQueryFuzzWork, &falling_minutes);
 }
 
 // Run-length past the cap filled with the blocks dearest a byte to decode twice: the dearest
@@ -651,6 +970,10 @@ struct CodecTiers {
     std::size_t decoded_once = 0;
     std::size_t not_examined = 0;
     bool first_refused_within_cap = false;
+    // Its last block states values and is refused past the cap and within the compare limit, so
+    // the fuzz target decodes it by both kernel sets, compares the refusals and checks the output
+    // was left alone. (The tail's header, which states none, is not counted.)
+    bool refused_compared = false;
 
     friend bool operator==(const CodecTiers&, const CodecTiers&) = default;
 };
@@ -678,6 +1001,11 @@ struct BoundSeed {
                                                          : CodecTiers{.within_cap = 1, .not_examined = 1};
 }
 
+// The tiers of a seed of one block within the cap and a refused maximal block after it.
+[[nodiscard]] constexpr CodecTiers refused_after_cap(std::size_t cap, std::size_t compare_limit) {
+    return CodecTiers{.within_cap = 1, .refused_compared = compare_limit >= cap + codec::kMaxBlockValues};
+}
+
 // The tiers of run_length_one_run_blocks_seed's blocks: the dearest block within the cap, the
 // one-run blocks the compare limit takes, then one not examined; -max_len holds 103 beside the
 // dearest block.
@@ -692,7 +1020,7 @@ struct BoundSeed {
 }
 
 // One line each in fuzz/bound_seeds.txt, in this order.
-inline constexpr std::array<BoundSeed, 15> kBoundSeeds{{
+inline constexpr std::array<BoundSeed, 17> kBoundSeeds{{
     {"fuzz_dictionary", "dictionary", "bound-costliest", kSmallMaxLen, Side::codec_tiers,
      &dictionary_seed, &codec::oracle::check_dict_column, &codec::oracle::kDictCodec,
      &codec::oracle::kDictFuzzBounds,
@@ -718,6 +1046,10 @@ inline constexpr std::array<BoundSeed, 15> kBoundSeeds{{
      &pfor_delta_past_cap_seed, &codec::oracle::check_pfor_column, &codec::oracle::kPforCodec,
      &codec::oracle::kPforFuzzBounds,
      maximal_after_cap(codec::oracle::kPforFuzzDecodedValues, codec::oracle::kPforFuzzComparedValues)},
+    {"fuzz_pfor", "pfor", "bound-refused-past-cap", kSmallMaxLen, Side::codec_tiers,
+     &pfor_refused_past_cap_seed, &codec::oracle::check_pfor_column, &codec::oracle::kPforCodec,
+     &codec::oracle::kPforFuzzBounds,
+     refused_after_cap(codec::oracle::kPforFuzzDecodedValues, codec::oracle::kPforFuzzComparedValues)},
     {"fuzz_stream_vbyte", "stream_vbyte", "bound-costliest", kLargeMaxLen, Side::unbounded,
      &stream_vbyte_seed, &codec::oracle::check_svb_column},
     {"fuzz_gorilla_timestamps", "gorilla_timestamps", "bound-costliest", kLargeMaxLen,
@@ -735,7 +1067,9 @@ inline constexpr std::array<BoundSeed, 15> kBoundSeeds{{
     {"fuzz_itch_query", "itch_query", "bound-costliest-compared", kQueryMaxLen,
      Side::query_compared, &itch_query_compared_seed, &store::oracle::check_itch_query},
     {"fuzz_itch_query", "itch_query", "bound-falling-minutes", kQueryMaxLen,
-     Side::within_query_budget, &itch_query_falling_minutes_seed, &store::oracle::check_itch_query},
+     Side::past_query_budget, &itch_query_falling_minutes_seed, &store::oracle::check_itch_query},
+    {"fuzz_itch_query", "itch_query", "bound-move-to-front", kQueryMaxLen,
+     Side::within_query_budget, &itch_query_move_to_front_seed, &store::oracle::check_itch_query},
 }};
 
 }  // namespace tick_store::bound_seeds

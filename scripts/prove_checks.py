@@ -545,6 +545,19 @@ FAULTS = (
           "a block's full vectors pass 131,072 packed bytes, more than any -max_len holds",
           EXIT_CTEST, "OracleGrid.PassTheWholeCheck/ranked_pfor_none_1048576 (Failed)",
           arguments=("--test-regex", "OracleGrid.PassTheWholeCheck/ranked_pfor_none_1048576$")),
+    # Past the cap the chosen kernel set decodes a block from an exact copy of its bytes, so a
+    # read past the block is seen where the input's next bytes would hide it; and a refused
+    # block there must leave the output alone.
+    Fault("neon-unpack-delta-overread-past-cap", "fuzz-pfor", "the NEON fused unpack and delta "
+          "pass reads 16 bytes past a width-0 vector's packed bytes from the 129th vector of a "
+          "block on, which at the last vector of the named seed's block past the cap is past "
+          "the block", EXIT_LIBFUZZER, "AddressSanitizer: heap-buffer-overflow",
+          arguments=FUZZ_ARGUMENTS),
+    Fault("pfor-refusal-keeps-values-past-cap", "fuzz-pfor", "the PFOR decoder keeps the values "
+          "it decoded of a refused block of more than 131,072 values, as the named seed's block "
+          "past the cap is", EXIT_LIBFUZZER,
+          "check_pfor_column: past the cap, a refused block changed the output",
+          arguments=FUZZ_ARGUMENTS),
     Fault("fuzz-dictionary-repeated-entry", "fuzz-dictionary", "the dictionary decoder stops "
           "refusing a ranked dictionary that holds one value twice", EXIT_LIBFUZZER,
           "check_dict_column:", arguments=FUZZ_ARGUMENTS),

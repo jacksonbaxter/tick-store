@@ -1,0 +1,16 @@
+diff --git a/src/codec/pfor.cpp b/src/codec/pfor.cpp
+index 7d9a077..fc717e6 100644
+--- a/src/codec/pfor.cpp
++++ b/src/codec/pfor.cpp
+@@ -472,7 +472,10 @@ std::expected<std::size_t, CodecError> decode_pfor_block(std::span<const std::by
+     ByteCursor cursor{block.subspan(kBlockHeaderSize, header->payload_bytes), kPayloadStart};
+     const std::size_t start = out.size();
+     const auto fail = [&](const CodecError& error) {
+-        out.resize(start);
++        // Planted: a refused block of more than 131,072 values keeps what it decoded.
++        if (count <= (std::size_t{1} << 17U)) {
++            out.resize(start);
++        }
+         return std::unexpected(error);
+     };
+     // Reads a one-byte field. The payload holds the fixed fields of a vector, but earlier
