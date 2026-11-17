@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -2598,7 +2598,7 @@
+                 if found else "none recorded" if run["host"] == "Linux" else
+                 "no record for this host")
+         lines.append(f"| {run['host']} | `{run['target']}` | {run['seconds']:,} | "
+-                     f"{run['runs']:,} | {run['exec_per_second']:,} | {held} |")
++                     f"{run['exec_per_second']:,} | {run['exec_per_second']:,} | {held} |")
+     return lines
+ 
+ 

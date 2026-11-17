@@ -1587,6 +1587,8 @@ def finished(row, root, specs, parts):
         writes = [read for read in reads if read[0] == "write"]
         if writes and is_comparison(row):
             notes["write"] = writes[0][3]
+        if fuzz_host(document, label):
+            text += fuzz_executions(document, fuzz_host(document, label))
         done.append((label, text, met, path, document, notes))
     return done
 
@@ -2540,7 +2542,75 @@ def render_targets(definitions_path, root):
         lines.append("| " + " | ".join(cells) + " |")
     if "headline" in definitions:
         lines += ["", short_forms_explained()]
+    lines += fuzz_runs_table(definitions, root)
     return lines
+
+
+# G-3's table of each fuzz target's run, under the targets table, which G-3's cell links (the
+# ruling on review P1-1 and P1-5).
+FUZZ_RUNS_HEADING = "#### G-3 runs by target"
+FUZZ_RUNS_ANCHOR = "#g-3-runs-by-target"
+FUZZ_RUNS_COLUMNS = ("Host", "Target", "Seconds", "Executions", "Executions a second",
+                     "Disturbances in the run")
+
+
+def fuzz_document(definitions, root):
+    """G-3's fuzz file and its path, or (None, None) with no G-3 row or file."""
+    for row in definitions.get("rows", []):
+        for spec in row.get("parts", []):
+            path = target_file(root, spec["file"]) if isinstance(spec, dict) else None
+            if path is None:
+                continue
+            document = json.loads(path.read_text(encoding="utf-8"))
+            if (document.get("header") or {}).get("gate") == "G-3":
+                return document, path
+    return None, None
+
+
+def fuzz_run_entries(entries, root, path, run):
+    """The recorded disturbances that fell in one fuzz target's timed run. The records are of
+    the Linux host, the only one they cover."""
+    name = results_name(root, path)
+    return [entry for entry in entries if entry["document"] == name and
+            entry["phase"] == "fuzz run" and entry.get("case") == run["target"] and
+            run["host"] == "Linux"]
+
+
+def fuzz_runs_table(definitions, root):
+    """Each fuzz target's run on each host, from G-3's file: its seconds, executions and
+    executions a second, and the disturbances recorded in it, with why a disturbed fuzz verdict
+    stands, said once."""
+    document, path = fuzz_document(definitions, root)
+    if document is None:
+        return []
+    entries = disturbance_entries(root)
+    lines = ["", FUZZ_RUNS_HEADING, "",
+             "G-3 stays met and counted with its disturbance marks: each target ran clean for its "
+             "30 minutes by its own record, and a login or a backup run on the host can take "
+             "executions from a run, not hide a finding. Each run's executions, from "
+             f"`{path.relative_to(root)}`; the disturbances are from the Linux host's records, "
+             "which cover no other host. The bound-seed gate's runs are a pass-or-fail check of "
+             "fixed inputs, not in this table; G-3's row gives what fell in them.", "",
+             "| " + " | ".join(FUZZ_RUNS_COLUMNS) + " |", "|" + "---|" * len(FUZZ_RUNS_COLUMNS)]
+    for run in document["runs"]:
+        found = fuzz_run_entries(entries, root, path, run)
+        held = (f"{held_words(found)}, " + ", ".join(utc_span(entry) for entry in found)
+                if found else "none recorded" if run["host"] == "Linux" else
+                "no record for this host")
+        lines.append(f"| {run['host']} | `{run['target']}` | {run['seconds']:,} | "
+                     f"{run['runs']:,} | {run['exec_per_second']:,} | {held} |")
+    return lines
+
+
+def fuzz_executions(document, host):
+    """A fuzz host's executions in a G-3 cell: its smallest run's and its total, linked to the
+    table of every run."""
+    runs = [run for run in document.get("runs", []) if run.get("host") == host]
+    if not runs:
+        return ""
+    least = min(runs, key=lambda run: run["runs"])
+    return (f", executions {least['runs']:,} in the smallest run (`{least['target']}`) and "
+            f"{sum(run['runs'] for run in runs):,} in all ([each run]({FUZZ_RUNS_ANCHOR}))")
 
 
 VERDICT_WORD = {True: "met", False: "missed", None: "not judged"}

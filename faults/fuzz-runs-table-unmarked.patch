@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -2571,7 +2571,7 @@
+     """The recorded disturbances that fell in one fuzz target's timed run. The records are of
+     the Linux host, the only one they cover."""
+     name = results_name(root, path)
+-    return [entry for entry in entries if entry["document"] == name and
++    return [entry for entry in entries if False and entry["document"] == name and
+             entry["phase"] == "fuzz run" and entry.get("case") == run["target"] and
+             run["host"] == "Linux"]
+ 

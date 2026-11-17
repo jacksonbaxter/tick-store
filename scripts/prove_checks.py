@@ -301,6 +301,14 @@ def hand_edit_roundtrip_sentence():
     edit_text("README.md", " records all four.", " records all four of them.")
 
 
+def hand_edit_fuzz_runs_table():
+    """RESULTS.md's table of G-3's runs, one run's executions typed by hand (review P1-5)."""
+    document = json.loads((TREE / "results" / "fuzz-g3-8616263b7561.json").read_text())
+    run = document["runs"][0]
+    edit_text("RESULTS.md", f"| {run['runs']:,} | {run['exec_per_second']:,} |",
+              f"| {run['runs'] + 1:,} | {run['exec_per_second']:,} |")
+
+
 def hand_edit_headline_value():
     """The README's headline, its one-thread ingest typed past the bar and the verdict met."""
     edit_table_cells("README.md", "| One-thread ingest |", {2: "9.000 M messages/s", 3: "met"})
@@ -2060,6 +2068,19 @@ FAULTS = (
           "FAIL: test_a_rival_disturbance_no_record_covers_on_the_replaced_run_is_not_counted (__main__.SidesTest"),
     Fault("sides-left-out-counts-uncounted", "py-scripts", "render_results.py counts a part no run confirms among the first screen's met parts", CHECK_FAILED,
           "FAIL: test_no_count_takes_a_part_not_counted (__main__.SidesTest"),
+    # The ruling on review P1-5: G-3's runs beside its verdict, from its file.
+    Fault("fuzz-runs-table-hand-edit", "render-check", "a run's executions typed by hand in "
+          "RESULTS.md's table of G-3's runs", CHECK_FAILED,
+          "the table in RESULTS.md is stale or was edited by hand", hand_edit_fuzz_runs_table),
+    Fault("fuzz-runs-table-rate-as-executions", "py-scripts", "render_results.py gives a run's "
+          "executions a second as its executions in G-3's table", CHECK_FAILED,
+          "FAIL: test_the_table_gives_each_run_of_the_file (__main__.FuzzRunsTableTest"),
+    Fault("fuzz-runs-table-unmarked", "py-scripts", "render_results.py leaves out the "
+          "disturbances recorded in G-3's runs", CHECK_FAILED,
+          "FAIL: test_the_table_gives_each_run_of_the_file (__main__.FuzzRunsTableTest"),
+    Fault("fuzz-cell-executions-dropped", "py-scripts", "render_results.py gives G-3's cell "
+          "without its executions", CHECK_FAILED,
+          "FAIL: test_the_cell_gives_each_hosts_smallest_and_total_executions (__main__.FuzzRunsTableTest"),
     # Review P1-2: a quote of a verdict whose part is not like for like says so.
     Fault("render-quote-not-alike-unasked", "py-scripts", "render_results.py takes a quote of a "
           "verdict whose part its row labels not like-for-like without those words",

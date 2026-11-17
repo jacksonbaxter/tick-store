@@ -2938,6 +2938,57 @@ class SidesTest(Scratch):
                                    "(ArcticDB)) |")
         self.assertIsNone(RENDER.quote_problem([("BENCHMARKS.md", said)], rows, self.tree))
 
+
+class FuzzRunsTableTest(unittest.TestCase):
+    """G-3 stays met and counted, the reason said once, with each fuzz target's run beside it:
+    a table under the targets table, every row from results/fuzz-g3-*.json and each disturbance
+    from the records, and the cell's smallest and total executions linking it (the ruling on
+    review P1-5)."""
+
+    def test_the_table_gives_each_run_of_the_file(self):
+        definitions = json.loads((REPO_ROOT / "scripts" / "targets.json").read_text())
+        document, path = RENDER.fuzz_document(definitions, REPO_ROOT)
+        lines = RENDER.fuzz_runs_table(definitions, REPO_ROOT)
+        self.assertIn(RENDER.FUZZ_RUNS_HEADING, lines)
+        self.assertIn("can take executions from a run, not hide a finding", " ".join(lines))
+        rows = [[cell.strip() for cell in line.strip("|").split("|")] for line in lines
+                if line.startswith("| ") and not line.startswith("| Host")]
+        self.assertEqual(len(rows), len(document["runs"]))
+        entries = RENDER.disturbance_entries(REPO_ROOT)
+        for run, cells in zip(document["runs"], rows):
+            with self.subTest(target=run["target"], host=run["host"]):
+                self.assertEqual(cells[:5], [run["host"], f"`{run['target']}`",
+                                             f"{run['seconds']:,}", f"{run['runs']:,}",
+                                             f"{run['exec_per_second']:,}"])
+                found = RENDER.fuzz_run_entries(entries, REPO_ROOT, path, run)
+                if found:
+                    self.assertTrue(cells[5].startswith(RENDER.held_words(found)), cells[5])
+                    for entry in found:
+                        self.assertIn(RENDER.utc_span(entry), cells[5])
+        # The Linux runs the records place a login in are marked: three phases, seven runs.
+        marked = [cells[1] for cells in rows if cells[5].startswith("a remote login")]
+        self.assertEqual(len(marked), 7, marked)
+
+    def test_the_cell_gives_each_hosts_smallest_and_total_executions(self):
+        definitions = json.loads((REPO_ROOT / "scripts" / "targets.json").read_text())
+        document, _ = RENDER.fuzz_document(definitions, REPO_ROOT)
+        for host in ("macOS", "Linux"):
+            runs = [run for run in document["runs"] if run["host"] == host]
+            least = min(runs, key=lambda run: run["runs"])
+            self.assertEqual(RENDER.fuzz_executions(document, host),
+                             f", executions {least['runs']:,} in the smallest run "
+                             f"(`{least['target']}`) and {sum(run['runs'] for run in runs):,} in "
+                             f"all ([each run]({RENDER.FUZZ_RUNS_ANCHOR}))")
+        row = next(row for row in definitions["rows"] if row["id"] == "G-3")
+        parts, _ = RENDER.judged_parts(row, REPO_ROOT)
+        for part in parts:
+            with self.subTest(part=part[0]):
+                self.assertTrue(part[1].endswith(RENDER.fuzz_executions(
+                    document, RENDER.fuzz_host(document, part[0]))), part[1])
+        text = (REPO_ROOT / "RESULTS.md").read_text(encoding="utf-8")
+        g3 = next(line for line in text.split("\n") if line.startswith("| G-3 |"))
+        self.assertEqual(g3.count(f"([each run]({RENDER.FUZZ_RUNS_ANCHOR}))"), 2)
+
 class NotAlikeQuoteTest(unittest.TestCase):
     """A hand-written quote of WT-4's verdict on Linux carries "not like-for-like", the words its
     row labels the QuestDB part with, beside the input clause (review P1-2)."""

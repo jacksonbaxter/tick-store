@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1588,7 +1588,7 @@
+         if writes and is_comparison(row):
+             notes["write"] = writes[0][3]
+         if fuzz_host(document, label):
+-            text += fuzz_executions(document, fuzz_host(document, label))
++            pass
+         done.append((label, text, met, path, document, notes))
+     return done
+ 
