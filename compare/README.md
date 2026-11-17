@@ -836,12 +836,14 @@ a 1% tail. Each block records its `n`, the rank used (`tail_rank`), whether the 
 slowest run (`tail_is_slowest`) and what it is (`tail`, such as "slowest of 7"). `p99_us` holds the
 same figure under its old name, which the files measured before the final review's protocol use;
 those files carry no `protocol` in their header and count as protocol 1, and every file since says
-`"protocol": 2`. `scripts/check_compare.py` accepts no protocol only from a file pinned by the
-SHA-256 of its bytes under `protocol_1_comparison_files` in `scripts/data_pins.json`, and any
-stated protocol only as the integer 2. The freeze's files at `ede0176` replaced the four protocol 1
-files, at `67ae574` and `2503d1e`; one is kept, the Linux full day at `67ae574`, in
-`results/compare/replaced/`, pinned there and under `replaced_comparison_files`, and the other
-three pins went with their files. The slice is five minutes long, so Q2 and Q3 are
+`"protocol": 2`. `scripts/check_compare.py` accepts a stated protocol only as the integer 2, and
+no protocol only from a file whose name a pins file pins to the SHA-256 of its bytes under
+`protocol_1_comparison_files`; `scripts/data_pins.json` holds no such line, and
+`scripts/check_ties.py` refuses one, so it passes no protocol 1 file. The freeze's files at
+`ede0176` replaced the four protocol 1 files, at `67ae574` and `2503d1e`; one is kept, the Linux
+full day at `67ae574`, in `results/compare/replaced/`. `scripts/render_results.py` reads it there
+through its pin under `replaced_comparison_files`, and `check_ties.py` holds it to that exact path
+and SHA-256; `check_compare.py` refuses it. The slice is five minutes long, so Q2 and Q3 are
 clipped from an hour to `[09:30:00, 09:34:30)`, and Q5 scans 6,125,294 rows and not a day's
 268,744,780. Every results file says which it is, and `scripts/render_results.py` never puts a
 full-day number and a slice number in one table. What the runs found is in "Comparison harness",
