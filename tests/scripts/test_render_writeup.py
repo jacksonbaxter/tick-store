@@ -1171,6 +1171,34 @@ class Marks(Tree):
         self.refused("rests on T-11 on Linux, whose outcome changed with the replaced run")
 
 
+
+class SetupMark(unittest.TestCase):
+    """Review P1-27: a verdict not met in whole names every part met, those another setup beats
+    before the setup mark and the rest after it, so each mark beside it has its part."""
+
+    def value(self, parts):
+        mark = RENDER.render_results.SHORT_SETUP + ", while another setup is faster"
+        # The word by the parts' raw outcomes alone: the faster note here is a stand-in that
+        # render_results.py's own marks would not read.
+        word = RENDER.render_results.class_of([part[2] for part in parts])
+        for name, value in (("verdict_parts", lambda *_: ({}, parts, None)),
+                            ("marks_of", lambda *_: [(mark,)]),
+                            ("verdict_class_of", lambda *_: word)):
+            self.addCleanup(setattr, RENDER, name, getattr(RENDER, name))
+            setattr(RENDER, name, value)
+        return RENDER.verdict_value(None, "verdict:x", {"verdict": {}}), mark
+
+    def test_every_part_met_is_named_beside_the_setup_mark(self):
+        value, mark = self.value([("Q1 warm", None, False, None, None, {}),
+                                  ("Q2 warm", None, True, None, None, {"faster": {"by": 1}}),
+                                  ("Q5 cold", None, True, None, None, {})])
+        self.assertEqual(value, f"missed in part; met on Q2 warm {mark}, and on Q5 cold")
+
+    def test_with_every_part_met_beaten_nothing_follows(self):
+        value, mark = self.value([("Q1 warm", None, False, None, None, {}),
+                                  ("Q2 warm", None, True, None, None, {"faster": {"by": 1}})])
+        self.assertEqual(value, f"missed in part; met on Q2 warm {mark}")
+
 class Prover(Tree):
     """Review WD-8: faults counted without the control, the record in its own terms."""
 

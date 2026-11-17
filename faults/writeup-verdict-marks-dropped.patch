@@ -1,12 +1,12 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -1278,8 +1278,7 @@
-     beaten = [part[0] for part in parts or [] if render_results.notes_of(part).get("faster")]
-     setup = " " if word == "met" or not beaten else \
+@@ -1323,8 +1323,7 @@
          f"; met on {render_results.and_list(beaten)} "
--    return word + "".join(f"{setup}{mark}" if mark.startswith(render_results.SHORT_SETUP) else
--                          f"; {mark}" for mark in shown)
+     after = f", and on {render_results.and_list(unbeaten)}" \
+         if word != "met" and beaten and unbeaten else ""
+-    return word + "".join(f"{setup}{mark}{after}" if mark.startswith(render_results.SHORT_SETUP)
+-                          else f"; {mark}" for mark in shown)
 +    return word
  
  

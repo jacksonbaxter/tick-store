@@ -2304,6 +2304,10 @@ FAULTS = (
     Fault("writeup-flag-never-set", "py-scripts", "render_writeup.py never sets the dagger "
           "of a figure from a disturbed or swapped-in phase", CHECK_FAILED,
           "FAIL: test_a_swapped_in_phase_is_flagged (__main__.Marks"),
+    Fault("writeup-met-parts-unnamed", "py-scripts", "render_writeup.py names only the parts "
+          "another setup beats beside a setup mark, leaving the other parts met unnamed",
+          CHECK_FAILED, "FAIL: test_every_part_met_is_named_beside_the_setup_mark "
+          "(__main__.SetupMark"),
     Fault("writeup-keeps-unchecked", "py-scripts", "render_writeup.py lets the essay say what the "
           "replaced run's record keeps other than as its fields give it", CHECK_FAILED,
           "FAIL: test_what_the_replaced_record_keeps_said_otherwise (__main__.Marks"),

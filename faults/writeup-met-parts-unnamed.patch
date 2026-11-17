@@ -1,0 +1,12 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1321,7 +1321,7 @@
+                 and render_results.counted(part) is True]
+     setup = " " if word == "met" or not beaten else \
+         f"; met on {render_results.and_list(beaten)} "
+-    after = f", and on {render_results.and_list(unbeaten)}" \
++    after = "" if True else f", and on {render_results.and_list(unbeaten)}" \
+         if word != "met" and beaten and unbeaten else ""
+     return word + "".join(f"{setup}{mark}{after}" if mark.startswith(render_results.SHORT_SETUP)
+                           else f"; {mark}" for mark in shown)

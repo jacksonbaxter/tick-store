@@ -1,12 +1,12 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -1272,7 +1272,7 @@
+@@ -1311,7 +1311,7 @@
          word = verdict_class_of(parts, {}, name)
      if not marks:
          return word
 -    shown = [mark for mark in dict.fromkeys(forms[-1] for forms in marks_of(row, parts, name))
 +    shown = [mark for mark in dict.fromkeys(forms[0] for forms in marks_of(row, parts, name))
               if mark not in word]
-     # On a verdict not met in whole, the setup mark names the parts it stands beside.
-     beaten = [part[0] for part in parts or [] if render_results.notes_of(part).get("faster")]
+     # On a verdict not met in whole, the setup mark names the parts it stands beside, and the
+     # parts met that no other setup beats follow it, so every part met is named and each mark

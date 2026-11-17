@@ -1313,12 +1313,18 @@ def verdict_value(resolver, name, entry, marks=True):
         return word
     shown = [mark for mark in dict.fromkeys(forms[-1] for forms in marks_of(row, parts, name))
              if mark not in word]
-    # On a verdict not met in whole, the setup mark names the parts it stands beside.
+    # On a verdict not met in whole, the setup mark names the parts it stands beside, and the
+    # parts met that no other setup beats follow it, so every part met is named and each mark
+    # has its part (review P1-27).
     beaten = [part[0] for part in parts or [] if render_results.notes_of(part).get("faster")]
+    unbeaten = [part[0] for part in parts or [] if part[0] not in beaten
+                and render_results.counted(part) is True]
     setup = " " if word == "met" or not beaten else \
         f"; met on {render_results.and_list(beaten)} "
-    return word + "".join(f"{setup}{mark}" if mark.startswith(render_results.SHORT_SETUP) else
-                          f"; {mark}" for mark in shown)
+    after = f", and on {render_results.and_list(unbeaten)}" \
+        if word != "met" and beaten and unbeaten else ""
+    return word + "".join(f"{setup}{mark}{after}" if mark.startswith(render_results.SHORT_SETUP)
+                          else f"; {mark}" for mark in shown)
 
 
 def check_marks(resolver, values):
