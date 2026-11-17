@@ -534,12 +534,15 @@ one-security query (Q2, Q3) reads that symbol alone, with no filter. A query ove
 (Q1, Q4, Q5) is one `read_batch` over every symbol, the list of which the worker takes from
 `list_symbols` when it opens, before any clock, as an application keeps its universe. The cost is at
 ingest under class B: LMDB commits each storage key in its own transaction, so every symbol costs
-flushes of its own. In the slice results at `25a462b`, the median write took 5.85 s in class A and
-216.9 s in class B on the Mac, against 0.48 s and 0.52 s for one symbol, and 14.95 s and 133.7 s on
-Linux, against 1.05 s and 1.21 s. The store took 235,167,744 bytes against 141,860,864 on the Mac,
-and 208,986,112 against 141,168,640 on Linux. A one-security query gains: Q2 warm 1.8 ms against
-39.3 ms on the Mac, 8.4 ms against 139.7 ms on Linux. A query over every security loses: Q1 warm
-1.05 s against 7.4 ms on the Mac, 5.77 s against 27.4 ms on Linux.
+flushes of its own. In the slice results at `ede0176`,
+`results/compare/macOS-12302019-open-ede0176b10bb.json` and
+`results/compare/Linux-12302019-open-ede0176b10bb.json`, ArcticDB's `rows100k-cols127-per-security`
+against `rows100k-cols127`, the median write took 6.38 s in class A and 202.8 s in class B on the
+Mac, against 0.50 s and 0.54 s for one symbol, and 15.10 s and 137.8 s on Linux, against 1.05 s
+and 1.29 s. The class B store took 235,167,744 bytes against 141,860,864 on the Mac, and 206,958,592
+against 141,168,640 on Linux. A one-security query gains: Q2 warm 2.0 ms against 41.8 ms on the
+Mac, 8.4 ms against 142.6 ms on Linux. A query over every security loses: Q1 warm 1.11 s against
+7.6 ms on the Mac, 6.11 s against 30.8 ms on Linux.
 
 ## Full-day capacity
 
@@ -679,7 +682,8 @@ TICK_STORE_MEASURE=<wrapper> <venv>/bin/python -I compare/run.py --day 12302019 
 
 **The variant rule, written before any full-day run.** The slice runs every variant of every
 system. On the day that does not fit: estimated from `results/fullday-capacity-12302019.json` and
-the Linux slice timings at `25a462b`, counting both classes, one write each, both classes' read-
+the Linux slice timings at `25a462b` (`git show
+25a462b:results/compare/Linux-12302019-open-67621b061000.json`, a file deleted in `bf130cc`), counting both classes, one write each, both classes' read-
 backs and the oracle, and the queries, every variant would take about 13.5 hours of measurement
 on the Linux host, and about 20 with three writes per class, against a guide of about 10.
 
@@ -769,7 +773,7 @@ clean tree at the commit, or an exported tree with its `COMMIT` file. The host: 
 for the 5% rule above; a wrapper that takes the machine and prints load lines; at least 50 GiB
 free on the work folder's disk and 3 GiB of `MemAvailable` throughout, the guard's floors, below
 which it stops the run, as it does on sustained swap-in. One variant took 32 minutes on the Linux host at `4c049c7`, the checks before it
-included, so the pair takes a little over an hour. Exit 75 means the wrapper did not get the
+included, by that run's log, which no results file records, so the pair takes a little over an hour. Exit 75 means the wrapper did not get the
 machine: run the same command again.
 
 The run measures tick-store exactly as the four-system day did, with the guard and the warm proof
