@@ -7071,7 +7071,7 @@ not defended. REVIEW rows W-1 to W-18 give each item.
 ### The outside page review's findings in the essay
 
 An outside review of the public pages read the essay at `16a5db9`. I gave rulings on its essay
-findings; 12 REVIEW rows, P1-1 to P1-28, give each, the other pages being fixed apart.
+findings; 13 REVIEW rows, P1-1 to P1-28, give each, the other pages being fixed apart.
 
 - **Done (`d25ab37`, `e41d75b`).** Swapped figures in the opening carry the dagger, and the swap
   mark is explained in plain words: the host was swapping memory. The table's write row and
@@ -7083,9 +7083,16 @@ findings; 12 REVIEW rows, P1-1 to P1-28, give each, the other pages being fixed 
   - parsing's share is the profile's alone;
   - the Linux host is the Zen 1 throughout.
 - **No longer applies.** P1-9, P1-10, P1-19 and P1-25: the sentences went in the restructure.
+- **The ruling on disturbed verdicts (`95fa8fd`, `71b6d7a`).** A disturbance on tick-store's
+  side, or in a pass-or-fail check, leaves a met counted with its mark. One on a rival's side
+  counts only if a run without it confirms the outcome. The essay ranks nothing in tick-store's
+  favour on Q2, Q3 and Q5 cold, and gives their verdict by token, so the "not counted" form
+  arrives with render_results.py's change. G-3 is given by token with why a login cannot hide
+  a finding. Fault `writeup-flag-variant-ignored`, shown by hand, outputs in `essay-prep/proofs-p1b`;
+  proof owed to the full re-proof.
 - **The verdict words stay as the rules give them.** QL-4's met parts and WT-4's met against
   QuestDB stand, with their marks. The proof sentence stays, as it is true.
-- **Counts.** 3,727 words by the renderer and 3,993 by `wc -w`.
+- **Counts.** 3,712 words by the renderer and 3,984 by `wc -w`.
 - **Faults, shown by hand.** `writeup-met-parts-unnamed` is new. `writeup-marks-in-full` and
   `writeup-verdict-marks-dropped` are remade on moved lines. Each was shown in a clone under
   `build/`, outputs in the phase's `essay-prep/proofs-p1` folder; proof owed to the full
