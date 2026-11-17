@@ -1,0 +1,13 @@
+diff --git a/scripts/check_ties.py b/scripts/check_ties.py
+index 520d96a..6f8e158 100644
+--- a/scripts/check_ties.py
++++ b/scripts/check_ties.py
+@@ -656,7 +656,7 @@ def results_files(results):
+     """(results, not results): every file under the folder, whatever its name, and those of
+     them NOT_RESULTS lists, with its reason."""
+     found, others = [], []
+-    for path in sorted(results.rglob("*")):
++    for path in sorted(results.rglob("*.json")):
+         if not (path.is_file() or path.is_symlink()):
+             continue
+         name = path.relative_to(results).as_posix()

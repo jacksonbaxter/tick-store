@@ -4,11 +4,14 @@ measured code changed since its commit.
 
     python3 -I scripts/check_ties.py [--repo DIR] [--results DIR] [--pins FILE] [--table]
 
-A figure holds for the code it was measured at and no later. Every file under results/ names
-the commit it was measured at: each value of a key `commit` or `source_commit`, anywhere in the
-file, is one. KINDS below says, for each kind of file, by its name, what was built and run when
-its figure was taken, each path with its reason, and what was deliberately left out, with its
-reason. For each file and each commit it names, this compares git's tree content:
+A figure holds for the code it was measured at and no later. Every file under results/, whatever
+its name, is examined: one that is no kind in KINDS and is not in NOT_RESULTS is refused, so a
+new kind of results file, a CSV or a compressed file included, must be given its paths here.
+Every results file names the commit it was measured at: each value of a key `commit` or
+`source_commit`, anywhere in the file, is one. KINDS below says, for each kind of file, by its
+name, what was built and run when its figure was taken, each path with its reason, and what was
+deliberately left out, with its reason. For each file and each commit it names, this compares
+git's tree content:
 
   - its MEASURED paths, what was built and run when the figure was taken, between that commit
     and the working tree: HEAD and anything not yet committed, new files included, as
@@ -21,25 +24,51 @@ reason. For each file and each commit it names, this compares git's tree content
     data verifies its input against, member by member, so the exemption pins beside them, which
     change nothing that runs, do not count.
 
+What the assembled comparison cannot show. It compares the assembled paths with the last commit
+that wrote the file, so any later commit of the file, by hand or not, a reformat, one field
+edited or a merge resolution, resets the comparison: it trusts that whoever last committed the
+file assembled it from that commit's tree, and it does not show that the file's bytes are what
+the assembler wrote. A file that differs from its committed blob, or is not committed, is not
+judged against what assembled it: "commit it first", EXIT_UNJUDGED, a skip under
+scripts/check.sh and a failure under --no-skips. CI only ever sees committed files.
+
 It refuses, exit 1, a file whose measured or assembled paths differ, naming the file, the
-commit and the paths; a file that names no commit, or a commit git cannot read; a file of no
-kind in KINDS, so a new kind of results file must be given its paths here; and a commit that a
-full clone does not hold, made up or rebased away.
+commit and the paths; a file that names no commit, or a value that is not a commit; a file of no
+kind in KINDS; a commit this clone does not hold although it is not shallow, one made up or
+rebased away and gone; a commit that is not in HEAD's history, on another branch or rebased away
+but still held here, which CI's fresh clone would not hold; and a symbolic link that git tracks
+inside a compared path, whose target's content the comparison does not see. A git command that
+fails is a refusal that names the command and what git said, never "nothing changed": an object
+missing from a corrupt or partial clone, a .git git cannot read, a --repo that is a folder inside
+a checkout and not its top, a --results folder outside the checkout, and git that cannot be run.
+
+What it does not see: a new file inside a compared path that this checkout's own ignore rules
+hide, .git/info/exclude or a global excludes file (CI has neither, and the repository's
+.gitignore patterns match nothing a measured path builds); and the working tree is what it
+compares, so locally it judges what would be built now, not what is committed, which CI's clean
+checkout makes the same.
 
 A file that an existing pin declares is reported as pinned, with its commit and how many of
 its measured paths changed since, and is not judged: each validator's own key in the pins file,
-and only the names that validator lets be pinned there, each known by the SHA-256 of its bytes,
-never by anything the file says of itself. This script adds no pin and no exemption: once the
-validators' pins are removed, it judges those files with no change here.
+and only the exact paths under results/ that PIN_NAMES below lets be pinned under that key, each
+known by the SHA-256 of its bytes, never by anything the file says of itself; a line in the pins
+file under one of those keys for any other name is refused, so a line added there exempts no
+new file. A file replaced by a later measurement and kept, unchanged, for the record is pinned
+under REPLACED_PINS only if it lives in a replaced/ folder and REPLACED_KEPT below names its
+exact path and the SHA-256 of its bytes, frozen for good, as the pins file does. This script
+adds no other pin and no exemption: once the validators' pins are removed, it judges those
+files with no change here.
 
 Where git has no history to compare with, a tree exported with git archive as a sync to the
-Linux host makes, it judges no file's code and says "not judged: no history here", and exits
-EXIT_UNJUDGED, which scripts/check.sh reports as a skip, a failure under --no-skips. So does a
-file whose commit a shallow clone lacks. A full clone that lacks it refuses the file.
+Linux host makes, with no .git of its own and in no checkout that tracks it, it judges no file's
+code and says "not judged: no history here", and exits EXIT_UNJUDGED, which scripts/check.sh
+reports as a skip, a failure under --no-skips. So does a file whose commit a shallow clone
+lacks, or whose writer is the commit a shallow clone is cut at. A full clone that lacks it
+refuses the file.
 
 Exit 0 if every file's measured code is unchanged or the file is pinned, 1 if any file is
 refused, 2 on a usage error, 3 if nothing was refused but some file could not be judged for
-want of history.
+want of history, or is not committed as it is.
 
 Standard library only. tests/scripts/test_check_ties.py shows each rule failing on a small git
 repository of its own.
@@ -75,6 +104,7 @@ EXIT_UNJUDGED = check_fuzz.EXIT_UNJUDGED
 COMMIT_KEYS = ("commit", "source_commit")
 COMMIT = re.compile(r"[0-9a-f]{7,40}")
 NO_HISTORY = "not judged: no history here"
+COMMIT_IT_FIRST = "commit it first"
 
 
 @dataclass(frozen=True)
@@ -83,7 +113,7 @@ class Kind:
     were built and run when its figure was taken, compared with the commit it names, and those
     that assembled it, compared with the last commit that wrote it, as (pathspec, reason); the
     data_pins.json members its runs read; what is excluded from the paths, and what is left out
-    of them, as (path, reason); and the pin that may declare one, as (key, names)."""
+    of them, as (path, reason); and the pins file's key that may declare one."""
     name: str
     files: tuple
     measured: tuple
@@ -91,10 +121,34 @@ class Kind:
     pin_members: tuple = ()
     excluded: tuple = ()
     left_out: tuple = ()
-    pin: tuple = None
+    pin: str = None
 
 
 PINS_FILE = "scripts/data_pins.json"
+
+# What may sit under results/ and is not a results file, by pattern relative to results/, with
+# its reason. Every other file there must be a results file of a kind below. None today.
+NOT_RESULTS = ()
+
+# The pins each validator keeps in the pins file, by key, and the exact paths under results/
+# that each may pin, fixed here: a line added to the pins file under one of these keys for any
+# other name exempts nothing and is refused.
+PIN_NAMES = {
+    check_compare.PROTOCOL_1_FILES: ("compare/Linux-12302019-full-67ae574f5666.json",
+                                     "compare/Linux-12302019-open-67ae574f5666.json",
+                                     "compare/macOS-12302019-full-tickstore-2503d1e7c5f6.json",
+                                     "compare/macOS-12302019-open-67ae574f5666.json"),
+    check_roundtrip.PINS_KEY: tuple(check_roundtrip.PINNED_NAMES),
+    check_fuzz.PRE_TIE_PINS: (check_fuzz.PRE_TIE_FILE,),
+}
+# A results file replaced by a later measurement and kept, unchanged, for the record, of any
+# kind: its exact path under results/, which must be inside a replaced/ folder, and the SHA-256
+# of its bytes, frozen for good. The pins file names it under REPLACED_PINS by the same path
+# with the same SHA-256. None today.
+REPLACED_PINS = "replaced_kept_for_the_record"
+REPLACED_FOLDER = "replaced"
+REPLACED_KEPT = ()
+SHA256 = re.compile(r"[0-9a-f]{64}")
 
 # What every binary that takes a figure is built from: the bench preset's build, or the coverage
 # preset's for coverage.
@@ -168,7 +222,7 @@ KINDS = (
                     "validator, not by the harness"), BENCH[:1] + ("built by the same preset, "
                     "never run by the harness",), VALIDATORS, RENDER, PROSE, TESTS_UNIT,
                    OTHER_BUILDS, FETCH),
-         pin=(check_compare.PROTOCOL_1_FILES, None)),
+         pin=check_compare.PROTOCOL_1_FILES),
     Kind("capacity", ("fullday-capacity-*.json",),
          measured=(*BUILT, TOOLS,
                    ("compare", "compare/fullday.py ran each system through the whole day, on "
@@ -200,11 +254,13 @@ KINDS = (
          excluded=PROSE_IN_PATHS,
          left_out=(("scripts/g2_plan.py", "chooses which bytes G-2 flips; the flips and their "
                     "seed are recorded in the round-trip file itself, and "
-                    "tests/scripts/test_g2_plan.py reproduces both days' plans, so it is not a "
-                    "measured path: 7a352ad and 1d234ee changed it after the freeze, and the "
-                    "second day's rerun at the freeze commit used the changed planner"),
+                    "tests/scripts/test_g2_plan.py's CommittedPlans recomputes every committed "
+                    "round-trip file's flips and seed with it from what that file and its "
+                    "day's store-size file record, so it is not a measured path: 7a352ad and "
+                    "1d234ee changed it after the freeze, and the second day's rerun at the "
+                    "freeze commit used the changed planner"),
                    VALIDATORS, RENDER, PROSE, TESTS_UNIT, OTHER_BUILDS, FETCH),
-         pin=(check_roundtrip.PINS_KEY, check_roundtrip.PINNED_NAMES)),
+         pin=check_roundtrip.PINS_KEY),
     Kind("store-size", ("store-size-*.json",),
          measured=(*BUILT, TOOLS),
          assembled=(STORE_RESULTS, BUILD_PRESET, CAPACITY),
@@ -254,12 +310,19 @@ KINDS = (
                                "check_fuzz.py's TIED_PATHS") for path in check_fuzz.TIED_PATHS),
          assembled=(("scripts/fuzz_results.py", "assembles the file from the runs' logs"),
                     ("scripts/fuzz_host.py", "writes each host's facts, which the header "
-                                             "holds, on that host after its launch")),
+                                             "holds, on that host after its launch"),
+                    ("scripts/build_preset.py", "fuzz_host.py reads the build's preset and "
+                                                "build type from its cache with it"),
+                    ("scripts/check_fuzz.py", "fuzz_results.py reads each log's status by its "
+                                              "STATUS pattern, and moves a run's commit on only "
+                                              "where its TIED_PATHS are unchanged")),
          excluded=tuple((spec.split(")", 1)[1], "check_fuzz.py's NOT_TIED: fuzz/'s prose")
                         for spec in check_fuzz.NOT_TIED),
          left_out=(("scripts/check.sh", "check_fuzz.py's reason: its fuzz steps read "
-                    "fuzz/launch.txt"), VALIDATORS, RENDER, PROSE),
-         pin=(check_fuzz.PRE_TIE_PINS, (check_fuzz.PRE_TIE_FILE,))),
+                    "fuzz/launch.txt"),
+                   ("scripts/check_results.py, check_compare.py, check_roundtrip.py, "
+                    "check_oracle.py", VALIDATORS[1]), RENDER, PROSE),
+         pin=check_fuzz.PRE_TIE_PINS),
     # The record of what else ran on the host during a campaign's timed steps: made by hand
     # from the host's logs and the project's session records, so no code makes its entries.
     Kind("disturbances", ("disturbances-*.json",),
@@ -268,7 +331,9 @@ KINDS = (
                     "records", "the list is made by hand from them after the campaign; nothing "
                     "in the tree writes or measures it, and render_results.py checks its shape "
                     "and that every document it places an entry in was measured at its commit"),
-                   RENDER, PROSE)),
+                   ("src, include, tools, bench, compare, scripts", "nothing tracked builds, "
+                    "runs or writes it, so only the commit it names is held, in HEAD's "
+                    "history"), RENDER, PROSE)),
     # prove_checks.py keys its proofs by the last commit that changed anything outside
     # NOT_CODE, and each fault's fingerprint holds what of NOT_CODE made its verdict.
     Kind("proofs", ("check-proofs.json",),
@@ -304,20 +369,73 @@ def commits_named(document, where=""):
     return found
 
 
+class Refusal(Exception):
+    """What stops a comparison: a git command that failed, named with what git said, or a
+    checkout that cannot be judged. Never read as "nothing changed"."""
+
+
 def git(repo, *arguments):
     return check_fuzz.git(repo, *arguments)
 
 
-def is_checkout(repo):
-    top = git(repo, "rev-parse", "--show-toplevel")
-    return top.returncode == 0 and Path(top.stdout.strip()).resolve() == Path(repo).resolve()
+def run_git(repo, *arguments, ok=(0,)):
+    """git's answer, or a Refusal naming the command and its exit code if it exited otherwise
+    than `ok` or could not be run."""
+    try:
+        done = git(repo, *arguments)
+    except OSError as error:
+        raise Refusal(f"git cannot be run: {error}") from error
+    if done.returncode not in ok:
+        said = done.stderr.strip().replace("\n", "; ") or "nothing on stderr"
+        raise Refusal(f"git {' '.join(arguments)} exited {done.returncode}: {said}")
+    return done
+
+
+def history_of(repo):
+    """True for the top of a checkout git can read; False for a tree with no history: no .git
+    of its own, and in no checkout that tracks files in it, as a tree exported with git archive
+    is. Anything else is a Refusal: a .git git cannot read, or a folder inside a checkout."""
+    repo = Path(repo)
+    if (repo / ".git").exists():
+        top = run_git(repo, "rev-parse", "--show-toplevel").stdout.strip()
+        if Path(top).resolve() != repo.resolve():
+            raise Refusal(f"{repo.name} holds a .git that git does not read as its own "
+                          f"repository: git rev-parse --show-toplevel gives {top}")
+        return True
+    try:
+        top = git(repo, "rev-parse", "--show-toplevel")
+    except OSError as error:
+        raise Refusal(f"git cannot be run: {error}") from error
+    if top.returncode != 0:
+        return False
+    top = Path(top.stdout.strip())
+    inside = repo.resolve().relative_to(top.resolve()).as_posix()
+    if run_git(top, "ls-files", "--", inside).stdout.strip():
+        raise Refusal(f"{repo.name} is a folder inside the checkout {top.name}, which tracks "
+                      "files in it, not a checkout's top: give the checkout's top as --repo")
+    return False
+
+
+@functools.cache
+def shallow_cuts(repo):
+    """The commits a shallow clone's history is cut at, or None for a full clone."""
+    if run_git(repo, "rev-parse", "--is-shallow-repository").stdout.strip() == "false":
+        return None
+    where = Path(run_git(repo, "rev-parse", "--git-path", "shallow").stdout.strip())
+    where = where if where.is_absolute() else Path(repo) / where
+    return frozenset(where.read_text(encoding="utf-8").split()) if where.exists() else frozenset()
 
 
 @functools.cache
 def resolve(repo, commit):
     """The full hash of a commit this checkout holds, or None."""
-    done = git(repo, "rev-parse", "--verify", "--quiet", f"{commit}^{{commit}}")
+    done = run_git(repo, "rev-parse", "--verify", "--quiet", f"{commit}^{{commit}}", ok=(0, 1))
     return done.stdout.strip() if done.returncode == 0 else None
+
+
+@functools.cache
+def in_head_history(repo, full):
+    return run_git(repo, "merge-base", "--is-ancestor", full, "HEAD", ok=(0, 1)).returncode == 0
 
 
 def pathspecs(paths, excluded):
@@ -330,23 +448,33 @@ def changed_paths(repo, base, specs):
     new: check_fuzz.py's tied_changes, for any paths."""
     if not specs:
         return []
-    changed = git(repo, "diff", "--name-only", base, "--", *specs)
-    new = git(repo, "ls-files", "--others", "--exclude-standard", "--", *specs)
-    for done in (changed, new):
-        if done.returncode != 0:
-            raise OSError(f"git: {done.stderr.strip()}")
+    changed = run_git(repo, "diff", "--name-only", base, "--", *specs)
+    new = run_git(repo, "ls-files", "--others", "--exclude-standard", "--", *specs)
     return sorted(set(changed.stdout.split()) | set(new.stdout.split()))
+
+
+@functools.cache
+def links_in(repo, specs):
+    """Every symbolic link git tracks under specs: the comparison sees the link, not the
+    content of what it points at."""
+    if not specs:
+        return []
+    listed = run_git(repo, "ls-files", "--stage", "--", *specs).stdout
+    return sorted(line.split("\t", 1)[1] for line in listed.splitlines()
+                  if line.startswith("120000 "))
 
 
 def changed_members(repo, base, keys):
     """The input pins, by member, that differ between base and the tree."""
     if not keys:
         return []
-    shown = git(repo, "show", f"{base}:{PINS_FILE}")
-    try:
-        old = json.loads(shown.stdout) if shown.returncode == 0 else {}
-    except json.JSONDecodeError:
-        old = {}
+    old = {}
+    if run_git(repo, "ls-tree", "--name-only", base, "--", PINS_FILE).stdout.strip():
+        shown_old = run_git(repo, "show", f"{base}:{PINS_FILE}")
+        try:
+            old = json.loads(shown_old.stdout)
+        except json.JSONDecodeError:
+            old = {}
     try:
         new = json.loads((Path(repo) / PINS_FILE).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -362,40 +490,72 @@ def measured_changes(repo, commit, kind):
 
 
 def written_at(repo, path):
-    """The last commit that wrote the file as it is now, or None if it is not committed as it
-    is: a file being written now was assembled from the tree as it is."""
-    try:
-        name = Path(path).resolve().relative_to(Path(repo).resolve()).as_posix()
-    except ValueError:
-        return None
-    if git(repo, "status", "--porcelain", "--", name).stdout.strip():
-        return None
-    done = git(repo, "log", "-1", "--format=%H", "--", name)
-    return done.stdout.strip() or None
+    """(commit, None): the last commit that wrote the file as it is now; or (None, why) when
+    that cannot be said: the file differs from its committed blob or is not committed, or the
+    commit found is where a shallow clone's history is cut."""
+    name = Path(path).resolve().relative_to(Path(repo).resolve()).as_posix()
+    if run_git(repo, "status", "--porcelain", "--ignored", "--", name).stdout.strip():
+        return None, (f"{COMMIT_IT_FIRST}: it differs from what is committed, or is not "
+                      "committed, so no commit wrote it as it is")
+    commit = run_git(repo, "log", "-1", "--format=%H", "--", name).stdout.strip()
+    if not commit:
+        raise Refusal(f"git log -1 -- {name} names no commit that wrote it, though git tracks "
+                      "it unchanged")
+    cuts = shallow_cuts(repo)
+    if cuts is not None and commit in cuts:
+        return None, (f"the commit that wrote it may be past this shallow clone's history, "
+                      f"which is cut at {commit[:12]}; fetch it whole")
+    return commit, None
 
 
 def assembled_changes(repo, path, kind):
-    """(base, changed): what assembled the file that differs since the commit that wrote it."""
+    """(base, changed, why): what assembled the file that differs since the commit that wrote
+    it, or why that cannot be compared."""
     if not kind.assembled:
-        return None, []
-    base = written_at(repo, path)
+        return None, [], None
+    base, why = written_at(repo, path)
     if base is None:
-        return None, []
-    return base, changed_paths(repo, base, pathspecs(kind.assembled, ()))
+        return None, [], why
+    return base, changed_paths(repo, base, pathspecs(kind.assembled, ())), None
 
 
-def pinned(kind, path, data, pins):
-    """The pins key that declares this file, by the SHA-256 of its bytes, or None."""
-    if kind.pin is None:
-        return None
-    key, names = kind.pin
-    entries = pins.get(key) or {}
-    name = Path(path).name
-    if names is not None and name not in names:
-        return None
-    if entries.get(name) == hashlib.sha256(data).hexdigest():
+def pinned(kind, name, data, pins):
+    """The pins key that declares this file, by its exact path under results/ and the SHA-256
+    of its bytes, or None."""
+    digest = hashlib.sha256(data).hexdigest()
+    key = kind.pin
+    entries = pins.get(key) if key is not None else None
+    if (isinstance(entries, dict) and name in PIN_NAMES.get(key, ())
+            and entries.get(Path(name).name) == digest):
         return key
+    kept = dict(REPLACED_KEPT)
+    entries = pins.get(REPLACED_PINS)
+    if (isinstance(entries, dict) and REPLACED_FOLDER in Path(name).parts[:-1]
+            and kept.get(name) == digest and entries.get(name) == digest):
+        return REPLACED_PINS
     return None
+
+
+def pin_problems(pins):
+    """Every line of the pins file, under a key this check reads, that names a file it does not
+    let be pinned there; and every replaced file kept for the record not held to its rule."""
+    problems = []
+    for key, names in (*PIN_NAMES.items(), (REPLACED_PINS, tuple(p for p, _ in REPLACED_KEPT))):
+        entries = pins.get(key, {})
+        if not isinstance(entries, dict):
+            problems.append(f"{key} in the pins file is not a table of names and SHA-256s")
+            continue
+        allowed = names if key == REPLACED_PINS else tuple(Path(name).name for name in names)
+        for name in sorted(entries):
+            if name not in allowed:
+                problems.append(f"{key} in the pins file pins {name}, and check_ties.py lets "
+                                f"only {', '.join(allowed) or 'no file'} be pinned there")
+    for path, digest in REPLACED_KEPT:
+        if REPLACED_FOLDER not in Path(path).parts[:-1] or not SHA256.fullmatch(str(digest)):
+            problems.append(f"REPLACED_KEPT holds {path}: a file kept for the record lives in "
+                            f"a {REPLACED_FOLDER}/ folder and is known by the SHA-256 of its "
+                            "bytes")
+    return problems
 
 
 def shown(paths):
@@ -412,8 +572,9 @@ def judge(repo, path, name, pins, history):
     """One file's verdict: same, pinned, differs, no commit, no kind, refused or unjudged."""
     kind = kind_of(name)
     if kind is None:
-        return Verdict("no kind", ["no kind in check_ties.py's KINDS matches it, so nothing "
-                                   "says what its figures measure: give its kind its paths"])
+        return Verdict("no kind", ["no kind in check_ties.py's KINDS matches it, and "
+                                   "NOT_RESULTS does not list it, so nothing says what its "
+                                   "figures measure: give its kind its paths"])
     try:
         data = Path(path).read_bytes()
         document = json.loads(data.decode("utf-8"))
@@ -428,7 +589,7 @@ def judge(repo, path, name, pins, history):
     if unreadable:
         return Verdict("refused", unreadable)
     commits = sorted({value for _, value in named})
-    key = pinned(kind, path, data, pins)
+    key = pinned(kind, name, data, pins)
     if key is not None:
         counts = []
         for commit in commits:
@@ -443,15 +604,28 @@ def judge(repo, path, name, pins, history):
                                     f"{', '.join(commit[:12] for commit in commits)}, and "
                                     f"{Path(repo).name} is not a git checkout, as an exported "
                                     f"tree is not ({kind.name})"])
-    problems, unjudged, same = [], [], []
+    refusals, problems, unjudged, same = [], [], [], []
+    cuts = shallow_cuts(repo)
+    specs = pathspecs(kind.measured, kind.excluded)
     for commit in commits:
         full = resolve(repo, commit)
         if full is None:
-            missing = check_fuzz.missing_from_full_history(repo, commit)
-            if missing:
-                problems.append(missing)
+            if cuts is None:
+                refusals.append(f"{commit[:12]} is in no commit of this checkout's full "
+                                "history: made up, or rebased away; a file names the commit "
+                                "it was made at")
             else:
-                unjudged.append(f"not judged: {check_fuzz.history_problem(repo, commit)}")
+                unjudged.append(f"not judged: {commit[:12]} is not in this checkout's history, "
+                                "as in a shallow clone; fetch it whole")
+            continue
+        if not in_head_history(repo, full):
+            if cuts is None:
+                refusals.append(f"{commit[:12]} is not in HEAD's history: a commit of another "
+                                "branch, or one rebased away that this clone still holds, "
+                                "which a fresh clone would not")
+            else:
+                unjudged.append(f"not judged: {commit[:12]} is not in HEAD's history as this "
+                                "shallow clone holds it; fetch it whole")
             continue
         changed = measured_changes(repo, full, kind)
         if changed:
@@ -459,16 +633,41 @@ def judge(repo, path, name, pins, history):
                             f"{shown(changed)}. Measure it again at this code")
         else:
             same.append(commit[:12])
-    base, changed = assembled_changes(repo, path, kind)
-    if changed:
+    links = links_in(repo, specs) + links_in(repo, pathspecs(kind.assembled, ()))
+    if links:
+        refusals.append(f"{shown(links)}: a symbolic link git tracks in what it measures, "
+                        "whose target's content the comparison does not see")
+    base, changed, why = assembled_changes(repo, path, kind)
+    if why:
+        unjudged.append(f"not judged against what assembled it: {why}")
+    elif changed:
         problems.append(f"written at {base[:12]}, and what assembled it changed since: "
                         f"{shown(changed)}. Assemble it again")
+    if refusals:
+        return Verdict("refused", [f"{line} ({kind.name})" for line in refusals + problems])
     if problems:
         return Verdict("differs", [f"{problem} ({kind.name})" for problem in problems])
     if unjudged:
         return Verdict("unjudged", [f"{line} ({kind.name})" for line in unjudged])
+    if not kind.measured and not kind.assembled:
+        return Verdict("same", [f"ok, names {', '.join(same)}, which HEAD's history holds; "
+                                f"nothing tracked builds, runs or writes it ({kind.name})"])
     return Verdict("same", [f"ok, nothing it measures changed since {', '.join(same)} "
                             f"({kind.name})"])
+
+
+def results_files(results):
+    """(results, not results): every file under the folder, whatever its name, and those of
+    them NOT_RESULTS lists, with its reason."""
+    found, others = [], []
+    for path in sorted(results.rglob("*")):
+        if not (path.is_file() or path.is_symlink()):
+            continue
+        name = path.relative_to(results).as_posix()
+        why = next((why for pattern, why in NOT_RESULTS
+                    if fnmatch.fnmatchcase(name, pattern)), None)
+        (found if why is None else others).append((path, why))
+    return [path for path, _ in found], others
 
 
 def table():
@@ -487,7 +686,12 @@ def table():
         for path, why in kind.left_out:
             lines.append(f"  left out   {path}: {why}")
         if kind.pin:
-            lines.append(f"  pin        {kind.pin[0]}")
+            lines.append(f"  pin        {kind.pin}: {', '.join(PIN_NAMES[kind.pin])}")
+    lines.append(f"any kind: pin {REPLACED_PINS}, a file in a {REPLACED_FOLDER}/ folder kept "
+                 "for the record by its path and SHA-256: "
+                 + (", ".join(f"{path} {digest}" for path, digest in REPLACED_KEPT) or "none"))
+    lines.append("not results files: " + (", ".join(f"{pattern}: {why}"
+                                                    for pattern, why in NOT_RESULTS) or "none"))
     return "\n".join(lines)
 
 
@@ -512,23 +716,42 @@ def main(argv=None):
     pins_path = args.pins or args.repo / PINS_FILE
     try:
         pins = json.loads(pins_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
         print(f"check_ties: cannot read the pins: {error}", file=sys.stderr)
         return EXIT_USAGE
-    files = sorted(results.rglob("*.json"))
+    if not isinstance(pins, dict):
+        print("check_ties: cannot read the pins: not a table", file=sys.stderr)
+        return EXIT_USAGE
+    files, others = results_files(results) if results.is_dir() else ([], [])
     if not files:
         print(f"check_ties: no results files in {results.name}", file=sys.stderr)
         return EXIT_USAGE
     # Each run reads the tree afresh: a caller may change it between runs.
-    resolve.cache_clear()
-    changed_paths.cache_clear()
-    history = is_checkout(args.repo)
+    for cached in (resolve, changed_paths, links_in, shallow_cuts, in_head_history):
+        cached.cache_clear()
+    try:
+        history = history_of(args.repo)
+        if history:
+            try:
+                results.resolve().relative_to(args.repo.resolve())
+            except ValueError:
+                raise Refusal(f"the results folder {results} is outside the checkout "
+                              f"{args.repo.resolve().name}, so git cannot say which commit "
+                              "wrote its files") from None
+    except Refusal as refusal:
+        print(f"check_ties: cannot judge: {refusal}", file=sys.stderr)
+        return EXIT_REFUSED
+    refused_pins = pin_problems(pins)
+    for problem in refused_pins:
+        print(f"check_ties: {problem}", file=sys.stderr)
+    for path, why in others:
+        print(f"{path.relative_to(results).as_posix()}: not a results file: {why}")
     counts = {}
     for path in files:
         name = path.relative_to(results).as_posix()
         try:
             verdict = judge(args.repo, path, name, pins, history)
-        except OSError as error:
+        except (Refusal, OSError) as error:
             verdict = Verdict("refused", [f"cannot compare: {error}"])
         counts[verdict.outcome] = counts.get(verdict.outcome, 0) + 1
         stream = sys.stdout if verdict.outcome in ("same", "pinned") else sys.stderr
@@ -537,7 +760,7 @@ def main(argv=None):
     order = ("same", "pinned", "differs", "no commit", "no kind", "refused", "unjudged")
     print(f"check_ties: {len(files)} files: " + ", ".join(
         f"{counts.get(outcome, 0)} {outcome}" for outcome in order))
-    if any(counts.get(outcome) for outcome in ERRORS):
+    if refused_pins or any(counts.get(outcome) for outcome in ERRORS):
         return EXIT_REFUSED
     if counts.get("unjudged"):
         if not history:

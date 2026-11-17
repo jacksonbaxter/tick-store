@@ -1,0 +1,13 @@
+diff --git a/scripts/check_ties.py b/scripts/check_ties.py
+index 520d96a..542259e 100644
+--- a/scripts/check_ties.py
++++ b/scripts/check_ties.py
+@@ -691,7 +691,7 @@ def table():
+     return "\n".join(lines)
+ 
+ 
+-ERRORS = ("differs", "no commit", "no kind", "refused")
++ERRORS = ("differs", "no commit", "no kind")
+ 
+ 
+ def main(argv=None):

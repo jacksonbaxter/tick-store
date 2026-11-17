@@ -1,0 +1,15 @@
+diff --git a/scripts/check_ties.py b/scripts/check_ties.py
+index 520d96a..abb0c2c 100644
+--- a/scripts/check_ties.py
++++ b/scripts/check_ties.py
+@@ -393,8 +393,9 @@ def history_of(repo):
+     is. Anything else is a Refusal: a .git git cannot read, or a folder inside a checkout."""
+     repo = Path(repo)
+     if (repo / ".git").exists():
+-        top = run_git(repo, "rev-parse", "--show-toplevel").stdout.strip()
++        top = run_git(repo, "rev-parse", "--show-toplevel", ok=(0, 128)).stdout.strip()
+         if Path(top).resolve() != repo.resolve():
++            return False
+             raise Refusal(f"{repo.name} holds a .git that git does not read as its own "
+                           f"repository: git rev-parse --show-toplevel gives {top}")
+         return True

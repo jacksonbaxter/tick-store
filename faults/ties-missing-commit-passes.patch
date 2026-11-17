@@ -1,13 +1,13 @@
 diff --git a/scripts/check_ties.py b/scripts/check_ties.py
-index 6543bae..37540ca 100644
+index 520d96a..f668a9c 100644
 --- a/scripts/check_ties.py
 +++ b/scripts/check_ties.py
-@@ -440,7 +440,7 @@ def judge(repo, path, name, pins, history):
+@@ -607,6 +607,8 @@ def judge(repo, path, name, pins, history):
+         full = resolve(repo, commit)
          if full is None:
-             missing = check_fuzz.missing_from_full_history(repo, commit)
-             if missing:
--                problems.append(missing)
+             if cuts is None:
 +                same.append(commit[:12])
-             else:
-                 unjudged.append(f"not judged: {check_fuzz.history_problem(repo, commit)}")
-             continue
++            elif False:
+                 refusals.append(f"{commit[:12]} is in no commit of this checkout's full "
+                                 "history: made up, or rebased away; a file names the commit "
+                                 "it was made at")

@@ -1,0 +1,13 @@
+diff --git a/scripts/check_ties.py b/scripts/check_ties.py
+index 520d96a..c7dd5cf 100644
+--- a/scripts/check_ties.py
++++ b/scripts/check_ties.py
+@@ -311,8 +311,6 @@ KINDS = (
+          assembled=(("scripts/fuzz_results.py", "assembles the file from the runs' logs"),
+                     ("scripts/fuzz_host.py", "writes each host's facts, which the header "
+                                              "holds, on that host after its launch"),
+-                    ("scripts/build_preset.py", "fuzz_host.py reads the build's preset and "
+-                                                "build type from its cache with it"),
+                     ("scripts/check_fuzz.py", "fuzz_results.py reads each log's status by its "
+                                               "STATUS pattern, and moves a run's commit on only "
+                                               "where its TIED_PATHS are unchanged")),

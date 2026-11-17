@@ -1,13 +1,13 @@
 diff --git a/scripts/check_ties.py b/scripts/check_ties.py
-index 6543bae..5a3f1d5 100644
+index 520d96a..fb403f6 100644
 --- a/scripts/check_ties.py
 +++ b/scripts/check_ties.py
-@@ -370,7 +370,7 @@ def assembled_changes(repo, path, kind):
+@@ -510,7 +510,7 @@ def assembled_changes(repo, path, kind):
      if not kind.assembled:
-         return None, []
-     base = written_at(repo, path)
+         return None, [], None
+     base, why = written_at(repo, path)
 -    if base is None:
 +    if True:
-         return None, []
-     return base, changed_paths(repo, base, pathspecs(kind.assembled, ()))
+         return None, [], why
+     return base, changed_paths(repo, base, pathspecs(kind.assembled, ())), None
  

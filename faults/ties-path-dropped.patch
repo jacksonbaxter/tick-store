@@ -1,8 +1,8 @@
 diff --git a/scripts/check_ties.py b/scripts/check_ties.py
-index 6543bae..e6a9758 100644
+index 520d96a..e7bcfb1 100644
 --- a/scripts/check_ties.py
 +++ b/scripts/check_ties.py
-@@ -184,7 +184,7 @@ KINDS = (
+@@ -238,7 +238,7 @@ KINDS = (
                      "tick_census's own output by hand, at 0e9c9de: no tracked script writes "
                      "them"), VALIDATORS, PROSE, TESTS_UNIT, OTHER_BUILDS, FETCH)),
      Kind("codec-eval", ("codec-eval-*.json",),

@@ -1,0 +1,13 @@
+diff --git a/scripts/check_ties.py b/scripts/check_ties.py
+index 520d96a..6ce81b1 100644
+--- a/scripts/check_ties.py
++++ b/scripts/check_ties.py
+@@ -521,7 +521,7 @@ def pinned(kind, name, data, pins):
+     digest = hashlib.sha256(data).hexdigest()
+     key = kind.pin
+     entries = pins.get(key) if key is not None else None
+-    if (isinstance(entries, dict) and name in PIN_NAMES.get(key, ())
++    if (isinstance(entries, dict) and True
+             and entries.get(Path(name).name) == digest):
+         return key
+     kept = dict(REPLACED_KEPT)

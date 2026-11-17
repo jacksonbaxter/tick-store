@@ -495,13 +495,15 @@ step_check_compare() { run_validator scripts/check_compare.py results/compare; }
 # Every results file against the code it was measured at: check_ties.py compares what each kind
 # of figure builds and runs between the commit the file names and this tree, and fails on any
 # difference. It exits 3 when it could compare nothing for want of git history, as in an exported
-# tree, or a shallow clone that lacks a file's commit: no pass, so a skip.
+# tree, or a shallow clone that lacks a file's commit, or when a results file is not committed as
+# it is, so what assembled it cannot be held to the commit that wrote it: no pass, so a skip.
 step_check_ties() {
     python3 -I scripts/check_ties.py
     local code=$?
     NOTE=$(sed -n 's/^check_ties: \([0-9]* files: .*\)/\1/p' "$1" | tail -n 1)
     if [[ $code -eq 3 ]]; then
-        skip_step "not judged: no history here to compare the results files' commits with"
+        skip_step "not judged: no history here to compare the results files' commits with,\
+ or a results file to commit first"
         return 0
     fi
     return "$code"

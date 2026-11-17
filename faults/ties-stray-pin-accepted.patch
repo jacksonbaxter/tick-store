@@ -1,0 +1,13 @@
+diff --git a/scripts/check_ties.py b/scripts/check_ties.py
+index 520d96a..9a47e3e 100644
+--- a/scripts/check_ties.py
++++ b/scripts/check_ties.py
+@@ -756,7 +756,7 @@ def main(argv=None):
+     order = ("same", "pinned", "differs", "no commit", "no kind", "refused", "unjudged")
+     print(f"check_ties: {len(files)} files: " + ", ".join(
+         f"{counts.get(outcome, 0)} {outcome}" for outcome in order))
+-    if refused_pins or any(counts.get(outcome) for outcome in ERRORS):
++    if any(counts.get(outcome) for outcome in ERRORS):
+         return EXIT_REFUSED
+     if counts.get("unjudged"):
+         if not history:

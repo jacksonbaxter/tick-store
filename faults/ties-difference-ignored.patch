@@ -1,13 +1,13 @@
 diff --git a/scripts/check_ties.py b/scripts/check_ties.py
-index 6543bae..b402173 100644
+index 520d96a..4fecbad 100644
 --- a/scripts/check_ties.py
 +++ b/scripts/check_ties.py
-@@ -326,7 +326,7 @@ def changed_paths(repo, base, specs):
-     for done in (changed, new):
-         if done.returncode != 0:
-             raise OSError(f"git: {done.stderr.strip()}")
+@@ -446,7 +446,7 @@ def changed_paths(repo, base, specs):
+         return []
+     changed = run_git(repo, "diff", "--name-only", base, "--", *specs)
+     new = run_git(repo, "ls-files", "--others", "--exclude-standard", "--", *specs)
 -    return sorted(set(changed.stdout.split()) | set(new.stdout.split()))
 +    return sorted(set(new.stdout.split()))
  
  
- def changed_members(repo, base, keys):
+ @functools.cache

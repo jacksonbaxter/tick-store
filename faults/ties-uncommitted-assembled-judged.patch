@@ -1,0 +1,13 @@
+diff --git a/scripts/check_ties.py b/scripts/check_ties.py
+index 520d96a..00e7460 100644
+--- a/scripts/check_ties.py
++++ b/scripts/check_ties.py
+@@ -490,7 +490,7 @@ def written_at(repo, path):
+     that cannot be said: the file differs from its committed blob or is not committed, or the
+     commit found is where a shallow clone's history is cut."""
+     name = Path(path).resolve().relative_to(Path(repo).resolve()).as_posix()
+-    if run_git(repo, "status", "--porcelain", "--ignored", "--", name).stdout.strip():
++    if False:
+         return None, (f"{COMMIT_IT_FIRST}: it differs from what is committed, or is not "
+                       "committed, so no commit wrote it as it is")
+     commit = run_git(repo, "log", "-1", "--format=%H", "--", name).stdout.strip()

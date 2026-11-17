@@ -1811,8 +1811,9 @@ FAULTS = (
           "tests, so the guard and the round-trip check lose their only callers", CHECK_FAILED,
           "REQUIRED FUNCTION NOT REACHED: verify_round_trip"),
     # check_ties.py: every results file against the code it was measured at.
-    Fault("ties-kind-dropped", "py-scripts", "check_ties.py's table loses the census kind, so "
-          "a census file has no measured paths", CHECK_FAILED,
+    Fault("ties-kind-dropped", "py-scripts", "check_ties.py's census kind is renamed so that "
+          "its pattern matches no file, and every census file is refused as of no kind (review "
+          "TD-9)", CHECK_FAILED,
           "FAIL: test_unchanged_code_passes_for_every_kind (__main__.SameContent"),
     Fault("ties-path-dropped", "py-scripts", "check_ties.py's codec-eval kind loses tools/, "
           "where tick_codec_eval is built", CHECK_FAILED,
@@ -1835,6 +1836,60 @@ FAULTS = (
     Fault("ties-pin-by-name", "py-scripts", "check_ties.py takes a file as pinned by its name, "
           "whatever its bytes", CHECK_FAILED,
           "FAIL: test_a_pin_of_other_bytes_does_not_hold (__main__.Pinned"),
+    # Review TD-1 and TD-7: a git command that fails is a refusal naming it.
+    Fault("ties-git-error-passes", "py-scripts", "check_ties.py takes what a failed git command "
+          "printed as its answer, so an object missing from the clone reads as nothing changed",
+          CHECK_FAILED, "FAIL: test_a_missing_object_is_a_refusal_naming_the_command "
+          "(__main__.GitErrors"),
+    Fault("ties-results-outside-passes", "py-scripts", "check_ties.py no longer refuses a "
+          "--results folder outside the checkout, and stops on a traceback where it should "
+          "refuse", CHECK_FAILED, "ERROR: test_a_results_folder_outside_the_checkout_is_refused "
+          "(__main__.GitErrors"),
+    Fault("ties-unreadable-git-dir-unjudged", "py-scripts", "check_ties.py takes a .git that "
+          "git cannot read as a tree with no history, a skip", CHECK_FAILED,
+          "FAIL: test_a_git_dir_git_cannot_read_is_refused (__main__.GitErrors"),
+    Fault("ties-subfolder-unjudged", "py-scripts", "check_ties.py takes a --repo that is a "
+          "folder inside a checkout as a tree with no history, a skip", CHECK_FAILED,
+          "FAIL: test_a_folder_inside_a_checkout_is_refused (__main__.GitErrors"),
+    # Review TD-2: a file not committed as it is is not judged against what assembled it.
+    Fault("ties-uncommitted-assembled-judged", "py-scripts", "check_ties.py judges a results "
+          "file that is not committed, or differs from its blob, against the last commit that "
+          "wrote it", CHECK_FAILED,
+          "FAIL: test_a_file_not_committed_as_it_is_is_not_judged_against_what_assembled_it "
+          "(__main__.AssembledChange"),
+    # Review TD-3: every file under results/ is examined.
+    Fault("ties-non-json-unseen", "py-scripts", "check_ties.py examines only the .json files "
+          "under results/", CHECK_FAILED,
+          "FAIL: test_every_file_under_results_is_examined (__main__.NoCommit"),
+    # Review TD-4: a pin names its file exactly, from a set fixed in code.
+    Fault("ties-pin-any-listed-name", "py-scripts", "check_ties.py takes as pinned any file "
+          "whose name has a line under its validator's key, at any path", CHECK_FAILED,
+          "FAIL: test_a_fifth_comparison_file_is_no_pin_and_its_line_is_refused "
+          "(__main__.Pinned"),
+    Fault("ties-stray-pin-accepted", "py-scripts", "check_ties.py lets a line in the pins file "
+          "for a name PIN_NAMES does not hold pass unremarked", CHECK_FAILED,
+          "FAIL: test_a_fifth_comparison_file_is_no_pin_and_its_line_is_refused "
+          "(__main__.Pinned"),
+    Fault("ties-replaced-pin-outside-folder", "py-scripts", "check_ties.py takes a file kept "
+          "for the record as pinned outside a replaced/ folder", CHECK_FAILED,
+          "FAIL: test_a_replaced_file_outside_a_replaced_folder_is_refused (__main__.Pinned"),
+    # Review TD-5 and TD-6: a commit must be in HEAD's history; a tracked link is refused.
+    Fault("ties-non-ancestor-passes", "py-scripts", "check_ties.py judges a file whose commit "
+          "this clone holds on another branch, which a fresh clone would not", CHECK_FAILED,
+          "FAIL: test_a_commit_not_in_heads_history_fails (__main__.MissingCommit"),
+    Fault("ties-symlink-passes", "py-scripts", "check_ties.py compares a symbolic link git "
+          "tracks in a measured path as if it were the file it points at", CHECK_FAILED,
+          "FAIL: test_a_symbolic_link_in_a_measured_path_is_refused (__main__.GitErrors"),
+    # Review TD-8: a refused file fails the step.
+    Fault("ties-refused-exits-0", "py-scripts", "check_ties.py counts a refused file as no "
+          "error, so a run whose only verdicts are refusals exits 0", CHECK_FAILED,
+          "FAIL: test_a_commit_git_cannot_read_fails (__main__.NoCommit"),
+    # Review TD-10: fuzz_results.py reads the preset through build_preset.py.
+    Fault("ties-fuzz-build-preset-dropped", "py-scripts", "check_ties.py's fuzz kind loses "
+          "scripts/build_preset.py from what assembles a fuzz file", CHECK_FAILED,
+          "FAIL: test_a_change_to_what_assembled_a_file_after_it_was_written_fails_it "
+          "(__main__.AssembledChange.test_a_change_to_what_assembled_a_file_after_it_was_written_"
+          "fails_it) (path='scripts/build_preset.py')"),
     Fault("check-sh-untied-results-pass", "py-scripts", "check.sh passes check-ties where no "
           "history let it compare anything", CHECK_FAILED,
           "FAIL: test_results_files_with_no_history_to_tie_them_skip_and_fail_under_no_skips "

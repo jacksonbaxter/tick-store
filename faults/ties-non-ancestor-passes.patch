@@ -1,0 +1,13 @@
+diff --git a/scripts/check_ties.py b/scripts/check_ties.py
+index 520d96a..4cba7e9 100644
+--- a/scripts/check_ties.py
++++ b/scripts/check_ties.py
+@@ -614,7 +614,7 @@ def judge(repo, path, name, pins, history):
+                 unjudged.append(f"not judged: {commit[:12]} is not in this checkout's history, "
+                                 "as in a shallow clone; fetch it whole")
+             continue
+-        if not in_head_history(repo, full):
++        if False:
+             if cuts is None:
+                 refusals.append(f"{commit[:12]} is not in HEAD's history: a commit of another "
+                                 "branch, or one rebased away that this clone still holds, "

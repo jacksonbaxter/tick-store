@@ -9,7 +9,9 @@ of each kind naming the commit it was measured at. The paths each kind must meas
 out here, apart from the script's table, so a kind or a path dropped from the table fails a
 test: a change in each measured path fails the files of every kind that measures it and names
 it, a change elsewhere passes, a pinned file is reported and not judged, and a file that names
-no commit, a commit the clone lacks and a tree with no history each get their own verdict.
+no commit, a commit the clone lacks and a tree with no history each get their own verdict. A
+refusal's exit code is shown on a tree whose proofs are brought up to date, so that it is the
+refusal's own and not the proofs file's, which any uncommitted results file unties.
 """
 
 import contextlib
@@ -22,6 +24,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "check_ties.py"
@@ -48,6 +51,7 @@ FILE_OF = {
     "scripts/diag_summary.py": "scripts/diag_summary.py",
     "scripts/fuzz_results.py": "scripts/fuzz_results.py",
     "scripts/fuzz_host.py": "scripts/fuzz_host.py",
+    "scripts/check_fuzz.py": "scripts/check_fuzz.py",
 }
 # Files no kind measures: prose, faults, the prover, and what prove_checks.py leaves out of its
 # key; then scripts and tests that are code to the prover alone.
@@ -77,6 +81,7 @@ MEASURED = {
                          "scripts/coverage_report.py"},
     "diag": BUILT | {"tools", "bench", "scripts/run_bench.py", "pins"},
     "fuzz": BUILT | {"fuzz", "scripts/fuzz_g3.py"},
+    "disturbances": set(),
 }
 ASSEMBLED = {
     "codec-eval": {"scripts/codec_eval_results.py", "scripts/build_preset.py",
@@ -87,7 +92,20 @@ ASSEMBLED = {
     "store-estimate": {"scripts/store_estimate.py", "results/codec-eval-12302019.json",
                        "results/fullday-capacity-12302019.json"},
     "diag": {"scripts/diag_summary.py"},
-    "fuzz": {"scripts/fuzz_results.py", "scripts/fuzz_host.py"},
+    "fuzz": {"scripts/fuzz_results.py", "scripts/fuzz_host.py", "scripts/build_preset.py",
+             "scripts/check_fuzz.py"},
+}
+# The exact paths under results/ each validator's pin may name, written out here, apart from the
+# script's PIN_NAMES.
+PIN_NAMES = {
+    "protocol_1_comparison_files": ("compare/Linux-12302019-full-67ae574f5666.json",
+                                    "compare/Linux-12302019-open-67ae574f5666.json",
+                                    "compare/macOS-12302019-full-tickstore-2503d1e7c5f6.json",
+                                    "compare/macOS-12302019-open-67ae574f5666.json"),
+    "roundtrip_files_before_exit_codes": ("roundtrip-10302019.json",
+                                          "roundtrip-12302019-linux.json",
+                                          "roundtrip-12302019.json"),
+    "fuzz_g3_file_before_the_tie": ("fuzz-g3-ea1dde4c02e4.json",),
 }
 
 
@@ -96,7 +114,7 @@ def results_of(commit):
     of that kind do."""
     return {
         "bench": ("bench/macOS-itch_codec-x.json", {"header": {"commit": commit}}),
-        "compare": ("compare/Linux-12302019-full-x.json",
+        "compare": ("compare/Linux-12302019-full-67ae574f5666.json",
                     {"header": {"commit": commit}, "variant_selection": {
                         "source_commit": commit}}),
         "capacity": ("fullday-capacity-12302019.json",
@@ -111,6 +129,7 @@ def results_of(commit):
         "diag": ("diag/writer-profile-12302019-x.json", {"commit": commit}),
         "fuzz": ("fuzz-g3-ea1dde4c02e4.json", {"header": {"commit": commit},
                                               "runs": [{"commit": commit}]}),
+        "disturbances": ("disturbances-ede0176b10bb.json", {"commit": commit[:12]}),
     }
 
 
@@ -208,7 +227,20 @@ class TieTest(unittest.TestCase):
         git(REPO, "commit", "-q", "-am", f"change the pins' {key}")
 
     def assert_same(self, result, kind):
-        self.assertIn("ok, nothing it measures changed since", result.said(FILES[kind]), kind)
+        said = result.said(FILES[kind])
+        if MEASURED.get(kind) == set() and kind not in ASSEMBLED:
+            self.assertIn("ok, names", said, kind)
+        else:
+            self.assertIn("ok, nothing it measures changed since", said, kind)
+
+    def commit_with_proofs(self, message):
+        """Commits the tree, then the proofs naming that commit, as prove_checks.py keys them,
+        so that only the file under test can untie anything."""
+        git(REPO, "add", "-A")
+        git(REPO, "commit", "-q", "-m", message)
+        head = git(REPO, "rev-parse", "HEAD")
+        write_json(REPO, "results/check-proofs.json", {"source_commit": head[:12]})
+        git(REPO, "commit", "-q", "-am", "the proofs again")
 
     def assert_measured_change(self, result, kind, path):
         said = result.said(FILES[kind])
@@ -223,7 +255,7 @@ class SameContent(TieTest):
         for kind in FILES:
             with self.subTest(kind=kind):
                 self.assert_same(result, kind)
-        self.assertIn("check_ties: 12 files: 12 same, 0 pinned, 0 differs", result.out)
+        self.assertIn("check_ties: 13 files: 13 same, 0 pinned, 0 differs", result.out)
 
     def test_a_short_commit_is_resolved(self):
         result = run_check()
@@ -338,13 +370,34 @@ class AssembledChange(TieTest):
         result = run_check()
         self.assert_same(result, "diag")
 
-    def test_a_file_being_written_now_is_assembled_from_the_tree(self):
+    def test_a_file_not_committed_as_it_is_is_not_judged_against_what_assembled_it(self):
+        # Review TD-2: no commit wrote it as it is, so there is nothing to compare from.
         self.change(FILE_OF["scripts/diag_summary.py"], commit=False)
         name, document = results_of(CODE)["diag"]
         document["again"] = True
         write_json(REPO, f"results/{name}", document)
+        write_json(REPO, "results/store-size-20202020.json", {"commit": CODE[:7]})
         result = run_check()
-        self.assert_same(result, "diag")
+        for said in (result.said(FILES["diag"]),
+                     result.said("results/store-size-20202020.json")):
+            self.assertIn("not judged against what assembled it: commit it first", said)
+            self.assertNotIn("ok", said)
+        self.assertIn("2 unjudged", result.out)
+        # A kind with nothing assembled is judged as it is.
+        write_json(REPO, "results/census-20202020.json", {"commit": CODE[:7]})
+        self.assertIn("ok, nothing it measures changed since",
+                      run_check().said("results/census-20202020.json"))
+
+    def test_an_uncommitted_results_file_is_no_pass(self):
+        # Not judged itself, and it unties the proofs, whose key holds every results file but
+        # the proofs and the coverage summary: the step fails, as it already did.
+        path = REPO / FILES["roundtrip"]
+        path.write_text(path.read_text(encoding="utf-8") + " ", encoding="utf-8")
+        result = run_check()
+        self.assertEqual(result.code, check_ties.EXIT_REFUSED, result.out + result.err)
+        self.assertIn("not judged against what assembled it: commit it first",
+                      result.said(FILES["roundtrip"]))
+        self.assert_measured_change(result, "proofs", FILES["roundtrip"])
 
 
 class ChangeElsewhere(TieTest):
@@ -427,6 +480,88 @@ class Pinned(TieTest):
         self.assertNotIn("pinned", result.said(FILES["roundtrip"]))
         self.assert_measured_change(result, "roundtrip", FILE_OF["src"])
 
+    def test_a_fifth_comparison_file_is_no_pin_and_its_line_is_refused(self):
+        # Review TD-4: check_compare.py takes any SHA-256 under its key, whatever the name.
+        source = REPO / FILES["compare"]
+        fifth = REPO / "results/compare/Linux-12302019-open-0000aaaa0000.json"
+        fifth.write_bytes(source.read_bytes() + b" ")
+        self.commit_with_proofs("a fifth comparison file")
+        pins = self.pins_for("compare")
+        document = json.loads(pins.read_text(encoding="utf-8"))
+        document["protocol_1_comparison_files"][fifth.name] = hashlib.sha256(
+            fifth.read_bytes()).hexdigest()
+        write_json(self.dir, "pins.json", document)
+        result = run_check(REPO, "--pins", str(pins))
+        self.assertEqual(result.code, check_ties.EXIT_REFUSED, result.out)
+        self.assertIn("check_ties: protocol_1_comparison_files in the pins file pins "
+                      "Linux-12302019-open-0000aaaa0000.json, and check_ties.py lets only "
+                      "Linux-12302019-full-67ae574f5666.json", result.err)
+        self.assertNotIn("pinned", result.said("results/compare/" + fifth.name))
+        self.assertIn("pinned under", result.said(FILES["compare"]))
+
+    def test_a_pin_names_its_file_by_its_path_under_results(self):
+        # The same bytes under the same name in another folder are no pinned file.
+        copy = REPO / "results/compare/old" / Path(FILES["compare"]).name
+        copy.parent.mkdir()
+        copy.write_bytes((REPO / FILES["compare"]).read_bytes())
+        self.commit_with_proofs("a copy elsewhere")
+        result = run_check(REPO, "--pins", str(self.pins_for("compare")))
+        self.assertIn("pinned under", result.said(FILES["compare"]))
+        self.assertNotIn("pinned", result.said("results/compare/old/" + copy.name))
+
+    def test_the_names_that_may_be_pinned_are_fixed(self):
+        self.assertEqual(check_ties.PIN_NAMES, PIN_NAMES)
+        self.assertEqual(check_ties.REPLACED_KEPT, ())
+        self.assertEqual(check_ties.NOT_RESULTS, ())
+
+    def replaced(self, kept_at, code_digest=None, pinned_digest=None, listed=None):
+        """A comparison file kept for the record at results/<kept_at>, REPLACED_KEPT naming it
+        with `code_digest`, and the pins file naming `listed` with `pinned_digest`, each by
+        default the path and the SHA-256 of its bytes."""
+        kept = REPO / "results" / kept_at
+        kept.parent.mkdir(parents=True, exist_ok=True)
+        kept.write_bytes((REPO / FILES["compare"]).read_bytes() + b" ")
+        self.commit_with_proofs("a replaced file kept")
+        digest = hashlib.sha256(kept.read_bytes()).hexdigest()
+        write_json(self.dir, "pins.json", {"replaced_kept_for_the_record": {
+            listed or kept_at: pinned_digest or digest}})
+        self.change(FILE_OF["compare"])
+        with mock.patch.object(check_ties, "REPLACED_KEPT", ((kept_at, code_digest or digest),)):
+            result = run_check(REPO, "--pins", str(self.dir / "pins.json"))
+        return result, f"results/{kept_at}"
+
+    KEPT = "compare/replaced/Linux-12302019-full-67ae574f5666.json"
+
+    def test_a_replaced_file_kept_for_the_record_is_pinned_by_path_and_sha256(self):
+        result, kept = self.replaced(self.KEPT)
+        self.assertIn("pinned under replaced_kept_for_the_record in the pins file",
+                      result.said(kept))
+        self.assertNotIn("check_ties: replaced", result.err)
+
+    def test_a_replaced_file_is_pinned_only_with_its_own_sha256_in_both_places(self):
+        for digests in ({"pinned_digest": "0" * 64}, {"code_digest": "0" * 64}):
+            with self.subTest(**digests):
+                result, kept = self.replaced(self.KEPT, **digests)
+                self.restore()
+                self.assertNotIn("pinned", result.said(kept))
+                self.assertIn("what it measures changed since", result.said(kept))
+
+    def test_a_replaced_file_outside_a_replaced_folder_is_refused(self):
+        result, kept = self.replaced("compare/kept/Linux-12302019-full-67ae574f5666.json")
+        self.assertEqual(result.code, check_ties.EXIT_REFUSED)
+        self.assertIn("check_ties: REPLACED_KEPT holds compare/kept/Linux-12302019-full-"
+                      "67ae574f5666.json: a file kept for the record lives in a replaced/ "
+                      "folder", result.err)
+        self.assertNotIn("pinned", result.said(kept))
+        self.assertIn("what it measures changed since", result.said(kept))
+
+    def test_a_replaced_pin_no_code_names_is_refused(self):
+        result, kept = self.replaced(self.KEPT, listed="compare/replaced/another.json")
+        self.assertEqual(result.code, check_ties.EXIT_REFUSED)
+        self.assertIn("check_ties: replaced_kept_for_the_record in the pins file pins "
+                      "compare/replaced/another.json", result.err)
+        self.assertNotIn("pinned", result.said(kept))
+
     def test_a_pin_only_its_validator_allows_holds(self):
         # Only the three round-trip files from before the exit codes may be pinned there, and
         # only G-3's file from before the tie, so a pin of another name is no pin.
@@ -454,24 +589,80 @@ class Pinned(TieTest):
 
 
 class NoCommit(TieTest):
+    # Review TD-8: each file is committed with the proofs brought up to date, so the exit code
+    # is the refusal's own.
+    def assert_alone(self, result, outcome):
+        self.assertEqual(result.code, check_ties.EXIT_REFUSED, result.out)
+        self.assertIn(f"0 differs", result.out)
+        self.assertIn(f"1 {outcome}", result.out)
+
     def test_a_file_that_names_no_commit_fails(self):
         write_json(REPO, "results/census-10302019.json", {"day": "10302019"})
+        self.commit_with_proofs("a file naming no commit")
         result = run_check()
-        self.assertEqual(result.code, check_ties.EXIT_REFUSED, result.out)
+        self.assert_alone(result, "no commit")
         self.assertIn("census-10302019.json: names no commit it was measured at", result.err)
-        self.assertIn("1 no commit", result.out)
 
     def test_a_commit_git_cannot_read_fails(self):
-        write_json(REPO, "results/census-10302019.json", {"commit": "unknown"})
-        result = run_check()
-        self.assertEqual(result.code, check_ties.EXIT_REFUSED, result.out)
-        self.assertIn("census-10302019.json: commit is 'unknown', not a commit", result.err)
+        for value in ("unknown", "abcd", "0123ab", 7):
+            with self.subTest(value=value):
+                write_json(REPO, "results/census-10302019.json", {"commit": value})
+                self.commit_with_proofs("a file naming no readable commit")
+                result = run_check()
+                self.restore()
+                self.assert_alone(result, "refused")
+                self.assertIn(f"census-10302019.json: commit is {value!r}, not a commit",
+                              result.err)
 
     def test_a_file_of_no_kind_fails(self):
         write_json(REPO, "results/latency-12302019.json", {"commit": CODE})
+        self.commit_with_proofs("a file of no kind")
+        result = run_check()
+        self.assert_alone(result, "no kind")
+        self.assertIn("latency-12302019.json: no kind in check_ties.py's KINDS", result.err)
+
+    def test_every_file_under_results_is_examined(self):
+        # Review TD-3: a results format that is not JSON meets "no kind" too.
+        write(REPO, "results/latency-1.csv", f"commit,{'0' * 40}\n")
+        write(REPO, "results/census-2.json.gz", "not even gzip")
+        write(REPO, "results/notes/whatever.txt", "x")
+        self.commit_with_proofs("files that are not JSON")
         result = run_check()
         self.assertEqual(result.code, check_ties.EXIT_REFUSED, result.out)
-        self.assertIn("latency-12302019.json: no kind in check_ties.py's KINDS", result.err)
+        for name in ("latency-1.csv", "census-2.json.gz", "notes/whatever.txt"):
+            self.assertIn(f"{name}: no kind in check_ties.py's KINDS", result.err)
+        self.assertIn("16 files:", result.out)
+        self.assertIn("3 no kind", result.out)
+
+    def test_a_file_not_results_lists_is_named_and_not_judged(self):
+        write(REPO, "results/notes/whatever.txt", "x")
+        self.commit_with_proofs("a listed file")
+        with mock.patch.object(check_ties, "NOT_RESULTS",
+                               (("notes/*.txt", "a stand-in for a listed kind of file"),)):
+            result = run_check()
+        self.assertEqual(result.code, check_ties.EXIT_OK, result.err)
+        self.assertIn("notes/whatever.txt: not a results file: a stand-in for a listed kind of "
+                      "file", result.out)
+        self.assertIn("13 files:", result.out)
+
+    def test_a_file_that_cannot_be_read_fails(self):
+        for content in (b"{not json", b'{"commit": "\xff"}'):
+            with self.subTest(content=content):
+                (REPO / "results/census-10302019.json").write_bytes(content)
+                self.commit_with_proofs("an unreadable file")
+                result = run_check()
+                self.restore()
+                self.assert_alone(result, "refused")
+                self.assertIn("census-10302019.json: cannot read it:", result.err)
+
+    def test_a_kind_with_no_paths_holds_only_its_commit(self):
+        result = run_check()
+        self.assertIn("ok, names " + CODE[:12] + ", which HEAD's history holds; nothing "
+                      "tracked builds, runs or writes it (disturbances)",
+                      result.said(FILES["disturbances"]))
+        write_json(REPO, FILES["disturbances"], {"commit": MissingCommit.MADE_UP})
+        self.commit_with_proofs("a disturbances file naming a made-up commit")
+        self.assert_alone(run_check(), "refused")
 
 
 class MissingCommit(TieTest):
@@ -493,6 +684,38 @@ class MissingCommit(TieTest):
         self.assertIn(f"not judged: {CODE[:12]} is not in this checkout's history, as in a "
                       "shallow clone", result.said(FILES["bench"]))
         self.assertNotIn("ok", result.said(FILES["bench"]))
+
+    def test_a_difference_beside_a_commit_a_shallow_clone_lacks_fails(self):
+        # Review TD-8: one commit differs and one the clone lacks; the difference decides.
+        shallow = self.dir / "shallow"
+        subprocess.run(["git", "clone", "-q", "--depth", "1", REPO.as_uri(), str(shallow)],
+                       check=True, capture_output=True)
+        head = git(shallow, "rev-parse", "HEAD")
+        name, document = results_of(CODE)["capacity"]
+        document["systems"]["questdb"]["commit"] = head
+        write_json(shallow, f"results/{name}", document)
+        with (shallow / FILE_OF["src"]).open("a", encoding="utf-8") as file:
+            file.write("changed\n")
+        result = run_check(shallow)
+        self.assertEqual(result.code, check_ties.EXIT_REFUSED, result.out + result.err)
+        said = result.said(FILES["capacity"])
+        self.assertIn(f"measured at {head[:12]}, and what it measures changed since", said)
+        self.assertNotIn("not judged", said)
+
+    def test_a_commit_not_in_heads_history_fails(self):
+        # Review TD-5: a commit of another branch, or one rebased away that this clone still
+        # holds, which CI's fresh clone would not.
+        git(REPO, "checkout", "-q", "-b", "side")
+        self.addCleanup(git, REPO, "branch", "-q", "-D", "side")
+        self.change("docs/NOTES.md")
+        side = git(REPO, "rev-parse", "HEAD")
+        git(REPO, "checkout", "-q", "-")
+        write_json(REPO, "results/census-10302019.json", {"commit": side})
+        self.commit_with_proofs("a file naming a commit of another branch")
+        result = run_check()
+        self.assertEqual(result.code, check_ties.EXIT_REFUSED, result.out)
+        self.assertIn(f"census-10302019.json: {side[:12]} is not in HEAD's history", result.err)
+        self.assertIn("1 refused", result.out)
 
     def test_a_refusal_beside_a_shallow_clone_still_fails(self):
         shallow = self.dir / "shallow"
@@ -520,7 +743,7 @@ class NoHistory(TieTest):
                 self.assertNotIn("ok", said)
         self.assertIn("check_ties: not judged: no history here: exported is not a git checkout",
                       result.err)
-        self.assertIn("12 unjudged", result.out)
+        self.assertIn("13 unjudged", result.out)
 
     def test_a_pinned_file_is_still_reported_pinned(self):
         tree = self.exported()
@@ -538,9 +761,152 @@ class NoHistory(TieTest):
         self.assertEqual(result.code, check_ties.EXIT_REFUSED, result.out)
 
 
+class GitErrors(TieTest):
+    """Review TD-1 and TD-7: a git command that fails is a refusal naming it, never "nothing
+    changed"; only a tree with no repository at all is not judged."""
+
+    def copy(self):
+        copy = self.dir / "copy"
+        shutil.copytree(REPO, copy, symlinks=True)
+        return copy
+
+    def test_a_missing_object_is_a_refusal_naming_the_command(self):
+        copy = self.copy()
+        with (copy / FILE_OF["scripts/store_results.py"]).open("a", encoding="utf-8") as file:
+            file.write("changed\n")
+        git(copy, "commit", "-q", "-am", "the assembler changed")
+        lost = git(copy, "rev-parse", "HEAD")
+        with (copy / "docs/NOTES.md").open("a", encoding="utf-8") as file:
+            file.write("later\n")
+        git(copy, "commit", "-q", "-am", "later")
+        self.assertIn("what assembled it changed since",
+                      run_check(copy).said(FILES["roundtrip"]))
+        (copy / ".git" / "objects" / lost[:2] / lost[2:]).unlink()
+        result = run_check(copy)
+        self.assertEqual(result.code, check_ties.EXIT_REFUSED, result.out)
+        said = result.said(FILES["roundtrip"])
+        self.assertIn("cannot compare: git ", said)
+        self.assertIn("exited 128", said)
+        self.assertNotIn("ok", said)
+
+    def test_a_git_command_git_refuses_is_a_refusal(self):
+        census = next(kind for kind in check_ties.KINDS if kind.name == "census")
+        broken = check_ties.Kind(census.name, census.files, (("src", "x"), (":(bogus)x", "y")))
+        kinds = tuple(broken if kind is census else kind for kind in check_ties.KINDS)
+        with mock.patch.object(check_ties, "KINDS", kinds):
+            result = run_check()
+        self.assertEqual(result.code, check_ties.EXIT_REFUSED, result.out)
+        self.assertIn("cannot compare: git diff --name-only", result.said(FILES["census"]))
+        self.assert_same(result, "bench")
+
+    def test_a_git_dir_git_cannot_read_is_refused(self):
+        copy = self.copy()
+        (copy / ".git" / "HEAD").write_text("garbage\n", encoding="utf-8")
+        result = run_check(copy)
+        self.assertEqual(result.code, check_ties.EXIT_REFUSED, result.out + result.err)
+        self.assertIn("check_ties: cannot judge: copy holds a .git that git does not read",
+                      result.err)
+
+    def test_a_folder_inside_a_checkout_is_refused(self):
+        result = run_check(REPO / "results", "--results", str(REPO / "results"), "--pins",
+                           str(REPO / PINS))
+        self.assertEqual(result.code, check_ties.EXIT_REFUSED, result.out + result.err)
+        self.assertIn("check_ties: cannot judge: results is a folder inside the checkout repo",
+                      result.err)
+
+    def test_a_results_folder_outside_the_checkout_is_refused(self):
+        outside = self.dir / "results"
+        shutil.copytree(REPO / "results", outside)
+        result = run_check(REPO, "--results", str(outside))
+        self.assertEqual(result.code, check_ties.EXIT_REFUSED, result.out + result.err)
+        self.assertIn("is outside the checkout repo, so git cannot say which commit wrote its "
+                      "files", result.err)
+
+    def test_git_that_cannot_be_run_is_a_refusal(self):
+        done = subprocess.run([sys.executable, "-I", str(SCRIPT), "--repo", str(REPO)],
+                              capture_output=True, text=True, check=False,
+                              env={"PATH": str(self.dir)})
+        self.assertEqual(done.returncode, check_ties.EXIT_REFUSED, done.stdout)
+        self.assertIn("check_ties: cannot judge: git cannot be run", done.stderr)
+        self.assertNotIn("Traceback", done.stderr)
+
+    def test_a_symbolic_link_in_a_measured_path_is_refused(self):
+        # Review TD-6: the comparison sees the link, not what it points at.
+        (REPO / "src/shared.hpp").symlink_to("../docs/NOTES.md")
+        git(REPO, "add", "-A")
+        git(REPO, "commit", "-q", "-m", "a link")
+        write_json(REPO, "results/census-10302019.json", {"commit": git(REPO, "rev-parse",
+                                                                         "HEAD")})
+        self.commit_with_proofs("a census at the link")
+        result = run_check()
+        self.assertIn("census-10302019.json: src/shared.hpp: a symbolic link git tracks in what "
+                      "it measures", result.err)
+        self.assertNotIn("ok", result.said("results/census-10302019.json"))
+
+
+class Writer(TieTest):
+    """The last commit that wrote a file, on what git answers: each rule shown on git's
+    answer itself, since a real clone gives these answers only with merges or grafts."""
+
+    def test_a_writer_where_a_shallow_clone_is_cut_is_not_taken(self):
+        writer = git(REPO, "log", "-1", "--format=%H", "--", FILES["roundtrip"])
+        self.assertEqual(check_ties.written_at(REPO, REPO / FILES["roundtrip"]), (writer, None))
+        with mock.patch.object(check_ties, "shallow_cuts", lambda repo: frozenset({writer})):
+            base, why = check_ties.written_at(REPO, REPO / FILES["roundtrip"])
+        self.assertIsNone(base)
+        self.assertIn(f"may be past this shallow clone's history, which is cut at "
+                      f"{writer[:12]}; fetch it whole", why)
+
+    def test_no_writer_for_a_tracked_unchanged_file_is_a_refusal(self):
+        real = check_ties.git
+
+        def no_log(repo, *arguments):
+            done = real(repo, *arguments)
+            if arguments[:1] == ("log",):
+                done.stdout = ""
+            return done
+        with mock.patch.object(check_ties, "git", no_log):
+            with self.assertRaisesRegex(check_ties.Refusal, "names no commit that wrote it"):
+                check_ties.written_at(REPO, REPO / FILES["roundtrip"])
+
+
+class Usage(TieTest):
+    def test_an_empty_or_missing_results_folder_is_a_usage_error(self):
+        (self.dir / "empty").mkdir()
+        for folder in (self.dir / "empty", self.dir / "missing"):
+            with self.subTest(folder=folder.name):
+                result = run_check(REPO, "--results", str(folder))
+                self.assertEqual(result.code, check_ties.EXIT_USAGE, result.out + result.err)
+                self.assertIn("check_ties: no results files in", result.err)
+
+    def test_an_unreadable_pins_file_is_a_usage_error(self):
+        write(self.dir, "pins.json", "{not json")
+        for pins in (self.dir / "pins.json", self.dir / "missing.json"):
+            with self.subTest(pins=pins.name):
+                result = run_check(REPO, "--pins", str(pins))
+                self.assertEqual(result.code, check_ties.EXIT_USAGE, result.out + result.err)
+                self.assertIn("check_ties: cannot read the pins:", result.err)
+
+    def test_an_input_pins_key_missing_fails(self):
+        # Removed since the commit, and missing at the commit and now alike: a run on real data
+        # verifies its input against a pin that is not there.
+        document = json.loads((REPO / PINS).read_text(encoding="utf-8"))
+        del document["slices"]
+        write_json(REPO, PINS, document)
+        git(REPO, "commit", "-q", "-am", "the slices' pins removed")
+        result = run_check()
+        self.assertEqual(result.code, check_ties.EXIT_REFUSED, result.out)
+        self.assert_measured_change(result, "census", f"{PINS} (slices)")
+        write_json(REPO, "results/census-10302019.json", {"commit": git(REPO, "rev-parse",
+                                                                         "HEAD")})
+        self.commit_with_proofs("a census with no slices' pins")
+        said = run_check().said("results/census-10302019.json")
+        self.assertIn(f"what it measures changed since: {PINS} (slices)", said)
+
+
 class Repository(unittest.TestCase):
     def test_every_committed_results_file_has_a_kind_and_names_a_commit(self):
-        for path in sorted((REPO_ROOT / "results").rglob("*.json")):
+        for path in sorted(p for p in (REPO_ROOT / "results").rglob("*") if p.is_file()):
             name = path.relative_to(REPO_ROOT / "results").as_posix()
             with self.subTest(name=name):
                 self.assertIsNotNone(check_ties.kind_of(name))
