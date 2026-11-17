@@ -7098,6 +7098,26 @@ findings; 13 REVIEW rows, P1-1 to P1-28, give each, the other pages being fixed 
   `build/`, outputs in the phase's `essay-prep/proofs-p1` folder; proof owed to the full
   re-proof.
 
+### The outside page review P1, part B: what moved where
+
+2026-11-17. I fixed part B of the outside review of the public pages (docs/REVIEW.md, "The outside
+page review P1, part B"). What moved:
+- The README's four paragraphs on how `render_results.py --check`, `render_writeup.py --check` and
+  `check_ties.py` hold the pages, the essay and the results files, with what each does not check,
+  are in `docs/checks.md`, word for word; the README's Checks section keeps a short summary and a
+  link. No test, fault patch or prover mutation reads those lines. render_results.py's whole-prose
+  rules read the README and not `docs/checks.md`; the moved text holds no results claim.
+- BENCHMARKS.md's status paragraph is two sentences, and its two results tables, "Measured decode
+  results" and "Measured results for the other targets", are links to RESULTS.md's targets table.
+  The notes found in neither RESULTS.md nor WRITEUP.md stay as short sentences: Gorilla and DS-8's
+  kernel are scalar code in every set, and G-3's harness runs on library code identical to
+  `ede0176`'s. Fault `benchmarks-wt4-old-word`'s mutation now puts its stale WT-4 quote beside the
+  new link; it, `benchmarks-move-cause-unsaid` and `benchmarks-replaced-record-widened` were shown
+  by hand failing render-check (exit 2) on a clone, under the phase's `p1-fix/b/proofs` folder,
+  their proof owed to the full re-proof.
+- compare/README.md's ArcticDB per-security figures come from the `ede0176` slice files; the
+  `25a462b` figures they replaced matched neither those nor the deleted `25a462b` files exactly.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
