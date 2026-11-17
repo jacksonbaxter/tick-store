@@ -1,0 +1,12 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -332,7 +332,7 @@
+         if "*" in folder or HEX_RUN.search(folder):
+             raise Refused(f"kind {kind!r}: {pattern!r} names a commit or a glob in a folder")
+     name = parts[-1]
+-    if name.count("*") > 1 or ("*" in name and not name.endswith("-*.json")):
++    if name.count("*") > 1:
+         raise Refused(f"kind {kind!r}: {pattern!r} has a * other than one in place of the "
+                       "commit, between - and .json")
+     for run in COMMIT_IN_NAME.findall(name):

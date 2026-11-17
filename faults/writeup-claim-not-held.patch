@@ -1,0 +1,12 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1637,7 +1637,7 @@
+             waits.append(wait)
+             covered.append(text)
+             continue
+-        if value is not True:
++        if value is None:
+             raise Refused(f"the template says {text!r}, and the results do not bear it out: "
+                           f"its condition is {value!r}; change the sentence")
+         covered.append(text)

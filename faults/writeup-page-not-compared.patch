@@ -1,8 +1,7 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
-index 6d3e0dc..74dd989 100644
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -827,7 +827,7 @@ def main(argv=None):
+@@ -1906,7 +1906,7 @@
              print(f"render_writeup: every token resolves, and there is no {page_name}: render it",
                    file=sys.stderr)
              return EXIT_STALE

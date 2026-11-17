@@ -1,8 +1,7 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
-index 6d3e0dc..a731bed 100644
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -811,7 +811,7 @@ def main(argv=None):
+@@ -1890,7 +1890,7 @@
              print(f"render_writeup: {line}")
          print(f"render_writeup: {page_name} does not exist yet; it is rendered once every token "
                "resolves")

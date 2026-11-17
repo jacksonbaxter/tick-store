@@ -1,0 +1,14 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -912,7 +912,9 @@
+                 control = any(keyword.arg == "control" and
+                               getattr(keyword.value, "value", False) is True
+                               for keyword in call.keywords)
+-                (controls if control else faults).append(call.args[0].value)
++                faults.append(call.args[0].value)
++                if control:
++                    controls.append(call.args[0].value)
+             if not faults:
+                 raise Refused(f"{show(name)}: FAULTS lists no fault")
+             return faults, controls

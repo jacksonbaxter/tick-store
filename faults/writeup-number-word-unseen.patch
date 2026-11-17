@@ -1,0 +1,12 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1647,7 +1647,7 @@
+             continue
+         for sentence in sentences_of(block):
+             masked = masked_sentence(resolver, sentence, covered, headers)
+-            found = JUDGING.search(masked) or NUMBER_WORDS.search(masked)
++            found = JUDGING.search(masked)
+             if found:
+                 raise Refused(f"the template ranks, compares, judges or counts with "
+                               f"{found.group(0)!r} in {sentence[:120]!r}, and no claim of the "

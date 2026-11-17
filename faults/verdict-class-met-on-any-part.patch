@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1167,7 +1167,7 @@
+         return "not judged"
+     verdict_of(parts)
+     verdicts = [part[2] for part in parts]
+-    if all(met is True for met in verdicts):
++    if any(met is True for met in verdicts):
+         return "met"
+     if all(met is False for met in verdicts):
+         return "missed"

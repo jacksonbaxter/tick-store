@@ -1,0 +1,12 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -178,7 +178,7 @@
+         at = stray.find("{{") if "{{" in stray else stray.find("}}")
+         raise Refused(f"the template holds {stray[at:at + 30]!r}, which is no token: a token is "
+                       "{{name}}, a name of letters, digits, _, - and :")
+-    glued = re.search(r"\}\}\{\{|\}\}[0-9]|[0-9]\{\{", body)
++    glued = None
+     if glued:
+         raise Refused(f"the template puts a token against another or a digit, "
+                       f"{body[max(glued.start() - 20, 0):glued.end() + 20]!r}, which prints as "

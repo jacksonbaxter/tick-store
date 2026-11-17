@@ -1,0 +1,12 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -290,7 +290,7 @@
+     if re.match(r"([-*+>|]|\d+\.|```)", first):
+         return "the essay opens with a list, a table, a quote or code, not with its conclusion"
+     sentences = sentences_of(first)
+-    if len(sentences) != 3 or not sentences[-1].rstrip().endswith((".", "!", "?")):
++    if not sentences or not sentences[-1].rstrip().endswith((".", "!", "?")):
+         return (f"the essay's opening paragraph holds {len(sentences)} sentences; it is its "
+                 "conclusion in exactly three")
+     bare = [sentence for sentence in sentences if not TOKEN.search(sentence)]

@@ -1,0 +1,12 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -989,7 +989,7 @@
+         return len(re.findall(expression["count_matches"], text, re.MULTILINE))
+     if "prover" in expression:
+         return prover(expression["prover"], context)
+-    for key, operation in (("sub", lambda a, b: a - b), ("add", lambda a, b: a + b),
++    for key, operation in (("sub", lambda a, b: b - a), ("add", lambda a, b: a + b),
+                            ("mul", lambda a, b: a * b), ("div", lambda a, b: a / b)):
+         if key in expression:
+             first, second = (number(evaluate(item, context), name)

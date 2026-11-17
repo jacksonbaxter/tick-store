@@ -1,0 +1,12 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -756,7 +756,7 @@
+     if isinstance(expression, bool):
+         raise Refused(f"{show(name)}: the literal {expression!r} is no expression")
+     if isinstance(expression, (int, float)):
+-        if expression not in factors:
++        if False:
+             raise Refused(f"{show(name)}: the literal {expression!r} is no declared factor; a "
+                           "figure comes from a file, and a factor is listed with its reason")
+         return False

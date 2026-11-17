@@ -1962,6 +1962,94 @@ FAULTS = (
     Fault("writeup-constant-found-twice-accepted", "py-scripts", "render_writeup.py reads a code "
           "constant from the first of two lines its pattern matches", CHECK_FAILED,
           "FAIL: test_a_constant_found_twice (__main__.Refuses"),
+    # Review WD-1.
+    Fault("writeup-commits-mixed-accepted", "py-scripts", "render_writeup.py reads results files "
+          "that name two measured commits", CHECK_FAILED,
+          "FAIL: test_a_file_at_another_commit_is_refused (__main__.Commits"),
+    Fault("writeup-differs-only-unchecked", "py-scripts", "render_writeup.py takes a commit "
+          "exception's claim to differ only in some paths without asking git", CHECK_FAILED,
+          "FAIL: test_a_claim_of_differing_only_in_some_paths_that_git_contradicts "
+          "(__main__.Commits"),
+    # Review WD-2 and WD-3.
+    Fault("writeup-judging-word-unclaimed", "py-scripts", "render_writeup.py lets a sentence "
+          "judge the results in words no claim or token carries", CHECK_FAILED,
+          "FAIL: test_a_judging_word_with_no_claim (__main__.Claims"),
+    Fault("writeup-number-word-unseen", "py-scripts", "render_writeup.py lets a number written "
+          "in words through", CHECK_FAILED, "FAIL: test_a_number_in_words (__main__.Refuses"),
+    Fault("writeup-claim-not-held", "py-scripts", "render_writeup.py keeps a claim whose "
+          "condition the results answer false", CHECK_FAILED,
+          "FAIL: test_a_claim_the_results_do_not_bear_out (__main__.Claims"),
+    # Review WD-6.
+    Fault("writeup-census-missing-row", "py-scripts", "render_writeup.py lets the Missed targets "
+          "section leave out a missed row", CHECK_FAILED,
+          "FAIL: test_a_missed_target_left_out (__main__.Census"),
+    Fault("writeup-census-met-row-kept", "py-scripts", "render_writeup.py lets the Missed "
+          "targets section keep a met row", CHECK_FAILED,
+          "FAIL: test_a_met_target_kept_in (__main__.Census"),
+    Fault("writeup-changed-outcome-unshown", "py-scripts", "render_writeup.py quotes a verdict "
+          "the replaced run judged otherwise with no token showing both outcomes", CHECK_FAILED,
+          "FAIL: test_a_changed_outcome_with_no_token (__main__.Changed"),
+    # Review WD-4.
+    Fault("writeup-literal-value-accepted", "py-scripts", "render_writeup.py takes a number "
+          "written into the figure list that is no declared factor", CHECK_FAILED,
+          "FAIL: test_a_literal_value (__main__.Literals"),
+    # Review WD-5.
+    Fault("writeup-host-word-unchecked", "py-scripts", "render_writeup.py lets an entry read on "
+          "one host be described as the other host's", CHECK_FAILED,
+          "FAIL: test_a_figure_described_as_the_other_host_s (__main__.Hosts"),
+    # Review WD-7.
+    Fault("writeup-bar-rounded", "py-scripts", "render_writeup.py shows a bar with fewer digits "
+          "than it has", CHECK_FAILED,
+          "FAIL: test_a_bar_shown_with_fewer_digits_than_it_has (__main__.Gaps"),
+    Fault("writeup-figure-across-its-bar", "py-scripts", "render_writeup.py prints a figure "
+          "rounded to the other side of its bar from its verdict", CHECK_FAILED,
+          "FAIL: test_a_figure_that_rounds_to_the_other_side_of_its_bar (__main__.Gaps"),
+    Fault("writeup-gap-shown-as-none", "py-scripts", "render_writeup.py prints a gap as a ratio "
+          "of 1 or a difference of 0", CHECK_FAILED,
+          "FAIL: test_a_gap_printed_as_none (__main__.Gaps"),
+    # Review WD-8.
+    Fault("writeup-prover-counts-control", "py-scripts", "render_writeup.py counts the prover's "
+          "control among its faults", CHECK_FAILED, "FAIL: test_the_counts (__main__.Prover"),
+    # Review WD-9.
+    Fault("writeup-pattern-glob-accepted", "py-scripts", "render_writeup.py takes a file pattern "
+          "with a commit prefix beside its *", CHECK_FAILED,
+          "FAIL: test_a_kind_named_by_a_commit_prefix_or_folder_or_leaving_results "
+          "(__main__.Refuses"),
+    # Review WD-10.
+    Fault("writeup-list-names-the-page", "py-scripts", "render_writeup.py lets the figure list "
+          "name its own page, template or targets", CHECK_FAILED,
+          "FAIL: test_the_list_naming_its_page_template_or_targets (__main__.Refuses"),
+    # Review WD-12.
+    Fault("verdict-class-met-on-any-part", "py-scripts", "render_results.py's verdict_class "
+          "calls a row met when any part is met", CHECK_FAILED,
+          "FAIL: test_verdict_class (__main__.Verdicts"),
+    # Review WD-11.
+    Fault("writeup-sub-operands-swapped", "py-scripts", "render_writeup.py's sub form subtracts "
+          "its operands the wrong way round", CHECK_FAILED,
+          "FAIL: test_each_form (__main__.Forms"),
+    # Review WD-13.
+    Fault("writeup-constant-from-a-comment", "py-scripts", "render_writeup.py reads a code "
+          "constant from a comment", CHECK_FAILED,
+          "FAIL: test_a_constant_read_from_a_comment (__main__.Refuses"),
+    # Review WD-14.
+    Fault("writeup-non-result-anywhere", "py-scripts", "render_writeup.py lets a non-result's "
+          "text stand outside the places it is declared for", CHECK_FAILED,
+          "FAIL: test_a_non_result_used_outside_its_place (__main__.Refuses"),
+    # Review WD-15.
+    Fault("writeup-pin-unsaid", "py-scripts", "render_writeup.py lets a paragraph show a pinned "
+          "kind's figures without saying so", CHECK_FAILED,
+          "FAIL: test_a_declared_pin_said_in_each_paragraph (__main__.Pins"),
+    Fault("writeup-pinned-file-undeclared", "py-scripts", "render_writeup.py reads a pinned file "
+          "through a kind that does not declare the pin", CHECK_FAILED,
+          "FAIL: test_a_pinned_file_read_by_a_kind_that_does_not_declare_it (__main__.Pins"),
+    # Review WD-16.
+    Fault("writeup-opening-any-length", "py-scripts", "render_writeup.py takes an opening of "
+          "other than three sentences", CHECK_FAILED,
+          "FAIL: test_an_opening_that_is_not_three_sentences_each_with_a_token (__main__.Refuses"),
+    # Review WD-17.
+    Fault("writeup-tokens-glued-accepted", "py-scripts", "render_writeup.py takes tokens side by "
+          "side or against a digit", CHECK_FAILED,
+          "FAIL: test_tokens_side_by_side_or_against_a_digit (__main__.Refuses"),
     # The step itself on the committed page. Its baseline passes only once WRITEUP.md is
     # rendered, when every results file it reads is committed (docs/TASKS.md).
     Fault("writeup-template-not-rendered", "writeup-check", "the essay's template reworded "

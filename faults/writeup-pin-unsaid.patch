@@ -1,0 +1,12 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1366,7 +1366,7 @@
+         for kind in sorted(kinds):
+             spec = resolver.kinds.get(kind, {})
+             for key, token in (("pin", f"pin:{kind}"), ("note", f"note:{kind}")):
+-                if spec.get(key) and token not in names:
++                if False:
+                     raise Refused(f"a block shows figures of the kind {kind!r}, and does not hold "
+                                   f"{show(token)}: {block[:80]!r}")
+         if block.lstrip().startswith("|"):
