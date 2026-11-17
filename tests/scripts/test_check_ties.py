@@ -15,6 +15,7 @@ refusal's own and not the proofs file's, which any uncommitted results file unti
 """
 
 import contextlib
+import dataclasses
 import hashlib
 import io
 import json
@@ -98,11 +99,14 @@ ASSEMBLED = {
              "scripts/check_fuzz.py"},
 }
 # The exact paths under results/ each validator's pin may name, written out here, apart from the
-# script's PIN_NAMES.
+# script's PIN_NAMES. G-3's file from before the tie, the last file a validator's pin let
+# through, was replaced at 8616263, and its key went with it.
 PIN_NAMES = {
     "protocol_1_comparison_files": (),
-    "fuzz_g3_file_before_the_tie": ("fuzz-g3-ea1dde4c02e4.json",),
 }
+# So no kind declares a validator's pin, and the pin rules are shown on a stand-in: the fuzz
+# kind declaring this key, and PIN_NAMES letting it pin the fixture's G-3 file alone.
+STAND_IN_PIN = "a_validators_pin"
 
 
 def results_of(commit):
@@ -128,7 +132,7 @@ def results_of(commit):
             {"commit": commit[:12], "day": "10302019"}]}),
         "coverage": ("coverage.json", {"commit": commit[:12]}),
         "diag": ("diag/writer-profile-12302019-x.json", {"commit": commit}),
-        "fuzz": ("fuzz-g3-ea1dde4c02e4.json", {"header": {"commit": commit},
+        "fuzz": ("fuzz-g3-8616263b7561.json", {"header": {"commit": commit},
                                               "runs": [{"commit": commit}]}),
         "disturbances": ("disturbances-ede0176b10bb.json", {"commit": commit[:12]}),
     }
@@ -428,16 +432,32 @@ class ChangeElsewhere(TieTest):
         self.assert_same(result, "store-size")
 
     def test_the_exemption_pins_change_no_input(self):
-        self.change_pins("fuzz_g3_file_before_the_tie", {"fuzz-g3-ea1dde4c02e4.json": "00"})
+        self.change_pins("replaced_comparison_files", {"Linux-12302019-full-0.json": "00"})
         result = run_check()
         for kind in MEASURED:
             self.assert_same(result, kind)
 
 
+def stand_in_pin(test):
+    """For the rest of the test, the fuzz kind declares STAND_IN_PIN, and PIN_NAMES lets it pin
+    the fixture's G-3 file alone."""
+    kinds = tuple(dataclasses.replace(kind, pin=STAND_IN_PIN) if kind.name == "fuzz" else kind
+                  for kind in check_ties.KINDS)
+    for patcher in (mock.patch.object(check_ties, "KINDS", kinds),
+                    mock.patch.dict(check_ties.PIN_NAMES,
+                                    {STAND_IN_PIN: (Path(FILES["fuzz"]).name,)})):
+        patcher.start()
+        test.addCleanup(patcher.stop)
+
+
 class Pinned(TieTest):
+    def setUp(self):
+        super().setUp()
+        stand_in_pin(self)
+
     def pins_for(self, *kinds, names=None):
         pins = {}
-        keys = {"compare": "protocol_1_comparison_files", "fuzz": "fuzz_g3_file_before_the_tie"}
+        keys = {"compare": "protocol_1_comparison_files", "fuzz": STAND_IN_PIN}
         for kind in kinds:
             path = REPO / FILES[kind]
             name = (names or {}).get(kind, path.name)
@@ -451,7 +471,7 @@ class Pinned(TieTest):
         pins = self.pins_for("fuzz")
         self.change(FILE_OF["src"])
         result = run_check(REPO, "--pins", str(pins))
-        for kind, key in (("fuzz", "fuzz_g3_file_before_the_tie"),):
+        for kind, key in (("fuzz", STAND_IN_PIN),):
             with self.subTest(kind=kind):
                 said = result.said(FILES[kind])
                 self.assertIn(f"pinned under {key} in the pins file: measured at", said)
@@ -487,14 +507,14 @@ class Pinned(TieTest):
         self.commit_with_proofs("another fuzz file")
         pins = self.pins_for("fuzz")
         document = json.loads(pins.read_text(encoding="utf-8"))
-        document["fuzz_g3_file_before_the_tie"][other.name] = hashlib.sha256(
+        document[STAND_IN_PIN][other.name] = hashlib.sha256(
             other.read_bytes()).hexdigest()
         write_json(self.dir, "pins.json", document)
         result = run_check(REPO, "--pins", str(pins))
         self.assertEqual(result.code, check_ties.EXIT_REFUSED, result.out)
-        self.assertIn("check_ties: fuzz_g3_file_before_the_tie in the pins file pins "
+        self.assertIn(f"check_ties: {STAND_IN_PIN} in the pins file pins "
                       "fuzz-g3-0000aaaa0000.json, and check_ties.py lets only "
-                      "fuzz-g3-ea1dde4c02e4.json", result.err)
+                      "fuzz-g3-8616263b7561.json", result.err)
         self.assertNotIn("pinned", result.said("results/" + other.name))
         self.assertIn("pinned under", result.said(FILES["fuzz"]))
 
@@ -520,7 +540,8 @@ class Pinned(TieTest):
         self.assertNotIn("pinned under", result.said("results/old/" + copy.name))
 
     def test_the_names_that_may_be_pinned_are_fixed(self):
-        self.assertEqual(check_ties.PIN_NAMES, PIN_NAMES)
+        self.assertEqual({key: names for key, names in check_ties.PIN_NAMES.items()
+                          if key != STAND_IN_PIN}, PIN_NAMES)
         self.assertEqual(check_ties.REPLACED_KEPT, (
             ("compare/replaced/Linux-12302019-full-67ae574f5666.json",
              "e8d447073c29d83c2341357df8ca01fa9afaa50d4f235590d5506e0d10a41a25"),))
@@ -590,9 +611,21 @@ class Pinned(TieTest):
         self.assertNotIn("pinned", result.said(FILES["roundtrip"]))
         self.assert_measured_change(result, "roundtrip", FILE_OF["src"])
 
-    def test_a_pin_holds_only_for_its_own_kind(self):
+    def test_a_g3_file_is_never_pinned_under_the_key_from_before_the_tie(self):
+        # G-3's file from before the tie was replaced at 8616263, and its key went with it: a
+        # line under it for the G-3 file's own name and bytes pins nothing.
         pins = self.dir / "pins.json"
         write_json(self.dir, "pins.json", {"fuzz_g3_file_before_the_tie": {
+            Path(FILES["fuzz"]).name: hashlib.sha256(
+                (REPO / FILES["fuzz"]).read_bytes()).hexdigest()}})
+        self.change(FILE_OF["src"])
+        result = run_check(REPO, "--pins", str(pins))
+        self.assertNotIn("pinned", result.said(FILES["fuzz"]))
+        self.assert_measured_change(result, "fuzz", FILE_OF["src"])
+
+    def test_a_pin_holds_only_for_its_own_kind(self):
+        pins = self.dir / "pins.json"
+        write_json(self.dir, "pins.json", {STAND_IN_PIN: {
             "store-size-12302019.json": hashlib.sha256(
                 (REPO / FILES["store-size"]).read_bytes()).hexdigest()}})
         self.change(FILE_OF["src"])
@@ -758,13 +791,14 @@ class NoHistory(TieTest):
         self.assertIn("13 unjudged", result.out)
 
     def test_a_pinned_file_is_still_reported_pinned(self):
+        stand_in_pin(self)
         tree = self.exported()
         pins = tree / "exemptions.json"
-        write_json(tree, "exemptions.json", {"fuzz_g3_file_before_the_tie": {
-            "fuzz-g3-ea1dde4c02e4.json": hashlib.sha256(
+        write_json(tree, "exemptions.json", {STAND_IN_PIN: {
+            Path(FILES["fuzz"]).name: hashlib.sha256(
                 (tree / FILES["fuzz"]).read_bytes()).hexdigest()}})
         result = run_check(tree, "--pins", str(pins))
-        self.assertIn("pinned under fuzz_g3_file_before_the_tie", result.said(FILES["fuzz"]))
+        self.assertIn(f"pinned under {STAND_IN_PIN}", result.said(FILES["fuzz"]))
 
     def test_a_file_with_no_commit_fails_there_too(self):
         tree = self.exported()

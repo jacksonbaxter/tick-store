@@ -1,12 +1,12 @@
 diff --git a/scripts/check_fuzz.py b/scripts/check_fuzz.py
 --- a/scripts/check_fuzz.py
 +++ b/scripts/check_fuzz.py
-@@ -452,7 +452,7 @@
-     """(problems, unjudged, note) for a file whose content is valid."""
-     problems, exempt = pinned_before_the_tie(path, pins)
-     schema = json.loads(path.read_text(encoding="utf-8"))["header"]["schema"]
--    if schema == PRE_TIE_SCHEMA and not exempt:
-+    if False:
-         problems.append(f"header.schema: {PRE_TIE_SCHEMA} records no replay or merge, and only "
-                         f"{PRE_TIE_FILE}, by its pin, may keep it; a file made now is {SCHEMA}")
-     reason = history_problem(repo, commit)
+@@ -133,7 +133,7 @@
+     for field in HEADER_FIELDS:
+         if field not in header:
+             problems.append(f"header: missing field '{field}'")
+-    if header.get("schema") != SCHEMA:
++    if header.get("schema") not in (SCHEMA, "tick-store-fuzz-1"):
+         problems.append(f"header.schema: expected {SCHEMA}")
+     if header.get("gate") != "G-3":
+         problems.append("header.gate: this file judges G-3")

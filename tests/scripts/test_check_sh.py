@@ -10,7 +10,6 @@ skip is never counted as a pass.
 """
 
 import fnmatch
-import json
 import os
 import re
 import shutil
@@ -22,7 +21,6 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
-import check_fuzz  # noqa: E402
 import check_hygiene  # noqa: E402
 
 SCRIPT = REPO_ROOT / "scripts" / "check.sh"
@@ -139,50 +137,15 @@ class CheckScript(unittest.TestCase):
         (tree / "COMMIT").write_text("0" * 40 + "\n")
         return tree
 
-    def untie(self, tree):
-        """The committed G-3 file with its pin taken out, so the tie applies to it, and as the
-        launcher records a run, so nothing else refuses it. The pinned file's G-3 row says it is
-        not judged on this code (review RG-6), and an untied one's does not, so the tree's
-        generated blocks are rendered again for it."""
-        pins_path = tree / "scripts" / "data_pins.json"
-        pins = json.loads(pins_path.read_text())
-        del pins[check_fuzz.PRE_TIE_PINS]
-        pins_path.write_text(json.dumps(pins, indent=2) + "\n")
-        path = tree / "results" / check_fuzz.PRE_TIE_FILE
-        document = json.loads(path.read_text())
-        document["header"]["schema"] = check_fuzz.SCHEMA
-        for run in document["runs"]:
-            budget = f"-max_total_time={check_fuzz.REQUIRED_SECONDS}"
-            # The launcher's folders: the replay on the corpus and seeds, the merge of them
-            # into the target's own folder, and the timed run on that folder alone.
-            inputs = " ".join(check_fuzz.folders_of(run["command"]))
-            merged = f"build/fuzz/g3/{run['target']}"
-            replay_command = run["command"].replace(budget, "-runs=0")
-            merge_command = run["command"].replace(budget, "-merge=1").replace(
-                inputs, f"{merged} {inputs}")
-            run["command"] = run["command"].replace(inputs, merged)
-            run["replay"] = {"command": replay_command, "inputs": 1,
-                             "runs": 1, "seconds": 1.0, "exit_code": 0, "clean": True,
-                             "findings": [], "done_line": "Done 1 runs in 1 second(s)"}
-            run["merge"] = {"command": merge_command,
-                            "inputs_kept": 1, "attempts": 1, "seconds": 1.0, "exit_code": 0,
-                            "clean": True, "findings": []}
-            run["timed"] = {"seconds_before_first_new_input": 0.0,
-                            "seconds_after_first_new_input": float(run["wall_seconds"])}
-        path.write_text(json.dumps(document, indent=1) + "\n")
-        subprocess.run([sys.executable, "-I", str(tree / "scripts" / "render_results.py")],
-                       capture_output=True, text=True, cwd=tree, env=self.env)
-
     def test_a_g3_file_with_no_history_to_tie_it_skips_and_fails_under_no_skips(self):
         tree = self.exported_copy()
-        self.untie(tree)
         script = str(tree / "scripts" / "check.sh")
         done = subprocess.run([script, "--log-dir", str(self.logs), "--only", "render-check"],
                               capture_output=True, text=True, env=self.env)
         self.assertEqual(done.returncode, 0, done.stdout)
         self.assertEqual(self.summary(), {"render-check": "SKIP"})
         self.assertIn("could not be tied to the code it judged: no git history", done.stdout)
-        self.assertIn("could not judge whether the fuzzed code changed after ea1dde4c02e4",
+        self.assertIn("could not judge whether the fuzzed code changed after 8616263b7561",
                       (self.logs / "render-check.log").read_text())
         done = subprocess.run([script, "--no-skips", "--log-dir", str(self.logs), "--only",
                                "render-check"], capture_output=True, text=True, env=self.env)
@@ -192,7 +155,7 @@ class CheckScript(unittest.TestCase):
     def test_render_check_names_how_the_g3_file_is_tied(self):
         done = self.run_script("--only", "render-check")
         self.assertEqual(done.returncode, 0, done.stdout)
-        self.assertIn("made before the tie and pinned, so not tied", done.stdout)
+        self.assertIn("tied: nothing fuzzed changed since 8616263b7561", done.stdout)
 
     def test_results_files_with_no_history_to_tie_them_skip_and_fail_under_no_skips(self):
         # An exported tree has no history to compare the results files' commits with: the

@@ -1,12 +1,12 @@
 diff --git a/scripts/check_ties.py b/scripts/check_ties.py
 --- a/scripts/check_ties.py
 +++ b/scripts/check_ties.py
-@@ -139,7 +139,7 @@ NOT_RESULTS = ()
+@@ -163,7 +163,7 @@
  # such file, so that key may pin none: any line there is refused. The protocol 1 Linux day kept
  # for the record is held by REPLACED_KEPT below, at its exact path and SHA-256.
  PIN_NAMES = {
 -    check_compare.PROTOCOL_1_FILES: (),
 +    check_compare.PROTOCOL_1_FILES: ("compare/Linux-12302019-full-67ae574f5666.json",),
-     check_fuzz.PRE_TIE_PINS: (check_fuzz.PRE_TIE_FILE,),
  }
  # A comparison file replaced by a later measurement and kept, unchanged, for the record: its
+ # exact path under results/, which must be in REPLACED_FOLDER, and the SHA-256 of its bytes,

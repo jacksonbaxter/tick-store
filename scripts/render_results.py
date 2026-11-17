@@ -94,9 +94,6 @@ import unicodedata
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT / "scripts"))
-
-import check_fuzz  # noqa: E402
 
 CHECK_RESULTS = REPO_ROOT / "scripts" / "check_results.py"
 CHECK_COMPARE = REPO_ROOT / "scripts" / "check_compare.py"
@@ -1354,9 +1351,6 @@ def judged_parts(row, root):
             met = unjudged[0]
         else:
             met = True
-        untied = made_before_the_tie(path, root)
-        if untied is not None and met is not None:
-            met = Unjudged(untied)
         parts.append((spec["label"], ", ".join(text for text, _ in judged), met, path,
                       documents[path]))
     return finished(row, root, row["parts"], parts), None
@@ -1804,22 +1798,6 @@ def disturbed(entries, root, path, reads):
                 found.append((entry, read))
                 break
     return found
-
-
-def made_before_the_tie(path, root):
-    """Why a part read from G-3's file is not judged at this code, or None: the one file made
-    before G-3 was tied to the code, which check_fuzz.py lets through by its pin, judged an
-    older commit, with each timed run holding its replay (review RG-6)."""
-    pins_path = root / "scripts" / "data_pins.json"
-    if not path.name.startswith("fuzz-g3-") or not pins_path.exists():
-        return None
-    _, exempt = check_fuzz.pinned_before_the_tie(path, json.loads(pins_path.read_text(
-        encoding="utf-8")))
-    if not exempt:
-        return None
-    commit = json.loads(path.read_text(encoding="utf-8"))["header"]["commit"]
-    return (f"this code: `{path.name}` was made at `{commit[:12]}`, before G-3 was tied to the "
-            "code it judged, and each timed run held its corpus replay")
 
 
 def measured_of(parts):
@@ -3588,8 +3566,7 @@ def main(argv=None):
     fuzz_paths = sorted((args.targets_root / "results").glob("fuzz-g3-*.json"))
     fuzz_code = validate(fuzz_paths, None, CHECK_FUZZ,
                          ("--cmake", str(args.targets_root / "fuzz" / "CMakeLists.txt"),
-                          "--repo", str(args.targets_root),
-                          "--pins", str(args.targets_root / "scripts" / "data_pins.json")),
+                          "--repo", str(args.targets_root)),
                          echo=True)
     if fuzz_code not in (0, EXIT_UNJUDGED):
         print("render_results: a fuzzing results file failed validation", file=sys.stderr)

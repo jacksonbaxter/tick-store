@@ -12,7 +12,6 @@ there, so the tie to the code is judged against its history.
 """
 
 import copy
-import hashlib
 import json
 import os
 import shutil
@@ -44,7 +43,6 @@ TIED = ("src/codec/pfor.cpp", "include/tick_store/codec/pfor.hpp", "fuzz/fuzz_pf
         "scripts/fuzz_g3.py")
 NOT_TIED = ("fuzz/README.md", "scripts/check.sh", "docs/NOTES.md", "tests/scripts/test_x.py")
 REPO = SCRATCH_ROOT / "repo"
-PINS = {"fuzz_g3_file_before_the_tie": {}}
 
 
 def git(repo, *arguments):
@@ -170,13 +168,11 @@ class Scratch(unittest.TestCase):
 
 
 class Checking(Scratch):
-    def run_check(self, document, name=NAME, repo=REPO, pins=None):
+    def run_check(self, document, name=NAME, repo=REPO):
         path = self.dir / name
         path.write_text(json.dumps(document, indent=1), encoding="utf-8")
-        pins_path = self.dir / "pins.json"
-        pins_path.write_text(json.dumps(PINS if pins is None else pins), encoding="utf-8")
         return subprocess.run([sys.executable, "-I", str(SCRIPT), "--cmake", str(self.cmake),
-                               "--repo", str(repo), "--pins", str(pins_path), str(path)],
+                               "--repo", str(repo), str(path)],
                               capture_output=True, text=True, check=False)
 
 
@@ -515,36 +511,6 @@ class TieTest(Checking):
         self.assertEqual(result.returncode, check_fuzz.EXIT_UNJUDGED, result.stdout)
         self.assertIn(f"{COMMIT[:12]} is not in this checkout's history", result.stderr)
 
-    def pre_tie_document(self):
-        """A valid file named as the one made before the tie, at a commit this repository
-        does not hold, so only the pin can let it through."""
-        document = valid_document()
-        commit = check_fuzz.PRE_TIE_FILE[len("fuzz-g3-"):-len(".json")] + "0" * 28
-        document["header"]["commit"] = commit
-        for run in document["runs"]:
-            run["commit"] = commit
-        return document
-
-    def pin_of(self, document):
-        digest = hashlib.sha256(json.dumps(document, indent=1).encode()).hexdigest()
-        return {check_fuzz.PRE_TIE_PINS: {check_fuzz.PRE_TIE_FILE: digest}}
-
-    def test_the_file_made_before_the_tie_passes_by_its_pin(self):
-        document = self.pre_tie_document()
-        result = self.run_check(document, check_fuzz.PRE_TIE_FILE, pins=self.pin_of(document))
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("made before the tie and pinned, so not tied", result.stdout)
-
-    def test_the_pin_lets_through_no_other_content(self):
-        document = self.pre_tie_document()
-        pins = self.pin_of(document)
-        find(document, "fuzz_columns", "macOS")["cpu"] = "cpu 3"
-        result = self.run_check(document, check_fuzz.PRE_TIE_FILE, pins=pins)
-        # Its commit is in no history of this full clone, so it is refused (review RG-11).
-        self.assertEqual(result.returncode, check_fuzz.EXIT_INVALID, result.stdout)
-        self.assertIn("is in no commit of this checkout's full history", result.stderr)
-        self.assertNotIn("pinned", result.stdout)
-
     def test_a_commit_in_no_history_of_a_full_clone_is_refused(self):
         # Review RG-11: in a clone that is not shallow, a commit git cannot find was made up or
         # rebased away, and the file is refused, not left unjudged.
@@ -558,41 +524,17 @@ class TieTest(Checking):
         self.assertIn(f"{commit[:12]} is in no commit of this checkout's full history",
                       result.stderr)
 
-    def test_no_other_file_may_be_pinned(self):
-        self.change("src/codec/pfor.cpp")
-        document = valid_document()
-        pins = {check_fuzz.PRE_TIE_PINS: {NAME: hashlib.sha256(
-            json.dumps(document, indent=1).encode()).hexdigest()}}
-        result = self.run_check(document, pins=pins)
-        self.assertEqual(result.returncode, check_fuzz.EXIT_INVALID, result.stdout)
-        self.assertIn(f"{NAME} is pinned, and only {check_fuzz.PRE_TIE_FILE} may be",
-                      result.stderr)
-        self.assertIn("the fuzzed code changed after", result.stderr)
-
-    def test_only_the_pinned_file_may_keep_the_schema_from_before_the_launcher(self):
-        document = self.pre_tie_document()
-        document["header"]["schema"] = check_fuzz.PRE_TIE_SCHEMA
-        for run in document["runs"]:
-            for part in ("replay", "merge", "timed"):
-                del run[part]
-        result = self.run_check(document, check_fuzz.PRE_TIE_FILE, pins=self.pin_of(document))
-        self.assertEqual(result.returncode, 0, result.stderr)
-        document = valid_document()
-        document["header"]["schema"] = check_fuzz.PRE_TIE_SCHEMA
-        result = self.run_check(document)
-        self.assertEqual(result.returncode, check_fuzz.EXIT_INVALID, result.stdout)
-        self.assertIn(f"header.schema: {check_fuzz.PRE_TIE_SCHEMA} records no replay or merge",
-                      result.stderr)
-
-    def test_the_committed_file_is_the_one_pinned(self):
-        pins = json.loads(check_fuzz.DEFAULT_PINS.read_text(encoding="utf-8"))
-        path = REPO_ROOT / "results" / check_fuzz.PRE_TIE_FILE
-        self.assertEqual(pins[check_fuzz.PRE_TIE_PINS],
-                         {path.name: hashlib.sha256(path.read_bytes()).hexdigest()})
-        result = subprocess.run([sys.executable, "-I", str(SCRIPT), str(path)],
-                                capture_output=True, text=True, check=False)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("made before the tie and pinned", result.stdout)
+    def test_the_schema_from_before_the_launcher_is_refused_in_any_file(self):
+        # tick-store-fuzz-1's runs replayed their folders inside the timed part and record no
+        # replay or merge. The one file that kept it, by a pin, was replaced at 8616263, so no
+        # file may: not a new one, and not one under the old file's name.
+        for name in (NAME, "fuzz-g3-ea1dde4c02e4.json"):
+            with self.subTest(name=name):
+                document = valid_document()
+                document["header"]["schema"] = "tick-store-fuzz-1"
+                result = self.run_check(document, name)
+                self.assertEqual(result.returncode, check_fuzz.EXIT_INVALID, result.stdout)
+                self.assertIn(f"header.schema: expected {check_fuzz.SCHEMA}", result.stderr)
 
 
 LOG_CLEAN = """INFO: Seed: 1

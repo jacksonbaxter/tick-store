@@ -1398,13 +1398,6 @@ FAULTS = (
           "commit is older than a change to the fuzzed code, so a file from before a codec "
           "change could still stand for G-3", CHECK_FAILED,
           "FAIL: test_a_file_older_than_a_fuzzed_code_change_is_refused (__main__.TieTest"),
-    Fault("fuzz-g3-pin-any-content", "py-scripts", "check_fuzz.py lets any file named as the "
-          "ea1dde4 one through the tie, whatever its bytes, where only the pinned SHA-256 may "
-          "pass", CHECK_FAILED,
-          "FAIL: test_the_pin_lets_through_no_other_content (__main__.TieTest"),
-    Fault("fuzz-g3-pin-other-file", "py-scripts", "check_fuzz.py takes a pin for any file, so a "
-          "new G-3 file could be pinned past the tie", CHECK_FAILED,
-          "FAIL: test_no_other_file_may_be_pinned (__main__.TieTest"),
     Fault("fuzz-g3-unjudged-passes", "py-scripts", "check_fuzz.py passes a file it could not "
           "tie to the code for want of git history, as in an exported tree or a shallow clone",
           CHECK_FAILED, "FAIL: test_no_history_is_not_judged (__main__.TieTest"),
@@ -1424,9 +1417,9 @@ FAULTS = (
           "of the timed part before and after its first new input", CHECK_FAILED,
           "FAIL: test_a_timed_part_under_1800_seconds_is_refused (__main__.CheckFuzzTest"),
     Fault("fuzz-g3-old-schema-accepted", "py-scripts", "check_fuzz.py takes the schema from "
-          "before the launcher in any file, not only in the pinned ea1dde4 one, so a new file "
-          "could record no replay", CHECK_FAILED,
-          "FAIL: test_only_the_pinned_file_may_keep_the_schema_from_before_the_launcher "
+          "before the launcher again, which records no replay or merge, so a new file could "
+          "record none", CHECK_FAILED,
+          "FAIL: test_the_schema_from_before_the_launcher_is_refused_in_any_file "
           "(__main__.TieTest"),
     # Review RG-1: a run stopped by its replay or merge carries that part's command.
     Fault("fuzz-g3-failed-part-caps-unchecked", "py-scripts", "check_fuzz.py holds a run "
@@ -1968,11 +1961,6 @@ FAULTS = (
     Fault("headline-left-out-miscounted", "render-check", "render_results.py counts the other "
           "targets missed in part as met in the line under the table", EXIT_RENDER_REFUSED,
           "the line under the table counts the other rows as"),
-    # Review RG-6: G-3's file from before the tie is not judged at this code.
-    Fault("render-g3-before-the-tie-judged", "py-scripts", "render_results.py judges G-3 met on "
-          "the file made before G-3 was tied to the code, which judged an older commit",
-          CHECK_FAILED, "FAIL: test_the_file_from_before_the_tie_is_not_judged_at_this_code "
-          "(__main__.RenderPreTieTest"),
     # D-10: a per-locate figure says it leaves out the permutation to file order.
     Fault("render-permutation-caveat-dropped", "py-scripts", "render_results.py shows a "
           "per-locate column's bits against a compression target with no word that they leave "

@@ -164,7 +164,6 @@ NOT_RESULTS = ()
 # for the record is held by REPLACED_KEPT below, at its exact path and SHA-256.
 PIN_NAMES = {
     check_compare.PROTOCOL_1_FILES: (),
-    check_fuzz.PRE_TIE_PINS: (check_fuzz.PRE_TIE_FILE,),
 }
 # A comparison file replaced by a later measurement and kept, unchanged, for the record: its
 # exact path under results/, which must be in REPLACED_FOLDER, and the SHA-256 of its bytes,
@@ -372,8 +371,7 @@ KINDS = (
          left_out=(("scripts/check.sh", "check_fuzz.py's reason: its fuzz steps read "
                     "fuzz/launch.txt"),
                    ("scripts/check_results.py, check_compare.py, check_roundtrip.py, "
-                    "check_oracle.py", VALIDATORS[1]), RENDER, PROSE),
-         pin=check_fuzz.PRE_TIE_PINS),
+                    "check_oracle.py", VALIDATORS[1]), RENDER, PROSE)),
     # The record of what else ran on the host during a campaign's timed steps: made by hand
     # from the host's logs and the project's session records, so no code makes its entries.
     Kind("disturbances", ("disturbances-*.json",),

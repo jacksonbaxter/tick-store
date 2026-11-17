@@ -45,8 +45,5 @@
   },
   "replaced_comparison_files": {
     "Linux-12302019-full-67ae574f5666.json": "e8d447073c29d83c2341357df8ca01fa9afaa50d4f235590d5506e0d10a41a25"
-  },
-  "fuzz_g3_file_before_the_tie": {
-    "fuzz-g3-ea1dde4c02e4.json": "bc76620e292023aa1fe78c941b3fb1a135e7716ca1b23c5aee17f9acbd746846"
   }
 }

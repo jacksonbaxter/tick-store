@@ -1,8 +1,8 @@
 diff --git a/scripts/check_fuzz.py b/scripts/check_fuzz.py
 --- a/scripts/check_fuzz.py
 +++ b/scripts/check_fuzz.py
-@@ -539,7 +539,7 @@
-         return problems, None, f"made before the tie and pinned, so not tied{counted}"
+@@ -508,7 +508,7 @@
+     reason = history_problem(repo, commit)
      if reason:
          missing = missing_from_full_history(repo, commit)
 -        if missing:

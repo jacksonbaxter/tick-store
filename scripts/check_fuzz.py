@@ -27,17 +27,12 @@ render_results.py passes on and scripts/check.sh reports as a skip, a failure un
 A full clone that holds no such commit refuses the file: the commit was made up or rebased away.
 The three parts must also run on the launcher's folders: the merge merges the replay's folders
 into one of its own, and the timed run starts from that one alone.
-One file made before this rule is let through it until the freeze replaces it: PRE_TIE_FILE,
-known by the SHA-256 of its bytes under PRE_TIE_PINS in scripts/data_pins.json, never by
-anything the file says of itself. No other file may be pinned there. It is also the one file
-that may keep PRE_TIE_SCHEMA, from before the launcher, whose runs record no replay or merge.
 
 Standard library only. tests/scripts/test_check_fuzz.py shows each rule failing on an injected
 fault.
 """
 
 import argparse
-import hashlib
 import json
 import re
 import subprocess
@@ -50,12 +45,8 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 import check_results  # noqa: E402
 
 DEFAULT_CMAKE = REPO_ROOT / "fuzz" / "CMakeLists.txt"
-DEFAULT_PINS = REPO_ROOT / "scripts" / "data_pins.json"
 
 SCHEMA = "tick-store-fuzz-2"
-# The pinned file's, from before scripts/fuzz_g3.py: each run replayed its folders inside its
-# timed part, and records nothing of it.
-PRE_TIE_SCHEMA = "tick-store-fuzz-1"
 EXIT_OK = 0
 EXIT_INVALID = 1
 EXIT_USAGE = 2
@@ -69,10 +60,6 @@ EXIT_UNJUDGED = 3
 TIED_PATHS = ("src", "include", "fuzz", "cmake", "CMakeLists.txt", "CMakePresets.json",
               "scripts/fuzz_g3.py")
 NOT_TIED = (":(exclude)fuzz/*.md",)
-# G-3's file from ea1dde4, made before the tie, and the key of the pins file that holds its
-# SHA-256. docs/TASKS.md removes both when the freeze's file is committed.
-PRE_TIE_FILE = "fuzz-g3-ea1dde4c02e4.json"
-PRE_TIE_PINS = "fuzz_g3_file_before_the_tie"
 
 # G-3's 30 minutes. The file states it too, and may not state less.
 REQUIRED_SECONDS = 1800
@@ -146,7 +133,7 @@ def check_header(header, top_keys, path, targets):
     for field in HEADER_FIELDS:
         if field not in header:
             problems.append(f"header: missing field '{field}'")
-    if header.get("schema") not in (SCHEMA, PRE_TIE_SCHEMA):
+    if header.get("schema") != SCHEMA:
         problems.append(f"header.schema: expected {SCHEMA}")
     if header.get("gate") != "G-3":
         problems.append("header.gate: this file judges G-3")
@@ -515,28 +502,10 @@ def tied_changes(repo, commit):
     return sorted(set(changed.stdout.split()) | set(new.stdout.split()))
 
 
-def pinned_before_the_tie(path, pins):
-    """(problems, exempt): whether this is the one file made before the tie, by its bytes."""
-    pinned = pins.get(PRE_TIE_PINS) or {}
-    problems = [f"{PRE_TIE_PINS} in the pins file: {name} is pinned, and only {PRE_TIE_FILE} "
-                "may be" for name in sorted(pinned) if name != PRE_TIE_FILE]
-    digest = hashlib.sha256(path.read_bytes()).hexdigest()
-    exempt = path.name == PRE_TIE_FILE and pinned.get(PRE_TIE_FILE) == digest
-    return problems, exempt
-
-
-def check_tie(path, commit, repo, pins):
+def check_tie(commit, repo):
     """(problems, unjudged, note) for a file whose content is valid."""
-    problems, exempt = pinned_before_the_tie(path, pins)
-    schema = json.loads(path.read_text(encoding="utf-8"))["header"]["schema"]
-    if schema == PRE_TIE_SCHEMA and not exempt:
-        problems.append(f"header.schema: {PRE_TIE_SCHEMA} records no replay or merge, and only "
-                        f"{PRE_TIE_FILE}, by its pin, may keep it; a file made now is {SCHEMA}")
+    problems = []
     reason = history_problem(repo, commit)
-    if exempt:
-        counted = ("" if reason else
-                   f"; {len(tied_changes(repo, commit))} tied files changed since {commit[:12]}")
-        return problems, None, f"made before the tie and pinned, so not tied{counted}"
     if reason:
         missing = missing_from_full_history(repo, commit)
         if missing:
@@ -559,14 +528,11 @@ def main(argv=None):
                         help="the fuzz/CMakeLists.txt whose targets the file must cover")
     parser.add_argument("--repo", type=Path, default=REPO_ROOT,
                         help="the checkout whose code the file must still be the code of")
-    parser.add_argument("--pins", type=Path, default=DEFAULT_PINS)
     args = parser.parse_args(argv)
     try:
         targets = targets_in(args.cmake)
-        pins = json.loads(args.pins.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        print(f"check_fuzz: cannot read {args.cmake.name} or {args.pins.name}: {error}",
-              file=sys.stderr)
+    except OSError as error:
+        print(f"check_fuzz: cannot read {args.cmake.name}: {error}", file=sys.stderr)
         return EXIT_USAGE
     if not targets:
         print(f"check_fuzz: {args.cmake.name} defines no fuzz targets", file=sys.stderr)
@@ -578,7 +544,7 @@ def main(argv=None):
         if not problems:
             commit = json.loads(path.read_text(encoding="utf-8"))["header"]["commit"]
             try:
-                problems, reason, note = check_tie(path, commit, args.repo, pins)
+                problems, reason, note = check_tie(commit, args.repo)
             except OSError as error:
                 problems = [f"cannot compare with {commit[:12]}: {error}"]
         if problems:
