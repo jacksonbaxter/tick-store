@@ -184,9 +184,11 @@ gate's run on the Mac at the frozen code, `8616263`: all 255 required functions 
 of lines (14,690 of 15,624) and 97.1% of functions (1,206 of 1,242) covered, with the four
 sources the Mac does not build listed as such. That run ran 681 of the unit binary's 889 tests,
 one of them skipped as Linux's alone, leaving out the 2 `ItchRealDay` tests, the grid's 144 and
-the named seeds' 62. The file's `run` line names only `ItchRealDay`: it is a fixed sentence in
-`scripts/coverage_report.py`, which was not changed when the filter grew, and the script is
-measured code, so the line waits for the next code change ([docs/TASKS.md](docs/TASKS.md)).
+the named seeds' 62; those counts are from the coverage run's log, which is not in this
+repository. The file's `run` line names only `ItchRealDay`, while `scripts/coverage.sh` leaves out
+the grid and the named seeds' tests too: the line is a fixed sentence in
+`scripts/coverage_report.py`, which was not changed when the filter grew. That script is among
+the measured paths and was left as it is; [docs/TASKS.md](docs/TASKS.md) carries the change.
 llvm-cov sees only the C++, so the Python validators are covered by their tests in
 `tests/scripts/` instead.
 

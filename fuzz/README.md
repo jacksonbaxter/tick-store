@@ -228,7 +228,7 @@ seconds and reports it as a finding (exit 70), as it does a crash. The limit is 
 input that makes the code under test hang, or do work that grows faster than its input, as the
 dictionary decoder's repeat check once did (B-1 in `docs/REVIEW.md`), is a finding and not just
 a slow run; libFuzzer's own default is 1,200 s. The 10 s came in with the first run commands at
-`3aaad2f`, and until now no reason for it was written down. A timeout means something only while
+`3aaad2f`, and no reason for it was written down then. A timeout means something only while
 the oracle's own work on one valid input stays well inside the limit. At `ede0176` it did not:
 the Linux replay of `fuzz_dictionary` stopped at 11 s or more on a valid seed, one maximal block
 whose values the oracle re-encoded in blocks of 3, which took 2.1 s an execution on the Mac. That
