@@ -63,6 +63,7 @@
 
 #include "container_oracles.hpp"
 #include "itch_store_oracles.hpp"
+#include "oracle_counts.hpp"
 #include "tick_store/codec/dictionary.hpp"
 #include "tick_store/codec/simd.hpp"
 #include "tick_store/itch/codec.hpp"
@@ -414,15 +415,20 @@ struct Answers {
                                     std::span<const Request> requests) {
     ItchQuery query{reader, path};
     Answers out;
+    // Each call counted at the values it reports it decoded (QueryStats::values_decoded).
+    const auto count = [&] { oracle_counts::counts.decoded += query.stats().values_decoded; };
     for (const Request& request : requests) {
         out.rows.push_back(query.rows(request.start, request.end, request.locate));
+        count();
         if (request.locate.has_value()) {
             out.minutes.push_back(query.minute_aggregate(request.start, request.end, *request.locate));
         } else {
             out.counts.push_back(query.locate_counts(request.start, request.end));
         }
+        count();
     }
     out.sum = query.shares_sum();
+    count();
     return out;
 }
 
@@ -442,6 +448,10 @@ struct ColumnForm {
     std::array<std::byte, itch::kMaxPayloadSize> scratch{};
     std::uint64_t previous = 0;
     for (std::uint64_t k = 0; k < reader.segment_count(); ++k) {
+        // Counted at the values the segment's entry states, which its columns decode to at most.
+        for (const std::uint32_t values : reader.segment(k).values) {
+            oracle_counts::counts.decoded += values;
+        }
         if (!records.seek(reader, k).has_value()) {
             return {};
         }
@@ -604,16 +614,21 @@ template <class T>
         }
         const query_detail::Answers kernels = query_detail::answer(*reader, QueryPath::indexed, all);
         const codec::simd::ScalarKernelsOnThisThread scalar;
-        return query_detail::answer(*reader, QueryPath::indexed, all) != kernels
-                   ? "past the cap, the kernel set and the scalar set answered the same queries differently"
-                   : nullptr;
+        const std::uint64_t before = oracle_counts::counts.decoded;
+        const bool same = query_detail::answer(*reader, QueryPath::indexed, all) == kernels;
+        oracle_counts::counts.compared += oracle_counts::counts.decoded - before;
+        return same ? nullptr
+                    : "past the cap, the kernel set and the scalar set answered the same queries differently";
     }
     const query_detail::Answers indexed = query_detail::answer(*reader, QueryPath::indexed, all);
     {
         // The kernel-against-scalar oracle, on every request: the same answers with the
         // scalar set forced. Never budgeted.
         const codec::simd::ScalarKernelsOnThisThread scalar;
-        if (query_detail::answer(*reader, QueryPath::indexed, all) != indexed) {
+        const std::uint64_t before = oracle_counts::counts.decoded;
+        const bool same = query_detail::answer(*reader, QueryPath::indexed, all) == indexed;
+        oracle_counts::counts.compared += oracle_counts::counts.decoded - before;
+        if (!same) {
             return "the kernel set and the scalar set answered the same queries differently";
         }
     }

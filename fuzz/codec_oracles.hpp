@@ -41,9 +41,10 @@
 //     why twice). Never budgeted there: both kernel sets' decodes and their agreement, the
 //     decode from an exact copy, the refusal checks, the cut check, the decoder-side block
 //     check (a dictionary's entry count, a run-length block's run count, against its
-//     values) and the column's exact-count and wrong-count checks. The re-encodes, the
-//     encoder-side block check and the column re-encodes take the cross-check budget and
-//     stop where it is spent, the block it runs out in checked on the part it reaches;
+//     values) and the column's exact-count and wrong-count checks. The re-encodes and the
+//     encoder-side block check take the cross-check budget, the block it runs out in checked
+//     on the part it reaches, and past it a prefix of each of the next few blocks
+//     (OracleBounds::past_budget_blocks); the column re-encodes take the budget's values;
 //   - past the cap, up to the compare limit: the block is decoded by the scalar set in
 //     place and by the chosen kernel set from an exact copy of its bytes, and the two must
 //     agree, refusal or values, and a refused block must leave the output alone. Nothing
@@ -52,6 +53,7 @@
 //     chosen set, with nothing compared, so ASan and UBSan still see its decode.
 // Past the decode limit nothing is examined. A refused block ends part 1 in any tier.
 
+#include "oracle_counts.hpp"
 #include "tick_store/codec/block.hpp"
 #include "tick_store/codec/codec_error.hpp"
 #include "tick_store/codec/dictionary.hpp"
@@ -120,6 +122,31 @@ struct CodecUnderTest {
     return out;
 }
 
+// The oracle's decodes and encodes, each counted (oracle_counts.hpp): a block decode at the
+// count its header states, a column decode at the count asked for, an encode at its values.
+[[nodiscard]] inline std::expected<std::size_t, CodecError> counted_decode(
+    const CodecUnderTest& codec, std::span<const std::byte> input, Words& out) {
+    oracle_counts::counts.decoded += stated_block_count(input).value_or(0);
+    return codec.decode_block(input, out);
+}
+[[nodiscard]] inline std::expected<void, CodecError> counted_decode_column(
+    const CodecUnderTest& codec, std::span<const std::byte> column, std::uint64_t count,
+    Words& out) {
+    oracle_counts::counts.decoded += count;
+    return codec.decode_column(column, count, out);
+}
+[[nodiscard]] inline std::expected<void, CodecError> counted_encode(
+    const Encoder& encoder, std::span<const std::uint64_t> values, Bytes& out) {
+    oracle_counts::counts.encoded += values.size();
+    return encoder.encode_block(values, out);
+}
+[[nodiscard]] inline std::expected<void, CodecError> counted_encode_column(
+    const Encoder& encoder, std::span<const std::uint64_t> values, std::size_t block_values,
+    Bytes& out) {
+    oracle_counts::counts.encoded += values.size();
+    return encoder.encode_column(values, block_values, out);
+}
+
 // Block sizes the accepted values are re-encoded at, as whole columns.
 // Part 2 covers blocks of one value, at a block size the input picks.
 inline constexpr std::array<std::size_t, 3> kOracleBlockSizes{3, 64, kDefaultBlockValues};
@@ -146,12 +173,18 @@ struct OracleBounds {
     std::size_t single_decoded_values = std::numeric_limits<std::size_t>::max();
     // The cross-check budget, within the cap: each block's re-encodes and its codec's
     // encoder-side check run on all its values while this lasts and on the part of the
-    // block that it reaches where it runs out, and on no block after. The column re-encodes
-    // at kOracleBlockSizes run on the first this many values taken. Each of these stops
-    // where the budget is spent; the never-budgeted checks run on every block within the
-    // cap.
+    // block that it reaches where it runs out. The column re-encodes at kOracleBlockSizes
+    // run on the first this many values taken.
     std::size_t cross_checked_values = std::numeric_limits<std::size_t>::max();
+    // The prefix past the budget: of the blocks within the cap that start once the budget is
+    // spent, the first this many still have their first kPastBudgetValues values (all of
+    // them, in a shorter block) through the re-encodes and the encoder-side check. A block
+    // within the cap past the budget and past these gets the never-budgeted checks only.
+    std::size_t past_budget_blocks = std::numeric_limits<std::size_t>::max();
 };
+
+// The values of a block past the budget that the prefix takes: the middle oracle block size.
+inline constexpr std::size_t kPastBudgetValues = kOracleBlockSizes[1];
 
 // The fuzz targets' bounds, for the codecs whose blocks hold up to kMaxBlockValues values
 // in a few bytes (dictionary, run-length, PFOR at width 0). Each bound is one constant below,
@@ -162,12 +195,16 @@ struct OracleBounds {
 // times the largest factor measured for its target, the Linux worst of five under the worst
 // placement over the Mac median (dictionary 6.04, run-length 7.19, PFOR 7.71), a margin over
 // the 1.13 swing measured between sessions. So the Mac medians are held under 728, 612 and
-// 571 ms. Each figure below is ms of one execution through the fuzz target on the Mac (fuzz
-// build, -detect_leaks=0, the median of seven rounds over every input timed beside it, each
-// run started with load1 under 8), from builds of the target at the bounds named. To repeat
-// one: set the constants, build the fuzz preset, which writes the named seeds, and run each
-// seed through its target. The store writes codec blocks of kDefaultBlockValues values, far
-// inside each cap.
+// 571 ms; where the least constant the bound's form allows (a whole number of maximal blocks,
+// a power of two) lands a target within about 3% over its limit, it is taken and said so.
+// Each figure below is ms of one execution through the fuzz target on the Mac (fuzz build,
+// -detect_leaks=0, the median of seven rounds over every input timed beside it, each run
+// started with load1 under 8), from builds of the target at the bounds named. To repeat one:
+// set the constants, build the fuzz preset, which writes the named seeds, and run each seed
+// through its target. The store writes codec blocks of kDefaultBlockValues values, far inside
+// each cap. What one execution can decode, encode and compare at these bounds is the count
+// table in fuzz/README.md, "Bounds", which FuzzOracles.TheCountTableHoldsTheConstants holds
+// to these constants.
 
 // A budget of `blocks` blocks: that many at the largest oracle block size, then
 // kOracleLongBlock values and `extra` more, so that at each oracle block size (3, 64 and
@@ -181,41 +218,63 @@ struct OracleBounds {
            budget % kOracleBlockSizes[2] >= kOracleLongBlock;
 }
 
+// The prefix past the budget, the same for the three targets: the first 64 blocks within the
+// cap that start once the budget is spent each have their first kPastBudgetValues (64) values
+// re-encoded and through the encoder-side check; a block within the cap past those gets the
+// never-budgeted checks only. 64 is the largest of 64, 32 and 16 with which every target's
+// dearest input fits: the dearest inputs took the same time with no prefix (dictionary 692 and
+// 694 ms, run-length 618 and 619, PFOR 566 and 566, no prefix and 64).
+inline constexpr std::size_t kFuzzPastBudgetBlocks = 64;
+
 // PFOR's cap: one maximal block, the format's largest.
 inline constexpr std::size_t kPforFuzzDecodedValues = kMaxBlockValues;
-// PFOR's compare limit: none, every block past the cap is compared. -max_len holds at most
-// three maximal blocks, each at least 5,131 bytes.
-inline constexpr std::size_t kPforFuzzComparedValues = std::numeric_limits<std::size_t>::max();
-// PFOR's budget: four blocks, 17,410 values (ragged 1, 2 and 1,026). The costliest input, the
-// dearest maximal block, 7 i^2 under delta of delta with the scale, then a maximal head-delta
-// block with the scale, compared, takes 561 ms, and with the first block shortened by 128
-// blocks of 64 values after it, compared, 558. Before the cap counted the values before a
-// block twice, the wrong-count check's second decode of the first block took that input to
-// 573 ms.
+// PFOR's compare limit, in values from the input's start: the cap and one maximal block, so a
+// maximal block just past the cap is decoded by both kernel sets and compared. -max_len holds
+// at most three maximal blocks, each at least 5,131 bytes. The costliest input, the dearest
+// maximal block, 7 i^2 under delta of delta with the scale, within the cap, then a maximal
+// head-delta block with the scale, compared, then a head-delta block of the 646,144 values the
+// bytes left hold, decoded once, takes 568 ms. From builds of the target at other limits
+// (before the prefix), medians of seven interleaved rounds: with every block past the cap
+// compared, that input took 583 ms, past the 571; with the compare limit at the cap and two
+// maximal blocks, 582; at the cap and one with nothing past it examined, 557 (the two blocks
+// alone 561). Of the other shapes timed beside it at these limits, 213 one-value blocks (as
+// many as -max_len holds) before a first block of 2^20 - 426 values took 560, the first block
+// shortened by 128 blocks of 64 values 555, and by 16 with a third block after it 567.
+inline constexpr std::size_t kPforFuzzComparedValues = kPforFuzzDecodedValues + kMaxBlockValues;
+// PFOR's decode limit: one maximal block more, so the block -max_len leaves room for after the
+// two is decoded once.
+inline constexpr std::size_t kPforFuzzSingleDecodedValues = kPforFuzzComparedValues + kMaxBlockValues;
+// PFOR's budget: four blocks, 17,410 values (ragged 1, 2 and 1,026). The first block shortened
+// by 128 blocks of 64 values after it, compared, takes 557 ms.
 inline constexpr std::size_t kPforFuzzCrossCheckedValues = ragged_budget(4, 1);
 inline constexpr OracleBounds kPforFuzzBounds{.decoded_values = kPforFuzzDecodedValues,
                                               .compared_values = kPforFuzzComparedValues,
-                                              .single_decoded_values = kPforFuzzComparedValues,
-                                              .cross_checked_values = kPforFuzzCrossCheckedValues};
+                                              .single_decoded_values = kPforFuzzSingleDecodedValues,
+                                              .cross_checked_values = kPforFuzzCrossCheckedValues,
+                                              .past_budget_blocks = kFuzzPastBudgetBlocks};
 
 // Run-length's cap: one maximal block, the format's largest.
 inline constexpr std::size_t kRleFuzzDecodedValues = kMaxBlockValues;
-// Run-length's compare limit: nine maximal blocks' values from the input's start, so the
-// blocks past the cap are decoded by both kernel sets and compared up to eight maximal
-// blocks. The 5 KB -max_len leaves beside the dearest maximal block (2^20 runs of one value,
-// 11,302 bytes) hold a maximal block of 467,968 runs, or about 100 one-run blocks, of which
-// the limit compares eight. Past it a block is not examined; its nested blocks are PFOR
-// blocks, which fuzz_pfor compares at every size.
-inline constexpr std::size_t kRleFuzzComparedValues = std::size_t{9} * kMaxBlockValues;
-// Run-length's budget: two blocks, 9,218 values (ragged 2, 2 and 1,026). The costliest input,
-// the dearest maximal block, then a maximal block of as many runs as the bytes left hold
-// beside seven maximal one-run blocks, all compared, takes 597 ms; from builds of the target at
-// other budgets it took 657 ms at four blocks and 627 at three, both past the 612.
-inline constexpr std::size_t kRleFuzzCrossCheckedValues = ragged_budget(2, 1);
+// Run-length's compare limit: the cap and one maximal block, the least the bound allows, so a
+// maximal block just past the cap is decoded by both kernel sets and compared, and past it a
+// block is not examined; its nested blocks are PFOR blocks, which fuzz_pfor compares at every
+// size. The costliest input, the dearest maximal block (2^20 runs of one value, 11,302 bytes)
+// within the cap, then a maximal block of as many runs as the 5 KB left hold (467,968),
+// compared, takes 620 ms, 1.3% over the 612, and the first block shortened by one block of 64
+// values 621, 1.5% over: taken as the least compare limit the bound's form allows, within the
+// 3%. From builds of the target at other limits, the dearest input at each: two maximal blocks
+// past the cap 621 to 623 ms, four 636, eight 656.
+inline constexpr std::size_t kRleFuzzComparedValues = kRleFuzzDecodedValues + kMaxBlockValues;
+// Run-length's budget: four blocks, 17,410 values (ragged 1, 2 and 1,026). Of the other shapes
+// timed beside the costliest at these limits, 109 one-value blocks (as many as -max_len holds)
+// before the first block took 557 ms, 40 blocks of 64 runs 594, maximal one-run blocks after the
+// first 553. At a budget of two blocks the costliest took 597 ms.
+inline constexpr std::size_t kRleFuzzCrossCheckedValues = ragged_budget(4, 1);
 inline constexpr OracleBounds kRleFuzzBounds{.decoded_values = kRleFuzzDecodedValues,
                                              .compared_values = kRleFuzzComparedValues,
                                              .single_decoded_values = kRleFuzzComparedValues,
-                                             .cross_checked_values = kRleFuzzCrossCheckedValues};
+                                             .cross_checked_values = kRleFuzzCrossCheckedValues,
+                                             .past_budget_blocks = kFuzzPastBudgetBlocks};
 
 // The dictionary's cap: 2^18 values, the one cap below a maximal block, so that beside it the
 // compare tier reaches a maximal block within the bar. The dearest block, values cycling
@@ -225,41 +284,47 @@ inline constexpr OracleBounds kRleFuzzBounds{.decoded_values = kRleFuzzDecodedVa
 inline constexpr std::size_t kDictFuzzDecodedValues = std::size_t{1} << 18U;
 // The dictionary's compare limit, in values from the input's start: the cap and one maximal
 // block, so every block of up to 2^20 values the input starts with or holds just past the cap
-// is decoded by both kernel sets and compared. The costliest input, the cap's block and then a
-// maximal block of it, compared, takes 680 ms; from builds of the target at other limits
-// (when its cap counted the values before a block once, and each block past the budget took
-// 64 values of the re-encodes), a quarter of a maximal block further took 733 ms, and 2^20
-// values 605 ms.
+// is decoded by both kernel sets and compared. The costliest input, 300 one-value blocks (as
+// many as -max_len holds) before the dearest block of the cap less 600 values, then a maximal
+// block of it, compared, takes 695 ms; the cap's block and a maximal block alone
+// 680. From builds of the target at other limits (when its cap counted the values
+// before a block once, and each block past the budget took 64 values of the re-encodes), a
+// quarter of a maximal block further took the cap's block and a maximal block to 733 ms.
 inline constexpr std::size_t kDictFuzzComparedValues = kDictFuzzDecodedValues + kMaxBlockValues;
 // The dictionary's decode limit: the compare limit, so past it a block is not examined. A
-// decode-once tier of a quarter of a maximal block more took the costliest input to 704 ms,
-// and one of a maximal block to 782 ms (from the same builds).
+// decode-once tier of a quarter of a maximal block more took the cap's block and a maximal
+// block to 704 ms, and one of a maximal block to 782 ms (from the same builds).
 inline constexpr std::size_t kDictFuzzSingleDecodedValues = kDictFuzzComparedValues;
 // The dictionary's budget: one block, 5,123 values (ragged 2, 3 and 1,027), so one block
 // boundary and one partial block are still exercised at each oracle block size. It is the
-// least budget, so that the compare tier reaches a maximal block within the bar (fuzz/README.md,
-// "Bounds").
+// least budget, so that the compare tier reaches a maximal block within the bar: at a budget of
+// two blocks (9,218 values) the costliest input took 855 ms and at four (17,410) 1,138, past
+// the 728.
 inline constexpr std::size_t kDictFuzzCrossCheckedValues = ragged_budget(1, 2);
 inline constexpr OracleBounds kDictFuzzBounds{.decoded_values = kDictFuzzDecodedValues,
                                               .compared_values = kDictFuzzComparedValues,
                                               .single_decoded_values = kDictFuzzSingleDecodedValues,
-                                              .cross_checked_values = kDictFuzzCrossCheckedValues};
+                                              .cross_checked_values = kDictFuzzCrossCheckedValues,
+                                              .past_budget_blocks = kFuzzPastBudgetBlocks};
 
 static_assert(ends_on_short_blocks(kPforFuzzCrossCheckedValues) &&
                   ends_on_short_blocks(kRleFuzzCrossCheckedValues) &&
                   ends_on_short_blocks(kDictFuzzCrossCheckedValues),
               "a budget must end on a short block at every oracle block size: change its extra");
 static_assert(kPforFuzzDecodedValues <= kPforFuzzComparedValues &&
+                  kPforFuzzComparedValues <= kPforFuzzSingleDecodedValues &&
                   kRleFuzzDecodedValues <= kRleFuzzComparedValues &&
                   kDictFuzzDecodedValues <= kDictFuzzComparedValues &&
                   kDictFuzzComparedValues <= kDictFuzzSingleDecodedValues,
               "a limit below the one before it");
-static_assert(kPforFuzzCrossCheckedValues >= 4 * kOracleBlockSizes[2],
-              "PFOR's budget below four blocks at the largest oracle block size");
-static_assert(kRleFuzzCrossCheckedValues >= 2 * kOracleBlockSizes[2],
-              "run-length's budget below two blocks at the largest oracle block size");
-static_assert(kDictFuzzComparedValues >= kDictFuzzDecodedValues + kMaxBlockValues,
-              "the dictionary's compare tier must reach a maximal block just past its cap");
+static_assert(kPforFuzzCrossCheckedValues >= 4 * kOracleBlockSizes[2] &&
+                  kRleFuzzCrossCheckedValues >= 4 * kOracleBlockSizes[2],
+              "PFOR's and run-length's budgets below four blocks at the largest oracle block size");
+static_assert(kDictFuzzComparedValues >= kDictFuzzDecodedValues + kMaxBlockValues &&
+                  kPforFuzzComparedValues >= kPforFuzzDecodedValues + kMaxBlockValues &&
+                  kRleFuzzComparedValues >= kRleFuzzDecodedValues + kMaxBlockValues,
+              "a compare tier must reach a maximal block just past the cap");
+static_assert(std::has_single_bit(kFuzzPastBudgetBlocks), "the prefix is a power of two blocks");
 
 // The kernel-against-scalar oracle for one block: decodes `input` again with the scalar
 // set and compares with what the chosen set gave, `result` into `decoded`.
@@ -268,7 +333,8 @@ static_assert(kDictFuzzComparedValues >= kDictFuzzDecodedValues + kMaxBlockValue
                                         const Words& decoded) {
     const simd::ScalarKernelsOnThisThread scalar;
     Words by_scalar{0xDEAD};
-    const auto again = codec.decode_block(input, by_scalar);
+    oracle_counts::counts.compared += stated_block_count(input).value_or(0);
+    const auto again = counted_decode(codec, input, by_scalar);
     if (again.has_value() != result.has_value()) {
         return false;
     }
@@ -293,7 +359,7 @@ static_assert(kDictFuzzComparedValues >= kDictFuzzDecodedValues + kMaxBlockValue
     Bytes first_reencoded;
     for (const Encoder& encoder : encoders) {
         Bytes reencoded;
-        if (!encoder.encode_block(crossed, reencoded).has_value()) {
+        if (!counted_encode(encoder, crossed, reencoded).has_value()) {
             return "the encoder refused values its decoder accepted";
         }
         // Only the whole block's values have the input's bytes as their one encoding.
@@ -302,14 +368,14 @@ static_assert(kDictFuzzComparedValues >= kDictFuzzDecodedValues + kMaxBlockValue
         }
         Words twice;
         const Bytes again = exact_bytes(reencoded);
-        const auto second = codec.decode_block(again, twice);
+        const auto second = counted_decode(codec, again, twice);
         if (!second.has_value() || *second != again.size() ||
             !std::ranges::equal(twice, crossed)) {
             return "the re-encoded block did not decode to the same values";
         }
         if (!codec.canonical) {
             Bytes repeat;
-            if (!encoder.encode_block(crossed, repeat).has_value() || repeat != reencoded) {
+            if (!counted_encode(encoder, crossed, repeat).has_value() || repeat != reencoded) {
                 return "the encoder gave different bytes for the same values";
             }
         }
@@ -331,20 +397,21 @@ static_assert(kDictFuzzComparedValues >= kDictFuzzDecodedValues + kMaxBlockValue
 // or to 0 if refused. The block is decoded in place first, to learn its size, and then
 // again from an exact copy of just its bytes, so ASan sees any read past its end. The
 // re-encodes and the extra check take the block's values up to `budget`, and `budget`
-// loses what they took; with none left, they do not run on this block.
+// loses what they took; with none left, they take its first kPastBudgetValues values while
+// `prefix_blocks` lasts, which loses one, and otherwise do not run on this block.
 [[nodiscard]] inline const char* check_one_block(const CodecUnderTest& codec,
                                                  std::span<const std::byte> input,
                                                  Words& values, std::size_t& taken,
-                                                 std::size_t& budget) {
+                                                 std::size_t& budget, std::size_t& prefix_blocks) {
     taken = 0;
     Words decoded{0xDEAD};
-    const auto first = codec.decode_block(input, decoded);
+    const auto first = counted_decode(codec, input, decoded);
     if (!scalar_agrees(codec, input, first, decoded)) {
         return "the kernel set and the scalar set decoded a block differently";
     }
     if (!first.has_value()) {
         Words again;
-        const auto repeat = codec.decode_block(input, again);
+        const auto repeat = counted_decode(codec, input, again);
         if (repeat.has_value() || repeat.error() != first.error()) {
             return "a refusal did not repeat";
         }
@@ -358,7 +425,7 @@ static_assert(kDictFuzzComparedValues >= kDictFuzzDecodedValues + kMaxBlockValue
     }
     const Bytes copy = exact_bytes(input.first(*first));
     Words exact{0xDEAD};
-    const auto from_copy = codec.decode_block(copy, exact);
+    const auto from_copy = counted_decode(codec, copy, exact);
     if (!from_copy.has_value() || *from_copy != copy.size() || exact != decoded) {
         return "a block decoded differently from an exact copy of its bytes";
     }
@@ -374,9 +441,15 @@ static_assert(kDictFuzzComparedValues >= kDictFuzzDecodedValues + kMaxBlockValue
     }
 
     // The values the re-encodes and the extra check take: all of them inside the budget,
-    // else what is left of it.
-    const std::span<const std::uint64_t> crossed = got.first(std::min(got.size(), budget));
-    budget -= crossed.size();
+    // else what is left of it; past it, the prefix of the next prefix_blocks blocks.
+    std::span<const std::uint64_t> crossed;
+    if (budget > 0) {
+        crossed = got.first(std::min(got.size(), budget));
+        budget -= crossed.size();
+    } else if (prefix_blocks > 0) {
+        crossed = got.first(std::min(got.size(), kPastBudgetValues));
+        --prefix_blocks;
+    }
     const bool whole_block = crossed.size() == got.size();
     if (!crossed.empty()) {
         if (const char* failure = cross_check_block(codec, block, crossed, whole_block)) {
@@ -388,7 +461,7 @@ static_assert(kDictFuzzComparedValues >= kDictFuzzDecodedValues + kMaxBlockValue
     const std::size_t cut = std::to_integer<std::size_t>(block[block.size() / 2]) * 131U %
                             block.size();
     Words ignored;
-    if (codec.decode_block(exact_bytes(block.first(cut)), ignored).has_value()) {
+    if (counted_decode(codec, exact_bytes(block.first(cut)), ignored).has_value()) {
         return "a block cut short was accepted";
     }
 
@@ -410,11 +483,12 @@ static_assert(kDictFuzzComparedValues >= kDictFuzzDecodedValues + kMaxBlockValue
     std::expected<std::size_t, CodecError> first = 0;
     {
         const simd::ScalarKernelsOnThisThread scalar;
-        first = codec.decode_block(input, by_scalar);
+        oracle_counts::counts.compared += stated_block_count(input).value_or(0);
+        first = counted_decode(codec, input, by_scalar);
     }
     if (!first.has_value()) {
         decoded = Words{0xDEAD};
-        const auto again = codec.decode_block(input, decoded);
+        const auto again = counted_decode(codec, input, decoded);
         if (again.has_value() || again.error() != first.error()) {
             return "past the cap, the kernel set and the scalar set decoded a block differently";
         }
@@ -427,7 +501,7 @@ static_assert(kDictFuzzComparedValues >= kDictFuzzDecodedValues + kMaxBlockValue
     }
     const Bytes copy = exact_bytes(input.first(*first));
     decoded = Words{0xDEAD};
-    const auto again = codec.decode_block(copy, decoded);
+    const auto again = counted_decode(codec, copy, decoded);
     if (!again.has_value() || *again != copy.size() || decoded != by_scalar) {
         return "past the cap, the kernel set and the scalar set decoded a block differently";
     }
@@ -455,6 +529,7 @@ static_assert(kDictFuzzComparedValues >= kDictFuzzDecodedValues + kMaxBlockValue
     Words values;
     std::size_t offset = 0;
     std::size_t budget = bounds.cross_checked_values;
+    std::size_t prefix_blocks = bounds.past_budget_blocks;
     bool capped = false;
     while (offset < input.size()) {
         // A block whose stated count, with the values taken before it counted twice, would
@@ -468,7 +543,7 @@ static_assert(kDictFuzzComparedValues >= kDictFuzzDecodedValues + kMaxBlockValue
             break;
         }
         std::size_t taken = 0;
-        if (const char* failure = check_one_block(codec, rest, values, taken, budget)) {
+        if (const char* failure = check_one_block(codec, rest, values, taken, budget, prefix_blocks)) {
             return failure;
         }
         if (taken == 0) {
@@ -492,7 +567,7 @@ static_assert(kDictFuzzComparedValues >= kDictFuzzDecodedValues + kMaxBlockValue
                 }
             } else if (after <= bounds.single_decoded_values) {
                 scratch.clear();
-                const auto once = codec.decode_block(rest, scratch);
+                const auto once = counted_decode(codec, rest, scratch);
                 taken = once.has_value() ? *once : 0;
                 count = scratch.size();
             }
@@ -510,12 +585,12 @@ static_assert(kDictFuzzComparedValues >= kDictFuzzDecodedValues + kMaxBlockValue
         // and refuses one value more or less.
         const Bytes copy = exact_bytes(input.first(column_end));
         Words decoded;
-        if (!codec.decode_column(copy, values.size(), decoded).has_value() || decoded != values) {
+        if (!counted_decode_column(codec, copy, values.size(), decoded).has_value() || decoded != values) {
             return "a valid column was refused at its exact count";
         }
         Words ignored;
-        if (codec.decode_column(copy, values.size() + 1, ignored).has_value() ||
-            codec.decode_column(copy, values.size() - 1, ignored).has_value()) {
+        if (counted_decode_column(codec, copy, values.size() + 1, ignored).has_value() ||
+            counted_decode_column(codec, copy, values.size() - 1, ignored).has_value()) {
             return "a column was accepted at the wrong count";
         }
     }
@@ -526,11 +601,11 @@ static_assert(kDictFuzzComparedValues >= kDictFuzzDecodedValues + kMaxBlockValue
     for (const Encoder& encoder : codec.encoders) {
         for (const std::size_t block_values : kOracleBlockSizes) {
             Bytes column;
-            if (!encoder.encode_column(crossed, block_values, column).has_value()) {
+            if (!counted_encode_column(encoder, crossed, block_values, column).has_value()) {
                 return "the encoder refused a column of accepted values";
             }
             Words decoded;
-            if (!codec.decode_column(exact_bytes(column), crossed.size(), decoded).has_value() ||
+            if (!counted_decode_column(codec, exact_bytes(column), crossed.size(), decoded).has_value() ||
                 !std::ranges::equal(decoded, crossed)) {
                 return "a re-encoded column did not decode to the same values";
             }
@@ -558,12 +633,12 @@ static_assert(kDictFuzzComparedValues >= kDictFuzzDecodedValues + kMaxBlockValue
     }
     for (const Encoder& encoder : codec.encoders) {
         Bytes column;
-        if (!encoder.encode_column(values, block_values, column).has_value()) {
+        if (!counted_encode_column(encoder, values, block_values, column).has_value()) {
             return "the encoder refused a column of values";
         }
         Words decoded;
         const Bytes exact = exact_bytes(column);
-        const auto done = codec.decode_column(exact, values.size(), decoded);
+        const auto done = counted_decode_column(codec, exact, values.size(), decoded);
         if (!done.has_value()) {
             return "a block from the encoder did not decode";
         }
@@ -573,7 +648,8 @@ static_assert(kDictFuzzComparedValues >= kDictFuzzDecodedValues + kMaxBlockValue
         Words by_scalar;
         {
             const simd::ScalarKernelsOnThisThread scalar;
-            if (!codec.decode_column(exact, values.size(), by_scalar).has_value() ||
+            oracle_counts::counts.compared += values.size();
+            if (!counted_decode_column(codec, exact, values.size(), by_scalar).has_value() ||
                 by_scalar != decoded) {
                 return "the kernel set and the scalar set decoded a column differently";
             }
@@ -703,6 +779,7 @@ inline constexpr std::array<Encoder, 2> kSvbEncoders{
     constexpr std::uint8_t kZigzagFlag = 2;
     const auto flags = std::to_integer<std::uint8_t>(block[kBlockHeaderSize]);
     Bytes reencoded;
+    oracle_counts::counts.encoded += values.size();
     if (!encode_svb_block(values, (flags & kDeltaFlag) != 0, reencoded).has_value()) {
         return "the encoder refused values its decoder accepted";
     }
@@ -800,6 +877,7 @@ inline constexpr std::size_t kDictEntriesAt = 1;
     constexpr std::size_t kEntriesAt = kDictEntriesAt;
     const std::uint64_t count = distinct_count(values);
     Bytes reencoded;
+    oracle_counts::counts.encoded += 2 * values.size();
     if (!encode_dict_block(values, reencoded).has_value()) {
         return "the encoder refused values its decoder accepted";
     }
@@ -852,6 +930,7 @@ inline constexpr std::size_t kRleRunsAt = 0;
     constexpr std::size_t kRunsAt = kRleRunsAt;
     const std::uint64_t runs = maximal_runs(values);
     Bytes reencoded;
+    oracle_counts::counts.encoded += values.size();
     if (!encode_rle_block(values, reencoded).has_value()) {
         return "the encoder refused values its decoder accepted";
     }

@@ -1,0 +1,12 @@
+diff --git a/fuzz/codec_oracles.hpp b/fuzz/codec_oracles.hpp
+--- a/fuzz/codec_oracles.hpp
++++ b/fuzz/codec_oracles.hpp
+@@ -560,7 +560,7 @@
+             const std::size_t after = seen + stated.value_or(0);
+             std::size_t taken = 0;
+             std::size_t count = 0;
+-            if (after <= bounds.compared_values) {
++            if (after <= bounds.compared_values + kMaxBlockValues) {  // Planted: one maximal block further.
+                 if (const char* failure = compare_block(codec, rest, scratch, taken, count)) {
+                     return failure;
+                 }

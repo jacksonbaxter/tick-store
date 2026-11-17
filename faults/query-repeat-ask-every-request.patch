@@ -1,0 +1,12 @@
+diff --git a/fuzz/itch_query_oracles.hpp b/fuzz/itch_query_oracles.hpp
+--- a/fuzz/itch_query_oracles.hpp
++++ b/fuzz/itch_query_oracles.hpp
+@@ -635,7 +635,7 @@
+     // The repeat ask takes every request within the budget, and the first few past it.
+     const std::size_t crossed = work <= bounds.cross_checked_work
+                                     ? requests.size()
+-                                    : std::min(requests.size(), kQueryPastBudgetRequests);
++                                    : requests.size();  // Planted: the repeat ask past the budget takes every request.
+     if (query_detail::answer(*reader, QueryPath::indexed, all.first(crossed)) !=
+         query_detail::first_answers(indexed, all, crossed)) {
+         return "the indexed path answered the same queries differently twice";

@@ -13,6 +13,7 @@
 #include "itch_query_oracles.hpp"
 #include "itch_store_fixture.hpp"
 #include "itch_store_oracles.hpp"
+#include "oracle_counts.hpp"
 #include "scratch_dir.hpp"
 #include "store_oracles.hpp"
 #include "stub_fixture.hpp"
@@ -301,6 +302,160 @@ INSTANTIATE_TEST_SUITE_P(
         return name;
     });
 
+// The count table (fuzz/README.md, "Bounds"): for each bounded fuzz target, the most values one
+// execution can decode, encode and compare (oracle_counts.hpp says how each is counted), as
+// expressions in the bound constants. Each expression is written out in the README; the test
+// below holds its number to the constants, and the named seeds' counts to the numbers.
+oracle_counts::Counts codec_table(const codec::oracle::OracleBounds& b, std::size_t encoders,
+                                  std::size_t block_encoders, std::size_t check_encodes) {
+    // Within the cap one block of the cap's values: four decodes of it (the chosen set, the
+    // scalar set, the exact copy, the cut) and three column decodes (its count, one more, one
+    // fewer). Each value the re-encodes take is encoded twice by each block encoder (the
+    // codecs are not canonical, so the same bytes are asked for twice), decoded once, and
+    // encoded by the codec's own check as many times as it encodes; the budget's values, then
+    // the prefix's. The column re-encodes encode and decode the budget's values at each oracle
+    // block size with every encoder. Past the cap each compared value is decoded twice and each
+    // value past that once. Part 2 encodes the input's words with every encoder and decodes
+    // them twice, once with the scalar set.
+    constexpr std::uint64_t kSizes = codec::oracle::kOracleBlockSizes.size();
+    constexpr std::uint64_t kWords = bound_seeds::kSmallMaxLen / 8;
+    const std::uint64_t cap = b.decoded_values;
+    const std::uint64_t compared = b.compared_values;
+    const std::uint64_t once = b.single_decoded_values;
+    const std::uint64_t budget = b.cross_checked_values;
+    const std::uint64_t prefix = b.past_budget_blocks * codec::oracle::kPastBudgetValues;
+    return {.decoded = (7 * cap) + (2 * (compared - cap)) + (once - compared) +
+                       ((block_encoders + (encoders * kSizes)) * budget) + (2 * encoders * kWords),
+            .encoded = (((2 * block_encoders) + check_encodes) * (budget + prefix)) +
+                       (encoders * kSizes * budget) + (encoders * kWords),
+            .compared = compared + (encoders * kWords)};
+}
+
+oracle_counts::Counts store_table() {
+    // Within the cap a file is read five times (CRCs skipped, the scalar set, CRCs recomputed,
+    // each segment alone, the rewritten file) and written twice; past it, up to the compare
+    // limit, read twice. The scalar set's read is the compared one.
+    const std::uint64_t cap = store::oracle::kStoreFuzzBounds.stated_values;
+    const std::uint64_t compared = store::oracle::kStoreFuzzBounds.compared_values;
+    return {.decoded = std::max(5 * cap, 2 * compared), .encoded = 2 * cap, .compared = compared};
+}
+
+oracle_counts::Counts query_table() {
+    // A file's values T are at most what its work leaves after one segment, at the cheapest
+    // value's weight (a plain segment's). An ask makes two calls a request and one for the share
+    // sum, each decoding at most T (QueryStats::values_decoded: each segment once a call, the
+    // seed before a segment kept); there are at most 4 windows and 4 locates. Within the budget,
+    // four asks (the chosen set, the scalar set, the repeat ask, the exact path) and the column
+    // form's whole read; past it the repeat ask takes kQueryPastBudgetRequests requests; past
+    // the cap, up to the compare limit, two asks, in the compare measure, which gives a plain
+    // segment no weight. The scalar set's ask is the compared one. Nothing is encoded.
+    using store::oracle::kComparedAsksWork;
+    using store::oracle::kQueryFuzzBounds;
+    using store::oracle::kWholeCheckWork;
+    constexpr std::uint64_t kRequests = 4 * 4;
+    constexpr std::uint64_t kCalls = (2 * kRequests) + 1;
+    constexpr std::uint64_t kRepeatCalls = (2 * store::oracle::kQueryPastBudgetRequests) + 1;
+    const std::uint64_t within_budget =
+        (kQueryFuzzBounds.cross_checked_work - kWholeCheckWork.plain.segment) / kWholeCheckWork.plain.value;
+    const std::uint64_t within_cap =
+        (kQueryFuzzBounds.work - kWholeCheckWork.plain.segment) / kWholeCheckWork.plain.value;
+    const std::uint64_t compared =
+        (kQueryFuzzBounds.compared_work - kComparedAsksWork.plain.segment) / kComparedAsksWork.plain.value;
+    const std::uint64_t decoded = std::max({((4 * kCalls) + 1) * within_budget,
+                                            ((3 * kCalls) + kRepeatCalls + 1) * within_cap,
+                                            2 * kCalls * compared});
+    return {.decoded = decoded, .encoded = 0, .compared = kCalls * std::max(within_cap, compared)};
+}
+
+// The table's numbers, as fuzz/README.md gives them: a change to a constant or to an oracle's
+// work that moves one fails here until the README's table moves with it.
+TEST(FuzzOracles, TheCountTableHoldsTheConstants) {
+    using C = oracle_counts::Counts;
+    EXPECT_EQ(codec_table(codec::oracle::kDictFuzzBounds, 2, 2, 2),
+              (C{.decoded = 3'981'336, .encoded = 90'148, .compared = 1'314'816}));
+    EXPECT_EQ(codec_table(codec::oracle::kRleFuzzBounds, 1, 1, 1),
+              (C{.decoded = 9'510'920, .encoded = 118'796, .compared = 2'099'200}));
+    EXPECT_EQ(codec_table(codec::oracle::kPforFuzzBounds, 16, 4, 0),
+              (C{.decoded = 11'456'616, .encoded = 1'040'496, .compared = 2'129'920}));
+    EXPECT_EQ(store_table(), (C{.decoded = 8'388'608, .encoded = 2'097'152, .compared = 4'194'304}));
+    EXPECT_EQ(query_table(), (C{.decoded = 14'850'000, .encoded = 0, .compared = 7'425'000}));
+    // The encoder counts the table assumes for each codec.
+    EXPECT_EQ(codec::oracle::kDictCodec.encoders.size(), 2U);
+    EXPECT_EQ(codec::oracle::kRleCodec.encoders.size(), 1U);
+    EXPECT_EQ(codec::oracle::kPforCodec.encoders.size(), 16U);
+    EXPECT_FALSE(codec::oracle::kDictCodec.canonical || codec::oracle::kRleCodec.canonical ||
+                 codec::oracle::kPforCodec.canonical);
+}
+
+// What each named seed of a bounded target counts through its fuzz target's bounds, as the
+// README's table gives it beside the target's most: each is that most, or a share of it the
+// README states with the reason.
+struct SeedCounts {
+    std::string_view seed;
+    oracle_counts::Counts counts;
+};
+constexpr std::array<SeedCounts, 21> kSeedCounts{{
+    {"dictionary/bound-costliest", {.decoded = 3'719'192, .encoded = 65'572, .compared = 1'314'816}},
+    {"dictionary/bound-small-blocks", {.decoded = 3'670'808, .encoded = 65'572, .compared = 1'314'816}},
+    {"dictionary/bound-one-value-blocks", {.decoded = 3'717'392, .encoded = 65'572, .compared = 1'314'516}},
+    {"dictionary/bound-prefix", {.decoded = 821'394, .encoded = 90'148, .compared = 257'021}},
+    {"run_length/bound-costliest", {.decoded = 9'510'920, .encoded = 106'508, .compared = 2'099'200}},
+    {"run_length/bound-one-run-blocks", {.decoded = 9'510'920, .encoded = 106'508, .compared = 2'099'200}},
+    {"run_length/bound-small-blocks", {.decoded = 9'510'600, .encoded = 106'508, .compared = 2'099'200}},
+    {"run_length/bound-prefix", {.decoded = 4'182'016, .encoded = 118'796, .compared = 1'029'118}},
+    {"run_length/bound-repeated-run-value", {.decoded = 3'148'586, .encoded = 1'429, .compared = 1'050'005}},
+    {"pfor/bound-costliest", {.decoded = 11'054'184, .encoded = 1'007'728, .compared = 2'129'920}},
+    {"pfor/bound-small-blocks", {.decoded = 10'367'080, .encoded = 1'007'728, .compared = 2'129'920}},
+    {"pfor/bound-prefix", {.decoded = 4'089'956, .encoded = 1'040'496, .compared = 1'059'838}},
+    {"pfor/bound-delta-past-cap", {.decoded = 9'359'464, .encoded = 1'007'728, .compared = 2'129'920}},
+    {"pfor/bound-refused-past-cap", {.decoded = 9'359'464, .encoded = 1'007'728, .compared = 2'129'920}},
+    {"itch_store/bound-costliest", {.decoded = 5'242'735, .encoded = 2'097'094, .compared = 1'048'547}},
+    {"itch_store/bound-costliest-compared", {.decoded = 8'388'550, .encoded = 0, .compared = 4'194'275}},
+    {"itch_query/bound-costliest", {.decoded = 138'259, .encoded = 0, .compared = 40'583}},
+    {"itch_query/bound-costliest-within-budget", {.decoded = 1'229'776, .encoded = 0, .compared = 304'400}},
+    {"itch_query/bound-costliest-compared", {.decoded = 94'614, .encoded = 0, .compared = 47'307}},
+    {"itch_query/bound-falling-minutes", {.decoded = 2'230'500, .encoded = 0, .compared = 615'405}},
+    {"itch_query/bound-move-to-front", {.decoded = 1'762'248, .encoded = 0, .compared = 436'200}},
+}};
+
+// Each named seed of a bounded target through its fuzz target's oracle and bounds, counted:
+// the counts the table gives it, and none past its target's most.
+TEST_P(BoundSeeds, CountWhatTheTableGivesThem) {
+    using bound_seeds::Side;
+    const auto& seed = bound_seeds::kBoundSeeds.at(GetParam());
+    const std::string name = std::string{seed.seeds} + "/" + std::string{seed.name};
+    const auto row = std::ranges::find(kSeedCounts, name, &SeedCounts::seed);
+    if (seed.side == Side::unbounded) {
+        // An unbounded codec target has no count table.
+        EXPECT_EQ(row, kSeedCounts.end()) << name;
+        return;
+    }
+    const std::vector<std::byte> bytes = exact_copy(seed.make());
+    oracle_counts::reset();
+    oracle_counts::Counts most;
+    const char* failure = nullptr;
+    if (seed.side == Side::codec_tiers) {
+        failure = codec::oracle::check_codec(*seed.codec, bytes, *seed.bounds);
+        most = seed.codec == &codec::oracle::kDictCodec  ? codec_table(*seed.bounds, 2, 2, 2)
+               : seed.codec == &codec::oracle::kRleCodec ? codec_table(*seed.bounds, 1, 1, 1)
+                                                         : codec_table(*seed.bounds, 16, 4, 0);
+    } else if (seed.side == Side::within_store_cap || seed.side == Side::store_compared) {
+        failure = store::oracle::check_itch_store(bytes, store::oracle::kStoreFuzzBounds);
+        most = store_table();
+    } else {
+        failure = store::oracle::check_itch_query(bytes, store::oracle::kQueryFuzzBounds);
+        most = query_table();
+    }
+    const oracle_counts::Counts counted = oracle_counts::counts;
+    EXPECT_EQ(text(failure), "");
+    ASSERT_NE(row, kSeedCounts.end()) << name << " has no row in the count table";
+    EXPECT_EQ(counted, row->counts) << name << ": decoded " << counted.decoded << ", encoded "
+                                    << counted.encoded << ", compared " << counted.compared;
+    EXPECT_LE(counted.decoded, most.decoded);
+    EXPECT_LE(counted.encoded, most.encoded);
+    EXPECT_LE(counted.compared, most.compared);
+}
+
 // The counts the column checks ask the PFOR column decoder for, which the test below reads.
 std::vector<std::uint64_t>& asked_counts() {
     static std::vector<std::uint64_t> asked;
@@ -337,6 +492,48 @@ TEST(FuzzOracles, TheCapCountsTheValuesBeforeABlockTwice) {
         ASSERT_GE(asked_counts().size(), wanted.size());
         EXPECT_EQ(std::vector<std::uint64_t>(asked_counts().begin(), asked_counts().begin() + 3), wanted);
         EXPECT_EQ(std::ranges::count(asked_counts(), cap == 250 ? 100U : 150U), 0);
+    }
+}
+
+// The values each re-encode of a block takes, which the test below reads.
+std::vector<std::size_t>& encoded_counts() {
+    static std::vector<std::size_t> encoded;
+    return encoded;
+}
+std::expected<void, codec::CodecError> counted_encode_pfor_block(std::span<const std::uint64_t> values,
+                                                                 std::vector<std::byte>& out) {
+    encoded_counts().push_back(values.size());
+    return codec::oracle::detail::kPforEncoders[0].encode_block(values, out);
+}
+
+// The re-encodes take the budget, then the first kPastBudgetValues values of each of the next
+// past_budget_blocks blocks, then nothing (codec_oracles.hpp, OracleBounds). Ten PFOR blocks
+// of 100 values under a budget of 150: the first block whole, the second's first 50, then 64
+// values of each of the next three blocks with a prefix of three, or of none with none, each
+// encoded twice (the encoder must give the same bytes again), and nothing of the last five.
+TEST(FuzzOracles, TheReEncodesTakeTheBudgetThenAPrefixOfTheNextBlocks) {
+    std::vector<std::uint64_t> values(1'000);
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        values[i] = 7 * i * i;
+    }
+    std::vector<std::byte> column;
+    ASSERT_TRUE(codec::oracle::kPforCodec.encoders[0].encode_column(values, 100, column).has_value());
+    const std::vector<std::byte> input = exact_copy(column);
+    const std::array<codec::oracle::Encoder, 1> encoders{
+        {{.encode_block = &counted_encode_pfor_block,
+          .encode_column = codec::oracle::detail::kPforEncoders[0].encode_column}}};
+    codec::oracle::CodecUnderTest counted = codec::oracle::kPforCodec;
+    counted.encoders = encoders;
+    counted.block_encoders = nullptr;
+    for (const std::size_t prefix : {std::size_t{3}, std::size_t{0}}) {
+        SCOPED_TRACE(prefix);
+        encoded_counts().clear();
+        EXPECT_EQ(codec::oracle::check_as_column(
+                      counted, input, {.cross_checked_values = 150, .past_budget_blocks = prefix}),
+                  nullptr);
+        std::vector<std::size_t> wanted{100, 100, 50, 50};
+        wanted.insert(wanted.end(), 2 * prefix, codec::oracle::kPastBudgetValues);
+        EXPECT_EQ(encoded_counts(), wanted);
     }
 }
 

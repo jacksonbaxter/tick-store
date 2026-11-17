@@ -583,6 +583,33 @@ FAULTS = (
           "run-length named seed's small block falls within the cap", EXIT_CTEST,
           "BoundSeeds.PassTheWholeCheck/run_length_small_blocks (Failed)",
           arguments=("--test-regex", "BoundSeeds.PassTheWholeCheck/run_length_small_blocks$")),
+    # Past the budget the re-encodes take a prefix of each of the next few blocks, and stop.
+    Fault("codec-prefix-past-budget-dropped", "dev-test", "the codec oracle's re-encodes take "
+          "no prefix of the blocks past the budget", EXIT_CTEST,
+          "FuzzOracles.TheReEncodesTakeTheBudgetThenAPrefixOfTheNextBlocks (Failed)",
+          arguments=("--test-regex", "FuzzOracles.TheReEncodesTakeTheBudgetThenAPrefixOfTheNextBlocks$")),
+    Fault("codec-prefix-past-budget-unbounded", "dev-test", "the codec oracle's re-encodes take "
+          "a prefix of every block past the budget, not only of the next few", EXIT_CTEST,
+          "FuzzOracles.TheReEncodesTakeTheBudgetThenAPrefixOfTheNextBlocks (Failed)",
+          arguments=("--test-regex", "FuzzOracles.TheReEncodesTakeTheBudgetThenAPrefixOfTheNextBlocks$")),
+    # The count table (fuzz/README.md, "Bounds"): its numbers held to the constants, and the
+    # named seeds' counts to its numbers.
+    Fault("codec-prefix-constant-moved-without-the-table", "dev-test", "the prefix past the "
+          "budget is halved and the count table is not moved with it", EXIT_CTEST,
+          "FuzzOracles.TheCountTableHoldsTheConstants (Failed)",
+          arguments=("--test-regex", "FuzzOracles.TheCountTableHoldsTheConstants$")),
+    Fault("codec-compare-past-its-limit", "dev-test", "the codec oracle compares one maximal "
+          "block past its compare limit", EXIT_CTEST,
+          "BoundSeeds.CountWhatTheTableGivesThem/pfor (Failed)",
+          arguments=("--test-regex", "BoundSeeds.CountWhatTheTableGivesThem/pfor$")),
+    Fault("store-cap-at-the-compare-limit", "dev-test", "the store oracle takes the whole check "
+          "up to its compare limit", EXIT_CTEST,
+          "BoundSeeds.CountWhatTheTableGivesThem/itch_store_compared (Failed)",
+          arguments=("--test-regex", "BoundSeeds.CountWhatTheTableGivesThem/itch_store_compared$")),
+    Fault("query-repeat-ask-every-request", "dev-test", "the query oracle's repeat ask takes "
+          "every request past the budget", EXIT_CTEST,
+          "BoundSeeds.CountWhatTheTableGivesThem/itch_query (Failed)",
+          arguments=("--test-regex", "BoundSeeds.CountWhatTheTableGivesThem/itch_query$")),
     Fault("fuzz-dictionary-repeated-entry", "fuzz-dictionary", "the dictionary decoder stops "
           "refusing a ranked dictionary that holds one value twice", EXIT_LIBFUZZER,
           "check_dict_column:", arguments=FUZZ_ARGUMENTS),

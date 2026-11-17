@@ -1,0 +1,12 @@
+diff --git a/fuzz/codec_oracles.hpp b/fuzz/codec_oracles.hpp
+--- a/fuzz/codec_oracles.hpp
++++ b/fuzz/codec_oracles.hpp
+@@ -224,7 +224,7 @@
+ // never-budgeted checks only. 64 is the largest of 64, 32 and 16 with which every target's
+ // dearest input fits: the dearest inputs took the same time with no prefix (dictionary 692 and
+ // 694 ms, run-length 618 and 619, PFOR 566 and 566, no prefix and 64).
+-inline constexpr std::size_t kFuzzPastBudgetBlocks = 64;
++inline constexpr std::size_t kFuzzPastBudgetBlocks = 32;  // Planted: the table not moved with it.
+ 
+ // PFOR's cap: one maximal block, the format's largest.
+ inline constexpr std::size_t kPforFuzzDecodedValues = kMaxBlockValues;

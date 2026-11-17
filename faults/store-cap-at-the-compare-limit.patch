@@ -1,0 +1,12 @@
+diff --git a/fuzz/itch_store_oracles.hpp b/fuzz/itch_store_oracles.hpp
+--- a/fuzz/itch_store_oracles.hpp
++++ b/fuzz/itch_store_oracles.hpp
+@@ -181,7 +181,7 @@
+     result.stated = stated_values(*reader);
+     result.segment_records = reader->header().segment_records;
+     if (reader->header().segment_records > kFuzzMaxSegmentRecords ||
+-        result.stated > bounds.stated_values) {
++        result.stated > bounds.compared_values) {  // Planted: the whole check up to the compare limit.
+         result.over_cap = true;
+         return result;
+     }

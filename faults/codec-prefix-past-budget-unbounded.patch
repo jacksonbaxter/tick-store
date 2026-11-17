@@ -1,0 +1,13 @@
+diff --git a/fuzz/codec_oracles.hpp b/fuzz/codec_oracles.hpp
+--- a/fuzz/codec_oracles.hpp
++++ b/fuzz/codec_oracles.hpp
+@@ -400,8 +400,8 @@
+         crossed = got.first(std::min(got.size(), budget));
+         budget -= crossed.size();
+     } else if (prefix_blocks > 0) {
++        // Planted: every block past the budget takes the prefix.
+         crossed = got.first(std::min(got.size(), kPastBudgetValues));
+-        --prefix_blocks;
+     }
+     const bool whole_block = crossed.size() == got.size();
+     if (!crossed.empty()) {

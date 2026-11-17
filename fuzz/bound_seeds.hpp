@@ -214,18 +214,45 @@ template <class Encode>
 // The PFOR target's costliest input: of the shapes timed at width 0 the two dearest maximal
 // blocks, 7 i^2 under delta of delta with the scale (6,414 bytes), within the cap, then 2^20
 // values rising by 7 under head delta with the scale (6,159 bytes), past it and so decoded
-// by both kernel sets and compared; then the tail.
+// by both kernel sets and compared; then, where the decode limit reaches past the compare
+// limit, a block of the same rising values, as many as the bytes left hold beside the tail's
+// header, decoded once; then the tail.
 [[nodiscard]] inline Bytes pfor_seed() {
+    constexpr codec::oracle::OracleBounds kBounds = codec::oracle::kPforFuzzBounds;
+    static_assert(kBounds.decoded_values == codec::kMaxBlockValues &&
+                      kBounds.compared_values == 2 * codec::kMaxBlockValues,
+                  "pfor_seed assumes a cap and a compare tier of one maximal block each");
+    const auto rising = [](std::size_t count) {
+        Words values(count);
+        for (std::size_t i = 0; i < count; ++i) {
+            values[i] = 7 * (1'000 + i);
+        }
+        return nested_pfor(values, codec::IntTransform::head_delta, true);
+    };
     Words square(codec::kMaxBlockValues);
-    Words rising(codec::kMaxBlockValues);
     for (std::size_t i = 0; i < square.size(); ++i) {
         square[i] = 7 * i * i;
-        rising[i] = 7 * (1'000 + i);
     }
-    return with_part_two_tail(
-        joined(nested_pfor(square, codec::IntTransform::delta_of_delta, true),
-               nested_pfor(rising, codec::IntTransform::head_delta, true)),
-        kSmallMaxLen);
+    Bytes column = joined(nested_pfor(square, codec::IntTransform::delta_of_delta, true),
+                          rising(codec::kMaxBlockValues));
+    if (kBounds.single_decoded_values > kBounds.compared_values) {
+        const std::size_t room = kSmallMaxLen - codec::kBlockHeaderSize - column.size();
+        std::size_t low = 0;
+        std::size_t high = std::min(std::size_t{codec::kMaxBlockValues},
+                                    kBounds.single_decoded_values - kBounds.compared_values);
+        while (low < high) {
+            const std::size_t middle = low + ((high - low + 1) / 2);
+            if (rising(middle).size() <= room) {
+                low = middle;
+            } else {
+                high = middle - 1;
+            }
+        }
+        if (low > 0) {
+            column = joined(column, rising(low));
+        }
+    }
+    return with_part_two_tail(std::move(column), kSmallMaxLen);
 }
 
 // The PFOR block of `count` zeros with no transform, each vector width 0, so no delta pass
@@ -977,7 +1004,8 @@ template <class Fits>
 
 // The PFOR target's: the dearest block, 7 i^2 under delta of delta with the scale, of `first`
 // values, `small` blocks carrying on its values the same way, then the maximal head-delta
-// block with the scale, which the compare limit always takes; then the tail.
+// block with the scale, which the compare limit takes after a first block of up to the cap's
+// values; then the tail.
 [[nodiscard]] inline std::optional<Bytes> pfor_small_blocks_of(std::size_t first, std::size_t small) {
     const auto squares = [](std::size_t from, std::size_t count) {
         Words values(count);
@@ -1069,6 +1097,78 @@ inline constexpr std::size_t kRleSmallBlocks = 1;
 inline constexpr std::size_t kRleComparedBlocks =
     (codec::oracle::kRleFuzzComparedValues - codec::oracle::kRleFuzzDecodedValues) / codec::kMaxBlockValues;
 
+// The dictionary target's costliest input: one-value blocks, as many as -max_len holds beside
+// the rest, then the dearest block of the cap's values less twice theirs, the last within the
+// cap (counted twice, the values before a block take the cap's room twice: codec_oracles.hpp,
+// OracleBounds::decoded_values), then a maximal block of it, compared; then the tail. Each
+// one-value block costs the fuzz target the whole of part 1 for one value, dearer a byte than
+// the cap's block. The builder checks that one more such block does not fit.
+inline constexpr std::size_t kDictOneValueBlocks = 300;
+[[nodiscard]] inline std::optional<Bytes> dictionary_one_value_blocks_of(std::size_t ones) {
+    constexpr codec::oracle::OracleBounds kBounds = codec::oracle::kDictFuzzBounds;
+    Bytes column;
+    for (std::size_t b = 0; b < ones; ++b) {
+        const Words value{codec::kDictMtfMaxEntries - 1 - (b % codec::kDictMtfMaxEntries)};
+        column = joined(column, encoded([&](Bytes& out) { return codec::encode_dict_block(value, out); }));
+    }
+    column = joined(column, move_to_front_block(kBounds.decoded_values - (2 * ones)));
+    column = joined(column, move_to_front_block(std::min(std::size_t{codec::kMaxBlockValues},
+                                                         kBounds.compared_values - kBounds.decoded_values)));
+    return fitted(std::move(column));
+}
+[[nodiscard]] inline Bytes dictionary_one_value_blocks_seed() {
+    if (dictionary_one_value_blocks_of(kDictOneValueBlocks + 1)) {
+        throw std::runtime_error("kDictOneValueBlocks is not the most one-value blocks -max_len holds");
+    }
+    return dictionary_one_value_blocks_of(kDictOneValueBlocks).value();
+}
+
+// Inputs that spend the cross-check budget and then the prefix past it within the cap, so the
+// re-encodes and the encoder-side check take the most values they can (the count table,
+// fuzz/README.md, "Bounds"): a first block of the budget's values, then
+// OracleBounds::past_budget_blocks blocks of kPastBudgetValues values, each taken whole by the
+// prefix, then a block of what the cap leaves, the last within it, which past the budget and
+// the prefix gets the never-budgeted checks only; then the tail. `block(from, count)` gives a
+// codec block of `count` values.
+template <class Block>
+[[nodiscard]] Bytes prefix_seed_of(const codec::oracle::OracleBounds& bounds, Block&& block) {
+    constexpr std::size_t kSmall = codec::oracle::kPastBudgetValues;
+    Bytes column = block(0, bounds.cross_checked_values);
+    std::size_t seen = bounds.cross_checked_values;
+    for (std::size_t b = 0; b < bounds.past_budget_blocks; ++b) {
+        column = joined(column, block(seen, kSmall));
+        seen += kSmall;
+    }
+    column = joined(column, block(seen, bounds.decoded_values - (2 * seen)));
+    auto fits = fitted(std::move(column));
+    if (!fits) {
+        throw std::runtime_error("a prefix seed does not fit -max_len");
+    }
+    return std::move(*fits);
+}
+[[nodiscard]] inline Bytes dictionary_prefix_seed() {
+    return prefix_seed_of(codec::oracle::kDictFuzzBounds, [](std::size_t from, std::size_t count) {
+        Words values(count);
+        for (std::size_t i = 0; i < count; ++i) {
+            values[i] = codec::kDictMtfMaxEntries - 1 - ((from + i) % codec::kDictMtfMaxEntries);
+        }
+        return encoded([&](Bytes& out) { return codec::encode_dict_block(values, out); });
+    });
+}
+[[nodiscard]] inline Bytes pfor_prefix_seed() {
+    return prefix_seed_of(codec::oracle::kPforFuzzBounds, [](std::size_t from, std::size_t count) {
+        Words values(count);
+        for (std::size_t i = 0; i < count; ++i) {
+            values[i] = 7 * (from + i) * (from + i);
+        }
+        return nested_pfor(values, codec::IntTransform::delta_of_delta, true);
+    });
+}
+[[nodiscard]] inline Bytes run_length_prefix_seed() {
+    return prefix_seed_of(codec::oracle::kRleFuzzBounds, [](std::size_t /*from*/, std::size_t count) {
+        return run_length_runs_block(count, std::min(count, kSmallBlockValues));
+    });
+}
 // Which side of its target's bounds a seed was built for, which the unit test holds it to.
 enum class Side : std::uint8_t {
     // A codec input of a bounded target: its blocks fall in the tiers `tiers` gives.
@@ -1161,14 +1261,23 @@ struct BoundSeed {
     return CodecTiers{.within_cap = 1, .compared = blocks(kCompared - kCap), .decoded_once = blocks(kOnce - kCompared)};
 }
 
+// The tiers of a prefix seed: the budget's block, the prefix's blocks and the cap's block.
+inline constexpr CodecTiers kPrefixTiers{.within_cap = 1 + codec::oracle::kFuzzPastBudgetBlocks + 1};
+
 // One line each in fuzz/bound_seeds.txt, in this order.
-inline constexpr std::array<BoundSeed, 20> kBoundSeeds{{
+inline constexpr std::array<BoundSeed, 24> kBoundSeeds{{
     {"fuzz_dictionary", "dictionary", "bound-costliest", kSmallMaxLen, Side::codec_tiers,
      &dictionary_seed, &codec::oracle::check_dict_column, &codec::oracle::kDictCodec,
      &codec::oracle::kDictFuzzBounds, dictionary_tiers()},
     {"fuzz_dictionary", "dictionary", "bound-small-blocks", kSmallMaxLen, Side::codec_tiers,
      &dictionary_small_blocks_seed, &codec::oracle::check_dict_column, &codec::oracle::kDictCodec,
      &codec::oracle::kDictFuzzBounds, CodecTiers{.within_cap = 1, .compared = kDictSmallBlocks + 1}},
+    {"fuzz_dictionary", "dictionary", "bound-one-value-blocks", kSmallMaxLen, Side::codec_tiers,
+     &dictionary_one_value_blocks_seed, &codec::oracle::check_dict_column, &codec::oracle::kDictCodec,
+     &codec::oracle::kDictFuzzBounds, CodecTiers{.within_cap = kDictOneValueBlocks + 1, .compared = 1}},
+    {"fuzz_dictionary", "dictionary", "bound-prefix", kSmallMaxLen, Side::codec_tiers,
+     &dictionary_prefix_seed, &codec::oracle::check_dict_column, &codec::oracle::kDictCodec,
+     &codec::oracle::kDictFuzzBounds, kPrefixTiers},
     {"fuzz_run_length", "run_length", "bound-costliest", kSmallMaxLen, Side::codec_tiers,
      &run_length_seed, &codec::oracle::check_rle_column, &codec::oracle::kRleCodec,
      &codec::oracle::kRleFuzzBounds, CodecTiers{.within_cap = 1, .compared = kRleComparedBlocks}},
@@ -1178,6 +1287,9 @@ inline constexpr std::array<BoundSeed, 20> kBoundSeeds{{
     {"fuzz_run_length", "run_length", "bound-small-blocks", kSmallMaxLen, Side::codec_tiers,
      &run_length_small_blocks_seed, &codec::oracle::check_rle_column, &codec::oracle::kRleCodec,
      &codec::oracle::kRleFuzzBounds, CodecTiers{.within_cap = 1, .compared = kRleSmallBlocks + kRleComparedBlocks}},
+    {"fuzz_run_length", "run_length", "bound-prefix", kSmallMaxLen, Side::codec_tiers,
+     &run_length_prefix_seed, &codec::oracle::check_rle_column, &codec::oracle::kRleCodec,
+     &codec::oracle::kRleFuzzBounds, kPrefixTiers},
     {"fuzz_run_length", "run_length", "bound-repeated-run-value", kSmallMaxLen,
      Side::codec_tiers, &run_length_repeat_seed, &codec::oracle::check_rle_column,
      &codec::oracle::kRleCodec, &codec::oracle::kRleFuzzBounds,
@@ -1185,10 +1297,13 @@ inline constexpr std::array<BoundSeed, 20> kBoundSeeds{{
     {"fuzz_pfor", "pfor", "bound-costliest", kSmallMaxLen, Side::codec_tiers, &pfor_seed,
      &codec::oracle::check_pfor_column, &codec::oracle::kPforCodec,
      &codec::oracle::kPforFuzzBounds,
-     maximal_after_cap(codec::oracle::kPforFuzzDecodedValues, codec::oracle::kPforFuzzComparedValues)},
+     CodecTiers{.within_cap = 1, .compared = 1, .decoded_once = 1}},
     {"fuzz_pfor", "pfor", "bound-small-blocks", kSmallMaxLen, Side::codec_tiers,
      &pfor_small_blocks_seed, &codec::oracle::check_pfor_column, &codec::oracle::kPforCodec,
      &codec::oracle::kPforFuzzBounds, CodecTiers{.within_cap = 1, .compared = kPforSmallBlocks + 1}},
+    {"fuzz_pfor", "pfor", "bound-prefix", kSmallMaxLen, Side::codec_tiers, &pfor_prefix_seed,
+     &codec::oracle::check_pfor_column, &codec::oracle::kPforCodec, &codec::oracle::kPforFuzzBounds,
+     kPrefixTiers},
     {"fuzz_pfor", "pfor", "bound-delta-past-cap", kSmallMaxLen, Side::codec_tiers,
      &pfor_delta_past_cap_seed, &codec::oracle::check_pfor_column, &codec::oracle::kPforCodec,
      &codec::oracle::kPforFuzzBounds,

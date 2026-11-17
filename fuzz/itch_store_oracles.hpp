@@ -33,6 +33,7 @@
 // segment cap (fuzz/README.md, "Bounds").
 
 #include "container_oracles.hpp"
+#include "oracle_counts.hpp"
 #include "tick_store/codec/block.hpp"
 #include "tick_store/codec/simd.hpp"
 #include "tick_store/itch/codec.hpp"
@@ -130,6 +131,10 @@ struct ReadResult {
                                        SegmentReader& records, std::vector<Bytes>& out,
                                        std::optional<ItchStoreError>& error,
                                        const char*& failure) {
+    // Counted at the values the segment's entry states, which its columns decode to at most.
+    for (const std::uint32_t values : reader.segment(segment).values) {
+        oracle_counts::counts.decoded += values;
+    }
     if (auto sought = records.seek(reader, segment); !sought.has_value()) {
         error = sought.error();
         return false;
@@ -261,8 +266,10 @@ struct ReadResult {
         // The kernel-against-scalar oracle: the same verdict and records with the scalar
         // set forced.
         const codec::simd::ScalarKernelsOnThisThread scalar;
+        const std::uint64_t before = oracle_counts::counts.decoded;
         const detail::ReadResult by_scalar =
             detail::read_store(file, Checksums::skip, bounds, failure);
+        oracle_counts::counts.compared += oracle_counts::counts.decoded - before;
         if (failure != nullptr) {
             return failure;
         }
@@ -298,7 +305,9 @@ struct ReadResult {
             return failure;
         }
         const codec::simd::ScalarKernelsOnThisThread scalar;
+        const std::uint64_t before = oracle_counts::counts.decoded;
         const detail::ReadResult by_scalar = detail::read_store(file, Checksums::skip, StoreBounds{}, failure);
+        oracle_counts::counts.compared += oracle_counts::counts.decoded - before;
         if (failure != nullptr) {
             return failure;
         }
@@ -331,6 +340,8 @@ struct ReadResult {
     if (!reread.content.has_value()) {
         return "the reader refused what the writer wrote";
     }
+    // Counted at the values the written file states, for it and for the second write below.
+    oracle_counts::counts.encoded += 2 * reread.stated;
     if (*reread.content != content) {
         return "the rewritten file reads back differently";
     }
