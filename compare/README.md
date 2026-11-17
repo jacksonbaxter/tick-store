@@ -351,6 +351,47 @@ the stat file of the block device under its input, so an input on a file system 
 device of its own, such as tmpfs, overlayfs or a btrfs subvolume, stops the write with an error
 naming it.
 
+**On the Linux day the inputs are not in the same place when the clocks start.** In
+`results/compare/Linux-12302019-full-ede0176b10bb.json`, tick-store's input, the day's ITCH file, is
+in memory before its write clock starts: `input_at_clock_start.made_ready` records one warm, and
+`input_resident_pages_at_start` equals `input_pages`, 2,014,504, for both classes of both variants.
+The other systems' input, the day's export of 5,825,603 pages, was taken as the page cache held it
+(`made_ready`: "nothing: the input is taken as the cache holds it") and was read from the device
+inside the clock. From each write's own record, `input_resident_pages_at_start` of `input_pages`,
+then `device_bytes_read`, which `device_counter` names as the block device's sectors read,
+machine-wide, over the whole ingest call:
+
+| Write | Class A | Class B |
+|---|---|---|
+| tick-store `v3-seg4Mi`, headline | 2,014,504 of 2,014,504; 250,916,864 B | 2,014,504 of 2,014,504; 274,239,488 B |
+| tick-store `v3-seg1Mi` | 2,014,504 of 2,014,504; 2,150,400 B | 2,014,504 of 2,014,504; 1,429,504 B |
+| Parquet `zstd1-rg1Mi`, headline | 2,259,585 of 5,825,603; 19,501,752,320 B | 4,033 of 5,825,603; 23,846,309,888 B |
+| ArcticDB `rows100k-cols127`, headline | 2,373,595 of 5,825,603; 18,411,094,016 B | 4,033 of 5,825,603; 23,850,713,088 B |
+| QuestDB `plain`, headline | 2,533,467 of 5,825,603; 21,521,625,088 B | 4,033 of 5,825,603; 24,631,062,528 B |
+| The other variants of those three, but ArcticDB's per security | 4,033 of 5,825,603; 23,846,330,368 to 23,942,299,648 B | 4,033 of 5,825,603; 23,846,940,672 to 24,299,143,168 B |
+| ArcticDB `rows100k-cols127-per-security` | 4,033 of 5,825,603; 46,472,331,264 B | 4,033 of 5,825,603; 46,369,882,112 B |
+
+`engine_only_seconds` is the total less `python_seconds`. For tick-store that leaves
+`tick_roundtrip`'s own wall time, the process's start and exit taken out; for the others it takes
+out the reading of each chunk and putting it in the form the system's call takes, as the table
+above says. Engine-only does not remove the difference in where the inputs are: the device bytes
+are counted over the whole clock, so engine-only may hold them as well. ArcticDB's headline class B
+write shows how far it can move: its engine-only time was 42.6 s on the replaced run (the total less
+`python_seconds` in `results/compare/replaced/Linux-12302019-full-67ae574f5666.json`, whose records
+keep no residency or device-read figure for the other systems) and 291.8 s on this one, with
+`python_seconds` at 80.9 s and 89.6 s. So the two-clock rule below does not take the asymmetry
+out. Each of these figures is from one host, with 15 GB of memory, less than the export's
+23,861,669,888 bytes, and from one write per class, a single repetition, with nothing to show its
+spread.
+
+A fair protocol would start every system's write clock with its input in the same state, proven by
+the same `mincore` reading: on this host, which cannot hold the export, every input evicted and
+proven at 0 resident before the clock, tick-store's ITCH file included, so every system reads its
+input from the device inside its clock; on a host with memory for it, every input wholly resident,
+as on the slice; and in either case more than one write per class. Until then RESULTS.md gives,
+beside each write verdict against another system, whose input was in memory and whose was read
+from disk, the bytes read and what engine-only holds.
+
 **A write target is met against another system only if tick-store is no slower on both times.**
 `BENCHMARKS.md`'s targets are not reworded; the rule is how they are judged, by
 `scripts/render_results.py`, whose tables show both columns. The files measured before protocol 2
@@ -676,12 +717,18 @@ ArcticDB `rows10M-cols127` and per security, QuestDB `locate-index`, and tick-st
 `snappy-rg1Mi` won Q2 cold, and no other Parquet variant beat the rest on Q5 cold, so
 `zstd9-rg1Mi` dropped out. That full day was lost to the host's backup reading QuestDB's store.
 
-At `67ae574`, the commit of the full-day results, the list changed before the run: Parquet
+At `67ae574`, the commit of the full-day results the freeze replaced, kept in
+`results/compare/replaced/`, the list changed before the run: Parquet
 `zstd1-rg128k` and `none-rg1Mi`, ArcticDB `rows100k-cols1` and per security, QuestDB
 `locate-index`, and tick-store `v3-seg1Mi`. Against `7a2e092`, Parquet lost `snappy-rg1Mi`, and
 ArcticDB lost `rows10M-cols127` and gained `rows100k-cols1`, as at `dd5de38`. By the table above
 that is about 10.3 hours: Parquet three variants, about 112 minutes, ArcticDB 213, QuestDB 182,
 tick-store 86, and 24 for the checks before each system.
+
+At `ede0176`, the freeze's commit and that of the committed full-day results, the Linux slice gave
+Parquet `zstd1-rg128k`, `zstd9-rg1Mi` and `none-rg1Mi`, ArcticDB `rows10M-cols127` and per
+security, QuestDB `locate-index`, and tick-store `v3-seg1Mi`. Against `67ae574`, Parquet gained
+`zstd9-rg1Mi`, and ArcticDB gained `rows10M-cols127` and lost `rows100k-cols1`.
 
 At `dd5de38` the full day has not finished. The guard stopped QuestDB `plain` twice on swap
 traffic: in its class A write, and on a freshly booted host in its read-back. Both times the kernel
@@ -693,9 +740,9 @@ none of this, because swap was already full when it started. See "Full-day compa
 `-Xms1g -Xmx1g`.
 
 **Reproducing tick-store's Linux figures at a later commit.** `--variant-source` wants Linux slice
-results of the same commit, and the only ones committed are `67ae574`'s, so at any other commit
+results of the same commit, and the only ones committed are `ede0176`'s, so at any other commit
 run tick-store alone, which runs both its variants, the headline `v3-seg4Mi` and `v3-seg1Mi`, the
-pair the rule chose at `67ae574`:
+pair the rule chose at `ede0176`:
 
 ```sh
 TICK_STORE_MEASURE=<wrapper> <venv>/bin/python -I compare/run.py --day 12302019 \
@@ -726,9 +773,10 @@ exits 1. Check a published one again with `<venv>/bin/python -I scripts/check_co
 Without `TICK_STORE_MEASURE` the same command is iteration: the document goes to
 `--iteration-dir`, `build/compare-iteration/` unless given, unchecked, and `check_compare.py`
 refuses it as iteration-only. Read tick-store's figures from it beside its block in
-`results/compare/Linux-12302019-full-67ae574f5666.json`, a protocol 1 file: the new one is
-protocol 2, where tick-store's cold figures hold the store's open and each write states its
-engine-only seconds (see "The final review's comparison protocol" in `docs/NOTES.md`). Before the
+`results/compare/Linux-12302019-full-ede0176b10bb.json`, protocol 2 as the new one is, where
+tick-store's cold figures hold the store's open and each write states its engine-only seconds;
+the replaced day in `results/compare/replaced/` is protocol 1, without either (see "The final
+review's comparison protocol" in `docs/NOTES.md`). Before the
 review's F-5 the same run took `--systems tickstore --variants v3-seg4Mi,v3-seg1Mi`, was validated
 as a four-system day, exited 1 and kept a `.pending` file; a measured run now refuses those
 arguments.
@@ -780,10 +828,12 @@ a 1% tail. Each block records its `n`, the rank used (`tail_rank`), whether the 
 slowest run (`tail_is_slowest`) and what it is (`tail`, such as "slowest of 7"). `p99_us` holds the
 same figure under its old name, which the files measured before the final review's protocol use;
 those files carry no `protocol` in their header and count as protocol 1, and every file since says
-`"protocol": 2`. `scripts/check_compare.py` accepts no protocol only from those four files
-themselves, at `67ae574` and `2503d1e`, each pinned by the SHA-256 of its bytes under
-`protocol_1_comparison_files` in `scripts/data_pins.json`, and any stated protocol only as the
-integer 2. The slice is five minutes long, so Q2 and Q3 are
+`"protocol": 2`. `scripts/check_compare.py` accepts no protocol only from a file pinned by the
+SHA-256 of its bytes under `protocol_1_comparison_files` in `scripts/data_pins.json`, and any
+stated protocol only as the integer 2. The freeze's files at `ede0176` replaced the four protocol 1
+files, at `67ae574` and `2503d1e`; one is kept, the Linux full day at `67ae574`, in
+`results/compare/replaced/`, pinned there and under `replaced_comparison_files`, and the other
+three pins went with their files. The slice is five minutes long, so Q2 and Q3 are
 clipped from an hour to `[09:30:00, 09:34:30)`, and Q5 scans 6,125,294 rows and not a day's
 268,744,780. Every results file says which it is, and `scripts/render_results.py` never puts a
 full-day number and a slice number in one table. What the runs found is in "Comparison harness",
