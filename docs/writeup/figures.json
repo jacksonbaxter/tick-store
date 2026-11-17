@@ -28,7 +28,7 @@
   {"text": "30 December 2019", "why": "the reference day's date", "in": ["The reference day is 30 December 2019,"]},
   {"text": "30 October 2019", "why": "the second day's date", "in": ["a second day, 30 October 2019,"]},
   {"text": "SHA-256", "why": "a hash function's name", "in": ["SHA-256 of the rebuilt stream"]},
-  {"text": "2018", "why": "the year the Linux host's processor was made, from its data sheet", "in": ["made in 2018,"]},
+  {"text": "2018", "why": "the year the Linux host's processor was made, from its data sheet", "in": ["machine from 2018,"]},
   {"text": "Zen 3", "why": "a processor named in a bar's source", "in": ["(FastLanes, Zen 3 server)"]},
   {"text": "EPYC 9554", "why": "a processor named in a bar's source", "in": ["(ALP, an AMD EPYC 9554 core)"]},
   {"text": "32 workers", "why": "the vendor's setup for its published figure, part of the bar's source", "in": ["(QuestDB vendor figure, 32 workers)"]},
@@ -38,7 +38,11 @@
   {"text": "distance of 0", "why": "the value that marks an import, a code, not a result", "in": ["A distance of 0"]},
   {"text": "10^-4", "why": "ITCH 5.0's price unit", "in": ["units of 10^-4 dollars"]},
   {"text": "order-0", "why": "the name of an entropy taken with no context", "in": ["order-0 entropy"]},
-  {"text": "two-pass", "why": "the name of a delta kernel that runs in two passes, not a count of results", "in": ["two-pass delta {{skM_two_pass_speedup}}x", "two-pass delta {{skL_two_pass_speedup}}x", "add and the two-pass delta. On AVX2"]}
+  {"text": "two-pass", "why": "the name of a delta kernel that runs in two passes, not a count of results", "in": ["two-pass delta {{skM_two_pass_speedup}}x", "two-pass delta {{skL_two_pass_speedup}}x", "add and the two-pass delta. On AVX2"]},
+  {"text": "15", "why": "the Linux host's own job schedule, from its scheduler, not a result", "in": ["backup every 15 minutes"]},
+  {"text": "2", "why": "the Linux host's own job schedule, from its scheduler, not a result", "in": ["and 2 small watchers", "2 sync jobs"]},
+  {"text": "5", "why": "the Linux host's own job schedule, from its scheduler, not a result", "in": ["watchers every 5,"]},
+  {"text": "10", "why": "the Linux host's own job schedule, from its scheduler, not a result", "in": ["jobs every 10,"]}
  ],
  "kinds": {
   "store-size": {"what": "the reference day's store as built, its bytes by column and part, from scripts/store_results.py", "files": {"any": "results/store-size-12302019.json"}, "commit": ["commit"]},
@@ -206,10 +210,10 @@
   "skL_fused_speedup": {"what": "AVX2 over scalar on the Zen 1, `pfor_delta_fused`, the median over its cases of each set", "kind": "simd-kernel", "host": "Linux", "value": {"div": [{"cases_median": "pfor_delta_fused/*avx2", "field": ["throughput", "values_per_second", "median"]}, {"cases_median": "pfor_delta_fused/*scalar", "field": ["throughput", "values_per_second", "median"]}]}, "format": "{:.2f}"},
   "skL_fused_cycles": {"what": "DS-4: fused AVX2 delta on the Zen 1, cycles a value, the median over its widths", "target": {"id": "DS-4", "host": "Linux", "part": "fused, median of the widths"}},
   "gap_ds4_x": {"what": "DS-4: the measured cycles over the bar, on the Zen 1", "value": {"div": [{"figure": "skL_fused_cycles"}, {"bar": {"id": "DS-4", "host": "Linux"}}]}, "format": "{:.2f}"},
-  "icL_parse_mps": {"what": "ITCH parsing alone, M messages a second, on the Zen 1", "kind": "itch-codec", "host": "Linux", "value": {"div": [{"case": "itch_decode", "field": ["throughput", "messages_per_second", "median"]}, 1000000.0]}, "format": "{:.2f}"},
-  "wr_parse_s": {"what": "seconds parsing the day would take at that rate, on the Zen 1", "kind": "itch-codec", "host": "Linux", "value": {"div": [{"figure": "ss_records"}, {"case": "itch_decode", "field": ["throughput", "messages_per_second", "median"]}]}, "format": "{:.1f}"},
   "measured_commit": {"what": "the commit every results file read names, but the declared exceptions, as its files' names give it", "measured_commit": true},
   "cmpL_ts_B_alloc_gb": {"what": "tick-store's flushed store, allocated, GB, on the Zen 1", "kind": "compare-day", "host": "Linux", "value": {"path": ["systems", "tickstore", "variants", "@headline", "classes", "B", "stored", "allocated_bytes"]}, "format": "{:.2f}", "scale": 1e-09},
+  "cmpL_ts_B_device_b": {"what": "bytes tick-store's flushed write read from the device inside its clock, on the Zen 1", "kind": "compare-day", "host": "Linux", "value": {"path": ["systems", "tickstore", "variants", "@headline", "classes", "B", "write", "detail", "device_read", "bytes"]}, "format": "{:,}"},
+  "cmpL_questdb_B_device_b": {"what": "bytes QuestDB's flushed write read from the device inside its clock, on the Zen 1", "kind": "compare-day", "host": "Linux", "value": {"path": ["systems", "questdb", "variants", "@headline", "classes", "B", "write", "detail", "device_read", "bytes"]}, "format": "{:,}"},
   "cmpL_ts_q1_warm_med_ms": {"what": "tick-store's Q1 warm median, ms, on the Zen 1", "kind": "compare-day", "host": "Linux", "value": {"path": ["systems", "tickstore", "variants", "@headline", "queries", "Q1", "warm", "median_us"]}, "format": "{:,.2f}", "scale": 0.001},
   "cmpL_q1_warm_best_ms": {"what": "the Q1 warm median, ms, of the fastest other system in the setup the comparison fixed for it, on the Zen 1", "kind": "compare-day", "host": "Linux", "value": {"lowest_value": {"systems": ["parquet", "arcticdb", "questdb"], "path": ["queries", "Q1", "warm", "median_us"]}}, "format": "{:,.2f}", "scale": 0.001},
   "cmpL_ts_q2_warm_med_ms": {"what": "tick-store's Q2 warm median, ms, on the Zen 1", "target": {"id": "QL-1", "host": "Linux", "part": "Q2 warm median"}},
@@ -249,7 +253,6 @@
   "glance_disk_x": {"what": "tick-store's flushed store over that, on the Zen 1", "value": {"div": [{"figure": "cmpL_ts_B_alloc_gb"}, {"figure": "glance_disk_other"}]}, "format": "{:.2f}"},
   "glance_write_other": {"what": "the shortest flushed day write of the other three, each in its fixed setup, total s, on the Zen 1", "kind": "compare-day", "host": "Linux", "value": {"lowest_value": {"systems": ["parquet", "arcticdb", "questdb"], "path": ["classes", "B", "write", "seconds_median"]}}, "format": "{:,.1f}"},
   "glance_write_other_system": {"what": "the system of that write, on the Zen 1", "kind": "compare-day", "host": "Linux", "value": {"lowest_system": {"systems": ["parquet", "arcticdb", "questdb"], "path": ["classes", "B", "write", "seconds_median"]}}, "format": "system"},
-  "glance_write_x": {"what": "tick-store's flushed write over that, on the Zen 1", "value": {"div": [{"figure": "cmpL_ts_B_total_s"}, {"figure": "glance_write_other"}]}, "format": "{:.2f}"},
   "cmpL_q2_warm_best_system": {"what": "the system of the fastest other Q2 warm median, each in its fixed setup, on the Zen 1", "kind": "compare-day", "host": "Linux", "value": {"lowest_system": {"systems": ["parquet", "arcticdb", "questdb"], "path": ["queries", "Q2", "warm", "median_us"]}}, "format": "system"},
   "cmpL_q3_warm_best_system": {"what": "the system of the fastest other Q3 warm median, each in its fixed setup, on the Zen 1", "kind": "compare-day", "host": "Linux", "value": {"lowest_system": {"systems": ["parquet", "arcticdb", "questdb"], "path": ["queries", "Q3", "warm", "median_us"]}}, "format": "system"},
   "cmpL_q5_warm_best_system": {"what": "the system of the fastest other Q5 warm median, each in its fixed setup, on the Zen 1", "kind": "compare-day", "host": "Linux", "value": {"lowest_system": {"systems": ["parquet", "arcticdb", "questdb"], "path": ["queries", "Q5", "warm", "median_us"]}}, "format": "system"},
@@ -281,7 +284,7 @@
   "cmpL_ts_warm_spread_max": {"what": "the highest of the same, %, on the Zen 1", "kind": "compare-day", "host": "Linux", "value": {"max": {"each": ["Q1", "Q2", "Q3", "Q4", "Q5"], "of": {"div": [{"sub": [{"path": ["systems", "tickstore", "variants", "@headline", "queries", "$", "warm", "max_us"]}, {"path": ["systems", "tickstore", "variants", "@headline", "queries", "$", "warm", "min_us"]}]}, {"path": ["systems", "tickstore", "variants", "@headline", "queries", "$", "warm", "median_us"]}]}}}, "format": "{:.1f}", "scale": 100},
   "cmpL_warm_runs": {"what": "the timed runs of each warm query block, on the Zen 1", "kind": "compare-day", "host": "Linux", "value": {"path": ["systems", "tickstore", "variants", "@headline", "queries", "Q1", "warm", "n"]}, "format": "{:d}"},
   "cmpL_cold_runs": {"what": "the timed runs of each cold query block, on the Zen 1", "kind": "compare-day", "host": "Linux", "value": {"path": ["systems", "tickstore", "variants", "@headline", "queries", "Q1", "cold", "n"]}, "format": "{:d}"},
-  "cmpL_tick_query_vmhwm_mb": {"what": "tick-store's query worker's peak resident set, MB, on the Zen 1", "kind": "compare-day", "host": "Linux", "value": {"path": ["systems", "tickstore", "peak_memory", "vmhwm_bytes_by_process", "tick_query"]}, "format": "{:,.1f}", "scale": 1e-06},
+  "cmpL_tick_query_vmhwm_mb": {"what": "the peak resident set of tick-store's query process, tick_query, MB, on the Zen 1", "kind": "compare-day", "host": "Linux", "value": {"path": ["systems", "tickstore", "peak_memory", "vmhwm_bytes_by_process", "tick_query"]}, "format": "{:,.1f}", "scale": 1e-06},
   "cmpL_ts_q4_cold_device_mb": {"what": "bytes read from the device in a cold Q4, the median of its proofs, MB, on the Zen 1", "kind": "compare-day", "host": "Linux", "value": {"median": {"items": ["systems", "tickstore", "variants", "@headline", "queries", "Q4", "cold", "proofs"], "field": ["device_bytes_read"]}}, "format": "{:.1f}", "scale": 1e-06},
   "q2_ns_per_row": {"what": "Q2's warm engine median a row, ns, on the Zen 1", "kind": "compare-day", "host": "Linux", "value": {"div": [{"mul": [{"path": ["systems", "tickstore", "variants", "@headline", "queries", "Q2", "warm", "engine", "median_us"]}, 1000]}, {"path": ["systems", "tickstore", "variants", "@headline", "queries", "Q2", "digest", "rows"]}]}, "format": "{:.0f}"},
   "q5_ns_per_value": {"what": "Q5's warm engine median a value decoded, ns, on the Zen 1", "kind": "compare-day", "host": "Linux", "value": {"div": [{"mul": [{"path": ["systems", "tickstore", "variants", "@headline", "queries", "Q5", "warm", "engine", "median_us"]}, 1000]}, {"path": ["systems", "tickstore", "variants", "@headline", "queries", "Q5", "scan", "values_decoded"]}]}, "format": "{:.1f}"},
@@ -397,8 +400,8 @@
   "note:diag-query": {"what": "what the counters summary is", "note_of": "diag-query"},
   "note:diag-price": {"what": "what the price-decode summary is", "note_of": "diag-price"},
   "note:diag-writer": {"what": "what the writer profile summary is", "note_of": "diag-writer"},
-  "disturbance:timed": {"what": "the events the disturbances file records inside timed phases, on the Zen 1", "kind": "disturbances", "host": "Linux", "value": {"count": ["entries"], "where": {"field": ["timed"], "equals": true}}, "format": "{:d}"},
-  "disturbance:timed_fuzz": {"what": "the events the fuzz run's disturbances file records inside timed phases, on the Zen 1", "kind": "disturbances-fuzz", "host": "Linux", "value": {"count": ["entries"], "where": {"field": ["timed"], "equals": true}}, "format": "{:d}"}
+  "disturbance:timed": {"what": "the entries the disturbances file holds inside timed phases, an event entered once for each phase it fell in, on the Zen 1", "kind": "disturbances", "host": "Linux", "value": {"count": ["entries"], "where": {"field": ["timed"], "equals": true}}, "format": "{:d}"},
+  "disturbance:timed_fuzz": {"what": "the entries the fuzz run's disturbances file holds inside timed phases, an event entered once for each target it fell in, on the Zen 1", "kind": "disturbances-fuzz", "host": "Linux", "value": {"count": ["entries"], "where": {"field": ["timed"], "equals": true}}, "format": "{:d}"}
  },
  "claims": [
   {"text": "times smaller than the feed", "holds": {"above": [{"figure": "ss_ratio"}, 1]}},

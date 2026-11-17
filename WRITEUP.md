@@ -3,12 +3,12 @@
 tick-store keeps a trading day of Nasdaq TotalView-ITCH 5.0, 268,744,780 messages in
 8.25 GB, in a store 4.69 times smaller than the feed, 1.76 GB
 on disk against 3.19 GB for Parquet, and rebuilds the feed from it.
-On the older test machine it answers an hour of a stock in 74.04 ms
-warm against 283.77 ms for the fastest other system in the setup the
-comparison fixed for it, though ArcticDB with a table per stock takes 44.58
+On the Zen 1, a Linux machine from 2018, it answers an hour of a stock in 74.04 ms
+warm against 283.77 ms † for the fastest other system in its fixed
+setup, though ArcticDB with a table per stock takes 44.58
 ms, while a millisecond across every stock takes it 167 times as long as
 QuestDB and the whole-day sum of a column 16.8 times as long as
-QuestDB.
+QuestDB †.
 A single writer thread there ingests 1.270 M messages/s before a flush, 2.15 times
 short of Nasdaq's published peak message rate.
 
@@ -18,36 +18,37 @@ their bits on timestamps and 3.554x on prices as dollar doubles.
 
 ## At a glance
 
-The older test machine, each system in the setup the comparison fixed for it; queries are warm
-medians, and on each row the other system shown is the system that comes first there.
+The Zen 1, each system in its fixed setup; queries are warm medians, and the other system is
+the system first on the row.
 
 | | tick-store | The other system first on the row | tick-store over it |
 |---|---|---|---|
 | Disk, GB | 1.76 | 3.19, Parquet | 0.55 |
-| Day write with flush, s | 190.7 † | 211.9, Parquet  | 0.90 |
-| A second of every stock (Q1), ms | 296.78  | 34.16 , ArcticDB | 8.7 |
-| An hour of a stock (Q2), ms | 74.04 ms  | 283.77 †, QuestDB | 0.26 |
-| Its per-minute aggregate (Q3), ms | 36.07 ms  | 64.95 , QuestDB | 0.56 |
-| A millisecond of every stock (Q4), ms | 207.95  | 1.24 , QuestDB | 167 |
-| The day's sum of a shares column (Q5), ms | 912.75  | 54.46 †, QuestDB | 16.8 |
+| Day write with flush, s | 190.7 † | 211.9, Parquet  | inputs not alike |
+| A second of every stock (Q1), ms | 296.78  | 34.16, ArcticDB  | 8.7 |
+| An hour of a stock (Q2), ms | 74.04 ms  | 283.77, QuestDB † | 0.26 |
+| Its per-minute aggregate (Q3), ms | 36.07 ms  | 64.95, QuestDB  | 0.56 |
+| A millisecond of every stock (Q4), ms | 207.95  | 1.24, QuestDB  | 167 |
+| The day's sum of a shares column (Q5), ms | 912.75  | 54.46, QuestDB † | 16.8 |
 
-† Timed while the host's logs record a login or a backup job, or while pages were swapped in; the
-[targets table](RESULTS.md#targets) names each.
+† In this table and the opening, timed while the host's logs record a login or a backup job, or
+while the host was swapping memory; the [targets table](RESULTS.md#targets) names each. The write row is not like-for-like:
+tick-store's input was in memory before its clock, and the others read theirs from disk inside it.
 
 ## How it was measured
 
 **Data.** The reference day is 30 December 2019, from Nasdaq's public sample files; a second day,
-30 October 2019, serves the round trip and the bit-flip check. The round trip re-encodes every
-record and compares the SHA-256 of the rebuilt stream with the source's.
+30 October 2019, serves the round trip and the bit-flip check. The round trip compares the
+SHA-256 of the rebuilt stream with the source's.
 
-**Hosts.** Every pinned figure comes from a Linux host whose processor is AMD Ryzen Embedded V1605B, 4 cores, 8 threads, made in
-2018, with 15.33 GiB of memory: "the Zen 1". Each benchmark is pinned to a core, and
+**Hosts.** Every pinned figure comes from the Zen 1, whose processor is AMD Ryzen Embedded V1605B, 4 cores, 8 threads, with
+15.33 GiB of memory. Each benchmark is pinned to a core, and
 refused if the core's hyperthread sibling was over 5% busy. Context
 figures come from an Apple M4 Max laptop, "the M4": unpinned, no hardware counters.
 
 **Clock and repetition.** The Zen 1 ran with frequency boost on and no fixed clock, so systems
 timed hours apart may have run at different clocks; what that costs every time-based figure was
-not measured. Each day write ran 1 time.
+not measured.
 
 **The comparison.** Parquet, ArcticDB and QuestDB each ran the setup the comparison fixed for it in
 advance, plus the setups a selection run on a slice kept. Each query ran 30 times
@@ -166,9 +167,8 @@ stay in value order, so the inverse delta is a prefix sum across each row's lane
 **Which kernels the store calls.** On every instruction set the decoder calls the interleaved and
 linear unpacks, the frame-of-reference add and the two-pass delta. On AVX2 it also fuses unpack,
 base and prefix sum for a full delta vector with no exceptions; on NEON and scalar that fused
-kernel is benchmarked and never called. The narrow fused unpack, on every set, Stream VByte and
-the delta-of-delta reconstruct are benchmark-only as well: the writer never chooses delta of
-delta, the block form that would reach the last.
+kernel is benchmarked and never called. The narrow fused unpack, Stream VByte and the
+delta-of-delta reconstruct are benchmark-only as well.
 
 **What SIMD bought.** On the M4, NEON over scalar, medians over widths: linear unpack
 5.68x, two-pass delta 1.80x, fused delta
@@ -184,15 +184,15 @@ median, so on whole queries SIMD's effect is inside or near the run-to-run sprea
 ([counters run](results/diag/counters-simd-12302019-ede0176b10bb.json): a diagnostic summary no separate validator re-reads).
 
 **What SIMD cost.** 1,870 lines of kernels and dispatch, 6.6% of the
-28,526 in `src/` and `include/`; a 875-line kernel benchmark and
-551 lines of kernel tests.
+28,526 in `src/` and `include/`, a 875-line benchmark and
+551 lines of tests.
 
 **The store's price column.** Per piece, the reader inflates any zstd frame, allocates, decodes
 PFOR with scale and patches, range-checks every value and appends. On the Zen 1 those steps take
 11.6%, 20.4% (unpack), 25.3% (patches),
 4.6% (scale and range check) and 0.6% (allocation and copy,
-from the profile's memory and containers groups only; a copy's addresses can land unresolved in
-the C library, which holds 19.4%, so that share does not bound what copies cost) of
+as the profile's memory and container groups count them; copies resolved only to the C library,
+19.4%, are not counted) of
 the decode's user cycles ([price-decode profile](results/diag/price-decode-profile-12302019-ede0176b10bb.json): a diagnostic summary no separate validator re-reads).
 
 ## Branch prediction and instruction counts
@@ -212,7 +212,7 @@ The writer holds a segment's messages, 8 bytes per column value, then
 sorts and codes them. On the M4 its peak memory footprint, the memory it owns, is
 1,229 MB at segments of 4,194,304 records; its peak resident
 set, which also counts the mapped source file, is 900 MB smaller at
-1,048,576. The Zen 1's query worker peaks at 472.0 MB resident,
+1,048,576. tick-store's query process (`tick_query`) peaks at 472.0 MB resident,
 mapped store pages included. QuestDB's day store, 22.90 GB, is larger than
 the Zen 1's 15.33 GiB of memory, so warm queries run a single system at a time.
 
@@ -224,8 +224,7 @@ ArcticDB 111.5 and 35.1, QuestDB
 678.7 and 193.8. Engine-only is the total minus the
 harness's reading and converting of the input, 52% to
 71% of the others' totals; tick-store parses its ITCH file inside the
-engine. The inputs did not start alike, which the write verdicts in the targets sections give with
-the bytes read. QuestDB's flushed write is not like-for-like: its flush proof on the
+engine. The inputs did not start alike; the targets sections give the bytes read. QuestDB's flushed write is not like-for-like: its flush proof on the
 day did not pass. With a flush, tick-store's write took 190.7 s and without a flush
 211.7 s, a single run each, so a difference of that size is not resolved here.
 
@@ -235,17 +234,14 @@ day did not pass. With a flush, tick-store's write took 190.7 s and without a fl
 41.0%, assembling segments 19.1%, the book state, each
 open order's stock and price kept to code the messages that name it, 18.7%,
 dictionary encoding 6.8%, sorting 4.8%, parsing 2.7%
-and zstd 1.2% ([writer profile](results/diag/writer-profile-12302019-ede0176b10bb.json): a diagnostic summary no separate validator re-reads). Parsing alone,
-timed on the slice in memory at 59.85 M messages a second, comes to about
-4.5 s. The others' engine-only times may still hold reading their input from disk, so
+and zstd 1.2% ([writer profile](results/diag/writer-profile-12302019-ede0176b10bb.json): a diagnostic summary no separate validator re-reads). The others' engine-only times may still hold reading their input from disk, so
 the clocks are not alike and the gap is not all tick-store's writer.
 
 **Queries.** On Q2 tick-store takes 74.04 ms warm against
 283.77 for the next system in its fixed setup, and on Q3
 36.07 ms against 64.95 ms; ArcticDB with a table per stock takes
 44.58 and 25.00 ms on them, and
-10.2 s on Q1. Q1 and Q4 decode their segment's whole permutation, as
-Segment size shows. Q5, the day's sum of a shares column, decodes 152,004,760 values at
+10.2 s on Q1. Q5, the day's sum of a shares column, decodes 152,004,760 values at
 6.0 ns each; of its sampled cycles, dictionary decoding takes 30.5%,
 the C library 20.6% and the unpack kernels 13.7%
 ([query profile](results/diag/query-profile-12302019-ede0176b10bb.json): a diagnostic summary no separate validator re-reads).
@@ -253,8 +249,7 @@ the C library 20.6% and the unpack kernels 13.7%
 ## Tried and not kept, and not done
 
 I tried and did not keep Gorilla for timestamps and prices; delta-of-delta timestamps; references
-in file order and as distances in the day's orders; the comparison's second segment size, which
-the rule did not pick; the fused delta kernel on NEON; and Stream VByte. Not built: a stored
+in file order and as distances in the day's orders; 1,048,576-record segments; the fused delta kernel on NEON; and Stream VByte. Not built: a stored
 per-stock minute aggregate (Q3), a sum over dictionary counts that would skip Q5's decode, a time
 index inside a run that would let Q1 and Q4 skip the permutation, and a second writer thread.
 
@@ -293,11 +288,14 @@ a direct bar, and the rows against the other systems are relative.
 | Q2 warm median | ≤ 16.9 ms (DuckDB on a small Parquet store, preprint) | 74.04 ms; M4 25.28 ms | 4.38x; 8.38 ms | missed; M4 missed | 100 ns a row |
 | Q3 warm median | ≤ 0.41 ms (QuestDB vendor benchmark) | 36.07 ms; M4 15.06 ms | 88x; 37x | missed; M4 missed | No stored aggregate |
 | Q4 cold mean | ≤ 10 ms (TimescaleDB, order-book preprint) | 356.09 ms; M4 136.16 ms | 36x; 14x | missed; M4 missed | 35.1 MB read cold |
-| Lowest median and p99 of the fixed setups, each query | same machine | warm medians in the table at a glance | 8.7x on Q1; 167x on Q4; 16.8x on Q5 | missed in part; met on Q2 warm, Q2 cold, Q3 warm and Q3 cold against each system's chosen setup, while ArcticDB with a table per stock is faster; swap-in: ArcticDB, QuestDB, tick-store | Q1 to Q5 under Queries |
+| Lowest median and p99 of the fixed setups, each query | same machine | warm medians in the table at a glance | 8.7x on Q1; 167x on Q4; 16.8x on Q5 | missed in part; met on Q2 warm, Q2 cold, Q3 warm and Q3 cold against each system's chosen setup, while ArcticDB with a table per stock is faster, and on Q5 cold; swap-in: ArcticDB, QuestDB, tick-store | Q1 to Q5 under Queries |
 
 The writes against each other system, on both clocks: without a flush, missed; inputs not alike, by each write's record: tick-store's input is in memory before the clock starts, with 250,916,864 B read from the device inside the clock; Parquet's, ArcticDB's and QuestDB's are read from disk inside it, with 18,411,094,016 to 21,521,625,088 B read from the device inside the clock; engine-only, the clock less reading the input and putting it in the form the system's call takes, may still hold those reads, which are counted over the whole clock, so the two-clock rule does not take the difference out.
 
-With a flush, met against QuestDB, not like-for-like; missed against Parquet; against ArcticDB met on this run and missed on the replaced one, a change for tick-store, counted as missed; two remote logins during tick-store's write; replaced run 188.9 s; a backup run and a remote login during QuestDB's write; replaced run 1,269.2 s; inputs not alike, by each write's record: tick-store's input is in memory before the clock starts, with 274,239,488 B read from the device inside the clock; Parquet's, ArcticDB's and QuestDB's are read from disk inside it, with 23,846,309,888 to 24,631,062,528 B read from the device inside the clock; engine-only, the clock less reading the input and putting it in the form the system's call takes, may still hold those reads, which are counted over the whole clock, so the two-clock rule does not take the difference out. The [targets table](RESULTS.md#targets) gives both runs'
+With a flush, met against QuestDB, not like-for-like; missed against Parquet; against ArcticDB met on this run and missed on the replaced one, a change for tick-store, counted as missed; two remote logins during tick-store's write; replaced run 188.9 s; a backup run and a remote login during QuestDB's write; replaced run 1,269.2 s; inputs not alike, by each write's record: tick-store's input is in memory before the clock starts, with 274,239,488 B read from the device inside the clock; Parquet's, ArcticDB's and QuestDB's are read from disk inside it, with 23,846,309,888 to 24,631,062,528 B read from the device inside the clock; engine-only, the clock less reading the input and putting it in the form the system's call takes, may still hold those reads, which are counted over the whole clock, so the two-clock rule does not take the difference out.
+Against QuestDB it is not like-for-like: QuestDB read 24,631,062,528 B from disk inside
+its clock, tick-store 274,239,488 B, its input in memory before its clock.
+The [targets table](RESULTS.md#targets) gives both runs'
 figures; the cause of ArcticDB's move between them was not measured and is not known.
 
 ## Not judged
@@ -315,22 +313,25 @@ figures; the cause of ArcticDB's move between them was not measured and is not k
 Every parser and decoder ran 30 minutes of fuzzing under
 AddressSanitizer and UndefinedBehaviorSanitizer at the second commit: 13 of
 13 targets ran clean on the M4 and 7 of 7 on the
-Zen 1, the shortest run 1,801 s ([fuzz results](results/fuzz-g3-8616263b7561.json)). The checks, the faults
-that prove each fails when it should, and what each does not check are in the README; the prover's
-record covers 99 of its 462 listed faults.
+Zen 1, the shortest run 1,801 s ([fuzz results](results/fuzz-g3-8616263b7561.json)). The checks and the faults
+that prove them are in the README; the prover's
+record covers 99 of its 463 listed faults.
 
 ## Limits
 
 Performance comes from a pinned day on a single host, the Zen 1, whose 15.33 GiB of memory
 is smaller than the other systems' 23.86 GB of input, with each day write run
 1 time. A fair protocol would give every system its input resident before its
-clock, or none, and repeat every write. The disturbance records list 31 events
-inside the campaign's timed phases and 10 inside the fuzz run's, logins and
-a backup job among them, gathered from the host's logs and another project's status file; the
-host's own scheduled jobs ran through every phase and were not stopped. The Linux day was measured
+clock, or none, and repeat every write. The disturbance records hold 31 entries
+inside the campaign's timed phases and 10 inside the fuzz run's, an event
+entered for each phase it fell in, from the host's logs and another project's status file. The host's own scheduled jobs ran through every timed window
+on the Zen 1 and were not stopped: a repository backup every 15 minutes, a health collector and
+2 small watchers every 5, 2 sync jobs every 10, a file backup about hourly, and daily maintenance;
+only the runs the logs place inside a phase are listed. The Zen 1's day was measured
 again: the earlier run, "the replaced run", is kept, and its figure stands beside this run's
 wherever a mark names it. In the targets sections a verdict marked "swap-in" rests on figures timed
-while pages were swapped in, and a verdict marked with a login or a backup run on a phase that held it.
+while the host was swapping memory, which may flatter tick-store where they are another system's
+and understate it where they are its own, and a verdict marked with a login or a backup run on a phase that held it.
 Sizes on the M4 are file-system allocation, so sizes come from the Zen 1. Not measured and not
 estimated: the cycles a mispredict costs and any memory-level counter.
 
