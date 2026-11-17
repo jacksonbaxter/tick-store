@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -3702,7 +3702,7 @@
+ # says where a crash input goes; and the essay is held to the rule by render_writeup.py.
+ # docs/checks.md, which says how the pages are checked, quotes results as it explains the rules,
+ # so it is read as a results page.
+-RESULTS_PAGES = ("BENCHMARKS.md", "compare/README.md", "fuzz/README.md", "docs/checks.md")
++RESULTS_PAGES = ("BENCHMARKS.md", "compare/README.md", "fuzz/README.md")
+ # A line that starts a unit of prose of its own rather than carrying on a wrapped paragraph.
+ UNIT_START = re.compile(r"\s*(?:$|[|#>]|```|<!--|(?:[-*+]|\d+[.)])\s)")
+ NOT_CARRIED_ON = re.compile(r"\s*(?:$|[|#]|```|<!--)")

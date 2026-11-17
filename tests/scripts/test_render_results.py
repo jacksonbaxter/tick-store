@@ -33,7 +33,7 @@ COMPARE_END = "<!-- compare:end -->"
 BOTH = f"{RESULTS_MD}\n{COMPARE_BEGIN}\n{COMPARE_END}\n\nEnd.\n"
 # The pages beyond the README and RESULTS.md whose whole prose the faster-write rule reads,
 # written out here so a page dropped from the script's list fails a test.
-RESULTS_PAGES = ("BENCHMARKS.md", "compare/README.md", "fuzz/README.md")
+RESULTS_PAGES = ("BENCHMARKS.md", "compare/README.md", "fuzz/README.md", "docs/checks.md")
 
 
 def load_fixtures(name):
@@ -3016,11 +3016,15 @@ class NotAlikeQuoteTest(unittest.TestCase):
                    if (row["id"], row["host"]) == ("WT-4", "Linux"))
         marks = RENDER.row_marks(row, REPO_ROOT)
         self.assertIn(("not like-for-like",), marks)
-        quote = next(line for line in (REPO_ROOT / "BENCHMARKS.md").read_text().split("\n")
-                     if line.startswith("| WT-4 | Linux | Total"))
+        # A quote of the row as a page would write it: each mark in its short form where it has
+        # one, its full form otherwise, and the verdict's own "not like-for-like".
+        quote = ("| WT-4 | Linux | Total 190.7 s | Met against QuestDB only, not like-for-like; "
+                 + "; ".join(forms[0] for forms in marks if forms != ("not like-for-like",))
+                 + " |")
         # QuestDB's phase mark in its short form, which names no comparison, so only the
         # verdict's own words say the part is not like for like.
-        full, short = next(forms for forms in marks if forms[0].startswith("(against QuestDB"))
+        full, short = next(forms for forms in marks
+                           if forms[0].startswith("(against QuestDB, not like-for-like) rests"))
         self.assertIn(full, quote)
         self.assertNotIn("not like-for-like", short)
         quote = quote.replace(full, short)

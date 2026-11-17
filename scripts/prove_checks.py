@@ -2085,6 +2085,12 @@ FAULTS = (
     Fault("ingest-input-column-inverted", "py-scripts", "render_results.py says a write's input "
           "read from disk was in memory, and the reverse", CHECK_FAILED,
           "FAIL: test_each_write_says_where_its_input_was (__main__.InputColumnTest"),
+    # docs/checks.md, moved out of the README, is read as a results page.
+    Fault("render-checks-page-unread", "py-scripts", "render_results.py leaves docs/checks.md "
+          "out of the pages whose whole prose the faster-write and quote rules read",
+          CHECK_FAILED,
+          "FAIL: test_every_results_page_is_read_whole_and_named_with_its_line "
+          "(__main__.ReplacedRunTest"),
     # Review P1-2: a quote of a verdict whose part is not like for like says so.
     Fault("render-quote-not-alike-unasked", "py-scripts", "render_results.py takes a quote of a "
           "verdict whose part its row labels not like-for-like without those words",

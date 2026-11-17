@@ -3700,7 +3700,9 @@ def faster_write_problem(texts, writers):
 # verdicts and the reviews' findings as they stood, not pages that present results; docs/format.md
 # and docs/store.md describe the store and state no comparison; tests/unit/crashers/README.md
 # says where a crash input goes; and the essay is held to the rule by render_writeup.py.
-RESULTS_PAGES = ("BENCHMARKS.md", "compare/README.md", "fuzz/README.md")
+# docs/checks.md, which says how the pages are checked, quotes results as it explains the rules,
+# so it is read as a results page.
+RESULTS_PAGES = ("BENCHMARKS.md", "compare/README.md", "fuzz/README.md", "docs/checks.md")
 # A line that starts a unit of prose of its own rather than carrying on a wrapped paragraph.
 UNIT_START = re.compile(r"\s*(?:$|[|#>]|```|<!--|(?:[-*+]|\d+[.)])\s)")
 NOT_CARRIED_ON = re.compile(r"\s*(?:$|[|#]|```|<!--)")
