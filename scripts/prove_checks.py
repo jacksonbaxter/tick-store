@@ -548,10 +548,11 @@ FAULTS = (
     # Past the cap the chosen kernel set decodes a block from an exact copy of its bytes, so a
     # read past the block is seen where the input's next bytes would hide it; and a refused
     # block there must leave the output alone.
-    Fault("neon-unpack-delta-overread-past-cap", "fuzz-pfor", "the NEON fused unpack and delta "
-          "pass reads 16 bytes past a width-0 vector's packed bytes from the 129th vector of a "
+    Fault("neon-unpack-delta-overread-past-cap", "fuzz-pfor", "the NEON delta pass loads 16 "
+          "bytes from where the vector's packed bytes end, from the 129th vector of a delta "
           "block on, which at the last vector of the named seed's block past the cap is past "
-          "the block", EXIT_LIBFUZZER, "AddressSanitizer: heap-buffer-overflow",
+          "the block (NEON does not fuse the unpack and the delta pass, so the fault is in the "
+          "pass it runs)", EXIT_LIBFUZZER, "AddressSanitizer: heap-buffer-overflow",
           arguments=FUZZ_ARGUMENTS),
     Fault("pfor-refusal-keeps-values-past-cap", "fuzz-pfor", "the PFOR decoder keeps the values "
           "it decoded of a refused block of more than 131,072 values, as the named seed's block "

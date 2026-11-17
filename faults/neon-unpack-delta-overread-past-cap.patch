@@ -1,30 +1,39 @@
 diff --git a/src/codec/simd/kernels_neon.cpp b/src/codec/simd/kernels_neon.cpp
-index d12e161..e45cbfb 100644
 --- a/src/codec/simd/kernels_neon.cpp
 +++ b/src/codec/simd/kernels_neon.cpp
-@@ -265,7 +265,24 @@ std::uint64_t unpack_delta_neon(std::span<const std::byte> packed, unsigned widt
-         for (std::uint64_t& value : values) {
-             value = 0;
-         }
--        return delta_pass_neon(values, base, zz, carry);
-+        // Planted: from the 129th vector of one delta block on, 131,072 values in, a load of
-+        // 16 bytes from the end of the vector's packed bytes, which at a block's last vector
-+        // reads past the block.
-+        thread_local std::uint64_t last = 0;
-+        thread_local std::size_t run = 0;
-+        run = (carry != 0 && carry == last) ? run + 1 : 0;
-+        const std::uint64_t result = delta_pass_neon(values, base, zz, carry);
-+        last = result;
-+        if (run >= 128) {
-+            const volatile unsigned char* const spill =
-+                reinterpret_cast<const volatile unsigned char*>(packed.data() + packed.size());
-+            unsigned char sink = 0;
-+            for (std::size_t i = 0; i < 16; ++i) {
-+                sink = static_cast<unsigned char>(sink ^ spill[i]);
-+            }
-+            values[0] += sink & 0U;
-+        }
-+        return result;
-     }
+@@ -72,8 +72,12 @@
+     return width <= kMaxWidth && packed.size() == kWordStride * width;
+ }
+ 
++// Planted: where the last vector unpacked ended its packed bytes, for the delta pass below.
++thread_local const std::byte* planted_packed_end = nullptr;
++
+ void unpack_vector_neon(std::span<const std::byte> packed, unsigned width,
+                         std::span<std::uint64_t, kVectorValues> values) noexcept {
++    planted_packed_end = packed.data() + packed.size();
      drive<kVectorValues>(
          kLevel, kVectorValues, kAlwaysFits,
+         [&](std::size_t) {
+@@ -191,6 +195,22 @@
+ 
+ std::uint64_t delta_pass_neon(std::span<std::uint64_t> values, std::uint64_t base, bool zz,
+                               std::uint64_t carry) noexcept {
++    // Planted: from the 129th vector of one delta block on, the delta pass loads 16 bytes from
++    // where the vector's packed bytes end; at a block's last vector only its 2-byte exception
++    // count follows, so the load reads past the block.
++    thread_local const std::byte* previous = nullptr;
++    thread_local std::size_t run = 0;
++    const std::byte* const end = planted_packed_end;
++    run = (previous != nullptr && end > previous && end - previous <= 16'384) ? run + 1 : 0;
++    previous = end;
++    if (run >= 128) {
++        const volatile unsigned char* const spill = reinterpret_cast<const volatile unsigned char*>(end);
++        unsigned char sink = 0;
++        for (std::size_t i = 0; i < 16; ++i) {
++            sink = static_cast<unsigned char>(sink ^ spill[i]);
++        }
++        carry += sink & 0U;
++    }
+     std::uint64_t* const p = values.data();
+     const V b = vdupq_n_u64(base);
+     V c = vdupq_n_u64(carry);
