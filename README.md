@@ -128,8 +128,10 @@ resolves; the field or computation; the format; and a line of what it is. A verd
 `render_results.py`'s own, a bar is the target's value, and a size the essay takes from the code
 is read from the source by a pattern that must match one line. The render stops on a token the list
 lacks, an entry the template never uses, a kind that matches two files, a value outside its
-format, a constant that moved or changed form, or a number typed in the template that the list
-does not declare a non-result with its reason. The essay must run 2,500 to 4,000 words and open
+format, a constant that moved or changed form, a number typed in the template that the list
+does not declare a non-result with its reason, or a token that reads what its results file lists
+as not established, as a diagnostic summary lists what its run's raw output did not show. The
+essay must run 2,500 to 4,000 words and open
 with its conclusion. Until every file it reads is committed there is no `WRITEUP.md`, and the step
 is not judged, naming how many tokens wait, which is a failure under `--no-skips`; once the page
 exists, a missing file or a page that differs from a fresh render fails. What it does not check is

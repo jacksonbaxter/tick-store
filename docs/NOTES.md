@@ -5197,14 +5197,19 @@ run at a commit other than the one given, self shares that do not sum to 100 wit
 report's rounding (a report cut at a percent limit), periods that do not add up to the event
 count, a line it cannot read, a build other than the bench preset, a query answer that is an
 error or ran kernels above its cap, and output that would hold an absolute path, this machine's
-name or user, or a word given with `--forbid` (the collector passes the host's name). A smoke's
-folder is iteration only and is never written under `results/`. Each refusal has a test. Six
-faults show a rule failing: `diag-no-samples-accepted`, `diag-commit-unchecked`,
-`diag-sum-unchecked`, `diag-unmatched-spread`, `diag-absolute-path-kept` and
-`diag-first-answer-timed`. Each is PROVEN with `--only` (`prove-diag.log`). No script globs
-`results/diag/`: `check.sh` validates the bench and comparison files only, and
-`render_results.py` reads named patterns. `check_hygiene.py` passes on a sample summary in the
-tests.
+name or user, or a word given with `--forbid` (the collector passes the host's name). Since
+review DX (The diagnostics summary after review DX, below) it also refuses a profile not tied
+to its recording, an inclusive share two entries would add up, query runs on different stores,
+a multiplexed counter, an AVX2 run that ran no AVX2 kernel where its scalar twin ran kernels,
+and answers that differ between the levels or the rounds; and what the raw output may not
+hold is listed under `not_established`, never guessed. A smoke's folder is iteration only and
+is never written anywhere under `results/`. Every refusal has a test, except five no input can
+reach on its own: the two no-samples checks each cover the other, the kind check follows from
+the builder the kind picks, an unknown kind fails on its lookup, and the groups' shares add up
+to 100 by construction. The faults that show a rule failing are listed under The diagnostics summary after
+review DX. No script globs `results/diag/`: `check.sh` validates the bench and comparison
+files only, and `render_results.py` reads named patterns. `check_hygiene.py` passes on a sample
+summary in the tests.
 
 **Not smoke-tested.** Nothing of L14 to L18 has run on the Linux host. That host is inside part
 A's measurement window until part B starts, and nothing runs there beside a measurement. What was
@@ -5564,6 +5569,69 @@ through `render_results.py`, which refused for it, so its test now names the fir
 reads the kind. `writeup-template-not-rendered`, on `writeup-check` itself, is BASELINE FAILED
 until WRITEUP.md is rendered, as expected; `control-comment-only` stayed UNDETECTED.
 `results/check-proofs.json` was restored from git after each run.
+
+### The diagnostics summary after review DX
+
+2026-11-16. A second reviewer read `scripts/diag_summary.py` at `8e616bf` (review rows DX-6 to
+DX-9 and DX-12 in `docs/REVIEW.md`). Each finding was shown again at `979fb58` first, with the
+reviewer's experiments rerun against this tree and the reviewer's 39 mutants applied to a copy of
+it; all still held. Raw logs are kept outside the repository.
+
+**What the summary now refuses.** A profile is tied to its recording: the self report must name
+its event (`# Samples: ... of event`), give Samples and Period columns and the event count, as
+the runner's `-n --show-total-period` reports do, and hold exactly the samples perf record says
+it wrote; more than 0.1% of a recording's samples lost (`LOST_AT_MOST`, of kept and lost) is
+refused, since perf drops samples in bursts; and the children and source-file reports must give
+the self report's event, sample count and event count, so they are the same recording's. An
+inclusive share two entries would add up is refused, and a lambda or class local to a function,
+`f(...)::$_0::operator()`, is left out of that function's own share, since it runs inside it.
+Every query run must open one store, and every counter must be counted the whole time, not
+multiplexed. In D3, an AVX2 run whose answers ran no AVX2 kernel, where its scalar twin ran
+kernels, is refused, and so are answers whose name, kind, rows or `sha256` differ between the
+levels or the rounds, answer by answer. The statement names the commit the run was made at,
+not "the freeze commit", and an iteration summary is refused anywhere under `results/`, not only
+under `results/diag/`.
+
+**What the raw output may not hold.** Four facts the summary needs may be missing from a run's
+raw output without the run being wrong: the self report's `# Total Lost Samples` line, perf
+record's line with its sample count, an answer's `kernel_runs`, and an answer's rows and
+`sha256`. None is guessed. The summary lists each under `not_established`, with the path it
+covers (the file, a query of D2, or a query's entry of `simd_change`) and why, and a query's
+AVX2-over-scalar ratio is then null; a query neither level ran a kernel on is listed the same
+way, since its two runs ran the same code. `render_writeup.py` refuses any token that reads a
+path so listed, with the file's reason, so the essay cannot state it.
+
+**On the freeze's own folders.** The four diagnostic folders the runner made at `ede0176` were
+summarised with the script before and after the change, into files outside the repository. At
+`979fb58` all four were written, but two of HEAD's readings were wrong. The price decode's
+report reads `# Samples: 827  of event 'cycles:u'`, perf padding a count with no unit, which
+the old pattern missed, so its event was never read and any event would have passed. And Q1's
+and Q3's engine shares added the engine function's own lambda to it: 54.38 + 1.76 = 56.14% for
+Q1 and 96.29 + 5.12 = 101.41% for Q3. After the change all four are written again, every
+sample count tied to its recording (37,184 for the writer, 827 for the price decode, and 7,415,
+17,499, 2,030, 3,152 and 13,640 for Q1 to Q5), no sample lost, every counter counted the whole
+time, every answer the same at both levels and in both rounds, nothing listed under
+`not_established`, and the engine shares read 54.38% and 96.29%. Those files are committed in a
+later step, from the same folders.
+
+**Tests and mutants.** `tests/scripts/test_diag_summary.py` has 26 new tests, one for each new
+rule and for each of the 11 refusals the reviewer's mutants showed untested. Its folders now
+take the runner's report form: the writer's flat profile is the probe's lines with samples and
+periods made in proportion to its percentages, since the probe's own has neither, and its
+children report is given that recording's header. The smoke test proves the iteration guard on
+a `results/` of its own, so a broken guard writes nothing into the repository's. With 23
+mutants added for the new rules, 56 of 62 are killed; the survivors are the five refusals no
+input reaches on its own and `self_shares`'s column choice, which never sees a children report.
+
+**Faults.** Twelve are new: `diag-recording-count-unchecked`, `diag-lost-samples-accepted`,
+`diag-event-line-optional`, `diag-other-recording-accepted`, `diag-inclusive-added-up`,
+`diag-avx2-without-avx2-accepted`, `diag-answers-differ-accepted`,
+`diag-ratio-not-established-published`, `diag-store-unchecked`, `diag-multiplexed-accepted`,
+`diag-iteration-under-results` and `writeup-not-established-read`, all in `py-scripts`;
+`diag-first-answer-timed` was remade on its moved lines. Each of the twelve, the remade one and
+the five older diagnostics faults was PROVEN with `--only` through the heavy-job wrapper, five to
+seven at a time, 18 of 18 as expected, and `results/check-proofs.json` was restored from git
+after each run.
 
 ## Process notes
 
