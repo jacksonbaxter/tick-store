@@ -7118,6 +7118,27 @@ page review P1, part B"). What moved:
 - compare/README.md's ArcticDB per-security figures come from the `ede0176` slice files; the
   `25a462b` figures they replaced matched neither those nor the deleted `25a462b` files exactly.
 
+### A test that failed by chance: the copied repository repacked
+
+2026-11-17. `test_check_ties.py`'s missing-object test failed once in the re-proof's baseline at
+`16a5db9`, with `FileNotFoundError` on the loose object it unlinks, and passed in the three
+baselines before. The test copies its scratch repository, commits twice, then removes the first
+commit's loose object file. Every `git commit` starts a detached `git maintenance run --auto`.
+With a global git config that turns on the loose-objects task at one loose object, that run packs
+and prunes the loose objects behind the test: the unfixed test failed 10 runs of 10, five times on
+the unlink and five times while copying the repository, whose own commits had started the same
+run. Under this host's own git (2.54.0) and config the copies hold about 130 loose objects, none in
+`objects/17`, against `gc.auto`'s 6,700, and no maintenance task is configured, so I could not
+show what packed the object in that baseline; the mechanism is the one shown. Every repository the
+file makes, and each copy, now has `gc.auto` 0 and `maintenance.auto` false, and the test fails
+with a message naming the object if it is not loose. Under the eager config the fixed test passed
+30 runs of 30, and the whole file 71 tests under it and under the host's own config, each through
+the heavy-job wrapper (docs/REVIEW.md, FL-1). I checked the other tests that make repositories,
+`test_check_fuzz.py`, `test_fuzz_g3.py`, `test_check_hygiene.py`, `test_render_writeup.py` and
+`test_prove_checks.py`, and the comparison tests: none removes or edits a file under a `.git` it
+committed to or copies one with its `.git`; `test_render_writeup.py` deletes a whole `.git`, and
+`test_prove_checks.py`'s shared clone reads only reachable objects.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
