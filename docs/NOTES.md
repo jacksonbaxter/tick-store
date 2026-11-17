@@ -6724,6 +6724,85 @@ and `collect2/proofs-d1` folders. Each is shown by hand, proof owed to the full 
   (`62941cb`).
 - Removed with the allow-list it tested: `writeup-differs-only-unchecked` (`1cac506`).
 
+### The essay ready for its last two inputs
+
+The essay's template, figure list and renderer now render without a hand edit once the Linux G-3
+file at `8616263` and the new capacity file are committed. The one edit left is the capacity kind's
+file pattern in place of its `pending`. In a scratch clone with stand-ins for both, `--check` passes
+on 340 of 340 tokens and 3,642 words. The stand-ins were the old G-3 file's content at `8616263`
+with the pre-tie pin dropped, and the committed capacity file with its commits set to `ede0176`.
+
+**What stopped the render, fixed (`32d749d`).**
+- `{{code:fuzz_dict_cap_log2}}` kept an `until` for a merge that has landed, and the renderer
+  refuses an `until` whose pattern matches. The `until` is dropped.
+- The claim "short windows across every stock are answered quicker by ArcticDB or QuestDB" named
+  pitch words that the pitch no longer holds. It now names "ArcticDB or QuestDB wins short
+  market-wide windows", the pitch sentence whose conditions it must meet: QL-4's Q2 and Q3 parts
+  met, and ArcticDB or QuestDB fastest on Q1 and Q4.
+
+**The marks, in the forms a quote takes (`edf7353`).** Since `2192e73` and `66ec93a` the targets
+table's cells for WT-3 and WT-4 carry four things beside the verdict:
+- the whole input note, with each system's pages and engine-only definition;
+- the moves between the runs, with their cause not known;
+- what the replaced record keeps;
+- QL-4's swap-in marks, part by part.
+
+Quoting those cells whole took the essay to 4,443 words. An essay verdict now carries each mark in
+a form that `render_results.py`'s rule for a hand-written quote (`row_marks`, `quote_problem`)
+accepts on the other pages, applied to the token's own parts:
+- a changed outcome in full: both outcomes, which way the change leans, and the outcome counted;
+- a disturbed or swapped-in phase in the first screen's short form, which RESULTS.md explains under
+  its targets table ("a login during tick-store's write; replaced run 188.9 s", "swap-in: QuestDB");
+- for a write against other systems, `input_clause`: whose input was in memory before the clock and
+  whose was read from disk inside it, the bytes read, and what engine-only holds.
+
+`check_marks` accepts exactly that. For each verdict token it takes every mark
+`render_results.py` gives the token's parts:
+- each part's changed outcome, word for word;
+- each phase mark, in full or in its short form;
+- the input clause, word for word.
+
+It refuses a verdict that holds a mark in neither form. The moves and the replaced record's sentence
+are no longer carried. The essay links the targets table where both runs stand, and its own
+sentence says the cause of ArcticDB's move was not measured and is not known. So that no sentence
+of the essay can state a move or the replaced record otherwise, `render_results.py`'s
+`move_problem` and `keeps_problem` now run on the page as they do on the results pages.
+
+**The bar, read against the stand-in render (`32d749d`, `5145389`).** Added:
+- which kernels the store calls on each instruction set, from the call sites in `pfor.cpp` and each
+  set's `fuse_delta` (the codec findings' B-6);
+- that boost's cost to every time-based figure was not measured;
+- that the price column's allocation-and-copy share is read from the memory and containers groups
+  only, so it does not bound what copies cost;
+- what was tried and not kept, Gorilla's loss among it;
+- QL-4's missed parts with their figures and gaps, in place of a pointer to other sections;
+- WT-2's unflushed rate beside its flushed one, each with its gap, where the row printed the
+  flushed rate beside the unflushed gap.
+
+Corrected:
+- CR-5's gap now prints as the bar less the figures, 0.019 to 0.293, not as a negative;
+- every "Not traced" now reads "Not measured";
+- CR-3's "Bases add bits" also reads "Not measured", since no published run measured that cause.
+
+The paragraph on the checks keeps to one link, and two choices are said in the first person.
+
+**Cut, to make room (`edf7353`).** The essay no longer repeats the targets table's cells:
+- each system's resident pages, files, readiness and engine-only definition in the write
+  verdicts, about 330 words each;
+- the moves between the runs and the replaced record's sentence, which stay in RESULTS.md, linked;
+- QL-4's swap-in marks part by part, now in short form.
+
+No figure, mark or limit of the essay was cut.
+
+**Faults, shown by hand, proof owed to the full re-proof.** Each was shown in a clone of the
+worktree under `build/`. The control is `test_render_writeup.py` as committed, which passes. Each
+fault's patch makes the test its entry names fail with the string the entry expects. The outputs
+are in the phase's `essay-prep/proofs` folder.
+- New: `writeup-phase-mark-unchecked`, `writeup-marks-in-full`, `writeup-move-unchecked`,
+  `writeup-keeps-unchecked`.
+- Remade on the lines that moved: `writeup-verdict-marks-dropped`,
+  `writeup-verdict-mark-unchecked`.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
