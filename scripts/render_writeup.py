@@ -1272,6 +1272,12 @@ def check_marks(resolver, values):
                               f"{mark[:100]!r}")
 
 
+def prose(text):
+    """The text as render_results.py reads a page for the faster-write rule: each paragraph, list
+    item, table row and heading on a line of its own, a wrapped sentence joined whole."""
+    return "\n".join(unit for _, unit in render_results.prose_units(text))
+
+
 def faster_write(resolver, text):
     """render_results.py's rule for every page: no sentence says tick-store writes faster than
     a system whose write read its input from disk inside its clock."""
@@ -1754,7 +1760,7 @@ def render(root):
         raise Refused(f"the template types the number {typed[0]!r} by hand: give it as a token "
                       "from the figure list, or, if it is no result, list it under not_results "
                       "with the reason and its place")
-    faster_write(resolver, TOKEN.sub(" ", body))
+    faster_write(resolver, prose(TOKEN.sub(" ", body)))
     blocks = blocks_of(body)
     values, waiting, states = {}, {}, {}
     later = []
@@ -1793,7 +1799,7 @@ def render(root):
             raise Refused(f"{show(name)} prints {value!r}, words with a number in them")
     text = TOKEN.sub(lambda found: values.get(found.group(1), found.group(0)), body)
     text = text.rstrip("\n") + "\n\n" + MARKER + "\n"
-    faster_write(resolver, text)
+    faster_write(resolver, prose(text))
     notes = sum(1 for comment in comments if CUT_NOTE in comment)
     count = word_count(text)
     if not WORDS_AT_LEAST <= count <= WORDS_AT_MOST:
