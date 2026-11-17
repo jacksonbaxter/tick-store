@@ -292,6 +292,19 @@ def reword_the_writeup_template():
               "gives every message back bit-exact, by hand")
 
 
+def move_a_committed_footer_flip():
+    """The first round-trip file that records G-2 with its footer flip one byte back, onto the
+    CRC32C byte before it, its seed unchanged (review TD-12)."""
+    found = sorted(path for path in (TREE / "results").glob("roundtrip-*.json")
+                   if "g2" in json.loads(path.read_text()))
+    if not found:
+        raise SystemExit("prove_checks: no results/roundtrip-*.json records G-2")
+
+    def back(document):
+        document["g2"]["injected"]["footer"]["store_byte_offset"] -= 1
+    edit_json(found[0].relative_to(TREE), back)
+
+
 def swap_pitch_store_sizes():
     """The README's pitch with the source's size and the store's in each other's places, both
     still figures the results give (review RG-4)."""
@@ -878,6 +891,15 @@ FAULTS = (
     Fault("g2-plan-block-crc-offset-drifted", "py-scripts", "g2_plan.py places a block entry's "
           "CRC32C four bytes before container.hpp's kBlockCrc", CHECK_FAILED,
           "FAIL: test_the_footer_constants_are_the_containers (__main__.G2Plan"),
+    # Review TD-14: each live refusal of the oracle step has a test.
+    Fault("oracle-sweep-disagreement-passes", "py-scripts", "check_oracle.py passes a footer "
+          "sweep whose verdicts disagree with the planner's rule", CHECK_FAILED,
+          "FAIL: test_each_wrong_answer_is_refused_with_its_reason (__main__.LiveRefusals"),
+    # Review TD-12: each committed round-trip file's flips are the planner's for its layout.
+    Fault("g2-committed-plan-moved", "py-scripts", "a committed round-trip file's footer flip "
+          "moved one byte back, onto a CRC32C, with its seed unchanged", CHECK_FAILED,
+          "FAIL: test_every_committed_round_trip_files_flips_are_the_planners "
+          "(__main__.CommittedPlans", mutate=move_a_committed_footer_flip),
     Fault("oracle-sweep-skips-positions", "py-scripts", "check_oracle.py's footer sweep flips "
           "every other footer byte", CHECK_FAILED,
           "FAIL: test_the_sweep_flips_every_footer_byte_once_and_puts_it_back "

@@ -287,6 +287,27 @@ class G2Plan(unittest.TestCase):
         # A data block past the footer is not a data block of this file.
         self.refused(blocks(footer_offset=5_000, file_bytes=10_000), "not before the footer")
 
+    def test_a_middle_segment_of_an_even_count_is_the_count_halved_rounded_down(self):
+        # Review TD-14: every other layout here has an odd count, where both roundings agree.
+        done = self.run_script(blocks(segments=4))
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(json.loads(self.out.read_text(encoding="utf-8"))["data"]["segment"], 2)
+
+    def test_a_footer_with_no_bytes_before_the_trailer_is_refused(self):
+        layout = blocks(footer_offset=100_000 - 24)
+        self.refused(layout, "the footer at 99976 has 0 bytes before the trailer of a "
+                             "100000-byte file")
+
+    def test_two_first_timestamp_blocks_in_the_middle_segment_are_refused(self):
+        layout = blocks()
+        layout["block_list"].append(dict(layout["block_list"][9], block=len(layout["block_list"])))
+        self.refused(layout, "segment 2 has 2 first timestamp blocks, not one")
+
+    def test_a_data_block_inside_the_header_is_refused(self):
+        layout = blocks()
+        layout["block_list"][9]["payload_offset"] = 8
+        self.refused(layout, "block 9, 1090 bytes at 8, is not before the footer")
+
     def test_the_plan_is_what_store_results_reads(self):
         done = self.run_script(blocks())
         self.assertEqual(done.returncode, 0, done.stderr)
@@ -296,6 +317,150 @@ class G2Plan(unittest.TestCase):
         self.assertEqual(sorted(plan), ["data", "footer", "seed"])
         for key in ("block", "block_payload_offset", "column"):
             self.assertIn(key, plan["data"])
+
+
+RESULTS = REPO_ROOT / "results"
+# What the committed files do not record, so it is read from the round-trip file's own g2 block
+# and not recomputed: the store's block listing. They hold the flipped data block's number,
+# segment, column, payload offset and size, but not its piece within the column, nor that no
+# other first timestamp block is in its segment.
+NOT_RECORDED = ("the block listing: that the flipped data block is piece 0 of its segment's "
+                "timestamp column, and the only such block there")
+
+
+def fact(document, *path):
+    """The value at path in the document, or KeyError naming the path."""
+    value = document
+    for key in path:
+        if not isinstance(value, dict) or key not in value:
+            raise KeyError(".".join(path))
+        value = value[key]
+    return value
+
+
+def committed_layout(roundtrip, size):
+    """g2_plan's layout of the store a round-trip file's G-2 flipped, rebuilt from what that
+    file and its day's store-size file record."""
+    footer = fact(size, "parts", "footer")
+    for key in ("day", "commit", "segment_records"):
+        if roundtrip.get(key) != size.get(key):
+            raise ValueError(f"the store-size file's {key} is {size.get(key)!r}, the round-trip "
+                             f"file's {roundtrip.get(key)!r}: not the same run's store")
+    file_bytes = fact(size, "stored_bytes")
+    trailer = fact(size, "parts", "container_trailer")
+    data = fact(roundtrip, "g2", "injected", "data")
+    return {"command": "layout", "segments": fact(size, "segments"),
+            "blocks": fact(footer, "block_entries") // g2_plan.BLOCK_ENTRY_BYTES,
+            "file_bytes": file_bytes,
+            "container": {"header_bytes": fact(size, "parts", "container_header"),
+                          "trailer_bytes": trailer,
+                          "footer_fixed_bytes": fact(footer, "fixed"),
+                          "block_entry_bytes": fact(footer, "block_entries"),
+                          "section_entry_bytes": fact(footer, "section_entries"),
+                          "block_metadata_bytes": fact(footer, "block_metadata"),
+                          "footer_offset": file_bytes - trailer - fact(size, "parts",
+                                                                       "footer_total")},
+            # NOT_RECORDED: the one block the file names, as piece 0.
+            "block_list": [{"block": fact(data, "block"), "segment": fact(data, "segment"),
+                            "column": fact(data, "column"), "piece": 0,
+                            "payload_offset": fact(data, "block_payload_offset"),
+                            "payload_bytes": fact(data, "block_payload_bytes")}]}
+
+
+def committed_plan_problems(results):
+    """(files checked, problems): each round-trip file under `results` that records G-2's flips,
+    against the planner's flips and seed for the layout its files record."""
+    checked, problems = [], []
+    for path in sorted(results.glob("roundtrip-*.json")):
+        roundtrip = json.loads(path.read_text(encoding="utf-8"))
+        if "g2" not in roundtrip:
+            continue
+        size_path = results / f"store-size-{roundtrip.get('day')}.json"
+        try:
+            size = json.loads(size_path.read_text(encoding="utf-8"))
+            layout = committed_layout(roundtrip, size)
+            planned = g2_plan.plan(layout)
+            recorded = {"seed": fact(roundtrip, "g2", "seed"),
+                        "data": fact(roundtrip, "g2", "injected", "data"),
+                        "footer": fact(roundtrip, "g2", "injected", "footer")}
+        except OSError as error:
+            problems.append(f"{path.name}: its day's store-size file cannot be read: {error}")
+            continue
+        except KeyError as error:
+            problems.append(f"{path.name} and {size_path.name} do not record {error.args[0]}, "
+                            "so the planner's flips cannot be recomputed")
+            continue
+        except (ValueError, g2_plan.Refused) as error:
+            problems.append(f"{path.name}: {error}")
+            continue
+        checked.append(path.name)
+        if planned != recorded:
+            problems.append(f"{path.name} records {recorded}, and the planner gives {planned} "
+                            f"for the layout {path.name} and {size_path.name} record")
+    return checked, problems
+
+
+class CommittedPlans(unittest.TestCase):
+    """Review TD-12: check_ties.py leaves the planner out of what a round-trip file measures
+    because each committed file's flips and seed are the planner's for its own layout, so this
+    holds them to it, from the committed files and not from constants copied out of them. What
+    the files do not record, NOT_RECORDED, is taken from the round-trip file's own g2 block."""
+
+    def test_every_committed_round_trip_files_flips_are_the_planners(self):
+        checked, problems = committed_plan_problems(RESULTS)
+        self.assertEqual(problems, [])
+        # Both days' macOS runs record G-2; the Linux run is G-1 alone.
+        self.assertEqual(checked, sorted(path.name for path in RESULTS.glob("roundtrip-*.json")
+                                         if "g2" in json.loads(path.read_text(encoding="utf-8"))))
+        self.assertGreaterEqual(len(checked), 2)
+
+    def stand_in(self, change):
+        """A copy of the committed round-trip and store-size files under build/, `change`d."""
+        SCRATCH_ROOT.mkdir(parents=True, exist_ok=True)
+        folder = Path(tempfile.mkdtemp(dir=SCRATCH_ROOT))
+        for path in (*RESULTS.glob("roundtrip-*.json"), *RESULTS.glob("store-size-*.json")):
+            (folder / path.name).write_bytes(path.read_bytes())
+        target = folder / "roundtrip-10302019.json"
+        document = json.loads(target.read_text(encoding="utf-8"))
+        change(document)
+        target.write_text(json.dumps(document), encoding="utf-8")
+        return committed_plan_problems(folder)
+
+    def test_a_footer_flip_moved_back_onto_the_crc_is_named(self):
+        # The review's experiment: one byte back, onto the CRC32C byte, with the seed unmoved.
+        moved = []
+
+        def back(document):
+            document["g2"]["injected"]["footer"]["store_byte_offset"] -= 1
+            moved.append(document["g2"]["injected"]["footer"]["store_byte_offset"])
+        _, problems = self.stand_in(back)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("roundtrip-10302019.json records", problems[0])
+        self.assertIn(f"'store_byte_offset': {moved[0]}", problems[0])
+
+    def test_a_seed_that_is_not_the_planners_is_named(self):
+        def plain(document):
+            document["g2"]["seed"] = SEED
+        _, problems = self.stand_in(plain)
+        self.assertEqual(len(problems), 1)
+
+    def test_a_fact_the_files_do_not_record_is_named(self):
+        def lose(document):
+            del document["g2"]["injected"]["data"]["block_payload_bytes"]
+        _, problems = self.stand_in(lose)
+        self.assertEqual(problems, ["roundtrip-10302019.json and store-size-10302019.json do "
+                                    "not record block_payload_bytes, so the planner's flips "
+                                    "cannot be recomputed"])
+
+    def test_a_store_size_file_of_another_run_is_named(self):
+        def other(document):
+            document["commit"] = "0000000"
+        _, problems = self.stand_in(other)
+        committed = json.loads((RESULTS / "store-size-10302019.json").read_text(
+            encoding="utf-8"))["commit"]
+        self.assertEqual(problems, [f"roundtrip-10302019.json: the store-size file's commit is "
+                                    f"{committed!r}, the round-trip file's '0000000': not the "
+                                    "same run's store"])
 
 
 if __name__ == "__main__":
