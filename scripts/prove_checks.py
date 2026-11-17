@@ -309,7 +309,8 @@ def reword_a_pitch_claim():
 
 def type_an_unchecked_pitch_figure():
     """A figure typed into the README's pitch that no row of its check covers (review E-9)."""
-    edit_text("README.md", "It gives every", "It is 42 times faster. It gives every")
+    # The pitch sits at its word limit, so the figure takes a word's place.
+    edit_text("README.md", "It keeps one", "It keeps 42")
 
 
 def drop_a_pitch_claims_tie():
@@ -336,8 +337,9 @@ def show_the_fuzz_row():
 
 def call_a_host_by_its_system():
     """The pitch calling the Linux host "Linux" again, in its figure sentence, which no claim
-    ties, so the screen's own rule is the one that stops it."""
-    edit_text("README.md", "4.69 times smaller.", "4.69 times smaller on Linux.")
+    ties, so the screen's own rule is the one that stops it; the word takes another's place,
+    since the pitch sits at its word limit."""
+    edit_text("README.md", "trading day,", "Linux day,")
 
 
 def headline_row(document, what):
