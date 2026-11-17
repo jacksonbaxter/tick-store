@@ -5935,12 +5935,14 @@ committed round-trip file's footer flip back onto the CRC32C. The seven earlier 
 were made again on the moved lines, and `check-sh-untied-results-pass` on check.sh's new skip
 text. `ties-results-outside-passes` fails its test as an error, a traceback where the refusal
 should be. The fourteen new faults were each PROVEN with `--only` through `heavy.sh`, two to
-four at a time, about 5 minutes a fault, at `94b2cc7`, which was `995242d` before its rebase
-onto `8a9cdfb`, a rebase that changed no file a fault edits; `results/check-proofs.json` was
-restored from git after each run. After the rebase, in one `heavy.sh` call with the tests,
-`g2-committed-plan-moved`, the seven remade `ties-*` patches and `check-sh-untied-results-pass`
-were PROVEN at `ad702b8`, 9 of 9 as expected, and the proofs file was restored again.
-`ties-measured-code-changed` is still BASELINE FAILED, as before, until the step passes.
+four at a time, about 5 minutes a fault. After the rebase onto `81cec1f` and the merge of the
+replaced-file and disturbances rules, every fault whose patch edits `check_ties.py` or the pins,
+the twenty-one `ties-*` above, `57215e2`'s `ties-disturbances-no-kind`,
+`compare-replaced-unpinned-accepted` and the three `compare-protocol-*`, was PROVEN again at
+`e8c04c7` in one `heavy.sh` call, 25 of 25 as expected; `g2-committed-plan-moved`,
+`oracle-sweep-disagreement-passes` and `check-sh-untied-results-pass` stand from the run before,
+at `ad702b8`, their edited files unchanged since. `results/check-proofs.json` was restored from
+git after each run. `ties-measured-code-changed` is still BASELINE FAILED, as before, until the step passes.
 
 **Today.** `python3 -I scripts/check_ties.py` on this tree says what it said before:
 `23 files: 0 same, 8 pinned, 15 differs, 0 no commit, 0 no kind, 0 refused, 0 unjudged`, exit 1,
