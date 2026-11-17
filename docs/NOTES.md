@@ -6662,6 +6662,68 @@ I changed no check, validator or fault, so no proof is added to what the full re
 - The full fault re-proof.
 - `coverage_report.py`'s `run` line.
 
+### Two tie rules narrowed to what is measured
+
+2026-11-17, before the Linux half of the second collection is copied. Both rules below asked
+for something no honest history could give, so I changed the rule, not the files, and added no
+pin.
+
+**The capacity file ties what reads it by the fields read (`b54259b`).** `check_ties.py` tied
+the store-size files and `store-estimate.json` to `results/fullday-capacity-12302019.json` by
+its bytes, compared from the commit that last wrote each of them. Any new capacity file would
+then untie all three, and a reassembly that gives the same bytes cannot be committed again, so
+nothing could ever tie them back: `store-size-10302019.json`, which reads nothing from the
+capacity file, for good. Now an assembled file is tied to that input through the fields its
+assembler reads, compared by value between the commit that last wrote the file and today:
+- `store_results.py` (lines 303-314) reads the capacity file's `day`, and, only where that day
+  is the size file's own, each compared system's `variant`, `stored_bytes` and `outcome`, for
+  Parquet, ArcticDB and QuestDB.
+- `store_estimate.py` (`judge`, lines 215-218) reads `day`, and, where it is one of the
+  estimate's days, each of those systems' `stored_bytes`.
+
+The lists are written once in `check_ties.py`, beside those lines. A test runs both assemblers'
+own code, `store_results.assemble` on a fixture run and `store_estimate.judge`, on a probe
+capacity file that records every key read, for the capacity file's day and for the other day,
+and fails if the keys read and the lists differ either way. For `10302019` the probe shows both
+read the day alone, so that file is tied to the day and to nothing else, by the rule and not by
+its name. What it still catches: a moved stored-bytes figure, variant or outcome, a moved day,
+a value that changes type, and a removed capacity file each untie exactly the files that read
+it: "Assemble it again", as before. What it no longer catches: a change to a field no assembler
+reads, which changes none of their figures. In a clone, a stand-in capacity file with every
+read field equal left the three files `same` (`27 same, 2 pinned, 1 differs`), and with
+ArcticDB's stored bytes moved, the 12302019 size file and the estimate differed, naming
+`systems.arcticdb.stored_bytes`, and the 10302019 file stayed `same`.
+
+**The essay's other-commit rule compares what the other figures measure (`560113d`).**
+`render_writeup.py` took a kind measured at a commit other than the essay's only if the whole
+tree between the two differed in nothing but the paths its entry listed. It counted pages, docs,
+CI and faults, from which no figure is measured, so any history with a docs commit in it failed
+it: 168 of the 184 paths between `ede0176` and `8616263` were outside the fuzz kind's list.
+Now such a kind is taken only if every path that the files the essay reads at its measured
+commit measure, by `check_ties.py`'s own kinds, imported and not copied, is the same at both
+commits, with their input pins in `scripts/data_pins.json`. An allow-list is refused. The
+fuzz and coverage kinds dropped theirs, and none was needed: of the measured paths, between
+`ede0176` and `8616263` only `fuzz/`, `tests/unit/CMakeLists.txt`,
+`tests/unit/fuzz_regression_test.cpp` and `scripts/coverage.sh` changed, and no file the essay
+reads at `ede0176` measures any of them. No figure reads the coverage kind, so the essay names only the fuzz result: its
+sentence on the measured commit now says the fuzz result is at `8616263` and the code every
+other figure measures is unchanged there. In a clone with a stand-in G-3 file at `8616263`,
+`--check` got past this rule and stopped on `{{code:fuzz_dict_cap_log2}}`, whose entry still
+waits for the bounds merge that has landed, and, with that dropped in the clone only, on the
+claim for "windows across every stock are answered", which finds no pitch claim holding
+"ArcticDB or QuestDB is fastest".
+
+**Proofs.** I ran no `prove_checks.py`. Each fault below was shown by hand in a clone under the
+worktree's `build/`: the test its entry names passed as committed and failed, with the string
+the entry expects, with the fault in. The outputs are under the phase's `collect2/proofs-d2`
+and `collect2/proofs-d1` folders. Each is shown by hand, proof owed to the full re-proof.
+- New: `ties-read-field-moved-ignored` and `ties-reads-list-misses-a-field` (`62941cb`);
+  `writeup-measured-change-ignored`, `writeup-every-path-compared` and
+  `writeup-exception-kind-measured` (`1cac506`).
+- Remade on the lines that moved: `ties-assembled-ignored` and `ties-symlink-passes`
+  (`62941cb`).
+- Removed with the allow-list it tested: `writeup-differs-only-unchecked` (`1cac506`).
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from

@@ -187,9 +187,10 @@ did not show. A verdict is
 `render_results.py`'s own; a bar is the target's value, shown exactly with its sign; a target's
 figure is the row's own part, printed on the same side of its bar as its verdict; and a gap is
 never printed as none. Every file a token reads names one measured commit, but for the exceptions
-the list declares with their reasons, which the essay names through a generated token; an
-exception's claim to differ from that commit only in some paths is put to `git diff`, and is not
-judged in a tree with no history. A file under a pin of `scripts/data_pins.json` is read only
+the list declares with their reasons, which the essay names through a generated token. A file
+measured at another commit is taken only where every path that the files read at the measured
+commit measure, by `check_ties.py`'s own kinds, and their input pins are the same at both
+commits, as `git diff` shows; that is not judged in a tree with no history. A file under a pin of `scripts/data_pins.json` is read only
 through a kind that declares the pin, and each paragraph showing its figures says so. A word that
 compares, ranks or judges, or a number in words, must sit inside a claim of the list whose
 condition reads the figures its sentence prints, or be carried by a token; the Missed targets and
