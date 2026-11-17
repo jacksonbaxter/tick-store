@@ -3,7 +3,7 @@
 On one trading day of Nasdaq TotalView-ITCH 5.0, {{ss_records}} messages in {{ss_source_gb}} GB, tick-store
 keeps a store {{ss_ratio}} times smaller than the feed and smaller than Parquet files or the
 ArcticDB and QuestDB time-series databases, and gives every message back bit-exact. Keeping each
-stock's records together makes queries about one stock faster than in the other systems' default
+stock's records together makes queries about one stock faster than in the other systems' fixed
 setups, though not than ArcticDB with a table per stock, and short windows across every stock slow,
 because each must decode a whole segment's positions to put records back in file order. Gorilla,
 the codec Facebook published for time series, {{verdict:gorilla_bits}} to plain integer codecs in
@@ -43,8 +43,8 @@ on the same machine. [BENCHMARKS.md](BENCHMARKS.md) gives every source. I chose 
 target as published, so a gap is the distance to that figure, not a defect in itself.
 
 **The comparison.** Parquet (a columnar file format, written by pyarrow), ArcticDB (Man Group's
-DataFrame database for time series) and QuestDB (a time-series SQL server) each ran its default
-setup, fixed in advance, plus any other setup that won a query on a
+DataFrame database for time series) and QuestDB (a time-series SQL server) each ran the setup
+the comparison fixed for it in advance, plus any other setup that won a query on a
 five-minute slice. The queries are one second of every stock at the open (Q1), one hour of one
 stock (Q2), its per-minute aggregate (Q3), one millisecond of every stock (Q4) and the day's sum of
 one shares column (Q5), each run {{cmpL_warm_runs}} times warm, proven to read nothing from storage, and {{cmpL_cold_runs}} times
@@ -281,7 +281,7 @@ profile]({{path:d1}})).
 PFOR encoder codes each block at every candidate scale, which is the likeliest cost, but that is a
 reading of the code, not a measurement." -->
 
-**Queries.** Among the four default setups, tick-store has the lowest median and slowest run on Q2
+**Queries.** Among the four fixed setups, tick-store has the lowest median and slowest run on Q2
 and Q3, warm and cold ({{verdict:ql4_linux_q2q3}}), and on Q5 cold ({{verdict:ql4_linux_q5_cold}});
 the next fastest takes {{cmpL_q2_warm_best_ms}} ms on Q2 warm and {{cmpL_q3_warm_best_ms}} ms on Q3.
 ArcticDB set up with one table per stock is faster still, {{cmpL_arcps_q2_warm_med_ms}} and

@@ -1,0 +1,15 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1591,10 +1591,7 @@
+ RANKING = re.compile(r"\b(?:faster|fastest|slower|slowest|quicker|quickest|least|most|smaller|"
+                      r"smallest|larger|largest|lower|lowest|higher|highest|below|above|beats?|"
+                      r"beating|beaten|outperform(?:s|ing|ed)?|wins|won|loses|lost|best|worst|"
+-                     r"exact|met|meets|missed|misses|exceeds|less|fewer|more|better|worse|ahead|"
+-                     r"behind|trails?|trailing|leads?|leading|keeps? up|kept up|keeping up|clean|"
+-                     r"pass(?:es|ed)?|fails?|failed|surpass(?:es|ed)?|twice|half|halves|double|"
+-                     r"triple|third|quarter|matches)\b", re.IGNORECASE)
++                     r"exact|met|meets|missed|misses|exceeds)\b", re.IGNORECASE)
+ 
+ 
+ def invisible_characters(text, what):

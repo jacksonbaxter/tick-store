@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1542,7 +1542,7 @@
+             _, parts = shown_parts(under, row, root)
+             shown.setdefault((under["id"], under["host"]), set()).update(p[0] for p in parts)
+             sentence = under_sentence(under, row, parts, hosts)
+-            check_under(sentence, under, row, parts, hosts)
++            pass
+             lines += ["", sentence]
+         names = plain_names(definitions, hosts)
+         items, met_parts, counts, named = left_out_items(definitions, root, shown, names)

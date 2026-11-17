@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1765,7 +1765,7 @@
+             raise TargetError(f"pitch: {item.get('text')!r} is kept out of the check with no "
+                               "reason")
+         found = remaining.count(item["text"])
+-        if found != 1:
++        if found < 1:
+             raise TargetError(f"pitch: {item['text']!r}, kept out of the check as "
+                               f"{item['why']}, is in the pitch {found} times, and may be once")
+         remaining = remaining.replace(item["text"], " ")

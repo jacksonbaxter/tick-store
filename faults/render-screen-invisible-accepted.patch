@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1601,7 +1601,7 @@
+     """A character a reader cannot see on the first screen, such as a zero-width space, which
+     would join words for the count and hide what they say, is refused (review DX-11)."""
+     for character in text:
+-        if unicodedata.category(character) in ("Cf", "Zl", "Zp"):
++        if False:
+             raise TargetError(f"{what} holds the character U+{ord(character):04X}, which a reader "
+                               "does not see and the checks would read past")
+ 

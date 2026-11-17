@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1576,7 +1576,7 @@
+         if found:
+             flush()
+             if (found.group(1) or "").strip():
+-                units.append(" ".join(found.group(1).split()))
++                pass
+         else:
+             prose.append(line)
+     flush()

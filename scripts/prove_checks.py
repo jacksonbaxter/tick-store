@@ -302,14 +302,14 @@ def swap_pitch_store_sizes():
 
 
 def reword_a_pitch_claim():
-    """The pitch's Q1 and Q4 sentence reworded to rank tick-store first, with no figure in it
-    for the figure check to catch (review RG-13)."""
+    """The pitch's query sentence reworded to rank tick-store first on short windows too, with
+    no figure in it for the figure check to catch (reviews RG-13, DX-2)."""
     edit_text("README.md", "ArcticDB or QuestDB is fastest", "tick-store is fastest")
 
 
 def type_an_unchecked_pitch_figure():
     """A figure typed into the README's pitch that no row of its check covers (review E-9)."""
-    edit_text("README.md", "It answers queries", "It is 42 times faster. It answers queries")
+    edit_text("README.md", "It gives every", "It is 42 times faster. It gives every")
 
 
 def drop_a_pitch_claims_tie():
@@ -335,9 +335,9 @@ def show_the_fuzz_row():
 
 
 def call_a_host_by_its_system():
-    """The pitch calling the Linux host "Linux" again past its introduction."""
-    edit_text("README.md", "it takes the least disk of the four",
-              "it takes the least disk of the four on Linux")
+    """The pitch calling the Linux host "Linux" again, in its figure sentence, which no claim
+    ties, so the screen's own rule is the one that stops it."""
+    edit_text("README.md", "4.69 times smaller.", "4.69 times smaller on Linux.")
 
 
 def headline_row(document, what):
@@ -1371,7 +1371,7 @@ FAULTS = (
           "FAIL: test_two_figures_of_one_format_are_refused (__main__.RenderPitchTest"),
     Fault("readme-pitch-claim-reworded", "render-check", "the pitch's Q1 and Q4 sentence "
           "reworded to rank tick-store first, with no figure in it", EXIT_RENDER_REFUSED,
-          "the README's pitch no longer says 'ArcticDB or QuestDB is fastest'",
+          "the README's pitch no longer says 'On the Ryzen it answers queries about one stock",
           reword_a_pitch_claim),
     Fault("render-pitch-claim-unchecked", "py-scripts", "render_results.py finds each claim's "
           "words in the pitch and never judges its condition, so a ranking the results reverse "
@@ -1388,6 +1388,92 @@ FAULTS = (
           "the pitch to its max_words, so the prose before the table can grow unseen",
           CHECK_FAILED, "FAIL: test_a_pitch_over_its_word_limit_stops_the_check "
           "(__main__.RenderPitchTest"),
+    # Review DX-2: a claim is its whole sentence, holds its target's words, and every sentence
+    # of the pitch is a claim, holds a figure or is listed as stating no result.
+    Fault("render-pitch-claim-a-phrase", "py-scripts", "render_results.py finds a claim's text "
+          "anywhere in the pitch, so words around a tied ranking widen, move or negate it "
+          "unseen", CHECK_FAILED,
+          "FAIL: test_a_claim_is_its_whole_sentence (__main__.RenderPitchTest"),
+    Fault("render-pitch-sentence-unaccounted", "py-scripts", "render_results.py takes a pitch "
+          "sentence that is no claim, holds no figure and is not listed as stating no result",
+          CHECK_FAILED, "FAIL: test_each_sentence_is_a_claim_holds_a_figure_or_is_listed_as_"
+          "stating_no_result (__main__.RenderPitchTest"),
+    Fault("render-pitch-claim-other-target", "py-scripts", "render_results.py takes a claim "
+          "tied to a target whose bar its sentence does not name, so it could rest on another "
+          "target of the same verdict", CHECK_FAILED,
+          "FAIL: test_a_claim_holds_the_words_its_target_lists_for_its_bar "
+          "(__main__.RenderPitchTest"),
+    # Review DX-14: a claim names its one machine, and fastest is judged on every field named.
+    Fault("render-pitch-claim-machine-unnamed", "py-scripts", "render_results.py takes a claim "
+          "judged on one machine whose sentence does not name it", CHECK_FAILED,
+          "FAIL: test_a_claim_judged_on_one_machine_names_it_and_no_other "
+          "(__main__.RenderPitchTest"),
+    Fault("render-pitch-fastest-median-only", "py-scripts", "render_results.py judges a fastest "
+          "claim on its first field alone, the median, under a bar of median and tail",
+          CHECK_FAILED, "FAIL: test_a_fastest_claim_is_judged_on_every_field_it_names "
+          "(__main__.RenderPitchTest"),
+    # Review DX-3: headings are on the first screen, under its rules and its word limit.
+    Fault("render-pitch-headings-skipped", "py-scripts", "render_results.py leaves the pitch's "
+          "headings out of its ranking rule", CHECK_FAILED,
+          "FAIL: test_headings_and_hash_lines_are_held_to_the_ranking_rule "
+          "(__main__.RenderPitchTest"),
+    Fault("render-pitch-word-limit-skips-a-heading", "py-scripts", "render_results.py leaves "
+          "the pitch's first heading out of its word count", CHECK_FAILED,
+          "FAIL: test_the_word_limit_counts_headings_with_the_prose (__main__.RenderPitchTest"),
+    # Reviews DX-10 and DX-11: the ranking words, and what the figure check read past.
+    Fault("render-pitch-ranking-words-dropped", "py-scripts", "render_results.py's ranking "
+          "words without the ones that passed false sentences, less, ahead, keeps up and the "
+          "rest", CHECK_FAILED,
+          "FAIL: test_the_ranking_words_include_the_ones_that_passed_false_sentences "
+          "(__main__.RenderPitchTest"),
+    Fault("render-pitch-not-result-reused", "py-scripts", "render_results.py keeps a not_results "
+          "text out of the figure check wherever it is found, so its digits pass in any "
+          "sentence", CHECK_FAILED,
+          "FAIL: test_a_text_kept_out_of_the_check_is_kept_out_once (__main__.RenderPitchTest"),
+    Fault("render-screen-invisible-accepted", "py-scripts", "render_results.py takes a "
+          "zero-width character on the first screen, which joins words for the count",
+          CHECK_FAILED, "FAIL: test_an_invisible_or_a_numeric_character_is_refused "
+          "(__main__.RenderPitchTest"),
+    Fault("render-pitch-numeric-character-accepted", "py-scripts", "render_results.py takes a "
+          "figure written as a vulgar fraction, which the digit pattern misses", CHECK_FAILED,
+          "FAIL: test_an_invisible_or_a_numeric_character_is_refused (__main__.RenderPitchTest"),
+    Fault("render-screen-after-the-headline-unread", "py-scripts", "render_results.py reads "
+          "nothing between the headline's end marker and the next heading, still on the first "
+          "screen", CHECK_FAILED,
+          "FAIL: test_text_after_the_headline_before_a_heading_is_refused "
+          "(__main__.RenderHeadlineTest"),
+    # Review DX-4: the line under the table and the sentence above it are checked apart from
+    # their writer.
+    Fault("headline-left-out-writer-class-shared", "py-scripts", "render_results.py's check of "
+          "the line under the table counts the other rows by the writer's own verdict classes, "
+          "so a fault there passes both", CHECK_FAILED,
+          "FAIL: test_a_writer_whose_classes_count_a_part_met_row_as_met_is_refused "
+          "(__main__.LeftOutLineTest"),
+    Fault("headline-left-out-machine-unchecked", "py-scripts", "render_results.py's check of "
+          "the line under the table finds each name under any machine", CHECK_FAILED,
+          "FAIL: test_a_writer_that_names_the_wrong_machine_is_refused "
+          "(__main__.LeftOutLineTest"),
+    Fault("headline-left-out-named-count-unchecked", "py-scripts", "render_results.py's check "
+          "of the line under the table drops the targets named among the counts", CHECK_FAILED,
+          "FAIL: test_a_writer_that_names_a_target_under_another_count_is_refused "
+          "(__main__.LeftOutLineTest"),
+    Fault("headline-left-out-extra-name-accepted", "py-scripts", "render_results.py's check of "
+          "the line under the table takes a name the targets do not leave out", CHECK_FAILED,
+          "FAIL: test_a_name_the_targets_do_not_leave_out_is_refused (__main__.LeftOutLineTest"),
+    Fault("headline-under-verdict-unchecked", "py-scripts", "render_results.py does not check "
+          "the verdict of the sentence under the table apart from its writer", CHECK_FAILED,
+          "FAIL: test_a_sentence_under_the_table_that_always_says_met_is_refused "
+          "(__main__.LeftOutLineTest"),
+    # Review DX-5: "vs" the best of the others is the best of every other system.
+    Fault("headline-lowest-of-a-subset", "py-scripts", "render_results.py shows the lowest of "
+          "some of the other systems as the best of them", CHECK_FAILED,
+          "FAIL: test_the_lowest_of_the_others_takes_every_other_system "
+          "(__main__.RenderHeadlineTest"),
+    # Review DX-13: the line is read back name by name.
+    Fault("headline-plain-name-shared", "py-scripts", "render_results.py takes one plain name "
+          "for two targets, or two parts, on one machine", CHECK_FAILED,
+          "FAIL: test_a_plain_name_is_whole_and_one_parts_on_a_machine "
+          "(__main__.RenderHeadlineTest"),
     Fault("headline-fuzz-row-names-its-id", "render-check", "the fuzz target added to the "
           "headline's table, whose verdict cell, written from the results, names its id",
           EXIT_RENDER_REFUSED, "the README's first screen names 'G-3'", show_the_fuzz_row),

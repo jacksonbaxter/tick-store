@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1407,7 +1407,7 @@
+         key = (row["id"], row["host"])
+         parts, _ = judged_parts(row, root)
+         if key not in shown:
+-            kind = class_of([part[2] for part in parts]) if parts is not None else "not judged"
++            kind = verdict_class(parts)
+             expected[kind] = expected.get(kind, 0) + 1
+             if key in asked and kind != "met":
+                 expected_named.setdefault(kind, []).append(names[key]["name"])

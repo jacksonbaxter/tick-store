@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1776,7 +1776,7 @@
+     pitch_words(definitions)
+     hosts = definitions["headline"].get("hosts") if "headline" in definitions else None
+     for claim in pitch.get("claims", []):
+-        if claim["text"] not in units:
++        if claim["text"] not in text:
+             raise TargetError(f"the README's pitch no longer says {claim['text']!r}, which "
+                               "scripts/targets.json ties to the results as a whole sentence; "
+                               "change the claim there with the sentence")

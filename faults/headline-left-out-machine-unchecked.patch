@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1434,7 +1434,7 @@
+         sentence = sentences.get(head)
+         given = stated_items(sentence[len(head) + 2:], hosts, kind) if sentence else set()
+         for (where, name), key in wanted.items():
+-            if (where, name) in given:
++            if name in {item for _, item in given}:
+                 continue
+             elsewhere = [other for other, item in given if item == name]
+             if elsewhere:

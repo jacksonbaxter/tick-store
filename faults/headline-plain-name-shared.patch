@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1228,7 +1228,7 @@
+                                   "read back")
+             for host, ident, other in owners.get(text, []):
+                 same_machine = "any" in (host, entry["host"]) or host == entry["host"]
+-                if same_machine and (ident != entry["id"] or
++                if False and (ident != entry["id"] or
+                                      None not in (label, other) and label != other):
+                     raise TargetError(f"the plain name {text!r} names both {ident} "
+                                       f"({other or 'the target'}) and {entry['id']} "

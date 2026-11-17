@@ -761,21 +761,27 @@ class RenderWriteTest(Scratch):
         self.assertIn("| missed |", self.row((13.0, 0.1), theirs))
 
 
-PITCH = {"max_words": 30, "figures": [
+PITCH = {"max_words": 40, "figures": [
     {"file": "results/day-*.json", "values": [{"path": ["one"]}, {"path": ["two"]}],
      "format": "{:.1f} and {:.1f} bits"},
     {"file": "results/day-*.json",
      "values": [{"path": ["systems", "s", "variants", "@headline", "ms"]}], "scale": 1,
      "format": "{:.2f} ms"}],
     "not_results": [{"text": "C++23", "why": "the language"}],
+    "no_result_sentences": [{"text": "Title", "why": "the page's name"},
+                            {"text": "Read on.", "why": "a sign-off"}],
     "claims": [
-        {"text": "it keeps", "target": {"id": "T-3", "host": "any", "parts": ["one"],
-                                        "verdict": "met"}},
-        {"text": "its other variant is faster", "file": "results/day-*.json",
+        {"text": "It keeps its bits.", "target": {"id": "T-3", "host": "any", "parts": ["one"],
+                                                  "verdict": "met"}},
+        {"text": "Its other variant is faster.", "file": "results/day-*.json",
          "below": [[{"path": ["systems", "s", "variants", "x", "ms"]},
                     {"path": ["systems", "s", "variants", "@headline", "ms"]}]]}]}
-PITCH_README = ("# Title\n\nWritten in C++23, it keeps 2.0 and\n4.0 bits, and answers in "
-                "7.25 ms; its other variant is\nfaster.\n\nMore.\n")
+PITCH_README = ("# Title\n\nWritten in C++23, it holds 2.0 and\n4.0 bits, and answers in "
+                "7.25 ms. It keeps its\nbits. Its other variant is\nfaster.\n\nRead on.\n")
+PITCH_DOCUMENT = {key: value for key, value in TARGET_DOCUMENT.items() if key != "host"}
+# The pitch's rows: T-3 lists the words a claim on its part one must hold.
+PITCH_ROWS = [dict(row, pitch=[{"words": "keeps its bits", "parts": ["one"]}])
+              if row["id"] == "T-3" else row for row in TARGET_ROWS]
 # Two systems' headline variants, each with two queries' warm medians.
 RANKED_DOCUMENT = {"host": "Linux", "systems": {
     system: {"headline_variant": "h", "variants": {"h": {"queries": {
@@ -793,12 +799,14 @@ class RenderPitchTest(Scratch):
         self.readme.write_text(PITCH_README, encoding="utf-8")
         (self.tree / "results").mkdir(parents=True)
         self.day = self.tree / "results" / "day-0123.json"
-        self.day.write_text(json.dumps(TARGET_DOCUMENT), encoding="utf-8")
+        # A file of no one machine, so a claim on it need name none; the machine rule has a
+        # test of its own.
+        self.day.write_text(json.dumps(PITCH_DOCUMENT), encoding="utf-8")
         self.write_pitch(PITCH)
 
-    def write_pitch(self, pitch):
-        self.targets.write_text(json.dumps({"schema": "t", "rows": TARGET_ROWS, "pitch": pitch}),
-                                encoding="utf-8")
+    def write_pitch(self, pitch, rows=None, **more):
+        self.targets.write_text(json.dumps({"schema": "t", "rows": rows or PITCH_ROWS,
+                                            "pitch": pitch, **more}), encoding="utf-8")
 
     def test_a_pitch_that_states_the_results_passes(self):
         self.assertEqual(self.render().returncode, 0)
@@ -806,7 +814,7 @@ class RenderPitchTest(Scratch):
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_a_figure_the_results_no_longer_give_stops_the_check(self):
-        document = json.loads(json.dumps(TARGET_DOCUMENT))
+        document = json.loads(json.dumps(PITCH_DOCUMENT))
         document["systems"]["s"]["variants"]["h"]["ms"] = 7.5
         self.day.write_text(json.dumps(document), encoding="utf-8")
         result = self.render("--check")
@@ -815,7 +823,7 @@ class RenderPitchTest(Scratch):
                       "results/day-0123.json gives", result.stderr)
 
     def test_a_typed_figure_nothing_checks_stops_the_check(self):
-        self.readme.write_text(PITCH_README.replace("More.", "It is 42 times faster."),
+        self.readme.write_text(PITCH_README.replace("Read on.", "It is 42 times faster."),
                                encoding="utf-8")
         result = self.render("--check")
         self.assertEqual(result.returncode, 2, result.stderr)
@@ -841,43 +849,47 @@ class RenderPitchTest(Scratch):
 
     # Review RG-13: a sentence that ranks tick-store is tied to a condition on the results.
 
+    def assert_passes(self):
+        self.assertEqual(self.render().returncode, 0)
+        result = self.render("--check")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def assert_claim_refused(self, expected):
         result = self.render("--check")
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertIn(expected, result.stderr)
 
     def test_a_claim_the_results_no_longer_bear_out_stops_the_check(self):
-        document = json.loads(json.dumps(TARGET_DOCUMENT))
+        document = json.loads(json.dumps(PITCH_DOCUMENT))
         document["systems"]["s"]["variants"]["x"]["ms"] = 9.0
         self.day.write_text(json.dumps(document), encoding="utf-8")
-        self.assert_claim_refused("the README's pitch says 'its other variant is faster', and "
+        self.assert_claim_refused("the README's pitch says 'Its other variant is faster.', and "
                                   "the results do not bear it out: 9.0 is not below 7.25")
 
     def test_a_claim_on_a_verdict_the_results_reverse_stops_the_check(self):
-        claim = {"text": "it keeps", "target": {"id": "T-3", "host": "any", "parts": ["two"],
-                                                "verdict": "met"}}
+        claim = {"text": "It keeps its bits.", "target": {"id": "T-3", "host": "any",
+                                                          "parts": ["two"], "verdict": "met"}}
         self.write_pitch({**PITCH, "claims": [claim, PITCH["claims"][1]]})
-        self.assert_claim_refused("the README's pitch says 'it keeps', and the results do not "
-                                  "bear it out: T-3 on any is missed, not met")
+        self.assert_claim_refused("the README's pitch says 'It keeps its bits.', and the "
+                                  "results do not bear it out: T-3 on any is missed, not met")
 
     def test_a_claim_whose_verdict_changes_names_its_sentence(self):
         # A new results file that turns a verdict stops the check at the sentence to change.
-        document = json.loads(json.dumps(TARGET_DOCUMENT))
+        document = json.loads(json.dumps(PITCH_DOCUMENT))
         document["one"] = 3.5
         self.day.write_text(json.dumps(document), encoding="utf-8")
         self.readme.write_text(PITCH_README.replace("2.0 and", "3.5 and"), encoding="utf-8")
-        self.assert_claim_refused("T-3 on any is missed, not met; change the sentence 'Written "
-                                  "in C++23, it keeps 3.5 and 4.0 bits, and answers in 7.25 ms; "
-                                  "its other variant is faster.'")
+        self.assert_claim_refused("the README's pitch says 'It keeps its bits.', and the "
+                                  "results do not bear it out: T-3 on any is missed, not met; "
+                                  "change the sentence")
 
     # The first screen's rules: a ranking keeps its tie, and the prose stays short.
 
     def test_a_ranking_whose_claim_is_dropped_stops_the_check(self):
         self.write_pitch({**PITCH, "claims": PITCH["claims"][:1]})
         self.assert_claim_refused("the README's pitch ranks or judges with 'faster' in the "
-                                  "sentence 'Written in C++23, it keeps 2.0 and 4.0 bits, and "
-                                  "answers in 7.25 ms; its other variant is faster.', and no "
-                                  "claim in scripts/targets.json ties those words to the results")
+                                  "sentence 'Its other variant is faster.', and no claim in "
+                                  "scripts/targets.json ties those words to the results")
 
     def test_a_ranking_word_inside_a_figures_words_needs_no_claim(self):
         pitch = json.loads(json.dumps(PITCH))
@@ -891,36 +903,44 @@ class RenderPitchTest(Scratch):
 
     def test_a_pitch_over_its_word_limit_stops_the_check(self):
         self.write_pitch({**PITCH, "max_words": 16})
-        self.assert_claim_refused("the README's pitch runs to 20 words before the table, over "
+        self.assert_claim_refused("the README's pitch runs to 26 words before the table, over "
                                   "its 16")
 
-    def test_the_word_limit_leaves_out_headings_and_counts_the_rest(self):
-        self.write_pitch({**PITCH, "max_words": 20})
-        self.readme.write_text(PITCH_README.replace("# Title", "# A title of many words here"),
+    def test_the_word_limit_counts_headings_with_the_prose(self):
+        # Review DX-3: GitHub shows a heading, so its words count.
+        self.write_pitch({**PITCH, "max_words": 26})
+        self.assert_passes()
+        pitch = json.loads(json.dumps({**PITCH, "max_words": 26}))
+        pitch["no_result_sentences"][0]["text"] = "Title page"
+        self.write_pitch(pitch)
+        self.readme.write_text(PITCH_README.replace("# Title", "# Title page"),
                                encoding="utf-8")
-        self.assertEqual(self.render().returncode, 0)
-        result = self.render("--check")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.readme.write_text(PITCH_README.replace("More.", "More words."), encoding="utf-8")
-        self.assert_claim_refused("runs to 21 words before the table, over its 20")
+        self.assert_claim_refused("runs to 27 words before the table, over its 26")
 
     def test_a_pitch_with_no_word_limit_is_refused(self):
         self.write_pitch({key: value for key, value in PITCH.items() if key != "max_words"})
         self.assert_claim_refused("pitch: no max_words")
 
     def test_a_claim_whose_words_the_pitch_no_longer_holds_stops_the_check(self):
-        self.readme.write_text(PITCH_README.replace("its other variant is\nfaster",
-                                                    "its other variant is slower"),
+        self.readme.write_text(PITCH_README.replace("Its other variant is\nfaster",
+                                                    "Its other variant is slower"),
                                encoding="utf-8")
-        self.assert_claim_refused("the README's pitch no longer says 'its other variant is "
-                                  "faster'")
+        self.assert_claim_refused("the README's pitch no longer says 'Its other variant is "
+                                  "faster.'")
+
+    def ranked(self, document=None):
+        document = json.loads(json.dumps(document or RANKED_DOCUMENT))
+        del document["host"]
+        (self.tree / "results" / "rank-0123.json").write_text(json.dumps(document),
+                                                             encoding="utf-8")
 
     def test_a_fastest_claim_is_judged_on_each_query_and_kind(self):
-        (self.tree / "results" / "rank-0123.json").write_text(json.dumps(RANKED_DOCUMENT),
-                                                             encoding="utf-8")
+        self.ranked()
+        self.readme.write_text(PITCH_README.replace("It keeps its\nbits.", "It answers A first."),
+                               encoding="utf-8")
         fastest = {"systems": ["s", "t"], "queries": ["A"], "kinds": ["warm"],
-                   "field": "median_us", "one_of": ["t"]}
-        claim = {"text": "answers in", "file": "results/rank-*.json", "fastest": fastest}
+                   "fields": ["median_us"], "one_of": ["t"]}
+        claim = {"text": "It answers A first.", "file": "results/rank-*.json", "fastest": fastest}
         self.write_pitch({**PITCH, "claims": [PITCH["claims"][1], claim]})
         self.assertEqual(self.render().returncode, 0)
         result = self.render("--check")
@@ -930,6 +950,166 @@ class RenderPitchTest(Scratch):
                                                                     "queries": ["A", "B"]}}]})
         self.assert_claim_refused("the results do not bear it out: B warm: s has the lowest "
                                   "median_us")
+
+    def test_a_fastest_claim_is_judged_on_every_field_it_names(self):
+        # Review DX-14: "fastest" under a bar of median and tail is judged on both.
+        document = json.loads(json.dumps(RANKED_DOCUMENT))
+        document["systems"]["s"]["variants"]["h"]["queries"]["A"]["warm"]["p99_us"] = 1.0
+        document["systems"]["t"]["variants"]["h"]["queries"]["A"]["warm"]["p99_us"] = 9.0
+        self.ranked(document)
+        self.readme.write_text(PITCH_README.replace("It keeps its\nbits.", "It answers A first."),
+                               encoding="utf-8")
+        fastest = {"systems": ["s", "t"], "queries": ["A"], "kinds": ["warm"],
+                   "fields": ["median_us", "p99_us"], "one_of": ["t"]}
+        claim = {"text": "It answers A first.", "file": "results/rank-*.json", "fastest": fastest}
+        self.write_pitch({**PITCH, "claims": [PITCH["claims"][1], claim]})
+        self.assert_claim_refused("the results do not bear it out: A warm: s has the lowest "
+                                  "p99_us")
+        self.write_pitch({**PITCH, "claims": [PITCH["claims"][1],
+                                              {**claim, "fastest": {**fastest,
+                                                                    "fields": []}}]})
+        self.assert_claim_refused("a fastest claim names no fields to judge fastest on")
+
+    # Review DX-2: a claim is its whole sentence, so nothing can be added around a tied ranking.
+
+    def test_a_claim_is_its_whole_sentence(self):
+        for readme in (PITCH_README.replace("It keeps its\nbits.",
+                                            "It keeps its bits, and every other system's."),
+                       PITCH_README.replace("It keeps its\nbits.",
+                                            "It is not true that it keeps its bits."),
+                       PITCH_README.replace("It keeps its\nbits.", "On a laptop too it keeps "
+                                            "its bits.")):
+            with self.subTest(readme=readme):
+                self.readme.write_text(readme, encoding="utf-8")
+                self.assert_claim_refused("the README's pitch no longer says 'It keeps its "
+                                          "bits.', which scripts/targets.json ties to the "
+                                          "results as a whole sentence")
+        # The phrase-only tie of before: a claim that is part of a sentence is no claim.
+        self.readme.write_text(PITCH_README, encoding="utf-8")
+        claim = {**PITCH["claims"][0], "text": "keeps its bits"}
+        self.write_pitch({**PITCH, "claims": [claim, PITCH["claims"][1]]})
+        self.assert_claim_refused("the README's pitch no longer says 'keeps its bits'")
+
+    def test_each_sentence_is_a_claim_holds_a_figure_or_is_listed_as_stating_no_result(self):
+        self.readme.write_text(PITCH_README.replace("Read on.", "It is quick to read."),
+                               encoding="utf-8")
+        self.assert_claim_refused("the README's pitch says 'It is quick to read.', which is no "
+                                  "claim tied to the results, holds no figure checked against "
+                                  "them, and is not listed as stating no result")
+        pitch = json.loads(json.dumps(PITCH))
+        pitch["no_result_sentences"][1] = {"text": "It is quick to read.", "why": "a reading"}
+        self.write_pitch(pitch)
+        self.assert_passes()
+        pitch["no_result_sentences"][1] = {"text": "It is quick to read."}
+        self.write_pitch(pitch)
+        self.assert_claim_refused("pitch: 'It is quick to read.' is listed as stating no result "
+                                  "with no reason")
+        pitch["no_result_sentences"][1] = {"text": "It is quick to read.", "why": "a reading"}
+        pitch["no_result_sentences"].append({"text": "It is slow to read.", "why": "a reading"})
+        self.write_pitch(pitch)
+        self.assert_claim_refused("pitch: 'It is slow to read.' is listed as stating no result, "
+                                  "and the README's pitch does not say it")
+        # A sentence listed as stating no result still may not rank.
+        self.readme.write_text(PITCH_README.replace("Read on.", "It is the fastest."),
+                               encoding="utf-8")
+        pitch["no_result_sentences"][1] = {"text": "It is the fastest.", "why": "a reading"}
+        self.write_pitch(pitch)
+        self.assert_claim_refused("ranks or judges with 'fastest' in the sentence 'It is the "
+                                  "fastest.'")
+
+    def test_a_claim_holds_the_words_its_target_lists_for_its_bar(self):
+        # Pointed at another target of the same verdict, the claim names that target's bar.
+        claim = {**PITCH["claims"][0], "target": {"id": "T-4", "host": "Linux",
+                                                  "verdict": "met"}}
+        self.write_pitch({**PITCH, "claims": [claim, PITCH["claims"][1]]})
+        self.assert_claim_refused("pitch: T-4 on Linux lists no words for a claim's sentence "
+                                  "to hold")
+        rows = [dict(row, pitch=[{"words": "orders its bits"}]) if row["id"] == "T-4" else row
+                for row in PITCH_ROWS]
+        self.write_pitch({**PITCH, "claims": [claim, PITCH["claims"][1]]}, rows)
+        self.assert_claim_refused("the README's pitch ties 'It keeps its bits.' to T-4 on "
+                                  "Linux, and the sentence holds none of the words that target "
+                                  "lists for its bar on those parts")
+        # The words name their parts: the same words on another part are not that part's.
+        claim = {**PITCH["claims"][0], "target": {"id": "T-3", "host": "any", "parts": ["two"],
+                                                  "verdict": "missed"}}
+        self.write_pitch({**PITCH, "claims": [claim, PITCH["claims"][1]]})
+        self.assert_claim_refused("holds none of the words that target lists for its bar")
+        rows = [dict(row, pitch=[{"words": "keeps its bits"}]) if row["id"] == "T-4" else row
+                for row in PITCH_ROWS]
+        self.write_pitch(PITCH, rows)
+        self.assert_claim_refused("the pitch words 'keeps its bits' name both T-3 on any and "
+                                  "T-4 on Linux")
+
+    def test_a_claim_judged_on_one_machine_names_it_and_no_other(self):
+        # Review DX-14: a sentence true on one machine says which.
+        document = json.loads(json.dumps(RANKED_DOCUMENT))
+        (self.tree / "results" / "rank-0123.json").write_text(json.dumps(document),
+                                                             encoding="utf-8")
+        hosts = {"hosts": HEADLINE["hosts"]}
+        fastest = {"systems": ["s", "t"], "queries": ["A"], "kinds": ["warm"],
+                   "fields": ["median_us"], "one_of": ["t"]}
+
+        def check(sentence):
+            readme = PITCH_README.replace("It keeps its\nbits.", sentence)
+            claim = {"text": sentence, "file": "results/rank-*.json", "fastest": fastest}
+            self.write_pitch({**PITCH, "claims": [PITCH["claims"][1], claim]}, headline=hosts)
+            RENDER.check_pitch(self.targets, self.tree, readme)
+        with self.assertRaises(RENDER.TargetError) as caught:
+            check("It answers A first.")
+        self.assertIn("judged on Linux alone, and does not name the machine; say 'the box' in "
+                      "it", str(caught.exception))
+        check("On the box it answers A first.")
+        with self.assertRaises(RENDER.TargetError) as caught:
+            check("On the box and the laptop it answers A first.")
+        self.assertIn("which names 'the laptop', and is judged on ['Linux'] alone",
+                      str(caught.exception))
+        self.write_pitch(PITCH)
+        with self.assertRaises(RENDER.TargetError) as caught:
+            claim = {"text": "It answers A first.", "file": "results/rank-*.json",
+                     "fastest": fastest}
+            self.write_pitch({**PITCH, "claims": [PITCH["claims"][1], claim]})
+            RENDER.check_pitch(self.targets, self.tree,
+                               PITCH_README.replace("It keeps its\nbits.", "It answers A first."))
+        self.assertIn("pitch: no words for the host Linux", str(caught.exception))
+
+    # Review DX-3: a heading is on the screen, and "#It" is no heading.
+
+    def test_headings_and_hash_lines_are_held_to_the_ranking_rule(self):
+        for line, word in (("## The fastest of all", "fastest"),
+                           ("#It beats every system.", "beats")):
+            with self.subTest(line=line):
+                self.readme.write_text(PITCH_README.replace("\nRead on.\n", f"\nRead on.\n\n{line}\n"),
+                                       encoding="utf-8")
+                self.assert_claim_refused(f"the README's pitch ranks or judges with {word!r}")
+
+    # Reviews DX-10 and DX-11: words and characters the checks read past before.
+
+    def test_the_ranking_words_include_the_ones_that_passed_false_sentences(self):
+        for sentence, word in (("One thread keeps up with the feed.", "keeps up"),
+                               ("It writes the day in less time.", "less"),
+                               ("Cold reads trail no other system.", "trail"),
+                               ("Its fuzzing came back clean.", "clean"),
+                               ("It ingests ahead of the rest.", "ahead"),
+                               ("It needs a third of the disk.", "third")):
+            with self.subTest(sentence=sentence):
+                self.readme.write_text(PITCH_README.replace("Read on.", sentence),
+                                       encoding="utf-8")
+                self.assert_claim_refused(f"the README's pitch ranks or judges with {word!r}")
+
+    def test_a_text_kept_out_of_the_check_is_kept_out_once(self):
+        self.readme.write_text(PITCH_README.replace("Read on.", "It needs C++23 too."),
+                               encoding="utf-8")
+        self.assert_claim_refused("pitch: 'C++23', kept out of the check as the language, is in "
+                                  "the pitch 2 times, and may be once")
+
+    def test_an_invisible_or_a_numeric_character_is_refused(self):
+        for text, expected in (("More​words here.", "holds the character U+200B"),
+                               ("It needs ⅓ of the disk.", "types the figure '⅓' as a "
+                                                                "character")):
+            with self.subTest(text=text):
+                self.readme.write_text(PITCH_README.replace("Read on.", text), encoding="utf-8")
+                self.assert_claim_refused(expected)
 
 
 class RenderPreTieTest(Scratch):
@@ -969,7 +1149,7 @@ class RenderPreTieTest(Scratch):
 HEADLINE_BEGIN = "<!-- headline:begin, generated by scripts/render_results.py, do not edit -->"
 HEADLINE_END = "<!-- headline:end -->"
 HEADLINE_README = (f"# Title\n\nPitch, on a pinned box running Linux.\n\n{HEADLINE_BEGIN}\n"
-                   f"{HEADLINE_END}\n\nAfter.\n")
+                   f"{HEADLINE_END}\n\n## After\n\nAfter.\n")
 MS = {"value": {"path": ["systems", "s", "variants", "@headline", "ms"]}, "format": "{:.2f}"}
 HEADLINE = {
     "hosts": {"Linux": {"introduced": "a pinned box running Linux", "then": "the box"},
@@ -1129,7 +1309,7 @@ class RenderHeadlineTest(Scratch):
                           ("T-4", "Linux"): {"against r"}, ("T-2", "macOS"): {"q"}}
         names = RENDER.plain_names(definitions, HEADLINE["hosts"])
         with self.assertRaises(RENDER.TargetError) as caught:
-            RENDER.check_left_out(line, definitions, self.tree, shown, names)
+            RENDER.check_left_out(line, definitions, self.tree, shown, names, HEADLINE["hosts"])
         return str(caught.exception)
 
     def test_a_count_the_writer_gets_wrong_is_refused(self):
@@ -1339,6 +1519,294 @@ class RenderHeadlineTest(Scratch):
         result = self.render("--check")
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertIn("there is no RESULTS.md", result.stderr)
+
+    # Review DX-11: the first screen ends at a heading.
+
+    def test_text_after_the_headline_before_a_heading_is_refused(self):
+        self.readme.write_text(HEADLINE_README.replace("\n\n## After\n", "\n\nIt is fastest.\n"),
+                               encoding="utf-8")
+        self.refused_readme("the README's first screen goes on past the headline with 'It is "
+                            "fastest.', which no check reads")
+
+    def refused_readme(self, expected):
+        before = self.readme.read_text(encoding="utf-8")
+        result = self.render()
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn(expected, result.stderr)
+        self.assertEqual(self.readme.read_text(encoding="utf-8"), before)
+
+    def test_an_invisible_character_on_the_first_screen_is_refused(self):
+        self.write_targets(with_row(0, what="Late​ncy"))
+        self.refused("the README's first screen holds the character U+200B")
+
+    # Review DX-5: "vs" the best of the other systems is the best of all of them.
+
+    def test_the_lowest_of_the_others_takes_every_other_system(self):
+        spec = {"systems": ["s"], "path": ["queries", "A", "warm", "median_us"]}
+        judged = [("a", "", True, Path("x"), RANKED_DOCUMENT)]
+        value = {"value": {"lowest_value": spec}, "format": "{:.1f}"}
+        with self.assertRaises(RENDER.TargetError) as caught:
+            RENDER.headline_value(value, {}, judged, "best")
+        self.assertIn("{best} takes the lowest of ['s'], and the comparison ran ['s', 't'] "
+                      "beside tickstore", str(caught.exception))
+        row = {"lowest_of": {"ours": "t", "others": ["s"]}}
+        self.assertEqual(RENDER.headline_value(value, row, judged, "best"), "5.0")
+        three = json.loads(json.dumps(RANKED_DOCUMENT))
+        three["systems"]["u"] = three["systems"]["s"]
+        with self.assertRaises(RENDER.TargetError) as caught:
+            RENDER.headline_value(value, {"lowest_of": {"ours": "t", "others": ["s", "u"]}},
+                                  [("a", "", True, Path("x"), three)], "best")
+        self.assertIn("{best} takes the lowest of ['s'], and the comparison ran ['s', 'u'] "
+                      "beside t", str(caught.exception))
+        with self.assertRaises(RENDER.TargetError) as caught:
+            RENDER.headline_value({"value": {"lowest_value": {**spec, "systems": ["s", "u"]}},
+                                   "format": "{:.1f}"},
+                                  {"lowest_of": {"ours": "t", "others": ["s"]}},
+                                  [("a", "", True, Path("x"), three)], "best")
+        self.assertIn("and its target ranks among ['s']", str(caught.exception))
+
+    # The reviewer's mutants of the first screen's code that no test killed.
+
+    def test_a_template_field_with_its_own_format_is_refused(self):
+        # A {ms:.1f} would bypass the value's own format and scale.
+        self.write_targets(with_row(0, measured="{ms:.1f} ms"))
+        self.refused("its bar and measured: {ms} is not a plain named value")
+
+    def test_each_host_needs_its_introduction_and_short_name(self):
+        for hosts in ({"Linux": HEADLINE["hosts"]["Linux"], "both": "both machines"},
+                      {**HEADLINE["hosts"], "macOS": {"introduced": "a laptop on macOS"}},
+                      {key: value for key, value in HEADLINE["hosts"].items() if key != "both"}):
+            with self.subTest(hosts=hosts):
+                with self.assertRaises(RENDER.TargetError):
+                    RENDER.headline_hosts({"hosts": hosts})
+
+    def test_two_plain_names_for_one_target_on_one_machine_are_refused(self):
+        headline = json.loads(json.dumps(HEADLINE))
+        headline["names"].append({"id": "T-1", "host": "Linux", "name": "delay"})
+        self.write_targets(headline)
+        self.refused("two plain names for T-1 on Linux")
+
+    # Review DX-13: the line is read back name by name, so each name is whole and one part's.
+
+    def test_a_plain_name_is_whole_and_one_parts_on_a_machine(self):
+        def names(entries):
+            definitions = {"headline": {"names": entries}, "rows": []}
+            return RENDER.plain_names(definitions, HEADLINE["hosts"])
+        # One target's name on two machines, and a target's name that is one of its parts'.
+        names([{"id": "T-1", "host": "Linux", "name": "latency"},
+               {"id": "T-2", "host": "macOS", "name": "latency"},
+               {"id": "T-3", "host": "any", "name": "bits", "parts": {"one": "bits"}}])
+        for entries, expected in (
+                ([{"id": "T-3", "host": "any", "name": "bits", "parts": {"one": "a bit",
+                                                                        "two": "a bit"}}],
+                 "the plain name 'a bit' names both T-3 (one) and T-3 (two) on one machine"),
+                ([{"id": "T-1", "host": "Linux", "name": "latency"},
+                  {"id": "T-4", "host": "Linux", "name": "latency"}],
+                 "the plain name 'latency' names both T-1 (the target) and T-4 (the target)"),
+                ([{"id": "T-1", "host": "any", "name": "latency"},
+                  {"id": "T-4", "host": "Linux", "name": "latency"}],
+                 "the plain name 'latency' names both T-1"),
+                ([{"id": "T-1", "host": "Linux", "name": "latency, warm"}],
+                 "the plain name 'latency, warm' is empty or holds a list's"),
+                ([{"id": "T-1", "host": "Linux", "name": "on the box"}],
+                 "the plain name 'on the box' is empty or holds")):
+            with self.subTest(expected=expected):
+                with self.assertRaises(RENDER.TargetError) as caught:
+                    names(entries)
+                self.assertIn(expected, str(caught.exception))
+
+
+def bits_part(label, path, at_most=None):
+    part = {"label": label, "file": "results/day-*.json", "value": {"path": path}}
+    return {**part, "at_most": at_most} if at_most is not None else part
+
+
+# Review DX-4: targets whose line under the table has a machine, two misses of one class, a
+# row missed in part among the others, a target named among its count, and a sentence under
+# the table that is missed.
+LEFT_OUT_ROWS = [
+    {"id": "L-1", "host": "Linux", "target": {"at_most": 3}, "digits": 1,
+     "parts": [bits_part("a", ["one"]), bits_part("b", ["two"]),
+               bits_part("c", ["systems", "s", "variants", "@headline", "ms"])]},
+    {"id": "L-2", "host": "macOS", "target": {"at_most": 3}, "digits": 1,
+     "parts": [bits_part("a", ["one"]), bits_part("b", ["two"])]},
+    {"id": "L-3", "host": "any", "target": {"at_most": 5}, "digits": 2,
+     "parts": [bits_part("q", ["systems", "s", "variants", "@headline", "ms"])]},
+    {"id": "L-4", "host": "Linux", "target": {"at_most": 3}, "digits": 1,
+     "parts": [bits_part("a", ["one"])]},
+    {"id": "L-5", "host": "Linux", "target_text": "fast", "no_figure": "it was not run"},
+    {"id": "L-6", "host": "Linux", "target": {"at_most": 3}, "digits": 1,
+     "parts": [bits_part("a", ["one"]), bits_part("z", ["two"])]},
+    {"id": "L-7", "host": "macOS", "target": {"at_most": 3}, "digits": 1,
+     "parts": [bits_part("a", ["one"]), bits_part("z", ["two"])]},
+    {"id": "U-1", "host": "macOS", "target": {"at_most": 5}, "digits": 2,
+     "parts": [bits_part("q", ["systems", "s", "variants", "@headline", "ms"])]},
+]
+ONE = {"one": {"value": {"path": ["one"]}, "format": "{:.1f}"}}
+LEFT_OUT_HEADLINE = {
+    "hosts": HEADLINE["hosts"],
+    "name_among_counts": [{"id": "L-5", "host": "Linux"}],
+    "rows": [
+        {"id": "L-1", "host": "Linux", "parts": ["a"], "what": "Bits", "bar": "few",
+         "source": "a codec", "measured": "{one} bits", "values": ONE},
+        {"id": "L-3", "host": "any", "what": "Latency", "bar": "short", "source": "a paper",
+         "measured": "{ms} ms", "values": {"ms": MS}},
+        {"id": "L-6", "host": "Linux", "parts": ["a"], "what": "More bits", "bar": "few",
+         "source": "a codec", "measured": "{one} bits", "values": ONE},
+        {"id": "L-7", "host": "macOS", "parts": ["a"], "what": "Laptop bits", "bar": "few",
+         "source": "a codec", "measured": "{one} bits", "values": ONE}],
+    "under": {"id": "U-1", "host": "macOS", "text": "On a laptop on macOS it takes {ms} ms: "
+              "{verdict}.", "values": {"ms": MS}},
+    "names": [
+        {"id": "L-1", "host": "Linux", "name": "bits", "parts": {"a": "bits a", "b": "bits b",
+                                                                 "c": "bits c"}},
+        {"id": "L-2", "host": "macOS", "name": "laptop bits"},
+        {"id": "L-3", "host": "any", "name": "latency"},
+        {"id": "L-4", "host": "Linux", "name": "one bit"},
+        {"id": "L-5", "host": "Linux", "name": "kernel time"},
+        {"id": "L-6", "host": "Linux", "name": "more bits", "parts": {"a": "more bits a",
+                                                                      "z": "two bits"}},
+        {"id": "L-7", "host": "macOS", "name": "more bits", "parts": {"a": "more bits a",
+                                                                      "z": "two bits"}},
+        {"id": "U-1", "host": "macOS", "name": "laptop latency"}]}
+LEFT_OUT_TEXT = ("Not shown above. Missed: on both machines, two bits; on the box, bits b, bits c. "
+                 "Of the other 3 target-and-machine rows of the [full table](RESULTS.md#targets): "
+                 "1 met, 1 missed in part, 1 not judged, kernel time among them.")
+
+
+class LeftOutLineTest(Scratch):
+    """Review DX-4: the line under the table is checked apart from its writer, by its own
+    verdict classes, each name under its machine, and each target named among its own count,
+    and so is the sentence under the table; each test breaks the writer and the check stops."""
+
+    def setUp(self):
+        super().setUp()
+        self.results_md.write_text(WITH_TARGETS, encoding="utf-8")
+        self.readme.write_text(HEADLINE_README, encoding="utf-8")
+        self.targets.write_text(json.dumps({"schema": "t", "headline": LEFT_OUT_HEADLINE,
+                                            "rows": LEFT_OUT_ROWS}), encoding="utf-8")
+        (self.tree / "results").mkdir(parents=True)
+        (self.tree / "results" / "day-0123.json").write_text(json.dumps(TARGET_DOCUMENT),
+                                                            encoding="utf-8")
+
+    def patch(self, name, replacement):
+        original = getattr(RENDER, name)
+        self.addCleanup(setattr, RENDER, name, original)
+        setattr(RENDER, name, replacement(original))
+
+    def refused(self, expected):
+        with self.assertRaises(RENDER.TargetError) as caught:
+            RENDER.render_headline(self.targets, self.tree)
+        self.assertIn(expected, str(caught.exception))
+
+    def test_the_line_names_each_miss_under_its_machine_and_counts_each_class(self):
+        result = self.render()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        text = self.readme.read_text(encoding="utf-8")
+        self.assertIn(f"\n{LEFT_OUT_TEXT}\n", text)
+        self.assertIn("\nOn a laptop on macOS it takes 7.25 ms: missed.\n", text)
+        self.assertEqual(self.render("--check").returncode, 0)
+
+    def test_a_writer_that_keeps_one_miss_of_a_class_is_refused(self):
+        def keeping_one(writes):
+            def write(*arguments):
+                items, met_parts, counts, named = writes(*arguments)
+                return {kind: found[:1] for kind, found in items.items()}, met_parts, counts, \
+                    named
+            return write
+        self.patch("left_out_items", keeping_one)
+        self.refused("the line under the table does not name 'bits c', which is missed (L-1 on "
+                     "Linux), and a headline never hides a miss")
+
+    def test_a_writer_whose_classes_count_a_part_met_row_as_met_is_refused(self):
+        def any_met(_):
+            def classify(parts):
+                if parts is not None and any(part[2] is True for part in parts):
+                    return "met"
+                return "missed" if parts is not None else "not judged"
+            return classify
+        self.patch("verdict_class", any_met)
+        self.refused("the line under the table counts the other rows as")
+
+    def test_a_writer_that_names_the_wrong_machine_is_refused(self):
+        def swapped(groups):
+            def write(found, hosts):
+                return groups(found, hosts).replace("on the box, ", "on the laptop, ")
+            return write
+        self.patch("host_groups", swapped)
+        self.refused("the line under the table names 'bits b' on the laptop, and it is missed "
+                     "on the box (L-1 on Linux)")
+
+    def test_a_writer_that_names_a_target_under_another_count_is_refused(self):
+        def moved(writes):
+            def write(*arguments):
+                items, met_parts, counts, named = writes(*arguments)
+                return items, met_parts, counts, {**named, "met": named["not judged"],
+                                                  "not judged": []}
+            return write
+        self.patch("left_out_items", moved)
+        self.refused("the line under the table names {'met': 'kernel time'} among its counts, "
+                     "and the targets give {'not judged': 'kernel time'}")
+
+    def test_a_sentence_under_the_table_that_always_says_met_is_refused(self):
+        def always_met(_):
+            def write(under, row, parts, hosts):
+                return RENDER.filled([under["text"]], under, row, parts, hosts, "under",
+                                     {"verdict": "met"})[0]
+            return write
+        self.patch("under_sentence", always_met)
+        self.refused("the sentence under the table reads 'On a laptop on macOS it takes 7.25 "
+                     "ms: met.', and its row is missed")
+
+    def test_a_sentence_under_the_table_of_a_row_missed_in_part_says_neither_word(self):
+        headline = json.loads(json.dumps(LEFT_OUT_HEADLINE))
+        headline["under"] = {"id": "L-2", "host": "macOS", "values": ONE,
+                             "text": "On a laptop on macOS it keeps {one} bits: {verdict}."}
+        self.targets.write_text(json.dumps({"schema": "t", "headline": headline,
+                                            "rows": LEFT_OUT_ROWS}), encoding="utf-8")
+        self.assertIn("On a laptop on macOS it keeps 2.0 bits: met on (a); missed on (b).",
+                      RENDER.render_headline(self.targets, self.tree))
+
+        def always_met(_):
+            def write(under, row, parts, hosts):
+                return RENDER.filled([under["text"]], under, row, parts, hosts, "under",
+                                     {"verdict": "met"})[0]
+            return write
+        self.patch("under_sentence", always_met)
+        self.refused("the sentence under the table says met, and its row is missed in part")
+
+    def test_a_name_the_targets_do_not_leave_out_is_refused(self):
+        definitions = json.loads(self.targets.read_text(encoding="utf-8"))
+        shown = {("L-1", "Linux"): {"a"}, ("L-3", "any"): {"q"}, ("L-6", "Linux"): {"a"},
+                 ("L-7", "macOS"): {"a"}, ("U-1", "macOS"): {"q"}}
+        names = RENDER.plain_names(definitions, HEADLINE["hosts"])
+        for line, expected in (
+                (LEFT_OUT_TEXT.replace("bits c.", "bits c, bits d."),
+                 "names 'bits d' on the box as missed, and the targets give no such part"),
+                (LEFT_OUT_TEXT.replace("bits c.", "bits c, bits c."),
+                 "names 'bits c' twice or empty under missed"),
+                (LEFT_OUT_TEXT.replace("Missed:", "Missed in part:"),
+                 "does not name 'bits b', which is missed"),
+                (LEFT_OUT_TEXT.replace("Not shown above. ", "Not shown above. Lost: bits. "),
+                 "the line under the table says 'Lost: bits', which is no class of its own"),
+                (LEFT_OUT_TEXT.replace("1 met, ", "1 met, 2 lost, "),
+                 "counts '2 lost', which is no count of a verdict")):
+            with self.subTest(line=line):
+                with self.assertRaises(RENDER.TargetError) as caught:
+                    RENDER.check_left_out(line, definitions, self.tree, shown, names,
+                                          HEADLINE["hosts"])
+                self.assertIn(expected, str(caught.exception))
+        RENDER.check_left_out(LEFT_OUT_TEXT, definitions, self.tree, shown, names,
+                              HEADLINE["hosts"])
+
+    def test_the_checks_own_classes_follow_the_raw_verdicts(self):
+        unjudged = RENDER.Unjudged("this code")
+        for mets, kind in (([True, True], "met"), ([False], "missed"), ([], "not judged"),
+                           ([None, unjudged], "not judged"), ([True, False], "missed in part"),
+                           ([True, unjudged], "not judged in part"),
+                           ([False, unjudged], "missed in part")):
+            with self.subTest(mets=mets):
+                self.assertEqual(RENDER.class_of(mets), kind)
 
 
 class RenderCompareTest(Scratch):

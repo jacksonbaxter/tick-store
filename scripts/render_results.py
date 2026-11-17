@@ -44,15 +44,24 @@ shown; a template that types a figure, names a value it is not given, or is give
 does not name stops the render. A sentence under the table gives another row's figure and
 verdict the same way. The line under that names, in plain words, every part of a target on the
 screen that the screen leaves out, and every other target, that is missed or not judged, and
-counts the met ones; it is checked against the targets apart from the code that writes it, and
-a headline with no missed target stops the render. The prose above the headline, the pitch, is
-written by hand: every figure it states is one scripts/targets.json lists under "pitch" and is
-checked against the results, or a text listed there with its reason for being no result, so
---check stops on a pitch figure the results no longer give; each listed claim must hold on the
-results, a word that ranks or judges must sit inside a claim or a figure's words, and the prose
-runs to at most "max_words" words. The whole first screen names no target id and no query's
-name, and introduces each host once by what it is, never calling it by its operating system
-after. What none of this checks is that the prose is true beyond its figures and claims.
+counts the met ones; it is checked against the targets apart from the code that writes it, by
+verdict classes of its own from the parts' raw verdicts, each name read back whole under its
+machine and each target asked for under its own count, and so is the verdict of the sentence
+under the table; a headline with no missed target stops the render. A value that is the lowest
+of the other systems takes every other system the comparison ran. The prose above the
+headline, the pitch, is written by hand: every figure it states is one scripts/targets.json
+lists under "pitch" and is checked against the results, or a text listed there with its reason
+for being no result, found once, so --check stops on a pitch figure the results no longer give.
+Each heading and sentence of it is a claim, a whole sentence listed there whose conditions must
+hold on the results, which holds the words its target lists for its bar and names the one
+machine it is judged on; a sentence holding a figure; or a text listed as stating no result,
+with its reason. A word that ranks or judges must sit inside a claim or a figure's words, and
+the pitch, headings included, runs to at most "max_words" words. The whole first screen names no
+target id and no query's name, holds no character a reader cannot see, ends at the next heading
+after the headline, and introduces each host once by what it is, never calling it by its
+operating system after. What none of this checks is that the prose is true beyond its figures
+and claims: a figure sentence or a sentence listed as stating no result is read for ranking
+words only, and a claim's words beyond those its target lists are held as written.
 
 G-3's file, results/fuzz-g3-<commit>.json, must pass check_fuzz.py first, against the fuzz
 targets fuzz/CMakeLists.txt defines: one that leaves a target out, holds a clean run under
@@ -71,6 +80,7 @@ import statistics
 import string
 import subprocess
 import sys
+import unicodedata
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -1080,10 +1090,33 @@ def no_typed_figure(text, hosts, what):
     a named value. A host's introduction, which says what its processor is, is the exception."""
     for host in HOSTS:
         text = text.replace(hosts[host]["introduced"], " ")
+    numeric_characters(text, what)
     typed = NUMBER.findall(text)
     if typed:
         raise TargetError(f"{what} types the figure {typed[0]!r} by hand; give it as a named "
                           "value read from the results")
+
+
+def lowest_systems(expression, row, documents, name):
+    """A headline value that is the lowest of other systems takes every other system of the
+    comparison, and, where its row's target ranks among some, exactly those: "vs QuestDB" under
+    a bar of the four is the best of the other three, never of a few (review DX-5)."""
+    if not isinstance(expression, dict):
+        return
+    for key in ("lowest_system", "lowest_value"):
+        if key not in expression:
+            continue
+        systems = set(expression[key]["systems"])
+        ranked = row.get("lowest_of")
+        ours = ranked["ours"] if ranked else "tickstore"
+        for document in documents:
+            others = set(walk(document, ["systems"])) - {ours}
+            if systems != others:
+                raise TargetError(f"{{{name}}} takes the lowest of {sorted(systems)}, and the "
+                                  f"comparison ran {sorted(others)} beside {ours}")
+        if ranked and systems != set(ranked["others"]):
+            raise TargetError(f"{{{name}}} takes the lowest of {sorted(systems)}, and its "
+                              f"target ranks among {sorted(ranked['others'])}")
 
 
 def headline_value(spec, row, parts, name):
@@ -1095,6 +1128,7 @@ def headline_value(spec, row, parts, name):
             raise TargetError(f"{{{name}}}: the row has no {spec['target']!r} target")
     else:
         documents = list({part[3]: part[4] for part in parts}.values())
+        lowest_systems(spec["value"], row, documents, name)
         values = [evaluate(spec["value"], document) for document in documents]
         over = spec.get("over")
         if over is None:
@@ -1178,13 +1212,28 @@ def verdict_class(parts):
 
 def plain_names(definitions, hosts):
     """Each target row's name in plain words, and its parts' where given, by (id, host)."""
-    names = {}
+    names, owners = {}, {}
     for entry in definitions["headline"].get("names", []):
         key = (entry["id"], entry["host"])
         if key in names:
             raise TargetError(f"two plain names for {key[0]} on {key[1]}")
-        for text in [entry["name"], *entry.get("parts", {}).values()]:
+        for label, text in [(None, entry["name"]), *entry.get("parts", {}).items()]:
             no_typed_figure(text, hosts, f"the plain name {text!r}")
+            # The line under the table is read back name by name, under its machine, so a name
+            # is whole, and on one machine it is one target's, and one part's within it: a name
+            # inside a list, or shared by two parts, could stand in for another (review DX-13).
+            if ", " in text or "; " in text or text.startswith("on ") or not text.strip():
+                raise TargetError(f"the plain name {text!r} is empty or holds a list's or a "
+                                  "machine's words, so the line under the table could not be "
+                                  "read back")
+            for host, ident, other in owners.get(text, []):
+                same_machine = "any" in (host, entry["host"]) or host == entry["host"]
+                if same_machine and (ident != entry["id"] or
+                                     None not in (label, other) and label != other):
+                    raise TargetError(f"the plain name {text!r} names both {ident} "
+                                      f"({other or 'the target'}) and {entry['id']} "
+                                      f"({label or 'the target'}) on one machine")
+            owners.setdefault(text, []).append((entry["host"], entry["id"], label))
         names[key] = entry
     for row in definitions["rows"]:
         if (row["id"], row["host"]) not in names:
@@ -1269,53 +1318,143 @@ def left_out_line(items, met_parts, counts, named, hosts):
                      + ", ".join(pieces) + "."])
 
 
-def check_left_out(line, definitions, root, shown, names):
-    """The line under the table, walked here apart from the code that writes it: it names each
-    left-out part of a target with a row on the screen that is missed or not judged, under its
-    verdict; its count of each verdict over the other rows is the targets' own; and what the
-    screen shows, names and counts adds up to every row of the targets and every part of the
-    targets it shows, so nothing drops out unseen. A headline never hides a miss."""
+def class_of(mets):
+    """The verdict class of a row or a part, from its parts' raw verdicts: worked out here apart
+    from verdict_class, which the writer of the line uses, so a fault in one shows against the
+    other (review DX-4). True is met and False missed; anything else is not judged."""
+    if not mets:
+        return "not judged"
+    met = sum(1 for value in mets if value is True)
+    missed = sum(1 for value in mets if value is False)
+    if met == len(mets):
+        return "met"
+    if missed == len(mets):
+        return "missed"
+    if met + missed == 0:
+        return "not judged"
+    return "missed in part" if missed else "not judged in part"
+
+
+def stated_items(sentence, hosts, kind):
+    """The (where, name) pairs one class sentence of the line states: where is "any", "both"
+    or a host, from the group's opening words, and each name is whole, split at ", "."""
+    pairs = []
+    heads = [("both", f"on {hosts['both']}, "),
+             *((host, f"on {hosts[host]['then']}, ") for host in HOSTS)]
+    for group in sentence.split("; "):
+        where = "any"
+        for key, words in heads:
+            if group.startswith(words):
+                where, group = key, group[len(words):]
+                break
+        for name in group.split(", "):
+            if not name or (where, name) in pairs:
+                raise TargetError(f"the line under the table names {name!r} twice or empty "
+                                  f"under {kind}")
+            pairs.append((where, name))
+    return set(pairs)
+
+
+def where_words(where, hosts):
+    return {"any": "with no machine", "both": f"on {hosts['both']}"}.get(
+        where, f"on {hosts[where]['then'] if where in hosts else where}")
+
+
+def check_left_out(line, definitions, root, shown, names, hosts):
+    """The line under the table, walked here apart from the code that writes it: its own
+    verdict classes from the parts' raw verdicts, not the writer's; it names each left-out part
+    of a target with a row on the screen that is missed or not judged, whole, under its verdict
+    and its machine, and nothing else there; its count of each verdict over the other rows is
+    the targets' own, with each target asked for named among its own class's count and no
+    other; and what the screen shows, names and counts adds up to every row of the targets and
+    every part of the targets it shows, so nothing drops out unseen. A headline never hides a
+    miss."""
     sentences = {}
-    for sentence in line.split(". "):
-        head = sentence.split(":", 1)[0]
-        if head in [*LEFT_OUT_HEADS.values(), "Met"]:
-            sentences[head] = sentence
     clause = COUNT_CLAUSE.search(line)
     if clause is None:
         raise TargetError("the line under the table gives no count of the other rows")
-    others, stated = int(clause.group(1)), {}
+    body = line[:clause.start()].strip()
+    if not body.startswith("Not shown above."):
+        raise TargetError("the line under the table does not open with what it is")
+    for sentence in [piece for piece in body[len("Not shown above."):].strip().split(". ")
+                     if piece]:
+        head = sentence.split(":", 1)[0]
+        if head not in [*LEFT_OUT_HEADS.values(), "Met"] or head in sentences:
+            raise TargetError(f"the line under the table says {sentence!r}, which is no class "
+                              "of its own or a second of one")
+        sentences[head] = sentence.rstrip(".")
+    others, stated, stated_named, last = int(clause.group(1)), {}, {}, None
     for piece in clause.group(2).split(", "):
         found = re.fullmatch(r"(\d+) (.+)", piece)
-        if found and found.group(2) in COUNT_ORDER:
-            stated[found.group(2)] = int(found.group(1))
+        if found and found.group(2) in COUNT_ORDER and found.group(2) not in stated:
+            last = found.group(2)
+            stated[last] = int(found.group(1))
+            continue
+        among = re.fullmatch(r"(.+) among them", piece)
+        if among and last is not None and last not in stated_named:
+            stated_named[last] = among.group(1)
+            continue
+        raise TargetError(f"the line under the table counts {piece!r}, which is no count of a "
+                          "verdict and no name among one")
     met = re.fullmatch(r"Met: (\d+) more of their parts?", sentences.get("Met", "Met: 0 more of "
                                                                           "their parts"))
-    expected, named_parts, shown_parts_count, total_parts, met_parts = {}, 0, 0, 0, 0
+    asked = [(entry["id"], entry["host"]) for entry in
+             definitions["headline"].get("name_among_counts", [])]
+    expected, expected_named, named_parts, shown_parts_count, total_parts, met_parts = \
+        {}, {}, 0, 0, 0, 0
+    found_items = {kind: {} for kind in LEFT_OUT_HEADS}
     for row in definitions["rows"]:
         key = (row["id"], row["host"])
         parts, _ = judged_parts(row, root)
         if key not in shown:
-            kind = verdict_class(parts)
+            kind = class_of([part[2] for part in parts]) if parts is not None else "not judged"
             expected[kind] = expected.get(kind, 0) + 1
+            if key in asked and kind != "met":
+                expected_named.setdefault(kind, []).append(names[key]["name"])
             continue
         total_parts += len(parts)
         for part in parts:
             if part[0] in shown[key]:
                 shown_parts_count += 1
                 continue
-            kind = verdict_class([part])
+            kind = class_of([part[2]])
             if kind == "met":
                 met_parts += 1
                 continue
             name = names[key].get("parts", {}).get(part[0])
-            if f" {name}" not in sentences.get(LEFT_OUT_HEADS[kind], ""):
-                raise TargetError(f"the line under the table does not name {name!r}, which is "
-                                  f"{kind} ({key[0]} on {key[1]}), and a headline never hides "
-                                  "a miss")
+            found_items[kind].setdefault(name, {})[row["host"]] = key
             named_parts += 1
+    for kind, head in LEFT_OUT_HEADS.items():
+        wanted = {}
+        for name, by_host in found_items[kind].items():
+            machines = set(by_host)
+            where = "any" if "any" in machines else "both" if machines >= set(HOSTS) else \
+                next(iter(machines))
+            wanted[(where, name)] = next(iter(by_host.values()))
+        sentence = sentences.get(head)
+        given = stated_items(sentence[len(head) + 2:], hosts, kind) if sentence else set()
+        for (where, name), key in wanted.items():
+            if (where, name) in given:
+                continue
+            elsewhere = [other for other, item in given if item == name]
+            if elsewhere:
+                raise TargetError(f"the line under the table names {name!r} "
+                                  f"{where_words(elsewhere[0], hosts)}, and it is {kind} "
+                                  f"{where_words(where, hosts)} ({key[0]} on {key[1]})")
+            raise TargetError(f"the line under the table does not name {name!r}, which is "
+                              f"{kind} ({key[0]} on {key[1]}), and a headline never hides a miss")
+        extra = sorted(given - set(wanted))
+        if extra:
+            raise TargetError(f"the line under the table names {extra[0][1]!r} "
+                              f"{where_words(extra[0][0], hosts)} as {kind}, and the targets give "
+                              "no such part")
     if stated != expected:
         raise TargetError(f"the line under the table counts the other rows as {stated}, and the "
                           f"targets give {expected}")
+    expected_named = {kind: " and ".join(items) for kind, items in expected_named.items()}
+    if stated_named != expected_named:
+        raise TargetError(f"the line under the table names {stated_named} among its counts, and "
+                          f"the targets give {expected_named}")
     stated_met = int(met.group(1)) if met else -1
     if stated_met != met_parts:
         raise TargetError(f"the line under the table counts {stated_met} more parts met, and "
@@ -1327,6 +1466,29 @@ def check_left_out(line, definitions, root, shown, names):
     if shown_parts_count + named_parts + stated_met != total_parts:
         raise TargetError(f"the screen shows {shown_parts_count} parts of its targets, names "
                           f"{named_parts} and counts {stated_met} met, of their {total_parts}")
+
+
+def under_sentence(under, row, parts, hosts):
+    """The sentence under the table, with its row's figure and verdict."""
+    return filled([under["text"]], under, row, parts, hosts, "the sentence under the table",
+                  {"verdict": verdict_of(parts)})[0]
+
+
+def check_under(sentence, under, row, parts, hosts):
+    """The sentence under the table, checked apart from the code that writes it: a row met or
+    missed in whole says that word, and any other says neither (review DX-4)."""
+    kind = class_of([part[2] for part in parts])
+    if kind in ("met", "missed"):
+        expected = filled([under["text"]], under, row, parts, hosts,
+                          "the sentence under the table", {"verdict": kind})[0]
+        if sentence != expected:
+            raise TargetError(f"the sentence under the table reads {sentence!r}, and its row is "
+                              f"{kind}: {expected!r}")
+        return
+    for word in ("met", "missed"):
+        if sentence == filled([under["text"]], under, row, parts, hosts,
+                              "the sentence under the table", {"verdict": word})[0]:
+            raise TargetError(f"the sentence under the table says {word}, and its row is {kind}")
 
 
 def headline_cells(entry, rows, root, hosts):
@@ -1379,13 +1541,13 @@ def render_headline(definitions_path, root):
                                   "under the table")
             _, parts = shown_parts(under, row, root)
             shown.setdefault((under["id"], under["host"]), set()).update(p[0] for p in parts)
-            lines += ["", filled([under["text"]], under, row, parts, hosts,
-                                 "the sentence under the table",
-                                 {"verdict": verdict_of(parts)})[0]]
+            sentence = under_sentence(under, row, parts, hosts)
+            check_under(sentence, under, row, parts, hosts)
+            lines += ["", sentence]
         names = plain_names(definitions, hosts)
         items, met_parts, counts, named = left_out_items(definitions, root, shown, names)
         line = left_out_line(items, met_parts, counts, named, hosts)
-        check_left_out(line, definitions, root, shown, names)
+        check_left_out(line, definitions, root, shown, names, hosts)
     except (TargetError, KeyError, TypeError, ValueError, ZeroDivisionError) as error:
         raise TargetError(f"headline: {error}") from error
     return lines + ["", line]
@@ -1395,22 +1557,84 @@ def sentences_of(prose):
     return re.split(r"(?<=[.!?])\s+(?=[A-Z])", prose)
 
 
-# Words that rank tick-store or state an outcome. Each one in the pitch must sit inside a claim,
-# which ties it to the results, or inside a figure's own words.
+# A heading as GitHub's Markdown takes it: at most three spaces, one to six #, then a space or
+# the line's end. "#It beats ..." is a paragraph, so it is prose like any other (review DX-3).
+HEADING = re.compile(r"^ {0,3}#{1,6}(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$")
+
+
+def screen_units(before):
+    """The pitch as a reader sees it, in the order it shows: each heading's text, its #s left
+    out, and each sentence of the prose around them. A heading ends the prose before it."""
+    units, prose = [], []
+
+    def flush():
+        text = " ".join(" ".join(prose).split())
+        units.extend(sentence for sentence in sentences_of(text) if sentence)
+        prose.clear()
+    for line in before.splitlines():
+        found = HEADING.match(line)
+        if found:
+            flush()
+            if (found.group(1) or "").strip():
+                units.append(" ".join(found.group(1).split()))
+        else:
+            prose.append(line)
+    flush()
+    return units
+
+
+# Words that rank tick-store or state an outcome. Each one on the first screen must sit in a
+# sentence that is a claim, which ties it to the results, or inside a figure's own words. The
+# list is the second line of defence: a sentence of the pitch must be a claim, hold a figure or
+# be listed as stating no result (review DX-2), and the words a reviewer showed passing false
+# sentences are on it too (review DX-10).
 RANKING = re.compile(r"\b(?:faster|fastest|slower|slowest|quicker|quickest|least|most|smaller|"
                      r"smallest|larger|largest|lower|lowest|higher|highest|below|above|beats?|"
-                     r"outperforms?|wins|loses|best|worst|exact|met|meets|missed|misses|"
-                     r"exceeds)\b", re.IGNORECASE)
+                     r"beating|beaten|outperform(?:s|ing|ed)?|wins|won|loses|lost|best|worst|"
+                     r"exact|met|meets|missed|misses|exceeds|less|fewer|more|better|worse|ahead|"
+                     r"behind|trails?|trailing|leads?|leading|keeps? up|kept up|keeping up|clean|"
+                     r"pass(?:es|ed)?|fails?|failed|surpass(?:es|ed)?|twice|half|halves|double|"
+                     r"triple|third|quarter|matches)\b", re.IGNORECASE)
+
+
+def invisible_characters(text, what):
+    """A character a reader cannot see on the first screen, such as a zero-width space, which
+    would join words for the count and hide what they say, is refused (review DX-11)."""
+    for character in text:
+        if unicodedata.category(character) in ("Cf", "Zl", "Zp"):
+            raise TargetError(f"{what} holds the character U+{ord(character):04X}, which a reader "
+                              "does not see and the checks would read past")
+
+
+def numeric_characters(text, what):
+    """A figure written with a character other than 0 to 9, such as a vulgar fraction, is one
+    the digit pattern misses, so it is refused as typed (review DX-11)."""
+    for character in text:
+        if not "0" <= character <= "9" and unicodedata.numeric(character, None) is not None:
+            raise TargetError(f"{what} types the figure {character!r} as a character, which no "
+                              "check reads; give it in digits where a check reads it")
 
 
 def check_screen(definitions_path, readme, headline_lines):
     """The README's first screen, the pitch and the headline as rendered, names no target's id
     and no query's name, so each says in words what it is; and introduces each host once, by
-    what it is, before any short name for it, and never calls it by its operating system after."""
+    what it is, before any short name for it, and never calls it by its operating system after.
+    It ends at the headline's end marker: text between that and the next heading would still be
+    on the first screen with none of these checks, so it is refused (review DX-11), and so is a
+    character a reader cannot see anywhere on it."""
     definitions = json.loads(definitions_path.read_text(encoding="utf-8"))
     hosts = headline_hosts(definitions["headline"])
+    after = readme.split(HEADLINE_END, 1)[1] if HEADLINE_END in readme else ""
+    for line in after.splitlines():
+        if HEADING.match(line):
+            break
+        if line.strip():
+            raise TargetError(f"the README's first screen goes on past the headline with "
+                              f"{line.strip()[:60]!r}, which no check reads; start a section "
+                              "with a heading first")
     screen = " ".join((readme.split(HEADLINE_BEGIN)[0] + "\n" +
                        "\n".join(headline_lines)).split())
+    invisible_characters(screen, "the README's first screen")
     for name in [*dict.fromkeys(row["id"] for row in definitions["rows"]), *QUERY_NAMES]:
         if re.search(rf"(?<![\w-]){re.escape(name)}(?![\w-])", screen):
             raise TargetError(f"the README's first screen names {name!r}; say in words what "
@@ -1432,29 +1656,82 @@ def check_screen(definitions_path, readme, headline_lines):
                               f"introduction; call it {hosts[host]['then']!r}")
 
 
+def conditions_of(claim):
+    """The conditions a claim's sentence rests on: its own, or each of "all"."""
+    if "all" in claim:
+        if not claim["all"] or not all(isinstance(item, dict) for item in claim["all"]):
+            raise TargetError(f"pitch: the claim {claim['text']!r} has an empty or malformed all")
+        return claim["all"]
+    return [claim]
+
+
+def condition_host(condition, definitions, root):
+    """The machine a condition is judged on: its target row's host, or its results file's."""
+    if "target" in condition:
+        return condition["target"]["host"]
+    path = target_file(root, condition["file"])
+    if path is None:
+        raise TargetError(f"pitch: no results file matches {condition['file']}")
+    document = json.loads(path.read_text(encoding="utf-8"))
+    header = document.get("header") if isinstance(document.get("header"), dict) else {}
+    return header.get("host") or document.get("host") or "any"
+
+
+def target_words(condition, definitions):
+    """The words a target condition's sentence must hold: its target row lists, under "pitch",
+    the words that name its bar with the parts they cover, so a claim cannot be pointed at
+    another target of the same verdict (review DX-2)."""
+    spec = condition["target"]
+    row = next((row for row in definitions["rows"]
+                if (row["id"], row["host"]) == (spec["id"], spec["host"])), None)
+    if row is None or not row.get("pitch"):
+        raise TargetError(f"pitch: {spec['id']} on {spec['host']} lists no words for a claim's "
+                          "sentence to hold, so the claim could name another target's bar")
+    wanted = sorted(spec.get("parts") or [])
+    return [item["words"] for item in row["pitch"] if sorted(item.get("parts") or []) == wanted]
+
+
+def pitch_words(definitions):
+    """Every target row's pitch words, each held by one row alone."""
+    owners = {}
+    for row in definitions["rows"]:
+        for item in row.get("pitch", []):
+            if not isinstance(item, dict) or not item.get("words"):
+                raise TargetError(f"{row['id']} on {row['host']} has pitch words with no text")
+            owner = owners.setdefault(item["words"], (row["id"], row["host"]))
+            if owner != (row["id"], row["host"]):
+                raise TargetError(f"the pitch words {item['words']!r} name both {owner[0]} on "
+                                  f"{owner[1]} and {row['id']} on {row['host']}")
+
+
 def check_pitch(definitions_path, root, readme):
-    """The README's pitch, the prose above its headline, states figures by hand. Each one
-    scripts/targets.json lists under "pitch" must appear in it as the results give it now, and
-    every other number in it must be a text listed with the reason it is no result, such as a
-    language version or a target's own value, so no figure there goes stale unseen (review
-    E-9). Each figure's format carries the words that say what it is, and no two figures share
-    one (review RG-4). Each sentence listed under "claims", which ranks tick-store or states an
-    outcome with no figure of its own, must be in it and borne out by its condition (review
-    RG-13), and a word that ranks or judges must sit inside a claim or a figure's words. The
-    prose, headings left out, runs to at most "max_words" words."""
+    """The README's pitch, the prose above its headline with its headings, states figures by
+    hand. Each one scripts/targets.json lists under "pitch" must appear in it as the results
+    give it now, and every other number in it must be a text listed with the reason it is no
+    result, such as a language version, each found once, so no figure there goes stale unseen
+    (review E-9). Each figure's format carries the words that say what it is, and no two
+    figures share one (review RG-4). Each heading and sentence is one of three things: a
+    claim, the whole sentence listed under "claims", which ranks tick-store or states an
+    outcome and must be borne out by its conditions (reviews RG-13, DX-2); a sentence holding a
+    figure; or a text listed under "no_result_sentences" with the reason it states no result.
+    A claim on a target holds the words that target's row lists for its bar, and a claim
+    judged on one machine names that machine and no other. A word that ranks or judges must sit in a claim
+    or a figure's words, headings included (review DX-3). The pitch, headings included, runs to
+    at most "max_words" words, and holds no character a reader cannot see."""
     definitions = json.loads(definitions_path.read_text(encoding="utf-8"))
     pitch = definitions.get("pitch")
     if not pitch:
         return
     before = readme.split(HEADLINE_BEGIN)[0]
+    invisible_characters(before, "the README's pitch")
+    numeric_characters(before, "the README's pitch")
     text = " ".join(before.split())
-    prose = " ".join(" ".join(line for line in before.splitlines()
-                              if not line.lstrip().startswith("#")).split())
+    units = screen_units(before)
     limit = pitch.get("max_words")
     if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
         raise TargetError("pitch: no max_words, the most words the prose before the table may "
                           "run to")
-    words = len(prose.split())
+    words = sum(len(unit.split()) for unit in units)
     if words > limit:
         raise TargetError(f"the README's pitch runs to {words} words before the table, over its "
                           f"{limit}: the first screen keeps its prose short")
@@ -1467,7 +1744,7 @@ def check_pitch(definitions_path, root, readme):
     if shared:
         raise TargetError(f"pitch: two figures share the format {shared[0]!r}, so they could "
                           "trade places in the text unseen; give each the words around it")
-    covered = []
+    stated_figures = []
     for figure in pitch["figures"]:
         path = target_file(root, figure["file"])
         if path is None:
@@ -1480,44 +1757,96 @@ def check_pitch(definitions_path, root, readme):
             raise TargetError(f"the README's pitch does not state {stated!r}, which "
                               f"{path.relative_to(root)} gives")
         remaining = remaining.replace(stated, " ")
-        covered.append(stated)
+        stated_figures.append(stated)
+    # A text kept out of the figure check is kept out once: the year of a processor is no
+    # licence for the same digits elsewhere (review DX-11).
     for item in pitch.get("not_results", []):
         if not item.get("why"):
             raise TargetError(f"pitch: {item.get('text')!r} is kept out of the check with no "
                               "reason")
+        found = remaining.count(item["text"])
+        if found != 1:
+            raise TargetError(f"pitch: {item['text']!r}, kept out of the check as "
+                              f"{item['why']}, is in the pitch {found} times, and may be once")
         remaining = remaining.replace(item["text"], " ")
     left = NUMBER.findall(remaining)
     if left:
         raise TargetError(f"a figure in the README's pitch that nothing checks: {left[0]!r}")
-    sentences = sentences_of(prose)
+    claims = {}
+    pitch_words(definitions)
+    hosts = definitions["headline"].get("hosts") if "headline" in definitions else None
     for claim in pitch.get("claims", []):
-        if claim["text"] not in text:
+        if claim["text"] not in units:
             raise TargetError(f"the README's pitch no longer says {claim['text']!r}, which "
-                              "scripts/targets.json ties to the results; change the claim there "
-                              "with the sentence")
-        problem = claim_problem(claim, definitions, root)
-        if problem:
-            sentence = next((item for item in sentences if claim["text"] in item), text)
-            raise TargetError(f"the README's pitch says {claim['text']!r}, and the results do "
-                              f"not bear it out: {problem}; change the sentence {sentence!r}")
-        covered.append(claim["text"])
-    for sentence in sentences:
-        masked = sentence
-        for words in covered:
+                              "scripts/targets.json ties to the results as a whole sentence; "
+                              "change the claim there with the sentence")
+        if claim["text"] in claims:
+            raise TargetError(f"pitch: two claims for {claim['text']!r}")
+        judged_on = {condition_host(condition, definitions, root)
+                     for condition in conditions_of(claim)}
+        for host in HOSTS:
+            if host in judged_on or "any" in judged_on or not hosts or host not in hosts:
+                continue
+            for words in (hosts[host]["introduced"], hosts[host]["then"], hosts.get("both")):
+                if words and words in claim["text"]:
+                    raise TargetError(f"the README's pitch says {claim['text']!r}, which names "
+                                      f"{words!r}, and is judged on {sorted(judged_on)} alone")
+        for condition in conditions_of(claim):
+            problem = claim_problem(condition, definitions, root)
+            if problem:
+                raise TargetError(f"the README's pitch says {claim['text']!r}, and the results "
+                                  f"do not bear it out: {problem}; change the sentence")
+            if "target" in condition and not any(
+                    words in claim["text"] for words in target_words(condition, definitions)):
+                spec = condition["target"]
+                raise TargetError(f"the README's pitch ties {claim['text']!r} to {spec['id']} on "
+                                  f"{spec['host']}, and the sentence holds none of the words "
+                                  "that target lists for its bar on those parts")
+            host = condition_host(condition, definitions, root)
+            if host in HOSTS:
+                if not hosts or host not in hosts:
+                    raise TargetError(f"pitch: no words for the host {host}, so the claim "
+                                      f"{claim['text']!r} cannot name its machine")
+                if hosts[host]["introduced"] not in claim["text"] and \
+                        hosts[host]["then"] not in claim["text"]:
+                    raise TargetError(f"the README's pitch says {claim['text']!r}, judged on "
+                                      f"{host} alone, and does not name the machine; say "
+                                      f"{hosts[host]['then']!r} in it")
+        claims[claim["text"]] = claim
+    no_result = {}
+    for item in pitch.get("no_result_sentences", []):
+        if not item.get("why"):
+            raise TargetError(f"pitch: {item.get('text')!r} is listed as stating no result with "
+                              "no reason")
+        no_result[item["text"]] = item
+    for unit in units:
+        if unit in claims:
+            continue
+        masked = unit
+        for words in stated_figures:
             masked = masked.replace(words, " ")
         found = RANKING.search(masked)
         if found:
             raise TargetError(f"the README's pitch ranks or judges with {found.group(0)!r} in "
-                              f"the sentence {sentence!r}, and no claim in scripts/targets.json "
+                              f"the sentence {unit!r}, and no claim in scripts/targets.json "
                               "ties those words to the results")
+        if unit not in no_result and not any(words in unit for words in stated_figures):
+            raise TargetError(f"the README's pitch says {unit!r}, which is no claim tied to the "
+                              "results, holds no figure checked against them, and is not listed "
+                              "as stating no result")
+    for text in no_result:
+        if text not in units:
+            raise TargetError(f"pitch: {text!r} is listed as stating no result, and the README's "
+                              "pitch does not say it")
 
 
 def claim_problem(claim, definitions, root):
-    """Why the results do not bear out a sentence of the pitch that ranks tick-store, or None
-    (review RG-13). "target" is a row's verdict, judged as in the targets block, on the parts
-    named; "below" pairs of figures of one file, each first below its second; "fastest" the
-    system with the lowest field among the systems' headline variants, for each query and kind,
-    one of those named."""
+    """Why the results do not bear out one condition of a sentence of the pitch that ranks
+    tick-store, or None (review RG-13). "target" is a row's verdict, judged as in the targets
+    block, on the parts named; "below" pairs of figures of one file, each first below its
+    second; "fastest" the system with the lowest of each field among the systems' headline
+    variants, for each query and kind, one of those named. A fastest claim is judged on every
+    field its words could be read on, median and tail alike (review DX-14)."""
     if "target" in claim:
         spec = claim["target"]
         row = next((row for row in definitions["rows"]
@@ -1547,16 +1876,19 @@ def claim_problem(claim, definitions, root):
         return None
     if "fastest" in claim:
         spec = claim["fastest"]
+        if not spec.get("fields"):
+            raise TargetError("pitch: a fastest claim names no fields to judge fastest on")
         for query in spec["queries"]:
             for kind in spec["kinds"]:
-                values = {system: walk(document, ["systems", system, "variants", "@headline",
-                                                  "queries", query, kind, spec["field"]])
-                          for system in spec["systems"]}
-                fastest = min(values, key=values.get)
-                if fastest not in spec["one_of"]:
-                    return f"{query} {kind}: {fastest} has the lowest {spec['field']}"
+                for field in spec["fields"]:
+                    values = {system: walk(document, ["systems", system, "variants", "@headline",
+                                                      "queries", query, kind, field])
+                              for system in spec["systems"]}
+                    fastest = min(values, key=values.get)
+                    if fastest not in spec["one_of"]:
+                        return f"{query} {kind}: {fastest} has the lowest {field}"
         return None
-    raise TargetError(f"pitch: the claim {claim['text']!r} names no condition")
+    raise TargetError(f"pitch: the claim {claim.get('text', 'condition')!r} names no condition")
 
 
 def block_of(text, begin=BEGIN, end=END):
