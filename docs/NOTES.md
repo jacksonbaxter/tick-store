@@ -7039,6 +7039,35 @@ for the fuzz and capacity parts. I ruled: no rerun; the entries and the marks go
 - **A count corrected.** My last report gave 23 faults owed from the pass before. This entry's
   "all nineteen" is right: seven new, nine remade and three render-check mutations.
 
+### The essay for a first reader
+
+A senior developer with no project knowledge read WRITEUP.md at `16a5db9` for 20 minutes. The
+verdict: the work behind it would raise their opinion, but the essay as written lowered it,
+reading as defended rather than explained. What stopped them: an opening of verdicts and marks,
+shorthand marks and "the replaced run" never introduced, a commit sentence that could not be
+parsed, repetition, terms never defined (the `locate` column, imports, book state), reference
+figures that did not agree, residue, and doubts left open on Q5, the segment size, the writer's
+cost, SIMD, the context targets and flushed against unflushed. I asked for the essay explained,
+not defended. REVIEW rows W-1 to W-18 give each item.
+
+- **What changed (`e398adb`, `3335065`, `9c5f0b4`).** The opening is three plain sentences with
+  figures and no verdict word, then Gorilla in one. An "At a glance" table follows, its daggers
+  set from the disturbance records and swap flags by a new `flagged` form, not by hand. Verdict
+  words stay in the targets sections, with one sentence on what held; the marks and the replaced
+  run are explained once, in Limits; the input asymmetry is said once, with the write verdicts.
+  The method is cut by half, and fuzzing and checks are four sentences. The commit sentence
+  names each commit once with its kinds. 3,713 words by the renderer and 3,981 by `wc -w`.
+- **Not done.** No .gz ratio, as no results file holds one. How 39 columns cover the mixed
+  message types and concurrent readers are not added. The WT-3 and WT-4 verdict paragraphs stay
+  long, as `check_marks` requires the input clause and change marks. The diagnostic note stays
+  in each paragraph that shows such a figure, as the renderer requires. No check yet forces a
+  glance figure to declare `flagged`.
+- **New tokens, in `docs/writeup/figures.json`.** The glance rows (`glance_*`, among them twelve
+  `_flag` tokens), the writer's cycles and instructions a message (`d3_write_*_per_msg`), Q5's
+  profile shares (`d2_q5_*`), and best-system tokens for Q2, Q3 and Q5. Unused entries were pruned.
+- **Fault, shown by hand.** `writeup-flag-never-set`, shown in a clone under `build/`, outputs in
+  the phase's `essay-prep/proofs` folder; proof owed to the full re-proof.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
