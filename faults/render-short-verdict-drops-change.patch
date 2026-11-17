@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -2102,7 +2102,7 @@
+     found = [part_phrase(part[0]) for part in rest if part[2] is not True and part[2] is not False]
+     if found:
+         pieces.append("not judged " + " and ".join(found))
+-    pieces += [f"{part_phrase(part[0])} {change_short(part)}" for part in changed]
++    pieces += [f"{part_phrase(part[0])} {verdict_word(counted(part))}" for part in changed]
+     return "; ".join(pieces)
+ 
+ 

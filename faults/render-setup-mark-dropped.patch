@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1554,7 +1554,7 @@
+             faster = [(system, name, setup_words(row, system, name)) for system, name, _ in
+                       faster_setups(row["lowest_of"], document, query, kind)]
+             if faster:
+-                notes["faster"] = faster
++                notes["faster"] = []
+         writes = [read for read in reads if read[0] == "write"]
+         if writes and is_comparison(row):
+             notes["write"] = writes[0][3]

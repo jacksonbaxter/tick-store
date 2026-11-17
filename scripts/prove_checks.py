@@ -1851,6 +1851,34 @@ FAULTS = (
     Fault("benchmarks-replaced-record-widened", "render-check", "BENCHMARKS.md saying the "
           "replaced record keeps less than it does, as the review found it", EXIT_RENDER_REFUSED,
           "is not the sentence its fields give", widen_what_the_replaced_record_lacks),
+    Fault("render-others-list-unheaded", "py-scripts", "render_results.py taking a first screen "
+          "whose list of what the table's targets leave out is gone or above its heading "
+          "(review R-A5)", CHECK_FAILED,
+          "FAIL: test_the_list_stays_under_its_heading_and_the_count_on_the_screen "
+          "(__main__.RenderHeadlineTest"),
+    Fault("render-pitch-setup-unsaid", "py-scripts", "render_results.py taking a pitch win "
+          "among the chosen setups without the setup that beats it (review R-A1)", CHECK_FAILED,
+          "FAIL: test_a_pitch_win_another_setup_beats_names_that_setup (__main__.ConditionsTest"),
+    Fault("render-setup-mark-dropped", "py-scripts", "render_results.py giving a part met "
+          "among the headline setups no mark for the setup that beats it (review R-A1)",
+          CHECK_FAILED, "FAIL: test_a_met_part_says_it_is_among_the_headlines_and_names_a_faster_"
+          "variant (__main__.RenderLowestTest"),
+    Fault("render-swap-short-per-part", "py-scripts", "render_results.py giving each part's "
+          "swap-in short form apart, so one verdict repeats a system (review R-B2)",
+          CHECK_FAILED, "FAIL: test_swap_in_marks_name_each_system_once_over_a_verdict "
+          "(__main__.ShortFormTest"),
+    Fault("render-screen-lean-one-way", "py-scripts", "render_results.py saying on the first "
+          "screen that swapping may flatter tick-store when its own runs swapped (review R-A3)",
+          CHECK_FAILED, "FAIL: test_the_screen_says_whose_runs_swapped_and_which_way_it_leans "
+          "(__main__.ShortFormTest"),
+    Fault("render-change-short-lean-unsaid", "py-scripts", "render_results.py's short changed "
+          "outcome saying the change favours tick-store whichever way it leans (review R-B1)",
+          CHECK_FAILED, "FAIL: test_a_changed_outcome_has_a_short_form_and_a_full_one_true_"
+          "anywhere (__main__.ShortFormTest"),
+    Fault("render-short-verdict-drops-change", "py-scripts", "render_results.py's short verdict "
+          "of several parts giving a changed part's counted word alone (review R-B3)",
+          CHECK_FAILED, "FAIL: test_a_verdict_of_several_parts_reads_as_one_sentence "
+          "(__main__.ShortFormTest"),
     Fault("headline-value-mark-dropped", "py-scripts", "render_results.py letting a headline "
           "text show a figure from a disturbed phase with no mark beside it", CHECK_FAILED,
           "FAIL: test_a_headline_figure_from_a_disturbed_phase_must_show_its_mark "

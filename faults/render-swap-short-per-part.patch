@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -2129,7 +2129,7 @@
+         if swapped:
+             text = SWAPPED + and_list([f"{SYSTEM_LABEL.get(system, system)}'s `{variant}`" + (
+                 " on the replaced run" if old else "") for system, variant, old in swapped])
+-            held.setdefault(text, (short_swapped(every), screen_swapped(every), []))[2].append(
++            held.setdefault(text, (short_swapped(swapped), screen_swapped(swapped), []))[2].append(
+                 part[0])
+     triples = []
+     for text, (short, screen, labels) in held.items():

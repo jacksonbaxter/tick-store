@@ -1,12 +1,12 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -1861,7 +1861,7 @@
- def short_disturbance(entry, read, replaced, row):
-     """A disturbance's mark in its short form: its kind, the phase, the replaced run's figure."""
-     what = SHORT_DISTURBANCE.get(entry["what"])
+@@ -1937,7 +1937,7 @@
+     """A disturbance's mark in its short form: its kind, the phase, the replaced run's figure;
+     or, for the README's first screen, the same in words that stand alone."""
+     what = (SCREEN_DISTURBANCE if screen else SHORT_DISTURBANCE).get(entry["what"])
 -    if what is None:
 +    if False:
          raise TargetError(f"no short form for the disturbance {entry['what']!r}; add one to "
-                           "SHORT_DISTURBANCE, which RESULTS.md explains")
-     figure = replaced_figure(read, replaced, row or {})
+                           f"{'SCREEN_DISTURBANCE' if screen else 'SHORT_DISTURBANCE'}, which "
+                           "RESULTS.md explains")

@@ -1,12 +1,12 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -1521,7 +1521,7 @@
-                 return bool(swapped_reads([read], old_document))
-             swapped += [(*read[:2], True) for read in swapped_reads(
-                 deciding_reads(row, spec, label, old_document, tainted_then), old_document)]
+@@ -2126,7 +2126,7 @@
+     every = [item for part in parts for item in notes_of(part).get("swapped") or []]
+     for part in parts:
+         swapped = notes_of(part).get("swapped") or []
 -        if swapped:
 +        if False:
-             notes["swapped"] = list(dict.fromkeys(swapped))
-         writes = [read for read in reads if read[0] == "write"]
-         if writes and is_comparison(row):
+             text = SWAPPED + and_list([f"{SYSTEM_LABEL.get(system, system)}'s `{variant}`" + (
+                 " on the replaced run" if old else "") for system, variant, old in swapped])
+             held.setdefault(text, (short_swapped(every), screen_swapped(every), []))[2].append(

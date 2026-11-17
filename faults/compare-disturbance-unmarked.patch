@@ -1,13 +1,14 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -1939,8 +1939,7 @@
+@@ -2120,9 +2120,7 @@
          for entry, read in notes_of(part).get("disturbed", []):
              replaced = notes_of(part).get("replaced")
              text = "rests on " + disturbance_text(entry, read, replaced, row)
--            held.setdefault(text, (short_disturbance(entry, read, replaced, row), []))[1].append(
--                part[0])
+-            held.setdefault(text, (short_disturbance(entry, read, replaced, row),
+-                                   short_disturbance(entry, read, replaced, row, screen=True),
+-                                   []))[2].append(part[0])
 +            pass
+     every = [item for part in parts for item in notes_of(part).get("swapped") or []]
      for part in parts:
          swapped = notes_of(part).get("swapped") or []
-         if swapped:

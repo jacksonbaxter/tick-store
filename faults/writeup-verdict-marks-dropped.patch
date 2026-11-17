@@ -1,11 +1,12 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -1268,7 +1268,7 @@
-     if not marks:
-         return word
-     shown = dict.fromkeys(forms[-1] for forms in marks_of(row, parts, name))
--    return word + "".join(f"; {mark}" for mark in shown)
+@@ -1278,8 +1278,7 @@
+     beaten = [part[0] for part in parts or [] if render_results.notes_of(part).get("faster")]
+     setup = " " if word == "met" or not beaten else \
+         f"; met on {render_results.and_list(beaten)} "
+-    return word + "".join(f"{setup}{mark}" if mark.startswith(render_results.SHORT_SETUP) else
+-                          f"; {mark}" for mark in shown)
 +    return word
  
  

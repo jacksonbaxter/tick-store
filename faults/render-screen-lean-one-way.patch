@@ -1,0 +1,13 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1960,8 +1960,7 @@
+     """SWAPPED's mark on the README's first screen: whose runs the host was swapping during,
+     each system once, and which way that may lean on tick-store's verdict."""
+     systems = list(dict.fromkeys(system for system, _, _ in swapped))
+-    lean = "both" if "tickstore" in systems and len(systems) > 1 else \
+-        "ours" if "tickstore" in systems else "rivals"
++    lean = "rivals"
+     names = and_list([SYSTEM_LABEL.get(system, system) + "'s" for system in systems])
+     old = " on the replaced run" if all(old for _, _, old in swapped) else ""
+     return f"{SCREEN_SWAPPED}{names} runs{old}, {SCREEN_LEANS[lean]}"

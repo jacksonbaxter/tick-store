@@ -1,7 +1,7 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -1929,7 +1929,7 @@
+@@ -2074,13 +2074,12 @@
  
  
  def change_marks(parts):
@@ -9,8 +9,15 @@ diff --git a/scripts/render_results.py b/scripts/render_results.py
 +    return []
  
  
- def phase_mark_pairs(parts, row=None, labelled=True):
-@@ -1993,7 +1993,7 @@
+ def change_mark_pairs(parts):
+     """(in full, short) for each changed part's mark."""
+-    return [(change_text(part), change_short(part)) for part in parts
+-            if notes_of(part).get("change")]
++    return []
+ 
+ 
+ def part_phrase(label):
+@@ -2192,7 +2191,7 @@
      """The verdict words: a part the replaced run's figures change stands apart, under the
      outcome the rule gives it on this run, with both outcomes and the counted one beside that
      word, and the others' counted outcomes as core_verdict gives them (review C1, E)."""

@@ -1,11 +1,12 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -1972,7 +1972,7 @@
- def screen_verdict(parts, row=None):
-     """A verdict on the README's first screen: its words, then its short marks in brackets."""
-     marks = short_marks(parts, row)
--    return shown_verdict(parts) + (f" ({'; '.join(marks)})" if marks else "")
+@@ -2170,8 +2170,7 @@
+     """A verdict on the README's first screen: its words, the setup mark beside them, then its
+     other marks in brackets."""
+     beside, marks = screen_marks(parts, row)
+-    return shown_verdict(parts) + "".join(f" {mark}" for mark in beside) + \
+-        (f" ({'; '.join(marks)})" if marks else "")
 +    return shown_verdict(parts)
  
  
