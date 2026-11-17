@@ -341,7 +341,7 @@ def swap_pitch_store_sizes():
 def reword_a_pitch_claim():
     """The pitch's query sentence reworded to rank tick-store first on short windows too, with
     no figure in it for the figure check to catch (reviews RG-13, DX-2)."""
-    edit_text("README.md", "or\nQuestDB wins", "or\ntick-store wins")
+    edit_text("README.md", "; ArcticDB or QuestDB wins short", "; tick-store wins short")
 
 
 def type_an_unchecked_pitch_figure():
@@ -399,8 +399,8 @@ def quote_wt4_with_the_old_word():
     (review C1, E)."""
     edit_text("BENCHMARKS.md", "Met against QuestDB only, not like-for-like; (against ArcticDB) "
               "met on this run's figures, a change that favours tick-store, and missed on the "
-              "replaced run's, so counted as missed in every count, ranking and first screen on "
-              "these pages; missed against Parquet", "Met against QuestDB only, not "
+              "replaced run's, so counted as missed in every count, ranking and first screen of "
+              "the project's pages; missed against Parquet", "Met against QuestDB only, not "
               "like-for-like; missed against Parquet and ArcticDB; against ArcticDB met on this "
               "run's figures "
               "and missed on the replaced run's, a change that favours tick-store, so counted "
@@ -420,7 +420,7 @@ def headline_row(document, what):
 def type_a_figure_into_a_template():
     """The disk row's measured template with Parquet's size typed in, not read."""
     def change(document):
-        row = headline_row(document, "Disk, store flushed")
+        row = headline_row(document, "Disk, store flushed (written through to the drive)")
         row["measured"] = row["measured"].replace("{parquet}", "3.19")
     edit_json("scripts/targets.json", change)
 
@@ -1581,7 +1581,7 @@ FAULTS = (
           "FAIL: test_two_figures_of_one_format_are_refused (__main__.RenderPitchTest"),
     Fault("readme-pitch-claim-reworded", "render-check", "the pitch's Q1 and Q4 sentence "
           "reworded to rank tick-store first, with no figure in it", EXIT_RENDER_REFUSED,
-          "the README's pitch no longer says \"On the Ryzen it answers queries about one stock",
+          "the README's pitch no longer says \"On the Ryzen it answers one-stock queries",
           reword_a_pitch_claim),
     Fault("render-pitch-claim-unchecked", "py-scripts", "render_results.py finds each claim's "
           "words in the pitch and never judges its condition, so a ranking the results reverse "
