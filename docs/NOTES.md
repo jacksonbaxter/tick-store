@@ -7068,6 +7068,29 @@ not defended. REVIEW rows W-1 to W-18 give each item.
 - **Fault, shown by hand.** `writeup-flag-never-set`, shown in a clone under `build/`, outputs in
   the phase's `essay-prep/proofs` folder; proof owed to the full re-proof.
 
+### The outside page review's findings in the essay
+
+An outside review of the public pages read the essay at `16a5db9`. I gave rulings on its essay
+findings; 12 REVIEW rows, P1-1 to P1-28, give each, the other pages being fixed apart.
+
+- **Done (`d25ab37`, `e41d75b`).** Swapped figures in the opening carry the dagger, and the swap
+  mark is explained in plain words: the host was swapping memory. The table's write row and
+  WT-4 against QuestDB are said not like-for-like, with the bytes each read. QL-4's row names
+  Q5 cold among its met parts. Other fixes:
+  - disturbance entries are called entries;
+  - the host's scheduled jobs are listed by kind;
+  - `tick_query` is named;
+  - parsing's share is the profile's alone;
+  - the Linux host is the Zen 1 throughout.
+- **No longer applies.** P1-9, P1-10, P1-19 and P1-25: the sentences went in the restructure.
+- **The verdict words stay as the rules give them.** QL-4's met parts and WT-4's met against
+  QuestDB stand, with their marks. The proof sentence stays, as it is true.
+- **Counts.** 3,727 words by the renderer and 3,993 by `wc -w`.
+- **Faults, shown by hand.** `writeup-met-parts-unnamed` is new. `writeup-marks-in-full` and
+  `writeup-verdict-marks-dropped` are remade on moved lines. Each was shown in a clone under
+  `build/`, outputs in the phase's `essay-prep/proofs-p1` folder; proof owed to the full
+  re-proof.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
