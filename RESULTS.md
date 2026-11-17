@@ -150,21 +150,21 @@ Queries, on each system's class B store, in milliseconds. Each latency is the me
 
 Ingest and size, class A: returns once data is in the OS page cache. Stored bytes are allocated at rest, and the ratio is the day's source bytes over them. "Total s" is the whole write clock; "engine-only s" is that less the time reading the input and putting it in the form the system's call takes, as "A write's two times" in compare/README.md sets out for each system. tick-store's both hold its ITCH parsing. A write of several repetitions measured before protocol 2 kept medians alone, so its engine-only seconds are not recorded. The rates below are not like for like: inputs not alike, by each write's record: tick-store's input is in memory before the clock starts, with 250,916,864 B read from the device inside the clock; Parquet's, ArcticDB's and QuestDB's are read from disk inside it, with 18,411,094,016 to 21,521,625,088 B read from the device inside the clock; engine-only, the clock less reading the input and putting it in the form the system's call takes, may still hold those reads, which are counted over the whole clock, so the two-clock rule does not take the difference out.
 
-| System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Like-for-like |
-|---|---|---|---|---|---|---|---|---|
-| Parquet | `zstd1-rg1Mi` | 168.748 | 80.911 | 1.59 | 3,191,406,592 | 2.586 | proven | yes |
-| ArcticDB | `rows100k-cols127` | 111.523 | 35.060 | 2.41 | 6,352,617,472 | 1.299 | proven | yes |
-| QuestDB | `plain` | 678.677 | 193.832 | 0.40 | 22,897,786,880 | 0.360 | proven | yes |
-| tick-store (parses ITCH) | `v3-seg4Mi` | 211.651 | 211.348 | 1.27 | 1,758,240,768 | 4.693 | proven | yes |
+| System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Durability like-for-like | Input at the clock's start |
+|---|---|---|---|---|---|---|---|---|---|
+| Parquet | `zstd1-rg1Mi` | 168.748 | 80.911 | 1.59 | 3,191,406,592 | 2.586 | proven | yes | read from disk inside the clock |
+| ArcticDB | `rows100k-cols127` | 111.523 | 35.060 | 2.41 | 6,352,617,472 | 1.299 | proven | yes | read from disk inside the clock |
+| QuestDB | `plain` | 678.677 | 193.832 | 0.40 | 22,897,786,880 | 0.360 | proven | yes | read from disk inside the clock |
+| tick-store (parses ITCH) | `v3-seg4Mi` | 211.651 | 211.348 | 1.27 | 1,758,240,768 | 4.693 | proven | yes | in memory before the clock |
 
 Ingest and size, class B: returns after a flush to the device. Stored bytes are allocated at rest, and the ratio is the day's source bytes over them. "Total s" is the whole write clock; "engine-only s" is that less the time reading the input and putting it in the form the system's call takes, as "A write's two times" in compare/README.md sets out for each system. tick-store's both hold its ITCH parsing. A write of several repetitions measured before protocol 2 kept medians alone, so its engine-only seconds are not recorded. The rates below are not like for like: inputs not alike, by each write's record: tick-store's input is in memory before the clock starts, with 274,239,488 B read from the device inside the clock; Parquet's, ArcticDB's and QuestDB's are read from disk inside it, with 23,846,309,888 to 24,631,062,528 B read from the device inside the clock; engine-only, the clock less reading the input and putting it in the form the system's call takes, may still hold those reads, which are counted over the whole clock, so the two-clock rule does not take the difference out.
 
-| System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Like-for-like |
-|---|---|---|---|---|---|---|---|---|
-| Parquet | `zstd1-rg1Mi` | 211.856 | 92.468 | 1.27 | 3,191,406,592 | 2.586 | proven | yes |
-| ArcticDB | `rows100k-cols127` | 381.423 | 291.821 | 0.70 | 6,352,666,624 | 1.299 | proven | yes |
-| QuestDB | `plain` | 1595.634 (disturbed) | 1459.491 (disturbed) | 0.17 (disturbed) | 22,897,786,880 | 0.360 | NOT PROVEN | no |
-| tick-store (parses ITCH) | `v3-seg4Mi` | 190.659 (disturbed) | 190.286 (disturbed) | 1.41 (disturbed) | 1,758,240,768 | 4.693 | proven | yes |
+| System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Durability like-for-like | Input at the clock's start |
+|---|---|---|---|---|---|---|---|---|---|
+| Parquet | `zstd1-rg1Mi` | 211.856 | 92.468 | 1.27 | 3,191,406,592 | 2.586 | proven | yes | read from disk inside the clock |
+| ArcticDB | `rows100k-cols127` | 381.423 | 291.821 | 0.70 | 6,352,666,624 | 1.299 | proven | yes | read from disk inside the clock |
+| QuestDB | `plain` | 1595.634 (disturbed) | 1459.491 (disturbed) | 0.17 (disturbed) | 22,897,786,880 | 0.360 | NOT PROVEN | no | read from disk inside the clock |
+| tick-store (parses ITCH) | `v3-seg4Mi` | 190.659 (disturbed) | 190.286 (disturbed) | 1.41 (disturbed) | 1,758,240,768 | 4.693 | proven | yes | in memory before the clock |
 
 tick-store ingests the day's ITCH file itself, so its write time holds ITCH parsing. The other systems ingest the columns tools/tick_export wrote from the same day, already parsed, and their times do not. Nothing is subtracted.
 
@@ -216,15 +216,15 @@ Queries, on each system's class B store, in milliseconds. Each latency is the me
 
 Ingest and size, class A: returns once data is in the OS page cache. Stored bytes are allocated at rest, and the ratio is the day's source bytes over them. On macOS, APFS can keep blocks allocated past the end of a file that grew in many small writes over time, so a stored figure here can exceed the file's own bytes: compare stored sizes from Linux. "Total s" is the whole write clock; "engine-only s" is that less the time reading the input and putting it in the form the system's call takes, as "A write's two times" in compare/README.md sets out for each system. tick-store's both hold its ITCH parsing. A write of several repetitions measured before protocol 2 kept medians alone, so its engine-only seconds are not recorded.
 
-| System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Like-for-like |
-|---|---|---|---|---|---|---|---|---|
-| tick-store (parses ITCH) | `v3-seg4Mi` | 81.391 | 81.356 | 3.30 | 1,762,254,848 | 4.682 | proven | yes |
+| System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Durability like-for-like | Input at the clock's start |
+|---|---|---|---|---|---|---|---|---|---|
+| tick-store (parses ITCH) | `v3-seg4Mi` | 81.391 | 81.356 | 3.30 | 1,762,254,848 | 4.682 | proven | yes | in memory before the clock |
 
 Ingest and size, class B: returns after a flush to the device. Stored bytes are allocated at rest, and the ratio is the day's source bytes over them. On macOS, APFS can keep blocks allocated past the end of a file that grew in many small writes over time, so a stored figure here can exceed the file's own bytes: compare stored sizes from Linux. "Total s" is the whole write clock; "engine-only s" is that less the time reading the input and putting it in the form the system's call takes, as "A write's two times" in compare/README.md sets out for each system. tick-store's both hold its ITCH parsing. A write of several repetitions measured before protocol 2 kept medians alone, so its engine-only seconds are not recorded.
 
-| System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Like-for-like |
-|---|---|---|---|---|---|---|---|---|
-| tick-store (parses ITCH) | `v3-seg4Mi` | 79.978 | 79.950 | 3.36 | 1,762,250,752 | 4.682 | proven | yes |
+| System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Durability like-for-like | Input at the clock's start |
+|---|---|---|---|---|---|---|---|---|---|
+| tick-store (parses ITCH) | `v3-seg4Mi` | 79.978 | 79.950 | 3.36 | 1,762,250,752 | 4.682 | proven | yes | in memory before the clock |
 
 tick-store ingests the day's ITCH file itself, so its write time holds ITCH parsing. The other systems ingest the columns tools/tick_export wrote from the same day, already parsed, and their times do not. Nothing is subtracted.
 
@@ -272,21 +272,21 @@ Queries, on each system's class B store, in milliseconds. Each latency is the me
 
 Ingest and size, class A: returns once data is in the OS page cache. Stored bytes are allocated at rest, and the ratio is the slice's source bytes over them. "Total s" is the whole write clock; "engine-only s" is that less the time reading the input and putting it in the form the system's call takes, as "A write's two times" in compare/README.md sets out for each system. tick-store's both hold its ITCH parsing. A write of several repetitions measured before protocol 2 kept medians alone, so its engine-only seconds are not recorded.
 
-| System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Like-for-like |
-|---|---|---|---|---|---|---|---|---|
-| Parquet | `zstd1-rg1Mi` | 2.247 | 2.247 | 2.73 | 70,479,872 | 2.925 | proven | yes |
-| ArcticDB | `rows100k-cols127` | 1.050 | 0.787 | 5.83 | 141,164,544 | 1.460 | proven | yes |
-| QuestDB | `plain` | 4.262 | 4.030 | 1.44 | 537,550,848 | 0.383 | proven | yes |
-| tick-store (parses ITCH) | `v3-seg4Mi` | 4.879 | 4.846 | 1.26 | 43,266,048 | 4.764 | proven | yes |
+| System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Durability like-for-like | Input at the clock's start |
+|---|---|---|---|---|---|---|---|---|---|
+| Parquet | `zstd1-rg1Mi` | 2.247 | 2.247 | 2.73 | 70,479,872 | 2.925 | proven | yes | in memory before the clock |
+| ArcticDB | `rows100k-cols127` | 1.050 | 0.787 | 5.83 | 141,164,544 | 1.460 | proven | yes | in memory before the clock |
+| QuestDB | `plain` | 4.262 | 4.030 | 1.44 | 537,550,848 | 0.383 | proven | yes | in memory before the clock |
+| tick-store (parses ITCH) | `v3-seg4Mi` | 4.879 | 4.846 | 1.26 | 43,266,048 | 4.764 | proven | yes | in memory before the clock |
 
 Ingest and size, class B: returns after a flush to the device. Stored bytes are allocated at rest, and the ratio is the slice's source bytes over them. "Total s" is the whole write clock; "engine-only s" is that less the time reading the input and putting it in the form the system's call takes, as "A write's two times" in compare/README.md sets out for each system. tick-store's both hold its ITCH parsing. A write of several repetitions measured before protocol 2 kept medians alone, so its engine-only seconds are not recorded.
 
-| System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Like-for-like |
-|---|---|---|---|---|---|---|---|---|
-| Parquet | `zstd1-rg1Mi` | 2.375 | 2.375 | 2.58 | 70,479,872 | 2.925 | proven | yes |
-| ArcticDB | `rows100k-cols127` | 1.287 | 1.014 | 4.76 | 141,168,640 | 1.460 | proven | yes |
-| QuestDB | `plain` | 23.596 | 23.366 | 0.26 | 537,550,848 | 0.383 | proven | no |
-| tick-store (parses ITCH) | `v3-seg4Mi` | 6.555 | 6.518 | 0.93 | 43,266,048 | 4.764 | proven | yes |
+| System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Durability like-for-like | Input at the clock's start |
+|---|---|---|---|---|---|---|---|---|---|
+| Parquet | `zstd1-rg1Mi` | 2.375 | 2.375 | 2.58 | 70,479,872 | 2.925 | proven | yes | in memory before the clock |
+| ArcticDB | `rows100k-cols127` | 1.287 | 1.014 | 4.76 | 141,168,640 | 1.460 | proven | yes | in memory before the clock |
+| QuestDB | `plain` | 23.596 | 23.366 | 0.26 | 537,550,848 | 0.383 | proven | no | in memory before the clock |
+| tick-store (parses ITCH) | `v3-seg4Mi` | 6.555 | 6.518 | 0.93 | 43,266,048 | 4.764 | proven | yes | in memory before the clock |
 
 tick-store ingests the ITCH slice itself, so its write time holds ITCH parsing. The other systems ingest the columns tools/tick_export wrote from the same slice, already parsed, and their times do not. Nothing is subtracted.
 
@@ -319,21 +319,21 @@ Queries, on each system's class B store, in milliseconds. Each latency is the me
 
 Ingest and size, class A: returns once data is in the OS page cache. Stored bytes are allocated at rest, and the ratio is the slice's source bytes over them. On macOS, APFS can keep blocks allocated past the end of a file that grew in many small writes over time, so a stored figure here can exceed the file's own bytes: compare stored sizes from Linux. "Total s" is the whole write clock; "engine-only s" is that less the time reading the input and putting it in the form the system's call takes, as "A write's two times" in compare/README.md sets out for each system. tick-store's both hold its ITCH parsing. A write of several repetitions measured before protocol 2 kept medians alone, so its engine-only seconds are not recorded.
 
-| System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Like-for-like |
-|---|---|---|---|---|---|---|---|---|
-| Parquet | `zstd1-rg1Mi` | 1.092 | 1.092 | 5.61 | 84,086,784 | 2.451 | proven | yes |
-| ArcticDB | `rows100k-cols127` | 0.503 | 0.376 | 12.18 | 141,860,864 | 1.453 | proven | yes |
-| QuestDB | `plain` | 0.867 | 0.754 | 7.06 | 537,772,032 | 0.383 | proven | yes |
-| tick-store (parses ITCH) | `v3-seg4Mi` | 2.036 | 2.025 | 3.01 | 43,638,784 | 4.724 | proven | yes |
+| System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Durability like-for-like | Input at the clock's start |
+|---|---|---|---|---|---|---|---|---|---|
+| Parquet | `zstd1-rg1Mi` | 1.092 | 1.092 | 5.61 | 84,086,784 | 2.451 | proven | yes | in memory before the clock |
+| ArcticDB | `rows100k-cols127` | 0.503 | 0.376 | 12.18 | 141,860,864 | 1.453 | proven | yes | in memory before the clock |
+| QuestDB | `plain` | 0.867 | 0.754 | 7.06 | 537,772,032 | 0.383 | proven | yes | in memory before the clock |
+| tick-store (parses ITCH) | `v3-seg4Mi` | 2.036 | 2.025 | 3.01 | 43,638,784 | 4.724 | proven | yes | in memory before the clock |
 
 Ingest and size, class B: returns after a flush to the device. Stored bytes are allocated at rest, and the ratio is the slice's source bytes over them. On macOS, APFS can keep blocks allocated past the end of a file that grew in many small writes over time, so a stored figure here can exceed the file's own bytes: compare stored sizes from Linux. "Total s" is the whole write clock; "engine-only s" is that less the time reading the input and putting it in the form the system's call takes, as "A write's two times" in compare/README.md sets out for each system. tick-store's both hold its ITCH parsing. A write of several repetitions measured before protocol 2 kept medians alone, so its engine-only seconds are not recorded.
 
-| System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Like-for-like |
-|---|---|---|---|---|---|---|---|---|
-| Parquet | `zstd1-rg1Mi` | 1.095 | 1.095 | 5.59 | 84,086,784 | 2.451 | proven | yes |
-| ArcticDB | `rows100k-cols127` | 0.536 | 0.410 | 11.43 | 141,860,864 | 1.453 | proven | yes |
-| QuestDB | `plain` | 0.944 | 0.836 | 6.49 | 537,772,032 | 0.383 | proven | no |
-| tick-store (parses ITCH) | `v3-seg4Mi` | 2.048 | 2.037 | 2.99 | 43,638,784 | 4.724 | proven | yes |
+| System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Durability like-for-like | Input at the clock's start |
+|---|---|---|---|---|---|---|---|---|---|
+| Parquet | `zstd1-rg1Mi` | 1.095 | 1.095 | 5.59 | 84,086,784 | 2.451 | proven | yes | in memory before the clock |
+| ArcticDB | `rows100k-cols127` | 0.536 | 0.410 | 11.43 | 141,860,864 | 1.453 | proven | yes | in memory before the clock |
+| QuestDB | `plain` | 0.944 | 0.836 | 6.49 | 537,772,032 | 0.383 | proven | no | in memory before the clock |
+| tick-store (parses ITCH) | `v3-seg4Mi` | 2.048 | 2.037 | 2.99 | 43,638,784 | 4.724 | proven | yes | in memory before the clock |
 
 tick-store ingests the ITCH slice itself, so its write time holds ITCH parsing. The other systems ingest the columns tools/tick_export wrote from the same slice, already parsed, and their times do not. Nothing is subtracted.
 <!-- compare:end -->

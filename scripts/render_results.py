@@ -144,7 +144,8 @@ SYSTEM_LABEL = {"parquet": "Parquet", "arcticdb": "ArcticDB", "questdb": "QuestD
                 "tickstore": "tick-store"}
 QUERY_NAMES = ("Q1", "Q2", "Q3", "Q4", "Q5")
 INGEST_COLUMNS = ("System", "Variant", "Total s, median", "Engine-only s, median", "M records/s",
-                  "Stored bytes", "Ratio", "Proof", "Like-for-like")
+                  "Stored bytes", "Ratio", "Proof", "Durability like-for-like",
+                  "Input at the clock's start")
 # What a write's two times hold, as compare/README.md's "A write's two times" has it per system.
 WRITE_TIMES = ("\"Total s\" is the whole write clock; \"engine-only s\" is that less the time "
                "reading the input and putting it in the form the system's call takes, as "
@@ -499,6 +500,14 @@ def engine_only_cell(write):
         return "not recorded"
 
 
+def input_cell(write):
+    """Where a write's input was when its clock started, by its record (review P1-17)."""
+    found = input_of(write, "")
+    if found is None:
+        return "not recorded"
+    return "in memory before the clock" if found[0] else "read from disk inside the clock"
+
+
 def ingest_table(document, class_name, entries=()):
     lines = ["| " + " | ".join(INGEST_COLUMNS) + " |", "|" + "---|" * len(INGEST_COLUMNS)]
     source_bytes = document["input"]["bytes"]
@@ -515,7 +524,7 @@ def ingest_table(document, class_name, entries=()):
                  engine_only_cell(write) + mark,
                  f"{write['records_per_second_median'] / 1e6:.2f}{mark}", f"{stored:,}",
                  f"{source_bytes / stored:.3f}", durability["status"],
-                 "yes" if durability["like_for_like"] else "no")
+                 "yes" if durability["like_for_like"] else "no", input_cell(write))
         lines.append("| " + " | ".join(cells) + " |")
     return lines
 

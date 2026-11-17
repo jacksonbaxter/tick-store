@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -505,7 +505,7 @@
+     found = input_of(write, "")
+     if found is None:
+         return "not recorded"
+-    return "in memory before the clock" if found[0] else "read from disk inside the clock"
++    return "in memory before the clock" if not found[0] else "read from disk inside the clock"
+ 
+ 
+ def ingest_table(document, class_name, entries=()):

@@ -1979,6 +1979,10 @@ class RenderCompareTest(Scratch):
                       "takes", block)
         full = block[:block.index("**Linux, slice only.**")]
         self.assertIn("| Parquet | `v` | 2.000 | 1.900 |", full)
+        # Review P1-17: the durability column says what it is about, and beside it where each
+        # write's input was when its clock started, by its record.
+        self.assertIn("| Proof | Durability like-for-like | Input at the clock's start |", block)
+        self.assertIn(" | not recorded |\n", block)
         sliced = block[block.index("**Linux, slice only.**"):]
         self.assertIn("| Parquet | `v` | 2.000 | not recorded |", sliced)
 
@@ -2988,6 +2992,19 @@ class FuzzRunsTableTest(unittest.TestCase):
         text = (REPO_ROOT / "RESULTS.md").read_text(encoding="utf-8")
         g3 = next(line for line in text.split("\n") if line.startswith("| G-3 |"))
         self.assertEqual(g3.count(f"([each run]({RENDER.FUZZ_RUNS_ANCHOR}))"), 2)
+
+
+class InputColumnTest(unittest.TestCase):
+    """Review P1-17: the ingest tables say beside each write where its input was when its clock
+    started, from the write's own record."""
+
+    def test_each_write_says_where_its_input_was(self):
+        def write(resident, pages):
+            return {"detail": {"input_at_clock_start": {"resident_pages": resident,
+                                                        "pages": pages}}}
+        self.assertEqual(RENDER.input_cell(write(10, 10)), "in memory before the clock")
+        self.assertEqual(RENDER.input_cell(write(3, 10)), "read from disk inside the clock")
+        self.assertEqual(RENDER.input_cell({"detail": {}}), "not recorded")
 
 class NotAlikeQuoteTest(unittest.TestCase):
     """A hand-written quote of WT-4's verdict on Linux carries "not like-for-like", the words its

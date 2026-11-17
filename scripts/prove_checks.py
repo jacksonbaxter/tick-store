@@ -2081,6 +2081,10 @@ FAULTS = (
     Fault("fuzz-cell-executions-dropped", "py-scripts", "render_results.py gives G-3's cell "
           "without its executions", CHECK_FAILED,
           "FAIL: test_the_cell_gives_each_hosts_smallest_and_total_executions (__main__.FuzzRunsTableTest"),
+    # Review P1-17: where each write's input was, beside its durability.
+    Fault("ingest-input-column-inverted", "py-scripts", "render_results.py says a write's input "
+          "read from disk was in memory, and the reverse", CHECK_FAILED,
+          "FAIL: test_each_write_says_where_its_input_was (__main__.InputColumnTest"),
     # Review P1-2: a quote of a verdict whose part is not like for like says so.
     Fault("render-quote-not-alike-unasked", "py-scripts", "render_results.py takes a quote of a "
           "verdict whose part its row labels not like-for-like without those words",
