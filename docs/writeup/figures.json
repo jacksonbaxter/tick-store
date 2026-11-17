@@ -35,7 +35,7 @@
   {"text": "Distance 0", "why": "the value that marks an import, docs/store.md", "in": ["Distance 0 means"]},
   {"text": "10^-4", "why": "ITCH 5.0's price unit", "in": ["units of 10^-4 dollars"]},
   {"text": "order-0", "why": "the name of an entropy taken with no context", "in": ["order-0 entropy"]},
-  {"text": "two-pass", "why": "the name of a delta kernel that runs in two passes, not a count of results", "in": ["two-pass delta {{skM_two_pass_speedup}}x", "two-pass delta {{skL_two_pass_speedup}}x"]}
+  {"text": "two-pass", "why": "the name of a delta kernel that runs in two passes, not a count of results", "in": ["two-pass delta {{skM_two_pass_speedup}}x", "two-pass delta {{skL_two_pass_speedup}}x", "add and the two-pass delta. On AVX2"]}
  ],
  "kinds": {
   "store-size": {"what": "the reference day's store as built, its bytes by column and part, from scripts/store_results.py", "files": {"any": "results/store-size-12302019.json"}, "commit": ["commit"]},
@@ -148,7 +148,8 @@
   "cr5_add_pl_best": {"what": "the same per stock", "target": {"id": "CR-5", "host": "any", "part": "add, per locate, over the best Gorilla"}},
   "cr5_best_file_missed_min": {"what": "the lowest of CR-5's four file-order parts against the best Gorilla that miss its bar", "kind": "codec-eval", "host": "any", "value": {"min": {"each": ["add_price", "replace_price", "executed_price", "trade_price"], "of": {"div": [{"best": "$", "family": "gorilla"}, {"best": "$", "not_family": "gorilla"}]}}, "only_below": {"bar": {"id": "CR-5", "host": "any"}}}, "format": "{:.3f}"},
   "cr5_best_file_missed_max": {"what": "the highest of the same", "kind": "codec-eval", "host": "any", "value": {"max": {"each": ["add_price", "replace_price", "executed_price", "trade_price"], "of": {"div": [{"best": "$", "family": "gorilla"}, {"best": "$", "not_family": "gorilla"}]}}, "only_below": {"bar": {"id": "CR-5", "host": "any"}}}, "format": "{:.3f}"},
-  "gap_cr5_worst": {"what": "the lowest such part less CR-5's bar", "value": {"sub": [{"figure": "cr5_best_file_missed_min"}, {"bar": {"id": "CR-5", "host": "any"}}]}, "format": "{:.3f}"},
+  "gap_cr5_least": {"what": "CR-5's bar less the highest such part", "value": {"sub": [{"bar": {"id": "CR-5", "host": "any"}}, {"figure": "cr5_best_file_missed_max"}]}, "format": "{:.3f}"},
+  "gap_cr5_worst": {"what": "CR-5's bar less the lowest such part", "value": {"sub": [{"bar": {"id": "CR-5", "host": "any"}}, {"figure": "cr5_best_file_missed_min"}]}, "format": "{:.3f}"},
   "ce_creation_ref_best_bits": {"what": "the best exact codec on new-order references", "kind": "codec-eval", "host": "any", "value": {"best": "creation_ref"}, "format": "{:.3f}"},
   "ce_cr7_values": {"what": "CR-7's codec-evaluation parts, each as targets.json reads it", "kind": "codec-eval", "host": "any", "value": {"target_values": {"id": "CR-7", "host": "any"}}, "helper": true},
   "ce_shares_missed_min_bits": {"what": "the lowest of CR-7's codec-evaluation parts that miss its bar", "value": {"min": {"figure": "ce_cr7_values"}, "only_above": {"bar": {"id": "CR-7", "host": "any"}}}, "format": "{:.3f}"},
@@ -258,6 +259,7 @@
   "cmpL_questdb_A_total_s": {"what": "QuestDB's unflushed write, total seconds, median, on the Zen 1", "kind": "compare-day", "host": "Linux", "value": {"path": ["systems", "questdb", "variants", "@headline", "classes", "A", "write", "seconds_median"]}, "format": "{:.1f}"},
   "cmpL_questdb_A_engine_s": {"what": "QuestDB's unflushed write, engine-only seconds, median, on the Zen 1", "kind": "compare-day", "host": "Linux", "value": {"engine_only": ["systems", "questdb", "variants", "@headline", "classes", "A", "write"]}, "format": "{:.1f}"},
   "cmpL_ts_A_rate_m": {"what": "tick-store's unflushed write, M records a second, on the Zen 1", "target": {"id": "WT-1", "host": "Linux", "part": "class A, one thread"}},
+  "cmpL_ts_A_msg_rate_m": {"what": "tick-store's unflushed write against the peak rate, M messages a second, on the Zen 1", "target": {"id": "WT-2", "host": "Linux", "part": "class A"}},
   "cmpL_ts_B_rate_m": {"what": "tick-store's flushed write, M records a second, on the Zen 1", "target": {"id": "WT-2", "host": "Linux", "part": "class B"}},
   "cmpL_others_read_share_min": {"what": "the lowest share of another system's unflushed total spent reading and converting its input, %, on the Zen 1", "kind": "compare-day", "host": "Linux", "value": {"min": {"each": ["parquet", "arcticdb", "questdb"], "of": {"div": [{"sub": [{"path": ["systems", "$", "variants", "@headline", "classes", "A", "write", "seconds_median"]}, {"engine_only": ["systems", "$", "variants", "@headline", "classes", "A", "write"]}]}, {"path": ["systems", "$", "variants", "@headline", "classes", "A", "write", "seconds_median"]}]}}}, "format": "{:.0f}", "scale": 100},
   "cmpL_others_read_share_max": {"what": "the highest of the same, %, on the Zen 1", "kind": "compare-day", "host": "Linux", "value": {"max": {"each": ["parquet", "arcticdb", "questdb"], "of": {"div": [{"sub": [{"path": ["systems", "$", "variants", "@headline", "classes", "A", "write", "seconds_median"]}, {"engine_only": ["systems", "$", "variants", "@headline", "classes", "A", "write"]}]}, {"path": ["systems", "$", "variants", "@headline", "classes", "A", "write", "seconds_median"]}]}}}, "format": "{:.0f}", "scale": 100},
@@ -277,6 +279,10 @@
   "gap_ql3_linux_x": {"what": "QL-3 on the Zen 1: the measured mean over the bar", "value": {"div": [{"figure": "cmpL_ts_q4_cold_mean_ms"}, {"bar": {"id": "QL-3", "host": "Linux"}}]}, "format": "{:.0f}"},
   "gap_wt1_linux_x": {"what": "WT-1 on the Zen 1: the bar over the measured rate", "value": {"div": [{"bar": {"id": "WT-1", "host": "Linux"}}, {"figure": "cmpL_ts_A_rate_m"}]}, "format": "{:.2f}"},
   "gap_wt2_linux_x": {"what": "WT-2 on the Zen 1, unflushed: the bar over the measured rate", "value": {"div": [{"bar": {"id": "WT-2", "host": "Linux"}}, {"figure": "cmpL_ts_A_rate_m"}]}, "format": "{:.2f}"},
+  "gap_wt2_B_x": {"what": "WT-2 on the Zen 1, flushed: the bar over the measured rate", "value": {"div": [{"bar": {"id": "WT-2", "host": "Linux"}}, {"figure": "cmpL_ts_B_rate_m"}]}, "format": "{:.2f}"},
+  "gap_ql4_q1_x": {"what": "QL-4 on the Zen 1, Q1 warm: tick-store's median over the fastest other system's", "value": {"div": [{"figure": "cmpL_ts_q1_warm_med_ms"}, {"figure": "cmpL_q1_warm_best_ms"}]}, "format": "{:.1f}"},
+  "gap_ql4_q4_x": {"what": "QL-4 on the Zen 1, Q4 warm: tick-store's median over the fastest other system's", "value": {"div": [{"figure": "cmpL_ts_q4_warm_med_ms"}, {"figure": "cmpL_q4_warm_best_ms"}]}, "format": "{:.0f}"},
+  "gap_ql4_q5_x": {"what": "QL-4 on the Zen 1, Q5 warm: tick-store's median over the fastest other system's", "value": {"div": [{"figure": "cmpL_ts_q5_warm_med_ms"}, {"figure": "cmpL_q5_warm_best_ms"}]}, "format": "{:.1f}"},
   "verdict:questdb_B_like_for_like": {"what": "whether QuestDB's flushed write is like-for-like, on the Zen 1", "kind": "compare-day", "host": "Linux", "value": {"path": ["systems", "questdb", "variants", "@headline", "classes", "B", "durability", "like_for_like"]}, "words": {"true": "like-for-like", "false": "not like-for-like"}},
   "verdict:questdb_B_proof": {"what": "QuestDB's flush proof on the day: its status and reason, on the Zen 1", "kind": "compare-day", "host": "Linux", "value": {"concat": [{"path": ["systems", "questdb", "variants", "@headline", "classes", "B", "durability", "status"]}, ": ", {"path": ["systems", "questdb", "variants", "@headline", "classes", "B", "durability", "reason"]}]}, "format": "text"},
   "cmpM_ts_A_rate_m": {"what": "tick-store's unflushed write on the M4, M records a second", "target": {"id": "WT-1", "host": "macOS", "part": "class A, one thread"}},
@@ -400,7 +406,7 @@
   "disturbance:timed": {"what": "the events the disturbances file records inside timed phases, on the Zen 1", "kind": "disturbances", "host": "Linux", "value": {"count": ["entries"], "where": {"field": ["timed"], "equals": true}}, "format": "{:d}"},
   "code:max_block_values_log2": {"what": "the format's largest codec block, a power of two: the shift of kMaxBlockValues", "value": {"constant": {"source": "include/tick_store/codec/block.hpp", "pattern": "^inline constexpr std::uint32_t kMaxBlockValues = std::uint32_t\\{1\\} << (\\d+)U;$"}}, "format": "{:d}", "helper": true},
   "max_block_values": {"what": "the values of the format's largest codec block", "value": {"pow2": {"figure": "code:max_block_values_log2"}}, "format": "{:,}"},
-  "code:fuzz_dict_cap_log2": {"what": "the dictionary target's cap, the values from an input's start on which fuzzing runs every check, a power of two: the shift of kDictFuzzDecodedValues", "value": {"constant": {"source": "fuzz/codec_oracles.hpp", "pattern": "^inline constexpr std::size_t kDictFuzzDecodedValues = std::size_t\\{1\\} << (\\d+)U;$", "until": "the fuzz oracle's bounds are merged from their branch"}}, "format": "{:d}", "helper": true},
+  "code:fuzz_dict_cap_log2": {"what": "the dictionary target's cap, the values from an input's start on which fuzzing runs every check, a power of two: the shift of kDictFuzzDecodedValues", "value": {"constant": {"source": "fuzz/codec_oracles.hpp", "pattern": "^inline constexpr std::size_t kDictFuzzDecodedValues = std::size_t\\{1\\} << (\\d+)U;$"}}, "format": "{:d}", "helper": true},
   "fuzz_dict_cap": {"what": "the dictionary target's cap in values", "value": {"pow2": {"figure": "code:fuzz_dict_cap_log2"}}, "format": "{:,}"}
  },
  "claims": [
@@ -408,7 +414,7 @@
   {"text": "takes the least disk of the systems compared", "pitch_claim": "it takes the least disk of the four"},
   {"text": "gives every message back bit-exact", "pitch_claim": "gives every message back bit-exact"},
   {"text": "quicker to query than in the other systems' fixed setups", "pitch_claim": "fastest of the four, each in the setup"},
-  {"text": "windows across every stock are answered quicker by ArcticDB or QuestDB", "pitch_claim": "ArcticDB or QuestDB is fastest"},
+  {"text": "short windows across every stock are answered quicker by ArcticDB or QuestDB", "pitch_claim": "ArcticDB or QuestDB wins short market-wide windows"},
   {"text": "ingests below Nasdaq's peak published message rate", "holds": {"verdict_is": {"id": "WT-2", "host": "Linux", "parts": ["class A"], "class": "missed"}}},
   {"text": "is exact on the whole day", "holds": {"verdict_is": {"id": "G-4", "host": "any", "class": "met"}}},
   {"text": "MB smaller", "holds": {"above": [{"figure": "cmpM_seg_rss_diff_mb"}, 0]}},
