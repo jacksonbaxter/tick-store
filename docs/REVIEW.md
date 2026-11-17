@@ -235,7 +235,7 @@ than asserted).
   differ only in the fuzz harness and its tests is put to `git diff --name-only` and is not judged
   in a tree with no history; the prover's record, which names no commit; and the replaced day.
 - Tests: `Commits` (ten). Faults: `writeup-commits-mixed-accepted`,
-  `writeup-differs-only-unchecked`, PROVEN. Commit: `ee91d17`.
+  `writeup-differs-only-unchecked`, PROVEN. Commit: `af2816c`.
 
 ### WD-2 (blocker) Comparison and ranking words around a figure were held by nothing
 
@@ -247,7 +247,7 @@ than asserted).
   leaves and reads a figure the sentence prints, or a token that carries the word, and a claim the
   results answer false stops the render.
 - Tests: `Claims` (nine). Faults: `writeup-judging-word-unclaimed`, `writeup-claim-not-held`,
-  `writeup-pitch-condition-skipped`, PROVEN. Commit: `ee91d17`.
+  `writeup-pitch-condition-skipped`, PROVEN. Commit: `af2816c`.
 
 ### WD-3 (blocker) Results typed in words and verdicts typed by hand
 
@@ -257,9 +257,14 @@ than asserted).
 - Fixed: a number word is held as a judging word is, and the Missed targets and Not judged sections
   must hold exactly the rows of those verdicts, with each changed outcome's token where its
   verdict is quoted.
-- Tests: `Refuses.test_a_number_in_words`, `Census` (three), `Changed` (three). Faults:
+- After the rebase onto `81cec1f`, where render_results.py judges every comparison verdict on
+  the replaced run too, the essay's own changed-outcome tokens gave way to its marks: each verdict
+  carries what RESULTS.md sets beside it, from `verdict_marks` and `write_inputs`, and a verdict
+  that drops one is refused (`ef16746`).
+- Tests: `Refuses.test_a_number_in_words`, `Census` (three), `Marks` (three). Faults:
   `writeup-number-word-unseen`, `writeup-census-missing-row`, `writeup-census-met-row-kept`,
-  `writeup-changed-outcome-unshown`, PROVEN. Commit: `ee91d17`.
+  `writeup-verdict-marks-dropped`, `writeup-verdict-mark-unchecked`,
+  `writeup-claim-on-changed-outcome`, PROVEN. Commit: `af2816c`.
 
 ### WD-4 (blocker) The figure list could type any number
 
@@ -269,14 +274,14 @@ than asserted).
 - Fixed: every value must reach a results file, a tree count, a code constant or a bar at its
   leaves; a number in the list must be one of its declared `factors`, each with its reason, and
   words and concat pieces may hold no number.
-- Tests: `Literals` (seven). Fault: `writeup-literal-value-accepted`, PROVEN. Commit: `ee91d17`.
+- Tests: `Literals` (seven). Fault: `writeup-literal-value-accepted`, PROVEN. Commit: `af2816c`.
 
 ### WD-5 (should-fix) A figure from one host could sit under a description of the other
 
 - Shown: a macOS file under a Zen 1 description passed.
 - Fixed: an entry read from one host's files must name that host and not the other; one read
   across hosts must say so with `across_hosts` and name both.
-- Tests: `Hosts` (four). Fault: `writeup-host-word-unchecked`, PROVEN. Commit: `ee91d17`.
+- Tests: `Hosts` (four). Fault: `writeup-host-word-unchecked`, PROVEN. Commit: `af2816c`.
 
 ### WD-6 (should-fix) The essay recomputed each target's figure with a copy of its expression
 
@@ -285,7 +290,7 @@ than asserted).
   row's unit; a test holds every such token to the Targets block's figure for the same part. The
   Missed-targets table is generated from the verdicts (WD-3).
 - Tests: `Forms.test_a_target_s_figure_is_the_targets_block_s`, `Census`. Fault:
-  `writeup-census-missing-row`, PROVEN. Commit: `ee91d17`.
+  `writeup-census-missing-row`, PROVEN. Commit: `af2816c`.
 
 ### WD-7 (should-fix) Formats could round a bar or a gap into a contradiction
 
@@ -293,7 +298,7 @@ than asserted).
 - Fixed: a bar is shown exactly with its sign and unit, a printed figure must stand on its
   verdict's side of the bar, and a gap printed as a ratio of 1 or a difference of 0 is refused.
 - Tests: `Gaps` (three). Faults: `writeup-bar-rounded`, `writeup-figure-across-its-bar`,
-  `writeup-gap-shown-as-none`, PROVEN. Commit: `ee91d17`.
+  `writeup-gap-shown-as-none`, PROVEN. Commit: `af2816c`.
 
 ### WD-8 (blocker) The prover sentence counted the control as a fault
 
@@ -305,7 +310,7 @@ than asserted).
   passed; a fault the list no longer has is not counted, and a record with no control is refused.
   The sentence comes out right today and after a full run.
 - Test: `Prover.test_the_counts`. Fault: `writeup-prover-counts-control`, PROVEN. Commit:
-  `ee91d17`.
+  `af2816c`.
 
 ### WD-9 (should-fix) A kind could still pin a commit, and a pattern could leave results/
 
@@ -313,7 +318,7 @@ than asserted).
 - Fixed: a pattern is a path under `results/` with one `*`, in place of the commit, before
   `.json`, and no hex run or glob in a folder.
 - Test: `Refuses.test_a_kind_named_by_a_commit_prefix_or_folder_or_leaving_results`. Fault:
-  `writeup-pattern-glob-accepted`, PROVEN. Commit: `ee91d17`.
+  `writeup-pattern-glob-accepted`, PROVEN. Commit: `af2816c`.
 
 ### WD-10 (should-fix) The figure list chose which template and which page were checked
 
@@ -321,7 +326,7 @@ than asserted).
 - Fixed: the page, template and targets paths are the script's; a list naming any of them is
   refused, and `--figures` is gone.
 - Test: `Refuses.test_the_list_naming_its_page_template_or_targets`. Fault:
-  `writeup-list-names-the-page`, PROVEN. Commit: `ee91d17`.
+  `writeup-list-names-the-page`, PROVEN. Commit: `af2816c`.
 
 ### WD-11 (should-fix) Most of the expression language was pinned by no test
 
@@ -329,7 +334,7 @@ than asserted).
 - Fixed: `Forms` computes every form and format on a small document and holds each to an answer
   worked out in plain Python beside it, with a test for every refusal.
 - Tests: `Forms` (six), `Refuses`. Fault: `writeup-sub-operands-swapped`, PROVEN. Commit:
-  `ee91d17`.
+  `af2816c`.
 
 ### WD-12 (should-fix) A bug in verdict_class passed writeup-check
 
@@ -337,7 +342,7 @@ than asserted).
 - Fixed: `Verdicts` holds `verdict_class` and `verdict_of` on hand-built parts, met, missed, not
   judged and each mix.
 - Test: `Verdicts.test_verdict_class`. Fault: `verdict-class-met-on-any-part`, which patches
-  `render_results.py` in the prover's clone, PROVEN. Commit: `ee91d17`.
+  `render_results.py` in the prover's clone, PROVEN. Commit: `af2816c`.
 
 ### WD-13 (should-fix) Byte sizes read from comments, and a lane width typed
 
@@ -347,7 +352,7 @@ than asserted).
   the lane word's width is read from `lane_pack.hpp`'s declaration, and a constant's source is
   read with its comments blanked.
 - Test: `Refuses.test_a_constant_read_from_a_comment`. Fault: `writeup-constant-from-a-comment`,
-  PROVEN. Commit: `ee91d17`.
+  PROVEN. Commit: `af2816c`.
 
 ### WD-14 (should-fix) Non-results were removed everywhere, and some were measurements
 
@@ -356,7 +361,7 @@ than asserted).
   text in the shape of a measurement, a number with a unit, is refused; the host's memory is read
   from the capacity file's host block, in GiB.
 - Tests: `Refuses.test_a_non_result_used_outside_its_place` and its neighbours. Fault:
-  `writeup-non-result-anywhere`, PROVEN. Commit: `ee91d17`.
+  `writeup-non-result-anywhere`, PROVEN. Commit: `af2816c`.
 
 ### WD-15 (should-fix) The essay read files under a pin, and files no validator checks, saying neither
 
@@ -366,14 +371,14 @@ than asserted).
   paragraph that cites it, that its summaries are assembled by a script that refuses inconsistent
   recordings and that no separate validator re-reads them.
 - Tests: `Pins` (four). Faults: `writeup-pin-unsaid`, `writeup-pinned-file-undeclared`, PROVEN.
-  Commit: `ee91d17`.
+  Commit: `af2816c`.
 
 ### WD-16 (should-fix) "Opens with its conclusion" was checked as a full stop
 
 - Shown: an opening of "Read on." passed.
 - Fixed: after the title, one paragraph of exactly three sentences, each holding a token.
 - Test: `Refuses.test_an_opening_that_is_not_three_sentences_each_with_a_token`. Fault:
-  `writeup-opening-any-length`, PROVEN. Commit: `ee91d17`.
+  `writeup-opening-any-length`, PROVEN. Commit: `af2816c`.
 
 ### WD-17 (note) Other things the check did not hold
 
@@ -387,7 +392,7 @@ than asserted).
   `Refuses.test_a_character_reference`,
   `Refuses.test_a_multiplier_or_a_numeral_that_is_not_a_digit`. Faults:
   `writeup-tokens-glued-accepted`, PROVEN; `writeup-numeral-forms-accepted`, PROVEN. Commits:
-  `ee91d17`, `de58a2a`.
+  `af2816c`, `dc3c24b`.
 
 ### WD-18 (should-fix) README's account of the step claimed more than the check held
 
@@ -395,4 +400,4 @@ than asserted).
   narrower in the code, and the account left out the judging words, the trusted list, the commits
   and the pins.
 - Fixed: the paragraph states each rule as the code enforces it and lists what it does not hold.
-- No test or fault: prose. Commit: `bed34fb`.
+- No test or fault: prose. Commit: `e2ac9b2`.

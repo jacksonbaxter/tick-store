@@ -6187,16 +6187,39 @@ cites a figure that shows it, says only what was measured, or is cut:
   terms, faults listed without the control, faults the record covers, proven, and whether its
   control passed.
 
-**The dry render.** On a scratch tree of the worktree with the campaign's 24 audited files, the
-old Linux day moved to `results/compare/replaced/` and the frozen commit's fuzz file removed,
-the render exits 3: not judged, 14 of 347 tokens waiting, capacity (Linux) 2 and a claim, the
-oracle's bound (a merge) 2, disturbances (Linux) 3, fuzz (any) 7 and the Not judged census. Its
-draft runs to 3,882 words, each waiting token counted as one; resolved, the waiting tokens add
-about 50. In the committed tree the render exits 2, refused: the verdict of CR-2 reads the Linux
-day `Linux-12302019-full-67ae574f5666.json`, which is under the pin
+**The dry render.** On a scratch tree of the committed results at `81cec1f`, with the campaign's
+24 audited files, the old Linux day moved to `results/compare/replaced/` and pinned under
+`replaced_comparison_files`, the disturbances file as `results/disturbances-ede0176b10bb.json`
+and the frozen commit's fuzz file removed, the render exits 3: not judged, 10 of 334 tokens
+waiting, capacity (Linux) 2 and a claim, the oracle's dictionary cap (a merge) 1, and fuzz (any)
+7 and the Not judged census. Its draft runs to 3,965 words, each waiting token counted as one;
+resolved, the waiting tokens add about ten. In the committed tree the render exits 2, refused:
+the verdict of CR-2 reads the Linux day `Linux-12302019-full-67ae574f5666.json`, which is under
+the pin
 `protocol_1_comparison_files` through a kind that does not declare it. The refusal stands until
 the campaign's commit moves that file to `results/compare/replaced/`, and until then
 writeup-check fails rather than skips.
+
+**The marks, after the rebase onto `81cec1f`.** render_results.py now judges each comparison
+verdict on the replaced run's pinned file as well, counts the less favourable outcome, and sets
+beside a verdict each changed outcome with both runs, each disturbed phase with the replaced
+run's figure, and, for a write against other systems, every system's resident pages and device
+reads. The essay takes those marks from `verdict_marks` and `write_inputs` and prints them beside
+the verdict word; a verdict without one is refused, and so is a claim resting on a changed
+outcome. Its own changed-outcome tokens and the replaced-run kind are gone. The faster-write rule
+is render_results.py's `faster_write_problem`, run on the template and the page. The marks add
+about 820 words, mostly the two write verdicts' inputs, so the template was cut by as much: the
+inputs paragraph to its plain words, the write-verdict paragraph after the table to its two
+verdicts and two totals, the kernel-sets paragraph, the test-harness list, the systems' glosses,
+the container trailer's contents, the per-stock delta sentence, the segment-size scoring rule,
+the first sentence of Tried and not kept, the comparison's pre-registration sentence, the Missed
+table's Why notes that only pointed elsewhere, and "a gap is not a defect". No figure, mark or
+limit was cut; the residency figures and the replaced run's figures now stand in the marks. The
+disturbances' three tokens became one, the count of timed entries in the Limits paragraph, since
+each disturbed verdict now names its own. The oracle's constants are those of `fuzz/README.md`'s
+Bounds on its branch: `kMaxBlockValues` (`include/tick_store/codec/block.hpp`, read now) and
+`kDictFuzzDecodedValues` (`fuzz/codec_oracles.hpp`, waiting for the merge); the run-length and
+PFOR caps are `kMaxBlockValues` itself, so the sentence says "its first maximal block".
 
 **On the rebase.** The README's pitch now ties whole sentences to the results, some with
 several conditions, so an essay claim names words of one pitch sentence and every condition of
