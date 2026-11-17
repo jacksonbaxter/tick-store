@@ -25,7 +25,7 @@ Results from the two hosts are kept apart and never mixed.
 
 | Label | Machine | Measurement limits |
 |---|---|---|
-| macOS | Apple M4 Max, 12 P and 4 E cores, 64 GiB, macOS 27.2, APFS on internal SSD | No pinning. 24 MHz timer, about 42 ns per tick. Results are unpinned and have no hardware counters. NEON only: no SVE, no bit-deposit instructions. Run under the machine's measurement lock (`measure.sh`). |
+| macOS | Apple M4 Max, 12 P and 4 E cores, 64 GiB, macOS 27.2, APFS on internal SSD | No pinning. 24 MHz timer, about 42 ns per tick. Results are unpinned and have no hardware counters. NEON only: no SVE, no bit-deposit instructions. Run under the machine's measurement lock (`measure.sh`): the machine's wrapper that runs one measurement at a time, with the governor set on Linux. It is not in this repository; [README.md](README.md#benchmarks) states what such a wrapper must do. |
 | Linux | AMD Ryzen Embedded V1605B (Zen 1), 4 cores and 8 threads, 2.0 GHz base, 4 MB L3, 15 GB RAM, Debian 13, kernel 6.12 | Pin with `taskset -c 4`. Nothing keeps its SMT sibling, `cpu5`, idle: each run records how busy `cpu5` was, case by case or system by system, and the validators refuse a run with it over 5% busy in any of them. Boost stays on and the clock is free to move, so no run used a fixed clock; the reported benchmark runs at `ede0176` averaged 2.74 to 3.57 GHz in their timed passes, case by case. TSC resolution about 10 ns. `perf` `:u` events only. AVX2 runs as two 128-bit halves; PEXT and PDEP are microcoded. Run under the host's measurement lock (`measure.sh`). Headline pinned numbers come from here. |
 
 ## Definitions
@@ -54,6 +54,10 @@ These come from the project brief, so they need no published source. Each one mu
 | G-2 | The check catches corruption | An injected single-bit corruption is detected, with the location reported |
 | G-3 | Every parser and decoder is fuzzed | Each libFuzzer target runs clean for 30 minutes under the heavy-job lock (`heavy.sh`) |
 | G-4 | Gorilla is built and measured | Delta-of-delta timestamps and XOR floats exist and run on this data, whatever the result |
+
+G-3's `heavy.sh` is the machine's wrapper that holds heavy jobs back while a measurement runs. It is
+not in this repository; [README.md](README.md#benchmarks) states what the measurement wrapper it
+waits on must do.
 
 G-2 is judged on the flips `scripts/g2_plan.py` plans for each pinned day's store: bit 1 of the
 middle byte of the middle segment's first timestamp block, and bit 1 of the footer's middle

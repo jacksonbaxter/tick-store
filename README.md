@@ -480,7 +480,9 @@ kernel and set, the median across the widths it ran.
 `TICK_STORE_MEASURE` names a wrapper that takes the machine, runs its arguments and prints
 a load line at each end. Exit 75 from it means retry later. Without the variable there is
 no lock, so the file is marked iteration-only, goes under `build/`, and the validator
-refuses it. Each case runs as its own process, so `perf stat` counts one workload. On
+refuses it. On the measured hosts the wrapper was `measure.sh`, the machine's
+measurement lock, which runs one measurement at a time, with the governor set on Linux; it is not
+in this repository. Each case runs as its own process, so `perf stat` counts one workload. On
 Linux, the case runs on `cpu4` under `taskset`, and `perf` counts only the timed passes.
 Nothing keeps that core's SMT sibling idle, so each case records in `sibling_busy_percent`
 how busy the sibling was, from `/proc/stat` once the lock is held and again at the end. The
