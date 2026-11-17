@@ -229,9 +229,9 @@ by call. LMDB's and QuestDB's are stated from what is known of them, and are not
 **How a class is proven.** Each run makes a small commit of 65,536 rows in a store of its own, and
 reads each file's dirty pages straight after the commit returns. The last full write is read the
 same way, for every system, with only the write's device counter read before it in its worker:
-on Linux a read of a stat file, on macOS of each process's count (review RF-10). Before protocol 2,
+on Linux a read of a stat file, on macOS of each process's count (review [RF-10](../docs/REVIEW.md)). Before protocol 2,
 tick-store's was read only after its worker had run the tools that report its settings, time in
-which writeback could clean pages (review F-11). `compare/settings.py` gives the verdict:
+which writeback could clean pages (review [F-11](../docs/REVIEW.md)). `compare/settings.py` gives the verdict:
 
 - Class A is proven only if pages are still dirty, since that shows no flush ran.
 - Class B is proven only if no data page is dirty, and class A on the same system and host saw
@@ -325,15 +325,15 @@ Parquet's leaves out the class B flush. Each repetition also records `input_page
 column files, or tick-store's ITCH file) once it is made ready and just before the clock, and
 `device_bytes_read` over the write. Its window is the whole ingest call, a little wider than the
 clock: QuestDB's `CREATE TABLE` before the clock and its check that the rows are applied after it
-fall inside (review RF-10). On Linux the block device's sectors read, machine-wide; on
+fall inside (review [RF-10](../docs/REVIEW.md)). On Linux the block device's sectors read, machine-wide; on
 macOS the bytes the device read for the processes that did the write, each one's own count
 (`proc_pid_rusage`'s `ri_diskio_bytesread`): the worker, QuestDB's server, and tick-store's
 `tick_roundtrip`, read once it has exited and before it is reaped, since macOS adds no reaped
 child's reads to its parent's. `iostat`'s `disk0` total, which the cold proof uses, counts the
 write's own output too, so `scripts/check_compare.py` refuses it for a protocol 2 macOS write
-(review RF-5), and takes only the counter's own statement. Each macOS repetition keeps each
+(review [RF-5](../docs/REVIEW.md)), and takes only the counter's own statement. Each macOS repetition keeps each
 process's count, `device_read_by_process`, which must hold the worker's and add up to the
-write's (review RV-7). A process's own executable and libraries count when they are not cached; in a run
+write's (review [RV-7](../docs/REVIEW.md)). A process's own executable and libraries count when they are not cached; in a run
 the flush probe has run the same tool first. Each write's `times` says what its two times hold,
 as the table does.
 
@@ -343,10 +343,10 @@ with the write refused unless `mincore` then reads every page resident. The reco
 write's `input_at_clock_start.made_ready`, and `scripts/check_compare.py` requires
 `input_resident_pages_at_start` to equal `input_pages` for every system on a protocol 2 slice.
 The files before protocol 2 stated that the export was warm before every write and never checked
-it (review F-10). On a day the export is taken as the cache holds it and only recorded. The
+it (review [F-10](../docs/REVIEW.md)). On a day the export is taken as the cache holds it and only recorded. The
 reading just before the clock is held to the same rule in the worker: tick-store's source on any
 run, and every input on the slice, must be whole there, or the write stops before its clock
-rather than when the file is validated (review RF-11). On Linux a write's device reads come from
+rather than when the file is validated (review [RF-11](../docs/REVIEW.md)). On Linux a write's device reads come from
 the stat file of the block device under its input, so an input on a file system with no block
 device of its own, such as tmpfs, overlayfs or a btrfs subvolume, stops the write with an error
 naming it.
@@ -417,7 +417,7 @@ of each query. Each query first runs once untimed, its answer checked, as on a f
 no timed repetition is the engine's first call in the worker; the proof records `warm_up_runs`,
 and each query its warm-up's seconds. The files before protocol 2 had no warm-up on the slice, so
 their first repetition paid each engine's first-call set-up, and with 30 runs their tail figure,
-the slowest, could be that call (review F-3).
+the slowest, could be that call (review [F-3](../docs/REVIEW.md)).
 
 **Cold.** Seven repetitions per query:
 
@@ -472,7 +472,7 @@ the query. Where the clock holds the whole open, `scripts/check_compare.py` requ
 and it is the bytes read before the open; where it does not, it is what the open had made
 resident, and it counts in the device's reads, as before. The tick-store figures before protocol
 2 are the query alone, the open outside the clock: on the full day's store the footer it reads is
-about 5 MB (review F-1).
+about 5 MB (review [F-1](../docs/REVIEW.md)).
 
 ## tick-store
 
@@ -791,7 +791,7 @@ refuses it as iteration-only. Read tick-store's figures from it beside its block
 tick-store's cold figures hold the store's open and each write states its engine-only seconds;
 the replaced day in `results/compare/replaced/` is protocol 1, without either (see "The final
 review's comparison protocol" in `docs/NOTES.md`). Before the
-review's F-5 the same run took `--systems tickstore --variants v3-seg4Mi,v3-seg1Mi`, was validated
+review's [F-5](../docs/REVIEW.md) the same run took `--systems tickstore --variants v3-seg4Mi,v3-seg1Mi`, was validated
 as a four-system day, exited 1 and kept a `.pending` file; a measured run now refuses those
 arguments.
 

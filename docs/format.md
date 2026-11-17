@@ -10,12 +10,12 @@ types it out field by field.
 [header 16][block and section bytes, in the order written][footer][trailer 24]
 ```
 
-Every multi-byte field is an unsigned little-endian integer (F2). Offsets are from the start of the
+Every multi-byte field is an unsigned little-endian integer ([F2](../BENCHMARKS.md#code-quality-bar)). Offsets are from the start of the
 file unless a row says otherwise. There is no padding and no alignment anywhere.
 
 ## Header, 16 bytes
 
-These 16 bytes are the same in every version (F1).
+These 16 bytes are the same in every version ([F1](../BENCHMARKS.md#code-quality-bar)).
 
 | Offset | Size | Field | Value |
 |---|---|---|---|
@@ -93,28 +93,28 @@ The same in every version.
 
 ## Checks at open, in order
 
-1. The file holds a header: at least 16 bytes. Then magic, version, header size (F1).
+1. The file holds a header: at least 16 bytes. Then magic, version, header size ([F1](../BENCHMARKS.md#code-quality-bar)).
 2. The file holds a header, an empty footer and a trailer: at least 64 bytes.
-3. The trailer's magic. A file missing its last write has none, so this is the incomplete-file check (F7).
-4. The trailer's reserved field, then the footer offset against the file size (M5).
+3. The trailer's magic. A file missing its last write has none, so this is the incomplete-file check ([F7](../BENCHMARKS.md#code-quality-bar)).
+4. The trailer's reserved field, then the footer offset against the file size ([M5](../BENCHMARKS.md#code-quality-bar)).
 5. The footer CRC, unless checksums are skipped.
 6. B, S and M against the footer's size, each compared with the room left by division, so no product
-   or sum can wrap (D7).
+   or sum can wrap ([D7](../BENCHMARKS.md#code-quality-bar)).
 7. One walk over both entry lists in file order: each entry's fields, then that it starts where the
    last extent ended and fits before the footer. Then that the extents end at the footer and the
    metadata fills its area.
 8. Section names unique.
 
 Each failure is a typed `StoreError` naming the field, its offset, and the expected and actual values
-(D2). `tests/unit/container_test.cpp` has a corrupt fixture for each check, asserting the exact error,
+([D2](../BENCHMARKS.md#code-quality-bar)). `tests/unit/container_test.cpp` has a corrupt fixture for each check, asserting the exact error,
 and cuts the golden file at every length.
 
 A block's CRC is checked when the block is looked up, and a section's when it is, so opening a file
 reads only its two ends; `verify_all()` checks every one. Skipping CRCs takes the named option
-`Checksums::skip` (F3). The fuzzer uses it to reach the structural checks below the CRCs, and so may a
+`Checksums::skip` ([F3](../BENCHMARKS.md#code-quality-bar)). The fuzzer uses it to reach the structural checks below the CRCs, and so may a
 caller that has verified the file once already.
 
-## Codec registry (F4)
+## Codec registry ([F4](../BENCHMARKS.md#code-quality-bar))
 
 `include/tick_store/codec/registry.hpp` is the one table of ids. An id is never reused. Its status is
 `active` (written and read), `read_only` (read, never written: how a codec leaves service while files
@@ -134,10 +134,10 @@ codec). A reserved entry stays in the table with its reason.
 | 8 | zstd | active: zstd level 1 around a payload of another codec, header above |
 
 A new codec takes the next id and changes no format version. A reader older than the id refuses a
-block that names it as an unknown codec, rather than misread it (D11). A change to an existing codec's
+block that names it as an unknown codec, rather than misread it ([D11](../BENCHMARKS.md#code-quality-bar)). A change to an existing codec's
 bytes is a new id, never an edit to the old one.
 
-## Version policy (F5)
+## Version policy ([F5](../BENCHMARKS.md#code-quality-bar))
 
 - The header's first 16 bytes and the 24-byte trailer never change, so any reader can find the
   version and the footer of any file.
@@ -151,7 +151,7 @@ bytes is a new id, never an edit to the old one.
 - Raising `kOldestReadableVersion` drops a version. That is a decision recorded in
   `docs/NOTES.md`, and its golden file goes with it.
 
-## Writing and durability (M1-M4, M8)
+## Writing and durability ([M1-M4](../BENCHMARKS.md#code-quality-bar), [M8](../BENCHMARKS.md#code-quality-bar))
 
 A file is written to `<path>.partial` and published by rename. The footer and trailer, the commit
 record, go last. `Durability` names what a commit has made safe:
@@ -164,7 +164,7 @@ record, go last. `Durability` names what a commit has made safe:
 On macOS, `F_FULLFSYNC` falls back to `fsync` only where the file system answers `ENOTSUP`, `EINVAL`
 or `ENOTTY`. Flush granularity is one flush per file, at commit. A failed flush is fatal: it is
 returned once and never retried, the writer is failed, and before the rename the old file stays as it
-was (M3). The system calls go through one seam, `FileOps`, so the tests record them and inject a
+was ([M3](../BENCHMARKS.md#code-quality-bar)). The system calls go through one seam, `FileOps`, so the tests record them and inject a
 failure or a crash at each.
 
 What the tests show and what they cannot. The call-sequence tests (`ContainerCommit` in
@@ -176,12 +176,12 @@ not. They fail if a flush call is missing, since two of their crash points are t
 if a flush is made and does nothing: with every `PosixFileOps` flush made a no-op that returns 0,
 all 166 store and durability tests pass. That a flush reaches the device, so class B survives power
 loss, rests on the operating system's documented semantics of those calls; showing it would take a
-power-cut test (dm-flakey on Linux, for one), which no unit test is (review C-9).
+power-cut test (dm-flakey on Linux, for one), which no unit test is (review [C-9](REVIEW.md)).
 
-## SIGBUS stance (M7)
+## SIGBUS stance ([M7](../BENCHMARKS.md#code-quality-bar))
 
 The reader maps the whole file read-only at its `fstat` size and proves every stored offset and size
-against that length before reading through it (M5). A read past the end of the mapping therefore
+against that length before reading through it ([M5](../BENCHMARKS.md#code-quality-bar)). A read past the end of the mapping therefore
 cannot come from the file's contents. It can come only from the file shrinking under the mapping, or
 from a device error under a mapped page, and either raises SIGBUS.
 
@@ -196,15 +196,15 @@ The process dies, and the cause is prevented instead:
   is outside the contract, like overwriting the file.
 
 `munmap` gets the length that was mapped, never one read from the file, and a failure aborts, since a
-destructor has nowhere to report it (M9).
+destructor has nowhere to report it ([M9](../BENCHMARKS.md#code-quality-bar)).
 
-## Over-read contract (A2)
+## Over-read contract ([A2](../BENCHMARKS.md#code-quality-bar))
 
 Nothing in the parser or the reader reads outside the file's bytes, and a view's span holds exactly a
 payload, with no padding guaranteed after it. A decoder given a payload must stay inside it. The
 CRC32C kernels read exactly their input too.
 
-## Lifetimes (A3)
+## Lifetimes ([A3](../BENCHMARKS.md#code-quality-bar))
 
 Views from `ContainerParser` borrow its input span. Views from `ContainerReader` hold a shared
 reference to the mapping, so their spans stay valid after the reader is destroyed, and the mapping is
