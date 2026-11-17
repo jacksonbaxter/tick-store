@@ -468,6 +468,16 @@ class Unjudged:
         self.what = what
 
 
+class NotCounted:
+    """What counts, rankings and first screens take for a part met by the rule whose mark, a
+    page swapped in or a recorded disturbance, falls on another system's timed side, and which
+    no run without that mark on that side confirms (the ruling on review P1-1): the verdict
+    keeps its word and its mark, and raises nothing."""
+
+    def __init__(self, sides):
+        self.sides = sides
+
+
 def engine_only(write):
     """A write's engine-only seconds, its seconds less its Python seconds (review RF-3): a
     protocol 2 file's own median, or a single repetition's difference. Several repetitions with
@@ -1374,7 +1384,8 @@ REPLACED_PINS = "replaced_comparison_files"
 
 
 def standing(met):
-    """How far an outcome favours tick-store: missed, then not judged, then met."""
+    """How far an outcome favours tick-store: missed, then not judged or met and not counted,
+    then met."""
     return 0 if met is False else 2 if met is True else 1
 
 
@@ -1386,6 +1397,11 @@ def counted(part):
     """The outcome counts and claims take for a part: the less favourable of its outcome on
     this run and on the replaced run, worked out from both apart from the part's own verdict,
     so a writer that counts the favourable one shows against it."""
+    if notes_of(part).get("unconfirmed"):
+        return NotCounted(notes_of(part)["unconfirmed"])
+    # A part its row labels not like-for-like is never counted as met (the ruling on P1-1).
+    if part[2] is True and NOT_ALIKE in part[0]:
+        return NotCounted([])
     change = notes_of(part).get("change")
     if not change:
         return part[2]
@@ -1549,6 +1565,17 @@ def finished(row, root, specs, parts):
                 deciding_reads(row, spec, label, old_document, tainted_then), old_document)]
         if swapped:
             notes["swapped"] = list(dict.fromkeys(swapped))
+        # A met part whose swap or disturbance mark falls on another system's side, or on
+        # both, counts only where the replaced run gives the same outcome with no such mark on
+        # that side (the ruling on review P1-1). A mark on tick-store's side alone can only
+        # have made its own figure worse, and stays counted.
+        if met is True and is_comparison(row):
+            sides = side_confirmation(root, entries, path, document, deciding, tainted,
+                                      notes.get("replaced"), old is not None and label in old)
+            if sides:
+                notes["unconfirmed" if any(side[1] for side in sides) else "confirmed"] = sides
+                if old is not None and label in old:
+                    notes["replaced_text"] = old[label][1]
         # A part met among the headline setups that another system's other setup beats carries
         # that setup beside its verdict, so the win is never quoted bare (review R-A1).
         if "lowest_of" in row and met is True:
@@ -1562,6 +1589,68 @@ def finished(row, root, specs, parts):
             notes["write"] = writes[0][3]
         done.append((label, text, met, path, document, notes))
     return done
+
+
+# Why a rival side's mark is not confirmed by the replaced run, in the words the marks give.
+UNCONFIRMED_WHY = {
+    "swapped": "swapping memory in both runs",
+    "no record": "a disturbance the replaced run has no record to rule out",
+    "no figure": "no figure on the replaced run",
+    "no run": "no replaced run",
+}
+
+
+def side_confirmation(root, entries, path, document, deciding, tainted, replaced,
+                      judged_there):
+    """For each other system's timed phase that decides a met part and carries a swap or a
+    disturbance mark: (the system's label, None where the replaced run confirms that side, or
+    why it does not, a key of UNCONFIRMED_WHY, and what the records give of it). The replaced
+    run confirms a side when it judged the part, to the same outcome as this run (else the
+    part's change mark stands instead), and its figure there is neither swapped nor disturbed
+    by its own records; a disturbance cannot be ruled out on a run no disturbance record
+    covers. [] when no rival side is marked."""
+    found = {}
+    for read in deciding:
+        if read[0] not in ("queries", "write") or read[1] == "tickstore" or not tainted(read):
+            continue
+        label = SYSTEM_LABEL.get(read[1], read[1])
+        if replaced is None or not judged_there:
+            found.setdefault(label, (label, "no run", ""))
+            continue
+        old_path, old_document = replaced
+        try:
+            walk(old_document, ["systems", read[1], "variants", read[2]])
+        except TargetError:
+            found.setdefault(label, (label, "no figure", ""))
+            continue
+        if swapped_reads([read], document) and swapped_reads([read], old_document):
+            found[label] = (label, "swapped", f"{pages_in(document, read):,} pages in this run "
+                            f"and {pages_in(old_document, read):,} in the replaced one")
+            continue
+        if disturbed(entries, root, path, [read]):
+            covered = any(entry["document"] == results_name(root, old_path) for entry in entries)
+            if not covered or disturbed(entries, root, old_path, [read]):
+                found[label] = (label, "no record", "")
+                continue
+        if swapped_reads([read], old_document):
+            found[label] = (label, "swapped", f"{pages_in(document, read):,} pages in this run "
+                            f"and {pages_in(old_document, read):,} in the replaced one")
+            continue
+        found.setdefault(label, (label, None, ""))
+    return list(found.values())
+
+
+def pages_in(document, read):
+    """The pages the whole host swapped in while a query phase was timed, by its record."""
+    return walk(document, ["systems", read[1], "variants", read[2], "queries", read[4],
+                           read[3], "swap_timed", "pages_in"])
+
+
+def results_name(root, path):
+    try:
+        return Path(path).resolve().relative_to((Path(root) / "results").resolve()).as_posix()
+    except ValueError:
+        return None
 
 
 def phase_of_path(path, document):
@@ -2015,7 +2104,7 @@ SCREEN_DISTURBANCE = {"a remote login by this project": "a remote login on the t
                       "process launches by this project": "process launches on the test machine",
                       "a file copy and process launch by this project":
                           "a file copy and process launch on the test machine"}
-SCREEN_SWAPPED = "the host was swapping during "
+SCREEN_SWAPPED = "the host was swapping memory during "
 SCREEN_LEANS = {"rivals": "which may flatter this", "ours": "which may understate this",
                 "both": "which may lean either way"}
 SCREEN_REPLACED = "an earlier full run, which this one replaces, gave "
@@ -2107,7 +2196,10 @@ def short_forms_explained():
             f"\"({SHORT_SWAPPED}ArcticDB, QuestDB)\" stands for \"{SWAPPED}ArcticDB's ... and "
             "QuestDB's ...\", the figures that decide the verdict from those systems' headline "
             "variants having been timed while pages were swapped in, as the record flags them, "
-            "each system named once over every part of the verdict; "
+            "each system named once over every part of the verdict, and the pages a mark gives "
+            "are those the whole host swapped in while that system's query was timed, from the "
+            "kernel's counters read before and after it (`compare/swap.py`), not a count for any "
+            "one process, so the record does not say whose pages they were; "
             f"\"({SHORT_SWAPPED_FIGURE})\" beside a figure stands for \"which the record flags as "
             "timed while pages were swapped in\"; \"(a login during tick-store's write; "
             f"{SHORT_REPLACED}1.423 M messages/s)\" stands for \"rests on\" or \"measured in\" "
@@ -2119,12 +2211,20 @@ def short_forms_explained():
             "a variant the comparison did not choose beats tick-store's figure; \"met on this "
             "run and missed on the replaced one, a change for tick-store, counted as missed\" "
             "stands for a changed outcome's mark in full, the less favourable outcome being the "
-            "one every count, ranking and first screen takes; and a verdict of several parts may "
+            "one every count, ranking and first screen takes; "
+            f"\"{NOT_COUNTED_SHORT}: {UNCONFIRMED_WHY['swapped']} (ArcticDB, QuestDB)\" stands "
+            f"for \"{NOT_COUNTED}\" in full, a part met by the rule whose swap or disturbance "
+            "mark falls on another system's side, or on both, which the replaced run does not "
+            "confirm, as that side carries the same mark there or no disturbance record covers "
+            "that run: it keeps its verdict word and its mark, the cell gives both runs' figures, "
+            "and no count, ranking or first screen takes it, while a mark on tick-store's side "
+            "alone, which can only have slowed it, leaves the part counted; and a verdict of "
+            "several parts may "
             "be given as \"met against QuestDB, not like-for-like; missed against Parquet; "
             "against ArcticDB met on this run and missed on the replaced one, a change for "
             "tick-store, counted as missed\", its parts named by what they compare. The README's "
             "first screen says the same in words that stand alone: \"the host was swapping "
-            "during ArcticDB's and QuestDB's runs, which may flatter this\" for a swap-in mark, "
+            "memory during ArcticDB's and QuestDB's runs, which may flatter this\" for a swap-in mark, "
             "\"which may understate this\" where tick-store's own figures are the swapped ones "
             "and \"which may lean either way\" where both are; and \"a remote login on the "
             "test machine fell inside the timing of ArcticDB's warm queries; an earlier full run, "
@@ -2151,7 +2251,7 @@ SCHEDULED_JOBS = ("The marks name only what the disturbance records list. The ho
 # The same mark in the README's pitch, which has no room for the systems and variants: a claim
 # there that rests on a rival's flagged figure says this, and the table below it keeps the whole
 # mark. It is held only in the pitch; a quote of a verdict anywhere else takes SWAPPED.
-PITCH_SWAPPED = "swapping in some rivals' runs may flatter it"
+PITCH_SWAPPED = "the host was swapping memory during some rivals' runs, which may flatter tick-store"
 
 
 def swapped_reads(reads, document):
@@ -2245,6 +2345,21 @@ def phase_mark_triples(parts, row=None, labelled=True):
             held.setdefault(text, (group_short(read, entries, replaced, row, False, part[4]),
                                    group_short(read, entries, replaced, row, True, part[4]),
                                    []))[2].append(part[0])
+    # The not-counted mark's short form names every system over all the parts once, as the
+    # swap mark's does.
+    every_side = [side for part in parts for side in notes_of(part).get("unconfirmed") or []]
+    for part in parts:
+        sides = notes_of(part).get("unconfirmed")
+        if sides:
+            full, _ = unconfirmed_forms(sides, notes_of(part).get("replaced_text"))
+            short = unconfirmed_forms(every_side)[1]
+            held.setdefault(full, (short, short, []))[2].append(part[0])
+        sides = notes_of(part).get("confirmed")
+        if sides:
+            full = (f"confirmed by the replaced run, which gives the same outcome with no such "
+                    f"mark on {and_list([label_of(side[0]) for side in sides])} side: "
+                    f"{notes_of(part)['replaced_text']}")
+            held.setdefault(full, (CONFIRMED_SHORT, CONFIRMED_SHORT, []))[2].append(part[0])
     every = [item for part in parts for item in notes_of(part).get("swapped") or []]
     for part in parts:
         swapped = notes_of(part).get("swapped") or []
@@ -2259,6 +2374,41 @@ def phase_mark_triples(parts, row=None, labelled=True):
             ", ".join(f"({label})" for label in labels) + " "
         triples.append((f"{who}{text}", short, screen))
     return triples
+
+
+# The not-counted mark's opening words, and the confirmed mark's short form (the ruling on
+# review P1-1).
+NOT_COUNTED = "met by the rule and not counted"
+NOT_COUNTED_SHORT = "met, not counted"
+CONFIRMED_SHORT = "confirmed by the replaced run"
+
+
+def label_of(label):
+    return f"{label}'s"
+
+
+def unconfirmed_forms(sides, replaced_text=None):
+    """A not-counted part's mark in full and short: each reason with the systems it holds for
+    and, for swapping, the pages each run's record gives; that neither run confirms the other,
+    so nothing counts it; and the replaced run's figures where it has them."""
+    by_why = {}
+    for label, why, detail in sides:
+        if why and (label, detail) not in by_why.get(why, []):
+            by_why.setdefault(why, []).append((label, detail))
+    pieces = []
+    for why, items in by_why.items():
+        if why == "swapped":
+            pieces.append(f"{UNCONFIRMED_WHY[why]}, on " + " and on ".join(
+                f"{label_of(label)} side {detail}" for label, detail in items))
+        else:
+            pieces.append(f"{UNCONFIRMED_WHY[why]} on "
+                          f"{and_list([label_of(label) for label, _ in items])} side")
+    short = "; ".join(f"{UNCONFIRMED_WHY[why]} "
+                      f"({', '.join(dict.fromkeys(label for label, _ in items))})"
+                      for why, items in by_why.items())
+    then = f"; the replaced run: {replaced_text}" if replaced_text else ""
+    return (f"{NOT_COUNTED}: {'; '.join(pieces)}, so neither run confirms the other, and no "
+            f"count, ranking or first screen takes it{then}", f"{NOT_COUNTED_SHORT}: {short}")
 
 
 def phase_mark_pairs(parts, row=None, labelled=True):
@@ -2407,7 +2557,8 @@ NUMBER = re.compile(r"\d+(?:[.,]\d+)*")
 FORMATTER = string.Formatter()
 # The verdict classes the line under the headline's table names, each with the word it opens.
 LEFT_OUT_HEADS = {"missed": "Missed", "missed in part": "Missed in part",
-                  "not judged": "Not judged", "not judged in part": "Not judged in part"}
+                  "not judged": "Not judged", "not judged in part": "Not judged in part",
+                  "met, not counted": "Met by the rule and not counted"}
 
 
 def headline_hosts(headline):
@@ -2552,6 +2703,10 @@ def verdict_class(parts):
         return "not judged"
     verdict_of(parts)
     verdicts = [part[2] for part in parts]
+    held = [part[2] is True and (bool(notes_of(part).get("unconfirmed")) or
+                                 NOT_ALIKE in part[0]) for part in parts]
+    if any(held) and all(met is True for met in verdicts):
+        return "met, not counted"
     if all(met is True for met in verdicts):
         return "met"
     if all(met is False for met in verdicts):
@@ -2658,7 +2813,8 @@ def host_groups(found, hosts):
 
 
 # The verdict classes of the count of the other rows, in the order the line gives them.
-COUNT_ORDER = ("met", "missed", "missed in part", "not judged", "not judged in part")
+COUNT_ORDER = ("met", "missed", "missed in part", "not judged", "not judged in part",
+               "met, not counted")
 # The first screen's last sentence counts the other rows of the Targets block, a target on a
 # host each, by verdict and links the full table; the list of what the screen's own targets
 # leave out follows directly under OTHERS_HEADING, off the first screen (review R-A5).
@@ -2677,7 +2833,7 @@ def left_out_line(items, met_parts, counts, named, hosts):
     sentences = [f"{LEFT_OUT_HEADS[kind]}: {host_groups(found, hosts)}."
                  for kind, found in items.items() if found]
     if met_parts:
-        sentences.append(f"Met: {met_parts} more of their {'part' if met_parts == 1 else 'parts'}.")
+        sentences.append(f"Met: {met_parts} more of their parts.")
     sentences += [f"{AMONG}{kind}: {' and '.join(named[kind])}."
                   for kind in COUNT_ORDER if named[kind]]
     pieces = [f"{counts[kind]} {kind}" for kind in COUNT_ORDER if counts[kind]]
@@ -2694,8 +2850,11 @@ def class_of(mets):
         return "not judged"
     met = sum(1 for value in mets if value is True)
     missed = sum(1 for value in mets if value is False)
+    held = sum(1 for value in mets if isinstance(value, NotCounted))
     if met == len(mets):
         return "met"
+    if held and met + held == len(mets):
+        return "met, not counted"
     if missed == len(mets):
         return "missed"
     if met + missed == 0:
@@ -2926,6 +3085,10 @@ def headline_cells(entry, rows, root, hosts):
     for key in ("what", "source"):
         no_typed_figure(entry[key], hosts, f"its {key} {entry[key]!r}")
     _, parts = shown_parts(entry, row, root)
+    held = [part[0] for part in parts if isinstance(counted(part), NotCounted)]
+    if held:
+        raise TargetError(f"it shows ({held[0]}), {NOT_COUNTED_SHORT}: a part no run confirms "
+                          "raises no first screen")
     bar, measured = filled([entry["bar"], entry["measured"]], entry, row, parts, hosts,
                            "its bar and measured", value_marks(entry, parts, root, row))
     return (entry["what"], f"{bar} ({entry['source']})", measured,
@@ -3365,6 +3528,10 @@ def claim_problem(claim, definitions, root):
             if unknown:
                 raise TargetError(f"pitch: no part {unknown} in {spec['id']} on {spec['host']}")
             parts = [part for part in parts if part[0] in spec["parts"]]
+        held = [part[0] for part in parts if isinstance(counted(part), NotCounted)]
+        if held:
+            return (f"{spec['id']} on {spec['host']} is {NOT_COUNTED} on ({held[0]}), which no "
+                    "run confirms, and raises no ranking sentence")
         # A claim takes each part's less favourable outcome, worked out here from both runs.
         verdict = core_verdict([(part[0], part[1], counted(part), *part[3:]) for part in parts])
         return None if verdict == spec["verdict"] else \
@@ -3522,9 +3689,13 @@ def row_marks(row, root):
     if parts is None:
         return []
     marks = change_mark_pairs(parts) + list(phase_mark_pairs(parts, row))
-    # A part its row labels as not like-for-like is quoted with those words (review P1-2).
+    # A part its row labels as not like-for-like is quoted with those words (review P1-2),
+    # which say already that it is not counted, so its quotes need not repeat the cell's
+    # not-counted mark (the ruling on review P1-1).
     if any(NOT_ALIKE in part[0] for part in parts):
         marks.append((NOT_ALIKE,))
+        alike = [f"({part[0]}) {NOT_COUNTED}" for part in parts if NOT_ALIKE in part[0]]
+        marks = [forms for forms in marks if not forms[0].startswith(tuple(alike))]
     classes = [notes_of(part)["write"] for part in parts if notes_of(part).get("write")]
     clause = input_clause(parts[0][4], classes[0]) if classes else None
     return marks + ([(clause,)] if clause else [])

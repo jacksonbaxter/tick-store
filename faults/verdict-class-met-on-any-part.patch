@@ -1,10 +1,10 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -1676,7 +1676,7 @@
-         return "not judged"
-     verdict_of(parts)
-     verdicts = [part[2] for part in parts]
+@@ -2707,7 +2707,7 @@
+                                  NOT_ALIKE in part[0]) for part in parts]
+     if any(held) and all(met is True for met in verdicts):
+         return "met, not counted"
 -    if all(met is True for met in verdicts):
 +    if any(met is True for met in verdicts):
          return "met"

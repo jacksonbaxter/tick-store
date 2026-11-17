@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -2705,7 +2705,7 @@
+     verdicts = [part[2] for part in parts]
+     held = [part[2] is True and (bool(notes_of(part).get("unconfirmed")) or
+                                  NOT_ALIKE in part[0]) for part in parts]
+-    if any(held) and all(met is True for met in verdicts):
++    if False:
+         return "met, not counted"
+     if all(met is True for met in verdicts):
+         return "met"

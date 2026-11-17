@@ -2041,6 +2041,25 @@ FAULTS = (
     Fault("render-proofs-prover-optional", "py-scripts", "render_results.py renders the proofs "
           "paragraph with no prover to count the listed faults from", CHECK_FAILED,
           "FAIL: test_the_markers_need_the_prover_and_its_list (__main__.ProofsBlockTest"),
+    # The ruling on review P1-1: which side of a verdict a swap or a disturbance fell on.
+    Fault("sides-unconfirmed-counted", "py-scripts", "render_results.py counts a met part whose mark on a rival's side both runs carry", CHECK_FAILED,
+          "FAIL: test_a_rival_mark_both_runs_carry_is_not_counted (__main__.SidesTest"),
+    Fault("sides-pitch-claim-unconfirmed", "py-scripts", "render_results.py lets a pitch claim rest on a met part no run confirms", CHECK_FAILED,
+          "FAIL: test_no_ranking_sentence_rests_on_a_part_not_counted (__main__.SidesTest"),
+    Fault("sides-headline-row-unconfirmed", "py-scripts", "render_results.py shows a met part no run confirms as a headline row's result", CHECK_FAILED,
+          "FAIL: test_no_first_screen_shows_a_part_not_counted (__main__.SidesTest"),
+    Fault("sides-confirmed-without-replaced-figures", "py-scripts", "render_results.py marks a confirmed part without the replaced run's figures", CHECK_FAILED,
+          "FAIL: test_a_rival_mark_the_replaced_run_does_not_carry_is_confirmed (__main__.SidesTest"),
+    Fault("sides-quote-not-counted-dropped", "py-scripts", "render_results.py takes a quote of a verdict without its not-counted words", CHECK_FAILED,
+          "FAIL: test_a_quote_without_the_not_counted_words_is_refused (__main__.SidesTest"),
+    Fault("sides-not-alike-counted", "py-scripts", "render_results.py counts a met part its row labels not like-for-like", CHECK_FAILED,
+          "FAIL: test_a_part_not_like_for_like_is_never_counted (__main__.SidesTest"),
+    Fault("sides-own-side-uncounted", "py-scripts", "render_results.py takes a mark on tick-store's own side as a rival's and leaves the part uncounted", CHECK_FAILED,
+          "FAIL: test_a_mark_on_tick_stores_side_alone_stays_counted (__main__.SidesTest"),
+    Fault("sides-unrecorded-run-confirms", "py-scripts", "render_results.py lets a replaced run that no disturbance record covers confirm a rival's disturbed side", CHECK_FAILED,
+          "FAIL: test_a_rival_disturbance_no_record_covers_on_the_replaced_run_is_not_counted (__main__.SidesTest"),
+    Fault("sides-left-out-counts-uncounted", "py-scripts", "render_results.py counts a part no run confirms among the first screen's met parts", CHECK_FAILED,
+          "FAIL: test_no_count_takes_a_part_not_counted (__main__.SidesTest"),
     # Review P1-2: a quote of a verdict whose part is not like for like says so.
     Fault("render-quote-not-alike-unasked", "py-scripts", "render_results.py takes a quote of a "
           "verdict whose part its row labels not like-for-like without those words",

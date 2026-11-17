@@ -18,12 +18,6 @@
     "measured": "{tickstore} GB vs Parquet {parquet} GB",
     "values": {"tickstore": {"value": {"path": ["systems", "tickstore", "variants", "@headline", "classes", "B", "stored", "allocated_bytes"]}, "scale": 1e-9, "format": "{:.2f}"},
                "parquet": {"value": {"min_variant": ["parquet", "classes", "B", "stored", "allocated_bytes"]}, "scale": 1e-9, "format": "{:.2f}"}}},
-   {"id": "QL-4", "host": "Linux", "parts": ["Q2 warm"], "what": "One hour of one stock, warm (data already in memory)", "bar": "fastest of the four, each system in the configuration chosen for it before the runs, by median and tail", "source": "the project's own bar",
-    "measured": "median {tickstore} ms vs {best_system} {best} ms; ArcticDB per stock {per_stock} ms {per_stock_mark}",
-    "values": {"tickstore": {"value": {"path": ["systems", "tickstore", "variants", "@headline", "queries", "Q2", "warm", "median_us"]}, "scale": 0.001, "format": "{:,.2f}"},
-               "best_system": {"value": {"lowest_system": {"systems": ["parquet", "arcticdb", "questdb"], "path": ["queries", "Q2", "warm", "median_us"]}}, "label": "system"},
-               "best": {"value": {"lowest_value": {"systems": ["parquet", "arcticdb", "questdb"], "path": ["queries", "Q2", "warm", "median_us"]}}, "scale": 0.001, "format": "{:,.2f}"},
-               "per_stock": {"value": {"path": ["systems", "arcticdb", "variants", "rows100k-cols127-per-security", "queries", "Q2", "warm", "median_us"]}, "scale": 0.001, "format": "{:,.2f}"}}},
    {"id": "QL-4", "host": "Linux", "parts": ["Q4 warm"], "what": "One millisecond of every stock, warm", "bar": "fastest of the four, each in its chosen configuration, by median and tail", "source": "the project's own bar",
     "measured": "median {tickstore} ms vs {best_system} {best} ms",
     "values": {"tickstore": {"value": {"path": ["systems", "tickstore", "variants", "@headline", "queries", "Q4", "warm", "median_us"]}, "scale": 0.001, "format": "{:,.2f}"},
@@ -86,7 +80,8 @@
   "what": "The README's pitch, the prose above its headline with its headings, written by hand. render_results.py requires each figure below to appear in it as the results give it now, each value times scale put through format, and every other number in it to be one of not_results, each with the reason it is no result and each found once. A format carries the words that say what its figures are, and no two figures share one, so two figures cannot trade places unseen. Each heading and sentence of the pitch is a claim, a sentence holding a figure, or one of no_result_sentences, each with the reason it states no result. Each of claims is a whole sentence there that ranks tick-store or states an outcome: it must be in the pitch word for word, and each of its conditions must hold on the results: a target row's verdict on the parts named, pairs of figures each below the other, or the fastest of the systems' headline variants by each field on each query and kind, given alone or as all. A target condition's sentence must hold words its target row lists under pitch for those parts, and a claim judged on one machine must name it and no other. A word that ranks or judges, such as fastest, least, below or keeps up, must sit in a claim or a figure's words, so a ranking sentence cannot lose its tie unseen. The pitch, headings included, runs to at most max_words words.",
   "max_words": 100,
   "figures": [
-   {"file": "results/store-size-12302019.json", "values": [{"path": ["records"]}, {"mul": [{"path": ["source_bytes"]}, 1e-09]}, {"mul": [{"path": ["stored_bytes"]}, 1e-09]}, {"path": ["ratio"]}], "format": "{:,} messages and {:.2f} GB, in {:.2f} GB, {:.2f} times smaller"}
+   {"file": "results/store-size-12302019.json", "values": [{"path": ["records"]}, {"mul": [{"path": ["source_bytes"]}, 1e-09]}, {"mul": [{"path": ["stored_bytes"]}, 1e-09]}, {"path": ["ratio"]}], "format": "{:,} messages and {:.2f} GB, in {:.2f} GB, {:.2f} times smaller"},
+   {"file": "results/compare/Linux-12302019-full-*.json", "values": [{"mul": [{"path": ["systems", "tickstore", "variants", "@headline", "queries", "Q2", "warm", "median_us"]}, 0.001]}, {"mul": [{"path": ["systems", "arcticdb", "variants", "rows100k-cols127-per-security", "queries", "Q2", "warm", "median_us"]}, 0.001]}], "format": "it answers one stock's hour, warm, in {:.2f} ms, ArcticDB with a table per stock in {:.2f} ms"}
   ],
   "not_results": [
    {"text": "C++23", "why": "the language standard"},
@@ -99,7 +94,7 @@
   "claims": [
    {"text": "It gives every message back bit-exact.", "target": {"id": "G-1", "host": "any", "verdict": "met"}},
    {"text": "Beside Parquet, ArcticDB and QuestDB on a 2018 four-core AMD Ryzen running Linux, it takes the least disk.", "target": {"id": "CR-2", "host": "Linux", "verdict": "met"}},
-   {"text": "On the Ryzen it answers one-stock queries fastest, each system [set up as chosen before the runs](compare/README.md#tuning-variants-and-their-sources), though ArcticDB with a table per stock is faster; ArcticDB or QuestDB wins short market-wide windows; swapping in some rivals' runs may flatter it.", "all": [{"target": {"id": "QL-4", "host": "Linux", "parts": ["Q2 warm", "Q2 cold", "Q3 warm", "Q3 cold"], "verdict": "met"}}, {"file": "results/compare/Linux-12302019-full-*.json", "fastest": {"systems": ["parquet", "arcticdb", "questdb", "tickstore"], "queries": ["Q1", "Q4"], "kinds": ["warm", "cold"], "fields": ["median_us", "p99_us"], "one_of": ["arcticdb", "questdb"]}}]},
+   {"text": "On the Ryzen it answers one stock's hour, warm, in 74.04 ms, ArcticDB with a table per stock in 44.58 ms; ArcticDB or QuestDB wins short market-wide windows; the host was swapping memory during some rivals' runs, which may flatter tick-store.", "file": "results/compare/Linux-12302019-full-*.json", "fastest": {"systems": ["parquet", "arcticdb", "questdb", "tickstore"], "queries": ["Q1", "Q4"], "kinds": ["warm", "cold"], "fields": ["median_us", "p99_us"], "one_of": ["arcticdb", "questdb"]}},
    {"text": "One thread on the Ryzen ingests below Nasdaq's peak rate.", "target": {"id": "WT-2", "host": "Linux", "parts": ["class A"], "verdict": "missed"}}
   ]
  },

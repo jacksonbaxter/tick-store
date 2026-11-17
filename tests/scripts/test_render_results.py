@@ -2388,12 +2388,16 @@ class ConditionsTest(Scratch):
         self.write(document)
         parts = self.parts(SWAP_ROW)
         self.assertEqual(RENDER.verdict_of(parts, SWAP_ROW),
-                         "met; (Q2 warm) rests on figures timed while pages were swapped in; the "
+                         "met; " + "(Q2 warm) met by the rule and not counted: no replaced run on ArcticDB's side, so neither "
+                         "run confirms the other, and no count, ranking or first screen takes it; "
+                         "(Q2 warm) rests on figures timed while pages were swapped in; the "
                          "record flags ArcticDB's `h`")
         # On the first screen, which names no query, the mark names no part.
         self.assertEqual(RENDER.verdict_of(parts, SWAP_ROW, labelled=False),
-                         "met; rests on figures timed while pages were swapped in; the record "
-                         "flags ArcticDB's `h`")
+                         "met; met by the rule and not counted: no replaced run on ArcticDB's "
+                         "side, so neither run confirms the other, and no count, ranking or "
+                         "first screen takes it; rests on figures timed while pages were swapped "
+                         "in; the record flags ArcticDB's `h`")
         self.write(with_queries(change_document(recorded_write(1.0, 0.1),
                                                 recorded_write(2.0, 0.1))))
         self.assertEqual(RENDER.verdict_of(self.parts(SWAP_ROW), SWAP_ROW), "met")
@@ -2580,8 +2584,12 @@ class ConditionsTest(Scratch):
                          "faster.")
 
     def test_a_pitch_claim_on_a_swapped_in_figure_says_so_in_its_short_form(self):
+        # A replaced run with ArcticDB's figure unflagged confirms the part, so it is counted
+        # and a claim may rest on it, saying what was swapped (the ruling on review P1-1).
         self.write(with_queries(change_document(recorded_write(1.0, 0.1),
-                                                recorded_write(2.0, 0.1)), flagged=["arcticdb"]))
+                                                recorded_write(2.0, 0.1)), flagged=["arcticdb"]),
+                   with_queries(change_document(recorded_write(1.0, 0.1),
+                                                recorded_write(2.0, 0.1), commit="67ae574f5666")))
         bare = "On the box it answers one stock fastest."
         with self.assertRaises(RENDER.TargetError) as refused:
             self.pitch_check(bare)
@@ -2589,6 +2597,7 @@ class ConditionsTest(Scratch):
                       f"and does not say {RENDER.PITCH_SWAPPED!r}", str(refused.exception))
         self.pitch_check(f"On the box it answers one stock fastest; {RENDER.PITCH_SWAPPED}.")
         # With no figure flagged the sentence needs no mark.
+        self.old.unlink()
         self.write(with_queries(change_document(recorded_write(1.0, 0.1),
                                                 recorded_write(2.0, 0.1))))
         self.pitch_check(bare)
@@ -2702,7 +2711,9 @@ class ConditionsTest(Scratch):
         # Review C2-3: met, so every rival tick-store had to beat decides, the flagged one too.
         self.assertEqual(self.ranked({"tickstore": 1.0, "arcticdb": 2.0, "questdb": 3.0},
                                      ["questdb"]),
-                         "met; (Q2 warm) rests on figures timed while pages were swapped in; the "
+                         "met; " + "(Q2 warm) met by the rule and not counted: no replaced run on QuestDB's side, so neither "
+                         "run confirms the other, and no count, ranking or first screen takes it; "
+                         "(Q2 warm) rests on figures timed while pages were swapped in; the "
                          "record flags QuestDB's `h`")
         # Missed, and the flagged rival is one that beat tick-store.
         self.assertEqual(self.ranked({"tickstore": 2.0, "arcticdb": 3.0, "questdb": 1.0},
@@ -2741,20 +2752,23 @@ class ConditionsTest(Scratch):
         self.write(with_queries(change_document(recorded_write(1.0, 0.1),
                                                 recorded_write(2.0, 0.1)), flagged=["arcticdb"]))
         parts = self.parts(SWAP_ROW)
-        self.assertEqual(RENDER.screen_verdict(parts, SWAP_ROW), "met (the host was swapping "
-                         "during ArcticDB's runs, which may flatter this)")
+        self.assertEqual(RENDER.screen_verdict(parts, SWAP_ROW), "met (met, not counted: no "
+                         "replaced run (ArcticDB); the host was swapping memory during "
+                         "ArcticDB's runs, which may flatter this)")
         self.assertEqual(RENDER.short_marks(parts, SWAP_ROW),
-                         [RENDER.SHORT_SWAPPED + "ArcticDB"])
+                         ["met, not counted: no replaced run (ArcticDB)",
+                          RENDER.SHORT_SWAPPED + "ArcticDB"])
         explained = RENDER.short_forms_explained()
         for short in (RENDER.SHORT_SWAPPED, RENDER.SHORT_SWAPPED_FIGURE, RENDER.SHORT_REPLACED,
                       *(single for single, _ in RENDER.SHORT_DISTURBANCE.values()),
                       RENDER.SCREEN_SWAPPED, RENDER.SCREEN_REPLACED, RENDER.SHORT_SETUP,
+                      RENDER.NOT_COUNTED_SHORT, RENDER.NOT_COUNTED,
                       *RENDER.SCREEN_LEANS.values()):
             self.assertIn(short, explained)
         for what in RENDER.SHORT_DISTURBANCE:
             self.assertIn(what, explained)
-        self.assertIsNone(self.quoted("| T-13 | Linux | 1 ms | Met (swap-in: ArcticDB) |\n",
-                                      [SWAP_ROW]))
+        self.assertIsNone(self.quoted("| T-13 | Linux | 1 ms | Met (swap-in: ArcticDB; met, not "
+                                      "counted: no replaced run (ArcticDB)) |\n", [SWAP_ROW]))
 
     def test_a_quote_with_no_mark_or_another_short_form_is_refused(self):
         self.write(with_queries(change_document(recorded_write(1.0, 0.1),
@@ -2808,6 +2822,121 @@ class ConditionsTest(Scratch):
                 self.assertIsNone(RENDER.method_problem([(name, said)], self.tree))
 
 
+
+
+class SidesTest(Scratch):
+    """The ruling on review P1-1: a met part whose swap or disturbance mark falls on another
+    system's side counts only where the replaced run gives the same outcome with no such mark
+    on that side; otherwise it keeps its word and its mark and raises no count, ranking
+    sentence or first screen. A mark on tick-store's side alone leaves it counted."""
+
+    def setUp(self):
+        super().setUp()
+        self.compare_dir = self.tree / "results" / "compare"
+        (self.compare_dir / "replaced").mkdir(parents=True)
+        (self.tree / "scripts").mkdir()
+        self.new = self.compare_dir / f"Linux-day-{FREEZE[:12]}.json"
+        self.old = self.compare_dir / "replaced" / "Linux-day-67ae574f5666.json"
+
+    write = ReplacedRunTest.write
+    parts = ReplacedRunTest.parts
+    pitch_check = ConditionsTest.pitch_check
+    disturb = ConditionsTest.disturb
+
+    def runs(self, new_flagged, old_flagged=None):
+        """SWAP_ROW's day with the systems named flagged, and a replaced run, tick-store's
+        median 1.10 ms there, with its own flagged systems, or none."""
+        new = with_queries(change_document(recorded_write(1.0, 0.1), recorded_write(2.0, 0.1)),
+                           flagged=new_flagged)
+        old = None
+        if old_flagged is not None:
+            old = with_queries(change_document(recorded_write(1.0, 0.1), recorded_write(2.0, 0.1),
+                                               commit="67ae574f5666"), flagged=old_flagged)
+            old["systems"]["tickstore"]["variants"]["h"]["queries"]["Q2"]["warm"]["median_us"] = \
+                1100.0
+        self.write(new, old)
+        return self.parts(SWAP_ROW)[0]
+
+    def test_a_mark_on_tick_stores_side_alone_stays_counted(self):
+        part = self.runs(["tickstore"], ["tickstore"])
+        self.assertIs(RENDER.counted(part), True)
+        self.assertNotIn("not counted", RENDER.verdict_of([part], SWAP_ROW))
+
+    def test_a_rival_mark_the_replaced_run_does_not_carry_is_confirmed(self):
+        part = self.runs(["arcticdb"], [])
+        self.assertIs(RENDER.counted(part), True)
+        verdict = RENDER.verdict_of([part], SWAP_ROW)
+        self.assertIn("(Q2 warm) confirmed by the replaced run, which gives the same outcome "
+                      "with no such mark on ArcticDB's side: 1.10 ms", verdict)
+        # This run's figure stands in the cell's measured text beside it.
+        self.assertIn("1.00", part[1])
+
+    def test_a_rival_mark_both_runs_carry_is_not_counted(self):
+        part = self.runs(["arcticdb"], ["arcticdb"])
+        self.assertIs(part[2], True)
+        self.assertIsInstance(RENDER.counted(part), RENDER.NotCounted)
+        self.assertEqual(RENDER.class_of([RENDER.counted(part)]), "met, not counted")
+        self.assertEqual(RENDER.verdict_class([part]), "met, not counted")
+        verdict = RENDER.verdict_of([part], SWAP_ROW)
+        self.assertTrue(verdict.startswith("met; "), verdict)
+        self.assertIn("(Q2 warm) met by the rule and not counted: swapping memory in both runs, "
+                      "on ArcticDB's side 3 pages in this run and 3 in the replaced one, so "
+                      "neither run confirms the other, and no count, ranking or first screen "
+                      "takes it; the replaced run: 1.10 ms", verdict)
+        self.assertIn("met, not counted: swapping memory in both runs (ArcticDB)",
+                      RENDER.short_marks([part], SWAP_ROW))
+
+    def test_a_rival_disturbance_no_record_covers_on_the_replaced_run_is_not_counted(self):
+        entry = dict(LOGIN, phase="warm queries", system="arcticdb", variant="h", query="Q2")
+        del entry["class"], entry["repetition"]
+        self.disturb(entry)
+        part = self.runs([], [])
+        self.assertIsInstance(RENDER.counted(part), RENDER.NotCounted)
+        self.assertIn("met by the rule and not counted: a disturbance the replaced run has no "
+                      "record to rule out on ArcticDB's side", RENDER.verdict_of([part], SWAP_ROW))
+
+    def test_a_part_not_like_for_like_is_never_counted(self):
+        part = ("against QuestDB, not like-for-like", "1 s against 2 s", True, None, {}, {})
+        self.assertIsInstance(RENDER.counted(part), RENDER.NotCounted)
+        self.assertEqual(RENDER.class_of([RENDER.counted(part)]), "met, not counted")
+        self.assertEqual(RENDER.verdict_class([part]), "met, not counted")
+
+    def test_no_count_takes_a_part_not_counted(self):
+        names = {("T-13", "Linux"): {"name": "T", "parts": {"Q2 warm": "a fast hour"}}}
+        definitions = {"rows": [SWAP_ROW], "headline": {}}
+        shown = {("T-13", "Linux"): set()}
+        self.runs(["arcticdb"], ["arcticdb"])
+        items, met_parts, _, _ = RENDER.left_out_items(definitions, self.tree, shown, names)
+        self.assertEqual(met_parts, 0)
+        self.assertEqual([name.split(" (")[0] for _, name in items["met, not counted"]],
+                         ["a fast hour"])
+        self.runs(["arcticdb"], [])
+        items, met_parts, _, _ = RENDER.left_out_items(definitions, self.tree, shown, names)
+        self.assertEqual((met_parts, items["met, not counted"]), (1, []))
+
+    def test_no_first_screen_shows_a_part_not_counted(self):
+        self.runs(["arcticdb"], ["arcticdb"])
+        entry = {"id": "T-13", "host": "Linux", "parts": ["Q2 warm"], "what": "w", "bar": "b",
+                 "source": "s", "measured": "m"}
+        with self.assertRaisesRegex(RENDER.TargetError, "a part no run confirms raises no first "
+                                                        "screen"):
+            RENDER.headline_cells(entry, {("T-13", "Linux"): SWAP_ROW}, self.tree, SCREEN_HOSTS)
+
+    def test_no_ranking_sentence_rests_on_a_part_not_counted(self):
+        self.runs(["arcticdb"], ["arcticdb"])
+        with self.assertRaisesRegex(RENDER.TargetError, "is met by the rule and not counted on "
+                                                        r"\(Q2 warm\), which no run confirms"):
+            self.pitch_check(f"On the box it answers one stock fastest; {RENDER.PITCH_SWAPPED}.")
+
+    def test_a_quote_without_the_not_counted_words_is_refused(self):
+        self.runs(["arcticdb"], ["arcticdb"])
+        rows = {"rows": [SWAP_ROW]}
+        bare = "| T-13 | Linux | 1 ms | Met (swap-in: ArcticDB) |\n"
+        self.assertIn("met by the rule and not counted",
+                      RENDER.quote_problem([("BENCHMARKS.md", bare)], rows, self.tree) or "")
+        said = bare.replace(") |", "; met, not counted: swapping memory in both runs "
+                                   "(ArcticDB)) |")
+        self.assertIsNone(RENDER.quote_problem([("BENCHMARKS.md", said)], rows, self.tree))
 
 class NotAlikeQuoteTest(unittest.TestCase):
     """A hand-written quote of WT-4's verdict on Linux carries "not like-for-like", the words its
@@ -3068,7 +3197,7 @@ class ShortFormTest(unittest.TestCase):
             with self.subTest(swapped=swapped):
                 self.assertEqual(RENDER.screen_verdict([self.part("Q2 warm", True,
                                                                   swapped=swapped)]),
-                                 f"met (the host was swapping {words})")
+                                 f"met (the host was swapping memory {words})")
 
     def test_a_changed_outcome_has_a_short_form_and_a_full_one_true_anywhere(self):
         part = self.part("against ArcticDB", False, change={"new": True, "old": False})

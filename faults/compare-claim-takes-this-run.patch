@@ -1,9 +1,9 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -2339,7 +2339,7 @@
-                 raise TargetError(f"pitch: no part {unknown} in {spec['id']} on {spec['host']}")
-             parts = [part for part in parts if part[0] in spec["parts"]]
+@@ -3533,7 +3533,7 @@
+             return (f"{spec['id']} on {spec['host']} is {NOT_COUNTED} on ({held[0]}), which no "
+                     "run confirms, and raises no ranking sentence")
          # A claim takes each part's less favourable outcome, worked out here from both runs.
 -        verdict = core_verdict([(part[0], part[1], counted(part), *part[3:]) for part in parts])
 +        verdict = core_verdict([(part[0], part[1], notes_of(part).get("change", {}).get("new", part[2]), *part[3:]) for part in parts])

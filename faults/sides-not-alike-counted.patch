@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1400,7 +1400,7 @@
+     if notes_of(part).get("unconfirmed"):
+         return NotCounted(notes_of(part)["unconfirmed"])
+     # A part its row labels not like-for-like is never counted as met (the ruling on P1-1).
+-    if part[2] is True and NOT_ALIKE in part[0]:
++    if False:
+         return NotCounted([])
+     change = notes_of(part).get("change")
+     if not change:

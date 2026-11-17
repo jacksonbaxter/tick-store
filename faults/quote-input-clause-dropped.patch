@@ -1,8 +1,8 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -3527,7 +3527,7 @@
-         marks.append((NOT_ALIKE,))
+@@ -3698,7 +3698,7 @@
+         marks = [forms for forms in marks if not forms[0].startswith(tuple(alike))]
      classes = [notes_of(part)["write"] for part in parts if notes_of(part).get("write")]
      clause = input_clause(parts[0][4], classes[0]) if classes else None
 -    return marks + ([(clause,)] if clause else [])

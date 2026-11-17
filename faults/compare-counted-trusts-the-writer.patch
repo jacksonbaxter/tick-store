@@ -1,9 +1,9 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -1068,9 +1068,7 @@
-     this run and on the replaced run, worked out from both apart from the part's own verdict,
-     so a writer that counts the favourable one shows against it."""
+@@ -1403,9 +1403,7 @@
+     if part[2] is True and NOT_ALIKE in part[0]:
+         return NotCounted([])
      change = notes_of(part).get("change")
 -    if not change:
 -        return part[2]

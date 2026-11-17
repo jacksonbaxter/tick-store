@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -2358,7 +2358,7 @@
+         if sides:
+             full = (f"confirmed by the replaced run, which gives the same outcome with no such "
+                     f"mark on {and_list([label_of(side[0]) for side in sides])} side: "
+-                    f"{notes_of(part)['replaced_text']}")
++                    "")
+             held.setdefault(full, (CONFIRMED_SHORT, CONFIRMED_SHORT, []))[2].append(part[0])
+     every = [item for part in parts for item in notes_of(part).get("swapped") or []]
+     for part in parts:

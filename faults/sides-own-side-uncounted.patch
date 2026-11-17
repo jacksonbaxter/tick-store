@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1611,7 +1611,7 @@
+     covers. [] when no rival side is marked."""
+     found = {}
+     for read in deciding:
+-        if read[0] not in ("queries", "write") or read[1] == "tickstore" or not tainted(read):
++        if read[0] not in ("queries", "write") or not tainted(read):
+             continue
+         label = SYSTEM_LABEL.get(read[1], read[1])
+         if replaced is None or not judged_there:

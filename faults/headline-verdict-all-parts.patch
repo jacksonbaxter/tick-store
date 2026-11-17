@@ -1,12 +1,16 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -2586,11 +2586,11 @@
+@@ -3084,7 +3084,7 @@
                                "bar comes from, before what was measured")
      for key in ("what", "source"):
          no_typed_figure(entry[key], hosts, f"its {key} {entry[key]!r}")
 -    _, parts = shown_parts(entry, row, root)
 +    every, parts = shown_parts(entry, row, root)
+     held = [part[0] for part in parts if isinstance(counted(part), NotCounted)]
+     if held:
+         raise TargetError(f"it shows ({held[0]}), {NOT_COUNTED_SHORT}: a part no run confirms "
+@@ -3092,7 +3092,7 @@
      bar, measured = filled([entry["bar"], entry["measured"]], entry, row, parts, hosts,
                             "its bar and measured", value_marks(entry, parts, root, row))
      return (entry["what"], f"{bar} ({entry['source']})", measured,

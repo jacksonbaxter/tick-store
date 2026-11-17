@@ -1,7 +1,7 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -2234,9 +2234,7 @@
+@@ -2342,9 +2342,7 @@
          replaced = notes_of(part).get("replaced")
          for read, entries in disturbance_groups(notes_of(part).get("disturbed", [])):
              text = "rests on " + group_text(read, entries, replaced, row, part[4])
@@ -9,6 +9,6 @@ diff --git a/scripts/render_results.py b/scripts/render_results.py
 -                                   group_short(read, entries, replaced, row, True, part[4]),
 -                                   []))[2].append(part[0])
 +            pass
-     every = [item for part in parts for item in notes_of(part).get("swapped") or []]
-     for part in parts:
-         swapped = notes_of(part).get("swapped") or []
+     # The not-counted mark's short form names every system over all the parts once, as the
+     # swap mark's does.
+     every_side = [side for part in parts for side in notes_of(part).get("unconfirmed") or []]

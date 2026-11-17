@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1397,7 +1397,7 @@
+     """The outcome counts and claims take for a part: the less favourable of its outcome on
+     this run and on the replaced run, worked out from both apart from the part's own verdict,
+     so a writer that counts the favourable one shows against it."""
+-    if notes_of(part).get("unconfirmed"):
++    if False:
+         return NotCounted(notes_of(part)["unconfirmed"])
+     # A part its row labels not like-for-like is never counted as met (the ruling on P1-1).
+     if part[2] is True and NOT_ALIKE in part[0]:
