@@ -13,7 +13,8 @@ short of Nasdaq's published peak message rate.
 
 Gorilla, the codec Facebook published for time series, lost to plain integer
 codecs in size on every column but the near-empty `mwcb_level`, at 1.09x
-their bits on timestamps and 3.554x on prices as dollar doubles.
+their bits on timestamps and, on prices, 1.503x as integer-valued doubles and
+3.554x as dollar doubles.
 
 ## At a glance
 
@@ -22,7 +23,7 @@ The Zen 1, each system in its fixed setup; queries are warm medians.
 | | tick-store | The other system first on the row | tick-store over it, or another setup |
 |---|---|---|---|
 | Disk, GB, each system's smallest setup | 1.76 | 3.09, Parquet | 0.57 |
-| Day write with flush, s | 190.7 † | 211.9, Parquet  | inputs not alike |
+| Day write before a flush, s, total; engine-only | 211.7; 211.3  | 111.5; 35.1, ArcticDB  | missed; inputs not alike |
 | A second of every stock (Q1), ms | 296.78  | 34.16, ArcticDB  | 8.7 |
 | An hour of a stock (Q2), ms | 74.04  | 283.77, QuestDB † | not counted †; ArcticDB, a table per stock: 44.58 † |
 | Its per-minute aggregate (Q3), ms | 36.07  | 64.95, QuestDB  | not counted †; ArcticDB, a table per stock: 25.00 † |
@@ -37,8 +38,9 @@ tick-store's input was in memory before its clock, and the others read theirs fr
 
 ## How it was measured
 
-**Data.** The reference day is 30 December 2019, from Nasdaq's public sample files; a second day,
-30 October 2019, serves the round trip and the bit-flip check. The round trip compares the
+**Data.** The reference day is 30 December 2019, from Nasdaq's public sample files, and a second
+day is 30 October 2019; the round trip and the bit-flip check ran on both days on the M4, and the
+round trip on the reference day on the Zen 1 too. The round trip compares the
 SHA-256 of the rebuilt stream with the source's.
 
 **Hosts.** Every pinned figure comes from the Zen 1, whose processor is AMD Ryzen Embedded V1605B, 4 cores, 8 threads, with
@@ -50,7 +52,7 @@ figures come from an Apple M4 Max laptop, "the M4": unpinned, no hardware counte
 timed hours apart may have run at different clocks; what that costs was not measured.
 
 **The comparison.** Parquet, ArcticDB and QuestDB each ran the setup the comparison fixed for it in
-advance, plus the setups a selection run on a slice kept. Each query ran 30 times
+advance. Each query ran 30 times
 warm, proven to read nothing from storage, and 7 times cold, proven evicted. A
 write without a flush returns when the data is in the page cache; a flushed write, after a proven
 flush to the device.
@@ -152,7 +154,7 @@ scaled), a dictionary, run-length, raw bytes, or ranked PFOR, and zstd over a pi
 bytes. zstd still shrinks 7,269 of 7,270 PFOR-coded price
 pieces, so the PFOR blocks leave redundancy across values that a block-local code does not reach.
 
-## Decode: kernels, SIMD, and what it cost
+## Decode: kernels and SIMD
 
 **The vector layout.** A full PFOR vector is 1,024 values at a bit width in
 16 lanes of 64-bit words, value i in lane i mod 16, so
@@ -178,9 +180,6 @@ query's own runs range 2.7% to 13.7% of their
 median, so on whole queries SIMD's effect is inside or near the run-to-run spread
 ([counters run](results/diag/counters-simd-12302019-ede0176b10bb.json): a diagnostic summary no separate validator re-reads).
 
-**What SIMD cost.** 1,870 lines of kernels and dispatch, 6.6% of the
-28,526 source lines.
-
 **The store's price column.** Per piece, the reader inflates any zstd frame, allocates, decodes
 PFOR with scale and patches, range-checks every value and appends. On the Zen 1 those steps take
 11.6%, 20.4% (unpack), 25.3% (patches),
@@ -200,8 +199,7 @@ instructions and 0.403 mispredicts per price, the store's price column
 
 ## Memory
 
-The writer holds a segment's messages, 8 bytes per column value, then
-sorts and codes them. On the M4 its peak memory footprint, the memory it owns, is
+On the M4 its peak memory footprint, the memory it owns, is
 1,229 MB at segments of 4,194,304 records; its peak resident
 set, which also counts the mapped source file, is 900 MB smaller at
 1,048,576. tick-store's query process (`tick_query`) peaks at 472.0 MB resident,
@@ -248,7 +246,7 @@ takes no appends and does not capture a live feed.
 
 ## Targets that held
 
-On the day the store gives every message back bit-exact (met), a flipped bit is caught
+On both days the store gives every message back bit-exact (met), a flipped bit is caught
 in a data block and in the footer (met), Gorilla is built and is exact on the whole day
 (met), and the store takes the least disk of the systems compared, each in its smallest setup (met).
 

@@ -13,7 +13,8 @@ short of Nasdaq's published peak message rate.
 
 Gorilla, the codec Facebook published for time series, {{verdict:gorilla_bits}} to plain integer
 codecs in size on every column but the near-empty `mwcb_level`, at {{ce_ts_gorilla_over_best}}x
-their bits on timestamps and {{cr5_add_file_dollars}} on prices as dollar doubles.
+their bits on timestamps and, on prices, {{cr5_add_file_best}} as integer-valued doubles and
+{{cr5_add_file_dollars}} as dollar doubles.
 
 ## At a glance
 
@@ -22,7 +23,7 @@ The Zen 1, each system in its fixed setup; queries are warm medians.
 | | tick-store | The other system first on the row | tick-store over it, or another setup |
 |---|---|---|---|
 | Disk, GB, each system's smallest setup | {{cmpL_ts_B_alloc_gb}} | {{glance_disk_other}}, Parquet | {{glance_disk_x}} |
-| Day write with flush, s | {{cmpL_ts_B_total_s}} {{glance_write_ts_flag}} | {{glance_write_other}}, {{glance_write_other_system}} {{glance_write_other_flag}} | inputs not alike |
+| Day write before a flush, s, total; engine-only | {{cmpL_ts_A_total_s}}; {{cmpL_ts_A_engine_s}} {{glance_write_ts_flag}} | {{cmpL_arctic_A_total_s}}; {{cmpL_arctic_A_engine_s}}, ArcticDB {{glance_write_other_flag}} | missed; inputs not alike |
 | A second of every stock (Q1), ms | {{cmpL_ts_q1_warm_med_ms}} {{glance_q1_ts_flag}} | {{cmpL_q1_warm_best_ms}}, {{cmpL_q1_warm_best_system}} {{glance_q1_other_flag}} | {{gap_ql4_q1_x}} |
 | An hour of a stock (Q2), ms | {{glance_ts_q2_ms}} {{glance_q2_ts_flag}} | {{cmpL_q2_warm_best_ms}}, {{cmpL_q2_warm_best_system}} {{glance_q2_other_flag}} | not counted {{glance_q2_rivals_flag}}; ArcticDB, a table per stock: {{cmpL_arcps_q2_warm_med_ms}} {{glance_arcps_q2_flag}} |
 | Its per-minute aggregate (Q3), ms | {{glance_ts_q3_ms}} {{glance_q3_ts_flag}} | {{cmpL_q3_warm_best_ms}}, {{cmpL_q3_warm_best_system}} {{glance_q3_other_flag}} | not counted {{glance_q3_rivals_flag}}; ArcticDB, a table per stock: {{cmpL_arcps_q3_warm_med_ms}} {{glance_arcps_q3_flag}} |
@@ -37,8 +38,9 @@ tick-store's input was in memory before its clock, and the others read theirs fr
 
 ## How it was measured
 
-**Data.** The reference day is 30 December 2019, from Nasdaq's public sample files; a second day,
-30 October 2019, serves the round trip and the bit-flip check. The round trip compares the
+**Data.** The reference day is 30 December 2019, from Nasdaq's public sample files, and a second
+day is 30 October 2019; the round trip and the bit-flip check ran on both days on the M4, and the
+round trip on the reference day on the Zen 1 too. The round trip compares the
 SHA-256 of the rebuilt stream with the source's.
 
 **Hosts.** Every pinned figure comes from the Zen 1, whose processor is {{cap_cpu}}, with
@@ -50,7 +52,7 @@ figures come from an Apple M4 Max laptop, "the M4": unpinned, no hardware counte
 timed hours apart may have run at different clocks; what that costs was not measured.
 
 **The comparison.** Parquet, ArcticDB and QuestDB each ran the setup the comparison fixed for it in
-advance, plus the setups a selection run on a slice kept. Each query ran {{cmpL_warm_runs}} times
+advance. Each query ran {{cmpL_warm_runs}} times
 warm, proven to read nothing from storage, and {{cmpL_cold_runs}} times cold, proven evicted. A
 write without a flush returns when the data is in the page cache; a flushed write, after a proven
 flush to the device.
@@ -152,7 +154,7 @@ scaled), a dictionary, run-length, raw bytes, or ranked PFOR, and zstd over a pi
 bytes. zstd still shrinks {{ss_add_price_zstd_blocks}} of {{ss_add_price_blocks}} PFOR-coded price
 pieces, so the PFOR blocks leave redundancy across values that a block-local code does not reach.
 
-## Decode: kernels, SIMD, and what it cost
+## Decode: kernels and SIMD
 
 **The vector layout.** A full PFOR vector is {{code:vector_values}} values at a bit width in
 {{code:lanes}} lanes of {{code:lane_word_bits}}-bit words, value i in lane i mod {{code:lanes}}, so
@@ -178,9 +180,6 @@ query's own runs range {{cmpL_ts_warm_spread_min}}% to {{cmpL_ts_warm_spread_max
 median, so on whole queries SIMD's effect is inside or near the run-to-run spread
 ([counters run]({{path:d3}}): {{note:diag-counters}}).
 
-**What SIMD cost.** {{simd_src_lines}} lines of kernels and dispatch, {{simd_src_share}}% of the
-{{src_include_lines}} source lines.
-
 **The store's price column.** Per piece, the reader inflates any zstd frame, allocates, decodes
 PFOR with scale and patches, range-checks every value and appends. On the Zen 1 those steps take
 {{d4_zstd_pct}}%, {{d4_pfor_unpack_pct}}% (unpack), {{d4_patches_pct}}% (patches),
@@ -200,8 +199,7 @@ instructions and {{cdL_gorilla_xor_bm}} mispredicts per price, the store's price
 
 ## Memory
 
-The writer holds a segment's messages, {{code:column_value_bytes}} bytes per column value, then
-sorts and codes them. On the M4 its peak memory footprint, the memory it owns, is
+On the M4 its peak memory footprint, the memory it owns, is
 {{rtM_ingest_footprint_mb}} MB at segments of {{rtM_segment_records}} records; its peak resident
 set, which also counts the mapped source file, is {{cmpM_seg_rss_diff_mb}} MB smaller at
 {{cmpM_seg1_records}}. tick-store's query process (`tick_query`) peaks at {{cmpL_tick_query_vmhwm_mb}} MB resident,
@@ -248,7 +246,7 @@ takes no appends and does not capture a live feed.
 
 ## Targets that held
 
-On the day the store gives every message back bit-exact ({{verdict:g1}}), a flipped bit is caught
+On both days the store gives every message back bit-exact ({{verdict:g1}}), a flipped bit is caught
 in a data block and in the footer ({{verdict:g2}}), Gorilla is built and is exact on the whole day
 ({{verdict:g4}}), and the store takes the least disk of the systems compared, each in its smallest setup ({{verdict:cr2}}).
 
