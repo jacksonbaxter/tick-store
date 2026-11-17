@@ -47,8 +47,7 @@ refused if the core's hyperthread sibling was over {{code:sibling_busy_limit_pct
 figures come from an Apple M4 Max laptop, "the M4": unpinned, no hardware counters.
 
 **Clock and repetition.** The Zen 1 ran with frequency boost on and no fixed clock, so systems
-timed hours apart may have run at different clocks; what that costs every time-based figure was
-not measured.
+timed hours apart may have run at different clocks; what that costs was not measured.
 
 **The comparison.** Parquet, ArcticDB and QuestDB each ran the setup the comparison fixed for it in
 advance, plus the setups a selection run on a slice kept. Each query ran {{cmpL_warm_runs}} times
@@ -180,7 +179,7 @@ median, so on whole queries SIMD's effect is inside or near the run-to-run sprea
 ([counters run]({{path:d3}}): {{note:diag-counters}}).
 
 **What SIMD cost.** {{simd_src_lines}} lines of kernels and dispatch, {{simd_src_share}}% of the
-{{src_include_lines}} in `src/` and `include/`.
+{{src_include_lines}} source lines.
 
 **The store's price column.** Per piece, the reader inflates any zstd frame, allocates, decodes
 PFOR with scale and patches, range-checks every value and appends. On the Zen 1 those steps take
@@ -219,7 +218,7 @@ harness's reading and converting of the input, {{cmpL_others_read_share_min}}% t
 {{cmpL_others_read_share_max}}% of the others' totals; tick-store parses its ITCH file inside the
 engine. The inputs did not start alike; the targets sections give the bytes read. QuestDB's flushed write is {{verdict:questdb_B_like_for_like}}: its flush proof on the
 day did not pass. With a flush, tick-store's write took {{cmpL_ts_B_total_s}} s and without a flush
-{{cmpL_ts_A_total_s}} s, a single run each, so a difference of that size is not resolved here.
+{{cmpL_ts_A_total_s}} s, a single run each, so that difference is not resolved.
 
 **Where the writer's time goes.** tick-store's engine-only time is its writer's own work:
 {{d3_write_cycles_per_msg}} cycles and {{d3_write_instr_per_msg}} instructions a message at
@@ -245,7 +244,7 @@ index inside a run that would let Q1 and Q4 skip the permutation, and a second w
 
 A store is a single file holding a single day, written from that day's ITCH file under a temporary name
 and published by rename, so a crash leaves the old file or none ([format.md](docs/format.md)). It
-takes no appends, does not capture a live feed, and holds no second day.
+takes no appends and does not capture a live feed.
 
 ## Targets that held
 
@@ -257,7 +256,7 @@ in a data block and in the footer ({{verdict:g2}}), Gorilla is built and is exac
 
 On the Zen 1 unless the M4 is named, units as the bar's; "x" is how many times off the bar.
 [BENCHMARKS.md](BENCHMARKS.md) classes nearly every bar as context, measured on other hardware or another
-workload: they show what good looks like and prove nothing about this store. Nasdaq's peak rate is
+workload: they prove nothing about this store. Nasdaq's peak rate is
 a direct bar, and the rows against the other systems are relative.
 
 | Asked | Bar (source) | Measured | Gap | Verdict | Why |
@@ -307,7 +306,7 @@ Zen 1, the shortest run {{g3_shortest_s}} s ([fuzz results]({{path:fuzz}})). The
 {{verdict:g3}}.
 
 A login or a backup run can take executions from a fuzzing run, not hide a finding; the
-[targets section](RESULTS.md#targets) gives each target's executions.
+[runs by target](RESULTS.md#g-3-runs-by-target) give each target's executions.
 
 The checks and the faults that prove them are in the README; the prover's
 record covers {{proofs_covered}} of its {{proofs_listed}} listed faults.

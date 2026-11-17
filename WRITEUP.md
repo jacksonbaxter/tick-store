@@ -47,8 +47,7 @@ refused if the core's hyperthread sibling was over 5% busy. Context
 figures come from an Apple M4 Max laptop, "the M4": unpinned, no hardware counters.
 
 **Clock and repetition.** The Zen 1 ran with frequency boost on and no fixed clock, so systems
-timed hours apart may have run at different clocks; what that costs every time-based figure was
-not measured.
+timed hours apart may have run at different clocks; what that costs was not measured.
 
 **The comparison.** Parquet, ArcticDB and QuestDB each ran the setup the comparison fixed for it in
 advance, plus the setups a selection run on a slice kept. Each query ran 30 times
@@ -180,7 +179,7 @@ median, so on whole queries SIMD's effect is inside or near the run-to-run sprea
 ([counters run](results/diag/counters-simd-12302019-ede0176b10bb.json): a diagnostic summary no separate validator re-reads).
 
 **What SIMD cost.** 1,870 lines of kernels and dispatch, 6.6% of the
-28,526 in `src/` and `include/`.
+28,526 source lines.
 
 **The store's price column.** Per piece, the reader inflates any zstd frame, allocates, decodes
 PFOR with scale and patches, range-checks every value and appends. On the Zen 1 those steps take
@@ -219,7 +218,7 @@ harness's reading and converting of the input, 52% to
 71% of the others' totals; tick-store parses its ITCH file inside the
 engine. The inputs did not start alike; the targets sections give the bytes read. QuestDB's flushed write is not like-for-like: its flush proof on the
 day did not pass. With a flush, tick-store's write took 190.7 s and without a flush
-211.7 s, a single run each, so a difference of that size is not resolved here.
+211.7 s, a single run each, so that difference is not resolved.
 
 **Where the writer's time goes.** tick-store's engine-only time is its writer's own work:
 2,328 cycles and 3,334 instructions a message at
@@ -245,7 +244,7 @@ index inside a run that would let Q1 and Q4 skip the permutation, and a second w
 
 A store is a single file holding a single day, written from that day's ITCH file under a temporary name
 and published by rename, so a crash leaves the old file or none ([format.md](docs/format.md)). It
-takes no appends, does not capture a live feed, and holds no second day.
+takes no appends and does not capture a live feed.
 
 ## Targets that held
 
@@ -257,7 +256,7 @@ in a data block and in the footer (met), Gorilla is built and is exact on the wh
 
 On the Zen 1 unless the M4 is named, units as the bar's; "x" is how many times off the bar.
 [BENCHMARKS.md](BENCHMARKS.md) classes nearly every bar as context, measured on other hardware or another
-workload: they show what good looks like and prove nothing about this store. Nasdaq's peak rate is
+workload: they prove nothing about this store. Nasdaq's peak rate is
 a direct bar, and the rows against the other systems are relative.
 
 | Asked | Bar (source) | Measured | Gap | Verdict | Why |
@@ -278,11 +277,11 @@ a direct bar, and the rows against the other systems are relative.
 | Q2 warm median | ≤ 16.9 ms (DuckDB on a small Parquet store, preprint) | 74.04 ms; M4 25.28 ms | 4.38x; 8.38 ms | missed; M4 missed | 100 ns a row |
 | Q3 warm median | ≤ 0.41 ms (QuestDB vendor benchmark) | 36.07 ms; M4 15.06 ms | 88x; 37x | missed; M4 missed | No stored aggregate |
 | Q4 cold mean | ≤ 10 ms (TimescaleDB, order-book preprint) | 356.09 ms; M4 136.16 ms | 36x; 14x | missed; M4 missed | 35.1 MB read cold |
-| Lowest median and p99 of the fixed setups, each query | same machine | warm medians in the table at a glance | 8.7x on Q1; 167x on Q4; 16.8x on Q5 | missed in part; met on Q2 warm, Q2 cold, Q3 warm and Q3 cold against each system's chosen setup, while ArcticDB with a table per stock is faster, and on Q5 cold; swap-in: ArcticDB, QuestDB, tick-store | Q1 to Q5 under Queries |
+| Lowest median and p99 of the fixed setups, each query | same machine | warm medians in the table at a glance | 8.7x on Q1; 167x on Q4; 16.8x on Q5 | missed in part; met on Q2 warm, Q2 cold, Q3 warm and Q3 cold against each system's chosen setup, while ArcticDB with a table per stock is faster, and on Q5 cold; met, not counted: swapping memory in both runs (ArcticDB, QuestDB); swap-in: ArcticDB, QuestDB, tick-store | Q1 to Q5 under Queries |
 
 The writes against each other system, on both clocks: without a flush, missed; inputs not alike, by each write's record: tick-store's input is in memory before the clock starts, with 250,916,864 B read from the device inside the clock; Parquet's, ArcticDB's and QuestDB's are read from disk inside it, with 18,411,094,016 to 21,521,625,088 B read from the device inside the clock; engine-only, the clock less reading the input and putting it in the form the system's call takes, may still hold those reads, which are counted over the whole clock, so the two-clock rule does not take the difference out.
 
-With a flush, met against QuestDB, not like-for-like; missed against Parquet; against ArcticDB met on this run and missed on the replaced one, a change for tick-store, counted as missed; two remote logins during tick-store's write; replaced run 188.9 s; a backup run and a remote login during QuestDB's write; replaced run 1,269.2 s; inputs not alike, by each write's record: tick-store's input is in memory before the clock starts, with 274,239,488 B read from the device inside the clock; Parquet's, ArcticDB's and QuestDB's are read from disk inside it, with 23,846,309,888 to 24,631,062,528 B read from the device inside the clock; engine-only, the clock less reading the input and putting it in the form the system's call takes, may still hold those reads, which are counted over the whole clock, so the two-clock rule does not take the difference out.
+With a flush, met against QuestDB, not like-for-like; missed against Parquet; against ArcticDB met on this run and missed on the replaced one, a change for tick-store, counted as missed; two remote logins during tick-store's write; replaced run 188.9 s; a backup run and a remote login during QuestDB's write; replaced run 1,269.2 s; met, not counted: a disturbance the replaced run has no record to rule out (QuestDB); inputs not alike, by each write's record: tick-store's input is in memory before the clock starts, with 274,239,488 B read from the device inside the clock; Parquet's, ArcticDB's and QuestDB's are read from disk inside it, with 23,846,309,888 to 24,631,062,528 B read from the device inside the clock; engine-only, the clock less reading the input and putting it in the form the system's call takes, may still hold those reads, which are counted over the whole clock, so the two-clock rule does not take the difference out.
 Against QuestDB it is not like-for-like: QuestDB read 24,631,062,528 B from disk inside
 its clock, tick-store 274,239,488 B, its input in memory before its clock.
 The [targets table](RESULTS.md#targets) gives both runs'
@@ -307,10 +306,10 @@ Zen 1, the shortest run 1,801 s ([fuzz results](results/fuzz-g3-8616263b7561.jso
 met; a backup run and two remote logins during its bound-seed gate, which could only have slowed them; three remote logins during its timed fuzzing runs, which could only have slowed them.
 
 A login or a backup run can take executions from a fuzzing run, not hide a finding; the
-[targets section](RESULTS.md#targets) gives each target's executions.
+[runs by target](RESULTS.md#g-3-runs-by-target) give each target's executions.
 
 The checks and the faults that prove them are in the README; the prover's
-record covers 99 of its 464 listed faults.
+record covers 99 of its 487 listed faults.
 
 ## Limits
 

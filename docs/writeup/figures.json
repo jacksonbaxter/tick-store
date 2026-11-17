@@ -42,7 +42,8 @@
   {"text": "15", "why": "the Linux host's own job schedule, from its scheduler, not a result", "in": ["backup every 15 minutes"]},
   {"text": "2", "why": "the Linux host's own job schedule, from its scheduler, not a result", "in": ["and 2 small watchers", "2 sync jobs"]},
   {"text": "5", "why": "the Linux host's own job schedule, from its scheduler, not a result", "in": ["watchers every 5,"]},
-  {"text": "10", "why": "the Linux host's own job schedule, from its scheduler, not a result", "in": ["jobs every 10,"]}
+  {"text": "10", "why": "the Linux host's own job schedule, from its scheduler, not a result", "in": ["jobs every 10,"]},
+  {"text": "3", "why": "part of the anchor of RESULTS.md's heading for G-3's runs, a name, not a result", "in": ["#g-3-runs-by-target"]}
  ],
  "kinds": {
   "store-size": {"what": "the reference day's store as built, its bytes by column and part, from scripts/store_results.py", "files": {"any": "results/store-size-12302019.json"}, "commit": ["commit"]},
