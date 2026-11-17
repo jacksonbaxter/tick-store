@@ -459,10 +459,20 @@ against 399) to 0.9% above it. No results file has a kind for the gate's table, 
 with the run's records. The Linux host's gate, the bar these bounds were set for, ran the same
 way at `8616263`, at AVX2, each run on cpu6 with its sibling, cpu7, kept busy for the whole of
 every run. All 31 passed. The worst was `run_length/bound-small-blocks` at 4,668.5 ms an
-execution (median 3,908.0) against 5,000. Each seed's median was from 21.0% below its prediction
+execution (median 3,908.0) against 5,000, and its run 2 of 5 held a remote login, 2026-11-17
+15:12:57 to 15:12:58 UTC. In all, the Linux gate held a backup run and two remote logins, which
+could only have slowed them: the backup run, 15:12:26 to 15:12:29 UTC, between runs of its seeds;
+a login, 15:12:31 to 15:12:32 UTC, in `run_length/bound-one-run-blocks` run 4 of 5; and that one.
+`results/disturbances-8616263b7561.json` records them, and RESULTS.md marks G-3 for them. Each
+seed's median was from 21.0% below its prediction
 below (`pfor/bound-costliest`, 3,433.5 against 4,348) to 10.4% above it
 (`dictionary/bound-most-blocks`, 633.5 against 574), and the five query seeds predicted at 3,113
 at most took 2,739.5 at most.
+
+The gate's figures above on both hosts, the per-seed medians and predictions in the table below
+and the grid's timing further down are from the runs' own records and logs, which are not in this
+repository: no results file holds them yet, and a results kind for the gate's table is an open
+item in docs/TASKS.md.
 
 | Seed | Shape | Mac median (worst) | Linux predicted |
 |---|---|---|---|
@@ -530,8 +540,9 @@ the unit binary once rather than through ctest, leaves out the first two; both s
 single-threaded re-runs of the fuzz oracles on fixed inputs, each already run in full under the
 plain build and under AddressSanitizer and UBSan, and they are what took the Linux tsan and
 coverage jobs from 16 and 9 minutes to over 55. On the Mac dev build, one ctest entry at a time on
-a loaded machine, 137 of the grid's tests took 3,373 s and the 62 seed tests 757 s (the run was
-stopped before the grid's last 7 and the scalar-capped parts).
+a loaded machine, 137 of the grid's tests took 3,373 s and the 62 seed tests 757 s by that run's
+log, which no results file holds (the run was stopped before the grid's last 7 and the
+scalar-capped parts).
 
 **Every target.** What bounds one execution's time and memory at its `-max_len`, with
 `-rss_limit_mb=2048` and `-malloc_limit_mb=256` over all of them, and the slowest input of each
