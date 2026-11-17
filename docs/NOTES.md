@@ -6365,11 +6365,26 @@ the input clause.
 shows 4,033 of 5,825,603 pages resident at the clock's start and 23,850,713,088 B read inside
 it; the replaced record keeps no residency or device-read figure for any system but tick-store.
 
-**Left as it is.** The README's pitch sentence on queries about one stock rests on QL-4's Q2 and
-Q3 parts, all four flagged as swapped in. The pitch is at its 100-word limit, so the mark cannot
-be added without a word limit or the marking rule giving way; the pitch names no target, and
-the quote check does not read it. "Met: 5 more of their parts" and the class counts carry no
-marks. The essay's text is unchanged: it takes the new marks through `verdict_marks`, so it grows.
+**The pitch.** Its sentence on queries about one stock rests on QL-4's Q2 and Q3 parts, all
+four resting on rivals' figures the record flags as swapped in, and its short windows on Q1 and
+Q4, where QuestDB's are flagged too. The pitch was at its 100-word limit. Neither rule gives way:
+the renderer defines a short form of the mark for the pitch alone, `PITCH_SWAPPED`, "some
+rivals' figures were timed with pages swapped in", and `check_pitch` requires it on a claim
+whose target parts, or whose fastest comparison, rest on a flagged figure. The form speaks of
+rivals, so a claim resting on tick-store's own flagged figure is refused even with it; a quote
+outside the pitch takes the whole mark, and the table row below keeps it. Room came from the
+other sentences, no claim, target word, machine or miss dropped: the first two sentences are one,
+"trading" goes, the link reads "the comparison fixed", and "on short windows across every stock
+ArcticDB or QuestDB is fastest" became "ArcticDB or QuestDB wins short market-wide windows". The
+pitch is 100 words. Faults `pitch-swap-mark-unchecked` and `pitch-swap-mark-own-figure-accepted`
+apply, and each one's test, run alone, fails with it applied; their proof is owed to the full
+re-proof, as the machine was held for another project's measurements. Three render faults
+whose edits named the old pitch's words were remade on the new: `readme-pitch-claim-reworded`
+(and its expected text, now quoted with double quotes as the sentence holds an apostrophe),
+`readme-pitch-unchecked-figure` and `readme-first-screen-host-by-system`. Each edit, run on the
+tree, is refused by render-check for its own reason; their proof is owed with the rest.
+
+**Left as it is.** "Met: 5 more of their parts" and the class counts carry no marks. The essay's text is unchanged: it takes the new marks through `verdict_marks`, so it grows.
 
 **Proofs.** On the Mac at `066c34a`, one `prove_checks.py --only` call took the 16 new
 faults and the 10 remade on lines the fix moved, and was stopped at its time limit after 24.

@@ -56,7 +56,9 @@ Each heading and sentence of it is a claim, a whole sentence listed there whose 
 hold on the results, which holds the words its target lists for its bar and names the one
 machine it is judged on; a sentence holding a figure; or a text listed as stating no result,
 with its reason. A word that ranks or judges must sit inside a claim or a figure's words, and
-the pitch, headings included, runs to at most "max_words" words. The whole first screen names no
+the pitch, headings included, runs to at most "max_words" words. A claim of the pitch resting on
+a rival's figure timed while pages were swapped in says so in the pitch's short form of that
+mark, which nothing but the pitch may use. The whole first screen names no
 target id and no query's name, holds no character a reader cannot see, ends at the next heading
 after the headline, and introduces each host once by what it is, never calling it by its
 operating system after. What none of this checks is that the prose is true beyond its figures
@@ -1634,6 +1636,10 @@ def disturbance_text(entry, read, replaced, row):
 # timed_policy has it: the number is kept and marked, and a verdict that rests on it says so.
 # The systems follow a semicolon, so a sentence read for a faster write ends before them.
 SWAPPED = "rests on figures timed while pages were swapped in; the record flags "
+# The same mark in the README's pitch, which has no room for the systems and variants: a claim
+# there that rests on a rival's flagged figure says this, and the table below it keeps the whole
+# mark. It is held only in the pitch; a quote of a verdict anywhere else takes SWAPPED.
+PITCH_SWAPPED = "some rivals' figures were timed with pages swapped in"
 
 
 def swapped_reads(reads, document):
@@ -2505,6 +2511,42 @@ def pitch_words(definitions):
                                   f"{owner[1]} and {row['id']} on {row['host']}")
 
 
+def pitch_swapped(condition, definitions, root):
+    """The systems whose figures, flagged by the record as timed while pages were swapped in,
+    one condition of a pitch claim rests on: a target's parts as RESULTS.md marks them, or
+    each system's headline query a fastest claim compares."""
+    if "target" in condition:
+        spec = condition["target"]
+        row = next((row for row in definitions["rows"]
+                    if (row["id"], row["host"]) == (spec["id"], spec["host"])), None)
+        parts = judged_parts(row, root)[0] if row is not None else None
+        if parts is None:
+            return []
+        if spec.get("parts"):
+            parts = [part for part in parts if part[0] in spec["parts"]]
+        return [system for part in parts
+                for system, _, _ in notes_of(part).get("swapped") or []]
+    if "fastest" in condition:
+        path = target_file(root, condition["file"])
+        if path is None:
+            return []
+        document = json.loads(path.read_text(encoding="utf-8"))
+        spec = condition["fastest"]
+        found = []
+        for system in spec["systems"]:
+            for query in spec["queries"]:
+                for kind in spec["kinds"]:
+                    try:
+                        block = walk(document, ["systems", system, "variants", "@headline",
+                                                "queries", query, kind])
+                    except TargetError:
+                        continue
+                    if isinstance(block, dict) and (block.get("swap_timed") or {}).get("flagged"):
+                        found.append(system)
+        return found
+    return []
+
+
 def check_pitch(definitions_path, root, readme):
     """The README's pitch, the prose above its headline with its headings, states figures by
     hand. Each one scripts/targets.json lists under "pitch" must appear in it as the results
@@ -2518,7 +2560,8 @@ def check_pitch(definitions_path, root, readme):
     A claim on a target holds the words that target's row lists for its bar, and a claim
     judged on one machine names that machine and no other. A word that ranks or judges must sit in a claim
     or a figure's words, headings included (review DX-3). The pitch, headings included, runs to
-    at most "max_words" words, and holds no character a reader cannot see."""
+    at most "max_words" words, and holds no character a reader cannot see. A claim resting on a figure the record flags as timed
+    while pages were swapped in says so, in PITCH_SWAPPED's words."""
     definitions = json.loads(definitions_path.read_text(encoding="utf-8"))
     pitch = definitions.get("pitch")
     if not pitch:
@@ -2603,6 +2646,18 @@ def check_pitch(definitions_path, root, readme):
                 raise TargetError(f"the README's pitch ties {claim['text']!r} to {spec['id']} on "
                                   f"{spec['host']}, and the sentence holds none of the words "
                                   "that target lists for its bar on those parts")
+            # A claim resting on a figure timed while pages were swapped in says so, in the
+            # pitch's short form; that form speaks of rivals, so tick-store's own flagged figure
+            # cannot rest under it (review C1-9).
+            flagged = pitch_swapped(condition, definitions, root)
+            if "tickstore" in flagged:
+                raise TargetError(f"the README's pitch says {claim['text']!r}, which rests on "
+                                  "tick-store's own figures timed while pages were swapped in, "
+                                  f"and the pitch's mark, {PITCH_SWAPPED!r}, speaks of rivals")
+            if flagged and PITCH_SWAPPED not in claim["text"]:
+                raise TargetError(f"the README's pitch says {claim['text']!r}, which rests on "
+                                  "figures the record flags as timed while pages were swapped "
+                                  f"in, and does not say {PITCH_SWAPPED!r}")
             host = condition_host(condition, definitions, root)
             if host in HOSTS:
                 if not hosts or host not in hosts:

@@ -317,13 +317,13 @@ def swap_pitch_store_sizes():
 def reword_a_pitch_claim():
     """The pitch's query sentence reworded to rank tick-store first on short windows too, with
     no figure in it for the figure check to catch (reviews RG-13, DX-2)."""
-    edit_text("README.md", "ArcticDB or QuestDB is fastest", "tick-store is fastest")
+    edit_text("README.md", "or\nQuestDB wins", "or\ntick-store wins")
 
 
 def type_an_unchecked_pitch_figure():
     """A figure typed into the README's pitch that no row of its check covers (review E-9)."""
     # The pitch sits at its word limit, so the figure takes a word's place.
-    edit_text("README.md", "It keeps one", "It keeps 42")
+    edit_text("README.md", "keeps one day,", "keeps 42 days,")
 
 
 def drop_a_pitch_claims_tie():
@@ -352,7 +352,7 @@ def call_a_host_by_its_system():
     """The pitch calling the Linux host "Linux" again, in its figure sentence, which no claim
     ties, so the screen's own rule is the one that stops it; the word takes another's place,
     since the pitch sits at its word limit."""
-    edit_text("README.md", "trading day,", "Linux day,")
+    edit_text("README.md", "C++23 columnar store", "C++23 Linux store")
 
 
 def quote_wt4_with_the_old_word():
@@ -1523,7 +1523,7 @@ FAULTS = (
           "FAIL: test_two_figures_of_one_format_are_refused (__main__.RenderPitchTest"),
     Fault("readme-pitch-claim-reworded", "render-check", "the pitch's Q1 and Q4 sentence "
           "reworded to rank tick-store first, with no figure in it", EXIT_RENDER_REFUSED,
-          "the README's pitch no longer says 'On the Ryzen it answers queries about one stock",
+          "the README's pitch no longer says \"On the Ryzen it answers queries about one stock",
           reword_a_pitch_claim),
     Fault("render-pitch-claim-unchecked", "py-scripts", "render_results.py finds each claim's "
           "words in the pitch and never judges its condition, so a ranking the results reverse "
@@ -1712,6 +1712,16 @@ FAULTS = (
           "rests on a figure the record flags as timed with a page swapped in with nothing "
           "beside it", CHECK_FAILED,
           "FAIL: test_a_verdict_on_a_figure_timed_with_a_page_swapped_in_says_so "
+          "(__main__.ConditionsTest"),
+    Fault("pitch-swap-mark-unchecked", "py-scripts", "render_results.py passing a README pitch "
+          "claim that rests on a rival's figure timed with pages swapped in and does not say so",
+          CHECK_FAILED,
+          "FAIL: test_a_pitch_claim_on_a_swapped_in_figure_says_so_in_its_short_form "
+          "(__main__.ConditionsTest"),
+    Fault("pitch-swap-mark-own-figure-accepted", "py-scripts", "render_results.py letting the "
+          "pitch's short swap-in mark, which speaks of rivals, stand for tick-store's own "
+          "flagged figure", CHECK_FAILED,
+          "FAIL: test_the_pitchs_short_form_speaks_of_rivals_and_stands_nowhere_else "
           "(__main__.ConditionsTest"),
     Fault("headline-value-mark-dropped", "py-scripts", "render_results.py letting a headline "
           "text show a figure from a disturbed phase with no mark beside it", CHECK_FAILED,

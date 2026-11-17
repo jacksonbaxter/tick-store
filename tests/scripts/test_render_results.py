@@ -2527,6 +2527,44 @@ class ConditionsTest(Scratch):
         self.assertIsNone(self.quoted(f"| T-13 | Linux | 1 ms | Met; {mark[0]} |\n",
                                       [SWAP_ROW]))
 
+    def pitch_check(self, sentence):
+        """check_pitch on a one-claim pitch of SWAP_ROW's Q2 warm, the sentence given."""
+        row = dict(SWAP_ROW, pitch=[{"words": "one stock fastest", "parts": ["Q2 warm"]}])
+        claim = {"text": sentence, "target": {"id": "T-13", "host": "Linux",
+                                              "parts": ["Q2 warm"], "verdict": "met"}}
+        pitch = {"max_words": 100, "figures": [], "claims": [claim],
+                 "no_result_sentences": [{"text": "Title", "why": "the page's heading"}]}
+        self.targets.write_text(json.dumps({"schema": "t", "rows": [row], "pitch": pitch,
+                                            "headline": {"hosts": SCREEN_HOSTS}}),
+                                encoding="utf-8")
+        RENDER.check_pitch(self.targets, self.tree,
+                           f"# Title\n\n{sentence}\n\n{RENDER.HEADLINE_BEGIN}\n")
+
+    def test_a_pitch_claim_on_a_swapped_in_figure_says_so_in_its_short_form(self):
+        self.write(with_queries(change_document(recorded_write(1.0, 0.1),
+                                                recorded_write(2.0, 0.1)), flagged=["arcticdb"]))
+        bare = "On the box it answers one stock fastest."
+        with self.assertRaises(RENDER.TargetError) as refused:
+            self.pitch_check(bare)
+        self.assertIn("rests on figures the record flags as timed while pages were swapped in, "
+                      f"and does not say {RENDER.PITCH_SWAPPED!r}", str(refused.exception))
+        self.pitch_check(f"On the box it answers one stock fastest; {RENDER.PITCH_SWAPPED}.")
+        # With no figure flagged the sentence needs no mark.
+        self.write(with_queries(change_document(recorded_write(1.0, 0.1),
+                                                recorded_write(2.0, 0.1))))
+        self.pitch_check(bare)
+
+    def test_the_pitchs_short_form_speaks_of_rivals_and_stands_nowhere_else(self):
+        self.write(with_queries(change_document(recorded_write(1.0, 0.1),
+                                                recorded_write(2.0, 0.1)), flagged=["tickstore"]))
+        with self.assertRaises(RENDER.TargetError) as refused:
+            self.pitch_check(f"On the box it answers one stock fastest; {RENDER.PITCH_SWAPPED}.")
+        self.assertIn("rests on tick-store's own figures timed while pages were swapped in",
+                      str(refused.exception))
+        # A hand-written quote of the verdict outside the pitch takes the whole mark.
+        self.assertIn("without a mark", self.quoted(
+            f"| T-13 | Linux | 1 ms | Met; {RENDER.PITCH_SWAPPED} |\n", [SWAP_ROW]) or "")
+
     def test_the_render_refuses_a_page_quoting_a_marked_verdict_bare(self):
         self.favourable_change()
         self.results_md.write_text(WITH_TARGETS, encoding="utf-8")
