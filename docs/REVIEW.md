@@ -211,3 +211,187 @@ three scripts are `8e616bf`'s, before its fix.
 | TD-13 | at `8e616bf`: `BENCHMARKS.md:52`, `:166`, `README.md:256-258` | The pages did not say that G-2 holds for the two planned flips and not for any flip: with checksums off the entries' CRC32Cs, the trailer's footer CRC32C and a small share of payload bits pass. README's Round-trip check and BENCHMARKS, below the gates, now say what G-2 shows, from a committed sweep of every bit of every byte of two small stores that `test_check_oracle.py`'s `AllBits` holds the counts to. The gate's wording and `targets.json` stay. | The sweep: with checksums every flip exits 1; without, 928 and 2,560 entry CRC32C pairs, 32 trailer pairs each, and 57 of 5,920 and 74 of 22,592 payload pairs exit 0. | `3d6b81d`, `ece94e1` |
 | TD-14 | at `8e616bf`: `scripts/g2_plan.py:121-131`, `scripts/check_oracle.py:140-144`, `:186-235` | Rules of the planner and the oracle step's live refusals that nothing failed on: an even segment count, a footer with no bytes before the trailer, two first timestamp blocks, a data block in the header, and every refusal in `check()`. Each has a test now, the live refusals through a stand-in tool; the sweep's third rule follows from its first and is left as it is. | Each mutation of those lines passed every test. Live with the dev build, `g2-plan-section-crc-classed-read` applied makes `check_oracle.py` exit 1, `the footer sweep disagrees with the rule in 24 places`. Fault `oracle-sweep-disagreement-passes`; a fault on the `oracle` step itself needs a C++ build and is not made. | `3d6b81d` |
 | TD-15 | at `8e616bf`: `docs/TASKS.md:197` | TASKS said the freeze diff prints only `scripts/g2_plan.py`; it also prints `compare/README.md` and `fuzz/README.md`, prose from `ebb1ae2`, which no kind measures. Corrected, dated. | `git diff --stat ede0176..HEAD --` over the listed paths prints the three files. | `ece94e1` |
+
+## The essay's render, reviewed at `979fb58`
+
+The WD- findings are a second reviewer's pass over the essay's render, `scripts/render_writeup.py`,
+its figure list and its template, read at `979fb58`; file and line are there. Each was shown on a
+copy of that commit's scripts before it was fixed, in a tree of its own, and "passed" below means
+the old render wrote the page and `--check` exited 0. Each fault is in `scripts/prove_checks.py`
+and was first seen failing its test on a patched copy; PROVEN means the prover's `--only` runs
+through `heavy.sh` said so, on clones of the fixes before their rebase onto `8a9cdfb` (docs/NOTES.md, The essay's render, derived rather
+than asserted).
+
+### WD-1 (blocker) The essay said every figure was measured at one commit, and nothing checked it
+
+- At `979fb58`: `docs/writeup/WRITEUP.template.md:341-342` named one measured commit and one fuzz
+  commit; `render_writeup.py` read no file's commit but the compare day's, and the committed files
+  its tokens read named seven.
+- Shown: two files at two commits under "measured at one commit" passed.
+- Fixed: every file a token reads must name the one measured commit, but the exceptions the list
+  declares, each with its reason, which the essay names through the generated token
+  `commit_exceptions`: the fuzz result and the coverage summary at the fuzz commit, whose claim to
+  differ only in the fuzz harness and its tests is put to `git diff --name-only` and is not judged
+  in a tree with no history; the prover's record, which names no commit; and the replaced day.
+- Tests: `Commits` (ten). Faults: `writeup-commits-mixed-accepted`,
+  `writeup-differs-only-unchecked`, PROVEN. Commit: `ee91d17`.
+
+### WD-2 (blocker) Comparison and ranking words around a figure were held by nothing
+
+- At `979fb58`: a sentence could call a figure faster, least or below its bar whatever the figure
+  said; two tokens had a condition.
+- Shown: "The demo decodes faster than its bar, as the target is missed." passed.
+- Fixed: the list's `claims` are `targets.json`'s own form; a sentence with a comparative,
+  superlative, ranking or verdict word must hold a claim whose condition reaches a file at its
+  leaves and reads a figure the sentence prints, or a token that carries the word, and a claim the
+  results answer false stops the render.
+- Tests: `Claims` (eight). Faults: `writeup-judging-word-unclaimed`, `writeup-claim-not-held`,
+  PROVEN. Commit: `ee91d17`.
+
+### WD-3 (blocker) Results typed in words and verdicts typed by hand
+
+- At `979fb58`: "four times", "half" and "once" were not seen, and the Missed targets section was
+  typed.
+- Shown: a ratio written in words passed.
+- Fixed: a number word is held as a judging word is, and the Missed targets and Not judged sections
+  must hold exactly the rows of those verdicts, with each changed outcome's token where its
+  verdict is quoted.
+- Tests: `Refuses.test_a_number_in_words`, `Census` (three), `Changed` (three). Faults:
+  `writeup-number-word-unseen`, `writeup-census-missing-row`, `writeup-census-met-row-kept`,
+  `writeup-changed-outcome-unshown`, PROVEN. Commit: `ee91d17`.
+
+### WD-4 (blocker) The figure list could type any number
+
+- At `979fb58`: a value, a `scale`, a `concat` piece or a verdict's words could be a literal.
+- Shown: a literal value, a literal in a concat, "ten times faster" in a verdict's words, and an
+  inflated scale each passed.
+- Fixed: every value must reach a results file, a tree count, a code constant or a bar at its
+  leaves; a number in the list must be one of its declared `factors`, each with its reason, and
+  words and concat pieces may hold no number.
+- Tests: `Literals` (seven). Fault: `writeup-literal-value-accepted`, PROVEN. Commit: `ee91d17`.
+
+### WD-5 (should-fix) A figure from one host could sit under a description of the other
+
+- Shown: a macOS file under a Zen 1 description passed.
+- Fixed: an entry read from one host's files must name that host and not the other; one read
+  across hosts must say so with `across_hosts` and name both.
+- Tests: `Hosts` (four). Fault: `writeup-host-word-unchecked`, PROVEN. Commit: `ee91d17`.
+
+### WD-6 (should-fix) The essay recomputed each target's figure with a copy of its expression
+
+- Shown: a target restated in `targets.json` left the essay's copy unchanged, and it passed.
+- Fixed: a `target` entry reads the row's part through `render_results.judged_parts` and prints the
+  row's unit; a test holds every such token to the Targets block's figure for the same part. The
+  Missed-targets table is generated from the verdicts (WD-3).
+- Tests: `Forms.test_a_target_s_figure_is_the_targets_block_s`, `Census`. Fault:
+  `writeup-census-missing-row`, PROVEN. Commit: `ee91d17`.
+
+### WD-7 (should-fix) Formats could round a bar or a gap into a contradiction
+
+- Shown: a bar of 1.2345 shown as 1.2 and a gap of 1.00 times passed.
+- Fixed: a bar is shown exactly with its sign and unit, a printed figure must stand on its
+  verdict's side of the bar, and a gap printed as a ratio of 1 or a difference of 0 is refused.
+- Tests: `Gaps` (three). Faults: `writeup-bar-rounded`, `writeup-figure-across-its-bar`,
+  `writeup-gap-shown-as-none`, PROVEN. Commit: `ee91d17`.
+
+### WD-8 (blocker) The prover sentence counted the control as a fault
+
+- Shown on the committed files: the line count gave one more fault than the list holds, its
+  control among them, and "proved 100 of 101" read as a fault unproven where the record held the
+  control as a control should be.
+- Fixed: the counts are read from `FAULTS` by its syntax tree, the control left out, and from the
+  record in its own terms: faults listed, faults the record covers, proven, and whether its control
+  passed; a fault the list no longer has is not counted, and a record with no control is refused.
+  The sentence comes out right today and after a full run.
+- Test: `Prover.test_the_counts`. Fault: `writeup-prover-counts-control`, PROVEN. Commit:
+  `ee91d17`.
+
+### WD-9 (should-fix) A kind could still pin a commit, and a pattern could leave results/
+
+- Shown: a commit prefix beside the `*`, a commit as a folder and `results/../` each passed.
+- Fixed: a pattern is a path under `results/` with one `*`, in place of the commit, before
+  `.json`, and no hex run or glob in a folder.
+- Test: `Refuses.test_a_kind_named_by_a_commit_prefix_or_folder_or_leaving_results`. Fault:
+  `writeup-pattern-glob-accepted`, PROVEN. Commit: `ee91d17`.
+
+### WD-10 (should-fix) The figure list chose which template and which page were checked
+
+- Shown: with the list naming another page and WRITEUP.md edited by hand, `--check` exited 0.
+- Fixed: the page, template and targets paths are the script's; a list naming any of them is
+  refused, and `--figures` is gone.
+- Test: `Refuses.test_the_list_naming_its_page_template_or_targets`. Fault:
+  `writeup-list-names-the-page`, PROVEN. Commit: `ee91d17`.
+
+### WD-11 (should-fix) Most of the expression language was pinned by no test
+
+- Shown: `sub`'s operands swapped left every old test passing.
+- Fixed: `Forms` computes every form and format on a small document and holds each to an answer
+  worked out in plain Python beside it, with a test for every refusal.
+- Tests: `Forms` (six), `Refuses`. Fault: `writeup-sub-operands-swapped`, PROVEN. Commit:
+  `ee91d17`.
+
+### WD-12 (should-fix) A bug in verdict_class passed writeup-check
+
+- Shown: `verdict_class` changed to call a row met on any part left every old test passing.
+- Fixed: `Verdicts` holds `verdict_class` and `verdict_of` on hand-built parts, met, missed, not
+  judged and each mix.
+- Test: `Verdicts.test_verdict_class`. Fault: `verdict-class-met-on-any-part`, which patches
+  `render_results.py` in the prover's clone, PROVEN. Commit: `ee91d17`.
+
+### WD-13 (should-fix) Byte sizes read from comments, and a lane width typed
+
+- Shown on the committed list: two PFOR sizes were counted in `pfor.hpp`'s layout comment, and
+  "64-bit" was declared a lane's word.
+- Fixed: the sizes are `src/codec/pfor.cpp`'s `kVectorHeaderBytes` and `kExceptionCountBytes`,
+  the lane word's width is read from `lane_pack.hpp`'s declaration, and a constant's source is
+  read with its comments blanked.
+- Test: `Refuses.test_a_constant_read_from_a_comment`. Fault: `writeup-constant-from-a-comment`,
+  PROVEN. Commit: `ee91d17`.
+
+### WD-14 (should-fix) Non-results were removed everywhere, and some were measurements
+
+- Shown: "Q2 took 2018 ms." passed with 2018 declared a year.
+- Fixed: each declared text has a reason and the places it stands, and is taken out only there; a
+  text in the shape of a measurement, a number with a unit, is refused; the host's memory is read
+  from the capacity file's host block, in GiB.
+- Tests: `Refuses.test_a_non_result_used_outside_its_place` and its neighbours. Fault:
+  `writeup-non-result-anywhere`, PROVEN. Commit: `ee91d17`.
+
+### WD-15 (should-fix) The essay read files under a pin, and files no validator checks, saying neither
+
+- Shown: a file under a pin of `scripts/data_pins.json` was read with no word of it.
+- Fixed: a pinned file is read only through a kind that declares the pin, and each paragraph
+  showing its figures carries the pin's token; each diagnostic kind carries a note, printed in each
+  paragraph that cites it, that its summaries are assembled by a script that refuses inconsistent
+  recordings and that no separate validator re-reads them.
+- Tests: `Pins` (four). Faults: `writeup-pin-unsaid`, `writeup-pinned-file-undeclared`, PROVEN.
+  Commit: `ee91d17`.
+
+### WD-16 (should-fix) "Opens with its conclusion" was checked as a full stop
+
+- Shown: an opening of "Read on." passed.
+- Fixed: after the title, one paragraph of exactly three sentences, each holding a token.
+- Test: `Refuses.test_an_opening_that_is_not_three_sentences_each_with_a_token`. Fault:
+  `writeup-opening-any-length`, PROVEN. Commit: `ee91d17`.
+
+### WD-17 (note) Other things the check did not hold
+
+- Shown: two tokens side by side made "3030", and a character reference made a digit.
+- Fixed: tokens glued to each other or to a digit, character references, a multiplier glued to its
+  number ("x3"), a numeral other than an ASCII digit ("½", "²") and "an order of magnitude" are
+  refused; the measured commit is twelve characters. Not fixed, and listed in README's account of
+  what the check does not hold: a verdict token beside the wrong target, a description that
+  misnames what its entry reads, and a number after a letter, as in a version.
+- Tests: `Refuses.test_tokens_side_by_side_or_against_a_digit`,
+  `Refuses.test_a_character_reference`,
+  `Refuses.test_a_multiplier_or_a_numeral_that_is_not_a_digit`. Faults:
+  `writeup-tokens-glued-accepted`, PROVEN; `writeup-numeral-forms-accepted`, PROVEN. Commits:
+  `ee91d17`, `de58a2a`.
+
+### WD-18 (should-fix) README's account of the step claimed more than the check held
+
+- Shown by reading `README.md:124-137` against the code: "every figure and verdict is a token" was
+  narrower in the code, and the account left out the judging words, the trusted list, the commits
+  and the pins.
+- Fixed: the paragraph states each rule as the code enforces it and lists what it does not hold.
+- No test or fault: prose. Commit: `bed34fb`.

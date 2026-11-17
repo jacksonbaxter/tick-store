@@ -214,8 +214,9 @@ kernel ([counters run]({{path:d3}}): {{note:diag-counters}}).
 **The store's price column.** Per piece, the reader inflates any zstd frame, allocates, decodes
 PFOR with scale and patches, range-checks every value and appends. On the Zen 1 those steps take
 {{d4_zstd_pct}}%, {{d4_pfor_unpack_pct}}% (unpack), {{d4_patches_pct}}% (patches),
-{{d4_scale_range_pct}}% (scale and range check) and {{d4_alloc_copy_pct}}% (allocation and copy) of
-the decode's user cycles ([price-decode profile]({{path:d4}}): {{note:diag-price}}).
+{{d4_scale_range_pct}}% (scale and range check) and {{d4_alloc_copy_pct}}% (allocation and copy, as far
+as the profile resolves them; the C library, where a copy's addresses can land unresolved, holds
+{{d4_libc_pct}}%) of the decode's user cycles ([price-decode profile]({{path:d4}}): {{note:diag-price}}).
 
 ## Branch prediction and instruction counts
 

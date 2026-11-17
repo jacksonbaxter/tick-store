@@ -6134,6 +6134,85 @@ from git after it.
 `scripts/check.sh --only py-scripts,hygiene,render-check` through `heavy.sh` at `38b95d5`: all
 three PASS, 986 tests with 6 skipped.
 
+### The essay's render, derived rather than asserted
+
+2026-11-16. A review of the render at `979fb58` found eighteen ways the essay could say more than
+its files hold (docs/REVIEW.md, WD-1 to WD-18). Each was reproduced first on a copy of that
+commit's scripts, in a small tree of its own. Thirteen rendered and passed `--check` with exit 0
+where they should have been refused; WD-11 and WD-12 were shown by mutations, `sub`'s operands
+swapped and `verdict_class` calling a row met on any part, that left every old test passing; WD-8,
+WD-13 and WD-18 were read off the committed files. `scripts/render_writeup.py` is rewritten to
+schema `tick-store-writeup-figures-2`, and its test file to 127 tests, one or more for every form,
+format and refusal.
+
+**What the render now derives.** The commit sentence is two generated tokens: the one commit
+every file a token reads names, and the exceptions the figure list declares, each with its
+reason: the fuzz result and the coverage summary, at the fuzz commit, whose claim to differ from
+the measured commit only in the fuzz harness and its tests is put to `git diff --name-only`; the
+prover's record, which names no commit; and the replaced comparison day. A sentence with a word
+that compares, ranks, judges or counts must hold a claim of the list, `targets.json`'s own form,
+whose condition reads the figures the sentence prints, or a token that carries the word: a
+verdict its target's words, a bar its comparator's, a table header its column's. The Missed
+targets and Not judged sections are held to the rows of those verdicts. A verdict the replaced
+run judged otherwise is printed with both runs' figures and outcomes, said to be in tick-store's
+favour where it is, and no claim may rest on it. A file under a pin is read only through a kind
+that declares the pin, and every paragraph showing its figures carries the pin's token, as each
+paragraph showing a diagnostic carries its note, which says the summaries are assembled by a
+script that refuses inconsistent recordings and that no separate validator re-reads them.
+
+**The template.** It is rewritten to the campaign at `ede0176b10bb`: an opening of three
+sentences, each with a token; the input asymmetry in plain words where the method is described
+and beside each write verdict against another system, with each write's resident pages and
+device reads as tokens; the replaced day's figures beside WT-4 against ArcticDB, the one verdict
+whose outcome changed; the disturbances as tokens of a pending kind; the fuzz result of the
+frozen commit called no result, G-3 judged at the second commit, and the oracle's bound constants
+as code tokens that wait for their merge; and a Limits paragraph. Each causal sentence either
+cites a figure that shows it, says only what was measured, or is cut:
+
+- Cut: the opening's "because each must decode", "in decode time", "plainest miss" and its counts
+  in words; the two faults of the test harness; AVX2's split of each 256-bit register; memory
+  wait costing more cycles; the book checkpoint's costing; "with the bases they miss their
+  target"; the segment-scoring rule and "won Q2, Q3 and Q5"; "only these two sizes were timed";
+  "decodes faster than a Huffman dictionary"; "misses three size targets that a codec meets";
+  PEXT being slow on the Zen 1; the clang vectorisation note; "two parts of the path have no
+  vector form"; the refused kernel runs' count; "instruction count binds it", "not
+  instruction-bound" and the data-dependent branches; the ITCH parse paragraph and "encoding
+  adds"; the bit-flip paragraph; "from beating one system to beating none"; "within 5%"; the
+  typed host facts, "4 MB of L3", "4-core" and "15 GB", now read from the capacity file.
+- Reworded: "four times longer" and "N times fewer" to tokens of the ratio; the one column where
+  Gorilla is smaller to its figures; "hottest columns" to "some columns"; "memory bounded by the
+  segment" to the segment's figures; "Why the writer is slow" to "Where the writer's time goes";
+  "faster still" to the figures; the kernel-sets table to a paragraph; the Missed table's Why
+  cells without a figure behind them to "Not traced"; the prover's sentence to its record's own
+  terms, faults listed without the control, faults the record covers, proven, and whether its
+  control passed.
+
+**The dry render.** On a scratch tree of the worktree with the campaign's 24 audited files, the
+old Linux day moved to `results/compare/replaced/` and the frozen commit's fuzz file removed,
+the render exits 3: not judged, 14 of 347 tokens waiting, capacity (Linux) 2 and a claim, the
+oracle's bound (a merge) 2, disturbances (Linux) 3, fuzz (any) 7 and the Not judged census. Its
+draft runs to 3,882 words, each waiting token counted as one; resolved, the waiting tokens add
+about 50. In the committed tree the render exits 2, refused: the verdict of CR-2 reads the Linux
+day `Linux-12302019-full-67ae574f5666.json`, which is under the pin
+`protocol_1_comparison_files` through a kind that does not declare it. The refusal stands until
+the campaign's commit moves that file to `results/compare/replaced/`, and until then
+writeup-check fails rather than skips.
+
+**On the rebase.** The README's pitch now ties whole sentences to the results, some with
+several conditions, so an essay claim names words of one pitch sentence and every condition of
+that sentence must hold; the essay says "fixed setups" where the README does; and the price
+column's sentence reads the C library's share beside allocation and copies, where a copy's
+addresses can land unresolved (review DX-12).
+
+**Faults.** Twenty-five are new and the essay's seven older patches are remade on the moved
+lines, each caught by its test on a patched copy before it was listed; `verdict-class-met-on-any-part`
+mutates `render_results.py` in the prover's clone only. All 33 of the essay's `py-scripts` faults,
+the 25 new, the seven remade and `check-sh-writeup-not-judged-passes`, were PROVEN with `--only`
+through `heavy.sh`, in batches of eight on clones of the fixes before their rebase onto
+`8a9cdfb`, at about four minutes a fault; the rebase changed the render only in how an essay
+claim finds its pitch sentence, which no fault mutates. `results/check-proofs.json` was restored from git
+after each run.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
