@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1085,7 +1085,7 @@
+                 if CAUSE_UNKNOWN not in said:
+                     return (f"{name}:{number}: {said[:90]!r} states a move between the replaced "
+                             f"run and this one and does not say its cause {CAUSE_UNKNOWN}")
+-                found = CAUSAL.search(UNKNOWN_CAUSE.sub("", said))
++                found = None
+                 if found:
+                     return (f"{name}:{number}: {said[:90]!r} joins a move between the runs to a "
+                             f"cause with {found.group(0)!r}, and its cause {CAUSE_UNKNOWN}")

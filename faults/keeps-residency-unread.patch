@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1122,7 +1122,7 @@
+         except TargetError:
+             continue
+         detail = (result.get("write") or {}).get("detail") or {}
+-        for key in ("input_at_clock_start", "input_resident"):
++        for key in ("input_at_clock_start",):
+             if isinstance(detail.get(key), dict):
+                 resident.append((system, key, detail[key]))
+                 break

@@ -2190,7 +2190,9 @@ class ReplacedRunTest(Scratch):
                       "Engine-only, by each write's record: for tick-store, the total less "
                       "python_seconds, itch; for ArcticDB, the total less python_seconds, cols",
                       "Engine-only does not remove the difference in where the inputs are",
-                      "ArcticDB's engine-only went from 43.0 s on the replaced run to 291.0 s"):
+                      "Between the replaced run and this one, ArcticDB's total went from 124.0 s to "
+                      "381.0 s and its engine-only from 43.0 s to 291.0 s; the cause of this move "
+                      "was not measured and is not known."):
             self.assertIn(words, text)
 
     def test_a_write_whose_record_keeps_no_residency_says_so(self):
@@ -2564,6 +2566,82 @@ class ConditionsTest(Scratch):
         # A hand-written quote of the verdict outside the pitch takes the whole mark.
         self.assertIn("without a mark", self.quoted(
             f"| T-13 | Linux | 1 ms | Met; {RENDER.PITCH_SWAPPED} |\n", [SWAP_ROW]) or "")
+
+    def test_a_move_between_the_runs_says_its_cause_is_not_known(self):
+        # Review C2-1: the move stands in a sentence of its own, its cause said to be unknown.
+        self.favourable_change()
+        text = RENDER.verdict_text(CHANGE_ROW, self.parts())
+        moves = [sentence for sentence in RENDER.sentences_of(text)
+                 if "Between the replaced run" in sentence]
+        self.assertEqual(len(moves), 1, text)
+        self.assertIn(RENDER.CAUSE_UNKNOWN, moves[0])
+        self.assertNotIn("where the inputs are", moves[0])
+        self.assertIsNone(RENDER.move_problem([("RESULTS.md", f"| T-11 | {text} |\n")]))
+        bare = text.replace(f"; the cause of this move {RENDER.CAUSE_UNKNOWN}", "")
+        self.assertIn("does not say its cause was not measured and is not known",
+                      RENDER.move_problem([("RESULTS.md", f"| T-11 | {bare} |\n")]) or "")
+        hand = ("ArcticDB's engine-only went from 42.6 s on the replaced run to 291.8 s on this "
+                "one.\n")
+        self.assertIn("BENCHMARKS.md:1: ", RENDER.move_problem([("BENCHMARKS.md", hand)]) or "")
+
+    def test_a_move_joined_to_a_cause_is_refused(self):
+        joined = ("Engine-only does not remove the difference in where the inputs are: the device "
+                  "bytes are counted over the whole clock, so engine-only may hold them as well, "
+                  "and ArcticDB's engine-only went from 42.6 s on the replaced run to 291.8 s; the "
+                  f"cause of that move {RENDER.CAUSE_UNKNOWN}.\n")
+        self.assertIn("joins a move between the runs to a cause",
+                      RENDER.move_problem([("RESULTS.md", joined)]) or "")
+        for cause in ("because the cache held less", "as a result of the cache"):
+            said = (f"ArcticDB's engine-only went from 42.6 s on the replaced run to 291.8 s, "
+                    f"{cause}; the cause of that move {RENDER.CAUSE_UNKNOWN}.\n")
+            with self.subTest(cause=cause):
+                self.assertIn("joins a move", RENDER.move_problem([("BENCHMARKS.md", said)]) or "")
+        alone = (f"ArcticDB's engine-only went from 42.6 s on the replaced run to 291.8 s; the "
+                 f"cause of that move {RENDER.CAUSE_UNKNOWN}.\n")
+        self.assertIsNone(RENDER.move_problem([("BENCHMARKS.md", alone)]))
+
+    def test_what_the_replaced_record_keeps_is_said_from_its_fields(self):
+        # Review C2-2: tick-store's write keeps its input's residency, another system's write
+        # keeps none, no write keeps a device read, and each read-back keeps its eviction.
+        ours = recorded_write(189.0, 0.4)
+        ours["detail"]["input_resident"] = {"pages": 10, "resident_pages": 10}
+        old = change_document(ours, recorded_write(124.0, 81.0), commit="67ae574f5666")
+        evicted = {"what": "the day's ITCH file and its export", "pages": 30, "resident_after": 0}
+        for system in old["systems"].values():
+            system["variants"]["h"]["classes"]["B"]["read_back"] = {
+                "streamed": {"inputs_evicted_before": evicted}}
+        said = RENDER.replaced_keeps(old, "B")
+        self.assertEqual(said, "The replaced run's record keeps, of the class B writes, an input "
+                               "residency figure for tick-store's write (`input_resident`, 10 of "
+                               "10 pages resident) and none for ArcticDB's, and no device-read "
+                               "figure for any write; and of their read-backs, every system's: "
+                               "that the day's ITCH file and its export were evicted before it, "
+                               "with 0 of their 30 pages resident after (`inputs_evicted_before`).")
+        self.write(change_document(recorded_write(190.0, 0.4), recorded_write(381.0, 90.0)), old)
+        self.assertIsNone(RENDER.keeps_problem([("BENCHMARKS.md", said + "\n")], self.tree))
+        wider = ("The replaced run's record keeps no residency or device-read figure for any "
+                 "system but tick-store, so it cannot show what the cache held.\n")
+        self.assertIn("is not the sentence its fields give",
+                      RENDER.keeps_problem([("compare/README.md", wider)], self.tree) or "")
+
+    def test_the_render_refuses_a_page_with_a_move_or_a_record_said_wrong(self):
+        self.favourable_change()
+        self.results_md.write_text(WITH_TARGETS, encoding="utf-8")
+        self.targets.write_text(json.dumps({"schema": "t", "rows": [CHANGE_ROW]}),
+                                encoding="utf-8")
+        page = self.tree / "BENCHMARKS.md"
+        for text, said in (("ArcticDB's engine-only went from 43.0 s on the replaced run to "
+                            "291.0 s on this one.\n", "does not say its cause"),
+                           ("The replaced run's record keeps no residency or device-read figure "
+                            "for any system but tick-store.\n", "is not the sentence its fields")):
+            with self.subTest(said=said):
+                page.write_text(text, encoding="utf-8")
+                result = self.render()
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn(f"BENCHMARKS.md:1: ", result.stderr)
+                self.assertIn(said, result.stderr)
+        page.unlink()
+        self.assertNotIn("BENCHMARKS.md", self.render().stderr)
 
     def test_the_render_refuses_a_page_quoting_a_marked_verdict_bare(self):
         self.favourable_change()

@@ -355,6 +355,20 @@ def call_a_host_by_its_system():
     edit_text("README.md", "C++23 columnar store", "C++23 Linux store")
 
 
+def drop_the_moves_unknown_cause():
+    """BENCHMARKS.md's move of ArcticDB's class B write between the runs with its unknown cause
+    taken out, as the pages read before review C2."""
+    edit_text("BENCHMARKS.md", "; the cause of that move was not measured and is not known.", ".")
+
+
+def widen_what_the_replaced_record_lacks():
+    """BENCHMARKS.md's sentence on what the replaced run's record keeps as review C2 found it,
+    saying it keeps no residency figure for any system but tick-store."""
+    edit_text("BENCHMARKS.md", "The replaced run's record keeps, of the class B writes,",
+              "The replaced run's record keeps no residency or device-read figure for any system "
+              "but tick-store, and, of the class B writes,")
+
+
 def quote_wt4_with_the_old_word():
     """BENCHMARKS.md's WT-4 row back as the review found it: the ArcticDB part under "missed"
     and its outcome on this run's figures in a later clause, not the mark RESULTS.md gives
@@ -1723,6 +1737,40 @@ FAULTS = (
           "flagged figure", CHECK_FAILED,
           "FAIL: test_the_pitchs_short_form_speaks_of_rivals_and_stands_nowhere_else "
           "(__main__.ConditionsTest"),
+    Fault("move-cause-unknown-dropped", "py-scripts", "render_results.py stating the moves between "
+          "the runs without saying their cause is not known", CHECK_FAILED,
+          "FAIL: test_a_move_between_the_runs_says_its_cause_is_not_known "
+          "(__main__.ConditionsTest"),
+    Fault("move-joined-to-the-inputs", "py-scripts", "render_results.py joining the moves between "
+          "the runs to the sentence on the inputs' difference", CHECK_FAILED,
+          "FAIL: test_a_move_between_the_runs_says_its_cause_is_not_known "
+          "(__main__.ConditionsTest"),
+    Fault("move-unknown-unchecked", "py-scripts", "render_results.py passing a page's move between "
+          "the runs that does not say its cause is not known", CHECK_FAILED,
+          "FAIL: test_a_move_between_the_runs_says_its_cause_is_not_known "
+          "(__main__.ConditionsTest"),
+    Fault("move-cause-unchecked", "py-scripts", "render_results.py passing a page's move between "
+          "the runs to a joined cause", CHECK_FAILED,
+          "FAIL: test_a_move_joined_to_a_cause_is_refused "
+          "(__main__.ConditionsTest"),
+    Fault("keeps-sentence-unchecked", "py-scripts", "render_results.py passing a page that says "
+          "more than the replaced record keeps", CHECK_FAILED,
+          "FAIL: test_what_the_replaced_record_keeps_is_said_from_its_fields "
+          "(__main__.ConditionsTest"),
+    Fault("keeps-residency-unread", "py-scripts", "render_results.py reading tick-store's input "
+          "residency in the replaced record as absent", CHECK_FAILED,
+          "FAIL: test_what_the_replaced_record_keeps_is_said_from_its_fields "
+          "(__main__.ConditionsTest"),
+    Fault("render-move-checks-unwired", "py-scripts", "render_results.py's render never reading "
+          "the pages for moves or the replaced record", CHECK_FAILED,
+          "FAIL: test_the_render_refuses_a_page_with_a_move_or_a_record_said_wrong "
+          "(__main__.ConditionsTest"),
+    Fault("benchmarks-move-cause-unsaid", "render-check", "BENCHMARKS.md's move of ArcticDB's "
+          "write between the runs without its unknown cause", EXIT_RENDER_REFUSED,
+          "does not say its cause was not measured and is not known", drop_the_moves_unknown_cause),
+    Fault("benchmarks-replaced-record-widened", "render-check", "BENCHMARKS.md saying the "
+          "replaced record keeps less than it does, as the review found it", EXIT_RENDER_REFUSED,
+          "is not the sentence its fields give", widen_what_the_replaced_record_lacks),
     Fault("headline-value-mark-dropped", "py-scripts", "render_results.py letting a headline "
           "text show a figure from a disturbed phase with no mark beside it", CHECK_FAILED,
           "FAIL: test_a_headline_figure_from_a_disturbed_phase_must_show_its_mark "

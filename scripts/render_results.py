@@ -1019,22 +1019,162 @@ def write_inputs(row, parts):
     replaced = next((notes_of(part)["replaced"] for part in parts
                      if notes_of(part).get("replaced")), None)
     if replaced is not None:
+        # The moves between the runs stand in a sentence of their own, with their cause said to
+        # be unknown, never joined to the inputs' difference, which would read as their cause:
+        # a cause is stated only from a published run that measured it (review C2-1).
         moved = []
         for system in systems:
             if system == "tickstore":
                 continue
-            try:
-                before = engine_only(walk(replaced[1], ["systems", system, "variants",
-                                                        "@headline", "classes", class_name,
-                                                        "write"]))
-                after = engine_only(writes[system])
-            except (NoFigure, TargetError):
-                continue
-            moved.append(f"{SYSTEM_LABEL[system]}'s engine-only went from {shown(before, row)} "
-                         f"on the replaced run to {shown(after, row)}")
+            old_write = walk(replaced[1], ["systems", system, "variants", "@headline",
+                                           "classes", class_name, "write"])
+            pieces = []
+            for what, figure in (("total", lambda write: write["seconds_median"]),
+                                 ("engine-only", engine_only)):
+                try:
+                    before, after = figure(old_write), figure(writes[system])
+                except (NoFigure, KeyError):
+                    continue
+                pieces.append(f"{what} from {shown(before, row)} to {shown(after, row)}")
+            if pieces:
+                moved.append(f"{SYSTEM_LABEL[system]}'s " + pieces[0].replace(" from ", " went "
+                             "from ", 1) + "".join(f" and its {piece}" for piece in pieces[1:]))
         if moved:
-            text += ", and " + ", ".join(moved)
+            text += (". Between the replaced run and this one, " + "; ".join(moved) + "; the "
+                     f"cause of {'this move' if len(moved) == 1 else 'these moves'} "
+                     f"{CAUSE_UNKNOWN}. This run's records give where each input was and the "
+                     "bytes read above. " + replaced_keeps(replaced[1], class_name)[:-1])
     return text
+
+
+# What a page says of a move between the replaced run and this one: its cause was not measured,
+# so it is not known, and nothing may say it is (review C2-1).
+CAUSE_UNKNOWN = "was not measured and is not known"
+# A sentence that states a move between the runs: one that says a figure went, moved, rose or
+# fell, or gives a figure on the replaced run beside one on this one.
+MOVE = re.compile(r"\b(?:went|moved|rose|fell|jumped|grew|dropped)\b|"
+                  r"\bon the replaced run\b.*\bon this (?:one|run)\b", re.IGNORECASE)
+# Words that would give a move a cause, or join it to the inputs' difference, which reads as
+# one.
+CAUSAL = re.compile(r"\b(?:because|since|so|thus|hence|therefore|due to|owing to|as a result|"
+                    r"caused?|causing|explains?|explained|reflects?|shows? how far|evidence|"
+                    r"asymmetry|where the inputs are|cache dependence)\b", re.IGNORECASE)
+
+
+# The words that say a move's cause is not known, left out when a sentence is read for a cause.
+UNKNOWN_CAUSE = re.compile(r"the cause of (?:this|that|these) moves? " + re.escape(CAUSE_UNKNOWN))
+
+
+def unit_sentences(unit):
+    """The sentences of a unit of a page, a table row's cells apart."""
+    cells = [cell.strip() for cell in unit.strip().strip("|").split(" | ")] \
+        if unit.startswith("|") else [unit]
+    return [sentence for cell in cells for sentence in sentences_of(cell)]
+
+
+def move_problem(pages):
+    """Where a sentence states a move between the replaced run and this one without saying
+    that its cause was not measured and is not known, or joins it to a cause, or None. pages
+    is (name, text)."""
+    for name, text in pages:
+        for number, unit in prose_units(text):
+            for sentence in unit_sentences(unit):
+                if not MOVE.search(sentence) or "replaced run" not in sentence:
+                    continue
+                said = " ".join(sentence.split())
+                if CAUSE_UNKNOWN not in said:
+                    return (f"{name}:{number}: {said[:90]!r} states a move between the replaced "
+                            f"run and this one and does not say its cause {CAUSE_UNKNOWN}")
+                found = CAUSAL.search(UNKNOWN_CAUSE.sub("", said))
+                if found:
+                    return (f"{name}:{number}: {said[:90]!r} joins a move between the runs to a "
+                            f"cause with {found.group(0)!r}, and its cause {CAUSE_UNKNOWN}")
+    return None
+
+
+def evictions_of(block):
+    """Every record of the inputs evicted before a phase, anywhere in a block."""
+    found = []
+    if isinstance(block, dict):
+        for key, value in block.items():
+            if key == "inputs_evicted_before" and isinstance(value, dict):
+                found.append(value)
+            else:
+                found += evictions_of(value)
+    return found
+
+
+# How the sentence on what a replaced run's record keeps opens, wherever it stands.
+KEEPS = "The replaced run's record keeps"
+
+
+def replaced_keeps(document, class_name):
+    """What a replaced run's record keeps of a class's headline writes and their read-backs
+    that could show where each input was, word for word from its fields: whose write keeps an
+    input residency figure, whose a device-read figure, and what each read-back keeps of the
+    inputs evicted before it (review C2-2)."""
+    systems = [*dict.fromkeys(["tickstore", *ordered_systems(document)])]
+    resident, device, evicted = [], [], {}
+    for system in systems:
+        try:
+            result = walk(document, ["systems", system, "variants", "@headline", "classes",
+                                     class_name])
+        except TargetError:
+            continue
+        detail = (result.get("write") or {}).get("detail") or {}
+        for key in ("input_at_clock_start", "input_resident"):
+            if isinstance(detail.get(key), dict):
+                resident.append((system, key, detail[key]))
+                break
+        if isinstance(detail.get("device_read"), dict):
+            device.append(system)
+        for found in evictions_of(result.get("read_back")):
+            evicted.setdefault((found.get("what"), found.get("pages"),
+                                found.get("resident_after")), []).append(system)
+    others = [system for system in systems if system not in [found[0] for found in resident]]
+    if not resident:
+        writes = "no input residency figure for any write"
+    else:
+        named = and_list([f"{SYSTEM_LABEL[system]}'s write (`{key}`, "
+                          f"{figure['resident_pages']:,} of {figure['pages']:,} pages resident)"
+                          for system, key, figure in resident])
+        writes = f"an input residency figure for {named}" + (
+            f" and none for {possessive(others)}" if others else "")
+    reads = "no device-read figure for any write" if not device else \
+        f"a device-read figure for {possessive(device)} alone" if len(device) < len(systems) \
+        else "a device-read figure for every write"
+    if not evicted:
+        backs = "nothing on the inputs"
+    else:
+        backs = "; ".join(
+            f"{'every system' if len(owners) == len(systems) else possessive(owners)}'s"
+            f"{'' if len(owners) == len(systems) else ' read-backs'}: that {what} were evicted "
+            f"before it, with {after:,} of their {pages:,} pages resident after "
+            f"(`inputs_evicted_before`)"
+            for (what, pages, after), owners in evicted.items())
+    return (f"{KEEPS}, of the class {class_name} writes, {writes}, and {reads}; and of their "
+            f"read-backs, {backs}.")
+
+
+def keeps_problem(pages, root):
+    """Where a sentence saying what a replaced run's record keeps is not replaced_keeps' own
+    sentence for one of its classes, word for word, or None: a hand-written page may not say
+    more, or less, than the record holds (review C2-2). pages is (name, text)."""
+    wanted = set()
+    for path in sorted((Path(root) / "results" / "compare" / REPLACED).glob("*.json")):
+        document = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(document.get("systems"), dict):
+            wanted |= {replaced_keeps(document, name) for name in ("A", "B")}
+    wanted = {sentence[:-1] for sentence in wanted}
+    for name, text in pages:
+        for number, unit in prose_units(text):
+            for sentence in unit_sentences(unit):
+                said = " ".join(sentence.split()).rstrip(".")
+                if KEEPS in said and said not in wanted:
+                    return (f"{name}:{number}: {said[:90]!r} says what the replaced run's record "
+                            "keeps, and is not the sentence its fields give: "
+                            f"{sorted(wanted)[0] if wanted else 'no replaced record'!r}")
+    return None
 
 
 def input_reads(document, class_name):
@@ -3091,6 +3231,12 @@ def main(argv=None):
         pages += [(name, (args.targets_root / name).read_text(encoding="utf-8"))
                   for name in RESULTS_PAGES if (args.targets_root / name).is_file()]
         problem = page_problem(pages, writers)
+        if problem:
+            raise TargetError(problem)
+        # The pages as they will be, their generated blocks as rendered now, for the moves.
+        written = [(name, without_blocks(text)) for name, text in pages] + \
+            [("the generated blocks", "\n".join(generated))]
+        problem = move_problem(written) or keeps_problem(written, args.targets_root)
         if problem:
             raise TargetError(problem)
         if has_targets:

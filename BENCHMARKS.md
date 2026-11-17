@@ -165,13 +165,16 @@ and `device_bytes_read`, the block device's sectors read machine-wide over the c
 23,850,713,088 and 24,631,062,528 B for class B. Engine-only takes out reading the input and putting
 it in the form the system's call takes, but the device bytes are counted over the whole clock, so
 engine-only may hold them as well. Since this run's records show those device reads inside every
-other system's clock, the two-clock rule does not take the asymmetry out. ArcticDB's class B
-engine-only time went from 42.6 s on the replaced run to 291.8 s on this one, and the cause is not
-known. This run's record shows that write starting with 4,033 of its input's 5,825,603 pages
-resident and reading 23,850,713,088 B from the device inside the clock. The replaced run's record
-keeps no residency or device-read figure for any system but tick-store, so it cannot show what the
-cache held then or how much was read, and the two records cannot say whether the cache made the
-difference. Each figure comes from one host, whose 15 GB of memory is less than the export, and one write per class.
+other system's clock, the two-clock rule does not take the asymmetry out. Between the replaced run
+and this one, ArcticDB's class B total went from 123.6 s to 381.4 s and its engine-only time from
+42.6 s to 291.8 s; the cause of that move was not measured and is not known. This run's record shows
+that write starting with 4,033 of its input's 5,825,603 pages resident and reading 23,850,713,088 B
+from the device inside the clock. The replaced run's record keeps, of the class B writes, an input
+residency figure for tick-store's write (`input_resident`, 2,014,504 of 2,014,504 pages resident)
+and none for Parquet's, ArcticDB's and QuestDB's, and no device-read figure for any write; and of
+their read-backs, every system's: that the day's ITCH file and its export were evicted before it,
+with 0 of their 7,840,107 pages resident after (`inputs_evicted_before`). So that record cannot show
+what the cache held when ArcticDB's write started or how much it read. Each figure comes from one host, whose 15 GB of memory is less than the export, and one write per class.
 A fair protocol would start every system's clock with its input in the same proven state: on this
 host every input evicted before the clock, tick-store's included, or on a host that can hold them
 every input resident, as on the slice, with more than one write per class. RESULTS.md gives these

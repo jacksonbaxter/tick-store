@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1040,7 +1040,7 @@
+                 moved.append(f"{SYSTEM_LABEL[system]}'s " + pieces[0].replace(" from ", " went "
+                              "from ", 1) + "".join(f" and its {piece}" for piece in pieces[1:]))
+         if moved:
+-            text += (". Between the replaced run and this one, " + "; ".join(moved) + "; the "
++            text += (", and between the replaced run and this one, " + "; ".join(moved) + "; the "
+                      f"cause of {'this move' if len(moved) == 1 else 'these moves'} "
+                      f"{CAUSE_UNKNOWN}. This run's records give where each input was and the "
+                      "bytes read above. " + replaced_keeps(replaced[1], class_name)[:-1])
