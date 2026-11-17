@@ -368,7 +368,7 @@ def drop_a_pitch_claims_tie():
     taken out of scripts/targets.json, so the sentence ranks with nothing to hold it to."""
     def change(document):
         document["pitch"]["claims"] = [claim for claim in document["pitch"]["claims"]
-                                       if "Nasdaq's peak" not in claim["text"]]
+                                       if "Nasdaq's published peak" not in claim["text"]]
     edit_json("scripts/targets.json", change)
 
 

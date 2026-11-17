@@ -23,13 +23,13 @@
     "values": {"tickstore": {"value": {"path": ["systems", "tickstore", "variants", "@headline", "queries", "Q4", "warm", "median_us"]}, "scale": 0.001, "format": "{:,.2f}"},
                "best_system": {"value": {"lowest_system": {"systems": ["parquet", "arcticdb", "questdb"], "path": ["queries", "Q4", "warm", "median_us"]}}, "label": "system"},
                "best": {"value": {"lowest_value": {"systems": ["parquet", "arcticdb", "questdb"], "path": ["queries", "Q4", "warm", "median_us"]}}, "scale": 0.001, "format": "{:,.2f}"}}},
-   {"id": "WT-2", "host": "Linux", "parts": ["class A"], "what": "One-thread ingest", "bar": "above {target} M messages/s, Nasdaq's peak", "source": "Nasdaq bandwidth report",
+   {"id": "WT-2", "host": "Linux", "parts": ["class A"], "what": "One-thread ingest", "bar": "above {target} M messages/s, Nasdaq's published peak rate", "source": "Nasdaq's bandwidth report",
     "measured": "{rate} M messages/s",
     "values": {"target": {"target": "above", "scale": 1e-6, "format": "{:.2f}"},
                "rate": {"value": {"path": ["systems", "tickstore", "variants", "@headline", "classes", "A", "write", "records_per_second_median"]}, "scale": 1e-6, "format": "{:.3f}"}}}
   ],
   "under": {"id": "WT-2", "host": "macOS", "parts": ["class A"],
-   "text": "Against the same bar, one thread on an Apple M4 Max laptop, unpinned (its thread not held to one core), ingests {rate} M messages/s: {verdict}.",
+   "text": "Against the same bar, one thread on an Apple M4 Max laptop, unpinned (its thread not held to one core), ingests {rate} M messages/s: {verdict}. Every figure from the Ryzen was taken while that machine's own scheduled jobs ran, backups, sync jobs and a health collector among them, and only the runs the logs place inside a timed phase are marked.",
    "values": {"rate": {"value": {"path": ["systems", "tickstore", "variants", "@headline", "classes", "A", "write", "records_per_second_median"]}, "scale": 1e-6, "format": "{:.3f}"}}},
   "names": [
    {"id": "G-1", "host": "any", "name": "the round trip", "parts": {"12302019 macOS": "the reference day's round trip on the laptop", "12302019 Linux": "the reference day's round trip on the Ryzen", "10302019 macOS": "the second day's round trip"}},
@@ -95,7 +95,7 @@
    {"text": "It gives every message back bit-exact.", "target": {"id": "G-1", "host": "any", "verdict": "met"}},
    {"text": "Beside Parquet, ArcticDB and QuestDB on a 2018 four-core AMD Ryzen running Linux, it takes the least disk.", "target": {"id": "CR-2", "host": "Linux", "verdict": "met"}},
    {"text": "On the Ryzen it answers one stock's hour, warm, in 74.04 ms, ArcticDB with a table per stock in 44.58 ms; ArcticDB or QuestDB wins short market-wide windows; the host was swapping memory during some rivals' runs, which may flatter tick-store.", "file": "results/compare/Linux-12302019-full-*.json", "fastest": {"systems": ["parquet", "arcticdb", "questdb", "tickstore"], "queries": ["Q1", "Q4"], "kinds": ["warm", "cold"], "fields": ["median_us", "p99_us"], "one_of": ["arcticdb", "questdb"]}},
-   {"text": "One thread on the Ryzen ingests below Nasdaq's peak rate.", "target": {"id": "WT-2", "host": "Linux", "parts": ["class A"], "verdict": "missed"}}
+   {"text": "One thread on the Ryzen ingests below Nasdaq's published peak.", "target": {"id": "WT-2", "host": "Linux", "parts": ["class A"], "verdict": "missed"}}
   ]
  },
  "rows": [
@@ -300,14 +300,14 @@
   {"id": "WT-1", "host": "macOS", "target": {"at_least": 8590000}, "target_text": "at least 8.59 M records/s", "digits": 3, "scale": 1e-6, "unit": " M records/s",
    "parts": [{"label": "class A, one thread", "file": "results/compare/macOS-12302019-full-tickstore-*.json",
               "value": {"path": ["systems", "tickstore", "variants", "@headline", "classes", "A", "write", "records_per_second_median"]}}]},
-  {"id": "WT-2", "host": "Linux", "pitch": [{"words": "ingests below Nasdaq's peak rate", "parts": ["class A"]}],
-   "target": {"above": 2732762}, "target_text": "above 2,732,762 messages/s", "digits": 3, "scale": 1e-6, "unit": " M messages/s",
+  {"id": "WT-2", "host": "Linux", "pitch": [{"words": "ingests below Nasdaq's published peak", "parts": ["class A"]}],
+   "target": {"above": 2732762}, "target_text": "above 2,732,762 messages/s", "judged": "Nasdaq's published peak rate, the highest TotalView rate in its bandwidth report, which describes an average trading day and warns that the open can run significantly higher, so the bar is a floor, not a true peak", "digits": 3, "scale": 1e-6, "unit": " M messages/s",
    "parts": [
     {"label": "class A", "file": "results/compare/Linux-12302019-full-*.json",
      "value": {"path": ["systems", "tickstore", "variants", "@headline", "classes", "A", "write", "records_per_second_median"]}},
     {"label": "class B", "file": "results/compare/Linux-12302019-full-*.json",
      "value": {"path": ["systems", "tickstore", "variants", "@headline", "classes", "B", "write", "records_per_second_median"]}}]},
-  {"id": "WT-2", "host": "macOS", "target": {"above": 2732762}, "target_text": "above 2,732,762 messages/s", "digits": 3, "scale": 1e-6, "unit": " M messages/s",
+  {"id": "WT-2", "host": "macOS", "target": {"above": 2732762}, "target_text": "above 2,732,762 messages/s", "judged": "Nasdaq's published peak rate, the highest TotalView rate in its bandwidth report, which describes an average trading day and warns that the open can run significantly higher, so the bar is a floor, not a true peak", "digits": 3, "scale": 1e-6, "unit": " M messages/s",
    "parts": [
     {"label": "class A", "file": "results/compare/macOS-12302019-full-tickstore-*.json",
      "value": {"path": ["systems", "tickstore", "variants", "@headline", "classes", "A", "write", "records_per_second_median"]}},
