@@ -2643,6 +2643,56 @@ class ConditionsTest(Scratch):
         page.unlink()
         self.assertNotIn("BENCHMARKS.md", self.render().stderr)
 
+    def ranked(self, figures, flagged):
+        """QL-4's parts of one query on a day of three systems, warm Q2 medians as given (ms),
+        tails three times them, the systems named flagged as timed with pages swapped in."""
+        document = change_document(recorded_write(1.0, 0.1), recorded_write(2.0, 0.1))
+        document["systems"]["questdb"] = json.loads(json.dumps(document["systems"]["arcticdb"]))
+        for system, entry in document["systems"].items():
+            block = {"median_us": figures[system] * 1000.0, "p99_us": figures[system] * 3000.0,
+                     "tail": "slowest of 30"}
+            if system in flagged:
+                block["swap_timed"] = {"pages_in": 3, "pages_out": 0, "flagged": True}
+            entry["variants"]["h"]["queries"] = {"Q2": {"warm": block}}
+        self.write(document)
+        row = {"id": "T-14", "host": "Linux", "digits": 2, "scale": 0.001, "unit": " ms",
+               "lowest_of": {"file": "results/compare/Linux-day-*.json", "ours": "tickstore",
+                             "others": ["arcticdb", "questdb"], "queries": ["Q2"],
+                             "kinds": ["warm"], "fields": ["median_us", "p99_us"]}}
+        return RENDER.verdict_of(self.parts(row), row)
+
+    def test_a_flagged_figure_that_decides_the_part_keeps_its_mark(self):
+        # Review C2-3: met, so every rival tick-store had to beat decides, the flagged one too.
+        self.assertEqual(self.ranked({"tickstore": 1.0, "arcticdb": 2.0, "questdb": 3.0},
+                                     ["questdb"]),
+                         "met; (Q2 warm) rests on figures timed while pages were swapped in; the "
+                         "record flags QuestDB's `h`")
+        # Missed, and the flagged rival is one that beat tick-store.
+        self.assertEqual(self.ranked({"tickstore": 2.0, "arcticdb": 3.0, "questdb": 1.0},
+                                     ["questdb"]),
+                         "missed; (Q2 warm) rests on figures timed while pages were swapped in; "
+                         "the record flags QuestDB's `h`")
+        # tick-store's own figure always decides.
+        self.assertIn("flags tick-store's `h`", self.ranked(
+            {"tickstore": 2.0, "arcticdb": 1.0, "questdb": 3.0}, ["tickstore"]))
+
+    def test_a_flagged_figure_that_does_not_decide_the_part_gets_no_rests_on(self):
+        # Missed on ArcticDB's unflagged figure; QuestDB's flagged one is slower than ours, so
+        # it did not make the miss and the verdict does not rest on it.
+        self.assertEqual(self.ranked({"tickstore": 2.0, "arcticdb": 1.0, "questdb": 3.0},
+                                     ["questdb"]), "missed")
+        # A write's condition met inside a part missed on another does not decide it: met on
+        # the total, 190 s against 381 s, missed on engine-only, 189.6 s against 81 s.
+        document = change_document(recorded_write(190.0, 0.4), recorded_write(381.0, 300.0))
+        spec = CHANGE_ROW["parts"][0]
+        self.assertEqual(RENDER.deciding_reads(CHANGE_ROW, spec, spec["label"], document),
+                         [("write", "tickstore", "h", "B", None),
+                          ("write", "arcticdb", "h", "B", None)])
+        # Met on both, both decide.
+        document = change_document(recorded_write(190.0, 0.4), recorded_write(381.0, 90.0))
+        self.assertEqual(RENDER.deciding_reads(CHANGE_ROW, spec, spec["label"], document),
+                         RENDER.reads_of_part(CHANGE_ROW, spec, spec["label"], document))
+
     def test_the_render_refuses_a_page_quoting_a_marked_verdict_bare(self):
         self.favourable_change()
         self.results_md.write_text(WITH_TARGETS, encoding="utf-8")

@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1495,7 +1495,7 @@
+         # A mark that says the verdict rests on a phase names only the phases whose figures
+         # decide it, as deciding_reads says; a flagged figure that does not is marked in its own
+         # cell of the comparison tables (review C2-3).
+-        deciding = deciding_reads(row, spec, label, document)
++        deciding = reads
+         found = disturbed(entries, root, path, deciding)
+         if found:
+             notes["disturbed"] = found

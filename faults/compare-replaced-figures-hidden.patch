@@ -1,7 +1,7 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -1159,8 +1159,7 @@
+@@ -1488,8 +1488,7 @@
                  notes["change"] = {"new": met, "old": old_met}
                  clock = (f", judged on {' and '.join(labels)} alone, as it keeps no "
                           f"{' and no '.join(missing)}" if labels else "")
@@ -10,4 +10,4 @@ diff --git a/scripts/render_results.py b/scripts/render_results.py
 +                text = text
                  met = min((met, old_met), key=standing)
          reads = reads_of_part(row, spec, label, document)
-         found = disturbed(entries, root, path, reads)
+         # A mark that says the verdict rests on a phase names only the phases whose figures

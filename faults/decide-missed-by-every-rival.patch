@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1592,7 +1592,7 @@
+         met = all(ours[field] <= min(other[field] for other in theirs.values())
+                   for field in fields)
+         rivals = [system for system, other in theirs.items()
+-                  if met or any(other[field] < ours[field] for field in fields)]
++                  if True]
+         return [read(spec["ours"]), *(read(system) for system in rivals)]
+     conditions = spec.get("all") or [spec]
+     judged = []

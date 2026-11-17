@@ -1765,6 +1765,18 @@ FAULTS = (
           "the pages for moves or the replaced record", CHECK_FAILED,
           "FAIL: test_the_render_refuses_a_page_with_a_move_or_a_record_said_wrong "
           "(__main__.ConditionsTest"),
+    Fault("decide-every-compared-figure", "py-scripts", "render_results.py saying a verdict "
+          "rests on every figure it compares, a flagged one that did not decide it too",
+          CHECK_FAILED, "FAIL: test_a_flagged_figure_that_does_not_decide_the_part_gets_no_rests_on "
+          "(__main__.ConditionsTest"),
+    Fault("decide-missed-by-every-rival", "py-scripts", "render_results.py taking a rival "
+          "tick-store beat as deciding a part it missed", CHECK_FAILED,
+          "FAIL: test_a_flagged_figure_that_does_not_decide_the_part_gets_no_rests_on "
+          "(__main__.ConditionsTest"),
+    Fault("decide-met-condition-in-a-miss", "py-scripts", "render_results.py taking a condition "
+          "met as deciding a part missed on another", CHECK_FAILED,
+          "FAIL: test_a_flagged_figure_that_does_not_decide_the_part_gets_no_rests_on "
+          "(__main__.ConditionsTest"),
     Fault("benchmarks-move-cause-unsaid", "render-check", "BENCHMARKS.md's move of ArcticDB's "
           "write between the runs without its unknown cause", EXIT_RENDER_REFUSED,
           "does not say its cause was not measured and is not known", drop_the_moves_unknown_cause),

@@ -1,12 +1,12 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -1161,7 +1161,7 @@
+@@ -1490,7 +1490,7 @@
                           f"{' and no '.join(missing)}" if labels else "")
                  text = (f"{text}, and on the replaced run, `{old_path.relative_to(root)}`"
                          f"{clock}, {old_text}")
 -                met = min((met, old_met), key=standing)
 +                met = max((met, old_met), key=standing)
          reads = reads_of_part(row, spec, label, document)
-         found = disturbed(entries, root, path, reads)
-         if found:
+         # A mark that says the verdict rests on a phase names only the phases whose figures
+         # decide it, as deciding_reads says; a flagged figure that does not is marked in its own

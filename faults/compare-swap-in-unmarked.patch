@@ -1,10 +1,10 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -1359,7 +1359,7 @@ def finished(row, root, specs, parts):
-         if notes.get("change"):
-             swapped += [(*read[:2], True) for read in
-                         swapped_reads(reads, notes["replaced"][1])]
+@@ -1507,7 +1507,7 @@
+             old_document = notes["replaced"][1]
+             swapped += [(*read[:2], True) for read in swapped_reads(
+                 deciding_reads(row, spec, label, old_document), old_document)]
 -        if swapped:
 +        if False:
              notes["swapped"] = list(dict.fromkeys(swapped))

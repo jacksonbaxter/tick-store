@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1605,7 +1605,7 @@
+     if any(met is not True and met is not False for met, _ in judged):
+         return reads_of_part(row, spec, label, document)
+     deciding = [reads for met, reads in judged
+-                if all(met for met, _ in judged) or met is False]
++                if True]
+     return list(dict.fromkeys(read for reads in deciding for read in reads))
+ 
+ 

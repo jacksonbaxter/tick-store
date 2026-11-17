@@ -1492,15 +1492,21 @@ def finished(row, root, specs, parts):
                         f"{clock}, {old_text}")
                 met = min((met, old_met), key=standing)
         reads = reads_of_part(row, spec, label, document)
-        found = disturbed(entries, root, path, reads)
+        # A mark that says the verdict rests on a phase names only the phases whose figures
+        # decide it, as deciding_reads says; a flagged figure that does not is marked in its own
+        # cell of the comparison tables (review C2-3).
+        deciding = deciding_reads(row, spec, label, document)
+        found = disturbed(entries, root, path, deciding)
         if found:
             notes["disturbed"] = found
-        # Each figure the part rests on that the record flags as timed with a page swapped in,
-        # and, where the replaced run's outcome is counted with this run's, the replaced run's.
-        swapped = [(*read[:2], False) for read in swapped_reads(reads, document)]
+        # Each figure that decides the part that the record flags as timed with a page swapped
+        # in, and, where the replaced run's outcome is counted with this run's, the replaced
+        # run's, decided on that run's figures.
+        swapped = [(*read[:2], False) for read in swapped_reads(deciding, document)]
         if notes.get("change"):
-            swapped += [(*read[:2], True) for read in
-                        swapped_reads(reads, notes["replaced"][1])]
+            old_document = notes["replaced"][1]
+            swapped += [(*read[:2], True) for read in swapped_reads(
+                deciding_reads(row, spec, label, old_document), old_document)]
         if swapped:
             notes["swapped"] = list(dict.fromkeys(swapped))
         writes = [read for read in reads if read[0] == "write"]
@@ -1557,6 +1563,50 @@ def reads_of_part(row, spec, label, document):
         if comparison is not None:
             found += reads_of(comparison[1], document)
     return list(dict.fromkeys(found))
+
+
+def deciding_reads(row, spec, label, document):
+    """The timed phases whose figures decide a part's outcome on a document, of the phases
+    reads_of_part gives (review C2-3). What decides, as a reader can check it against the
+    figures shown:
+    - tick-store's own figure always decides: it is the figure judged;
+    - for a part met, every rival figure tick-store had to beat decides, since any one of them
+      lower would have turned the part;
+    - for a part missed, only the rival figures that beat tick-store decide; a rival it beat did
+      not make the miss;
+    - a part of several conditions is decided, when met, by every condition's figures, and when
+      missed by the figures of the conditions it missed; a condition with no target is shown
+      only, and decides nothing;
+    - a part that cannot be judged on the document rests on every figure it reads."""
+    if "lowest_of" in row:
+        query, kind = label.split(" ", 1)
+        def read(system):
+            return ("queries", system, walk(document, ["systems", system, "headline_variant"]),
+                    kind, query)
+        def entry(system):
+            return walk(document, ["systems", system, "variants", "@headline", "queries", query,
+                                   kind])
+        ours = entry(spec["ours"])
+        theirs = {system: entry(system) for system in spec["others"]}
+        fields = spec["fields"]
+        met = all(ours[field] <= min(other[field] for other in theirs.values())
+                  for field in fields)
+        rivals = [system for system, other in theirs.items()
+                  if met or any(other[field] < ours[field] for field in fields)]
+        return [read(spec["ours"]), *(read(system) for system in rivals)]
+    conditions = spec.get("all") or [spec]
+    judged = []
+    for item in conditions:
+        comparison = comparison_of(item, row)
+        if comparison is None:
+            continue
+        reads = reads_of(item.get("value"), document) + reads_of(comparison[1], document)
+        judged.append((judge(item, row, document)[1], reads))
+    if any(met is not True and met is not False for met, _ in judged):
+        return reads_of_part(row, spec, label, document)
+    deciding = [reads for met, reads in judged
+                if all(met for met, _ in judged) or met is False]
+    return list(dict.fromkeys(read for reads in deciding for read in reads))
 
 
 # The record of what else ran on the host during a campaign's timed steps, one per campaign.
