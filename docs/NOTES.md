@@ -5946,6 +5946,129 @@ were PROVEN at `ad702b8`, 9 of 9 as expected, and the proofs file was restored a
 `23 files: 0 same, 8 pinned, 15 differs, 0 no commit, 0 no kind, 0 refused, 0 unjudged`, exit 1,
 the same files failing for the same paths.
 
+### The freeze's results
+
+2026-11-17. The files measured at the freeze commit `ede0176` are committed in `9066cbf`, after an
+audit of every step's record. They replace the six benchmark files, the four comparison files, both
+codec evaluation files, both census files, `coverage.json`, the three round-trip files and the two
+store-size files, and add the Linux kernel file, four diagnostic summaries and the disturbance
+record. Every one of the 24 audited files matched the SHA-256 the audit took of it. The Linux day at
+`67ae574` stays, bytes unchanged, in `results/compare/replaced/`, pinned under
+`replaced_comparison_files`; the other three protocol 1 pins went with their files, and `1c17c0a`
+drops their paths from `check_ties.PIN_NAMES`. All times below are UTC.
+
+**What ran, where and when.** Each step ran from its runner's private copy at `ede0176`, every
+comparison and benchmark under `measure.sh`.
+
+| Run | Steps | Window | Counted |
+|---|---|---|---|
+| macOS chain | preflight, the bench and fuzz builds (the fuzz build waited 6,105 s for the sanitizer build), coverage, the round trips of both days, `itch_codec` and `column_decode` benchmarks, the codec evaluation of both days, the 314-case kernel benchmark, four fuzz phases and the fuzz host file, the slice comparison, the day of tick-store alone, the validators | 14 Nov 14:06:28 to 21:58:35 | 18 of 19: the second day's round trip withdrawn |
+| macOS, the second day's round trip again | preflight, nothing built (the 11 binaries' SHA-256 equal before and after), the round trip of `10302019` with `scripts/g2_plan.py` from `1d234ee` | 14 Nov 21:59:05 to 22:04:15 | 3 of 3 |
+| macOS census | preflight, the census of both days | 15 Nov 05:06:39 to 05:07:05 | 3 of 3; every count equal to the committed files' |
+| Linux, part A | preflight, the bench and fuzz builds, the kernel check (576 cases match their reference), the round trip of `12302019` (its store's SHA-256 equal to the Mac's), the fuzz phase and its host file, the slice comparison, the day comparison, the validators | window taken 14 Nov 14:02:41; ran 14:15:37 to 15 Nov 04:27:04, the day from 17:04:01 | 8 of 10: the fuzz phase and its host file are not results |
+| Linux, part B | preflight, the perf check, the build, the kernel check, the `itch_codec` and `column_decode` benchmarks, the kernel benchmark in three attempts, the four diagnostic runs, the validators | window taken 15 Nov 04:34:50; ran 04:38:35 to 07:44:10 | 13 of 13, the kernel benchmark counted once, as its third attempt |
+
+Every comparison was counted on its first try, of at most three for a slice or the Mac's day and
+two for the Linux day. On Linux every hold started at load under 1.5 with cpu5 under 5% busy (1.69%
+at most on the slice, 2.56% on the day), no guard fired, no part restarted, the governor was
+`performance` and boost was on before the first system and after the last. On the Mac every hold
+started at load under 4, at most 3.99, while other work ran on it; the Mac keeps no sibling figure.
+
+**Withdrawn, and not results.**
+
+- The Mac chain's first round trip of `10302019` exited 1: `store_results.py` refused it, "G-2
+  footer_no_checksums: verify passed on a corrupt store", since the planner the private copy held
+  flipped footer byte 1,932,611,735, which the reader does not read with checksums off. Nothing was
+  staged. The pre-registration sets no attempt limit for the round trip, so it ran again with the
+  corrected planner, which flips bytes 963,271,577 and 1,932,611,736: all four corrupt verifies
+  refused, the restored one passed, and its store's SHA-256 equals the first attempt's.
+- The Linux kernel benchmark's first two attempts broke the sibling rule: the first in 2 of 314
+  cases, 15.33% and 26.89%, the second in 4, 8.24 to 18.93%. The third kept it in every case, at
+  most 3.918% and a median of 0.20%, and under DS-4's rule is the reported file; a fourth was not
+  allowed. What disturbed the second attempt, at 06:27:24 to 06:28:18, is in no record.
+- Not results: the Linux fuzz phase failed its replay on `fuzz_dictionary-avx2` with a libFuzzer
+  timeout, exit 70, the known harness timeout, with the six other targets clean; its host file
+  describes that failed run. So no G-3 file at `ede0176` was assembled, neither host's fuzz phase
+  is committed, and `fuzz-g3-ea1dde4c02e4.json` stays pinned.
+
+**Disturbances.** `results/disturbances-ede0176b10bb.json` lists 16, made by hand from the host's
+window log, its backup tool's log and this project's session records; the host keeps no login
+record for the campaign, so a login's time is known to the minute. Timed phases that held one:
+
+- slice, Parquet `zstd1-rg1Mi-ts-default` cold Q2: a file copy and process launch, 14 Nov 15:57:41;
+- slice, ArcticDB `rows100k-cols1` class B write 3: process launches, 16:05:28 to 16:05:30;
+- slice, tick-store `v3-seg1Mi` cold Q2: a login, 17:03;
+- day, Parquet `zstd1-rg128k` warm queries: a login, 18:14;
+- day, ArcticDB `rows10M-cols127` warm queries: a login, 21:21;
+- day, ArcticDB per security warm queries: a login, 23:01;
+- day, QuestDB `plain` class B write 1: the backup tool, 15 Nov 00:13:09 to 00:17:11;
+- day, QuestDB `locate-index` class B write 1: a login, 01:58;
+- day, tick-store `v3-seg4Mi` class B write 1: a login, 03:22;
+- day, tick-store `v3-seg1Mi` cold Q1: a login, 04:25;
+- kernel benchmark, `pfor_delta_two_pass/w=31/avx2`: the backup tool, 07:15:01 to 07:15:11,
+  the case with the third attempt's highest sibling share.
+
+And in untimed read-backs: logins at 16:02 and 16:45 on 14 Nov (slice) and at 19:05 and 00:00
+(day), and the backup tool at 19:56:45 to 19:58:48 (day). Not listed, each with its reason in the
+file: the backup tool's routine runs of about 10 s every 15 minutes, which every phase may hold; a
+queued window request by this project, waiting from 16:05:30 until part B took the window; another
+project's queued request during part B; and the withdrawn attempts. Between parts A and B another
+project held the window, from 04:27:06 to 04:34:45, with no timed step running. RESULTS.md marks
+each verdict that rests on a listed timed phase, with the replaced run's figure beside it.
+
+**Verdicts that changed.**
+
+- DS-4, Linux: not judged, with no reported kernel file, becomes missed, at 2.709 cycles a value,
+  fused, the median of 65 widths, against at most 0.377.
+- WT-4, Linux, against ArcticDB: on this run tick-store's class B write, 190.7 s total and 190.3 s
+  engine-only, is no slower than ArcticDB's 381.4 s and 291.8 s, so met; on the replaced run it was
+  188.9 s and 188.5 s against 123.6 s and 42.6 s, missed. The change favours tick-store, so the part
+  counts as missed, and RESULTS.md gives both. Against Parquet it stays missed (190.7 and 190.3
+  against 211.9 and 92.5 s) and against QuestDB met, not like-for-like (against 1,595.6 and
+  1,459.5 s). The line under the README's table goes from 14 missed and 7 not judged to 15 and 6,
+  for DS-4 alone; missed in part stays 7.
+
+Every other verdict is unchanged. Its figures moved: on the first screen Parquet's smallest store
+is 3.09 GB (its new `zstd9-rg1Mi` variant) against 3.19, one hour of one stock 74.04 ms against
+QuestDB's 283.77 (74.32 against 319.30), ArcticDB with a table per stock 44.58 ms (49.65), one
+millisecond of every stock 207.95 ms against QuestDB's 1.24 (207.10 against 1.18), one-thread
+ingest 1.270 M messages a second (1.376), and the Mac's 3.302 M (3.215).
+
+**Crossings.** 57 figures moved past the pre-registration's thresholds against the replaced files:
+49 on the Linux day, 8 on the Linux slice and none on the Mac. The pre-registration lets a crossing
+neither void nor rerun a run: each is reported beside its figure as measured, and none was run
+again. The day's ten crossed writes, nine slower, all started with the export mostly not resident
+and read 21.5 to 46.5 GB from the device inside their clocks; the replaced files keep no residency
+or device-read figure, so whether their writes started resident cannot be told. ArcticDB's class B
+write, behind WT-4's change, rose from 123.6 to 381.4 s, +208.7%, its engine-only part from 42.6 to
+291.8 s, with no event on record inside it; the slice's own run-to-run spread for that class reaches
+74.0%, and there is no second day. tick-store's cold figures now hold the store's open, a changed
+code path. For the warm crossings on the day, the slice's Parquet `none-rg1Mi` cold Q2 to Q4 and
+tick-store's warm Q4 and Q5, no record shows a cause.
+
+**How the commit was made.** The four diagnostic summaries were made again from part B's staging
+with `85aa3da`'s `scripts/diag_summary.py`, not the audit's older copy: each gains
+`not_established`, empty in all four, and the writer and price profiles `lost_samples_at_most`.
+The build-lines step's only output is its identical-code check, "same" for all three binaries, and
+no summary kind takes it. `results/store-estimate.json` was made again as at `e61dbce`,
+`python3 -I scripts/store_estimate.py results/store-estimate.json results/codec-eval-12302019.json
+results/codec-eval-10302019.json`, which on the old files gives the committed file byte for byte;
+on the new ones only each day's `commit` changes, since every column's bytes are equal.
+`tests/scripts/test_g2_plan.py CommittedPlans` passed on the new round-trip files.
+`test_check_compare.py`'s test that a protocol 1 file is held to its bytes read one of the dropped
+files; it now holds a fixture pinned as written, and fails if the pin is not made.
+`python3 -I scripts/check_ties.py`: `30 files: 26 same, 2 pinned, 2 differs, 0 no commit, 0 no
+kind, 0 refused, 0 unjudged`, the two differing `check-proofs.json` and
+`fullday-capacity-12302019.json`.
+
+**Still owed.** The G-3 file and `coverage.json` at the second commit, the fuzz oracle's, whose
+runs replace them; the capacity file, not measured at the freeze; `results/check-proofs.json`,
+every fault proven again after the last code change. `scripts/check_hygiene.py` refuses two of the
+new files for size, `results/bench/Linux-simd_kernel-ede0176b10bb.json` at 1,141,409 bytes and
+`results/compare/Linux-12302019-full-ede0176b10bb.json` at 1,102,687, over its 1,000,000-byte
+limit, whose allowance names only the slice files: a recorded decision, not done here. The essay
+is on another branch.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
