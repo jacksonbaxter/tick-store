@@ -402,8 +402,9 @@ one plain segment's weight) / that weight.
 Why: within the cap a value is decoded five times at the most, by the chosen set, the scalar set
 and the exact copy, and by the column decoder at its count and one more; the cut check and a
 one-block column asked for one fewer decode nothing, the decoders refusing them first. A value
-the re-encodes take counts twice in the cap's measure and is decoded six times, so a such values
-leave 5C - 4a, and the re-encodes' own decodes are taken in full beside the 5C: B values once by
+the re-encodes take counts twice in the cap's measure and is decoded six times, so if they take
+a values, the other C - 2a are decoded five times and the cap's decodes come to 6a + 5(C - 2a) =
+5C - 4a, and the re-encodes' own decodes are taken in full beside the 5C: B values once by
 each block encoder and at each oracle block size with every encoder. The prefix's decodes, at most
 N P values by each block encoder, are fewer than the 4a the budget's values leave. Each re-encoded
 value is encoded twice by each block encoder (none of these codecs is canonical, so the same bytes
