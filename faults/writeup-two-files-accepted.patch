@@ -1,10 +1,10 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -410,7 +410,7 @@
-         """The one results file of a kind on a host, or Waiting if there is none yet."""
-         pattern = self.pattern_of(kind, host, name)
-         try:
+@@ -425,7 +425,7 @@
+                 if commit is None:
+                     raise Refused(f"kind {kind!r}: the kind {other!r} it records names no commit")
+                 pattern = pattern.replace("*", commit[:COMMIT_SHOWN])
 -            path = render_results.target_file(self.root, pattern)
 +            path = next(iter(sorted(self.root.glob(pattern))), None)
          except render_results.TargetError as error:

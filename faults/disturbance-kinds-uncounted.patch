@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1946,7 +1946,7 @@
+                               "SHORT_DISTURBANCE, which RESULTS.md explains")
+         counts[kind] = counts.get(kind, 0) + 1
+     return and_list([(f"a {single}" if count == 1 else
+-                      f"{COUNT_NOUNS.get(count, str(count))} {plural}")
++                      f"a {single}")
+                      for (single, plural), count in counts.items()])
+ 
+ 

@@ -1872,6 +1872,24 @@ FAULTS = (
           "of several parts giving a changed part's counted word alone (review R-B3)",
           CHECK_FAILED, "FAIL: test_a_verdict_of_several_parts_reads_as_one_sentence "
           "(__main__.ShortFormTest"),
+    Fault("disturbance-events-counted-each", "py-scripts", "render_results.py counting one "
+          "login listed in three fuzz targets that ran at once as three (review R-D2)",
+          CHECK_FAILED, "FAIL: test_a_fuzz_runs_events_mark_its_linux_part_only_each_event_once "
+          "(__main__.FuzzDisturbanceTest"),
+    Fault("disturbance-fuzz-any-host", "py-scripts", "render_results.py marking G-3's macOS "
+          "part with the Linux host's events (review R-D1)", CHECK_FAILED,
+          "FAIL: test_a_fuzz_runs_events_mark_its_linux_part_only_each_event_once "
+          "(__main__.FuzzDisturbanceTest"),
+    Fault("disturbance-fuzz-target-unchecked", "py-scripts", "render_results.py taking a fuzz "
+          "run entry whose target the fuzz file has no run of (review R-D1)", CHECK_FAILED,
+          "FAIL: test_a_fuzz_record_is_checked_like_any_other (__main__.FuzzDisturbanceTest"),
+    Fault("disturbance-kinds-uncounted", "py-scripts", "render_results.py saying a phase of two "
+          "logins held a login (review R-D2)", CHECK_FAILED,
+          "FAIL: test_several_events_in_one_phase_are_said_by_kind_and_count "
+          "(__main__.FuzzDisturbanceTest"),
+    Fault("writeup-record-of-ignored", "py-scripts", "render_writeup.py reading a record kind "
+          "by its pattern alone, so two records make one token read two files (review R-D1)",
+          CHECK_FAILED, "ERROR: test_the_record_of_the_runs_commit_is_read (__main__.RecordOf"),
     Fault("headline-value-mark-dropped", "py-scripts", "render_results.py letting a headline "
           "text show a figure from a disturbed phase with no mark beside it", CHECK_FAILED,
           "FAIL: test_a_headline_figure_from_a_disturbed_phase_must_show_its_mark "

@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1820,7 +1820,7 @@
+                 hit = entry["phase"] == "case" and fnmatch.fnmatchcase(entry["case"], read[1])
+             elif read[0] == "fuzz":
+                 # The disturbance records are of the Linux host, the only one shared.
+-                hit = entry["phase"] in ("fuzz run", "gate run") and read[1] == "Linux"
++                hit = entry["phase"] in ("fuzz run", "gate run")
+             elif read[0] == "write":
+                 hit = entry["phase"] == "write" and \
+                     (entry["system"], entry["variant"], entry["class"]) == read[1:4]

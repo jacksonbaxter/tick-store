@@ -1,10 +1,10 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -1302,7 +1302,7 @@
+@@ -1764,7 +1764,7 @@
                  NUMBER.search(entry["what"]):
              raise TargetError(f"{where} says in words, with no figure, what it was")
-         timed = phase != "read back"
+         timed = phase not in UNTIMED_PHASES
 -        if entry["timed"] is not timed:
 +        if False:
              raise TargetError(f"{where}: a {phase} phase is {'' if timed else 'not '}timed")

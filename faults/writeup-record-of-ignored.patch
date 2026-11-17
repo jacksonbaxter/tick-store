@@ -1,0 +1,12 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -416,7 +416,7 @@
+         pattern = self.pattern_of(kind, host, name)
+         spec = self.kinds[kind]
+         try:
+-            if "record_of" in spec:
++            if False:
+                 other = spec["record_of"]
+                 other_host = host if host in (self.kinds.get(other, {}).get("files") or {}) \
+                     else "any"

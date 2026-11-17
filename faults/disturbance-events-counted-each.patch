@@ -1,0 +1,14 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1958,9 +1958,7 @@
+     for entry, read in found:
+         key = (read, entry["phase"], entry.get("case") if read[0] == "case" else None)
+         events = groups.setdefault(key, (read, []))[1]
+-        if not any((other["start"], other["end"], other["what"]) ==
+-                   (entry["start"], entry["end"], entry["what"]) for other in events):
+-            events.append(entry)
++        events.append(entry)
+     return list(groups.values())
+ 
+ 

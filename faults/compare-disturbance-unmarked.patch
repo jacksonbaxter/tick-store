@@ -1,12 +1,12 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -2120,9 +2120,7 @@
-         for entry, read in notes_of(part).get("disturbed", []):
-             replaced = notes_of(part).get("replaced")
-             text = "rests on " + disturbance_text(entry, read, replaced, row)
--            held.setdefault(text, (short_disturbance(entry, read, replaced, row),
--                                   short_disturbance(entry, read, replaced, row, screen=True),
+@@ -2234,9 +2234,7 @@
+         replaced = notes_of(part).get("replaced")
+         for read, entries in disturbance_groups(notes_of(part).get("disturbed", [])):
+             text = "rests on " + group_text(read, entries, replaced, row, part[4])
+-            held.setdefault(text, (group_short(read, entries, replaced, row, False, part[4]),
+-                                   group_short(read, entries, replaced, row, True, part[4]),
 -                                   []))[2].append(part[0])
 +            pass
      every = [item for part in parts for item in notes_of(part).get("swapped") or []]
