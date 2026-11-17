@@ -1,7 +1,7 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -721,7 +721,7 @@
+@@ -716,7 +716,7 @@
          met = [part[2] for part in parts or [] if part[0] == entry["target"]["part"]]
          bar = bar_value(row, name) * row.get("scale", 1)
          printed = render_results.COMPARATORS[comparator][0](printed_number(text), bar)

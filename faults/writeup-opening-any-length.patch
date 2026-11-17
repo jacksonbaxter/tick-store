@@ -1,7 +1,7 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -296,7 +296,7 @@
+@@ -299,7 +299,7 @@
      if re.match(r"([-*+>|]|\d+\.|```)", first):
          return "the essay opens with a list, a table, a quote or code, not with its conclusion"
      sentences = sentences_of(first)

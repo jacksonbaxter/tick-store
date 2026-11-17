@@ -37,8 +37,11 @@ What the render holds, each a refusal (exit 2) when it fails:
   whose condition reads the figures the sentence prints;
 - the Missed targets table holds a row for exactly the targets missed in whole or in part, and
   the not-judged line exactly those not judged;
-- every verdict whose outcome differs on the replaced comparison run is shown with both figures
-  and both outcomes, in every paragraph that quotes it;
+- every verdict carries beside its word the marks RESULTS.md gives it, from render_results.py's
+  own functions: an outcome the replaced comparison run judges otherwise, a disturbed phase it
+  rests on, and whose write input was where;
+- no sentence says tick-store writes faster than a system whose write read its input from disk
+  inside its clock, by render_results.py's rule for every page;
 - the page opens, after its title, with one paragraph of exactly three sentences, each with a
   token, and runs to 2,500 to 4,000 words.
 
@@ -458,22 +461,15 @@ class Resolver:
                           f"{spec.get('host')} in scripts/targets.json")
         return rows[0]
 
-    def judged(self, row, name, replaced=None):
+    def judged(self, row, name):
         """A target row's parts, judged by render_results.py on the files of the kinds its
-        patterns name, which are read as any token's. With replaced, the pattern of the kind
-        replaced[0] is read from the kind replaced[1] instead."""
+        patterns name, which are read as any token's; render_results.py judges a comparison row
+        on the replaced run's pinned file too, and notes each part's marks."""
         specs = [] if "no_figure" in row else [row["lowest_of"]] if "lowest_of" in row \
             else row.get("parts", [])
         own = json.loads(json.dumps(row))
         for spec in specs:
             kind, host = self.kind_of_pattern(spec["file"], f"{row['id']} on {row['host']}")
-            if replaced and kind == replaced[0]:
-                pattern = self.pattern_of(replaced[1], host, name)
-                for item in ([own["lowest_of"]] if "lowest_of" in own else own["parts"]):
-                    if item["file"] == spec["file"]:
-                        item["file"] = pattern
-                self.file_of(replaced[1], host, name)
-                continue
             try:
                 path, _ = self.file_of(kind, host, name)
                 self.document_of(path)
@@ -577,8 +573,7 @@ class Resolver:
             if not path.is_file():
                 raise Refused(f"{show(name)}: {entry['repo_file']} is not in the tree")
             return entry["repo_file"]
-        for special in ("measured_commit", "commit_exceptions", "pin_of", "note_of",
-                        "changed"):
+        for special in ("measured_commit", "commit_exceptions", "pin_of", "note_of"):
             if special in entry:
                 raise Refused(f"{show(name)}: {special} is shown once the page is read")
         value = self.raw(name)
@@ -1225,52 +1220,65 @@ def verdict_class_of(parts, spec, name):
         raise Refused(f"{show(name)}: {error}") from error
 
 
-def verdict_value(resolver, name, entry):
-    """A target's verdict, the Targets block's own: render_results.py judges the row on its
-    files, and its verdict code names the parts the token takes."""
+def verdict_parts(resolver, name, entry):
+    """A verdict token's row and the parts it takes, judged by render_results.py, or None and
+    the reason the row has no figure."""
     spec = entry["verdict"]
     row = resolver.target_row(spec, name)
     parts, reason = resolver.judged(row, name)
+    if parts is not None and spec.get("parts"):
+        verdict_class_of(parts, spec, name)
+        parts = [part for part in parts if part[0] in spec["parts"]]
+    return row, parts, reason
+
+
+def marks_of(row, parts, name):
+    """What RESULTS.md sets beside the verdict, by render_results.py's own functions: each part
+    the replaced run judges otherwise, each disturbed phase with the replaced run's figure, and,
+    for a write against other systems, whose input was where."""
+    if parts is None:
+        return []
+    try:
+        marks = render_results.verdict_marks(parts, row)
+        inputs = render_results.write_inputs(row, parts)
+    except (render_results.TargetError, KeyError, TypeError) as error:
+        raise Refused(f"{show(name)}: {error}") from error
+    return marks + ([inputs] if inputs else [])
+
+
+def verdict_value(resolver, name, entry, marks=True):
+    """A target's verdict, the Targets block's own: render_results.py judges the row on its
+    files, its verdict code names the parts the token takes, and its marks stand beside it."""
+    row, parts, reason = verdict_parts(resolver, name, entry)
     if entry.get("words", "class") == "text":
-        if parts is not None and spec.get("parts"):
-            verdict_class_of(parts, spec, name)
-            parts = [part for part in parts if part[0] in spec["parts"]]
-        return reason if parts is None else render_results.verdict_of(parts)
-    return verdict_class_of(parts, spec, name)
+        word = reason if parts is None else render_results.core_verdict(parts)
+    else:
+        word = verdict_class_of(parts, {}, name)
+    if not marks:
+        return word
+    return word + "".join(f"; {mark}" for mark in marks_of(row, parts, name))
 
 
-def changed_parts(resolver, replaced):
-    """The parts of each target row whose outcome on the replaced run differs from this run's:
-    {(id, host, part): (this run's part, the replaced run's part)}."""
-    found = {}
-    for row in resolver.targets_file().get("rows", []):
-        specs = [] if "no_figure" in row else [row["lowest_of"]] if "lowest_of" in row \
-            else row.get("parts", [])
-        kinds = {resolver.kind_of_pattern(spec["file"], row["id"])[0] for spec in specs}
-        if replaced["of"] not in kinds:
+def check_marks(resolver, values):
+    """Every verdict on the page carries each mark RESULTS.md gives it."""
+    for name, value in values.items():
+        entry = resolver.entries.get(name, {})
+        if "verdict" not in entry:
             continue
-        label = f"changed:{row['id']}:{row['host']}"
-        now, _ = resolver.judged(row, label)
-        before, _ = resolver.judged(row, label, (replaced["of"], replaced["kind"]))
-        for part, old in zip(now or [], before or []):
-            if part[0] != old[0]:
-                raise Refused(f"{row['id']}: the replaced run's parts {old[0]!r} and this run's "
-                              f"{part[0]!r} differ")
-            if isinstance(part[2], bool) and isinstance(old[2], bool) and part[2] != old[2]:
-                found[(row["id"], row["host"], part[0])] = (part, old)
-    return found
+        row, parts, _ = verdict_parts(resolver, name, entry)
+        for mark in marks_of(row, parts, name):
+            if mark not in value:
+                raise Refused(f"{show(name)} drops a mark RESULTS.md sets beside its verdict: "
+                              f"{mark[:100]!r}")
 
 
-def changed_text(change):
-    """A changed outcome, as the page shows it: both figures and both outcomes, and which way
-    the new one goes."""
-    part, old = change
-    words = render_results.VERDICT_WORD
-    text = (f"{words[part[2]]} on this run's {part[1]}, {words[old[2]]} on the replaced run's "
-            f"{old[1]}")
-    if part[2] and not old[2]:
-        text += ", the new outcome in tick-store's favour"
-    return text
+def faster_write(resolver, text):
+    """render_results.py's rule for every page: no sentence says tick-store writes faster than
+    a system whose write read its input from disk inside its clock."""
+    problem = render_results.faster_write_problem(
+        [text], render_results.disk_read_writers(resolver.root))
+    if problem:
+        raise Refused(problem)
 
 
 # --- The page ---------------------------------------------------------------------------------
@@ -1357,18 +1365,15 @@ def check_entries(resolver, names, factors):
                 raise Refused(f"kind {kind!r}: its {key} is no text free of numbers")
 
 
-def paragraph_rules(resolver, blocks, replaced):
+def paragraph_rules(resolver, blocks):
     """Each block that shows a figure of a kind with a pin or a note says so through the kind's
-    pin or note token, a changed outcome showing the replaced run's figures among them; and each
-    table row holds one target's tokens."""
+    pin or note token; and each table row holds one target's tokens."""
     for block in blocks:
         names = TOKEN.findall(block)
         kinds = set()
         for name in names:
             for _, kind, _ in resolver.deps.get(name, set()):
                 kinds.add(kind)
-            if "changed" in resolver.entries.get(name, {}) and replaced:
-                kinds.add(replaced["kind"])
         for kind in sorted(kinds):
             spec = resolver.kinds.get(kind, {})
             for key, token in (("pin", f"pin:{kind}"), ("note", f"note:{kind}")):
@@ -1497,8 +1502,8 @@ def carried_words(resolver, name):
     names under carries, refused where its value ranks nothing."""
     entry = resolver.entries.get(name) or {}
     words = set()
-    if "verdict" in entry or "changed" in entry:
-        spec = entry.get("verdict") or entry.get("changed")
+    if "verdict" in entry:
+        spec = entry["verdict"]
         row = resolver.target_row(spec, name)
         labels = [item.get("label", "") for item in
                   ([row["lowest_of"]] if "lowest_of" in row else row.get("parts", []))
@@ -1611,7 +1616,7 @@ def claim_value(resolver, claim, name):
         raise Refused(f"{name}: {error}") from error
 
 
-def claims_hold(resolver, body, blocks, figures, changes):
+def claims_hold(resolver, body, blocks, figures):
     """Every sentence that ranks, compares or presumes a verdict is covered by a claim that holds
     or a token that carries its word. A claim names its words, which must sit in one sentence,
     and a condition that reads the figures the sentence prints, or a row's verdict, or the README
@@ -1648,8 +1653,15 @@ def claims_hold(resolver, body, blocks, figures, changes):
             rests += json.dumps(pitch_spec(resolver, claim, name)[1])
         for name_used in set(referenced(holds)):
             rests += json.dumps(resolver.entries.get(name_used, {}))
-        for row_id, host, part in changes:
-            if f'"id": "{row_id}"' in rests and f'"host": "{host}"' in rests:
+        for row_id, host in sorted(set(re.findall(r'"id": "([^"]+)", "host": "([^"]+)"',
+                                                  rests))):
+            rows = [row for row in resolver.targets_file().get("rows", [])
+                    if (row.get("id"), row.get("host")) == (row_id, host)]
+            try:
+                parts = [part for row in rows for part in resolver.judged(row, name)[0] or []]
+            except Waiting:
+                continue
+            if any(render_results.notes_of(part).get("change") for part in parts):
                 raise Refused(f"{name} rests on {row_id} on {host}, whose outcome changed with "
                               "the replaced run: no count or ranking rests on it")
         try:
@@ -1692,7 +1704,8 @@ def census_holds(resolver, body, figures):
             if "verdict" in entry and not entry["verdict"].get("parts"):
                 key = (entry["verdict"]["id"], entry["verdict"]["host"])
                 try:
-                    shown[key] = verdict_value(resolver, name, dict(entry, words="class"))
+                    shown[key] = verdict_value(resolver, name, dict(entry, words="class"),
+                                               marks=False)
                 except Waiting as wait:
                     waits.append(wait)
                     shown[key] = None
@@ -1741,13 +1754,14 @@ def render(root):
         raise Refused(f"the template types the number {typed[0]!r} by hand: give it as a token "
                       "from the figure list, or, if it is no result, list it under not_results "
                       "with the reason and its place")
+    faster_write(resolver, TOKEN.sub(" ", body))
     blocks = blocks_of(body)
     values, waiting, states = {}, {}, {}
     later = []
     for name in dict.fromkeys(names):
         entry = resolver.entries[name]
         if any(key in entry for key in ("measured_commit", "commit_exceptions", "pin_of",
-                                        "note_of", "changed")):
+                                        "note_of")):
             later.append(name)
             continue
         try:
@@ -1757,34 +1771,29 @@ def render(root):
             waiting[name] = wait.label
             states[name] = f"waits on {wait.label}" + (f": {wait.why}" if wait.why else "")
     pending = census_holds(resolver, body, figures)
-    replaced = figures.get("replaced")
-    changes = {}
-    if replaced:
-        try:
-            changes = changed_parts(resolver, replaced)
-        except Waiting as wait:
-            pending.append(wait)
-    pending += claims_hold(resolver, body, blocks, figures, changes)
+    pending += claims_hold(resolver, body, blocks, figures)
     for name in later:
         entry = resolver.entries[name]
         try:
-            values[name] = special_value(resolver, name, entry, changes, waiting)
+            values[name] = special_value(resolver, name, entry, waiting)
             states[name] = "resolved"
         except Waiting as wait:
             waiting[name] = wait.label
             states[name] = f"waits on {wait.label}" + (f": {wait.why}" if wait.why else "")
-    check_changes(resolver, blocks, changes)
-    paragraph_rules(resolver, blocks, replaced)
+    check_marks(resolver, values)
+    paragraph_rules(resolver, blocks)
     for wait in pending:
         waiting[f"({wait.label})"] = wait.label
         states[f"({wait.label})"] = f"waits on {wait.label}" + (f": {wait.why}" if wait.why
                                                                  else "")
     for name, value in values.items():
         if isinstance(value, str) and resolver.entries[name].get("words") and \
+                "verdict" not in resolver.entries[name] and \
                 (TYPED.search(value) or NUMBER_WORDS.search(value)):
             raise Refused(f"{show(name)} prints {value!r}, words with a number in them")
     text = TOKEN.sub(lambda found: values.get(found.group(1), found.group(0)), body)
     text = text.rstrip("\n") + "\n\n" + MARKER + "\n"
+    faster_write(resolver, text)
     notes = sum(1 for comment in comments if CUT_NOTE in comment)
     count = word_count(text)
     if not WORDS_AT_LEAST <= count <= WORDS_AT_MOST:
@@ -1794,9 +1803,9 @@ def render(root):
     return Rendered(text, values, waiting, states, notes, len(dict.fromkeys(names)), count)
 
 
-def special_value(resolver, name, entry, changes, waiting):
+def special_value(resolver, name, entry, waiting):
     """The tokens shown from the page's whole reading: the measured commit and its exceptions,
-    a kind's pin and note, and a changed outcome."""
+    and a kind's pin and note."""
     if "measured_commit" in entry or "commit_exceptions" in entry:
         commit, phrase = commits(resolver)
         if "measured_commit" in entry:
@@ -1819,39 +1828,7 @@ def special_value(resolver, name, entry, changes, waiting):
         if name != f"{key[:-3]}:{kind}":
             raise Refused(f"{show(name)}: a kind's {key[:-3]} token is {key[:-3]}:{kind}")
         return words
-    spec = entry["changed"]
-    key = (spec.get("id"), spec.get("host"), spec.get("part"))
-    if key not in changes:
-        raise Refused(f"{show(name)}: {key} did not change with the replaced run")
-    return changed_text(changes[key])
-
-
-def check_changes(resolver, blocks, changes):
-    """Every changed outcome has its token, and every block that quotes the verdict holds it."""
-    tokens = {}
-    for name, entry in resolver.entries.items():
-        if "changed" in entry:
-            spec = entry["changed"]
-            tokens[(spec.get("id"), spec.get("host"), spec.get("part"))] = name
-    for key in changes:
-        if key not in tokens:
-            raise Refused(f"{key[0]} on {key[1]}, part {key[2]!r}, has another outcome on the "
-                          "replaced run, and no changed token shows both")
-    for block in blocks:
-        for name in TOKEN.findall(block):
-            entry = resolver.entries.get(name, {})
-            if "verdict" not in entry:
-                continue
-            spec = entry["verdict"]
-            for key, token in tokens.items():
-                if key not in changes or (key[0], key[1]) != (spec["id"], spec["host"]):
-                    continue
-                if spec.get("parts") and key[2] not in spec["parts"]:
-                    continue
-                if token not in TOKEN.findall(block):
-                    raise Refused(f"{show(name)} quotes {key[0]} on {key[1]}, whose part "
-                                  f"{key[2]!r} changed with the replaced run, and its block "
-                                  f"does not hold {show(token)}")
+    raise Refused(f"{show(name)}: no value")
 
 
 def waiting_lines(rendered):

@@ -1,7 +1,7 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -995,7 +995,7 @@
+@@ -990,7 +990,7 @@
          return len(re.findall(expression["count_matches"], text, re.MULTILINE))
      if "prover" in expression:
          return prover(expression["prover"], context)

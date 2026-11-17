@@ -1,7 +1,7 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -272,7 +272,7 @@
+@@ -275,7 +275,7 @@
      # A numeral other than an ASCII digit, "½", "²" or "Ⅻ", is a number too.
      numerals = [char for char in text if not char.isascii()
                  and unicodedata.numeric(char, None) is not None]

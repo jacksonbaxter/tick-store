@@ -1,0 +1,12 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1661,7 +1661,7 @@
+                 parts = [part for row in rows for part in resolver.judged(row, name)[0] or []]
+             except Waiting:
+                 continue
+-            if any(render_results.notes_of(part).get("change") for part in parts):
++            if False:
+                 raise Refused(f"{name} rests on {row_id} on {host}, whose outcome changed with "
+                               "the replaced run: no count or ranking rests on it")
+         try:

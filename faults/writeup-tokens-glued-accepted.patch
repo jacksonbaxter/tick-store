@@ -1,7 +1,7 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -181,7 +181,7 @@
+@@ -184,7 +184,7 @@
          at = stray.find("{{") if "{{" in stray else stray.find("}}")
          raise Refused(f"the template holds {stray[at:at + 30]!r}, which is no token: a token is "
                        "{{name}}, a name of letters, digits, _, - and :")

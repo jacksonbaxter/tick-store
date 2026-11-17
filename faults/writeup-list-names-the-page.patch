@@ -1,7 +1,7 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -1313,7 +1313,7 @@
+@@ -1321,7 +1321,7 @@
      if figures.get("schema") != SCHEMA:
          raise Refused(f"{FIGURES_PATH.as_posix()} is not a {SCHEMA} figure list")
      for key, fixed in FIXED_PATHS.items():

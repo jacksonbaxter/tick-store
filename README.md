@@ -156,22 +156,6 @@ nothing, and a faster write said in other words than the rule's passes. Nor does
 `docs/NOTES.md`, `docs/TASKS.md`, `docs/REVIEW.md` or `research/`, the working record, which quotes
 each run's verdicts as they stood.
 
-`render_writeup.py` holds the essay to `docs/writeup/figures.json`, its figure list. Every figure,
-verdict and results link in `docs/writeup/WRITEUP.template.md` is a token the list defines: the
-results file by kind and host, never by a name with a commit in it, so a file measured again still
-resolves; the field or computation; the format; and a line of what it is. A verdict is
-`render_results.py`'s own, a bar is the target's value, and a size the essay takes from the code
-is read from the source by a pattern that must match one line. The render stops on a token the list
-lacks, an entry the template never uses, a kind that matches two files, a value outside its
-format, a constant that moved or changed form, a number typed in the template that the list
-does not declare a non-result with its reason, or a token that reads what its results file lists
-as not established, as a diagnostic summary lists what its run's raw output did not show. The
-essay must run 2,500 to 4,000 words and open
-with its conclusion. Until every file it reads is committed there is no `WRITEUP.md`, and the step
-is not judged, naming how many tokens wait, which is a failure under `--no-skips`; once the page
-exists, a missing file or a page that differs from a fresh render fails. What it does not check is
-that the prose is true beyond its figures and verdicts: a sentence can misread a right figure, and
-a number written in words is not seen.
 `render_writeup.py` holds the essay to `docs/writeup/figures.json`, its figure list; the
 template, the page and `scripts/targets.json` are fixed in the script, not chosen by the list. No
 digit stands in `docs/writeup/WRITEUP.template.md` outside a token of the list, a host's name or a
@@ -192,8 +176,11 @@ judged in a tree with no history. A file under a pin of `scripts/data_pins.json`
 through a kind that declares the pin, and each paragraph showing its figures says so. A word that
 compares, ranks or judges, or a number in words, must sit inside a claim of the list whose
 condition reads the figures its sentence prints, or be carried by a token; the Missed targets and
-Not judged sections hold exactly the rows of those verdicts; a verdict the replaced run judged
-otherwise is shown with both outcomes and rests no claim. A figure read on one host must be
+Not judged sections hold exactly the rows of those verdicts; every verdict carries the marks RESULTS.md sets beside it, taken from render_results.py's own
+functions: an outcome the replaced run judges otherwise, a disturbed phase, and whose write
+input was where; a verdict the replaced run judges otherwise rests no claim; and
+render_results.py's rule that no sentence says tick-store writes faster than a system whose
+clock holds its disk reads holds on the essay as on the other pages. A figure read on one host must be
 described as that host's. The essay must run 2,500 to 4,000 words and open with one paragraph of
 three sentences, each holding a token. Until every file it reads is committed there is no
 `WRITEUP.md`, and the step is not judged, naming how many tokens and checks wait and on what, which

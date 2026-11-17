@@ -1,7 +1,7 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -1711,7 +1711,7 @@
+@@ -1724,7 +1724,7 @@
              raise Refused(f"census {census['block']!r} holds {wrong}, whose verdict is not "
                            f"{classes}")
          missing = sorted(wanted - set(shown))

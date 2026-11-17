@@ -1,7 +1,7 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -1421,7 +1421,7 @@
+@@ -1426,7 +1426,7 @@
          raise Waiting("history", "git", f"git cannot compare {first[:12]} with {second[:12]}: "
                        f"{done.stderr.strip()[:80]}")
      other = [path for path in done.stdout.split() if not path.startswith(tuple(paths))]

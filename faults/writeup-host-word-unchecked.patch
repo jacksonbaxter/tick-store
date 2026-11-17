@@ -1,7 +1,7 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -620,7 +620,7 @@
+@@ -615,7 +615,7 @@
              raise Refused(f"{show(name)} reads {sorted(hosts)}, and its description does not "
                            f"name {missing}")
          return

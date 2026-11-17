@@ -1986,9 +1986,15 @@ FAULTS = (
     Fault("writeup-census-met-row-kept", "py-scripts", "render_writeup.py lets the Missed "
           "targets section keep a met row", CHECK_FAILED,
           "FAIL: test_a_met_target_kept_in (__main__.Census"),
-    Fault("writeup-changed-outcome-unshown", "py-scripts", "render_writeup.py quotes a verdict "
-          "the replaced run judged otherwise with no token showing both outcomes", CHECK_FAILED,
-          "FAIL: test_a_changed_outcome_with_no_token (__main__.Changed"),
+    Fault("writeup-verdict-marks-dropped", "py-scripts", "render_writeup.py prints a verdict "
+          "without the marks RESULTS.md sets beside it", CHECK_FAILED,
+          "FAIL: test_a_verdict_carries_the_marks_results_gives_it (__main__.Marks"),
+    Fault("writeup-verdict-mark-unchecked", "py-scripts", "render_writeup.py lets a verdict "
+          "that drops a mark RESULTS.md gives it through", CHECK_FAILED,
+          "FAIL: test_a_verdict_that_drops_a_mark_is_refused (__main__.Marks"),
+    Fault("writeup-claim-on-changed-outcome", "py-scripts", "render_writeup.py lets a claim "
+          "rest on a verdict the replaced run judged otherwise", CHECK_FAILED,
+          "FAIL: test_a_claim_that_rests_on_a_changed_outcome (__main__.Marks"),
     # Review WD-4.
     Fault("writeup-literal-value-accepted", "py-scripts", "render_writeup.py takes a number "
           "written into the figure list that is no declared factor", CHECK_FAILED,

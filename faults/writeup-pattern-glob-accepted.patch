@@ -1,7 +1,7 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -338,7 +338,7 @@
+@@ -341,7 +341,7 @@
          if "*" in folder or HEX_RUN.search(folder):
              raise Refused(f"kind {kind!r}: {pattern!r} names a commit or a glob in a folder")
      name = parts[-1]

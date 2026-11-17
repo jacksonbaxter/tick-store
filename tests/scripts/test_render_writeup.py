@@ -948,49 +948,81 @@ class Census(Tree):
         self.renders()
 
 
-class Changed(Tree):
-    """A verdict whose outcome differs on the replaced run shows both, wherever it is quoted."""
+B_WRITE = ["classes", "B", "write"]
+# A flushed write against ArcticDB on both clocks, read from the comparison files, as WT-4.
+WRITE_ROW = {"id": "T-11", "host": "Linux", "target_text": "class B write no slower",
+             "digits": 1, "unit": " s",
+             "parts": [{"label": "against ArcticDB", "file": "results/compare/Linux-day-*.json",
+                        "all": [{"label": "total",
+                                 "value": {"path": ["systems", "tickstore", "variants",
+                                                    "@headline", *B_WRITE, "seconds_median"]},
+                                 "at_most": {"path": ["systems", "arcticdb", "variants",
+                                                      "@headline", *B_WRITE,
+                                                      "seconds_median"]}}]}]}
+
+
+def write_record(seconds, resident, pages=10):
+    ready = {"warms": 1} if resident == pages else {"what": "nothing"}
+    return {"repetitions": 1, "seconds_median": seconds, "python_seconds": 0.5,
+            "times": {"engine_only_seconds": "the total less python_seconds"},
+            "detail": {"input_at_clock_start": {"files": ["input"], "pages": pages,
+                                                "resident_pages": resident,
+                                                "made_ready": ready},
+                       "device_read": {"bytes": 0, "counter": "machine-wide"}}}
+
+
+def day(ours, theirs, commit=COMMIT):
+    def system(write):
+        return {"headline_variant": "h", "variants": {"h": {"classes": {"B": {"write": write}}}}}
+    return {"header": {"host": "Linux", "commit": commit},
+            "systems": {"tickstore": system(ours), "arcticdb": system(theirs)}}
+
+
+class Marks(Tree):
+    """A verdict carries the marks RESULTS.md sets beside it, from render_results.py's own
+    functions: an outcome the replaced run judges otherwise, with both, and whose write input
+    was where; and no claim rests on a changed outcome."""
 
     def setUp(self):
         super().setUp()
-        self.figures["kinds"]["replaced"] = {
-            "what": "the replaced demo", "files": {"macOS": "results/bench/replaced/macOS-demo-*.json"},
-            "exception": {"why": "the run this one replaced", "says": "the replaced demo"}}
-        self.figures["replaced"] = {"of": "demo", "kind": "replaced"}
-        self.write("results/bench/replaced/macOS-demo-fedcba987654.json", json.dumps(
-            dict(RESULTS, median_us=3000.0, header={"commit": "fedcba987654" + "0" * 28})))
+        self.targets["rows"].append(WRITE_ROW)
+        self.figures["kinds"]["day"] = {"what": "the demo day", "files": {
+            "Linux": "results/compare/Linux-day-*.json"}}
+        self.figures["figures"]["verdict:t11"] = {"what": "the write target, on the Zen 1",
+                                                  "verdict": {"id": "T-11", "host": "Linux"}}
+        self.write(f"results/compare/Linux-day-{COMMIT[:12]}.json",
+                   json.dumps(day(write_record(190.0, 10), write_record(381.0, 1))))
+        old = self.write("results/compare/replaced/Linux-day-67ae574f5666.json",
+                         json.dumps(day(write_record(189.0, 10), write_record(124.0, 1),
+                                        commit="67ae574f5666" + "0" * 28)))
+        self.write("scripts/data_pins.json", json.dumps({"replaced_comparison_files": {
+            old.name: hashlib.sha256(old.read_bytes()).hexdigest()}}))
         self.save()
+        self.insert("The day write is {{verdict:t11}}.")
 
-    def test_a_changed_outcome_with_no_token(self):
-        self.refused("T-1 on macOS, part 'demo', has another outcome on the replaced run")
-
-    def test_a_changed_outcome_shown_beside_each_quote(self):
-        self.figures["figures"]["changed:t1"] = {"what": "T-1's outcome on both runs",
-                                                 "changed": {"id": "T-1", "host": "macOS",
-                                                             "part": "demo"}}
-        self.save()
-        self.insert("Both runs: {{changed:t1}}.")
-        self.refused("{{verdict:t1}} quotes T-1 on macOS, whose part 'demo' changed",
-                     "does not hold {{changed:t1}}")
-        self.edit("docs/writeup/WRITEUP.template.md", "Both runs: {{changed:t1}}.\n\n", "")
-        self.edit("docs/writeup/WRITEUP.template.md", "is {{verdict:t1}}.",
-                  "is {{verdict:t1}} ({{changed:t1}}).")
+    def test_a_verdict_carries_the_marks_results_gives_it(self):
         page = self.renders()
-        self.assertIn("is met (met on this run's 1.23 ms, missed on the replaced run's 3.00 ms, "
-                      "the new outcome in tick-store's favour).", page)
-        self.assertIn("except the replaced demo, at `fedcba987654`.", page)
+        self.assertIn("The day write is missed; (against ArcticDB) met on this run's figures, a "
+                      "change that favours tick-store, and missed on the replaced run's, so "
+                      "counted missed; inputs of the class B writes, from each write's record: "
+                      "tick-store's input, `input`, is in memory before the clock starts", page)
+        self.assertIn("ArcticDB's input, `input`, is read from disk inside the clock", page)
+
+    def test_a_verdict_that_drops_a_mark_is_refused(self):
+        own = RENDER.verdict_value
+        self.addCleanup(setattr, RENDER, "verdict_value", own)
+        RENDER.verdict_value = lambda resolver, name, entry, marks=True: own(
+            resolver, name, entry, marks=False)
+        with self.assertRaisesRegex(RENDER.Refused, r"\{\{verdict:t11\}\} drops a mark "
+                                                    r"RESULTS.md sets beside its verdict"):
+            RENDER.render(self.root)
 
     def test_a_claim_that_rests_on_a_changed_outcome(self):
-        self.figures["figures"]["changed:t1"] = {"what": "T-1's outcome on both runs",
-                                                 "changed": {"id": "T-1", "host": "macOS",
-                                                             "part": "demo"}}
         self.figures["claims"] = [{"text": "so it leads", "holds": {"verdict_is": {
-            "id": "T-1", "host": "macOS", "class": "met"}}}]
+            "id": "T-11", "host": "Linux", "class": "missed"}}}]
         self.save()
-        self.edit("docs/writeup/WRITEUP.template.md", "is {{verdict:t1}}.",
-                  "is {{verdict:t1}} ({{changed:t1}}).")
         self.insert("And so it leads.")
-        self.refused("rests on T-1 on macOS, whose outcome changed with the replaced run")
+        self.refused("rests on T-11 on Linux, whose outcome changed with the replaced run")
 
 
 class Prover(Tree):

@@ -1,7 +1,7 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -255,7 +255,7 @@
+@@ -258,7 +258,7 @@
              kept = re.sub(inner, " ", found[0].group(0))
              text = text[:found[0].start()] + kept + text[found[0].end():]
          left = re.search(rf"(?<![A-Za-z0-9]){re.escape(item['text'])}(?![A-Za-z0-9])", text)
