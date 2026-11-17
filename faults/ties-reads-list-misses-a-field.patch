@@ -1,0 +1,14 @@
+diff --git a/scripts/check_ties.py b/scripts/check_ties.py
+index 945d99e..043b96a 100644
+--- a/scripts/check_ties.py
++++ b/scripts/check_ties.py
+@@ -219,8 +219,7 @@ STORE_RESULTS_READS = Reads(
+             ("systems", "parquet", "outcome"),
+             ("systems", "arcticdb", "variant"), ("systems", "arcticdb", "stored_bytes"),
+             ("systems", "arcticdb", "outcome"),
+-            ("systems", "questdb", "variant"), ("systems", "questdb", "stored_bytes"),
+-            ("systems", "questdb", "outcome")))
++            ("systems", "questdb", "variant"), ("systems", "questdb", "stored_bytes")))
+ # What scripts/store_estimate.py reads of it, in judge() (store_estimate.py:215-218):
+ # `capacity["day"] == day` for each day the estimate costs, which it states as "day" in each
+ # item of "days"; then, on that day only, capacity["systems"][name]["stored_bytes"] for each of

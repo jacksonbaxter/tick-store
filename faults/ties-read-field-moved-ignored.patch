@@ -1,0 +1,14 @@
+diff --git a/scripts/check_ties.py b/scripts/check_ties.py
+index 945d99e..a35c958 100644
+--- a/scripts/check_ties.py
++++ b/scripts/check_ties.py
+@@ -626,8 +626,7 @@ def read_changes(repo, base, document, kind):
+             moved = [dotted(reads.select)]
+         elif selected is not MISSING and any(same_value(selected, own) for own in
+                                              values_of(document, reads.own)):
+-            moved = [dotted(path) for path in reads.fields
+-                     if not same_value(field_of(before, path), field_of(now, path))]
++            moved = []
+         else:
+             moved = []
+         if moved:

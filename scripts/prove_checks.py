@@ -2107,6 +2107,17 @@ FAULTS = (
           "a file since the commit that wrote it", CHECK_FAILED,
           "FAIL: test_a_change_to_what_assembled_a_file_after_it_was_written_fails_it "
           "(__main__.AssembledChange"),
+    # The capacity file ties the files that copy from it through the fields read of it.
+    Fault("ties-read-field-moved-ignored", "py-scripts", "check_ties.py compares only the "
+          "capacity file's day, so a moved stored-bytes figure leaves the store-size files and "
+          "the estimate that copy it tied", CHECK_FAILED,
+          "FAIL: test_each_read_field_that_moves_unties_the_files_that_read_it "
+          "(__main__.ReadFields"),
+    Fault("ties-reads-list-misses-a-field", "py-scripts", "check_ties.py's list of what "
+          "store_results.py reads of the capacity file leaves out QuestDB's outcome, which it "
+          "copies, so a moved outcome would leave the store-size file tied", CHECK_FAILED,
+          "FAIL: test_store_results_reads_the_fields_the_store_size_kind_lists "
+          "(__main__.ReadsAreWhatTheAssemblersRead"),
     Fault("ties-pin-by-name", "py-scripts", "check_ties.py takes a file as pinned by its name, "
           "whatever its bytes", CHECK_FAILED,
           "FAIL: test_a_pin_of_other_bytes_does_not_hold (__main__.Pinned"),
