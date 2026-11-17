@@ -6827,8 +6827,11 @@ faults (`acc3539`); REVIEW rows R-A1 to R-A7 and R-B1 to R-B3 give each.
   The pitch is at 100 words, so the Ryzen's "why" (R-A7) is not added. The stand-in render gives
   340 of 340 tokens and 3,711 words, and `--check` passes on it.
 - **Faults, shown by hand.** Seven new faults and nine remade on moved lines, each shown in a
-  clone under `build/`, outputs in the phase's `conditions-check/fix4/proofs` folder; the full
-  re-proof owes them.
+  clone under `build/`, outputs in the phase's `conditions-check/fix4/proofs` folder. Three
+  render-check mutations the rewording moved are remade too (`5f0c8dc`):
+  `readme-pitch-claim-reworded`, `benchmarks-wt4-old-word` and `headline-template-typed-figure`,
+  shown the same way, outputs in `conditions-check/fix4/proofs-render`. The full re-proof owes
+  all nineteen.
 
 ## Process notes
 
