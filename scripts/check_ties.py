@@ -53,9 +53,11 @@ its measured paths changed since, and is not judged: each validator's own key in
 and only the exact paths under results/ that PIN_NAMES below lets be pinned under that key, each
 known by the SHA-256 of its bytes, never by anything the file says of itself; a line in the pins
 file under one of those keys for any other name is refused, so a line added there exempts no
-new file. A file replaced by a later measurement and kept, unchanged, for the record is pinned
-under REPLACED_PINS only if it lives in a replaced/ folder and REPLACED_KEPT below names its
-exact path and the SHA-256 of its bytes, frozen for good, as the pins file does. This script
+new file. A comparison file replaced by a later measurement and kept, unchanged, for the
+record is pinned under REPLACED_PINS, the key render_results.py reads it by, only if it lives in
+compare/replaced/, REPLACED_KEPT below names its exact path and the SHA-256 of its bytes, frozen
+for good, and the pins file gives its name the same SHA-256; a line under that key for any other
+name is refused too. This script
 adds no other pin and no exemption: once the validators' pins are removed, it judges those
 files with no change here.
 
@@ -141,13 +143,16 @@ PIN_NAMES = {
     check_roundtrip.PINS_KEY: tuple(check_roundtrip.PINNED_NAMES),
     check_fuzz.PRE_TIE_PINS: (check_fuzz.PRE_TIE_FILE,),
 }
-# A results file replaced by a later measurement and kept, unchanged, for the record, of any
-# kind: its exact path under results/, which must be inside a replaced/ folder, and the SHA-256
-# of its bytes, frozen for good. The pins file names it under REPLACED_PINS by the same path
-# with the same SHA-256. None today.
-REPLACED_PINS = "replaced_kept_for_the_record"
-REPLACED_FOLDER = "replaced"
-REPLACED_KEPT = ()
+# A comparison file replaced by a later measurement and kept, unchanged, for the record: its
+# exact path under results/, which must be in REPLACED_FOLDER, and the SHA-256 of its bytes,
+# frozen for good. The pins file names it under REPLACED_PINS, the key render_results.py reads
+# it by (render_results.REPLACED_PINS, by name, as it looks it up), with the same SHA-256. The
+# freeze's rerun replaces the Linux full day measured at 67ae574; until the results commit moves
+# it into the folder and pins it there, the entry holds nothing.
+REPLACED_PINS = "replaced_comparison_files"
+REPLACED_FOLDER = "compare/replaced"
+REPLACED_KEPT = (("compare/replaced/Linux-12302019-full-67ae574f5666.json",
+                  "e8d447073c29d83c2341357df8ca01fa9afaa50d4f235590d5506e0d10a41a25"),)
 SHA256 = re.compile(r"[0-9a-f]{64}")
 
 # What every binary that takes a figure is built from: the bench preset's build, or the coverage
@@ -530,8 +535,8 @@ def pinned(kind, name, data, pins):
         return key
     kept = dict(REPLACED_KEPT)
     entries = pins.get(REPLACED_PINS)
-    if (isinstance(entries, dict) and REPLACED_FOLDER in Path(name).parts[:-1]
-            and kept.get(name) == digest and entries.get(name) == digest):
+    if (isinstance(entries, dict) and Path(name).parent.as_posix() == REPLACED_FOLDER
+            and kept.get(name) == digest and entries.get(Path(name).name) == digest):
         return REPLACED_PINS
     return None
 
@@ -545,16 +550,16 @@ def pin_problems(pins):
         if not isinstance(entries, dict):
             problems.append(f"{key} in the pins file is not a table of names and SHA-256s")
             continue
-        allowed = names if key == REPLACED_PINS else tuple(Path(name).name for name in names)
+        allowed = tuple(Path(name).name for name in names)
         for name in sorted(entries):
             if name not in allowed:
                 problems.append(f"{key} in the pins file pins {name}, and check_ties.py lets "
                                 f"only {', '.join(allowed) or 'no file'} be pinned there")
     for path, digest in REPLACED_KEPT:
-        if REPLACED_FOLDER not in Path(path).parts[:-1] or not SHA256.fullmatch(str(digest)):
+        if (Path(path).parent.as_posix() != REPLACED_FOLDER
+                or not SHA256.fullmatch(str(digest))):
             problems.append(f"REPLACED_KEPT holds {path}: a file kept for the record lives in "
-                            f"a {REPLACED_FOLDER}/ folder and is known by the SHA-256 of its "
-                            "bytes")
+                            f"{REPLACED_FOLDER}/ and is known by the SHA-256 of its bytes")
     return problems
 
 
@@ -687,8 +692,8 @@ def table():
             lines.append(f"  left out   {path}: {why}")
         if kind.pin:
             lines.append(f"  pin        {kind.pin}: {', '.join(PIN_NAMES[kind.pin])}")
-    lines.append(f"any kind: pin {REPLACED_PINS}, a file in a {REPLACED_FOLDER}/ folder kept "
-                 "for the record by its path and SHA-256: "
+    lines.append(f"replaced: pin {REPLACED_PINS}, a file in {REPLACED_FOLDER}/ kept for the "
+                 "record by its path and SHA-256: "
                  + (", ".join(f"{path} {digest}" for path, digest in REPLACED_KEPT) or "none"))
     lines.append("not results files: " + (", ".join(f"{pattern}: {why}"
                                                     for pattern, why in NOT_RESULTS) or "none"))

@@ -32,6 +32,7 @@ SCRATCH_ROOT = REPO_ROOT / "build" / "test_check_ties"
 
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 import check_ties  # noqa: E402
+import render_results  # noqa: E402
 
 # One file for each path a kind measures or is assembled by, and some no kind does.
 FILE_OF = {
@@ -511,7 +512,13 @@ class Pinned(TieTest):
 
     def test_the_names_that_may_be_pinned_are_fixed(self):
         self.assertEqual(check_ties.PIN_NAMES, PIN_NAMES)
-        self.assertEqual(check_ties.REPLACED_KEPT, ())
+        self.assertEqual(check_ties.REPLACED_KEPT, (
+            ("compare/replaced/Linux-12302019-full-67ae574f5666.json",
+             "e8d447073c29d83c2341357df8ca01fa9afaa50d4f235590d5506e0d10a41a25"),))
+        # One key for a replaced file, the one render_results.py reads it by.
+        self.assertEqual(check_ties.REPLACED_PINS, render_results.REPLACED_PINS)
+        self.assertEqual(check_ties.REPLACED_FOLDER,
+                         f"compare/{render_results.REPLACED}")
         self.assertEqual(check_ties.NOT_RESULTS, ())
 
     def replaced(self, kept_at, code_digest=None, pinned_digest=None, listed=None):
@@ -523,8 +530,8 @@ class Pinned(TieTest):
         kept.write_bytes((REPO / FILES["compare"]).read_bytes() + b" ")
         self.commit_with_proofs("a replaced file kept")
         digest = hashlib.sha256(kept.read_bytes()).hexdigest()
-        write_json(self.dir, "pins.json", {"replaced_kept_for_the_record": {
-            listed or kept_at: pinned_digest or digest}})
+        write_json(self.dir, "pins.json", {"replaced_comparison_files": {
+            Path(listed or kept_at).name: pinned_digest or digest}})
         self.change(FILE_OF["compare"])
         with mock.patch.object(check_ties, "REPLACED_KEPT", ((kept_at, code_digest or digest),)):
             result = run_check(REPO, "--pins", str(self.dir / "pins.json"))
@@ -534,7 +541,7 @@ class Pinned(TieTest):
 
     def test_a_replaced_file_kept_for_the_record_is_pinned_by_path_and_sha256(self):
         result, kept = self.replaced(self.KEPT)
-        self.assertIn("pinned under replaced_kept_for_the_record in the pins file",
+        self.assertIn("pinned under replaced_comparison_files in the pins file",
                       result.said(kept))
         self.assertNotIn("check_ties: replaced", result.err)
 
@@ -550,16 +557,16 @@ class Pinned(TieTest):
         result, kept = self.replaced("compare/kept/Linux-12302019-full-67ae574f5666.json")
         self.assertEqual(result.code, check_ties.EXIT_REFUSED)
         self.assertIn("check_ties: REPLACED_KEPT holds compare/kept/Linux-12302019-full-"
-                      "67ae574f5666.json: a file kept for the record lives in a replaced/ "
-                      "folder", result.err)
+                      "67ae574f5666.json: a file kept for the record lives in compare/replaced/",
+                      result.err)
         self.assertNotIn("pinned", result.said(kept))
         self.assertIn("what it measures changed since", result.said(kept))
 
     def test_a_replaced_pin_no_code_names_is_refused(self):
         result, kept = self.replaced(self.KEPT, listed="compare/replaced/another.json")
         self.assertEqual(result.code, check_ties.EXIT_REFUSED)
-        self.assertIn("check_ties: replaced_kept_for_the_record in the pins file pins "
-                      "compare/replaced/another.json", result.err)
+        self.assertIn("check_ties: replaced_comparison_files in the pins file pins "
+                      "another.json", result.err)
         self.assertNotIn("pinned", result.said(kept))
 
     def test_a_pin_only_its_validator_allows_holds(self):

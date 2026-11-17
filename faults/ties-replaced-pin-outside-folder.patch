@@ -1,13 +1,13 @@
 diff --git a/scripts/check_ties.py b/scripts/check_ties.py
-index 520d96a..b06ce35 100644
+index 5cd8976..bdc432e 100644
 --- a/scripts/check_ties.py
 +++ b/scripts/check_ties.py
-@@ -526,7 +526,7 @@ def pinned(kind, name, data, pins):
+@@ -535,7 +535,7 @@ def pinned(kind, name, data, pins):
          return key
      kept = dict(REPLACED_KEPT)
      entries = pins.get(REPLACED_PINS)
--    if (isinstance(entries, dict) and REPLACED_FOLDER in Path(name).parts[:-1]
+-    if (isinstance(entries, dict) and Path(name).parent.as_posix() == REPLACED_FOLDER
 +    if (isinstance(entries, dict)
-             and kept.get(name) == digest and entries.get(name) == digest):
+             and kept.get(name) == digest and entries.get(Path(name).name) == digest):
          return REPLACED_PINS
      return None
