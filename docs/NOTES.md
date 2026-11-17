@@ -6804,6 +6804,32 @@ are in the phase's `essay-prep/proofs` folder.
 - Remade on the lines that moved: `writeup-verdict-marks-dropped`,
   `writeup-verdict-mark-unchecked`.
 
+### The first screen for a reader who knows nothing of the project
+
+A reader with no project knowledge read the README's first screen for 90 seconds, and the essay's
+author found three mark problems. Both sets are fixed through the renderer (`e7fdc18`), with
+faults (`acc3539`); REVIEW rows R-A1 to R-A7 and R-B1 to R-B3 give each.
+
+- **The one-stock win.** Q2 and Q3, warm and cold, are met among the four headline setups, and
+  ArcticDB stored one table a stock is faster on each. The verdict word stays; beside it every
+  page now says what beat it, in full in RESULTS.md and BENCHMARKS.md and short on the screen, in
+  the pitch and in the essay. The plain words come from `setup_words` in `targets.json`.
+- **Plain marks on the screen.** The swap-in mark says the host was swapping during the named
+  systems' runs and which way that may lean. The login mark says a remote login on the test
+  machine fell inside the timing, and gives the replaced run's figure as an earlier full run's.
+  The short forms stay for quotes and the essay. RESULTS.md explains every form once.
+- **The list off the screen.** The screen ends with one count sentence. The list of the headline
+  targets' other parts follows under its own heading, which `check_left_out` requires.
+- **The essay's marks.** A changed outcome has a short form, and its full form's last words hold
+  on any page. Swap-in short forms name each system once in a verdict. A verdict of several parts
+  has a sentence-long short form, which WT-4's takes. The essay's template is not edited.
+- **Counts.** The first screen is 349 words before and 358 after, by the count used since C2-4.
+  The pitch is at 100 words, so the Ryzen's "why" (R-A7) is not added. The stand-in render gives
+  340 of 340 tokens and 3,711 words, and `--check` passes on it.
+- **Faults, shown by hand.** Seven new faults and nine remade on moved lines, each shown in a
+  clone under `build/`, outputs in the phase's `conditions-check/fix4/proofs` folder; the full
+  re-proof owes them.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
