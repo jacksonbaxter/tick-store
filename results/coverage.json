@@ -1,6 +1,6 @@
 {
   "schema": "tick-store-coverage-1",
-  "commit": "ede0176b10bb",
+  "commit": "8616263b7561",
   "platform": "Darwin arm64",
   "run": "tests/unit, with ItchRealDay left out so the report needs no data file.",
   "simd_kernels": "The kernels' dispatch, src/codec/simd/dispatch.cpp, and their scalar set, src/codec/simd/kernels_scalar.cpp, are required on every processor. This processor's set, NEON, in src/codec/simd/kernels_neon.cpp, is required too, 9 functions. The other processor's set is not built here, so it is neither required nor measured, and is listed among the sources not built.",
@@ -357,7 +357,7 @@
         "group": "parser",
         "file": "include/tick_store/store/little_endian.hpp",
         "name": "read_le",
-        "calls": 116199403
+        "calls": 120256414
       },
       {
         "group": "parser",
@@ -411,13 +411,13 @@
         "group": "parser",
         "file": "src/store/container.cpp",
         "name": "ContainerParser::block_info",
-        "calls": 6431496
+        "calls": 6488264
       },
       {
         "group": "parser",
         "file": "src/store/container.cpp",
         "name": "ContainerParser::block_with",
-        "calls": 3129962
+        "calls": 3186730
       },
       {
         "group": "parser",
@@ -621,13 +621,13 @@
         "group": "parser",
         "file": "src/codec/zstd_frame.cpp",
         "name": "decode_zstd_payload",
-        "calls": 40718
+        "calls": 40818
       },
       {
         "group": "parser",
         "file": "src/store/itch_store.cpp",
         "name": "unwrap_column",
-        "calls": 3113759
+        "calls": 3170527
       },
       {
         "group": "parser",
@@ -657,13 +657,13 @@
         "group": "parser",
         "file": "src/store/itch_store_reader.cpp",
         "name": "ItchStoreReader::column_view",
-        "calls": 733790
+        "calls": 790558
       },
       {
         "group": "kernel",
         "file": "src/codec/simd/dispatch.cpp",
         "name": "active_kernels",
-        "calls": 16522299
+        "calls": 16525849
       },
       {
         "group": "kernel",
@@ -699,7 +699,7 @@
         "group": "kernel",
         "file": "src/codec/simd/dispatch.cpp",
         "name": "ScalarKernelsOnThisThread",
-        "calls": 116276
+        "calls": 116300
       },
       {
         "group": "kernel",
@@ -711,13 +711,13 @@
         "group": "kernel",
         "file": "src/codec/simd/kernels_scalar.cpp",
         "name": "unpack_linear_scalar",
-        "calls": 828064
+        "calls": 828112
       },
       {
         "group": "kernel",
         "file": "src/codec/simd/kernels_scalar.cpp",
         "name": "add_base_scalar",
-        "calls": 1641364
+        "calls": 1641412
       },
       {
         "group": "kernel",
@@ -945,7 +945,7 @@
         "group": "codec",
         "file": "src/store/crc32c.cpp",
         "name": "crc32c",
-        "calls": 6679149
+        "calls": 6792685
       },
       {
         "group": "codec",
@@ -993,13 +993,13 @@
         "group": "codec",
         "file": "src/codec/block.cpp",
         "name": "read_block_header",
-        "calls": 17179732
+        "calls": 17181474
       },
       {
         "group": "codec",
         "file": "src/codec/block.cpp",
         "name": "decode_column",
-        "calls": 2666472
+        "calls": 2666594
       },
       {
         "group": "codec",
@@ -1071,7 +1071,7 @@
         "group": "codec",
         "file": "src/codec/lane_pack.cpp",
         "name": "unpack_linear",
-        "calls": 14637064
+        "calls": 14639039
       },
       {
         "group": "codec",
@@ -1083,43 +1083,43 @@
         "group": "codec",
         "file": "src/codec/lane_pack.cpp",
         "name": "pack_linear",
-        "calls": 11853812
+        "calls": 11862553
       },
       {
         "group": "codec",
         "file": "src/codec/patch_list.cpp",
         "name": "read_patches",
-        "calls": 1194254
+        "calls": 1194441
       },
       {
         "group": "codec",
         "file": "src/codec/patch_list.cpp",
         "name": "append_patches",
-        "calls": 1335070
+        "calls": 1335999
       },
       {
         "group": "codec",
         "file": "src/codec/pfor.cpp",
         "name": "decode_pfor_block",
-        "calls": 76170224
+        "calls": 76180689
       },
       {
         "group": "codec",
         "file": "src/codec/pfor.cpp",
         "name": "decode_pfor",
-        "calls": 336955
+        "calls": 337069
       },
       {
         "group": "codec",
         "file": "src/codec/pfor.cpp",
         "name": "encode_pfor_block",
-        "calls": 566886
+        "calls": 566924
       },
       {
         "group": "codec",
         "file": "src/codec/pfor.cpp",
         "name": "encode_pfor",
-        "calls": 308346
+        "calls": 308450
       },
       {
         "group": "codec",
@@ -1281,7 +1281,7 @@
         "group": "validator",
         "file": "fuzz/itch_store_oracles.hpp",
         "name": "check_itch_store",
-        "calls": 15077
+        "calls": 30154
       },
       {
         "group": "validator",
@@ -1305,7 +1305,7 @@
         "group": "validator",
         "file": "fuzz/itch_query_oracles.hpp",
         "name": "check_itch_query",
-        "calls": 2221
+        "calls": 4442
       },
       {
         "group": "validator",
@@ -1323,7 +1323,7 @@
         "group": "validator",
         "file": "fuzz/codec_oracles.hpp",
         "name": "check_one_block",
-        "calls": 27059
+        "calls": 27082
       },
       {
         "group": "validator",
@@ -1341,7 +1341,7 @@
         "group": "validator",
         "file": "fuzz/codec_oracles.hpp",
         "name": "check_pfor_column",
-        "calls": 3985
+        "calls": 7970
       },
       {
         "group": "validator",
@@ -1359,13 +1359,13 @@
         "group": "validator",
         "file": "fuzz/codec_oracles.hpp",
         "name": "pfor_block_encoders",
-        "calls": 7857
+        "calls": 7860
       },
       {
         "group": "validator",
         "file": "fuzz/codec_oracles.hpp",
         "name": "check_dict_column",
-        "calls": 1002
+        "calls": 2004
       },
       {
         "group": "validator",
@@ -1377,7 +1377,7 @@
         "group": "validator",
         "file": "fuzz/codec_oracles.hpp",
         "name": "check_rle_column",
-        "calls": 1280
+        "calls": 2560
       },
       {
         "group": "validator",
@@ -1491,7 +1491,7 @@
         "group": "codec",
         "file": "src/store/crc32c_armv8.cpp",
         "name": "crc32c_armv8",
-        "calls": 6684192
+        "calls": 6797728
       },
       {
         "group": "kernel",
@@ -1503,13 +1503,13 @@
         "group": "kernel",
         "file": "src/codec/simd/kernels_neon.cpp",
         "name": "unpack_linear_neon",
-        "calls": 25476865
+        "calls": 25485067
       },
       {
         "group": "kernel",
         "file": "src/codec/simd/kernels_neon.cpp",
         "name": "add_base_neon",
-        "calls": 55764550
+        "calls": 55769455
       },
       {
         "group": "kernel",
@@ -1527,7 +1527,7 @@
         "group": "kernel",
         "file": "src/codec/simd/kernels_neon.cpp",
         "name": "delta_pass_neon",
-        "calls": 10353209
+        "calls": 10354165
       },
       {
         "group": "kernel",

@@ -245,12 +245,14 @@ codecs' decoders and encoders, the container's and the ITCH store's readers and 
 queries, CRC32C in software and in this processor's hardware kernel, the SIMD kernels (the
 dispatch, the scalar set and this processor's own set, NEON on arm64 or AVX2 and its CPUID
 check on x86-64), the fuzz oracles and the oracle's compare path: 255 functions on arm64 and
-256 on x86-64. The gate's last full run on the Mac, at `83cd39b`, whose C++ differs from
-`5a810a2`'s only in comments, reached all 255, with 93.68% of lines and 97.06% of functions
-covered. `results/coverage.json`, written with `--output results/coverage.json`, is the summary
-as published at `4302ce8`, before the queries and the kernels joined the list: 204 required
-functions, all reached. Its line that no SIMD kernels exist is out of date, and so is the same
-line in each summary the script writes; both wait for Phase 4 ([docs/TASKS.md](docs/TASKS.md)).
+256 on x86-64. `results/coverage.json`, written with `--output results/coverage.json`, is the
+gate's run on the Mac at the frozen code, `8616263`: all 255 required functions reached, 94.02%
+of lines (14,690 of 15,624) and 97.1% of functions (1,206 of 1,242) covered, with the four
+sources the Mac does not build listed as such. That run ran 681 of the unit binary's 889 tests,
+one of them skipped as Linux's alone, leaving out the 2 `ItchRealDay` tests, the grid's 144 and
+the named seeds' 62. The file's `run` line names only `ItchRealDay`: it is a fixed sentence in
+`scripts/coverage_report.py`, which was not changed when the filter grew, and the script is
+measured code, so the line waits for the next code change ([docs/TASKS.md](docs/TASKS.md)).
 llvm-cov sees only the C++, so the Python validators are covered by their tests in
 `tests/scripts/` instead.
 
