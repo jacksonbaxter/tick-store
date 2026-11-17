@@ -2,10 +2,9 @@
 
 tick-store keeps a trading day of Nasdaq TotalView-ITCH 5.0, {{ss_records}} messages in
 {{ss_source_gb}} GB, in a store {{ss_ratio}} times smaller than the feed, {{cmpL_ts_B_alloc_gb}} GB
-on disk against {{glance_disk_other}} GB for {{glance_disk_other_system}}, and rebuilds the feed from it.
+on disk against {{glance_disk_other}} GB for Parquet's smallest setup, and rebuilds the feed from it.
 On the Zen 1, a Linux machine from 2018, it answers an hour of a stock in {{cmpL_ts_q2_warm_med_ms}}
-warm, {{cmpL_q2_warm_best_system}} in its fixed setup in {{cmpL_q2_warm_best_ms}} ms {{glance_q2_other_flag}} and ArcticDB with a
-table per stock in {{cmpL_arcps_q2_warm_med_ms}} ms {{glance_arcps_q2_flag}}, while a second and a millisecond across every
+warm, against {{cmpL_arcps_q2_warm_med_ms}} ms {{glance_arcps_q2_flag}} for ArcticDB with a table per stock, while a second and a millisecond across every
 stock take it {{gap_ql4_q1_x}} and {{gap_ql4_q4_x}} times as long as {{cmpL_q1_warm_best_system}} and
 {{cmpL_q4_warm_best_system}}, and the whole-day sum of a column {{gap_ql4_q5_x}} times as long as
 {{cmpL_q5_warm_best_system}} {{glance_q5_other_flag}}.
@@ -22,16 +21,18 @@ The Zen 1, each system in its fixed setup; queries are warm medians.
 
 | | tick-store | The other system first on the row | tick-store over it, or another setup |
 |---|---|---|---|
-| Disk, GB | {{cmpL_ts_B_alloc_gb}} | {{glance_disk_other}}, {{glance_disk_other_system}} | {{glance_disk_x}} |
+| Disk, GB, each system's smallest setup | {{cmpL_ts_B_alloc_gb}} | {{glance_disk_other}}, Parquet | {{glance_disk_x}} |
 | Day write with flush, s | {{cmpL_ts_B_total_s}} {{glance_write_ts_flag}} | {{glance_write_other}}, {{glance_write_other_system}} {{glance_write_other_flag}} | inputs not alike |
 | A second of every stock (Q1), ms | {{cmpL_ts_q1_warm_med_ms}} {{glance_q1_ts_flag}} | {{cmpL_q1_warm_best_ms}}, {{cmpL_q1_warm_best_system}} {{glance_q1_other_flag}} | {{gap_ql4_q1_x}} |
-| An hour of a stock (Q2), ms | {{cmpL_ts_q2_warm_med_ms}} {{glance_q2_ts_flag}} | {{cmpL_q2_warm_best_ms}}, {{cmpL_q2_warm_best_system}} {{glance_q2_other_flag}} | ArcticDB, a table per stock: {{cmpL_arcps_q2_warm_med_ms}} {{glance_arcps_q2_flag}} |
-| Its per-minute aggregate (Q3), ms | {{cmpL_ts_q3_warm_med_ms}} {{glance_q3_ts_flag}} | {{cmpL_q3_warm_best_ms}}, {{cmpL_q3_warm_best_system}} {{glance_q3_other_flag}} | ArcticDB, a table per stock: {{cmpL_arcps_q3_warm_med_ms}} {{glance_arcps_q3_flag}} |
+| An hour of a stock (Q2), ms | {{glance_ts_q2_ms}} {{glance_q2_ts_flag}} | {{cmpL_q2_warm_best_ms}}, {{cmpL_q2_warm_best_system}} {{glance_q2_other_flag}} | not counted {{glance_q2_rivals_flag}}; ArcticDB, a table per stock: {{cmpL_arcps_q2_warm_med_ms}} {{glance_arcps_q2_flag}} |
+| Its per-minute aggregate (Q3), ms | {{glance_ts_q3_ms}} {{glance_q3_ts_flag}} | {{cmpL_q3_warm_best_ms}}, {{cmpL_q3_warm_best_system}} {{glance_q3_other_flag}} | not counted {{glance_q3_rivals_flag}}; ArcticDB, a table per stock: {{cmpL_arcps_q3_warm_med_ms}} {{glance_arcps_q3_flag}} |
 | A millisecond of every stock (Q4), ms | {{cmpL_ts_q4_warm_med_ms}} {{glance_q4_ts_flag}} | {{cmpL_q4_warm_best_ms}}, {{cmpL_q4_warm_best_system}} {{glance_q4_other_flag}} | {{gap_ql4_q4_x}} |
 | The day's sum of a shares column (Q5), ms | {{cmpL_ts_q5_warm_med_ms}} {{glance_q5_ts_flag}} | {{cmpL_q5_warm_best_ms}}, {{cmpL_q5_warm_best_system}} {{glance_q5_other_flag}} | {{gap_ql4_q5_x}} |
 
-† Here, in the opening and under Queries, timed while the host's logs record a login or a backup job, or
-while the host was swapping memory; the [targets table](RESULTS.md#targets) names each. The write row is not like-for-like:
+† Here and in the opening, timed while the host's logs record a login or a backup job, or
+while the host was swapping memory; the [targets table](RESULTS.md#targets) names each. On Q2 and Q3 the host was swapping memory while a
+rival's queries were timed, in this run and in the replaced run, so neither run confirms the
+comparison with the fixed setups, which is not counted. The write row is not like-for-like:
 tick-store's input was in memory before its clock, and the others read theirs from disk inside it.
 
 ## How it was measured
@@ -179,8 +180,7 @@ median, so on whole queries SIMD's effect is inside or near the run-to-run sprea
 ([counters run]({{path:d3}}): {{note:diag-counters}}).
 
 **What SIMD cost.** {{simd_src_lines}} lines of kernels and dispatch, {{simd_src_share}}% of the
-{{src_include_lines}} in `src/` and `include/`, a {{simd_bench_lines}}-line benchmark and
-{{simd_test_lines}} lines of tests.
+{{src_include_lines}} in `src/` and `include/`.
 
 **The store's price column.** Per piece, the reader inflates any zstd frame, allocates, decodes
 PFOR with scale and patches, range-checks every value and appends. On the Zen 1 those steps take
@@ -230,10 +230,7 @@ dictionary encoding {{d1_dict_encode_pct}}%, sorting {{d1_sort_pct}}%, parsing {
 and zstd {{d1_zstd_pct}}% ([writer profile]({{path:d1}}): {{note:diag-writer}}). The others' engine-only times may still hold reading their input from disk, so
 the clocks are not alike and the gap is not all tick-store's writer.
 
-**Queries.** On Q2 tick-store takes {{cmpL_ts_q2_warm_med_ms}} warm and
-{{cmpL_q2_warm_best_system}} {{cmpL_q2_warm_best_ms}} ms {{glance_q2_other_flag}} in its fixed setup, and on Q3
-{{cmpL_ts_q3_warm_med_ms}} and {{cmpL_q3_warm_best_system}} {{cmpL_q3_warm_best_ms}} ms; ArcticDB with a table per stock takes
-{{cmpL_arcps_q2_warm_med_ms}} {{glance_arcps_q2_flag}} and {{cmpL_arcps_q3_warm_med_ms}} ms {{glance_arcps_q3_flag}} on them, and
+**Queries.** The table at a glance gives Q1 to Q5 warm; ArcticDB with a table per stock takes
 {{cmpL_arcps_q1_warm_med_s}} s on Q1. Q5, the day's sum of a shares column, decodes {{cmpL_ts_q5_values}} values at
 {{q5_ns_per_value}} ns each; of its sampled cycles, dictionary decoding takes {{d2_q5_dict_pct}}%,
 the C library {{d2_q5_libc_pct}}% and the unpack kernels {{d2_q5_unpack_pct}}%
@@ -254,7 +251,7 @@ takes no appends, does not capture a live feed, and holds no second day.
 
 On the day the store gives every message back bit-exact ({{verdict:g1}}), a flipped bit is caught
 in a data block and in the footer ({{verdict:g2}}), Gorilla is built and is exact on the whole day
-({{verdict:g4}}), and the store takes the least disk of the systems compared ({{verdict:cr2}}).
+({{verdict:g4}}), and the store takes the least disk of the systems compared, each in its smallest setup ({{verdict:cr2}}).
 
 ## Missed targets
 
@@ -331,5 +328,5 @@ wherever a mark names it. In the targets sections a verdict marked "swap-in" res
 while the host was swapping memory, and a verdict marked with a login or a backup run on a phase
 that held it. Where this run and the replaced run both carry the swap on a rival's side, neither
 confirms the other, and such a verdict keeps its word and is not counted.
-Not measured and not
-estimated: the cycles a mispredict costs and any memory-level counter.
+Not measured: the
+cycles a mispredict costs and any memory-level counter.

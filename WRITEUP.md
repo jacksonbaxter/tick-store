@@ -2,10 +2,9 @@
 
 tick-store keeps a trading day of Nasdaq TotalView-ITCH 5.0, 268,744,780 messages in
 8.25 GB, in a store 4.69 times smaller than the feed, 1.76 GB
-on disk against 3.19 GB for Parquet, and rebuilds the feed from it.
+on disk against 3.09 GB for Parquet's smallest setup, and rebuilds the feed from it.
 On the Zen 1, a Linux machine from 2018, it answers an hour of a stock in 74.04 ms
-warm, QuestDB in its fixed setup in 283.77 ms † and ArcticDB with a
-table per stock in 44.58 ms †, while a second and a millisecond across every
+warm, against 44.58 ms † for ArcticDB with a table per stock, while a second and a millisecond across every
 stock take it 8.7 and 167 times as long as ArcticDB and
 QuestDB, and the whole-day sum of a column 16.8 times as long as
 QuestDB †.
@@ -22,16 +21,18 @@ The Zen 1, each system in its fixed setup; queries are warm medians.
 
 | | tick-store | The other system first on the row | tick-store over it, or another setup |
 |---|---|---|---|
-| Disk, GB | 1.76 | 3.19, Parquet | 0.55 |
+| Disk, GB, each system's smallest setup | 1.76 | 3.09, Parquet | 0.57 |
 | Day write with flush, s | 190.7 † | 211.9, Parquet  | inputs not alike |
 | A second of every stock (Q1), ms | 296.78  | 34.16, ArcticDB  | 8.7 |
-| An hour of a stock (Q2), ms | 74.04 ms  | 283.77, QuestDB † | ArcticDB, a table per stock: 44.58 † |
-| Its per-minute aggregate (Q3), ms | 36.07 ms  | 64.95, QuestDB  | ArcticDB, a table per stock: 25.00 † |
+| An hour of a stock (Q2), ms | 74.04  | 283.77, QuestDB † | not counted †; ArcticDB, a table per stock: 44.58 † |
+| Its per-minute aggregate (Q3), ms | 36.07  | 64.95, QuestDB  | not counted †; ArcticDB, a table per stock: 25.00 † |
 | A millisecond of every stock (Q4), ms | 207.95  | 1.24, QuestDB  | 167 |
 | The day's sum of a shares column (Q5), ms | 912.75  | 54.46, QuestDB † | 16.8 |
 
-† Here, in the opening and under Queries, timed while the host's logs record a login or a backup job, or
-while the host was swapping memory; the [targets table](RESULTS.md#targets) names each. The write row is not like-for-like:
+† Here and in the opening, timed while the host's logs record a login or a backup job, or
+while the host was swapping memory; the [targets table](RESULTS.md#targets) names each. On Q2 and Q3 the host was swapping memory while a
+rival's queries were timed, in this run and in the replaced run, so neither run confirms the
+comparison with the fixed setups, which is not counted. The write row is not like-for-like:
 tick-store's input was in memory before its clock, and the others read theirs from disk inside it.
 
 ## How it was measured
@@ -179,8 +180,7 @@ median, so on whole queries SIMD's effect is inside or near the run-to-run sprea
 ([counters run](results/diag/counters-simd-12302019-ede0176b10bb.json): a diagnostic summary no separate validator re-reads).
 
 **What SIMD cost.** 1,870 lines of kernels and dispatch, 6.6% of the
-28,526 in `src/` and `include/`, a 875-line benchmark and
-551 lines of tests.
+28,526 in `src/` and `include/`.
 
 **The store's price column.** Per piece, the reader inflates any zstd frame, allocates, decodes
 PFOR with scale and patches, range-checks every value and appends. On the Zen 1 those steps take
@@ -230,10 +230,7 @@ dictionary encoding 6.8%, sorting 4.8%, parsing 2.7%
 and zstd 1.2% ([writer profile](results/diag/writer-profile-12302019-ede0176b10bb.json): a diagnostic summary no separate validator re-reads). The others' engine-only times may still hold reading their input from disk, so
 the clocks are not alike and the gap is not all tick-store's writer.
 
-**Queries.** On Q2 tick-store takes 74.04 ms warm and
-QuestDB 283.77 ms † in its fixed setup, and on Q3
-36.07 ms and QuestDB 64.95 ms; ArcticDB with a table per stock takes
-44.58 † and 25.00 ms † on them, and
+**Queries.** The table at a glance gives Q1 to Q5 warm; ArcticDB with a table per stock takes
 10.2 s on Q1. Q5, the day's sum of a shares column, decodes 152,004,760 values at
 6.0 ns each; of its sampled cycles, dictionary decoding takes 30.5%,
 the C library 20.6% and the unpack kernels 13.7%
@@ -254,7 +251,7 @@ takes no appends, does not capture a live feed, and holds no second day.
 
 On the day the store gives every message back bit-exact (met), a flipped bit is caught
 in a data block and in the footer (met), Gorilla is built and is exact on the whole day
-(met), and the store takes the least disk of the systems compared (met).
+(met), and the store takes the least disk of the systems compared, each in its smallest setup (met).
 
 ## Missed targets
 
@@ -331,7 +328,7 @@ wherever a mark names it. In the targets sections a verdict marked "swap-in" res
 while the host was swapping memory, and a verdict marked with a login or a backup run on a phase
 that held it. Where this run and the replaced run both carry the swap on a rival's side, neither
 confirms the other, and such a verdict keeps its word and is not counted.
-Not measured and not
-estimated: the cycles a mispredict costs and any memory-level counter.
+Not measured: the
+cycles a mispredict costs and any memory-level counter.
 
 <!-- generated by scripts/render_writeup.py from docs/writeup/WRITEUP.template.md and docs/writeup/figures.json: edit those, never this file -->
