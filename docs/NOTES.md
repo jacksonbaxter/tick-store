@@ -6237,6 +6237,15 @@ finds its pitch sentence, `writeup-pitch-condition-skipped` joins them, and it a
 faults whose patches the rebase moved, `verdict-class-met-on-any-part` among them, were PROVEN
 again with `--only`, 11 of 11 as expected. `results/check-proofs.json` was restored from git
 after each run.
+After the rebase onto `81cec1f` and the marks, `check.sh --only py-scripts` passed at `f552e89`
+(1,022 Python tests, 129 of them the render's), and one `heavy.sh` run took the essay's 38
+faults, upstream's `writeup-faster-write-unchecked` and `writeup-not-established-read` and the
+three new `Marks` faults among them. It reached its two-hour limit after 28, all PROVEN, and was
+stopped during `writeup-sub-operands-swapped`; that one and `writeup-constant-from-a-comment`,
+`writeup-non-result-anywhere`, `writeup-pin-unsaid`, `writeup-pinned-file-undeclared`,
+`writeup-opening-any-length`, `writeup-tokens-glued-accepted`, `writeup-numeral-forms-accepted`,
+`writeup-pitch-condition-skipped` and `writeup-template-not-rendered` were not proven again at
+this commit, though each was shown failing on its remade patch before it was committed.
 
 ## Process notes
 
