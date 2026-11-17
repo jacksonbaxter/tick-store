@@ -6600,6 +6600,68 @@ outside the repository.
   writeup-check, 35 of 310 tokens with no results file yet.
 - Run 44108908661, at `30789f9`, started at 14:58Z.
 
+### The second collection's Mac half
+
+2026-11-17. The Mac's judged run at `8616263`, the second commit, ran from 14:05:44 to 16:21:33
+UTC: preflight, the fuzz build, coverage, the named seeds' gate, the four batches of 30-minute
+fuzz runs, the host file and the runner's own validation, each step ending with exit 0. I read
+every raw record before using it. Its staging manifest checks 80 of 80 entries. The Linux
+host's run at the same commit is collected separately; until it is, nothing that needs both
+hosts is made.
+
+**Coverage (`3b1d33a`).** `results/coverage.json` is the run's staging file, byte for byte:
+SHA-256 `93837908cadd09960573f29a80a484825edc0f340b085847cb7fbccfa102890b`, the manifest's.
+It replaces the summary at `ede0176` committed in `c88ff7e`, which `8616263`'s change to `fuzz/`
+and `tests/unit/` had untied. The two agree on every total: 14,690 of 15,624 lines (94.02%),
+1,206 of 1,242 functions (97.1%), 255 of 255 required functions reached, the same four sources
+not built on macOS. They differ in the commit and in some call counts, since `8616263`'s
+`coverage.sh` runs fewer tests: 681 of the unit binary's 889, leaving out the 2 `ItchRealDay`
+tests, the grid's 144 and the named seeds' 62 (the counts from the build's ctest list, and 681
+from the run's log, one of them skipped as Linux's alone). So leaving those two groups out cost
+no line or function. The file's `run` line still names only `ItchRealDay`, because
+`coverage_report.py` writes a fixed sentence and was not changed with the filter; the script is
+measured code, so that waits (docs/TASKS.md). The README's Coverage section, which still
+described the `4302ce8` summary and a run at `83cd39b`, now describes this file.
+`check_ties.py` says it is tied: `30 files: 26 same, 2 pinned, 2 differs`, the two being
+`check-proofs.json` and the capacity file.
+
+**The G-3 file: not made.** `check_fuzz.py` takes a file only with both hosts, macOS and Linux,
+and with Linux's runs of the seven targets that reach the AVX2 or SSE4.2 kernels at `avx2`.
+I assembled the Mac's host folder with `fuzz_results.py`'s own assembly and checked it with
+`check_fuzz.py`'s own document check, outside the repository: eight problems, all of them the
+missing Linux host (the hosts header and one per AVX2 target). The Mac's part is clean: all 13
+targets, each timed run 1,801 s (run-length's 1,802), each replay clean and each merge in one
+attempt, no crash, timeout, leak or slow unit in any log. The old file and its pin stay until
+the Linux file lands, so the pages still show `ea1dde4`'s G-3, and `render_writeup.py --check`
+still stops on `{{verdict:g3}}`.
+
+**The named seeds' times (`2c0a8ba`).** fuzz/README.md's seed times came in with `0dbdb95`, and
+its every-target table with `126b03f`. Both are from a timing run of their own, at
+`-detect_leaks=0` in interleaved rounds, not from a judged run. The fuzz targets' code is the
+same at `8616263`. The run's gate, with the leak check on and five runs a seed, passed all 31
+named seeds against 5,000 ms an execution. The worst was `dictionary/bound-one-value-blocks`
+at 682.0 ms. Each seed's median was from 3.1% below to 0.9% above the README's. No results
+file has a kind for the gate's table, so the README says which run its figures are from, and
+the gate's figures are given in prose.
+
+**Checks.** At `2c0a8ba`:
+- `render_results.py` changed nothing, and `--check` exits 0.
+- `check_hygiene.py` is clean.
+- `check_ties.py` exits 1 on the two files above.
+- `render_writeup.py --check` exits 2 on the G-3 pin alone.
+- All 22 test files under `tests/scripts/` pass; `test_run_bench.py` skips its 4 Linux-only
+  tests.
+
+I changed no check, validator or fault, so no proof is added to what the full re-proof owes.
+`git diff 8616263 --` the measured paths prints nothing. The outputs are under the phase's
+`collect2` folder.
+
+**Still open.**
+- With the Linux run: the G-3 file for both hosts, the old file and its pin removed, and the
+  capacity file.
+- The full fault re-proof.
+- `coverage_report.py`'s `run` line.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
