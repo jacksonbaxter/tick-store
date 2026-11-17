@@ -2954,6 +2954,7 @@ class FuzzDisturbanceTest(unittest.TestCase):
     LOGIN = RENDER.WATCHER_COMPUTED
 
     def setUp(self):
+        (REPO_ROOT / "build").mkdir(exist_ok=True)
         self.root = Path(tempfile.mkdtemp(dir=REPO_ROOT / "build"))
         self.addCleanup(shutil.rmtree, self.root)
         (self.root / "results").mkdir()
