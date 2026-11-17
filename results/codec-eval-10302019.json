@@ -1,19 +1,20 @@
 {
   "tool": "tick_codec_eval",
   "schema": 1,
-  "tool_version": "3",
+  "tool_version": "4",
   "day": "10302019",
   "source": "10302019.NASDAQ_ITCH50",
   "host": "macOS",
-  "commit": "0d55bfef90d3",
+  "commit": "ede0176b10bb",
   "tree_dirty": false,
+  "commit_source": "git",
   "compiler": "Clang 23.1.4",
   "build_type": "Release",
   "sanitizers": "none",
   "build_preset": "bench",
-  "peak_rss_bytes": 14905966592,
+  "peak_rss_bytes": 14895677440,
   "peak_rss_note": "Peak resident size counts the clean file-backed pages of the read-only mapping of the source. peak_memory_footprint_bytes is what the process held beyond that mapping. Both are from /usr/bin/time -l around the whole run, the two exhaustive Price(4) proofs included.",
-  "peak_memory_footprint_bytes": 5755071432,
+  "peak_memory_footprint_bytes": 5746830304,
   "block_values": 4096,
   "columns_subset": null,
   "zstd_version": "1.5.7",
@@ -91,7 +92,7 @@
       "raw_zstd1_bytes": 1226801393,
       "raw_zstd1_bits_per_value": 33.383591,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 3.483011,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 6.696625,
       "codecs": [
         {
           "codec": "gorilla-dod",
@@ -114,7 +115,7 @@
           "zstd1_or_plain_bytes": 744462046,
           "zstd1_or_plain_bits_per_value": 20.258223,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.01465,
+          "zstd1_decompress_over_decode_time": 0.015431,
           "examples": [],
           "counters": {
             "zero": 2200296,
@@ -145,7 +146,7 @@
           "zstd1_or_plain_bytes": 673031938,
           "zstd1_or_plain_bits_per_value": 18.314475,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.052993,
+          "zstd1_decompress_over_decode_time": 2.039952,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -180,7 +181,7 @@
           "zstd1_or_plain_bytes": 779531674,
           "zstd1_or_plain_bits_per_value": 21.212534,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 3.296507,
+          "zstd1_decompress_over_decode_time": 7.022725,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -215,7 +216,7 @@
           "zstd1_or_plain_bytes": 716560794,
           "zstd1_or_plain_bits_per_value": 19.498977,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.038907,
+          "zstd1_decompress_over_decode_time": 1.605223,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -250,7 +251,7 @@
           "zstd1_or_plain_bytes": 844229860,
           "zstd1_or_plain_bits_per_value": 22.973095,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 2.983339,
+          "zstd1_decompress_over_decode_time": 4.491997,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -285,7 +286,7 @@
           "zstd1_or_plain_bytes": 688463699,
           "zstd1_or_plain_bits_per_value": 18.734402,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.61533,
+          "zstd1_decompress_over_decode_time": 3.835212,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -305,6 +306,7 @@
         "target_bits_per_value_at_most": 20.0,
         "met": true,
         "gap_bits_per_value": -1.309358,
+        "excludes_permutation": false,
         "census_ideal_delta_bits": 17.138549,
         "census_ideal_delta_of_delta_bits": 18.420357
       }
@@ -329,7 +331,7 @@
       "raw_zstd1_bytes": 1512438141,
       "raw_zstd1_bits_per_value": 41.158726,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 1.028065,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 8.026309,
       "codecs": [
         {
           "codec": "gorilla-dod",
@@ -352,7 +354,7 @@
           "zstd1_or_plain_bytes": 1298694936,
           "zstd1_or_plain_bits_per_value": 35.342369,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.27596,
+          "zstd1_decompress_over_decode_time": 0.274531,
           "examples": [],
           "counters": {
             "zero": 2155980,
@@ -383,7 +385,7 @@
           "zstd1_or_plain_bytes": 952381151,
           "zstd1_or_plain_bits_per_value": 25.918514,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.015823,
+          "zstd1_decompress_over_decode_time": 2.459486,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -418,7 +420,7 @@
           "zstd1_or_plain_bytes": 1039196974,
           "zstd1_or_plain_bits_per_value": 28.280937,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 3.425958,
+          "zstd1_decompress_over_decode_time": 8.318436,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -453,7 +455,7 @@
           "zstd1_or_plain_bytes": 1068067328,
           "zstd1_or_plain_bits_per_value": 29.066554,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.140434,
+          "zstd1_decompress_over_decode_time": 2.268629,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -488,7 +490,7 @@
           "zstd1_or_plain_bytes": 1204932857,
           "zstd1_or_plain_bits_per_value": 32.790925,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 2.779713,
+          "zstd1_decompress_over_decode_time": 4.822501,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -523,7 +525,7 @@
           "zstd1_or_plain_bytes": 915193855,
           "zstd1_or_plain_bits_per_value": 24.906578,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.40173,
+          "zstd1_decompress_over_decode_time": 3.150579,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -543,6 +545,7 @@
         "target_bits_per_value_at_most": 20.0,
         "met": false,
         "gap_bits_per_value": 5.503684,
+        "excludes_permutation": true,
         "census_ideal_delta_bits": 23.38717,
         "census_ideal_delta_of_delta_bits": 26.786824
       }
@@ -567,7 +570,7 @@
       "raw_zstd1_bytes": 320222427,
       "raw_zstd1_bits_per_value": 19.914554,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 3.229768,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 4.967972,
       "codecs": [
         {
           "codec": "gorilla-xor-f64-dollars",
@@ -590,7 +593,7 @@
           "zstd1_or_plain_bytes": 723354554,
           "zstd1_or_plain_bits_per_value": 44.985241,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.74518,
+          "zstd1_decompress_over_decode_time": 0.727406,
           "examples": [],
           "counters": {
             "zero": 18862357,
@@ -620,7 +623,7 @@
           "zstd1_or_plain_bytes": 356695292,
           "zstd1_or_plain_bits_per_value": 22.182792,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.250965,
+          "zstd1_decompress_over_decode_time": 0.234906,
           "examples": [],
           "counters": {
             "zero": 18862357,
@@ -650,7 +653,7 @@
           "zstd1_or_plain_bytes": 381095336,
           "zstd1_or_plain_bits_per_value": 23.700225,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.369795,
+          "zstd1_decompress_over_decode_time": 0.34756,
           "examples": [],
           "counters": {
             "zero": 18862357,
@@ -680,7 +683,7 @@
           "zstd1_or_plain_bytes": 325308238,
           "zstd1_or_plain_bits_per_value": 20.230839,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.549887,
+          "zstd1_decompress_over_decode_time": 2.693859,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -715,7 +718,7 @@
           "zstd1_or_plain_bytes": 346405222,
           "zstd1_or_plain_bits_per_value": 21.542855,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 2.726965,
+          "zstd1_decompress_over_decode_time": 4.983529,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -750,7 +753,7 @@
           "zstd1_or_plain_bytes": 328413698,
           "zstd1_or_plain_bits_per_value": 20.423967,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.630228,
+          "zstd1_decompress_over_decode_time": 3.226806,
           "examples": [],
           "counters": {
             "zigzag_blocks": 31406,
@@ -782,7 +785,7 @@
           "zstd1_or_plain_bytes": 339981337,
           "zstd1_or_plain_bits_per_value": 21.143356,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.498076,
+          "zstd1_decompress_over_decode_time": 0.934166,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -817,7 +820,7 @@
           "zstd1_or_plain_bytes": 240972603,
           "zstd1_or_plain_bits_per_value": 14.986027,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.046919,
+          "zstd1_decompress_over_decode_time": 0.074524,
           "examples": [],
           "counters": {
             "scaled_blocks": 31406,
@@ -852,7 +855,7 @@
           "zstd1_or_plain_bytes": 231673359,
           "zstd1_or_plain_bits_per_value": 14.407709,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.985989,
+          "zstd1_decompress_over_decode_time": 1.527127,
           "examples": [],
           "counters": {
             "scaled_blocks": 31406,
@@ -887,7 +890,7 @@
           "zstd1_or_plain_bytes": 252067599,
           "zstd1_or_plain_bits_per_value": 15.676022,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.717534,
+          "zstd1_decompress_over_decode_time": 2.53624,
           "examples": [],
           "counters": {
             "scaled_blocks": 31406,
@@ -910,6 +913,7 @@
         "target_bits_per_value_at_most": 7.9,
         "met": false,
         "gap_bits_per_value": 7.129958,
+        "excludes_permutation": false,
         "xor_dollars_over_xor_u64_integer": 1.860743,
         "xor_dollars_over_xor_f64_integer": 2.375268,
         "cr5_bits_per_value_an_integer_scheme_must_reach": 35.88476,
@@ -953,7 +957,7 @@
       "raw_zstd1_bytes": 137125798,
       "raw_zstd1_bits_per_value": 8.533337,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 2.466799,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 3.611689,
       "codecs": [
         {
           "codec": "gorilla-xor-f64-dollars",
@@ -976,7 +980,7 @@
           "zstd1_or_plain_bytes": 375503360,
           "zstd1_or_plain_bits_per_value": 23.357978,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.485985,
+          "zstd1_decompress_over_decode_time": 0.479768,
           "examples": [],
           "counters": {
             "zero": 38664939,
@@ -1006,7 +1010,7 @@
           "zstd1_or_plain_bytes": 178653499,
           "zstd1_or_plain_bits_per_value": 11.115934,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.165396,
+          "zstd1_decompress_over_decode_time": 0.159979,
           "examples": [],
           "counters": {
             "zero": 38664939,
@@ -1036,7 +1040,7 @@
           "zstd1_or_plain_bytes": 206059437,
           "zstd1_or_plain_bits_per_value": 12.820303,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.335068,
+          "zstd1_decompress_over_decode_time": 0.326419,
           "examples": [],
           "counters": {
             "zero": 38664939,
@@ -1066,7 +1070,7 @@
           "zstd1_or_plain_bytes": 156760018,
           "zstd1_or_plain_bits_per_value": 9.754384,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.965132,
+          "zstd1_decompress_over_decode_time": 1.669272,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -1101,7 +1105,7 @@
           "zstd1_or_plain_bytes": 180950560,
           "zstd1_or_plain_bits_per_value": 11.258788,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 2.275321,
+          "zstd1_decompress_over_decode_time": 4.057825,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -1136,7 +1140,7 @@
           "zstd1_or_plain_bytes": 143683445,
           "zstd1_or_plain_bits_per_value": 8.941155,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.60071,
+          "zstd1_decompress_over_decode_time": 2.953092,
           "examples": [],
           "counters": {
             "zigzag_blocks": 37341,
@@ -1168,7 +1172,7 @@
           "zstd1_or_plain_bytes": 187975659,
           "zstd1_or_plain_bits_per_value": 11.695677,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 2.098666,
+          "zstd1_decompress_over_decode_time": 3.494013,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -1203,7 +1207,7 @@
           "zstd1_or_plain_bytes": 111314051,
           "zstd1_or_plain_bits_per_value": 6.928111,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.81974,
+          "zstd1_decompress_over_decode_time": 1.081552,
           "examples": [],
           "counters": {
             "scaled_blocks": 36907,
@@ -1238,7 +1242,7 @@
           "zstd1_or_plain_bytes": 86710233,
           "zstd1_or_plain_bits_per_value": 5.398005,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.572687,
+          "zstd1_decompress_over_decode_time": 0.851656,
           "examples": [],
           "counters": {
             "scaled_blocks": 36883,
@@ -1273,7 +1277,7 @@
           "zstd1_or_plain_bytes": 114238176,
           "zstd1_or_plain_bits_per_value": 7.109961,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.396566,
+          "zstd1_decompress_over_decode_time": 2.002825,
           "examples": [],
           "counters": {
             "scaled_blocks": 36888,
@@ -1296,6 +1300,7 @@
         "target_bits_per_value_at_most": 7.9,
         "met": true,
         "gap_bits_per_value": -1.479274,
+        "excludes_permutation": true,
         "xor_dollars_over_xor_u64_integer": 1.611558,
         "xor_dollars_over_xor_f64_integer": 2.833331,
         "cr5_bits_per_value_an_integer_scheme_must_reach": 24.758618,
@@ -1339,7 +1344,7 @@
       "raw_zstd1_bytes": 121494579,
       "raw_zstd1_bits_per_value": 7.567856,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 2.361284,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 3.594548,
       "codecs": [
         {
           "codec": "gorilla-xor-f64-dollars",
@@ -1362,7 +1367,7 @@
           "zstd1_or_plain_bytes": 310782749,
           "zstd1_or_plain_bits_per_value": 19.339641,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.449702,
+          "zstd1_decompress_over_decode_time": 0.443019,
           "examples": [],
           "counters": {
             "zero": 47886985,
@@ -1392,7 +1397,7 @@
           "zstd1_or_plain_bytes": 155078959,
           "zstd1_or_plain_bits_per_value": 9.65646,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.160922,
+          "zstd1_decompress_over_decode_time": 0.156608,
           "examples": [],
           "counters": {
             "zero": 47886985,
@@ -1422,7 +1427,7 @@
           "zstd1_or_plain_bytes": 178071198,
           "zstd1_or_plain_bits_per_value": 11.086342,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.316575,
+          "zstd1_decompress_over_decode_time": 0.310395,
           "examples": [],
           "counters": {
             "zero": 47886985,
@@ -1452,7 +1457,7 @@
           "zstd1_or_plain_bytes": 134852652,
           "zstd1_or_plain_bits_per_value": 8.398591,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.848255,
+          "zstd1_decompress_over_decode_time": 1.545988,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -1487,7 +1492,7 @@
           "zstd1_or_plain_bytes": 155694426,
           "zstd1_or_plain_bits_per_value": 9.694736,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 2.332936,
+          "zstd1_decompress_over_decode_time": 4.24641,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -1522,7 +1527,7 @@
           "zstd1_or_plain_bytes": 117542479,
           "zstd1_or_plain_bits_per_value": 7.322076,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.618522,
+          "zstd1_decompress_over_decode_time": 2.994742,
           "examples": [],
           "counters": {
             "zigzag_blocks": 43976,
@@ -1554,7 +1559,7 @@
           "zstd1_or_plain_bytes": 164195791,
           "zstd1_or_plain_bits_per_value": 10.223434,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 2.062077,
+          "zstd1_decompress_over_decode_time": 3.703801,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -1589,7 +1594,7 @@
           "zstd1_or_plain_bytes": 96850773,
           "zstd1_or_plain_bits_per_value": 6.035264,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.830232,
+          "zstd1_decompress_over_decode_time": 1.156073,
           "examples": [],
           "counters": {
             "scaled_blocks": 43230,
@@ -1624,7 +1629,7 @@
           "zstd1_or_plain_bytes": 73568839,
           "zstd1_or_plain_bits_per_value": 4.587366,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.536301,
+          "zstd1_decompress_over_decode_time": 0.829231,
           "examples": [],
           "counters": {
             "scaled_blocks": 43159,
@@ -1659,7 +1664,7 @@
           "zstd1_or_plain_bytes": 99785212,
           "zstd1_or_plain_bits_per_value": 6.217756,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.473606,
+          "zstd1_decompress_over_decode_time": 2.175841,
           "examples": [],
           "counters": {
             "scaled_blocks": 43218,
@@ -1682,6 +1687,7 @@
         "target_bits_per_value_at_most": 7.9,
         "met": true,
         "gap_bits_per_value": -2.282542,
+        "excludes_permutation": true,
         "xor_dollars_over_xor_u64_integer": 1.598525,
         "xor_dollars_over_xor_f64_integer": 2.861272,
         "cr5_bits_per_value_an_integer_scheme_must_reach": 22.156954,
@@ -1725,7 +1731,7 @@
       "raw_zstd1_bytes": 66540560,
       "raw_zstd1_bits_per_value": 20.864303,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 3.066624,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 4.519314,
       "codecs": [
         {
           "codec": "gorilla-xor-f64-dollars",
@@ -1748,7 +1754,7 @@
           "zstd1_or_plain_bytes": 147030362,
           "zstd1_or_plain_bits_per_value": 46.102495,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.786807,
+          "zstd1_decompress_over_decode_time": 0.750791,
           "examples": [],
           "counters": {
             "zero": 3221776,
@@ -1778,7 +1784,7 @@
           "zstd1_or_plain_bytes": 72965648,
           "zstd1_or_plain_bits_per_value": 22.878938,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.238277,
+          "zstd1_decompress_over_decode_time": 0.224952,
           "examples": [],
           "counters": {
             "zero": 3221776,
@@ -1808,7 +1814,7 @@
           "zstd1_or_plain_bytes": 77417474,
           "zstd1_or_plain_bits_per_value": 24.274842,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.402769,
+          "zstd1_decompress_over_decode_time": 0.372916,
           "examples": [],
           "counters": {
             "zero": 3221776,
@@ -1838,7 +1844,7 @@
           "zstd1_or_plain_bytes": 66259631,
           "zstd1_or_plain_bits_per_value": 20.776216,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.528566,
+          "zstd1_decompress_over_decode_time": 2.686543,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -1873,7 +1879,7 @@
           "zstd1_or_plain_bytes": 70653750,
           "zstd1_or_plain_bits_per_value": 22.154025,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 2.719403,
+          "zstd1_decompress_over_decode_time": 4.927386,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -1908,7 +1914,7 @@
           "zstd1_or_plain_bytes": 66750471,
           "zstd1_or_plain_bits_per_value": 20.930122,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.757077,
+          "zstd1_decompress_over_decode_time": 3.565029,
           "examples": [],
           "counters": {
             "zigzag_blocks": 6229,
@@ -1940,7 +1946,7 @@
           "zstd1_or_plain_bytes": 68749447,
           "zstd1_or_plain_bits_per_value": 21.556916,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.61746,
+          "zstd1_decompress_over_decode_time": 1.176822,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -1975,7 +1981,7 @@
           "zstd1_or_plain_bytes": 48592867,
           "zstd1_or_plain_bits_per_value": 15.236667,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.053107,
+          "zstd1_decompress_over_decode_time": 0.079686,
           "examples": [],
           "counters": {
             "scaled_blocks": 6229,
@@ -2010,7 +2016,7 @@
           "zstd1_or_plain_bytes": 47456289,
           "zstd1_or_plain_bits_per_value": 14.880284,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.980335,
+          "zstd1_decompress_over_decode_time": 1.527695,
           "examples": [],
           "counters": {
             "scaled_blocks": 6229,
@@ -2045,7 +2051,7 @@
           "zstd1_or_plain_bytes": 51655123,
           "zstd1_or_plain_bits_per_value": 16.196861,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.716561,
+          "zstd1_decompress_over_decode_time": 2.517051,
           "examples": [],
           "counters": {
             "scaled_blocks": 6229,
@@ -2106,7 +2112,7 @@
       "raw_zstd1_bytes": 270996,
       "raw_zstd1_bits_per_value": 16.712007,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 3.133993,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 4.860714,
       "codecs": [
         {
           "codec": "gorilla-xor-f64-dollars",
@@ -2129,7 +2135,7 @@
           "zstd1_or_plain_bytes": 600956,
           "zstd1_or_plain_bits_per_value": 37.059655,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.469457,
+          "zstd1_decompress_over_decode_time": 0.46732,
           "examples": [],
           "counters": {
             "zero": 42596,
@@ -2159,7 +2165,7 @@
           "zstd1_or_plain_bytes": 283829,
           "zstd1_or_plain_bits_per_value": 17.50338,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.17989,
+          "zstd1_decompress_over_decode_time": 0.174059,
           "examples": [],
           "counters": {
             "zero": 42596,
@@ -2189,7 +2195,7 @@
           "zstd1_or_plain_bytes": 309091,
           "zstd1_or_plain_bits_per_value": 19.061212,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.247468,
+          "zstd1_decompress_over_decode_time": 0.236437,
           "examples": [],
           "counters": {
             "zero": 42596,
@@ -2219,7 +2225,7 @@
           "zstd1_or_plain_bytes": 289438,
           "zstd1_or_plain_bits_per_value": 17.84927,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.567088,
+          "zstd1_decompress_over_decode_time": 2.903064,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -2254,7 +2260,7 @@
           "zstd1_or_plain_bytes": 300491,
           "zstd1_or_plain_bits_per_value": 18.530876,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 2.965002,
+          "zstd1_decompress_over_decode_time": 5.34676,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -2289,7 +2295,7 @@
           "zstd1_or_plain_bytes": 289715,
           "zstd1_or_plain_bits_per_value": 17.866352,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.552864,
+          "zstd1_decompress_over_decode_time": 3.209045,
           "examples": [],
           "counters": {
             "zigzag_blocks": 32,
@@ -2321,7 +2327,7 @@
           "zstd1_or_plain_bytes": 307327,
           "zstd1_or_plain_bits_per_value": 18.952432,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.366123,
+          "zstd1_decompress_over_decode_time": 2.685514,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -2356,7 +2362,7 @@
           "zstd1_or_plain_bytes": 228717,
           "zstd1_or_plain_bits_per_value": 14.104788,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.223455,
+          "zstd1_decompress_over_decode_time": 0.357892,
           "examples": [],
           "counters": {
             "scaled_blocks": 32,
@@ -2391,7 +2397,7 @@
           "zstd1_or_plain_bytes": 208454,
           "zstd1_or_plain_bits_per_value": 12.855229,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.960705,
+          "zstd1_decompress_over_decode_time": 1.590835,
           "examples": [],
           "counters": {
             "scaled_blocks": 32,
@@ -2426,7 +2432,7 @@
           "zstd1_or_plain_bytes": 218560,
           "zstd1_or_plain_bits_per_value": 13.478436,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.932522,
+          "zstd1_decompress_over_decode_time": 2.820353,
           "examples": [],
           "counters": {
             "scaled_blocks": 32,
@@ -2487,7 +2493,7 @@
       "raw_zstd1_bytes": 3672294,
       "raw_zstd1_bits_per_value": 19.259951,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 3.281134,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 5.00649,
       "codecs": [
         {
           "codec": "gorilla-xor-f64-dollars",
@@ -2510,7 +2516,7 @@
           "zstd1_or_plain_bytes": 8052801,
           "zstd1_or_plain_bits_per_value": 42.234191,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.594503,
+          "zstd1_decompress_over_decode_time": 0.584721,
           "examples": [],
           "counters": {
             "zero": 349822,
@@ -2540,7 +2546,7 @@
           "zstd1_or_plain_bytes": 4016278,
           "zstd1_or_plain_bits_per_value": 21.064027,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.21206,
+          "zstd1_decompress_over_decode_time": 0.204186,
           "examples": [],
           "counters": {
             "zero": 349822,
@@ -2570,7 +2576,7 @@
           "zstd1_or_plain_bytes": 4246620,
           "zstd1_or_plain_bits_per_value": 22.272091,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.301724,
+          "zstd1_decompress_over_decode_time": 0.287486,
           "examples": [],
           "counters": {
             "zero": 349822,
@@ -2600,7 +2606,7 @@
           "zstd1_or_plain_bytes": 3757134,
           "zstd1_or_plain_bits_per_value": 19.704907,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.665736,
+          "zstd1_decompress_over_decode_time": 2.998174,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -2635,7 +2641,7 @@
           "zstd1_or_plain_bytes": 4015923,
           "zstd1_or_plain_bits_per_value": 21.062166,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 2.988201,
+          "zstd1_decompress_over_decode_time": 5.497207,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -2670,7 +2676,7 @@
           "zstd1_or_plain_bytes": 3777803,
           "zstd1_or_plain_bits_per_value": 19.813309,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.559143,
+          "zstd1_decompress_over_decode_time": 3.044519,
           "examples": [],
           "counters": {
             "zigzag_blocks": 373,
@@ -2702,7 +2708,7 @@
           "zstd1_or_plain_bytes": 4007724,
           "zstd1_or_plain_bits_per_value": 21.019165,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.538007,
+          "zstd1_decompress_over_decode_time": 1.060556,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -2737,7 +2743,7 @@
           "zstd1_or_plain_bytes": 2994550,
           "zstd1_or_plain_bits_per_value": 15.705418,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.825312,
+          "zstd1_decompress_over_decode_time": 1.266663,
           "examples": [],
           "counters": {
             "scaled_blocks": 373,
@@ -2772,7 +2778,7 @@
           "zstd1_or_plain_bytes": 2799277,
           "zstd1_or_plain_bits_per_value": 14.681279,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.14338,
+          "zstd1_decompress_over_decode_time": 1.832995,
           "examples": [],
           "counters": {
             "scaled_blocks": 373,
@@ -2807,7 +2813,7 @@
           "zstd1_or_plain_bytes": 3045990,
           "zstd1_or_plain_bits_per_value": 15.975203,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.973296,
+          "zstd1_decompress_over_decode_time": 2.939513,
           "examples": [],
           "counters": {
             "scaled_blocks": 373,
@@ -2868,7 +2874,7 @@
       "raw_zstd1_bytes": 33,
       "raw_zstd1_bits_per_value": 109.333333,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.493976,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 0.506024,
       "codecs": [
         {
           "codec": "gorilla-xor-f64-dollars",
@@ -2891,7 +2897,7 @@
           "zstd1_or_plain_bytes": 33,
           "zstd1_or_plain_bits_per_value": 109.333333,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.0,
+          "zstd1_decompress_over_decode_time": 4.0,
           "examples": [],
           "counters": {
             "zero": 0,
@@ -2921,7 +2927,7 @@
           "zstd1_or_plain_bytes": 27,
           "zstd1_or_plain_bits_per_value": 93.333333,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.506024,
+          "zstd1_decompress_over_decode_time": 0.493976,
           "examples": [],
           "counters": {
             "zero": 0,
@@ -2951,7 +2957,7 @@
           "zstd1_or_plain_bytes": 28,
           "zstd1_or_plain_bits_per_value": 96.0,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.97619,
+          "zstd1_decompress_over_decode_time": 1.0,
           "examples": [],
           "counters": {
             "zero": 0,
@@ -2981,7 +2987,7 @@
           "zstd1_or_plain_bytes": 37,
           "zstd1_or_plain_bits_per_value": 120.0,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.201923,
+          "zstd1_decompress_over_decode_time": 0.140411,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -3016,7 +3022,7 @@
           "zstd1_or_plain_bytes": 37,
           "zstd1_or_plain_bits_per_value": 120.0,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.336,
+          "zstd1_decompress_over_decode_time": 1.0,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -3051,7 +3057,7 @@
           "zstd1_or_plain_bytes": 32,
           "zstd1_or_plain_bits_per_value": 106.666667,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.091503,
+          "zstd1_decompress_over_decode_time": 0.071918,
           "examples": [],
           "counters": {
             "zigzag_blocks": 1,
@@ -3083,7 +3089,7 @@
           "zstd1_or_plain_bytes": 36,
           "zstd1_or_plain_bits_per_value": 117.333333,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.251497,
+          "zstd1_decompress_over_decode_time": 0.506024,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -3118,7 +3124,7 @@
           "zstd1_or_plain_bytes": 32,
           "zstd1_or_plain_bits_per_value": 106.666667,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.201923,
+          "zstd1_decompress_over_decode_time": 0.328,
           "examples": [],
           "counters": {
             "scaled_blocks": 1,
@@ -3153,7 +3159,7 @@
           "zstd1_or_plain_bytes": 33,
           "zstd1_or_plain_bits_per_value": 109.333333,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.0,
+          "zstd1_decompress_over_decode_time": 0.328,
           "examples": [],
           "counters": {
             "scaled_blocks": 1,
@@ -3188,7 +3194,7 @@
           "zstd1_or_plain_bytes": 33,
           "zstd1_or_plain_bits_per_value": 109.333333,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.0,
+          "zstd1_decompress_over_decode_time": 1.02439,
           "examples": [],
           "counters": {
             "scaled_blocks": 1,
@@ -3249,7 +3255,7 @@
       "raw_zstd1_bytes": 235424168,
       "raw_zstd1_bits_per_value": 14.640971,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 1.095669,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 2.930629,
       "codecs": [
         {
           "codec": "pfor-delta",
@@ -3272,7 +3278,7 @@
           "zstd1_or_plain_bytes": 280071422,
           "zstd1_or_plain_bits_per_value": 17.417573,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.234936,
+          "zstd1_decompress_over_decode_time": 2.559321,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -3307,7 +3313,7 @@
           "zstd1_or_plain_bytes": 286376432,
           "zstd1_or_plain_bits_per_value": 17.80968,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 3.241585,
+          "zstd1_decompress_over_decode_time": 6.022233,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -3342,7 +3348,7 @@
           "zstd1_or_plain_bytes": 243128665,
           "zstd1_or_plain_bits_per_value": 15.120112,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.522067,
+          "zstd1_decompress_over_decode_time": 3.590109,
           "examples": [],
           "counters": {
             "zigzag_blocks": 31406,
@@ -3374,7 +3380,7 @@
           "zstd1_or_plain_bytes": 333952749,
           "zstd1_or_plain_bits_per_value": 20.768439,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.715844,
+          "zstd1_decompress_over_decode_time": 3.948253,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -3409,7 +3415,7 @@
           "zstd1_or_plain_bytes": 93325270,
           "zstd1_or_plain_bits_per_value": 5.803876,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.163867,
+          "zstd1_decompress_over_decode_time": 0.441371,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -3432,7 +3438,8 @@
         "target_what": "Order reference columns at most 11.2 bits per value",
         "target_bits_per_value_at_most": 11.2,
         "met": true,
-        "gap_bits_per_value": -2.828814
+        "gap_bits_per_value": -2.828814,
+        "excludes_permutation": false
       }
     },
     {
@@ -3455,7 +3462,7 @@
       "raw_zstd1_bytes": 236264642,
       "raw_zstd1_bits_per_value": 14.698757,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 1.872782,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 12.957361,
       "codecs": [
         {
           "codec": "pfor-delta",
@@ -3478,7 +3485,7 @@
           "zstd1_or_plain_bytes": 179921466,
           "zstd1_or_plain_bits_per_value": 11.194789,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.768848,
+          "zstd1_decompress_over_decode_time": 1.716485,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -3513,7 +3520,7 @@
           "zstd1_or_plain_bytes": 197612233,
           "zstd1_or_plain_bits_per_value": 12.294973,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 3.066553,
+          "zstd1_decompress_over_decode_time": 6.224925,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -3548,7 +3555,7 @@
           "zstd1_or_plain_bytes": 174922233,
           "zstd1_or_plain_bits_per_value": 10.883888,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.468706,
+          "zstd1_decompress_over_decode_time": 3.253529,
           "examples": [],
           "counters": {
             "zigzag_blocks": 3999,
@@ -3580,7 +3587,7 @@
           "zstd1_or_plain_bytes": 361530140,
           "zstd1_or_plain_bits_per_value": 22.488987,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.833912,
+          "zstd1_decompress_over_decode_time": 1.66482,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -3615,7 +3622,7 @@
           "zstd1_or_plain_bytes": 192450396,
           "zstd1_or_plain_bits_per_value": 11.97396,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.595238,
+          "zstd1_decompress_over_decode_time": 0.874313,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -3638,7 +3645,8 @@
         "target_what": "Order reference columns at most 11.2 bits per value",
         "target_bits_per_value_at_most": 11.2,
         "met": false,
-        "gap_bits_per_value": 2.878168
+        "gap_bits_per_value": 2.878168,
+        "excludes_permutation": true
       }
     },
     {
@@ -3661,7 +3669,7 @@
       "raw_zstd1_bytes": 222333817,
       "raw_zstd1_bits_per_value": 13.826886,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.234818,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 0.46755,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -3684,7 +3692,7 @@
           "zstd1_or_plain_bytes": 302503778,
           "zstd1_or_plain_bits_per_value": 18.812636,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 4.117712,
+          "zstd1_decompress_over_decode_time": 8.781023,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -3719,7 +3727,7 @@
           "zstd1_or_plain_bytes": 302503778,
           "zstd1_or_plain_bits_per_value": 18.812636,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 3.721087,
+          "zstd1_decompress_over_decode_time": 7.921698,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -3754,7 +3762,7 @@
           "zstd1_or_plain_bytes": 242850866,
           "zstd1_or_plain_bits_per_value": 15.102836,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.972221,
+          "zstd1_decompress_over_decode_time": 8.850311,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -3786,7 +3794,7 @@
           "zstd1_or_plain_bytes": 163505717,
           "zstd1_or_plain_bits_per_value": 10.168381,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.045899,
+          "zstd1_decompress_over_decode_time": 0.090994,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 1,
@@ -3816,7 +3824,7 @@
           "zstd1_or_plain_bytes": 292755277,
           "zstd1_or_plain_bits_per_value": 18.206379,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.403771,
+          "zstd1_decompress_over_decode_time": 0.497844,
           "examples": [],
           "counters": {
             "runs": 121714508,
@@ -3831,7 +3839,8 @@
         "target_what": "Order reference columns at most 11.2 bits per value",
         "target_bits_per_value_at_most": 11.2,
         "met": false,
-        "gap_bits_per_value": 0.319403
+        "gap_bits_per_value": 0.319403,
+        "excludes_permutation": false
       }
     },
     {
@@ -3854,7 +3863,7 @@
       "raw_zstd1_bytes": 277299574,
       "raw_zstd1_bits_per_value": 14.39095,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 1.031598,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 2.755289,
       "codecs": [
         {
           "codec": "pfor-delta",
@@ -3877,7 +3886,7 @@
           "zstd1_or_plain_bytes": 323539585,
           "zstd1_or_plain_bits_per_value": 16.790656,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.137926,
+          "zstd1_decompress_over_decode_time": 2.350983,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -3912,7 +3921,7 @@
           "zstd1_or_plain_bytes": 332248390,
           "zstd1_or_plain_bits_per_value": 17.242615,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 3.255384,
+          "zstd1_decompress_over_decode_time": 6.089791,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -3947,7 +3956,7 @@
           "zstd1_or_plain_bytes": 280301440,
           "zstd1_or_plain_bits_per_value": 14.546737,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.531474,
+          "zstd1_decompress_over_decode_time": 3.609743,
           "examples": [],
           "counters": {
             "zigzag_blocks": 37635,
@@ -3979,7 +3988,7 @@
           "zstd1_or_plain_bytes": 398299598,
           "zstd1_or_plain_bits_per_value": 20.670459,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.718252,
+          "zstd1_decompress_over_decode_time": 3.950841,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -4014,7 +4023,7 @@
           "zstd1_or_plain_bytes": 102737944,
           "zstd1_or_plain_bits_per_value": 5.331767,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.160126,
+          "zstd1_decompress_over_decode_time": 0.431867,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -4037,7 +4046,8 @@
         "target_what": "Order reference columns at most 11.2 bits per value",
         "target_bits_per_value_at_most": 11.2,
         "met": true,
-        "gap_bits_per_value": -3.559262
+        "gap_bits_per_value": -3.559262,
+        "excludes_permutation": false
       }
     },
     {
@@ -4060,7 +4070,7 @@
       "raw_zstd1_bytes": 53781630,
       "raw_zstd1_bits_per_value": 16.863643,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 1.318118,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 3.323052,
       "codecs": [
         {
           "codec": "pfor-delta",
@@ -4083,7 +4093,7 @@
           "zstd1_or_plain_bytes": 55283417,
           "zstd1_or_plain_bits_per_value": 17.33454,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.921296,
+          "zstd1_decompress_over_decode_time": 1.982263,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -4118,7 +4128,7 @@
           "zstd1_or_plain_bytes": 58573559,
           "zstd1_or_plain_bits_per_value": 18.366189,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 3.179215,
+          "zstd1_decompress_over_decode_time": 5.97884,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -4153,7 +4163,7 @@
           "zstd1_or_plain_bytes": 49774672,
           "zstd1_or_plain_bits_per_value": 15.607231,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.465072,
+          "zstd1_decompress_over_decode_time": 3.183307,
           "examples": [],
           "counters": {
             "zigzag_blocks": 6229,
@@ -4185,7 +4195,7 @@
           "zstd1_or_plain_bytes": 68248676,
           "zstd1_or_plain_bits_per_value": 21.399896,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.641642,
+          "zstd1_decompress_over_decode_time": 3.765211,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -4220,7 +4230,7 @@
           "zstd1_or_plain_bytes": 26566802,
           "zstd1_or_plain_bits_per_value": 8.330226,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.196562,
+          "zstd1_decompress_over_decode_time": 0.498195,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -4243,7 +4253,8 @@
         "target_what": "Order reference columns at most 11.2 bits per value",
         "target_bits_per_value_at_most": 11.2,
         "met": true,
-        "gap_bits_per_value": -0.173031
+        "gap_bits_per_value": -0.173031,
+        "excludes_permutation": false
       }
     },
     {
@@ -4266,7 +4277,7 @@
       "raw_zstd1_bytes": 67388067,
       "raw_zstd1_bits_per_value": 21.130045,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 1.16855,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 1.415975,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -4289,7 +4300,7 @@
           "zstd1_or_plain_bytes": 57639519,
           "zstd1_or_plain_bits_per_value": 18.073314,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.282325,
+          "zstd1_decompress_over_decode_time": 2.797134,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -4324,7 +4335,7 @@
           "zstd1_or_plain_bytes": 52629045,
           "zstd1_or_plain_bits_per_value": 16.502241,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.0467,
+          "zstd1_decompress_over_decode_time": 2.047082,
           "examples": [],
           "counters": {
             "scaled_blocks": 6229,
@@ -4359,7 +4370,7 @@
           "zstd1_or_plain_bytes": 55636974,
           "zstd1_or_plain_bits_per_value": 17.4454,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.50161,
+          "zstd1_decompress_over_decode_time": 5.900984,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -4391,7 +4402,7 @@
           "zstd1_or_plain_bytes": 69214777,
           "zstd1_or_plain_bits_per_value": 21.702824,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.002843,
+          "zstd1_decompress_over_decode_time": 0.015094,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 0,
@@ -4421,7 +4432,7 @@
           "zstd1_or_plain_bytes": 51198115,
           "zstd1_or_plain_bits_per_value": 16.053562,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.255872,
+          "zstd1_decompress_over_decode_time": 0.315813,
           "examples": [],
           "counters": {
             "runs": 23594442,
@@ -4436,7 +4447,8 @@
         "target_what": "Order reference columns at most 11.2 bits per value",
         "target_bits_per_value_at_most": 11.2,
         "met": false,
-        "gap_bits_per_value": 6.457178
+        "gap_bits_per_value": 6.457178,
+        "excludes_permutation": false
       }
     },
     {
@@ -4459,7 +4471,7 @@
       "raw_zstd1_bytes": 501813927,
       "raw_zstd1_bits_per_value": 25.118082,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 2.174444,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 12.848536,
       "codecs": [
         {
           "codec": "pfor-delta",
@@ -4482,7 +4494,7 @@
           "zstd1_or_plain_bytes": 459517221,
           "zstd1_or_plain_bits_per_value": 23.000938,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.414204,
+          "zstd1_decompress_over_decode_time": 2.484745,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -4517,7 +4529,7 @@
           "zstd1_or_plain_bytes": 496720235,
           "zstd1_or_plain_bits_per_value": 24.863119,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 2.461516,
+          "zstd1_decompress_over_decode_time": 4.633631,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -4552,7 +4564,7 @@
           "zstd1_or_plain_bytes": 457979049,
           "zstd1_or_plain_bits_per_value": 22.923946,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.552318,
+          "zstd1_decompress_over_decode_time": 3.300638,
           "examples": [],
           "counters": {
             "zigzag_blocks": 39020,
@@ -4584,7 +4596,7 @@
           "zstd1_or_plain_bytes": 525986113,
           "zstd1_or_plain_bits_per_value": 26.32801,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.126119,
+          "zstd1_decompress_over_decode_time": 2.4349,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -4619,7 +4631,7 @@
           "zstd1_or_plain_bytes": 491551708,
           "zstd1_or_plain_bits_per_value": 24.604411,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.252377,
+          "zstd1_decompress_over_decode_time": 1.060693,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -4642,7 +4654,8 @@
         "target_what": "Order reference columns at most 11.2 bits per value",
         "target_bits_per_value_at_most": 11.2,
         "met": false,
-        "gap_bits_per_value": 12.793781
+        "gap_bits_per_value": 12.793781,
+        "excludes_permutation": false
       }
     },
     {
@@ -4665,7 +4678,7 @@
       "raw_zstd1_bytes": 500973951,
       "raw_zstd1_bits_per_value": 25.076039,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 2.163206,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 12.964978,
       "codecs": [
         {
           "codec": "pfor-delta",
@@ -4688,7 +4701,7 @@
           "zstd1_or_plain_bytes": 457143781,
           "zstd1_or_plain_bits_per_value": 22.882139,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.441569,
+          "zstd1_decompress_over_decode_time": 2.575694,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -4723,7 +4736,7 @@
           "zstd1_or_plain_bytes": 495087011,
           "zstd1_or_plain_bits_per_value": 24.781371,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 2.509533,
+          "zstd1_decompress_over_decode_time": 4.779253,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -4758,7 +4771,7 @@
           "zstd1_or_plain_bytes": 456395741,
           "zstd1_or_plain_bits_per_value": 22.844696,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.554706,
+          "zstd1_decompress_over_decode_time": 3.358703,
           "examples": [],
           "counters": {
             "zigzag_blocks": 39022,
@@ -4790,7 +4803,7 @@
           "zstd1_or_plain_bytes": 524901087,
           "zstd1_or_plain_bits_per_value": 26.273702,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.135498,
+          "zstd1_decompress_over_decode_time": 2.492447,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -4825,7 +4838,7 @@
           "zstd1_or_plain_bytes": 488209447,
           "zstd1_or_plain_bits_per_value": 24.437117,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.257978,
+          "zstd1_decompress_over_decode_time": 1.077457,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -4848,7 +4861,8 @@
         "target_what": "Order reference columns at most 11.2 bits per value",
         "target_bits_per_value_at_most": 11.2,
         "met": false,
-        "gap_bits_per_value": 12.758513
+        "gap_bits_per_value": 12.758513,
+        "excludes_permutation": false
       }
     },
     {
@@ -4871,7 +4885,7 @@
       "raw_zstd1_bytes": 19192770,
       "raw_zstd1_bits_per_value": 20.985166,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.590562,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 0.726925,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -4894,7 +4908,7 @@
           "zstd1_or_plain_bytes": 17822589,
           "zstd1_or_plain_bits_per_value": 19.487025,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.490527,
+          "zstd1_decompress_over_decode_time": 3.201432,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -4929,7 +4943,7 @@
           "zstd1_or_plain_bytes": 17822589,
           "zstd1_or_plain_bits_per_value": 19.487025,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.505558,
+          "zstd1_decompress_over_decode_time": 3.471276,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -4964,7 +4978,7 @@
           "zstd1_or_plain_bytes": 17660303,
           "zstd1_or_plain_bits_per_value": 19.309584,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.570264,
+          "zstd1_decompress_over_decode_time": 6.240552,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -4996,7 +5010,7 @@
           "zstd1_or_plain_bytes": 23963170,
           "zstd1_or_plain_bits_per_value": 26.201067,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.002997,
+          "zstd1_decompress_over_decode_time": 0.016429,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 0,
@@ -5026,7 +5040,7 @@
           "zstd1_or_plain_bytes": 17166318,
           "zstd1_or_plain_bits_per_value": 18.769466,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.294504,
+          "zstd1_decompress_over_decode_time": 0.360259,
           "examples": [],
           "counters": {
             "runs": 6797263,
@@ -5041,7 +5055,8 @@
         "target_what": "Order reference columns at most 11.2 bits per value",
         "target_bits_per_value_at_most": 11.2,
         "met": false,
-        "gap_bits_per_value": 8.879896
+        "gap_bits_per_value": 8.879896,
+        "excludes_permutation": false
       }
     },
     {
@@ -5064,7 +5079,7 @@
       "raw_zstd1_bytes": 268913,
       "raw_zstd1_bits_per_value": 16.583555,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 1.114439,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 11.952338,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -5087,7 +5102,7 @@
           "zstd1_or_plain_bytes": 234448,
           "zstd1_or_plain_bits_per_value": 14.458201,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.020317,
+          "zstd1_decompress_over_decode_time": 2.224189,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -5122,7 +5137,7 @@
           "zstd1_or_plain_bytes": 234448,
           "zstd1_or_plain_bits_per_value": 14.458201,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.042326,
+          "zstd1_decompress_over_decode_time": 2.453983,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -5157,7 +5172,7 @@
           "zstd1_or_plain_bytes": 220373,
           "zstd1_or_plain_bits_per_value": 13.590238,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.437101,
+          "zstd1_decompress_over_decode_time": 4.611826,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -5189,7 +5204,7 @@
           "zstd1_or_plain_bytes": 278902,
           "zstd1_or_plain_bits_per_value": 17.199547,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.01481,
+          "zstd1_decompress_over_decode_time": 0.051415,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 0,
@@ -5219,7 +5234,7 @@
           "zstd1_or_plain_bytes": 232231,
           "zstd1_or_plain_bits_per_value": 14.321486,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.238931,
+          "zstd1_decompress_over_decode_time": 0.298231,
           "examples": [],
           "counters": {
             "runs": 122838,
@@ -5234,7 +5249,8 @@
         "target_what": "Order reference columns at most 11.2 bits per value",
         "target_bits_per_value_at_most": 11.2,
         "met": false,
-        "gap_bits_per_value": 3.754004
+        "gap_bits_per_value": 3.754004,
+        "excludes_permutation": false
       }
     },
     {
@@ -5257,7 +5273,7 @@
       "raw_zstd1_bytes": 8264006,
       "raw_zstd1_bits_per_value": 18.525363,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 1.143907,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 11.618338,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -5280,7 +5296,7 @@
           "zstd1_or_plain_bytes": 7312772,
           "zstd1_or_plain_bits_per_value": 16.392991,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.165841,
+          "zstd1_decompress_over_decode_time": 2.486277,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -5315,7 +5331,7 @@
           "zstd1_or_plain_bytes": 7312772,
           "zstd1_or_plain_bits_per_value": 16.392991,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.19025,
+          "zstd1_decompress_over_decode_time": 2.757973,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -5350,7 +5366,7 @@
           "zstd1_or_plain_bytes": 7165209,
           "zstd1_or_plain_bits_per_value": 16.0622,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.510299,
+          "zstd1_decompress_over_decode_time": 5.0714,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -5382,7 +5398,7 @@
           "zstd1_or_plain_bytes": 9600926,
           "zstd1_or_plain_bits_per_value": 21.522324,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.009608,
+          "zstd1_decompress_over_decode_time": 0.039125,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 0,
@@ -5412,7 +5428,7 @@
           "zstd1_or_plain_bytes": 7194180,
           "zstd1_or_plain_bits_per_value": 16.127144,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.260649,
+          "zstd1_decompress_over_decode_time": 0.320994,
           "examples": [],
           "counters": {
             "runs": 3381596,
@@ -5427,7 +5443,8 @@
         "target_what": "Order reference columns at most 11.2 bits per value",
         "target_bits_per_value_at_most": 11.2,
         "met": false,
-        "gap_bits_per_value": 6.135283
+        "gap_bits_per_value": 6.135283,
+        "excludes_permutation": false
       }
     },
     {
@@ -5450,7 +5467,7 @@
       "raw_zstd1_bytes": 308766214,
       "raw_zstd1_bits_per_value": 20.034023,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.942385,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 11.20164,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -5473,7 +5490,7 @@
           "zstd1_or_plain_bytes": 273052705,
           "zstd1_or_plain_bits_per_value": 17.716784,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.353733,
+          "zstd1_decompress_over_decode_time": 2.85919,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -5508,7 +5525,7 @@
           "zstd1_or_plain_bytes": 273052705,
           "zstd1_or_plain_bits_per_value": 17.716784,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.388083,
+          "zstd1_decompress_over_decode_time": 3.185633,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -5543,7 +5560,7 @@
           "zstd1_or_plain_bytes": 266250426,
           "zstd1_or_plain_bits_per_value": 17.275424,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.46452,
+          "zstd1_decompress_over_decode_time": 5.460589,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -5575,7 +5592,7 @@
           "zstd1_or_plain_bytes": 373332452,
           "zstd1_or_plain_bits_per_value": 24.223346,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.002619,
+          "zstd1_decompress_over_decode_time": 0.012729,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 14,
@@ -5605,7 +5622,7 @@
           "zstd1_or_plain_bytes": 272522698,
           "zstd1_or_plain_bits_per_value": 17.682395,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.292331,
+          "zstd1_decompress_over_decode_time": 0.355201,
           "examples": [],
           "counters": {
             "runs": 122525488,
@@ -5620,7 +5637,8 @@
         "target_what": "Order reference columns at most 11.2 bits per value",
         "target_bits_per_value_at_most": 11.2,
         "met": false,
-        "gap_bits_per_value": 7.155033
+        "gap_bits_per_value": 7.155033,
+        "excludes_permutation": false
       }
     },
     {
@@ -5643,7 +5661,7 @@
       "raw_zstd1_bytes": 60878533,
       "raw_zstd1_bits_per_value": 19.088931,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 1.016739,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 12.090814,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -5666,7 +5684,7 @@
           "zstd1_or_plain_bytes": 55886446,
           "zstd1_or_plain_bits_per_value": 17.523624,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.218187,
+          "zstd1_decompress_over_decode_time": 2.602502,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -5701,7 +5719,7 @@
           "zstd1_or_plain_bytes": 55886446,
           "zstd1_or_plain_bits_per_value": 17.523624,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.228625,
+          "zstd1_decompress_over_decode_time": 2.859376,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -5736,7 +5754,7 @@
           "zstd1_or_plain_bytes": 53312330,
           "zstd1_or_plain_bits_per_value": 16.71649,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.472335,
+          "zstd1_decompress_over_decode_time": 5.559263,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -5768,7 +5786,7 @@
           "zstd1_or_plain_bytes": 73695709,
           "zstd1_or_plain_bits_per_value": 23.107855,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.0028,
+          "zstd1_decompress_over_decode_time": 0.014241,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 0,
@@ -5798,7 +5816,7 @@
           "zstd1_or_plain_bytes": 54323222,
           "zstd1_or_plain_bits_per_value": 17.033463,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.273488,
+          "zstd1_decompress_over_decode_time": 0.33858,
           "examples": [],
           "counters": {
             "runs": 23574477,
@@ -5813,7 +5831,8 @@
         "target_what": "Order reference columns at most 11.2 bits per value",
         "target_bits_per_value_at_most": 11.2,
         "met": false,
-        "gap_bits_per_value": 6.582791
+        "gap_bits_per_value": 6.582791,
+        "excludes_permutation": false
       }
     },
     {
@@ -5836,7 +5855,7 @@
       "raw_zstd1_bytes": 10121118,
       "raw_zstd1_bits_per_value": 11.066324,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.121802,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 0.725956,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -5859,7 +5878,7 @@
           "zstd1_or_plain_bytes": 7558692,
           "zstd1_or_plain_bits_per_value": 8.264597,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.929309,
+          "zstd1_decompress_over_decode_time": 1.749734,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -5894,7 +5913,7 @@
           "zstd1_or_plain_bytes": 7558692,
           "zstd1_or_plain_bits_per_value": 8.264597,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.915797,
+          "zstd1_decompress_over_decode_time": 1.912916,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -5929,7 +5948,7 @@
           "zstd1_or_plain_bytes": 7342334,
           "zstd1_or_plain_bits_per_value": 8.028033,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.882139,
+          "zstd1_decompress_over_decode_time": 4.371205,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -5961,7 +5980,7 @@
           "zstd1_or_plain_bytes": 7926286,
           "zstd1_or_plain_bits_per_value": 8.66652,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.001798,
+          "zstd1_decompress_over_decode_time": 0.011263,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 0,
@@ -5991,7 +6010,7 @@
           "zstd1_or_plain_bytes": 7525231,
           "zstd1_or_plain_bits_per_value": 8.228011,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.169302,
+          "zstd1_decompress_over_decode_time": 0.206686,
           "examples": [],
           "counters": {
             "runs": 6476038,
@@ -6006,7 +6025,8 @@
         "target_what": "Order reference columns at most 11.2 bits per value",
         "target_bits_per_value_at_most": 11.2,
         "met": true,
-        "gap_bits_per_value": -2.467977
+        "gap_bits_per_value": -2.467977,
+        "excludes_permutation": false
       }
     },
     {
@@ -6029,7 +6049,7 @@
       "raw_zstd1_bytes": 146760,
       "raw_zstd1_bits_per_value": 9.050744,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.141397,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 0.953619,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -6052,7 +6072,7 @@
           "zstd1_or_plain_bytes": 101543,
           "zstd1_or_plain_bits_per_value": 6.262347,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.89976,
+          "zstd1_decompress_over_decode_time": 1.453554,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -6087,7 +6107,7 @@
           "zstd1_or_plain_bytes": 101543,
           "zstd1_or_plain_bits_per_value": 6.262347,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.912069,
+          "zstd1_decompress_over_decode_time": 1.672948,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -6122,7 +6142,7 @@
           "zstd1_or_plain_bytes": 95497,
           "zstd1_or_plain_bits_per_value": 5.889508,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.98475,
+          "zstd1_decompress_over_decode_time": 3.383116,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -6154,7 +6174,7 @@
           "zstd1_or_plain_bytes": 97636,
           "zstd1_or_plain_bits_per_value": 6.021414,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.000867,
+          "zstd1_decompress_over_decode_time": 0.007833,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 0,
@@ -6184,7 +6204,7 @@
           "zstd1_or_plain_bytes": 103456,
           "zstd1_or_plain_bits_per_value": 6.380316,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.143074,
+          "zstd1_decompress_over_decode_time": 0.169767,
           "examples": [],
           "counters": {
             "runs": 113819,
@@ -6199,7 +6219,8 @@
         "target_what": "Order reference columns at most 11.2 bits per value",
         "target_bits_per_value_at_most": 11.2,
         "met": true,
-        "gap_bits_per_value": -5.177476
+        "gap_bits_per_value": -5.177476,
+        "excludes_permutation": false
       }
     },
     {
@@ -6222,7 +6243,7 @@
       "raw_zstd1_bytes": 4526866,
       "raw_zstd1_bits_per_value": 10.147851,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.13093,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 0.80458,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -6245,7 +6266,7 @@
           "zstd1_or_plain_bytes": 3268900,
           "zstd1_or_plain_bits_per_value": 7.327881,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.785744,
+          "zstd1_decompress_over_decode_time": 1.443431,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -6280,7 +6301,7 @@
           "zstd1_or_plain_bytes": 3268900,
           "zstd1_or_plain_bits_per_value": 7.327881,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.773744,
+          "zstd1_decompress_over_decode_time": 1.612353,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -6315,7 +6336,7 @@
           "zstd1_or_plain_bytes": 3141302,
           "zstd1_or_plain_bits_per_value": 7.041845,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.934841,
+          "zstd1_decompress_over_decode_time": 4.272277,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -6347,7 +6368,7 @@
           "zstd1_or_plain_bytes": 3311457,
           "zstd1_or_plain_bits_per_value": 7.42328,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.001196,
+          "zstd1_decompress_over_decode_time": 0.007962,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 0,
@@ -6377,7 +6398,7 @@
           "zstd1_or_plain_bytes": 3297856,
           "zstd1_or_plain_bits_per_value": 7.392791,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.153552,
+          "zstd1_decompress_over_decode_time": 0.186858,
           "examples": [],
           "counters": {
             "runs": 3084500,
@@ -6392,7 +6413,8 @@
         "target_what": "Order reference columns at most 11.2 bits per value",
         "target_bits_per_value_at_most": 11.2,
         "met": true,
-        "gap_bits_per_value": -3.758333
+        "gap_bits_per_value": -3.758333,
+        "excludes_permutation": false
       }
     },
     {
@@ -6415,7 +6437,7 @@
       "raw_zstd1_bytes": 160285460,
       "raw_zstd1_bits_per_value": 10.399981,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.126758,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 0.784966,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -6438,7 +6460,7 @@
           "zstd1_or_plain_bytes": 114103426,
           "zstd1_or_plain_bits_per_value": 7.4035,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.819642,
+          "zstd1_decompress_over_decode_time": 1.515562,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -6473,7 +6495,7 @@
           "zstd1_or_plain_bytes": 114103426,
           "zstd1_or_plain_bits_per_value": 7.4035,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.828823,
+          "zstd1_decompress_over_decode_time": 1.68018,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -6508,7 +6530,7 @@
           "zstd1_or_plain_bytes": 108164333,
           "zstd1_or_plain_bits_per_value": 7.018148,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.948321,
+          "zstd1_decompress_over_decode_time": 4.207779,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -6540,7 +6562,7 @@
           "zstd1_or_plain_bytes": 115931446,
           "zstd1_or_plain_bits_per_value": 7.52211,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.00132,
+          "zstd1_decompress_over_decode_time": 0.008821,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 5,
@@ -6570,7 +6592,7 @@
           "zstd1_or_plain_bytes": 116948642,
           "zstd1_or_plain_bits_per_value": 7.58811,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.155516,
+          "zstd1_decompress_over_decode_time": 0.187551,
           "examples": [],
           "counters": {
             "runs": 117306298,
@@ -6585,7 +6607,8 @@
         "target_what": "Order reference columns at most 11.2 bits per value",
         "target_bits_per_value_at_most": 11.2,
         "met": true,
-        "gap_bits_per_value": -3.656693
+        "gap_bits_per_value": -3.656693,
+        "excludes_permutation": false
       }
     },
     {
@@ -6608,7 +6631,7 @@
       "raw_zstd1_bytes": 30792000,
       "raw_zstd1_bits_per_value": 9.655069,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.135738,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 0.862809,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -6631,7 +6654,7 @@
           "zstd1_or_plain_bytes": 21933401,
           "zstd1_or_plain_bits_per_value": 6.877388,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.809564,
+          "zstd1_decompress_over_decode_time": 1.420976,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -6666,7 +6689,7 @@
           "zstd1_or_plain_bytes": 21933401,
           "zstd1_or_plain_bits_per_value": 6.877388,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.809501,
+          "zstd1_decompress_over_decode_time": 1.598804,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -6701,7 +6724,7 @@
           "zstd1_or_plain_bytes": 20702861,
           "zstd1_or_plain_bits_per_value": 6.491543,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.072884,
+          "zstd1_decompress_over_decode_time": 4.383952,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -6733,7 +6756,7 @@
           "zstd1_or_plain_bytes": 21689187,
           "zstd1_or_plain_bits_per_value": 6.800813,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.001059,
+          "zstd1_decompress_over_decode_time": 0.007269,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 0,
@@ -6763,7 +6786,7 @@
           "zstd1_or_plain_bytes": 21968889,
           "zstd1_or_plain_bits_per_value": 6.888515,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.152134,
+          "zstd1_decompress_over_decode_time": 0.184636,
           "examples": [],
           "counters": {
             "runs": 21974788,
@@ -6778,7 +6801,8 @@
         "target_what": "Order reference columns at most 11.2 bits per value",
         "target_bits_per_value_at_most": 11.2,
         "met": true,
-        "gap_bits_per_value": -4.39364
+        "gap_bits_per_value": -4.39364,
+        "excludes_permutation": false
       }
     },
     {
@@ -6801,7 +6825,7 @@
       "raw_zstd1_bytes": 102219890,
       "raw_zstd1_bits_per_value": 6.35703,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.204291,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 1.014297,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -6824,7 +6848,7 @@
           "zstd1_or_plain_bytes": 121720946,
           "zstd1_or_plain_bits_per_value": 7.569796,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.229542,
+          "zstd1_decompress_over_decode_time": 2.244682,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -6859,7 +6883,7 @@
           "zstd1_or_plain_bytes": 76993221,
           "zstd1_or_plain_bits_per_value": 4.78819,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.398038,
+          "zstd1_decompress_over_decode_time": 0.696118,
           "examples": [],
           "counters": {
             "scaled_blocks": 31290,
@@ -6894,7 +6918,7 @@
           "zstd1_or_plain_bytes": 90441479,
           "zstd1_or_plain_bits_per_value": 5.624534,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.800551,
+          "zstd1_decompress_over_decode_time": 5.383737,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -6926,7 +6950,7 @@
           "zstd1_or_plain_bytes": 58410900,
           "zstd1_or_plain_bits_per_value": 3.63256,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.002005,
+          "zstd1_decompress_over_decode_time": 0.011213,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 28,
@@ -6956,7 +6980,7 @@
           "zstd1_or_plain_bytes": 76287016,
           "zstd1_or_plain_bits_per_value": 4.744271,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.124567,
+          "zstd1_decompress_over_decode_time": 0.160695,
           "examples": [],
           "counters": {
             "runs": 70670281,
@@ -6971,7 +6995,8 @@
         "target_what": "Shares columns at most 3.8 bits per value",
         "target_bits_per_value_at_most": 3.8,
         "met": true,
-        "gap_bits_per_value": -0.157439
+        "gap_bits_per_value": -0.157439,
+        "excludes_permutation": false
       }
     },
     {
@@ -6994,7 +7019,7 @@
       "raw_zstd1_bytes": 71772234,
       "raw_zstd1_bits_per_value": 4.469015,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.238686,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 1.013669,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -7017,7 +7042,7 @@
           "zstd1_or_plain_bytes": 91046003,
           "zstd1_or_plain_bits_per_value": 5.667646,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.314437,
+          "zstd1_decompress_over_decode_time": 2.359346,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -7052,7 +7077,7 @@
           "zstd1_or_plain_bytes": 57876816,
           "zstd1_or_plain_bits_per_value": 3.604862,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.441173,
+          "zstd1_decompress_over_decode_time": 0.72706,
           "examples": [],
           "counters": {
             "scaled_blocks": 35834,
@@ -7087,7 +7112,7 @@
           "zstd1_or_plain_bytes": 63599405,
           "zstd1_or_plain_bits_per_value": 3.960749,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.980338,
+          "zstd1_decompress_over_decode_time": 5.522819,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -7119,7 +7144,7 @@
           "zstd1_or_plain_bytes": 39802080,
           "zstd1_or_plain_bits_per_value": 2.480799,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.017901,
+          "zstd1_decompress_over_decode_time": 0.079582,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 3185,
@@ -7149,7 +7174,7 @@
           "zstd1_or_plain_bytes": 58157566,
           "zstd1_or_plain_bits_per_value": 3.622322,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.137015,
+          "zstd1_decompress_over_decode_time": 0.172139,
           "examples": [],
           "counters": {
             "runs": 58973341,
@@ -7164,7 +7189,8 @@
         "target_what": "Shares columns at most 3.8 bits per value",
         "target_bits_per_value_at_most": 3.8,
         "met": true,
-        "gap_bits_per_value": -1.251094
+        "gap_bits_per_value": -1.251094,
+        "excludes_permutation": true
       }
     },
     {
@@ -7187,7 +7213,7 @@
       "raw_zstd1_bytes": 8302871,
       "raw_zstd1_bits_per_value": 9.078274,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.144318,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 0.932178,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -7210,7 +7236,7 @@
           "zstd1_or_plain_bytes": 7151639,
           "zstd1_or_plain_bits_per_value": 7.81953,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.898872,
+          "zstd1_decompress_over_decode_time": 1.575197,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -7245,7 +7271,7 @@
           "zstd1_or_plain_bytes": 7088736,
           "zstd1_or_plain_bits_per_value": 7.750752,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.680039,
+          "zstd1_decompress_over_decode_time": 1.372255,
           "examples": [],
           "counters": {
             "scaled_blocks": 238,
@@ -7280,7 +7306,7 @@
           "zstd1_or_plain_bytes": 5949148,
           "zstd1_or_plain_bits_per_value": 6.50474,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.053133,
+          "zstd1_decompress_over_decode_time": 4.854031,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -7312,7 +7338,7 @@
           "zstd1_or_plain_bytes": 5495242,
           "zstd1_or_plain_bits_per_value": 6.008444,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.000854,
+          "zstd1_decompress_over_decode_time": 0.006238,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 0,
@@ -7342,7 +7368,7 @@
           "zstd1_or_plain_bytes": 6858066,
           "zstd1_or_plain_bits_per_value": 7.49854,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.157524,
+          "zstd1_decompress_over_decode_time": 0.190091,
           "examples": [],
           "counters": {
             "runs": 5839173,
@@ -7357,7 +7383,8 @@
         "target_what": "Shares columns at most 3.8 bits per value",
         "target_bits_per_value_at_most": 3.8,
         "met": false,
-        "gap_bits_per_value": 2.20678
+        "gap_bits_per_value": 2.20678,
+        "excludes_permutation": false
       }
     },
     {
@@ -7380,7 +7407,7 @@
       "raw_zstd1_bytes": 118820,
       "raw_zstd1_bits_per_value": 7.327768,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.181401,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 1.008151,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -7403,7 +7430,7 @@
           "zstd1_or_plain_bytes": 117270,
           "zstd1_or_plain_bits_per_value": 7.232184,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.023552,
+          "zstd1_decompress_over_decode_time": 1.839916,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -7438,7 +7465,7 @@
           "zstd1_or_plain_bytes": 97329,
           "zstd1_or_plain_bits_per_value": 6.002482,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.315605,
+          "zstd1_decompress_over_decode_time": 0.575544,
           "examples": [],
           "counters": {
             "scaled_blocks": 31,
@@ -7473,7 +7500,7 @@
           "zstd1_or_plain_bytes": 89876,
           "zstd1_or_plain_bits_per_value": 5.542878,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.037912,
+          "zstd1_decompress_over_decode_time": 5.026327,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -7505,7 +7532,7 @@
           "zstd1_or_plain_bytes": 73593,
           "zstd1_or_plain_bits_per_value": 4.538754,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.00095,
+          "zstd1_decompress_over_decode_time": 0.006706,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 0,
@@ -7535,7 +7562,7 @@
           "zstd1_or_plain_bytes": 99848,
           "zstd1_or_plain_bits_per_value": 6.157821,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.140989,
+          "zstd1_decompress_over_decode_time": 0.183196,
           "examples": [],
           "counters": {
             "runs": 82438,
@@ -7550,7 +7577,8 @@
         "target_what": "Shares columns at most 3.8 bits per value",
         "target_bits_per_value_at_most": 3.8,
         "met": false,
-        "gap_bits_per_value": 0.740789
+        "gap_bits_per_value": 0.740789,
+        "excludes_permutation": false
       }
     },
     {
@@ -7573,7 +7601,7 @@
       "raw_zstd1_bytes": 3893797,
       "raw_zstd1_bits_per_value": 8.728706,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.162334,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 0.963684,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -7596,7 +7624,7 @@
           "zstd1_or_plain_bytes": 4192435,
           "zstd1_or_plain_bits_per_value": 9.39816,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.100919,
+          "zstd1_decompress_over_decode_time": 1.994821,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -7631,7 +7659,7 @@
           "zstd1_or_plain_bytes": 2721972,
           "zstd1_or_plain_bits_per_value": 6.101837,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.408159,
+          "zstd1_decompress_over_decode_time": 0.74945,
           "examples": [],
           "counters": {
             "scaled_blocks": 867,
@@ -7666,7 +7694,7 @@
           "zstd1_or_plain_bytes": 3362767,
           "zstd1_or_plain_bits_per_value": 7.538301,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.595556,
+          "zstd1_decompress_over_decode_time": 5.448739,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -7698,7 +7726,7 @@
           "zstd1_or_plain_bytes": 2372767,
           "zstd1_or_plain_bits_per_value": 5.319028,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.001061,
+          "zstd1_decompress_over_decode_time": 0.007544,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 0,
@@ -7728,7 +7756,7 @@
           "zstd1_or_plain_bytes": 2796332,
           "zstd1_or_plain_bits_per_value": 6.268529,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.127893,
+          "zstd1_decompress_over_decode_time": 0.168965,
           "examples": [],
           "counters": {
             "runs": 2722905,
@@ -7743,7 +7771,8 @@
         "target_what": "Shares columns at most 3.8 bits per value",
         "target_bits_per_value_at_most": 3.8,
         "met": false,
-        "gap_bits_per_value": 1.523883
+        "gap_bits_per_value": 1.523883,
+        "excludes_permutation": false
       }
     },
     {
@@ -7766,7 +7795,7 @@
       "raw_zstd1_bytes": 14007666,
       "raw_zstd1_bits_per_value": 4.392213,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.224323,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 0.909931,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -7789,7 +7818,7 @@
           "zstd1_or_plain_bytes": 19328982,
           "zstd1_or_plain_bits_per_value": 6.060752,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.258305,
+          "zstd1_decompress_over_decode_time": 2.424297,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -7824,7 +7853,7 @@
           "zstd1_or_plain_bytes": 11586086,
           "zstd1_or_plain_bits_per_value": 3.632908,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.439773,
+          "zstd1_decompress_over_decode_time": 0.744031,
           "examples": [],
           "counters": {
             "scaled_blocks": 6206,
@@ -7859,7 +7888,7 @@
           "zstd1_or_plain_bytes": 13020590,
           "zstd1_or_plain_bits_per_value": 4.082708,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.032873,
+          "zstd1_decompress_over_decode_time": 5.629846,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -7891,7 +7920,7 @@
           "zstd1_or_plain_bytes": 8079747,
           "zstd1_or_plain_bits_per_value": 2.533469,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.038675,
+          "zstd1_decompress_over_decode_time": 0.16249,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 68,
@@ -7921,7 +7950,7 @@
           "zstd1_or_plain_bytes": 10681736,
           "zstd1_or_plain_bits_per_value": 3.349342,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.14018,
+          "zstd1_decompress_over_decode_time": 0.179088,
           "examples": [],
           "counters": {
             "runs": 9109623,
@@ -7936,7 +7965,8 @@
         "target_what": "Shares columns at most 3.8 bits per value",
         "target_bits_per_value_at_most": 3.8,
         "met": true,
-        "gap_bits_per_value": -1.144604
+        "gap_bits_per_value": -1.144604,
+        "excludes_permutation": false
       }
     },
     {
@@ -7959,7 +7989,7 @@
       "raw_zstd1_bytes": 8669600,
       "raw_zstd1_bits_per_value": 6.296502,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.194207,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 0.984579,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -7982,7 +8012,7 @@
           "zstd1_or_plain_bytes": 7855711,
           "zstd1_or_plain_bits_per_value": 5.705397,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.547199,
+          "zstd1_decompress_over_decode_time": 1.164981,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -8017,7 +8047,7 @@
           "zstd1_or_plain_bytes": 7687269,
           "zstd1_or_plain_bits_per_value": 5.583063,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.400077,
+          "zstd1_decompress_over_decode_time": 0.783939,
           "examples": [],
           "counters": {
             "scaled_blocks": 1694,
@@ -8052,7 +8082,7 @@
           "zstd1_or_plain_bytes": 6972363,
           "zstd1_or_plain_bits_per_value": 5.063847,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.974234,
+          "zstd1_decompress_over_decode_time": 5.30498,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -8084,7 +8114,7 @@
           "zstd1_or_plain_bytes": 5492333,
           "zstd1_or_plain_bits_per_value": 3.988944,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.003081,
+          "zstd1_decompress_over_decode_time": 0.016382,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 0,
@@ -8114,7 +8144,7 @@
           "zstd1_or_plain_bytes": 7817666,
           "zstd1_or_plain_bits_per_value": 5.677766,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.128143,
+          "zstd1_decompress_over_decode_time": 0.199025,
           "examples": [],
           "counters": {
             "runs": 6106355,
@@ -8129,7 +8159,8 @@
         "target_what": "Shares columns at most 3.8 bits per value",
         "target_bits_per_value_at_most": 3.8,
         "met": false,
-        "gap_bits_per_value": 0.191812
+        "gap_bits_per_value": 0.191812,
+        "excludes_permutation": false
       }
     },
     {
@@ -8152,7 +8183,7 @@
       "raw_zstd1_bytes": 1608282,
       "raw_zstd1_bits_per_value": 8.434923,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.158989,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 0.945654,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -8175,7 +8206,7 @@
           "zstd1_or_plain_bytes": 1441652,
           "zstd1_or_plain_bits_per_value": 7.561007,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.886324,
+          "zstd1_decompress_over_decode_time": 1.632141,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -8210,7 +8241,7 @@
           "zstd1_or_plain_bytes": 1368229,
           "zstd1_or_plain_bits_per_value": 7.175929,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.376684,
+          "zstd1_decompress_over_decode_time": 0.798202,
           "examples": [],
           "counters": {
             "scaled_blocks": 231,
@@ -8245,7 +8276,7 @@
           "zstd1_or_plain_bytes": 1158993,
           "zstd1_or_plain_bits_per_value": 6.078558,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.027506,
+          "zstd1_decompress_over_decode_time": 4.932153,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -8277,7 +8308,7 @@
           "zstd1_or_plain_bytes": 1026577,
           "zstd1_or_plain_bits_per_value": 5.384082,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.000846,
+          "zstd1_decompress_over_decode_time": 0.006039,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 0,
@@ -8307,7 +8338,7 @@
           "zstd1_or_plain_bytes": 1311056,
           "zstd1_or_plain_bits_per_value": 6.876076,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.151696,
+          "zstd1_decompress_over_decode_time": 0.191909,
           "examples": [],
           "counters": {
             "runs": 1121665,
@@ -8340,7 +8371,7 @@
       "raw_zstd1_bytes": 18762,
       "raw_zstd1_bits_per_value": 8.44782,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 2.292188,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 4.844042,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -8363,7 +8394,7 @@
           "zstd1_or_plain_bytes": 14351,
           "zstd1_or_plain_bits_per_value": 6.46256,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.47262,
+          "zstd1_decompress_over_decode_time": 1.01843,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -8398,7 +8429,7 @@
           "zstd1_or_plain_bytes": 14351,
           "zstd1_or_plain_bits_per_value": 6.46256,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.487036,
+          "zstd1_decompress_over_decode_time": 1.116217,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -8433,7 +8464,7 @@
           "zstd1_or_plain_bytes": 16261,
           "zstd1_or_plain_bits_per_value": 7.322194,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.760263,
+          "zstd1_decompress_over_decode_time": 5.554329,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -8465,7 +8496,7 @@
           "zstd1_or_plain_bytes": 17832,
           "zstd1_or_plain_bits_per_value": 8.029255,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.024573,
+          "zstd1_decompress_over_decode_time": 0.088375,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 0,
@@ -8495,7 +8526,7 @@
           "zstd1_or_plain_bytes": 16719,
           "zstd1_or_plain_bits_per_value": 7.528326,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.182585,
+          "zstd1_decompress_over_decode_time": 0.234261,
           "examples": [],
           "counters": {
             "runs": 9506,
@@ -8528,7 +8559,7 @@
       "raw_zstd1_bytes": 5194334,
       "raw_zstd1_bits_per_value": 5.555238,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 2.618012,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 5.443672,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -8551,7 +8582,7 @@
           "zstd1_or_plain_bytes": 4013293,
           "zstd1_or_plain_bits_per_value": 4.29214,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.524757,
+          "zstd1_decompress_over_decode_time": 1.074163,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -8586,7 +8617,7 @@
           "zstd1_or_plain_bytes": 4013274,
           "zstd1_or_plain_bits_per_value": 4.29212,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.515804,
+          "zstd1_decompress_over_decode_time": 1.096926,
           "examples": [],
           "counters": {
             "scaled_blocks": 1,
@@ -8621,7 +8652,7 @@
           "zstd1_or_plain_bytes": 4912474,
           "zstd1_or_plain_bits_per_value": 5.253795,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.929673,
+          "zstd1_decompress_over_decode_time": 5.576848,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -8653,7 +8684,7 @@
           "zstd1_or_plain_bytes": 5088588,
           "zstd1_or_plain_bits_per_value": 5.442145,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.05384,
+          "zstd1_decompress_over_decode_time": 0.182463,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 0,
@@ -8683,7 +8714,7 @@
           "zstd1_or_plain_bytes": 4658931,
           "zstd1_or_plain_bits_per_value": 4.982636,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.2029,
+          "zstd1_decompress_over_decode_time": 0.264752,
           "examples": [],
           "counters": {
             "runs": 2536943,
@@ -8716,7 +8747,7 @@
       "raw_zstd1_bytes": 83702623,
       "raw_zstd1_bits_per_value": 2.277707,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.101278,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 0.472005,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -8739,7 +8770,7 @@
           "zstd1_or_plain_bytes": 88528691,
           "zstd1_or_plain_bits_per_value": 2.409034,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.59505,
+          "zstd1_decompress_over_decode_time": 1.010288,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -8774,7 +8805,7 @@
           "zstd1_or_plain_bytes": 85384771,
           "zstd1_or_plain_bits_per_value": 2.323482,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.539669,
+          "zstd1_decompress_over_decode_time": 4.36036,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -8806,7 +8837,7 @@
           "zstd1_or_plain_bytes": 66449688,
           "zstd1_or_plain_bits_per_value": 1.808222,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.016374,
+          "zstd1_decompress_over_decode_time": 0.077032,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 682,
@@ -8836,7 +8867,7 @@
           "zstd1_or_plain_bytes": 104760496,
           "zstd1_or_plain_bits_per_value": 2.850732,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.114183,
+          "zstd1_decompress_over_decode_time": 0.131102,
           "examples": [],
           "counters": {
             "runs": 160125591,
@@ -8869,7 +8900,7 @@
       "raw_zstd1_bytes": 425816450,
       "raw_zstd1_bits_per_value": 11.587273,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.092145,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 0.17123,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -8892,7 +8923,7 @@
           "zstd1_or_plain_bytes": 485277762,
           "zstd1_or_plain_bits_per_value": 13.205328,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.462329,
+          "zstd1_decompress_over_decode_time": 0.749227,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -8927,7 +8958,7 @@
           "zstd1_or_plain_bytes": 436317184,
           "zstd1_or_plain_bits_per_value": 11.873018,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.632363,
+          "zstd1_decompress_over_decode_time": 7.104054,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -8959,7 +8990,7 @@
           "zstd1_or_plain_bytes": 307981334,
           "zstd1_or_plain_bits_per_value": 8.380756,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.045762,
+          "zstd1_decompress_over_decode_time": 0.083638,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 10,
@@ -8989,7 +9020,7 @@
           "zstd1_or_plain_bytes": 403132317,
           "zstd1_or_plain_bits_per_value": 10.969995,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.021678,
+          "zstd1_decompress_over_decode_time": 0.026449,
           "examples": [],
           "counters": {
             "runs": 204441047,
@@ -9022,7 +9053,7 @@
       "raw_zstd1_bytes": 209356726,
       "raw_zstd1_bits_per_value": 12.483676,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.064317,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 0.148156,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -9045,7 +9076,7 @@
           "zstd1_or_plain_bytes": 228853379,
           "zstd1_or_plain_bits_per_value": 13.646236,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.2077,
+          "zstd1_decompress_over_decode_time": 0.352982,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -9080,7 +9111,7 @@
           "zstd1_or_plain_bytes": 214606993,
           "zstd1_or_plain_bits_per_value": 12.796743,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.55588,
+          "zstd1_decompress_over_decode_time": 6.722789,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -9112,7 +9143,7 @@
           "zstd1_or_plain_bytes": 170984056,
           "zstd1_or_plain_bits_per_value": 10.195562,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.038393,
+          "zstd1_decompress_over_decode_time": 0.086853,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 14,
@@ -9142,7 +9173,7 @@
           "zstd1_or_plain_bytes": 195730845,
           "zstd1_or_plain_bits_per_value": 11.671182,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.009378,
+          "zstd1_decompress_over_decode_time": 0.011834,
           "examples": [],
           "counters": {
             "runs": 100777267,
@@ -9175,7 +9206,7 @@
       "raw_zstd1_bytes": 20004898,
       "raw_zstd1_bits_per_value": 0.544371,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.734589,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 0.903961,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -9198,7 +9229,7 @@
           "zstd1_or_plain_bytes": 14746674,
           "zstd1_or_plain_bits_per_value": 0.401285,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.809059,
+          "zstd1_decompress_over_decode_time": 1.024131,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -9233,7 +9264,7 @@
           "zstd1_or_plain_bytes": 17479982,
           "zstd1_or_plain_bits_per_value": 0.475664,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.701102,
+          "zstd1_decompress_over_decode_time": 2.065729,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -9265,7 +9296,7 @@
           "zstd1_or_plain_bytes": 15793379,
           "zstd1_or_plain_bits_per_value": 0.429768,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.149825,
+          "zstd1_decompress_over_decode_time": 0.376135,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 70796,
@@ -9295,7 +9326,7 @@
           "zstd1_or_plain_bytes": 16338172,
           "zstd1_or_plain_bits_per_value": 0.444593,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.203184,
+          "zstd1_decompress_over_decode_time": 0.254853,
           "examples": [],
           "counters": {
             "runs": 14032019,
@@ -9328,7 +9359,7 @@
       "raw_zstd1_bytes": 4810124,
       "raw_zstd1_bits_per_value": 0.130897,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.197352,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 0.531807,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -9351,7 +9382,7 @@
           "zstd1_or_plain_bytes": 5120475,
           "zstd1_or_plain_bits_per_value": 0.139342,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.194503,
+          "zstd1_decompress_over_decode_time": 0.271525,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -9386,7 +9417,7 @@
           "zstd1_or_plain_bytes": 4509940,
           "zstd1_or_plain_bits_per_value": 0.122728,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.391585,
+          "zstd1_decompress_over_decode_time": 1.090788,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -9418,7 +9449,7 @@
           "zstd1_or_plain_bytes": 5648823,
           "zstd1_or_plain_bits_per_value": 0.15372,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.021353,
+          "zstd1_decompress_over_decode_time": 0.06185,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 44496,
@@ -9448,7 +9479,7 @@
           "zstd1_or_plain_bytes": 6481553,
           "zstd1_or_plain_bits_per_value": 0.17638,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.158504,
+          "zstd1_decompress_over_decode_time": 0.187647,
           "examples": [],
           "counters": {
             "runs": 4773755,
@@ -9481,7 +9512,7 @@
       "raw_zstd1_bytes": 26350677,
       "raw_zstd1_bits_per_value": 1.638743,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.293208,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 0.529658,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -9504,7 +9535,7 @@
           "zstd1_or_plain_bytes": 34622108,
           "zstd1_or_plain_bits_per_value": 2.153141,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.688892,
+          "zstd1_decompress_over_decode_time": 1.457704,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -9539,7 +9570,7 @@
           "zstd1_or_plain_bytes": 27106042,
           "zstd1_or_plain_bits_per_value": 1.685719,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.662071,
+          "zstd1_decompress_over_decode_time": 5.017079,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -9571,7 +9602,7 @@
           "zstd1_or_plain_bytes": 17125753,
           "zstd1_or_plain_bits_per_value": 1.065047,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.005556,
+          "zstd1_decompress_over_decode_time": 0.010467,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 14,
@@ -9601,7 +9632,7 @@
           "zstd1_or_plain_bytes": 22012649,
           "zstd1_or_plain_bits_per_value": 1.368962,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.105674,
+          "zstd1_decompress_over_decode_time": 0.124132,
           "examples": [],
           "counters": {
             "runs": 50927745,
@@ -9634,7 +9665,7 @@
       "raw_zstd1_bytes": 25147975,
       "raw_zstd1_bits_per_value": 1.569464,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.275111,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 0.483972,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -9657,7 +9688,7 @@
           "zstd1_or_plain_bytes": 33129751,
           "zstd1_or_plain_bits_per_value": 2.065848,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.770185,
+          "zstd1_decompress_over_decode_time": 1.60188,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -9692,7 +9723,7 @@
           "zstd1_or_plain_bytes": 25962658,
           "zstd1_or_plain_bits_per_value": 1.620129,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.646681,
+          "zstd1_decompress_over_decode_time": 4.852743,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -9724,7 +9755,7 @@
           "zstd1_or_plain_bytes": 16712985,
           "zstd1_or_plain_bits_per_value": 1.044894,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.041534,
+          "zstd1_decompress_over_decode_time": 0.07491,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 337,
@@ -9754,7 +9785,7 @@
           "zstd1_or_plain_bytes": 20369241,
           "zstd1_or_plain_bits_per_value": 1.272276,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.111143,
+          "zstd1_decompress_over_decode_time": 0.129581,
           "examples": [],
           "counters": {
             "runs": 42799705,
@@ -9787,7 +9818,7 @@
       "raw_zstd1_bytes": 918992,
       "raw_zstd1_bits_per_value": 5.163255,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.179392,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 0.835147,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -9810,7 +9841,7 @@
           "zstd1_or_plain_bytes": 2254371,
           "zstd1_or_plain_bits_per_value": 12.665869,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 3.012195,
+          "zstd1_decompress_over_decode_time": 5.96275,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -9845,7 +9876,7 @@
           "zstd1_or_plain_bytes": 891353,
           "zstd1_or_plain_bits_per_value": 5.00797,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.978563,
+          "zstd1_decompress_over_decode_time": 9.559488,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -9877,7 +9908,7 @@
           "zstd1_or_plain_bytes": 540574,
           "zstd1_or_plain_bits_per_value": 3.037174,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.016117,
+          "zstd1_decompress_over_decode_time": 0.076696,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 22,
@@ -9907,7 +9938,7 @@
           "zstd1_or_plain_bytes": 1781418,
           "zstd1_or_plain_bits_per_value": 10.008658,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.397116,
+          "zstd1_decompress_over_decode_time": 0.485691,
           "examples": [],
           "counters": {
             "runs": 677838,
@@ -9940,7 +9971,7 @@
       "raw_zstd1_bytes": 7594,
       "raw_zstd1_bits_per_value": 0.468793,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.597913,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 0.744861,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -9963,7 +9994,7 @@
           "zstd1_or_plain_bytes": 8518,
           "zstd1_or_plain_bits_per_value": 0.525773,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 2.463104,
+          "zstd1_decompress_over_decode_time": 3.086153,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -9998,7 +10029,7 @@
           "zstd1_or_plain_bytes": 8066,
           "zstd1_or_plain_bits_per_value": 0.497899,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.826068,
+          "zstd1_decompress_over_decode_time": 2.456351,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -10030,7 +10061,7 @@
           "zstd1_or_plain_bytes": 5912,
           "zstd1_or_plain_bits_per_value": 0.365069,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.153223,
+          "zstd1_decompress_over_decode_time": 0.337281,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 27,
@@ -10060,7 +10091,7 @@
           "zstd1_or_plain_bytes": 5976,
           "zstd1_or_plain_bits_per_value": 0.369015,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.065738,
+          "zstd1_decompress_over_decode_time": 0.088747,
           "examples": [],
           "counters": {
             "runs": 5325,
@@ -10093,7 +10124,7 @@
       "raw_zstd1_bytes": 9227770,
       "raw_zstd1_bits_per_value": 8.211985,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 8.700325,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 12.557145,
       "codecs": [
         {
           "codec": "pfor-delta",
@@ -10116,7 +10147,7 @@
           "zstd1_or_plain_bytes": 148737,
           "zstd1_or_plain_bits_per_value": 0.132371,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.157813,
+          "zstd1_decompress_over_decode_time": 0.278468,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -10151,7 +10182,7 @@
           "zstd1_or_plain_bytes": 213449,
           "zstd1_or_plain_bits_per_value": 0.18996,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.477203,
+          "zstd1_decompress_over_decode_time": 0.777359,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -10186,7 +10217,7 @@
           "zstd1_or_plain_bytes": 127803,
           "zstd1_or_plain_bits_per_value": 0.113742,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.250574,
+          "zstd1_decompress_over_decode_time": 0.596564,
           "examples": [],
           "counters": {
             "zigzag_blocks": 1,
@@ -10218,7 +10249,7 @@
           "zstd1_or_plain_bytes": 3573851,
           "zstd1_or_plain_bits_per_value": 3.180449,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.403891,
+          "zstd1_decompress_over_decode_time": 0.615845,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -10253,7 +10284,7 @@
           "zstd1_or_plain_bytes": 159969,
           "zstd1_or_plain_bits_per_value": 0.142367,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.066837,
+          "zstd1_decompress_over_decode_time": 0.053105,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -10294,7 +10325,7 @@
       "raw_zstd1_bytes": 7087,
       "raw_zstd1_bits_per_value": 0.037211,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 4.160725,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 6.885744,
       "codecs": [
         {
           "codec": "pfor-delta",
@@ -10317,7 +10348,7 @@
           "zstd1_or_plain_bytes": 10438,
           "zstd1_or_plain_bits_per_value": 0.054786,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.076178,
+          "zstd1_decompress_over_decode_time": 0.151969,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -10352,7 +10383,7 @@
           "zstd1_or_plain_bytes": 10438,
           "zstd1_or_plain_bits_per_value": 0.054786,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.039244,
+          "zstd1_decompress_over_decode_time": 0.060055,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -10387,7 +10418,7 @@
           "zstd1_or_plain_bytes": 10444,
           "zstd1_or_plain_bits_per_value": 0.054817,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.287819,
+          "zstd1_decompress_over_decode_time": 0.65155,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -10419,7 +10450,7 @@
           "zstd1_or_plain_bytes": 10438,
           "zstd1_or_plain_bits_per_value": 0.054786,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.064521,
+          "zstd1_decompress_over_decode_time": 0.068076,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -10454,7 +10485,7 @@
           "zstd1_or_plain_bytes": 10438,
           "zstd1_or_plain_bits_per_value": 0.054786,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.013164,
+          "zstd1_decompress_over_decode_time": 0.010532,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -10495,7 +10526,7 @@
       "raw_zstd1_bytes": 7087,
       "raw_zstd1_bits_per_value": 0.037211,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.123942,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 0.344305,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -10518,7 +10549,7 @@
           "zstd1_or_plain_bytes": 12300,
           "zstd1_or_plain_bits_per_value": 0.064551,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.133694,
+          "zstd1_decompress_over_decode_time": 0.155651,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -10553,7 +10584,7 @@
           "zstd1_or_plain_bytes": 12309,
           "zstd1_or_plain_bits_per_value": 0.064598,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.36981,
+          "zstd1_decompress_over_decode_time": 0.959462,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -10585,7 +10616,7 @@
           "zstd1_or_plain_bytes": 11936,
           "zstd1_or_plain_bits_per_value": 0.062642,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.007116,
+          "zstd1_decompress_over_decode_time": 0.019515,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 0,
@@ -10615,7 +10646,7 @@
           "zstd1_or_plain_bytes": 17158,
           "zstd1_or_plain_bits_per_value": 0.09003,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.249892,
+          "zstd1_decompress_over_decode_time": 0.291383,
           "examples": [],
           "counters": {
             "runs": 373,
@@ -10648,7 +10679,7 @@
       "raw_zstd1_bytes": 22773,
       "raw_zstd1_bits_per_value": 10.253052,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 1.626318,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 3.296301,
       "codecs": [
         {
           "codec": "gorilla-xor-f64-dollars",
@@ -10671,7 +10702,7 @@
           "zstd1_or_plain_bytes": 52087,
           "zstd1_or_plain_bits_per_value": 23.446414,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.466456,
+          "zstd1_decompress_over_decode_time": 0.471216,
           "examples": [],
           "counters": {
             "zero": 8264,
@@ -10701,7 +10732,7 @@
           "zstd1_or_plain_bytes": 36022,
           "zstd1_or_plain_bits_per_value": 16.216034,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.207061,
+          "zstd1_decompress_over_decode_time": 0.212745,
           "examples": [],
           "counters": {
             "zero": 8264,
@@ -10731,7 +10762,7 @@
           "zstd1_or_plain_bytes": 33215,
           "zstd1_or_plain_bits_per_value": 14.952686,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.220397,
+          "zstd1_decompress_over_decode_time": 0.211862,
           "examples": [],
           "counters": {
             "zero": 8264,
@@ -10761,7 +10792,7 @@
           "zstd1_or_plain_bytes": 32209,
           "zstd1_or_plain_bits_per_value": 14.499916,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.960736,
+          "zstd1_decompress_over_decode_time": 2.017651,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -10796,7 +10827,7 @@
           "zstd1_or_plain_bytes": 34063,
           "zstd1_or_plain_bits_per_value": 15.334346,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 3.376078,
+          "zstd1_decompress_over_decode_time": 6.283828,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -10831,7 +10862,7 @@
           "zstd1_or_plain_bytes": 32365,
           "zstd1_or_plain_bits_per_value": 14.570127,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.603552,
+          "zstd1_decompress_over_decode_time": 3.241172,
           "examples": [],
           "counters": {
             "zigzag_blocks": 5,
@@ -10863,7 +10894,7 @@
           "zstd1_or_plain_bytes": 18217,
           "zstd1_or_plain_bits_per_value": 8.202532,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.50464,
+          "zstd1_decompress_over_decode_time": 1.161566,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -10898,7 +10929,7 @@
           "zstd1_or_plain_bytes": 14277,
           "zstd1_or_plain_bits_per_value": 6.429255,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.388882,
+          "zstd1_decompress_over_decode_time": 0.774367,
           "examples": [],
           "counters": {
             "scaled_blocks": 5,
@@ -10933,7 +10964,7 @@
           "zstd1_or_plain_bytes": 24159,
           "zstd1_or_plain_bits_per_value": 10.87685,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.594976,
+          "zstd1_decompress_over_decode_time": 1.145255,
           "examples": [],
           "counters": {
             "scaled_blocks": 5,
@@ -10968,7 +10999,7 @@
           "zstd1_or_plain_bytes": 25836,
           "zstd1_or_plain_bits_per_value": 11.631617,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 2.146177,
+          "zstd1_decompress_over_decode_time": 2.677395,
           "examples": [],
           "counters": {
             "scaled_blocks": 5,
@@ -11029,7 +11060,7 @@
       "raw_zstd1_bytes": 101,
       "raw_zstd1_bits_per_value": 0.049058,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.999755,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 1.27003,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -11052,7 +11083,7 @@
           "zstd1_or_plain_bytes": 203,
           "zstd1_or_plain_bits_per_value": 0.094965,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.160966,
+          "zstd1_decompress_over_decode_time": 0.146774,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -11087,7 +11118,7 @@
           "zstd1_or_plain_bytes": 171,
           "zstd1_or_plain_bits_per_value": 0.080563,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.374013,
+          "zstd1_decompress_over_decode_time": 0.961035,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -11119,7 +11150,7 @@
           "zstd1_or_plain_bytes": 245,
           "zstd1_or_plain_bits_per_value": 0.113868,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.015837,
+          "zstd1_decompress_over_decode_time": 0.034332,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 2,
@@ -11149,7 +11180,7 @@
           "zstd1_or_plain_bytes": 242,
           "zstd1_or_plain_bits_per_value": 0.112518,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.204456,
+          "zstd1_decompress_over_decode_time": 0.26976,
           "examples": [],
           "counters": {
             "runs": 8,
@@ -11182,7 +11213,7 @@
       "raw_zstd1_bytes": 7302056,
       "raw_zstd1_bits_per_value": 5.206268,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 1.249858,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 2.250524,
       "codecs": [
         {
           "codec": "gorilla-xor-f64-dollars",
@@ -11205,7 +11236,7 @@
           "zstd1_or_plain_bytes": 13680296,
           "zstd1_or_plain_bits_per_value": 9.753862,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.36188,
+          "zstd1_decompress_over_decode_time": 0.370688,
           "examples": [],
           "counters": {
             "zero": 8737020,
@@ -11235,7 +11266,7 @@
           "zstd1_or_plain_bytes": 9536844,
           "zstd1_or_plain_bits_per_value": 6.79964,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.160261,
+          "zstd1_decompress_over_decode_time": 0.165404,
           "examples": [],
           "counters": {
             "zero": 8737020,
@@ -11265,7 +11296,7 @@
           "zstd1_or_plain_bytes": 8773063,
           "zstd1_or_plain_bits_per_value": 6.255075,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.169945,
+          "zstd1_decompress_over_decode_time": 0.173913,
           "examples": [],
           "counters": {
             "zero": 8737020,
@@ -11295,7 +11326,7 @@
           "zstd1_or_plain_bytes": 8240893,
           "zstd1_or_plain_bits_per_value": 5.875645,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.447887,
+          "zstd1_decompress_over_decode_time": 0.857942,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -11330,7 +11361,7 @@
           "zstd1_or_plain_bytes": 10791196,
           "zstd1_or_plain_bits_per_value": 7.693975,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 3.038097,
+          "zstd1_decompress_over_decode_time": 5.335249,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -11365,7 +11396,7 @@
           "zstd1_or_plain_bytes": 9700874,
           "zstd1_or_plain_bits_per_value": 6.916591,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.729065,
+          "zstd1_decompress_over_decode_time": 2.876935,
           "examples": [],
           "counters": {
             "zigzag_blocks": 2740,
@@ -11397,7 +11428,7 @@
           "zstd1_or_plain_bytes": 9978963,
           "zstd1_or_plain_bits_per_value": 7.114865,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.611373,
+          "zstd1_decompress_over_decode_time": 1.421427,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -11432,7 +11463,7 @@
           "zstd1_or_plain_bytes": 7586152,
           "zstd1_or_plain_bits_per_value": 5.408824,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.473839,
+          "zstd1_decompress_over_decode_time": 0.97069,
           "examples": [],
           "counters": {
             "scaled_blocks": 2740,
@@ -11467,7 +11498,7 @@
           "zstd1_or_plain_bytes": 6303538,
           "zstd1_or_plain_bits_per_value": 4.494339,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.352307,
+          "zstd1_decompress_over_decode_time": 0.640935,
           "examples": [],
           "counters": {
             "scaled_blocks": 2740,
@@ -11502,7 +11533,7 @@
           "zstd1_or_plain_bytes": 7991950,
           "zstd1_or_plain_bits_per_value": 5.698152,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 2.201703,
+          "zstd1_decompress_over_decode_time": 3.240935,
           "examples": [],
           "counters": {
             "scaled_blocks": 2740,
@@ -11563,7 +11594,7 @@
       "raw_zstd1_bytes": 1707377,
       "raw_zstd1_bits_per_value": 1.217341,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.098791,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 0.313594,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -11586,7 +11617,7 @@
           "zstd1_or_plain_bytes": 3423297,
           "zstd1_or_plain_bits_per_value": 2.440768,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 3.611838,
+          "zstd1_decompress_over_decode_time": 4.183363,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -11621,7 +11652,7 @@
           "zstd1_or_plain_bytes": 1741430,
           "zstd1_or_plain_bits_per_value": 1.241621,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.266791,
+          "zstd1_decompress_over_decode_time": 3.921322,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -11653,7 +11684,7 @@
           "zstd1_or_plain_bytes": 1856522,
           "zstd1_or_plain_bits_per_value": 1.32368,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.082238,
+          "zstd1_decompress_over_decode_time": 0.259873,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 0,
@@ -11683,7 +11714,7 @@
           "zstd1_or_plain_bytes": 4063480,
           "zstd1_or_plain_bits_per_value": 2.897209,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.240215,
+          "zstd1_decompress_over_decode_time": 0.246883,
           "examples": [],
           "counters": {
             "runs": 10525402,
@@ -11716,7 +11747,7 @@
       "raw_zstd1_bytes": 1254032,
       "raw_zstd1_bits_per_value": 2.727917,
       "raw_zstd1_mismatches": 0,
-      "raw_zstd1_decompress_over_best_codec_decode_time": 0.066551,
+      "raw_zstd1_decompress_over_best_codec_decode_time": 0.373133,
       "codecs": [
         {
           "codec": "pfor-for",
@@ -11739,7 +11770,7 @@
           "zstd1_or_plain_bytes": 2026022,
           "zstd1_or_plain_bits_per_value": 4.40723,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 2.23747,
+          "zstd1_decompress_over_decode_time": 3.297801,
           "examples": [],
           "counters": {
             "scaled_blocks": 0,
@@ -11774,7 +11805,7 @@
           "zstd1_or_plain_bytes": 1274901,
           "zstd1_or_plain_bits_per_value": 2.773314,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 1.182056,
+          "zstd1_decompress_over_decode_time": 3.558324,
           "examples": [],
           "counters": {
             "zigzag_blocks": 0,
@@ -11806,7 +11837,7 @@
           "zstd1_or_plain_bytes": 1686533,
           "zstd1_or_plain_bits_per_value": 3.668738,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.044107,
+          "zstd1_decompress_over_decode_time": 0.244698,
           "examples": [],
           "counters": {
             "ranked_pfor_blocks": 0,
@@ -11836,7 +11867,7 @@
           "zstd1_or_plain_bytes": 2309592,
           "zstd1_or_plain_bits_per_value": 5.024081,
           "zstd1_mismatches": 0,
-          "zstd1_decompress_over_decode_time": 0.15296,
+          "zstd1_decompress_over_decode_time": 0.179473,
           "examples": [],
           "counters": {
             "runs": 2705036,
@@ -11870,11 +11901,13 @@
       "distinct_gaps": 441267,
       "head_steps": 128537933,
       "head_same_locate_share": 0.349193,
+      "head_side_steps": 128537926,
       "head_same_side_share": 0.621888,
       "head_mpid_steps": 767864,
       "head_same_mpid_share": 0.66692,
       "consecutive_pairs": 128638556,
       "consecutive_same_locate_share": 0.255621,
+      "consecutive_side_pairs": 128638556,
       "consecutive_same_side_share": 0.60425,
       "consecutive_mpid_pairs": 708264,
       "consecutive_same_mpid_share": 0.628792,
@@ -11934,12 +11967,14 @@
       "distinct_gaps": 448431,
       "head_steps": 154048722,
       "head_same_locate_share": 0.372426,
-      "head_same_side_share": 0.624204,
+      "head_side_steps": 154048715,
+      "head_same_side_share": 0.612278,
       "head_mpid_steps": 727388,
       "head_same_mpid_share": 0.671092,
       "consecutive_pairs": 154152207,
       "consecutive_same_locate_share": 0.272869,
-      "consecutive_same_side_share": 0.608963,
+      "consecutive_side_pairs": 154152207,
+      "consecutive_same_side_share": 0.595282,
       "consecutive_mpid_pairs": 661544,
       "consecutive_same_mpid_share": 0.633793,
       "plain_deltas_minus_16_to_16": [
@@ -12141,5 +12176,5 @@
     "raw_unknown_type": 0,
     "raw_wrong_length": 0
   },
-  "wall_seconds": 950.226351
+  "wall_seconds": 1017.748666
 }

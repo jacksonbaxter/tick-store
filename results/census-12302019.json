@@ -3,11 +3,11 @@
   "source": "12302019.NASDAQ_ITCH50",
   "host": "macOS",
   "build_preset": "bench",
-  "commit": "ac0d641",
-  "peak_rss_bytes": 8256077824,
+  "commit": "ede0176b10bb49e505226285530d0b91a33b4f34",
+  "peak_rss_bytes": 8256192512,
   "peak_rss_note": "Peak resident size counts the clean file-backed pages of the read-only mapping of the source. peak_memory_footprint_bytes is what the process held beyond that mapping.",
-  "peak_memory_footprint_bytes": 7674000,
-  "real_seconds": 17.81,
+  "peak_memory_footprint_bytes": 7706792,
+  "real_seconds": 7.36,
   "gzip_reconciliation": {
     "gzip_isize": 3956440613,
     "file_bytes_mod_2_32": 3956440613,
@@ -1616,5 +1616,5 @@
     "stock_checked": 124125385,
     "stock_mismatches": 2
   },
-  "wall_seconds": 17.660561
+  "wall_seconds": 7.197111
 }

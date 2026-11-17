@@ -13,14 +13,14 @@ Nasdaq's peak message rate.
 | What | Bar (source) | Measured | Result |
 |---|---|---|---|
 | Round trip, both days | every message bit-exact, stream hashes equal (the project's correctness gate) | 0 messages differ; stream hashes equal | met |
-| Disk, store flushed | below each other system's smallest setup (the project's own bar) | 1.76 GB vs Parquet 3.19 GB | met |
-| One hour of one stock, warm | fastest of the four, each in the setup the comparison fixed for it, by median and tail (the project's own bar) | median 74.32 ms vs QuestDB 319.30 ms; ArcticDB with a table per stock 49.65 ms | met |
-| One millisecond of every stock, warm | fastest of the four, each in the setup the comparison fixed for it, by median and tail (the project's own bar) | median 207.10 ms vs QuestDB 1.18 ms | missed |
-| One-thread ingest | above 2.73 M messages/s, Nasdaq's peak (Nasdaq bandwidth report) | 1.376 M messages/s | missed |
+| Disk, store flushed | below each other system's smallest setup (the project's own bar) | 1.76 GB vs Parquet 3.09 GB | met |
+| One hour of one stock, warm | fastest of the four, each in the setup the comparison fixed for it, by median and tail (the project's own bar) | median 74.04 ms vs QuestDB 283.77 ms; ArcticDB with a table per stock 44.58 ms | met |
+| One millisecond of every stock, warm | fastest of the four, each in the setup the comparison fixed for it, by median and tail (the project's own bar) | median 207.95 ms vs QuestDB 1.24 ms | missed |
+| One-thread ingest | above 2.73 M messages/s, Nasdaq's peak (Nasdaq bandwidth report) | 1.270 M messages/s | missed |
 
-Against the same bar, one thread on an Apple M4 Max laptop, unpinned, ingests 3.215 M messages/s: met.
+Against the same bar, one thread on an Apple M4 Max laptop, unpinned, ingests 3.302 M messages/s: met.
 
-Not shown above. Missed: on the Ryzen, flushed one-thread ingest, fastest warm on the open's first second, fastest cold on the open's first second, fastest cold on one millisecond of every stock, fastest warm on a full-day column scan. Met: 5 more of their parts. Of the other 32 target-and-machine rows of the [full table](RESULTS.md#targets): 4 met, 14 missed, 7 missed in part, 7 not judged, fuzzing among them.
+Not shown above. Missed: on the Ryzen, flushed one-thread ingest, fastest warm on the open's first second, fastest cold on the open's first second, fastest cold on one millisecond of every stock, fastest warm on a full-day column scan. Met: 5 more of their parts. Of the other 32 target-and-machine rows of the [full table](RESULTS.md#targets): 4 met, 15 missed, 7 missed in part, 6 not judged, fuzzing among them.
 <!-- headline:end -->
 
 ## What it is

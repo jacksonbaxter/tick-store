@@ -1920,14 +1920,21 @@ class Protocol2(Harness):
 
     def test_a_committed_protocol_1_file_with_a_byte_changed(self):
         # Review RV-6: the committed files are pinned by their bytes. The same document written
-        # again, its content unchanged and its bytes not, is no longer one of them.
-        committed = REPO_ROOT / "results" / "compare" / "macOS-12302019-open-67ae574f5666.json"
+        # again, its content unchanged and its bytes not, is no longer one of them. The freeze's
+        # files replaced the committed protocol 1 slices, and the day kept in replaced/ is not
+        # checked away from its slice, so a fixture pinned as written stands for one.
+        committed = self.directory / f"macOS-{SLICE}-{COMMIT[:12]}.json"
+        committed.write_text(json.dumps(valid_document("macOS")), encoding="utf-8")
+        pin_protocol_1(self.pins, self.directory)
         document = json.loads(committed.read_text(encoding="utf-8"))
-        copied = self.directory / committed.name
+        copied = self.directory / "again" / committed.name
+        copied.parent.mkdir()
         copied.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
         for path, code in ((committed, 0), (copied, 1)):
             with self.subTest(path=path.parent.name):
-                result = subprocess.run([sys.executable, "-I", str(SCRIPT), str(path)],
+                result = subprocess.run([sys.executable, "-I", str(SCRIPT), "--pins",
+                                         str(self.pins), "--capacity", str(self.capacity),
+                                         str(path)],
                                         check=False, capture_output=True, text=True)
                 self.assertEqual(result.returncode, code, result.stderr)
         self.assertIn(PROTOCOL_1_UNPINNED, result.stderr)

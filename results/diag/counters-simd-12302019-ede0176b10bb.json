@@ -1,0 +1,767 @@
+{
+ "schema": "tick-store-diag-1",
+ "kind": "counters-simd",
+ "day": "12302019",
+ "commit": "ede0176b10bb49e505226285530d0b91a33b4f34",
+ "host": "Linux",
+ "measurement": "diagnostic",
+ "statement": "A diagnostic, one run at commit ede0176b10bb, judging no target: user-mode counter totals of the write and of each query process under measure.sh on cpu4, and each query's engine times at AVX2 and capped to scalar, read from the query tool's own answer lines (engine_ns), not from wall time. Those engine times are the only times here.",
+ "runs": 1,
+ "input": "the day 12302019",
+ "build": {
+  "preset": "bench",
+  "used": "bench",
+  "extra_flags": "none",
+  "text_identical": null,
+  "note": "the measured build, the binaries the comparison ran"
+ },
+ "wrapper": "measure.sh, taskset -c 4",
+ "not_established": [],
+ "events": "cycles:u,instructions:u,branches:u,branch-misses:u,task-clock,user_time,system_time",
+ "tool_events": "user_time and system_time counted",
+ "query_parameters_from": "Linux-12302019-full-ede0176b10bb.json",
+ "parameters": [
+  {
+   "name": "Q1",
+   "kind": "rows",
+   "start_ns": 34200000000000,
+   "end_ns": 34201000000000,
+   "locate": -1
+  },
+  {
+   "name": "Q2",
+   "kind": "rows",
+   "start_ns": 34200000000000,
+   "end_ns": 37800000000000,
+   "locate": 6556
+  },
+  {
+   "name": "Q3",
+   "kind": "minute_aggregate",
+   "start_ns": 34200000000000,
+   "end_ns": 37800000000000,
+   "locate": 6556
+  },
+  {
+   "name": "Q4",
+   "kind": "rows",
+   "start_ns": 34200000000000,
+   "end_ns": 34200001000000,
+   "locate": -1
+  },
+  {
+   "name": "Q5",
+   "kind": "column_sum",
+   "start_ns": 0,
+   "end_ns": 0,
+   "locate": -1
+  }
+ ],
+ "repetitions": "each query file holds one untimed first request and then the timed ones: Q1:31,Q2:31,Q3:31,Q4:31,Q5:31",
+ "order": "round 1 AVX2 then scalar, round 2 scalar then AVX2, Q1 to Q5 in each",
+ "load_lines": [
+  "measure.sh: start load1=1.20 at=2026-11-15T07:36:33Z cpus=4 governor=performance freq_khz=cpu4:2450622 perf_event_paranoid=2",
+  "measure.sh: end load1=1.17 exit=0 at=2026-11-15T07:39:36Z cpus=4 governor=performance freq_khz=cpu4:2958647 perf_event_paranoid=2",
+  "measure.sh: start load1=1.17 at=2026-11-15T07:39:37Z cpus=4 governor=performance freq_khz=cpu4:2000000 perf_event_paranoid=2",
+  "measure.sh: end load1=1.02 exit=0 at=2026-11-15T07:43:57Z cpus=4 governor=performance freq_khz=cpu4:3309349 perf_event_paranoid=2"
+ ],
+ "governor": "performance",
+ "turbo": "enabled",
+ "write": {
+  "records": 268744780,
+  "cycles": 625636300867,
+  "cycles_coverage_percent": 100.0,
+  "instructions": 896028650514,
+  "instructions_coverage_percent": 100.0,
+  "branches": 129592370380,
+  "branches_coverage_percent": 100.0,
+  "branch_misses": 5911215323,
+  "branch_misses_coverage_percent": 100.0,
+  "effective_mhz": 3499.6,
+  "effective_mhz_over": "user time (perf's user_time)",
+  "system_share_of_cpu_time_percent": 2.41,
+  "ipc": 1.4322,
+  "branch_miss_rate_percent": 4.5614,
+  "per_message": {
+   "cycles": 2327.9942,
+   "instructions": 3334.1249,
+   "branches": 482.2135,
+   "branch_misses": 21.9956
+  }
+ },
+ "queries": [
+  {
+   "name": "Q1",
+   "level": "avx2",
+   "round": 1,
+   "timed_repetitions": 30,
+   "engine_ms_median": 300.8086,
+   "engine_ms_slowest": 318.1945,
+   "values_decoded": 27037000,
+   "kernel_runs": {
+    "avx2": 107809,
+    "neon": 0,
+    "scalar": 0
+   },
+   "process_counters": {
+    "cycles": 53047995999,
+    "cycles_coverage_percent": 100.0,
+    "instructions": 136083381375,
+    "instructions_coverage_percent": 100.0,
+    "branches": 10562644634,
+    "branches_coverage_percent": 100.0,
+    "branch_misses": 113474823,
+    "branch_misses_coverage_percent": 100.0,
+    "effective_mhz": 3549.8,
+    "effective_mhz_over": "user time (perf's user_time)",
+    "system_share_of_cpu_time_percent": 4.225,
+    "ipc": 2.5653,
+    "branch_miss_rate_percent": 1.0743,
+    "cycles_per_value_decoded": 63.292
+   },
+   "sibling_busy_percent": 0.064
+  },
+  {
+   "name": "Q2",
+   "level": "avx2",
+   "round": 1,
+   "timed_repetitions": 30,
+   "engine_ms_median": 73.4576,
+   "engine_ms_slowest": 80.0105,
+   "values_decoded": 7559833,
+   "kernel_runs": {
+    "avx2": 29907,
+    "neon": 0,
+    "scalar": 0
+   },
+   "process_counters": {
+    "cycles": 37809077646,
+    "cycles_coverage_percent": 100.0,
+    "instructions": 128465693968,
+    "instructions_coverage_percent": 100.0,
+    "branches": 8116878223,
+    "branches_coverage_percent": 100.0,
+    "branch_misses": 83356753,
+    "branch_misses_coverage_percent": 100.0,
+    "effective_mhz": 3557.5,
+    "effective_mhz_over": "user time (perf's user_time)",
+    "system_share_of_cpu_time_percent": 2.243,
+    "ipc": 3.3977,
+    "branch_miss_rate_percent": 1.027,
+    "cycles_per_value_decoded": 161.3326
+   },
+   "sibling_busy_percent": 0.276
+  },
+  {
+   "name": "Q3",
+   "level": "avx2",
+   "round": 1,
+   "timed_repetitions": 30,
+   "engine_ms_median": 35.8048,
+   "engine_ms_slowest": 36.1551,
+   "values_decoded": 5558116,
+   "kernel_runs": {
+    "avx2": 21393,
+    "neon": 0,
+    "scalar": 0
+   },
+   "process_counters": {
+    "cycles": 3981875656,
+    "cycles_coverage_percent": 100.0,
+    "instructions": 7732869429,
+    "instructions_coverage_percent": 100.0,
+    "branches": 844006549,
+    "branches_coverage_percent": 100.0,
+    "branch_misses": 16057365,
+    "branch_misses_coverage_percent": 100.0,
+    "effective_mhz": 3584.8,
+    "effective_mhz_over": "user time (perf's user_time)",
+    "system_share_of_cpu_time_percent": 3.472,
+    "ipc": 1.942,
+    "branch_miss_rate_percent": 1.9025,
+    "cycles_per_value_decoded": 23.1099
+   },
+   "sibling_busy_percent": 0.0
+  },
+  {
+   "name": "Q4",
+   "level": "avx2",
+   "round": 1,
+   "timed_repetitions": 30,
+   "engine_ms_median": 212.5695,
+   "engine_ms_slowest": 216.4613,
+   "values_decoded": 25558344,
+   "kernel_runs": {
+    "avx2": 102027,
+    "neon": 0,
+    "scalar": 0
+   },
+   "process_counters": {
+    "cycles": 23015086642,
+    "cycles_coverage_percent": 100.0,
+    "instructions": 40648197130,
+    "instructions_coverage_percent": 100.0,
+    "branches": 4061433225,
+    "branches_coverage_percent": 100.0,
+    "branch_misses": 45832529,
+    "branch_misses_coverage_percent": 100.0,
+    "effective_mhz": 3575.8,
+    "effective_mhz_over": "user time (perf's user_time)",
+    "system_share_of_cpu_time_percent": 3.127,
+    "ipc": 1.7662,
+    "branch_miss_rate_percent": 1.1285,
+    "cycles_per_value_decoded": 29.0481
+   },
+   "sibling_busy_percent": 0.15
+  },
+  {
+   "name": "Q5",
+   "level": "avx2",
+   "round": 1,
+   "timed_repetitions": 30,
+   "engine_ms_median": 906.07,
+   "engine_ms_slowest": 917.8346,
+   "values_decoded": 152004760,
+   "kernel_runs": {
+    "avx2": 747040,
+    "neon": 0,
+    "scalar": 0
+   },
+   "process_counters": {
+    "cycles": 100130998137,
+    "cycles_coverage_percent": 100.0,
+    "instructions": 191748238478,
+    "instructions_coverage_percent": 100.0,
+    "branches": 19281866543,
+    "branches_coverage_percent": 100.0,
+    "branch_misses": 186041903,
+    "branch_misses_coverage_percent": 100.0,
+    "effective_mhz": 3558.1,
+    "effective_mhz_over": "user time (perf's user_time)",
+    "system_share_of_cpu_time_percent": 0.043,
+    "ipc": 1.915,
+    "branch_miss_rate_percent": 0.9649,
+    "cycles_per_value_decoded": 21.2495
+   },
+   "sibling_busy_percent": 0.107
+  },
+  {
+   "name": "Q1",
+   "level": "scalar",
+   "round": 1,
+   "timed_repetitions": 30,
+   "engine_ms_median": 305.9422,
+   "engine_ms_slowest": 310.2698,
+   "values_decoded": 27037000,
+   "kernel_runs": {
+    "avx2": 0,
+    "neon": 0,
+    "scalar": 107832
+   },
+   "process_counters": {
+    "cycles": 53682649445,
+    "cycles_coverage_percent": 100.0,
+    "instructions": 144034194842,
+    "instructions_coverage_percent": 100.0,
+    "branches": 11668261791,
+    "branches_coverage_percent": 100.0,
+    "branch_misses": 112417282,
+    "branch_misses_coverage_percent": 100.0,
+    "effective_mhz": 3562.0,
+    "effective_mhz_over": "user time (perf's user_time)",
+    "system_share_of_cpu_time_percent": 4.241,
+    "ipc": 2.6831,
+    "branch_miss_rate_percent": 0.9634,
+    "cycles_per_value_decoded": 64.0492
+   },
+   "sibling_busy_percent": 0.063
+  },
+  {
+   "name": "Q2",
+   "level": "scalar",
+   "round": 1,
+   "timed_repetitions": 30,
+   "engine_ms_median": 76.2052,
+   "engine_ms_slowest": 82.8552,
+   "values_decoded": 7559833,
+   "kernel_runs": {
+    "avx2": 0,
+    "neon": 0,
+    "scalar": 30121
+   },
+   "process_counters": {
+    "cycles": 38032287274,
+    "cycles_coverage_percent": 100.0,
+    "instructions": 130467794583,
+    "instructions_coverage_percent": 100.0,
+    "branches": 8386986358,
+    "branches_coverage_percent": 100.0,
+    "branch_misses": 83418452,
+    "branch_misses_coverage_percent": 100.0,
+    "effective_mhz": 3564.8,
+    "effective_mhz_over": "user time (perf's user_time)",
+    "system_share_of_cpu_time_percent": 2.52,
+    "ipc": 3.4304,
+    "branch_miss_rate_percent": 0.9946,
+    "cycles_per_value_decoded": 162.2851
+   },
+   "sibling_busy_percent": 0.091
+  },
+  {
+   "name": "Q3",
+   "level": "scalar",
+   "round": 1,
+   "timed_repetitions": 30,
+   "engine_ms_median": 37.6226,
+   "engine_ms_slowest": 41.051,
+   "values_decoded": 5558116,
+   "kernel_runs": {
+    "avx2": 0,
+    "neon": 0,
+    "scalar": 21539
+   },
+   "process_counters": {
+    "cycles": 4190925433,
+    "cycles_coverage_percent": 100.0,
+    "instructions": 9070997453,
+    "instructions_coverage_percent": 100.0,
+    "branches": 1016126691,
+    "branches_coverage_percent": 100.0,
+    "branch_misses": 16033781,
+    "branch_misses_coverage_percent": 100.0,
+    "effective_mhz": 3549.4,
+    "effective_mhz_over": "user time (perf's user_time)",
+    "system_share_of_cpu_time_percent": 2.31,
+    "ipc": 2.1644,
+    "branch_miss_rate_percent": 1.5779,
+    "cycles_per_value_decoded": 24.3232
+   },
+   "sibling_busy_percent": 0.0
+  },
+  {
+   "name": "Q4",
+   "level": "scalar",
+   "round": 1,
+   "timed_repetitions": 30,
+   "engine_ms_median": 220.3076,
+   "engine_ms_slowest": 225.1406,
+   "values_decoded": 25558344,
+   "kernel_runs": {
+    "avx2": 0,
+    "neon": 0,
+    "scalar": 102050
+   },
+   "process_counters": {
+    "cycles": 23868044883,
+    "cycles_coverage_percent": 100.0,
+    "instructions": 48148644733,
+    "instructions_coverage_percent": 100.0,
+    "branches": 5103647194,
+    "branches_coverage_percent": 100.0,
+    "branch_misses": 46337004,
+    "branch_misses_coverage_percent": 100.0,
+    "effective_mhz": 3573.8,
+    "effective_mhz_over": "user time (perf's user_time)",
+    "system_share_of_cpu_time_percent": 3.018,
+    "ipc": 2.0173,
+    "branch_miss_rate_percent": 0.9079,
+    "cycles_per_value_decoded": 30.1247
+   },
+   "sibling_busy_percent": 0.0
+  },
+  {
+   "name": "Q5",
+   "level": "scalar",
+   "round": 1,
+   "timed_repetitions": 30,
+   "engine_ms_median": 974.0541,
+   "engine_ms_slowest": 987.6563,
+   "values_decoded": 152004760,
+   "kernel_runs": {
+    "avx2": 0,
+    "neon": 0,
+    "scalar": 747568
+   },
+   "process_counters": {
+    "cycles": 107507651462,
+    "cycles_coverage_percent": 100.0,
+    "instructions": 236114164011,
+    "instructions_coverage_percent": 100.0,
+    "branches": 26100520256,
+    "branches_coverage_percent": 100.0,
+    "branch_misses": 180792333,
+    "branch_misses_coverage_percent": 100.0,
+    "effective_mhz": 3554.0,
+    "effective_mhz_over": "user time (perf's user_time)",
+    "system_share_of_cpu_time_percent": 0.04,
+    "ipc": 2.1963,
+    "branch_miss_rate_percent": 0.6927,
+    "cycles_per_value_decoded": 22.815
+   },
+   "sibling_busy_percent": 0.099
+  },
+  {
+   "name": "Q1",
+   "level": "avx2",
+   "round": 2,
+   "timed_repetitions": 30,
+   "engine_ms_median": 297.7705,
+   "engine_ms_slowest": 303.5269,
+   "values_decoded": 27037000,
+   "kernel_runs": {
+    "avx2": 107809,
+    "neon": 0,
+    "scalar": 0
+   },
+   "process_counters": {
+    "cycles": 52939316466,
+    "cycles_coverage_percent": 100.0,
+    "instructions": 136081427245,
+    "instructions_coverage_percent": 100.0,
+    "branches": 10562347382,
+    "branches_coverage_percent": 100.0,
+    "branch_misses": 111847634,
+    "branch_misses_coverage_percent": 100.0,
+    "effective_mhz": 3568.7,
+    "effective_mhz_over": "user time (perf's user_time)",
+    "system_share_of_cpu_time_percent": 4.329,
+    "ipc": 2.5705,
+    "branch_miss_rate_percent": 1.0589,
+    "cycles_per_value_decoded": 63.1623
+   },
+   "sibling_busy_percent": 0.129
+  },
+  {
+   "name": "Q2",
+   "level": "avx2",
+   "round": 2,
+   "timed_repetitions": 30,
+   "engine_ms_median": 73.5081,
+   "engine_ms_slowest": 78.938,
+   "values_decoded": 7559833,
+   "kernel_runs": {
+    "avx2": 29907,
+    "neon": 0,
+    "scalar": 0
+   },
+   "process_counters": {
+    "cycles": 37787198698,
+    "cycles_coverage_percent": 100.0,
+    "instructions": 128465698793,
+    "instructions_coverage_percent": 100.0,
+    "branches": 8116883067,
+    "branches_coverage_percent": 100.0,
+    "branch_misses": 83390607,
+    "branch_misses_coverage_percent": 100.0,
+    "effective_mhz": 3547.0,
+    "effective_mhz_over": "user time (perf's user_time)",
+    "system_share_of_cpu_time_percent": 1.985,
+    "ipc": 3.3997,
+    "branch_miss_rate_percent": 1.0274,
+    "cycles_per_value_decoded": 161.2393
+   },
+   "sibling_busy_percent": 0.092
+  },
+  {
+   "name": "Q3",
+   "level": "avx2",
+   "round": 2,
+   "timed_repetitions": 30,
+   "engine_ms_median": 36.2435,
+   "engine_ms_slowest": 44.5006,
+   "values_decoded": 5558116,
+   "kernel_runs": {
+    "avx2": 21393,
+    "neon": 0,
+    "scalar": 0
+   },
+   "process_counters": {
+    "cycles": 4093174222,
+    "cycles_coverage_percent": 100.0,
+    "instructions": 7732868938,
+    "instructions_coverage_percent": 100.0,
+    "branches": 844006055,
+    "branches_coverage_percent": 100.0,
+    "branch_misses": 17802034,
+    "branch_misses_coverage_percent": 100.0,
+    "effective_mhz": 3580.8,
+    "effective_mhz_over": "user time (perf's user_time)",
+    "system_share_of_cpu_time_percent": 3.367,
+    "ipc": 1.8892,
+    "branch_miss_rate_percent": 2.1092,
+    "cycles_per_value_decoded": 23.7559
+   },
+   "sibling_busy_percent": 0.0
+  },
+  {
+   "name": "Q4",
+   "level": "avx2",
+   "round": 2,
+   "timed_repetitions": 30,
+   "engine_ms_median": 211.106,
+   "engine_ms_slowest": 219.3318,
+   "values_decoded": 25558344,
+   "kernel_runs": {
+    "avx2": 102027,
+    "neon": 0,
+    "scalar": 0
+   },
+   "process_counters": {
+    "cycles": 22854456999,
+    "cycles_coverage_percent": 100.0,
+    "instructions": 40648197125,
+    "instructions_coverage_percent": 100.0,
+    "branches": 4061433207,
+    "branches_coverage_percent": 100.0,
+    "branch_misses": 45889804,
+    "branch_misses_coverage_percent": 100.0,
+    "effective_mhz": 3575.0,
+    "effective_mhz_over": "user time (perf's user_time)",
+    "system_share_of_cpu_time_percent": 3.265,
+    "ipc": 1.7786,
+    "branch_miss_rate_percent": 1.1299,
+    "cycles_per_value_decoded": 28.8454
+   },
+   "sibling_busy_percent": 0.302
+  },
+  {
+   "name": "Q5",
+   "level": "avx2",
+   "round": 2,
+   "timed_repetitions": 30,
+   "engine_ms_median": 910.9009,
+   "engine_ms_slowest": 922.0295,
+   "values_decoded": 152004760,
+   "kernel_runs": {
+    "avx2": 747040,
+    "neon": 0,
+    "scalar": 0
+   },
+   "process_counters": {
+    "cycles": 100249578539,
+    "cycles_coverage_percent": 100.0,
+    "instructions": 191748239378,
+    "instructions_coverage_percent": 100.0,
+    "branches": 19281867107,
+    "branches_coverage_percent": 100.0,
+    "branch_misses": 187493194,
+    "branch_misses_coverage_percent": 100.0,
+    "effective_mhz": 3554.2,
+    "effective_mhz_over": "user time (perf's user_time)",
+    "system_share_of_cpu_time_percent": 0.057,
+    "ipc": 1.9127,
+    "branch_miss_rate_percent": 0.9724,
+    "cycles_per_value_decoded": 21.2747
+   },
+   "sibling_busy_percent": 0.177
+  },
+  {
+   "name": "Q1",
+   "level": "scalar",
+   "round": 2,
+   "timed_repetitions": 30,
+   "engine_ms_median": 307.1504,
+   "engine_ms_slowest": 313.9732,
+   "values_decoded": 27037000,
+   "kernel_runs": {
+    "avx2": 0,
+    "neon": 0,
+    "scalar": 107832
+   },
+   "process_counters": {
+    "cycles": 53893377028,
+    "cycles_coverage_percent": 100.0,
+    "instructions": 144036127637,
+    "instructions_coverage_percent": 100.0,
+    "branches": 11668538639,
+    "branches_coverage_percent": 100.0,
+    "branch_misses": 112435836,
+    "branch_misses_coverage_percent": 100.0,
+    "effective_mhz": 3568.4,
+    "effective_mhz_over": "user time (perf's user_time)",
+    "system_share_of_cpu_time_percent": 4.397,
+    "ipc": 2.6726,
+    "branch_miss_rate_percent": 0.9636,
+    "cycles_per_value_decoded": 64.3006
+   },
+   "sibling_busy_percent": 0.063
+  },
+  {
+   "name": "Q2",
+   "level": "scalar",
+   "round": 2,
+   "timed_repetitions": 30,
+   "engine_ms_median": 76.1717,
+   "engine_ms_slowest": 81.9132,
+   "values_decoded": 7559833,
+   "kernel_runs": {
+    "avx2": 0,
+    "neon": 0,
+    "scalar": 30121
+   },
+   "process_counters": {
+    "cycles": 38019512548,
+    "cycles_coverage_percent": 100.0,
+    "instructions": 130467787977,
+    "instructions_coverage_percent": 100.0,
+    "branches": 8386979985,
+    "branches_coverage_percent": 100.0,
+    "branch_misses": 83427205,
+    "branch_misses_coverage_percent": 100.0,
+    "effective_mhz": 3562.5,
+    "effective_mhz_over": "user time (perf's user_time)",
+    "system_share_of_cpu_time_percent": 2.374,
+    "ipc": 3.4316,
+    "branch_miss_rate_percent": 0.9947,
+    "cycles_per_value_decoded": 162.2306
+   },
+   "sibling_busy_percent": 0.0
+  },
+  {
+   "name": "Q3",
+   "level": "scalar",
+   "round": 2,
+   "timed_repetitions": 30,
+   "engine_ms_median": 37.7061,
+   "engine_ms_slowest": 38.1239,
+   "values_decoded": 5558116,
+   "kernel_runs": {
+    "avx2": 0,
+    "neon": 0,
+    "scalar": 21539
+   },
+   "process_counters": {
+    "cycles": 4183802138,
+    "cycles_coverage_percent": 100.0,
+    "instructions": 9070997497,
+    "instructions_coverage_percent": 100.0,
+    "branches": 1016126798,
+    "branches_coverage_percent": 100.0,
+    "branch_misses": 16043410,
+    "branch_misses_coverage_percent": 100.0,
+    "effective_mhz": 3535.7,
+    "effective_mhz_over": "user time (perf's user_time)",
+    "system_share_of_cpu_time_percent": 1.987,
+    "ipc": 2.1681,
+    "branch_miss_rate_percent": 1.5789,
+    "cycles_per_value_decoded": 24.2819
+   },
+   "sibling_busy_percent": 0.0
+  },
+  {
+   "name": "Q4",
+   "level": "scalar",
+   "round": 2,
+   "timed_repetitions": 30,
+   "engine_ms_median": 219.8208,
+   "engine_ms_slowest": 235.7761,
+   "values_decoded": 25558344,
+   "kernel_runs": {
+    "avx2": 0,
+    "neon": 0,
+    "scalar": 102050
+   },
+   "process_counters": {
+    "cycles": 23822367010,
+    "cycles_coverage_percent": 100.0,
+    "instructions": 48148643637,
+    "instructions_coverage_percent": 100.0,
+    "branches": 5103647203,
+    "branches_coverage_percent": 100.0,
+    "branch_misses": 45989830,
+    "branch_misses_coverage_percent": 100.0,
+    "effective_mhz": 3568.8,
+    "effective_mhz_over": "user time (perf's user_time)",
+    "system_share_of_cpu_time_percent": 2.905,
+    "ipc": 2.0212,
+    "branch_miss_rate_percent": 0.9011,
+    "cycles_per_value_decoded": 30.067
+   },
+   "sibling_busy_percent": 0.145
+  },
+  {
+   "name": "Q5",
+   "level": "scalar",
+   "round": 2,
+   "timed_repetitions": 30,
+   "engine_ms_median": 1145.3985,
+   "engine_ms_slowest": 1152.0638,
+   "values_decoded": 152004760,
+   "kernel_runs": {
+    "avx2": 0,
+    "neon": 0,
+    "scalar": 747568
+   },
+   "process_counters": {
+    "cycles": 120642581421,
+    "cycles_coverage_percent": 100.0,
+    "instructions": 236114170399,
+    "instructions_coverage_percent": 100.0,
+    "branches": 26100521000,
+    "branches_coverage_percent": 100.0,
+    "branch_misses": 180750106,
+    "branch_misses_coverage_percent": 100.0,
+    "effective_mhz": 3565.3,
+    "effective_mhz_over": "user time (perf's user_time)",
+    "system_share_of_cpu_time_percent": 0.035,
+    "ipc": 1.9571,
+    "branch_miss_rate_percent": 0.6925,
+    "cycles_per_value_decoded": 25.6025
+   },
+   "sibling_busy_percent": 0.0
+  }
+ ],
+ "store": {
+  "records": 268744780,
+  "segments": 65,
+  "store_version": 3,
+  "segment_records": 4194304
+ },
+ "simd_change": [
+  {
+   "name": "Q1",
+   "avx2_engine_ms_median": 299.6787,
+   "scalar_engine_ms_median": 306.6298,
+   "avx2_over_scalar_median": 0.9773
+  },
+  {
+   "name": "Q2",
+   "avx2_engine_ms_median": 73.4777,
+   "scalar_engine_ms_median": 76.1898,
+   "avx2_over_scalar_median": 0.9644
+  },
+  {
+   "name": "Q3",
+   "avx2_engine_ms_median": 36.0481,
+   "scalar_engine_ms_median": 37.6513,
+   "avx2_over_scalar_median": 0.9574
+  },
+  {
+   "name": "Q4",
+   "avx2_engine_ms_median": 211.9949,
+   "scalar_engine_ms_median": 220.0918,
+   "avx2_over_scalar_median": 0.9632
+  },
+  {
+   "name": "Q5",
+   "avx2_engine_ms_median": 908.8311,
+   "scalar_engine_ms_median": 980.2665,
+   "avx2_over_scalar_median": 0.9271
+  }
+ ],
+ "sibling_busy_percent": {
+  "core": 4,
+  "sibling": 5,
+  "method": "Busy jiffies over total jiffies from the kernel's proc stat file, read once the measurement lock is held and again when the wrapper exits. Busy is everything but idle and iowait, and a wait for the lock is not in the window.",
+  "holds": {
+   "write": 0.191,
+   "queries": 0.096
+  },
+  "per_command": "each query run's own share is in queries[].sibling_busy_percent"
+ },
+ "commands": [
+  "measure.sh taskset -c 4 sh -c cat\\ \\\"\\$0\\\"\\ \\>\\ \\\"\\$1\\\"\\ \\&\\&\\ shift\\ \\&\\&\\ exec\\ \\\"\\$@\\\" stat write-stat-before.txt perf stat -x\\, -e cycles:u\\,instructions:u\\,branches:u\\,branch-misses:u\\,task-clock\\,user_time\\,system_time -o write.perf -- tick_roundtrip ingest 12302019.NASDAQ_ITCH50 diag-day-B.tsc --durability page_cache",
+  "measure.sh taskset -c 4 sh -c cat\\ \\\"\\$0\\\"\\ \\>\\ \\\"\\$1\\\"\\ \\&\\&\\ shift\\ \\&\\&\\ exec\\ \\\"\\$@\\\" stat queries-stat-before.txt bash d3-queries.sh tools diag-day-B.tsc counters-simd cycles:u\\,instructions:u\\,branches:u\\,branch-misses:u\\,task-clock\\,user_time\\,system_time stat"
+ ],
+ "note": "process_counters cover the whole query process: the store's open, every request and every digest. The first request of each file is untimed; the engine times are the tool's engine_ns over the others."
+}

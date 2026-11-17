@@ -5,13 +5,14 @@
     "measurement": "reported",
     "statement": "Pinned with taskset -c 4 and verified by sched_getcpu. Counters come from perf stat user-mode events. perf cycles and timer ticks are different units.",
     "cpu_model": "AMD Ryzen Embedded V1605B with Radeon Vega Gfx",
-    "kernel": "Linux 6.12.115+deb13.1-amd64",
+    "kernel": "Linux 6.12.117+deb13-amd64",
     "compiler": "Clang 23.1.4",
     "compile_flags": "-O3 -DNDEBUG -std=c++23",
     "build_type": "Release",
     "sanitizers": "none",
-    "isa": "x86-64 baseline, scalar kernels",
-    "commit": "1b7cfe19648370af56e7494621d80306fe9e5930",
+    "isa": "x86-64 baseline, avx2 kernels",
+    "commit": "ede0176b10bb49e505226285530d0b91a33b4f34",
+    "commit_source": "export",
     "core": 4,
     "sibling": "cpu5 idle as stated, not enforced: see sibling_busy_percent",
     "sibling_busy_percent": {
@@ -20,22 +21,22 @@
       "topology": "thread_siblings_list",
       "method": "Busy jiffies over total jiffies from the kernel's proc stat file, read once the measurement lock is held and again when the wrapper exits. Busy is everything but idle and iowait, and a wait for the lock is not in the window.",
       "cases": {
-        "itch_decode": 0.33707865168539325,
-        "itch_decode_encode": 0.14524328249818447
+        "itch_decode": 0.22271714922049,
+        "itch_decode_encode": 1.043115438108484
       }
     },
     "second_thread": "cpu6 reserved, unused: every case is single-threaded",
     "governor": "performance",
     "frequency": {
       "snapshot_khz": [
-        2108083,
-        3169640,
-        2690338,
-        2150218
+        2701463,
+        3081026,
+        2000000,
+        3013465
       ],
       "effective_mhz": {
-        "itch_decode": 3573.4186175421337,
-        "itch_decode_encode": 3567.1924872922323
+        "itch_decode": 3567.3690017796043,
+        "itch_decode_encode": 3434.593562740967
       },
       "note": "snapshot_khz is scaling_cur_freq at each load line. effective_mhz is user-mode cycles over the wall time of the timed passes."
     },
@@ -45,23 +46,24 @@
     "timer": {
       "source": "rdtscp+lfence",
       "calibrated_against": "CLOCK_MONOTONIC_RAW",
-      "ticks_per_second": 1997962121.609924,
+      "ticks_per_second": 1997961261.773702,
       "resolution_ticks": 20,
-      "resolution_ns": 10.0102,
-      "read_cost_ns": 25.234074,
-      "min_publishable_ns": 126.17037,
-      "calibration_window_ns": 200000158.0
+      "resolution_ns": 10.010204,
+      "read_cost_ns": 25.234085,
+      "min_publishable_ns": 126.170424,
+      "calibration_window_ns": 200000174.0
     },
     "load_lines": [
-      "measure.sh: start load1=0.78 at=2026-11-03T16:25:13Z cpus=4 governor=performance freq_khz=cpu4:2108083 perf_event_paranoid=2",
-      "measure.sh: end load1=0.81 exit=0 at=2026-11-03T16:25:22Z cpus=4 governor=performance freq_khz=cpu4:3169640 perf_event_paranoid=2",
-      "measure.sh: start load1=0.81 at=2026-11-03T16:25:22Z cpus=4 governor=performance freq_khz=cpu4:2690338 perf_event_paranoid=2",
-      "measure.sh: end load1=0.86 exit=0 at=2026-11-03T16:25:36Z cpus=4 governor=performance freq_khz=cpu4:2150218 perf_event_paranoid=2"
+      "measure.sh: start load1=0.15 at=2026-11-15T04:38:40Z cpus=4 governor=performance freq_khz=cpu4:2701463 perf_event_paranoid=2",
+      "measure.sh: end load1=0.28 exit=0 at=2026-11-15T04:38:49Z cpus=4 governor=performance freq_khz=cpu4:3081026 perf_event_paranoid=2",
+      "measure.sh: start load1=0.28 at=2026-11-15T04:38:49Z cpus=4 governor=performance freq_khz=cpu4:2000000 perf_event_paranoid=2",
+      "measure.sh: end load1=0.44 exit=0 at=2026-11-15T04:39:03Z cpus=4 governor=performance freq_khz=cpu4:3013465 perf_event_paranoid=2"
     ],
-    "peak_rss_bytes": 417312768
+    "peak_rss_bytes": 417341440
   },
   "benchmark": "itch_codec",
   "input": {
+    "kind": "slice",
     "slice": "12302019-open",
     "sha256": "6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a",
     "messages": 6125294,
@@ -72,22 +74,23 @@
     {
       "case": "itch_decode",
       "host": "Linux",
+      "isa": "x86-64 baseline, avx2 kernels",
       "timer": {
         "source": "rdtscp+lfence",
         "calibrated_against": "CLOCK_MONOTONIC_RAW",
-        "ticks_per_second": 1997962121.609924,
+        "ticks_per_second": 1997961261.773702,
         "resolution_ticks": 20,
-        "resolution_ns": 10.0102,
-        "read_cost_ns": 25.234074,
-        "min_publishable_ns": 126.17037,
-        "calibration_window_ns": 200000158.0
+        "resolution_ns": 10.010204,
+        "read_cost_ns": 25.234085,
+        "min_publishable_ns": 126.170424,
+        "calibration_window_ns": 200000174.0
       },
-      "timer_end_ticks_per_second": 1997962170.947591,
+      "timer_end_ticks_per_second": 1997961112.538415,
       "warmup": {
         "passes_per_repetition": 2,
         "first_repetition_pass_ms": [
-          102.774981,
-          103.336063
+          103.182681,
+          102.589907
         ]
       },
       "verification": {
@@ -98,28 +101,28 @@
       },
       "throughput": {
         "repetitions": 10,
-        "pass_ms_median": 102.44223150039033,
+        "pass_ms_median": 102.33899599916185,
         "messages_per_second": {
-          "median": 59792665.18737031,
-          "mean": 59744707.70968812,
-          "stddev": 148094.61905034454,
-          "cv": 0.0024787905862719574
+          "median": 59852989.38614412,
+          "mean": 59894107.97926161,
+          "stddev": 126568.77401897621,
+          "cv": 0.002113209100013657
         },
-        "bytes_per_second_median": 2012239851.0353363
+        "bytes_per_second_median": 2014269978.917645
       },
       "counters": {
         "cycles": {
-          "value": 3660759987,
+          "value": 3644303356,
           "unit": "core cycles, user mode",
           "coverage_percent": 100.0
         },
         "instructions": {
-          "value": 8266954911,
+          "value": 8266776476,
           "unit": "instructions, user mode",
           "coverage_percent": 100.0
         },
         "branch_misses": {
-          "value": 31280947,
+          "value": 31254704,
           "unit": "mispredicted branches, user mode",
           "coverage_percent": 100.0
         },
@@ -130,9 +133,9 @@
         "scope": "timed throughput passes only, gated by perf's control FIFOs",
         "gated_messages": 61252940,
         "per_message": {
-          "cycles": 59.76464128905486,
-          "instructions": 134.96421414221098,
-          "branch_misses": 0.5106848259038668
+          "cycles": 59.495974495265045,
+          "instructions": 134.96130105754924,
+          "branch_misses": 0.5102563893259654
         }
       },
       "ratio": {
@@ -144,31 +147,33 @@
         "batch_messages": 1024,
         "batches": 59806,
         "batch_phase_seed": 130816448909017089,
-        "timer_resolution_ns": 10.0102,
-        "min_publishable_ns": 126.17037,
+        "timer_resolution_ns": 10.010204,
+        "min_publishable_ns": 126.170424,
         "significant_figures": 3,
-        "min_ns": 15984.287017,
-        "max_ns": 4036624.574995,
+        "min_ns": 15952.261242,
+        "max_ns": 114035.744516,
         "percentiles": [
           {
             "percentile": 50.0,
-            "value_ns": 17441.271595
+            "value_ns": 17281.115836
           },
           {
             "percentile": 90.0,
-            "value_ns": 18226.071258
+            "value_ns": 18129.981143
           },
           {
             "percentile": 99.0,
-            "value_ns": 21797.710542
+            "value_ns": 19843.728083
           },
           {
             "percentile": 99.9,
-            "value_ns": 35075.239536
-          },
+            "value_ns": 35491.679121
+          }
+        ],
+        "omitted_percentiles": [
           {
             "percentile": 99.99,
-            "value_ns": 65121.855211
+            "reason": "5.9806 of 59806 batches lie above it, and publishing needs 10"
           }
         ]
       }
@@ -176,22 +181,23 @@
     {
       "case": "itch_decode_encode",
       "host": "Linux",
+      "isa": "x86-64 baseline, avx2 kernels",
       "timer": {
         "source": "rdtscp+lfence",
         "calibrated_against": "CLOCK_MONOTONIC_RAW",
-        "ticks_per_second": 1997962120.692879,
+        "ticks_per_second": 1997961261.671765,
         "resolution_ticks": 20,
-        "resolution_ns": 10.0102,
-        "read_cost_ns": 25.234074,
-        "min_publishable_ns": 126.17037,
-        "calibration_window_ns": 200000068.0
+        "resolution_ns": 10.010204,
+        "read_cost_ns": 25.234238,
+        "min_publishable_ns": 126.171188,
+        "calibration_window_ns": 200000164.0
       },
-      "timer_end_ticks_per_second": 1997962072.577978,
+      "timer_end_ticks_per_second": 1997961172.171352,
       "warmup": {
         "passes_per_repetition": 2,
         "first_repetition_pass_ms": [
-          180.411018,
-          181.125566
+          183.006041,
+          183.153001
         ]
       },
       "verification": {
@@ -202,28 +208,28 @@
       },
       "throughput": {
         "repetitions": 10,
-        "pass_ms_median": 180.77620250005566,
+        "pass_ms_median": 180.29586700140499,
         "messages_per_second": {
-          "median": 33883301.44647199,
-          "mean": 33889278.303009495,
-          "stddev": 82585.06421327716,
-          "cv": 0.0024369083187570652
+          "median": 33973574.969454035,
+          "mean": 32282881.0449582,
+          "stddev": 3035074.6023866073,
+          "cv": 0.09401498578023017
         },
-        "bytes_per_second_median": 1140295874.7795672
+        "bytes_per_second_median": 1143333905.947246
       },
       "counters": {
         "cycles": {
-          "value": 6442594359,
+          "value": 6569735638,
           "unit": "core cycles, user mode",
           "coverage_percent": 100.0
         },
         "instructions": {
-          "value": 16622673765,
+          "value": 16622677350,
           "unit": "instructions, user mode",
           "coverage_percent": 100.0
         },
         "branch_misses": {
-          "value": 31290233,
+          "value": 31273949,
           "unit": "mispredicted branches, user mode",
           "coverage_percent": 100.0
         },
@@ -234,9 +240,9 @@
         "scope": "timed throughput passes only, gated by perf's control FIFOs",
         "gated_messages": 61252940,
         "per_message": {
-          "cycles": 105.18016537655173,
-          "instructions": 271.3775659584666,
-          "branch_misses": 0.5108364267902896
+          "cycles": 107.25584172776033,
+          "instructions": 271.37762448626955,
+          "branch_misses": 0.5105705783265261
         }
       },
       "ratio": {
@@ -250,31 +256,33 @@
         "batch_messages": 1024,
         "batches": 59808,
         "batch_phase_seed": 130816448909017090,
-        "timer_resolution_ns": 10.0102,
-        "min_publishable_ns": 126.17037,
+        "timer_resolution_ns": 10.010204,
+        "min_publishable_ns": 126.171188,
         "significant_figures": 3,
-        "min_ns": 25033.507634,
-        "max_ns": 100453.856418,
+        "min_ns": 24857.338805,
+        "max_ns": 180663.662967,
         "percentiles": [
           {
             "percentile": 50.0,
-            "value_ns": 29982.0499
+            "value_ns": 29982.06279
           },
           {
             "percentile": 90.0,
-            "value_ns": 31920.024579
+            "value_ns": 31855.972997
           },
           {
             "percentile": 99.0,
-            "value_ns": 39271.515304
+            "value_ns": 38118.356677
           },
           {
             "percentile": 99.9,
-            "value_ns": 51187.657134
-          },
+            "value_ns": 61181.866909
+          }
+        ],
+        "omitted_percentiles": [
           {
             "percentile": 99.99,
-            "value_ns": 82451.513116
+            "reason": "5.9808 of 59808 batches lie above it, and publishing needs 10"
           }
         ]
       }

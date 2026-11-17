@@ -1,6 +1,7 @@
 {
  "header": {
   "schema": 2,
+  "protocol": 2,
   "host": "macOS",
   "measurement": "reported",
   "statement": "Unpinned. No hardware counters. macOS has no thread pinning, and no unprivileged hardware counters. Each system gets the same thread budget.",
@@ -9,17 +10,19 @@
   "compiler": "clang version 23.1.4 (https://github.com/llvm/llvm-project 7a941dfb2877a0b8cf30323fefa85ad019e0b0f5)",
   "build_type": "Release",
   "compile_flags": "-O3 -DNDEBUG",
-  "commit": "2503d1e7c5f68c657fab7c02ddb59c489b005c73",
+  "commit": "ede0176b10bb49e505226285530d0b91a33b4f34",
   "core": "not-available",
   "sibling_busy_percent": "not-available",
+  "second_sibling_busy_percent": "not-available",
   "second_thread": "not-available",
   "governor": "not-available",
   "turbo": "not-available",
+  "turbo_readings": "not-available",
   "pinning": "not-supported",
   "questdb_runtime": "not-run",
   "load_lines": [
-   "measure.sh: start load1=2.67 at=2026-11-11T08:57:35Z",
-   "measure.sh: end load1=2.26 exit=0 at=2026-11-11T09:14:56Z"
+   "measure.sh: start load1=3.44 at=2026-11-14T21:41:45Z",
+   "measure.sh: end load1=1.99 exit=0 at=2026-11-14T21:58:34Z"
   ]
  },
  "label": "A full day of tick-store alone: every record of the pinned day, every query as BENCHMARKS.md defines it with nothing clipped, and no other system. The four-system full day runs on Linux only; this gives the targets whose host is Both their figure on this host. No figure here is compared with another system's.",
@@ -52,13 +55,13 @@
   ]
  },
  "method": {
-  "warm": "Before the warm queries the day's ITCH file, its export and every store file are evicted from the page cache, each proven at 0 resident, as on Linux. Then every store file is read through by tick_coldcache warm, and mincore on a fresh mapping must read 100% of its pages resident before and after all repetitions of every query: the slice's proof, which holds on the day because tick-store's day store fits this host's memory many times over. The per-process proof of the four-system day reads /proc, which this host does not have.",
+  "warm": "Before the warm queries the day's ITCH file, its export and every store file are evicted from the page cache, each proven at 0 resident, as on Linux. Then every store file is read through by tick_coldcache warm, and mincore on a fresh mapping must read 100% of its pages resident before and after all repetitions of every query, each query first run once untimed, its answer checked: the slice's proof, which holds on the day because tick-store's day store fits this host's memory many times over. The per-process proof of the four-system day reads /proc, which this host does not have.",
   "cold": "Service stopped. A fresh read-only MAP_SHARED mapping and msync(MS_INVALIDATE) per file, repeated until mincore reads 0 on every file. A fresh process then opens the store, with the server started again where there is one, and runs the query once. File system metadata stays warm. iostat's machine-wide disk0 delta must reach the bytes that became resident: a shortfall is conclusive, and an excess is not.",
-  "cold_includes": "Each cold number is the query alone, in a fresh process. The server's start and the worker's imports fall before the clock, pyarrow.dataset and pyarrow.acero among them, and pages they touched count as resident and as device reads. The clock does hold what an engine sets up on its first call in a process: for Parquet on macOS, about 1 ms over a second call on warm pages.",
+  "cold_includes": "Each cold number is a fresh process's query, with the store's whole open inside the clock where the system allows it: Parquet opens the file and reads its footer inside every call, and tick-store's figure is the open its query tool reports plus the query's round trip, both parts kept. ArcticDB's open of its LMDB environment and QuestDB's server start are before the clock. Every proof records the store's bytes resident when the clock started, 0 where the whole open is inside it. The worker's imports fall before the clock, pyarrow.dataset and pyarrow.acero among them. The clock does hold what an engine sets up on its first call in a process: for Parquet on macOS, about 1 ms over a second call on warm pages.",
   "one_system_at_a_time": true,
-  "tickstore_queries": "tick-store's queries go to one tools/tick_query worker per store, started before the clock. Each is timed from Python as a round trip that stops on the worker's acknowledgement that the answer is in its memory. The worker then digests the answer by compare/queries.py's rule, outside the clock, as the other systems' digests are made in Python, and returns no rows to Python. Its engine time is recorded beside each round trip and is not the number compared. The writer and the worker each run on one thread.",
+  "tickstore_queries": "tick-store's queries go to one tools/tick_query worker per store. Its open is outside the warm clock and timed once per worker; a cold figure adds the open its ready line reports to the query. Each query is timed from Python as a round trip that stops on the worker's acknowledgement that the answer is in its memory. The worker then digests the answer by compare/queries.py's rule, outside the clock, as the other systems' digests are made in Python, and returns no rows to Python. Its engine time is recorded beside each round trip and is not the number compared. The writer and the worker each run on one thread.",
   "input_cache": "tick-store's write reads the day's ITCH file, 8.25 GB, which is read through first and must be resident, as on the slice. No other system ran, so no export is read inside a clock.",
-  "p99": "nearest rank, so a small n gives a value that really occurred",
+  "tail": "Each latency block's tail figure, tail_us, is the 99th percentile by nearest rank, so it is a value that really occurred, with n and the rank used beside it. Below 100 runs the nearest rank is the last, so with 30 warm and 7 cold repetitions the tail figure is the slowest of 30 and the slowest of 7, never a 1% tail, and each block says so in tail_is_slowest and tail. p99_us holds the same figure under its old name.",
   "swap": {
    "source": "vm_stat Swapins and Swapouts",
    "page_bytes": 16384,
@@ -196,7 +199,7 @@
         "flush": {
          "probe": {
           "rows": 65536,
-          "seconds": 0.03926104097627103,
+          "seconds": 0.03610508400015533,
           "data_dirty_pages": 0,
           "data_dirty_files": {},
           "residual_dirty_files": {},
@@ -501,31 +504,77 @@
        "write": {
         "repetitions": 1,
         "seconds": [
-         83.59584279195406
+         81.39074525001342
         ],
-        "seconds_median": 83.59584279195406,
-        "records_per_second_median": 3214810.3425289732,
-        "bytes_per_second_median": 98705959.93075128,
-        "engine_seconds": 83.564729,
-        "python_seconds": 0.031113791954055614,
+        "seconds_median": 81.39074525001342,
+        "by_repetition": [
+         {
+          "seconds": 81.39074525001342,
+          "engine_seconds": 81.355952,
+          "python_seconds": 0.03479325001342204,
+          "engine_only_seconds": 81.355952,
+          "input_pages": 503626,
+          "input_resident_pages_at_start": 503626,
+          "device_bytes_read": 0,
+          "device_counter": "bytes the device read for the processes that did the write: proc_pid_rusage's ri_diskio_bytesread of the worker, of each server process, and of each child the worker ran, read before it was reaped",
+          "device_read_by_process": {
+           "worker": 0,
+           "waited children": 0
+          }
+         }
+        ],
+        "times": {
+         "seconds": "tools/tick_roundtrip ingest as a process, from its start to its exit: mapping the day's ITCH file, which is resident before the clock, parsing it, coding and writing the store, its commit and, under class B, its flushes",
+         "engine_only_seconds": "the total less python_seconds, the process's start and exit: tick_roundtrip's own wall time"
+        },
+        "records_per_second_median": 3301908.33336737,
+        "bytes_per_second_median": 101380173.92092425,
+        "engine_seconds": 81.355952,
+        "python_seconds": 0.03479325001342204,
+        "engine_only_seconds_median": 81.355952,
         "python_note": "python_seconds is the tool's start and exit, outside its own clock. engine_seconds is tick_roundtrip's own wall time: mapping the source, parsing ITCH, coding and writing the store, and its commit",
         "detail": {
-         "seconds": 83.59584279195406,
-         "engine_seconds": 83.564729,
-         "python_seconds": 0.031113791954055614,
+         "seconds": 81.39074525001342,
+         "engine_seconds": 81.355952,
+         "python_seconds": 0.03479325001342204,
          "python_note": "python_seconds is the tool's start and exit, outside its own clock. engine_seconds is tick_roundtrip's own wall time: mapping the source, parsing ITCH, coding and writing the store, and its commit",
          "input": "tick-store ingests the day's ITCH file itself, so its write time holds ITCH parsing. The other systems ingest the columns tools/tick_export wrote from the same day, already parsed, and their times do not. Nothing is subtracted.",
          "input_resident": {
           "pages": 503626,
-          "resident_pages": 503626
+          "resident_pages": 503626,
+          "warms": 1
          },
          "records": 268744780,
          "stored_file_bytes": 1758234758,
-         "tool_peak_rss_bytes": 9430138880,
+         "tool_peak_rss_bytes": 9478881280,
          "flushes": [],
-         "clock_stops": "when tick_roundtrip exits, after the rename that publishes the store and, under device_flush, its flushes"
+         "clock_stops": "when tick_roundtrip exits, after the rename that publishes the store and, under device_flush, its flushes",
+         "engine_only_seconds": 81.355952,
+         "input_at_clock_start": {
+          "files": [
+           "12302019.NASDAQ_ITCH50"
+          ],
+          "pages": 503626,
+          "resident_pages": 503626,
+          "page_size": 16384,
+          "read": "mincore on a fresh mapping, after the input was made ready and just before the write's clock",
+          "made_ready": {
+           "pages": 503626,
+           "resident_pages": 503626,
+           "warms": 1
+          }
+         },
+         "device_read": {
+          "bytes": 0,
+          "counter": "bytes the device read for the processes that did the write: proc_pid_rusage's ri_diskio_bytesread of the worker, of each server process, and of each child the worker ran, read before it was reaped",
+          "slack": 0,
+          "by_process": {
+           "worker": 0,
+           "waited children": 0
+          }
+         }
         },
-        "peak_rss_bytes_client": 9430138880,
+        "peak_rss_bytes_client": 9478881280,
         "peak_rss_bytes_service": 0,
         "clock": "stops when every row is readable and durable for its class"
        },
@@ -538,7 +587,7 @@
          "segment_records": 4194304,
          "hot_columns": "the writer's default column specs: the eight hot dictionary columns held to ranked PFOR. Not read back: the footer names each block's codec id, not its dictionary mode",
          "codecs": "each column's codec as docs/store.md lists it, zstd where the writer finds it smaller",
-         "query_worker": "tools/tick_query, one process per store, opened before the clock, path indexed, block CRCs checked",
+         "query_worker": "tools/tick_query, one process per store, path indexed, block CRCs checked; a cold figure adds the open its ready line reports to the query's round trip",
          "kernel_level": "neon",
          "TICK_STORE_SIMD": "neon",
          "threads": "one: the writer and the query worker each run on one thread"
@@ -582,12 +631,12 @@
          "stored_matches_expected": true,
          "first_difference": null,
          "store_error": null,
-         "wall_seconds": 31.38872,
-         "peak_rss_bytes": 32118325248,
+         "wall_seconds": 19.620438,
+         "peak_rss_bytes": 32145162240,
          "exit_code": 0
         },
-        "seconds": 44.11836920795031,
-        "peak_rss_bytes": 11281727488,
+        "seconds": 41.84806495800149,
+        "peak_rss_bytes": 11303043072,
         "stored_settings": {
          "checks_passed": 44,
          "store_format": "itch-store-v3",
@@ -1049,7 +1098,7 @@
         "streamed": {
          "windows": "none: tick_export --store reads the whole store in order",
          "rows": 268744780,
-         "write_columns_seconds": 0.0022909591207280755,
+         "write_columns_seconds": 0.003463667002506554,
          "method": "tick_export --store, every record through the store's read path and the ITCH encoder, straight into one column directory",
          "inputs_evicted_before": {
           "what": "the day's ITCH file and its export",
@@ -1085,7 +1134,7 @@
         "flush": {
          "probe": {
           "rows": 65536,
-          "seconds": 0.045068792067468166,
+          "seconds": 0.037719500018283725,
           "data_dirty_pages": 0,
           "data_dirty_files": {},
           "residual_dirty_files": {},
@@ -1418,27 +1467,49 @@
        "write": {
         "repetitions": 1,
         "seconds": [
-         83.77398254198488
+         79.97767700001714
         ],
-        "seconds_median": 83.77398254198488,
-        "records_per_second_median": 3207974.264149536,
-        "bytes_per_second_median": 98496068.33320422,
-        "engine_seconds": 83.743168,
-        "python_seconds": 0.030814541984881316,
+        "seconds_median": 79.97767700001714,
+        "by_repetition": [
+         {
+          "seconds": 79.97767700001714,
+          "engine_seconds": 79.949997,
+          "python_seconds": 0.027680000017141992,
+          "engine_only_seconds": 79.949997,
+          "input_pages": 503626,
+          "input_resident_pages_at_start": 503626,
+          "device_bytes_read": 0,
+          "device_counter": "bytes the device read for the processes that did the write: proc_pid_rusage's ri_diskio_bytesread of the worker, of each server process, and of each child the worker ran, read before it was reaped",
+          "device_read_by_process": {
+           "worker": 0,
+           "waited children": 0
+          }
+         }
+        ],
+        "times": {
+         "seconds": "tools/tick_roundtrip ingest as a process, from its start to its exit: mapping the day's ITCH file, which is resident before the clock, parsing it, coding and writing the store, its commit and, under class B, its flushes",
+         "engine_only_seconds": "the total less python_seconds, the process's start and exit: tick_roundtrip's own wall time"
+        },
+        "records_per_second_median": 3360247.38502898,
+        "bytes_per_second_median": 103171387.54853097,
+        "engine_seconds": 79.949997,
+        "python_seconds": 0.027680000017141992,
+        "engine_only_seconds_median": 79.949997,
         "python_note": "python_seconds is the tool's start and exit, outside its own clock. engine_seconds is tick_roundtrip's own wall time: mapping the source, parsing ITCH, coding and writing the store, and its commit",
         "detail": {
-         "seconds": 83.77398254198488,
-         "engine_seconds": 83.743168,
-         "python_seconds": 0.030814541984881316,
+         "seconds": 79.97767700001714,
+         "engine_seconds": 79.949997,
+         "python_seconds": 0.027680000017141992,
          "python_note": "python_seconds is the tool's start and exit, outside its own clock. engine_seconds is tick_roundtrip's own wall time: mapping the source, parsing ITCH, coding and writing the store, and its commit",
          "input": "tick-store ingests the day's ITCH file itself, so its write time holds ITCH parsing. The other systems ingest the columns tools/tick_export wrote from the same day, already parsed, and their times do not. Nothing is subtracted.",
          "input_resident": {
           "pages": 503626,
-          "resident_pages": 503626
+          "resident_pages": 503626,
+          "warms": 1
          },
          "records": 268744780,
          "stored_file_bytes": 1758234758,
-         "tool_peak_rss_bytes": 9391964160,
+         "tool_peak_rss_bytes": 9383444480,
          "flushes": [
           {
            "call": "F_FULLFSYNC",
@@ -1451,9 +1522,33 @@
            "result": 0
           }
          ],
-         "clock_stops": "when tick_roundtrip exits, after the rename that publishes the store and, under device_flush, its flushes"
+         "clock_stops": "when tick_roundtrip exits, after the rename that publishes the store and, under device_flush, its flushes",
+         "engine_only_seconds": 79.949997,
+         "input_at_clock_start": {
+          "files": [
+           "12302019.NASDAQ_ITCH50"
+          ],
+          "pages": 503626,
+          "resident_pages": 503626,
+          "page_size": 16384,
+          "read": "mincore on a fresh mapping, after the input was made ready and just before the write's clock",
+          "made_ready": {
+           "pages": 503626,
+           "resident_pages": 503626,
+           "warms": 1
+          }
+         },
+         "device_read": {
+          "bytes": 0,
+          "counter": "bytes the device read for the processes that did the write: proc_pid_rusage's ri_diskio_bytesread of the worker, of each server process, and of each child the worker ran, read before it was reaped",
+          "slack": 0,
+          "by_process": {
+           "worker": 0,
+           "waited children": 0
+          }
+         }
         },
-        "peak_rss_bytes_client": 9391964160,
+        "peak_rss_bytes_client": 9383444480,
         "peak_rss_bytes_service": 0,
         "clock": "stops when every row is readable and durable for its class"
        },
@@ -1466,7 +1561,7 @@
          "segment_records": 4194304,
          "hot_columns": "the writer's default column specs: the eight hot dictionary columns held to ranked PFOR. Not read back: the footer names each block's codec id, not its dictionary mode",
          "codecs": "each column's codec as docs/store.md lists it, zstd where the writer finds it smaller",
-         "query_worker": "tools/tick_query, one process per store, opened before the clock, path indexed, block CRCs checked",
+         "query_worker": "tools/tick_query, one process per store, path indexed, block CRCs checked; a cold figure adds the open its ready line reports to the query's round trip",
          "kernel_level": "neon",
          "TICK_STORE_SIMD": "neon",
          "threads": "one: the writer and the query worker each run on one thread"
@@ -1510,12 +1605,12 @@
          "stored_matches_expected": true,
          "first_difference": null,
          "store_error": null,
-         "wall_seconds": 21.877931,
-         "peak_rss_bytes": 32157761536,
+         "wall_seconds": 19.693035,
+         "peak_rss_bytes": 32148324352,
          "exit_code": 0
         },
-        "seconds": 40.666319209034555,
-        "peak_rss_bytes": 11286282240,
+        "seconds": 39.13303783399169,
+        "peak_rss_bytes": 11305353216,
         "stored_settings": {
          "checks_passed": 44,
          "store_format": "itch-store-v3",
@@ -1977,7 +2072,7 @@
         "streamed": {
          "windows": "none: tick_export --store reads the whole store in order",
          "rows": 268744780,
-         "write_columns_seconds": 0.0004328739596530795,
+         "write_columns_seconds": 0.00048795799375511706,
          "method": "tick_export --store, every record through the store's read path and the ITCH encoder, straight into one column directory",
          "inputs_evicted_before": {
           "what": "the day's ITCH file and its export",
@@ -2042,21 +2137,61 @@
          "neon": 107832,
          "avx2": 0
         },
-        "digest_ns": 99514583,
+        "digest_ns": 97469375,
         "method": "tools/tick_query's own counters for the last repetition: stored bytes and values decoded, segments and blocks read"
        },
        "warm": {
         "n": 30,
-        "median_us": 107093.56248844415,
-        "p99_us": 128463.54197245091,
-        "mean_us": 108028.13476960485,
-        "min_us": 106037.41696104407,
-        "max_us": 128463.54197245091,
+        "median_us": 104892.6250077784,
+        "tail_us": 109621.66701210663,
+        "tail_rank": 30,
+        "tail_is_slowest": true,
+        "tail": "slowest of 30",
+        "p99_us": 109621.66701210663,
+        "mean_us": 104812.41386636005,
+        "min_us": 101885.45798882842,
+        "max_us": 109621.66701210663,
+        "seconds_by_repetition": [
+         0.10736591700697318,
+         0.10815179199562408,
+         0.10568829198018648,
+         0.10495425001136027,
+         0.10430879198247567,
+         0.10258037497987971,
+         0.10188545798882842,
+         0.10425891599152237,
+         0.10206858301535249,
+         0.10588899999856949,
+         0.10962166701210663,
+         0.10691783297806978,
+         0.10609720798674971,
+         0.1021924160013441,
+         0.10508891701465473,
+         0.1063734169874806,
+         0.10515404198667966,
+         0.10586862498894334,
+         0.10361662501236424,
+         0.10386412500520237,
+         0.10369804099900648,
+         0.10336233300040476,
+         0.1039877499861177,
+         0.10204991701175459,
+         0.10279487501247786,
+         0.1062167500203941,
+         0.1057922920153942,
+         0.10566712499712594,
+         0.10483100000419654,
+         0.10402608301956207
+        ],
+        "warm_up_seconds": [
+         0.12099949998082593
+        ],
         "proof": {
          "method": "mincore on a fresh mapping of every store file",
          "pages": 107315,
          "resident_before": 107315,
-         "resident_after": 107315
+         "resident_after": 107315,
+         "warm_up_runs": 1
         },
         "swap_timed": {
          "pages_in": 0,
@@ -2065,20 +2200,69 @@
         },
         "engine": {
          "n": 30,
-         "median_us": 107015.1245,
-         "p99_us": 128308.333,
-         "mean_us": 107936.79026666666,
-         "min_us": 105960.416,
-         "max_us": 128308.333
+         "median_us": 104808.64600000001,
+         "tail_us": 109545.958,
+         "tail_rank": 30,
+         "tail_is_slowest": true,
+         "tail": "slowest of 30",
+         "p99_us": 109545.958,
+         "mean_us": 104731.12086666666,
+         "min_us": 101801.583,
+         "max_us": 109545.958,
+         "seconds_by_repetition": [
+          0.107249459,
+          0.108065,
+          0.105603459,
+          0.104872459,
+          0.104227875,
+          0.102507834,
+          0.101801583,
+          0.104180333,
+          0.101990959,
+          0.105816166,
+          0.109545958,
+          0.10682825,
+          0.106020083,
+          0.102107042,
+          0.105009458,
+          0.1062945,
+          0.105070417,
+          0.105788916,
+          0.1035325,
+          0.103792958,
+          0.103617375,
+          0.103291208,
+          0.103909917,
+          0.101966042,
+          0.102714875,
+          0.106132708,
+          0.105717125,
+          0.105587959,
+          0.104744833,
+          0.103946375
+         ]
         }
        },
        "cold": {
         "n": 7,
-        "median_us": 166223.2920061797,
-        "p99_us": 172983.7500024587,
-        "mean_us": 166819.81542413787,
-        "min_us": 164166.49997700006,
-        "max_us": 172983.7500024587,
+        "median_us": 173604.4589977562,
+        "tail_us": 181456.00000256745,
+        "tail_rank": 7,
+        "tail_is_slowest": true,
+        "tail": "slowest of 7",
+        "p99_us": 181456.00000256745,
+        "mean_us": 174092.3691462673,
+        "min_us": 170044.2080133291,
+        "max_us": 181456.00000256745,
+        "seconds_by_repetition": [
+         0.17165779201193154,
+         0.17360445899775623,
+         0.18145600000256745,
+         0.1723129590051627,
+         0.1752558749917416,
+         0.17431529100138266,
+         0.1700442080133291
+        ],
         "proofs": [
          {
           "evicted_pages": 107315,
@@ -2088,10 +2272,48 @@
           "eviction_attempts": 1,
           "eviction_waited_seconds": 1.1,
           "resident_bytes_after_run": 34537472,
-          "device_bytes_read": 40758149,
+          "device_bytes_read": 34550580,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
+         },
+         {
+          "evicted_pages": 107315,
+          "resident_after_eviction": 0,
+          "eviction_passes": 1,
+          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
+          "eviction_attempts": 1,
+          "eviction_waited_seconds": 1.1,
+          "resident_bytes_after_run": 34537472,
+          "device_bytes_read": 35284582,
+          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
+          "device_slack": 20972,
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
+         },
+         {
+          "evicted_pages": 107315,
+          "resident_after_eviction": 0,
+          "eviction_passes": 1,
+          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
+          "eviction_attempts": 1,
+          "eviction_waited_seconds": 1.1,
+          "resident_bytes_after_run": 34537472,
+          "device_bytes_read": 34550580,
+          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
+          "device_slack": 20972,
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
          },
          {
           "evicted_pages": 107315,
@@ -2104,7 +2326,11 @@
           "device_bytes_read": 34550579,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
          },
          {
           "evicted_pages": 107315,
@@ -2117,7 +2343,11 @@
           "device_bytes_read": 34550579,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
          },
          {
           "evicted_pages": 107315,
@@ -2127,10 +2357,14 @@
           "eviction_attempts": 1,
           "eviction_waited_seconds": 1.1,
           "resident_bytes_after_run": 34537472,
-          "device_bytes_read": 34949038,
+          "device_bytes_read": 34561065,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
          },
          {
           "evicted_pages": 107315,
@@ -2140,36 +2374,14 @@
           "eviction_attempts": 1,
           "eviction_waited_seconds": 1.1,
           "resident_bytes_after_run": 34537472,
-          "device_bytes_read": 34540093,
+          "device_bytes_read": 34550580,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
-         },
-         {
-          "evicted_pages": 107315,
-          "resident_after_eviction": 0,
-          "eviction_passes": 1,
-          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
-          "eviction_attempts": 1,
-          "eviction_waited_seconds": 1.1,
-          "resident_bytes_after_run": 34537472,
-          "device_bytes_read": 34550579,
-          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
-          "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
-         },
-         {
-          "evicted_pages": 107315,
-          "resident_after_eviction": 0,
-          "eviction_passes": 1,
-          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
-          "eviction_attempts": 1,
-          "eviction_waited_seconds": 1.1,
-          "resident_bytes_after_run": 34537472,
-          "device_bytes_read": 34550579,
-          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
-          "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
          }
         ],
         "run_again_refilled_pages": [],
@@ -2189,11 +2401,45 @@
         },
         "engine": {
          "n": 7,
-         "median_us": 166096.875,
-         "p99_us": 172830.25,
-         "mean_us": 166690.1727142857,
-         "min_us": 164047.0,
-         "max_us": 172830.25
+         "median_us": 163904.041,
+         "tail_us": 172335.0,
+         "tail_rank": 7,
+         "tail_is_slowest": true,
+         "tail": "slowest of 7",
+         "p99_us": 172335.0,
+         "mean_us": 164778.23799999998,
+         "min_us": 160761.0,
+         "max_us": 172335.0,
+         "seconds_by_repetition": [
+          0.162532083,
+          0.163904041,
+          0.172335,
+          0.1628915,
+          0.165974667,
+          0.165049375,
+          0.160761
+         ]
+        },
+        "parts": {
+         "open_seconds_by_repetition": [
+          0.008996,
+          0.009556625,
+          0.008979666,
+          0.009300417,
+          0.009142417,
+          0.009121708,
+          0.009144708
+         ],
+         "query_seconds_by_repetition": [
+          0.16266179201193154,
+          0.16404783399775624,
+          0.17247633400256746,
+          0.16301254200516269,
+          0.1661134579917416,
+          0.16519358300138265,
+          0.1608995000133291
+         ],
+         "what": "each cold figure is the open the engine reported plus the query's round trip"
         }
        }
       },
@@ -2218,21 +2464,61 @@
          "neon": 30121,
          "avx2": 0
         },
-        "digest_ns": 135690417,
+        "digest_ns": 133411541,
         "method": "tools/tick_query's own counters for the last repetition: stored bytes and values decoded, segments and blocks read"
        },
        "warm": {
         "n": 30,
-        "median_us": 25793.812470510602,
-        "p99_us": 30279.20809108764,
-        "mean_us": 25954.038902030636,
-        "min_us": 25635.95795072615,
-        "max_us": 30279.20809108764,
+        "median_us": 25277.79150113929,
+        "tail_us": 26555.207994533703,
+        "tail_rank": 30,
+        "tail_is_slowest": true,
+        "tail": "slowest of 30",
+        "p99_us": 26555.207994533703,
+        "mean_us": 25333.474999448903,
+        "min_us": 24587.45799958706,
+        "max_us": 26555.207994533703,
+        "seconds_by_repetition": [
+         0.02487616697908379,
+         0.0247581250150688,
+         0.026555207994533703,
+         0.026150374993449077,
+         0.026122790994122624,
+         0.025065875001018867,
+         0.0253469169838354,
+         0.02483149999170564,
+         0.02610004198504612,
+         0.025730458000907674,
+         0.025914625002769753,
+         0.02488429198274389,
+         0.025276290980400518,
+         0.024892082990845665,
+         0.02458745799958706,
+         0.024874917027773336,
+         0.0250837090134155,
+         0.025204917008522898,
+         0.02567825000733137,
+         0.025388082984136418,
+         0.025162041012663394,
+         0.025366083020344377,
+         0.024602374993264675,
+         0.024913458997616544,
+         0.025559500005329028,
+         0.025526665995130315,
+         0.02551524998852983,
+         0.025836292013991624,
+         0.024921208998421207,
+         0.025279292021878064
+        ],
+        "warm_up_seconds": [
+         0.028614665992790833
+        ],
         "proof": {
          "method": "mincore on a fresh mapping of every store file",
          "pages": 107315,
          "resident_before": 107315,
-         "resident_after": 107315
+         "resident_after": 107315,
+         "warm_up_runs": 1
         },
         "swap_timed": {
          "pages_in": 0,
@@ -2241,20 +2527,69 @@
         },
         "engine": {
          "n": 30,
-         "median_us": 25711.3125,
-         "p99_us": 30160.916999999998,
-         "mean_us": 25873.7847,
-         "min_us": 25557.75,
-         "max_us": 30160.916999999998
+         "median_us": 25211.167,
+         "tail_us": 26476.583000000002,
+         "tail_rank": 30,
+         "tail_is_slowest": true,
+         "tail": "slowest of 30",
+         "p99_us": 26476.583000000002,
+         "mean_us": 25261.74726666667,
+         "min_us": 24520.625,
+         "max_us": 26476.583000000002,
+         "seconds_by_repetition": [
+          0.024784125,
+          0.024692292,
+          0.026476583,
+          0.026070667,
+          0.026039667,
+          0.024996917,
+          0.025280333,
+          0.024768083,
+          0.026031,
+          0.025650042,
+          0.02582,
+          0.02481275,
+          0.0252125,
+          0.024824541,
+          0.024520625,
+          0.024809958,
+          0.025025167,
+          0.025141125,
+          0.025601,
+          0.02532075,
+          0.02508925,
+          0.025293042,
+          0.024538459,
+          0.024850875,
+          0.025484458,
+          0.025454166,
+          0.025438583,
+          0.025765584,
+          0.024850042,
+          0.025209834
+         ]
         }
        },
        "cold": {
         "n": 7,
-        "median_us": 106244.20794192702,
-        "p99_us": 110636.24999951571,
-        "mean_us": 106865.04155663509,
-        "min_us": 105825.74992440641,
-        "max_us": 110636.24999951571,
+        "median_us": 116071.08199419528,
+        "tail_us": 120991.70802386364,
+        "tail_rank": 7,
+        "tail_is_slowest": true,
+        "tail": "slowest of 7",
+        "p99_us": 120991.70802386364,
+        "mean_us": 116788.29142998722,
+        "min_us": 115717.74998885077,
+        "max_us": 120991.70802386364,
+        "seconds_by_repetition": [
+         0.11596445901618396,
+         0.11585362599051298,
+         0.11607108199419527,
+         0.11667770699971242,
+         0.11624170799659136,
+         0.11571774998885077,
+         0.12099170802386364
+        ],
         "proofs": [
          {
           "evicted_pages": 107315,
@@ -2264,10 +2599,14 @@
           "eviction_attempts": 1,
           "eviction_waited_seconds": 1.1,
           "resident_bytes_after_run": 37437440,
-          "device_bytes_read": 37455135,
+          "device_bytes_read": 37444649,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
          },
          {
           "evicted_pages": 107315,
@@ -2277,10 +2616,14 @@
           "eviction_attempts": 1,
           "eviction_waited_seconds": 1.1,
           "resident_bytes_after_run": 37437440,
-          "device_bytes_read": 40611348,
+          "device_bytes_read": 37455134,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
          },
          {
           "evicted_pages": 107315,
@@ -2293,7 +2636,11 @@
           "device_bytes_read": 37444649,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
          },
          {
           "evicted_pages": 107315,
@@ -2306,20 +2653,11 @@
           "device_bytes_read": 37444649,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
-         },
-         {
-          "evicted_pages": 107315,
-          "resident_after_eviction": 0,
-          "eviction_passes": 1,
-          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
-          "eviction_attempts": 1,
-          "eviction_waited_seconds": 1.1,
-          "resident_bytes_after_run": 37437440,
-          "device_bytes_read": 38273024,
-          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
-          "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
          },
          {
           "evicted_pages": 107315,
@@ -2332,7 +2670,11 @@
           "device_bytes_read": 37444649,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
          },
          {
           "evicted_pages": 107315,
@@ -2342,10 +2684,31 @@
           "eviction_attempts": 1,
           "eviction_waited_seconds": 1.1,
           "resident_bytes_after_run": 37437440,
-          "device_bytes_read": 43452989,
+          "device_bytes_read": 37444649,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
+         },
+         {
+          "evicted_pages": 107315,
+          "resident_after_eviction": 0,
+          "eviction_passes": 1,
+          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
+          "eviction_attempts": 1,
+          "eviction_waited_seconds": 1.1,
+          "resident_bytes_after_run": 37437440,
+          "device_bytes_read": 37444649,
+          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
+          "device_slack": 20972,
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
          }
         ],
         "run_again_refilled_pages": [],
@@ -2365,11 +2728,45 @@
         },
         "engine": {
          "n": 7,
-         "median_us": 106128.45899999999,
-         "p99_us": 110511.334,
-         "mean_us": 106745.11914285715,
-         "min_us": 105713.75,
-         "max_us": 110511.334
+         "median_us": 106606.459,
+         "tail_us": 111728.625,
+         "tail_rank": 7,
+         "tail_is_slowest": true,
+         "tail": "slowest of 7",
+         "p99_us": 111728.625,
+         "mean_us": 107371.36328571428,
+         "min_us": 106193.459,
+         "max_us": 111728.625,
+         "seconds_by_repetition": [
+          0.106606459,
+          0.10630075,
+          0.106865708,
+          0.107354458,
+          0.106550084,
+          0.106193459,
+          0.111728625
+         ]
+        },
+        "parts": {
+         "open_seconds_by_repetition": [
+          0.009224167,
+          0.009414834,
+          0.009082791,
+          0.009184166,
+          0.009557958,
+          0.009383292,
+          0.009086666
+         ],
+         "query_seconds_by_repetition": [
+          0.10674029201618396,
+          0.10643879199051298,
+          0.10698829099419527,
+          0.10749354099971242,
+          0.10668374999659136,
+          0.10633445798885077,
+          0.11190504202386364
+         ],
+         "what": "each cold figure is the open the engine reported plus the query's round trip"
         }
        }
       },
@@ -2394,21 +2791,61 @@
          "neon": 21539,
          "avx2": 0
         },
-        "digest_ns": 12333,
+        "digest_ns": 11250,
         "method": "tools/tick_query's own counters for the last repetition: stored bytes and values decoded, segments and blocks read"
        },
        "warm": {
         "n": 30,
-        "median_us": 14694.937504827976,
-        "p99_us": 15304.583008401096,
-        "mean_us": 14746.83329773446,
-        "min_us": 14526.166021823883,
-        "max_us": 15304.583008401096,
+        "median_us": 15062.499995110556,
+        "tail_us": 15288.750000763685,
+        "tail_rank": 30,
+        "tail_is_slowest": true,
+        "tail": "slowest of 30",
+        "p99_us": 15288.750000763685,
+        "mean_us": 14905.24459804874,
+        "min_us": 13771.042024018243,
+        "max_us": 15288.750000763685,
+        "seconds_by_repetition": [
+         0.014559458999428898,
+         0.013771042024018243,
+         0.01431283398414962,
+         0.014056458981940523,
+         0.014214416994946077,
+         0.014763916988158599,
+         0.015098291973117739,
+         0.015091291978023946,
+         0.01507937500718981,
+         0.014954792015487328,
+         0.015227583993691951,
+         0.01510404099826701,
+         0.0151268329937011,
+         0.01500258399755694,
+         0.014634040999226272,
+         0.014940458000637591,
+         0.01495116701698862,
+         0.015141209005378187,
+         0.015134875022340566,
+         0.014884125004755333,
+         0.015176375018199906,
+         0.015090083994437009,
+         0.015143124997848645,
+         0.015123249992029741,
+         0.015045624983031303,
+         0.015022333012893796,
+         0.014984958979766816,
+         0.015288750000763685,
+         0.01511845798813738,
+         0.015115582995349541
+        ],
+        "warm_up_seconds": [
+         0.014140999992378056
+        ],
         "proof": {
          "method": "mincore on a fresh mapping of every store file",
          "pages": 107315,
          "resident_before": 107315,
-         "resident_after": 107315
+         "resident_after": 107315,
+         "warm_up_runs": 1
         },
         "swap_timed": {
          "pages_in": 0,
@@ -2417,20 +2854,69 @@
         },
         "engine": {
          "n": 30,
-         "median_us": 14649.562500000002,
-         "p99_us": 15246.208,
-         "mean_us": 14699.770833333332,
-         "min_us": 14490.833999999999,
-         "max_us": 15246.208
+         "median_us": 15002.041500000001,
+         "tail_us": 15231.458999999999,
+         "tail_rank": 30,
+         "tail_is_slowest": true,
+         "tail": "slowest of 30",
+         "p99_us": 15231.458999999999,
+         "mean_us": 14844.492933333333,
+         "min_us": 13733.957999999999,
+         "max_us": 15231.458999999999,
+         "seconds_by_repetition": [
+          0.0144755,
+          0.013733958,
+          0.014272541,
+          0.014016708,
+          0.01416725,
+          0.014693792,
+          0.015034042,
+          0.015018916,
+          0.015013708,
+          0.014891584,
+          0.015150084,
+          0.015037416,
+          0.015065541,
+          0.014935417,
+          0.014573916,
+          0.014879375,
+          0.014886875,
+          0.015075666,
+          0.015074708,
+          0.014828084,
+          0.015115416,
+          0.015023042,
+          0.015078583,
+          0.015063583,
+          0.014990375,
+          0.014967541,
+          0.014931833,
+          0.015231459,
+          0.015056375,
+          0.0150515
+         ]
         }
        },
        "cold": {
         "n": 7,
-        "median_us": 52782.249986194074,
-        "p99_us": 53796.20799794793,
-        "mean_us": 52958.07131499585,
-        "min_us": 52617.000066675246,
-        "max_us": 53796.20799794793,
+        "median_us": 63107.95798168647,
+        "tail_us": 66059.74997901673,
+        "tail_rank": 7,
+        "tail_is_slowest": true,
+        "tail": "slowest of 7",
+        "p99_us": 66059.74997901673,
+        "mean_us": 63310.43428236302,
+        "min_us": 61884.16600142792,
+        "max_us": 66059.74997901673,
+        "seconds_by_repetition": [
+         0.06382604201580398,
+         0.06605974997901673,
+         0.06246949999308829,
+         0.06310795798168647,
+         0.06321420699494032,
+         0.06188416600142792,
+         0.0626114170105774
+        ],
         "proofs": [
          {
           "evicted_pages": 107315,
@@ -2440,36 +2926,14 @@
           "eviction_attempts": 1,
           "eviction_waited_seconds": 1.1,
           "resident_bytes_after_run": 22134784,
-          "device_bytes_read": 22135439,
+          "device_bytes_read": 22145925,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
-         },
-         {
-          "evicted_pages": 107315,
-          "resident_after_eviction": 0,
-          "eviction_passes": 1,
-          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
-          "eviction_attempts": 1,
-          "eviction_waited_seconds": 1.1,
-          "resident_bytes_after_run": 22134784,
-          "device_bytes_read": 22135439,
-          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
-          "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
-         },
-         {
-          "evicted_pages": 107315,
-          "resident_after_eviction": 0,
-          "eviction_passes": 1,
-          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
-          "eviction_attempts": 1,
-          "eviction_waited_seconds": 1.1,
-          "resident_bytes_after_run": 22134784,
-          "device_bytes_read": 22135439,
-          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
-          "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
          },
          {
           "evicted_pages": 107315,
@@ -2482,7 +2946,11 @@
           "device_bytes_read": 22145925,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
          },
          {
           "evicted_pages": 107315,
@@ -2495,20 +2963,11 @@
           "device_bytes_read": 22145925,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
-         },
-         {
-          "evicted_pages": 107315,
-          "resident_after_eviction": 0,
-          "eviction_passes": 1,
-          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
-          "eviction_attempts": 1,
-          "eviction_waited_seconds": 1.1,
-          "resident_bytes_after_run": 22134784,
-          "device_bytes_read": 22135439,
-          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
-          "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
          },
          {
           "evicted_pages": 107315,
@@ -2521,7 +2980,62 @@
           "device_bytes_read": 22145925,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
+         },
+         {
+          "evicted_pages": 107315,
+          "resident_after_eviction": 0,
+          "eviction_passes": 1,
+          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
+          "eviction_attempts": 1,
+          "eviction_waited_seconds": 1.1,
+          "resident_bytes_after_run": 22134784,
+          "device_bytes_read": 22145925,
+          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
+          "device_slack": 20972,
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
+         },
+         {
+          "evicted_pages": 107315,
+          "resident_after_eviction": 0,
+          "eviction_passes": 1,
+          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
+          "eviction_attempts": 1,
+          "eviction_waited_seconds": 1.1,
+          "resident_bytes_after_run": 22134784,
+          "device_bytes_read": 22145925,
+          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
+          "device_slack": 20972,
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
+         },
+         {
+          "evicted_pages": 107315,
+          "resident_after_eviction": 0,
+          "eviction_passes": 1,
+          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
+          "eviction_attempts": 1,
+          "eviction_waited_seconds": 1.1,
+          "resident_bytes_after_run": 22134784,
+          "device_bytes_read": 22145925,
+          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
+          "device_slack": 20972,
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
          }
         ],
         "run_again_refilled_pages": [],
@@ -2541,11 +3055,45 @@
         },
         "engine": {
          "n": 7,
-         "median_us": 52685.75,
-         "p99_us": 53666.25,
-         "mean_us": 52841.66657142857,
-         "min_us": 52503.458000000006,
-         "max_us": 53666.25
+         "median_us": 53877.041,
+         "tail_us": 56299.958999999995,
+         "tail_rank": 7,
+         "tail_is_slowest": true,
+         "tail": "slowest of 7",
+         "p99_us": 56299.958999999995,
+         "mean_us": 53896.97014285714,
+         "min_us": 52371.333,
+         "max_us": 56299.958999999995,
+         "seconds_by_repetition": [
+          0.054371417,
+          0.056299959,
+          0.053193208,
+          0.053877041,
+          0.053985666,
+          0.052371333,
+          0.053180167
+         ]
+        },
+        "parts": {
+         "open_seconds_by_repetition": [
+          0.00928125,
+          0.009608708,
+          0.009163167,
+          0.009103208,
+          0.009097791,
+          0.00941425,
+          0.009328625
+         ],
+         "query_seconds_by_repetition": [
+          0.05454479201580398,
+          0.056451041979016736,
+          0.05330633299308829,
+          0.05400474998168647,
+          0.054116415994940326,
+          0.05246991600142792,
+          0.053282792010577396
+         ],
+         "what": "each cold figure is the open the engine reported plus the query's round trip"
         }
        }
       },
@@ -2570,21 +3118,61 @@
          "neon": 102050,
          "avx2": 0
         },
-        "digest_ns": 69250,
+        "digest_ns": 67834,
         "method": "tools/tick_query's own counters for the last repetition: stored bytes and values decoded, segments and blocks read"
        },
        "warm": {
         "n": 30,
-        "median_us": 78922.70799493417,
-        "p99_us": 79620.83304300904,
-        "mean_us": 78893.6623876604,
-        "min_us": 78352.33304649591,
-        "max_us": 79620.83304300904,
+        "median_us": 76551.35450477246,
+        "tail_us": 78430.33300014213,
+        "tail_rank": 30,
+        "tail_is_slowest": true,
+        "tail": "slowest of 30",
+        "p99_us": 78430.33300014213,
+        "mean_us": 76557.32783023268,
+        "min_us": 74685.16597873531,
+        "max_us": 78430.33300014213,
+        "seconds_by_repetition": [
+         0.07706162499380298,
+         0.07681016699643806,
+         0.07624433300225064,
+         0.07652708402019925,
+         0.07638145898818038,
+         0.07579637499293312,
+         0.0774448339943774,
+         0.07749716698890552,
+         0.07843033300014213,
+         0.0784083750040736,
+         0.07832062500528991,
+         0.07599858299363405,
+         0.0779585000127554,
+         0.07672612500027753,
+         0.07689100000425242,
+         0.07652679199236445,
+         0.07606074999785051,
+         0.07657562498934567,
+         0.07541762499022298,
+         0.07568737500696443,
+         0.07597395798075013,
+         0.07716616601101123,
+         0.07524766697315499,
+         0.07468516597873531,
+         0.07482166698900983,
+         0.07727087498642504,
+         0.07723079199786298,
+         0.0748996670008637,
+         0.07701750000705943,
+         0.07564162500784732
+        ],
+        "warm_up_seconds": [
+         0.08108674999675713
+        ],
         "proof": {
          "method": "mincore on a fresh mapping of every store file",
          "pages": 107315,
          "resident_before": 107315,
-         "resident_after": 107315
+         "resident_after": 107315,
+         "warm_up_runs": 1
         },
         "swap_timed": {
          "pages_in": 0,
@@ -2593,20 +3181,69 @@
         },
         "engine": {
          "n": 30,
-         "median_us": 78856.354,
-         "p99_us": 79555.667,
-         "mean_us": 78824.92923333334,
-         "min_us": 78287.917,
-         "max_us": 79555.667
+         "median_us": 76492.5835,
+         "tail_us": 78360.042,
+         "tail_rank": 30,
+         "tail_is_slowest": true,
+         "tail": "slowest of 30",
+         "p99_us": 78360.042,
+         "mean_us": 76490.70700000001,
+         "min_us": 74622.584,
+         "max_us": 78360.042,
+         "seconds_by_repetition": [
+          0.076946208,
+          0.076749375,
+          0.076177083,
+          0.076468125,
+          0.076316458,
+          0.075725666,
+          0.077377,
+          0.077421958,
+          0.078360042,
+          0.07834075,
+          0.078253917,
+          0.075933584,
+          0.07789075,
+          0.076662833,
+          0.076824959,
+          0.076459042,
+          0.075988917,
+          0.076517042,
+          0.075351625,
+          0.075626875,
+          0.075911334,
+          0.077100958,
+          0.075187166,
+          0.074622584,
+          0.074763125,
+          0.077206167,
+          0.077168542,
+          0.074833917,
+          0.076960625,
+          0.075574583
+         ]
         }
        },
        "cold": {
         "n": 7,
-        "median_us": 133212.62504905462,
-        "p99_us": 134599.1250127554,
-        "mean_us": 133625.36313278333,
-        "min_us": 133098.79193548113,
-        "max_us": 134599.1250127554,
+        "median_us": 135822.54100032468,
+        "tail_us": 138015.5840146106,
+        "tail_rank": 7,
+        "tail_is_slowest": true,
+        "tail": "slowest of 7",
+        "p99_us": 138015.5840146106,
+        "mean_us": 136156.71414527905,
+        "min_us": 134915.12499625722,
+        "max_us": 138015.5840146106,
+        "seconds_by_repetition": [
+         0.13750166600159314,
+         0.13528041700081955,
+         0.13587158302174696,
+         0.13569008298160135,
+         0.1349151249962572,
+         0.1380155840146106,
+         0.13582254100032468
+        ],
         "proofs": [
          {
           "evicted_pages": 107315,
@@ -2619,7 +3256,45 @@
           "device_bytes_read": 34508636,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
+         },
+         {
+          "evicted_pages": 107315,
+          "resident_after_eviction": 0,
+          "eviction_passes": 1,
+          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
+          "eviction_attempts": 1,
+          "eviction_waited_seconds": 1.1,
+          "resident_bytes_after_run": 34504704,
+          "device_bytes_read": 34508636,
+          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
+          "device_slack": 20972,
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
+         },
+         {
+          "evicted_pages": 107315,
+          "resident_after_eviction": 0,
+          "eviction_passes": 1,
+          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
+          "eviction_attempts": 1,
+          "eviction_waited_seconds": 1.1,
+          "resident_bytes_after_run": 34504704,
+          "device_bytes_read": 34917581,
+          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
+          "device_slack": 20972,
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
          },
          {
           "evicted_pages": 107315,
@@ -2632,7 +3307,11 @@
           "device_bytes_read": 34508637,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
          },
          {
           "evicted_pages": 107315,
@@ -2645,20 +3324,11 @@
           "device_bytes_read": 34508636,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
-         },
-         {
-          "evicted_pages": 107315,
-          "resident_after_eviction": 0,
-          "eviction_passes": 1,
-          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
-          "eviction_attempts": 1,
-          "eviction_waited_seconds": 1.1,
-          "resident_bytes_after_run": 34504704,
-          "device_bytes_read": 34508636,
-          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
-          "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
          },
          {
           "evicted_pages": 107315,
@@ -2671,20 +3341,11 @@
           "device_bytes_read": 34519122,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
-         },
-         {
-          "evicted_pages": 107315,
-          "resident_after_eviction": 0,
-          "eviction_passes": 1,
-          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
-          "eviction_attempts": 1,
-          "eviction_waited_seconds": 1.1,
-          "resident_bytes_after_run": 34504704,
-          "device_bytes_read": 34519122,
-          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
-          "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
          },
          {
           "evicted_pages": 107315,
@@ -2697,7 +3358,11 @@
           "device_bytes_read": 34508636,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
          }
         ],
         "run_again_refilled_pages": [],
@@ -2717,11 +3382,45 @@
         },
         "engine": {
          "n": 7,
-         "median_us": 133104.584,
-         "p99_us": 134475.333,
-         "mean_us": 133511.30971428572,
-         "min_us": 132987.666,
-         "max_us": 134475.333
+         "median_us": 126674.333,
+         "tail_us": 128850.54200000002,
+         "tail_rank": 7,
+         "tail_is_slowest": true,
+         "tail": "slowest of 7",
+         "p99_us": 128850.54200000002,
+         "mean_us": 127056.25000000001,
+         "min_us": 125917.625,
+         "max_us": 128850.54200000002,
+         "seconds_by_repetition": [
+          0.128850542,
+          0.125917625,
+          0.126693375,
+          0.126147625,
+          0.126674333,
+          0.128750958,
+          0.126359292
+         ]
+        },
+        "parts": {
+         "open_seconds_by_repetition": [
+          0.008538333,
+          0.009259792,
+          0.009065125,
+          0.009424,
+          0.008131584,
+          0.009149459,
+          0.009339958
+         ],
+         "query_seconds_by_repetition": [
+          0.12896333300159313,
+          0.12602062500081956,
+          0.12680645802174695,
+          0.12626608298160136,
+          0.12678354099625722,
+          0.1288661250146106,
+          0.12648258300032467
+         ],
+         "what": "each cold figure is the open the engine reported plus the query's round trip"
         }
        }
       },
@@ -2746,21 +3445,61 @@
          "neon": 747568,
          "avx2": 0
         },
-        "digest_ns": 542,
+        "digest_ns": 500,
         "method": "tools/tick_query's own counters for the last repetition: stored bytes and values decoded, segments and blocks read"
        },
        "warm": {
         "n": 30,
-        "median_us": 282884.45802172646,
-        "p99_us": 288401.0410634801,
-        "mean_us": 283367.25836076465,
-        "min_us": 282032.5830252841,
-        "max_us": 288401.0410634801,
+        "median_us": 277433.3744891919,
+        "tail_us": 285527.7920025401,
+        "tail_rank": 30,
+        "tail_is_slowest": true,
+        "tail": "slowest of 30",
+        "p99_us": 285527.7920025401,
+        "mean_us": 277529.63606520405,
+        "min_us": 270987.24999814294,
+        "max_us": 285527.7920025401,
+        "seconds_by_repetition": [
+         0.2765592499927152,
+         0.2772723750094883,
+         0.27569691601092927,
+         0.28067708399612457,
+         0.27892954199342057,
+         0.27781162501196377,
+         0.2833046250161715,
+         0.2825185419933405,
+         0.2800050829828251,
+         0.28145787501125596,
+         0.27730441599851474,
+         0.27615508300368674,
+         0.2775623329798691,
+         0.27098724999814294,
+         0.2728832080028951,
+         0.2760442500002682,
+         0.2741927499882877,
+         0.2755285000021104,
+         0.2718873330159113,
+         0.277766209008405,
+         0.27937149998615496,
+         0.27657579199876636,
+         0.2785622079973109,
+         0.2855277920025401,
+         0.2799949999898672,
+         0.28003299998817965,
+         0.2817077910003718,
+         0.2745866249897517,
+         0.27239475000533275,
+         0.27259037498151883
+        ],
+        "warm_up_seconds": [
+         0.28233520800131373
+        ],
         "proof": {
          "method": "mincore on a fresh mapping of every store file",
          "pages": 107315,
          "resident_before": 107315,
-         "resident_after": 107315
+         "resident_after": 107315,
+         "warm_up_runs": 1
         },
         "swap_timed": {
          "pages_in": 0,
@@ -2769,20 +3508,69 @@
         },
         "engine": {
          "n": 30,
-         "median_us": 282815.2295,
-         "p99_us": 288286.875,
-         "mean_us": 283297.68196666666,
-         "min_us": 281955.167,
-         "max_us": 288286.875
+         "median_us": 277373.31249999994,
+         "tail_us": 285468.29099999997,
+         "tail_rank": 30,
+         "tail_is_slowest": true,
+         "tail": "slowest of 30",
+         "p99_us": 285468.29099999997,
+         "mean_us": 277465.21393333335,
+         "min_us": 270930.709,
+         "max_us": 285468.29099999997,
+         "seconds_by_repetition": [
+          0.27644625,
+          0.277205417,
+          0.275637792,
+          0.280613167,
+          0.27886425,
+          0.27775125,
+          0.283242583,
+          0.282456084,
+          0.279935666,
+          0.28139725,
+          0.277245917,
+          0.276087125,
+          0.277500708,
+          0.270930709,
+          0.272826167,
+          0.275984917,
+          0.274128208,
+          0.275465292,
+          0.27182375,
+          0.2777045,
+          0.279313625,
+          0.276515,
+          0.278498416,
+          0.285468291,
+          0.279934375,
+          0.279961833,
+          0.281641833,
+          0.274518084,
+          0.272327792,
+          0.272530167
+         ]
         }
        },
        "cold": {
         "n": 7,
-        "median_us": 410517.45892036706,
-        "p99_us": 411235.0420327857,
-        "mean_us": 410590.3157033026,
-        "min_us": 410076.87500678,
-        "max_us": 411235.0420327857,
+        "median_us": 408143.58299565874,
+        "tail_us": 425629.3750068763,
+        "tail_rank": 7,
+        "tail_is_slowest": true,
+        "tail": "slowest of 7",
+        "p99_us": 425629.3750068763,
+        "mean_us": 411989.47028789506,
+        "min_us": 401387.6670006638,
+        "max_us": 425629.3750068763,
+        "seconds_by_repetition": [
+         0.42139062501505203,
+         0.4038670009970937,
+         0.4177925409979647,
+         0.4081435829956587,
+         0.40571550000195633,
+         0.4256293750068763,
+         0.4013876670006638
+        ],
         "proofs": [
          {
           "evicted_pages": 107315,
@@ -2792,49 +3580,14 @@
           "eviction_attempts": 1,
           "eviction_waited_seconds": 1.1,
           "resident_bytes_after_run": 107364352,
-          "device_bytes_read": 107374182,
+          "device_bytes_read": 107437097,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
-         },
-         {
-          "evicted_pages": 107315,
-          "resident_after_eviction": 0,
-          "eviction_passes": 1,
-          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
-          "eviction_attempts": 1,
-          "eviction_waited_seconds": 1.1,
-          "resident_bytes_after_run": 107364352,
-          "device_bytes_read": 107374182,
-          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
-          "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
-         },
-         {
-          "evicted_pages": 107315,
-          "resident_after_eviction": 0,
-          "eviction_passes": 1,
-          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
-          "eviction_attempts": 1,
-          "eviction_waited_seconds": 1.1,
-          "resident_bytes_after_run": 107364352,
-          "device_bytes_read": 107374182,
-          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
-          "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
-         },
-         {
-          "evicted_pages": 107315,
-          "resident_after_eviction": 0,
-          "eviction_passes": 1,
-          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
-          "eviction_attempts": 1,
-          "eviction_waited_seconds": 1.1,
-          "resident_bytes_after_run": 107364352,
-          "device_bytes_read": 107374182,
-          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
-          "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
          },
          {
           "evicted_pages": 107315,
@@ -2847,7 +3600,11 @@
           "device_bytes_read": 107374183,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
          },
          {
           "evicted_pages": 107315,
@@ -2860,7 +3617,11 @@
           "device_bytes_read": 107374182,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
          },
          {
           "evicted_pages": 107315,
@@ -2873,7 +3634,62 @@
           "device_bytes_read": 107374182,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
+         },
+         {
+          "evicted_pages": 107315,
+          "resident_after_eviction": 0,
+          "eviction_passes": 1,
+          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
+          "eviction_attempts": 1,
+          "eviction_waited_seconds": 1.1,
+          "resident_bytes_after_run": 107364352,
+          "device_bytes_read": 108066242,
+          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
+          "device_slack": 20972,
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
+         },
+         {
+          "evicted_pages": 107315,
+          "resident_after_eviction": 0,
+          "eviction_passes": 1,
+          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
+          "eviction_attempts": 1,
+          "eviction_waited_seconds": 1.1,
+          "resident_bytes_after_run": 107364352,
+          "device_bytes_read": 107363697,
+          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
+          "device_slack": 20972,
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
+         },
+         {
+          "evicted_pages": 107315,
+          "resident_after_eviction": 0,
+          "eviction_passes": 1,
+          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
+          "eviction_attempts": 1,
+          "eviction_waited_seconds": 1.1,
+          "resident_bytes_after_run": 107364352,
+          "device_bytes_read": 176653599,
+          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
+          "device_slack": 20972,
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5144576
          }
         ],
         "run_again_refilled_pages": [],
@@ -2893,11 +3709,45 @@
         },
         "engine": {
          "n": 7,
-         "median_us": 410398.54199999996,
-         "p99_us": 411131.416,
-         "mean_us": 410479.39885714283,
-         "min_us": 409960.83300000004,
-         "max_us": 411131.416
+         "median_us": 398811.542,
+         "tail_us": 416083.417,
+         "tail_rank": 7,
+         "tail_is_slowest": true,
+         "tail": "slowest of 7",
+         "p99_us": 416083.417,
+         "mean_us": 402806.04171428573,
+         "min_us": 393073.33300000004,
+         "max_us": 416083.417,
+         "seconds_by_repetition": [
+          0.411934167,
+          0.394701833,
+          0.408580125,
+          0.398811542,
+          0.396457875,
+          0.416083417,
+          0.393073333
+         ]
+        },
+        "parts": {
+         "open_seconds_by_repetition": [
+          0.00934425,
+          0.009052834,
+          0.009097083,
+          0.009217875,
+          0.009143417,
+          0.009417458,
+          0.008208458
+         ],
+         "query_seconds_by_repetition": [
+          0.41204637501505204,
+          0.3948141669970937,
+          0.4086954579979647,
+          0.39892570799565874,
+          0.39657208300195634,
+          0.4162119170068763,
+          0.39317920900066383
+         ],
+         "what": "each cold figure is the open the engine reported plus the query's round trip"
         }
        }
       }
@@ -2905,14 +3755,125 @@
      "query_store_class": "B",
      "python_floor": {
       "n": 100,
-      "median_us": 23.1250305660069,
-      "p99_us": 45.45797128230333,
-      "mean_us": 24.416687665507197,
-      "min_us": 22.165942937135696,
-      "max_us": 72.08297029137611,
+      "median_us": 20.74998337775469,
+      "tail_us": 45.41699308902025,
+      "tail_rank": 99,
+      "tail_is_slowest": false,
+      "tail": "99th percentile, nearest rank: run 99 of 100",
+      "p99_us": 45.41699308902025,
+      "mean_us": 21.834592043887824,
+      "min_us": 16.04101271368563,
+      "max_us": 62.4579843133688,
+      "seconds_by_repetition": [
+       6.24579843133688e-05,
+       4.541699308902025e-05,
+       3.3208983950316906e-05,
+       2.7458008844405413e-05,
+       2.633300027810037e-05,
+       2.3500004317611456e-05,
+       2.3791013518348336e-05,
+       2.204100019298494e-05,
+       2.1665997337549925e-05,
+       1.937500201165676e-05,
+       2.270800177939236e-05,
+       2.1665997337549925e-05,
+       2.0749983377754688e-05,
+       2.3250002413988113e-05,
+       2.1624990040436387e-05,
+       2.8875016141682863e-05,
+       2.0540988771244884e-05,
+       2.2625026758760214e-05,
+       2.066700835712254e-05,
+       2.041601692326367e-05,
+       2.0832987502217293e-05,
+       2.0750012481585145e-05,
+       1.9875005818903446e-05,
+       2.108400803990662e-05,
+       2.0209001377224922e-05,
+       2.0249979570508003e-05,
+       2.037500962615013e-05,
+       2.1415995433926582e-05,
+       2.0333012798801064e-05,
+       2.087498432956636e-05,
+       2.0209001377224922e-05,
+       2.1417014067992568e-05,
+       2.0832987502217293e-05,
+       2.1417014067992568e-05,
+       2.025000867433846e-05,
+       2.1333020413294435e-05,
+       1.9917002646252513e-05,
+       2.0584004232659936e-05,
+       2.008400042541325e-05,
+       1.979200169444084e-05,
+       2.0374980522319674e-05,
+       2.170802326872945e-05,
+       2.1041982108727098e-05,
+       2.0292005501687527e-05,
+       2.037500962615013e-05,
+       2.1083018509671092e-05,
+       1.9875005818903446e-05,
+       2.087498432956636e-05,
+       2.0000006770715117e-05,
+       2.0000006770715117e-05,
+       1.824999344535172e-05,
+       2.1790998289361596e-05,
+       2.404101542197168e-05,
+       2.575002145022154e-05,
+       2.058298559859395e-05,
+       2.037500962615013e-05,
+       2.0708015654236078e-05,
+       2.0249979570508003e-05,
+       2.0584004232659936e-05,
+       2.3542001144960523e-05,
+       2.0749983377754688e-05,
+       2.2791995434090495e-05,
+       2.0083010895177722e-05,
+       1.6041012713685632e-05,
+       2.129198401235044e-05,
+       1.77919864654541e-05,
+       2.1916988771408796e-05,
+       2.1124986233189702e-05,
+       2.0584004232659936e-05,
+       2.28749995585531e-05,
+       2.3833010345697403e-05,
+       2.0042003598064184e-05,
+       2.2249994799494743e-05,
+       2.012500772252679e-05,
+       2.1249987185001373e-05,
+       1.9500002963468432e-05,
+       2.1000014385208488e-05,
+       1.9875005818903446e-05,
+       2.0208011846989393e-05,
+       2.0374980522319674e-05,
+       2.1208019461482763e-05,
+       1.9708997569978237e-05,
+       2.0875013433396816e-05,
+       1.9750004867091775e-05,
+       2.0167004549875855e-05,
+       2.0209001377224922e-05,
+       2.1042011212557554e-05,
+       1.9750004867091775e-05,
+       2.0875013433396816e-05,
+       1.979200169444084e-05,
+       2.0042003598064184e-05,
+       2.0249979570508003e-05,
+       2.108400803990662e-05,
+       2.0750012481585145e-05,
+       2.116599353030324e-05,
+       2.037500962615013e-05,
+       2.125001628883183e-05,
+       1.9500002963468432e-05,
+       2.0583014702424407e-05,
+       1.966700074262917e-05
+      ],
       "what": "the same Python call over an empty window: the path's cost, with no data"
      },
-     "query_worker_peak_rss_bytes": 611024896,
+     "warm_worker_open": {
+      "seconds": 0.011882624996360391,
+      "reported_open_seconds": 0.00813975,
+      "what": "the worker's system.open(), timed from Python before any query, and the open the engine reports where it reports one; no warm figure holds it"
+     },
+     "query_worker_peak_rss_bytes": 582205440,
      "swap": {
       "warm_queries": {
        "pages_in": 0,
@@ -2945,7 +3906,7 @@
         "flush": {
          "probe": {
           "rows": 65536,
-          "seconds": 0.018662916962057352,
+          "seconds": 0.02063462499063462,
           "data_dirty_pages": 0,
           "data_dirty_files": {},
           "residual_dirty_files": {},
@@ -3250,31 +4211,77 @@
        "write": {
         "repetitions": 1,
         "seconds": [
-         82.46223854203708
+         77.25819962500827
         ],
-        "seconds_median": 82.46223854203708,
-        "records_per_second_median": 3259004.178779369,
-        "bytes_per_second_median": 100062865.80243209,
-        "engine_seconds": 82.438544,
-        "python_seconds": 0.023694542037091537,
+        "seconds_median": 77.25819962500827,
+        "by_repetition": [
+         {
+          "seconds": 77.25819962500827,
+          "engine_seconds": 77.23088,
+          "python_seconds": 0.027319625008274784,
+          "engine_only_seconds": 77.23088,
+          "input_pages": 503626,
+          "input_resident_pages_at_start": 503626,
+          "device_bytes_read": 0,
+          "device_counter": "bytes the device read for the processes that did the write: proc_pid_rusage's ri_diskio_bytesread of the worker, of each server process, and of each child the worker ran, read before it was reaped",
+          "device_read_by_process": {
+           "worker": 0,
+           "waited children": 0
+          }
+         }
+        ],
+        "times": {
+         "seconds": "tools/tick_roundtrip ingest as a process, from its start to its exit: mapping the day's ITCH file, which is resident before the clock, parsing it, coding and writing the store, its commit and, under class B, its flushes",
+         "engine_only_seconds": "the total less python_seconds, the process's start and exit: tick_roundtrip's own wall time"
+        },
+        "records_per_second_median": 3478527.603599606,
+        "bytes_per_second_median": 106803005.36448225,
+        "engine_seconds": 77.23088,
+        "python_seconds": 0.027319625008274784,
+        "engine_only_seconds_median": 77.23088,
         "python_note": "python_seconds is the tool's start and exit, outside its own clock. engine_seconds is tick_roundtrip's own wall time: mapping the source, parsing ITCH, coding and writing the store, and its commit",
         "detail": {
-         "seconds": 82.46223854203708,
-         "engine_seconds": 82.438544,
-         "python_seconds": 0.023694542037091537,
+         "seconds": 77.25819962500827,
+         "engine_seconds": 77.23088,
+         "python_seconds": 0.027319625008274784,
          "python_note": "python_seconds is the tool's start and exit, outside its own clock. engine_seconds is tick_roundtrip's own wall time: mapping the source, parsing ITCH, coding and writing the store, and its commit",
          "input": "tick-store ingests the day's ITCH file itself, so its write time holds ITCH parsing. The other systems ingest the columns tools/tick_export wrote from the same day, already parsed, and their times do not. Nothing is subtracted.",
          "input_resident": {
           "pages": 503626,
-          "resident_pages": 503626
+          "resident_pages": 503626,
+          "warms": 1
          },
          "records": 268744780,
          "stored_file_bytes": 1808255218,
-         "tool_peak_rss_bytes": 8584445952,
+         "tool_peak_rss_bytes": 8578908160,
          "flushes": [],
-         "clock_stops": "when tick_roundtrip exits, after the rename that publishes the store and, under device_flush, its flushes"
+         "clock_stops": "when tick_roundtrip exits, after the rename that publishes the store and, under device_flush, its flushes",
+         "engine_only_seconds": 77.23088,
+         "input_at_clock_start": {
+          "files": [
+           "12302019.NASDAQ_ITCH50"
+          ],
+          "pages": 503626,
+          "resident_pages": 503626,
+          "page_size": 16384,
+          "read": "mincore on a fresh mapping, after the input was made ready and just before the write's clock",
+          "made_ready": {
+           "pages": 503626,
+           "resident_pages": 503626,
+           "warms": 1
+          }
+         },
+         "device_read": {
+          "bytes": 0,
+          "counter": "bytes the device read for the processes that did the write: proc_pid_rusage's ri_diskio_bytesread of the worker, of each server process, and of each child the worker ran, read before it was reaped",
+          "slack": 0,
+          "by_process": {
+           "worker": 0,
+           "waited children": 0
+          }
+         }
         },
-        "peak_rss_bytes_client": 8584445952,
+        "peak_rss_bytes_client": 8578908160,
         "peak_rss_bytes_service": 0,
         "clock": "stops when every row is readable and durable for its class"
        },
@@ -3287,19 +4294,19 @@
          "segment_records": 1048576,
          "hot_columns": "the writer's default column specs: the eight hot dictionary columns held to ranked PFOR. Not read back: the footer names each block's codec id, not its dictionary mode",
          "codecs": "each column's codec as docs/store.md lists it, zstd where the writer finds it smaller",
-         "query_worker": "tools/tick_query, one process per store, opened before the clock, path indexed, block CRCs checked",
+         "query_worker": "tools/tick_query, one process per store, path indexed, block CRCs checked; a cold figure adds the open its ready line reports to the query's round trip",
          "kernel_level": "neon",
          "TICK_STORE_SIMD": "neon",
          "threads": "one: the writer and the query worker each run on one thread"
         }
        },
        "stored": {
-        "allocated_bytes": 1812447232,
+        "allocated_bytes": 1812439040,
         "apparent_bytes": 1808255218,
         "files": 1,
         "method": "sum of st_blocks * 512 over every file, each inode once",
-        "store_root_allocated_bytes": 1812447232,
-        "ratio_stored_over_source": 0.21965308853815385,
+        "store_root_allocated_bytes": 1812439040,
+        "ratio_stored_over_source": 0.21965209573788386,
         "denominator": "the day's source bytes",
         "measured": "at rest, after commit, service stopped, every file flushed first",
         "settle": {}
@@ -3331,12 +4338,12 @@
          "stored_matches_expected": true,
          "first_difference": null,
          "store_error": null,
-         "wall_seconds": 21.869149,
-         "peak_rss_bytes": 32158826496,
+         "wall_seconds": 19.699609,
+         "peak_rss_bytes": 32149372928,
          "exit_code": 0
         },
-        "seconds": 41.32768266706262,
-        "peak_rss_bytes": 10450665472,
+        "seconds": 38.883743999991566,
+        "peak_rss_bytes": 10425729024,
         "stored_settings": {
          "checks_passed": 44,
          "store_format": "itch-store-v3",
@@ -3799,7 +4806,7 @@
         "streamed": {
          "windows": "none: tick_export --store reads the whole store in order",
          "rows": 268744780,
-         "write_columns_seconds": 0.00044483295641839504,
+         "write_columns_seconds": 0.0004174160130787641,
          "method": "tick_export --store, every record through the store's read path and the ITCH encoder, straight into one column directory",
          "inputs_evicted_before": {
           "what": "the day's ITCH file and its export",
@@ -3835,7 +4842,7 @@
         "flush": {
          "probe": {
           "rows": 65536,
-          "seconds": 0.041282417019829154,
+          "seconds": 0.04107370800920762,
           "data_dirty_pages": 0,
           "data_dirty_files": {},
           "residual_dirty_files": {},
@@ -4168,27 +5175,49 @@
        "write": {
         "repetitions": 1,
         "seconds": [
-         82.6357382920105
+         78.76140633400064
         ],
-        "seconds_median": 82.6357382920105,
-        "records_per_second_median": 3252161.662189483,
-        "bytes_per_second_median": 99852776.52922928,
-        "engine_seconds": 82.608958,
-        "python_seconds": 0.026780292010499807,
+        "seconds_median": 78.76140633400064,
+        "by_repetition": [
+         {
+          "seconds": 78.76140633400064,
+          "engine_seconds": 78.735635,
+          "python_seconds": 0.02577133400063758,
+          "engine_only_seconds": 78.735635,
+          "input_pages": 503626,
+          "input_resident_pages_at_start": 503626,
+          "device_bytes_read": 0,
+          "device_counter": "bytes the device read for the processes that did the write: proc_pid_rusage's ri_diskio_bytesread of the worker, of each server process, and of each child the worker ran, read before it was reaped",
+          "device_read_by_process": {
+           "worker": 0,
+           "waited children": 0
+          }
+         }
+        ],
+        "times": {
+         "seconds": "tools/tick_roundtrip ingest as a process, from its start to its exit: mapping the day's ITCH file, which is resident before the clock, parsing it, coding and writing the store, its commit and, under class B, its flushes",
+         "engine_only_seconds": "the total less python_seconds, the process's start and exit: tick_roundtrip's own wall time"
+        },
+        "records_per_second_median": 3412137.904957458,
+        "bytes_per_second_median": 104764608.62073176,
+        "engine_seconds": 78.735635,
+        "python_seconds": 0.02577133400063758,
+        "engine_only_seconds_median": 78.735635,
         "python_note": "python_seconds is the tool's start and exit, outside its own clock. engine_seconds is tick_roundtrip's own wall time: mapping the source, parsing ITCH, coding and writing the store, and its commit",
         "detail": {
-         "seconds": 82.6357382920105,
-         "engine_seconds": 82.608958,
-         "python_seconds": 0.026780292010499807,
+         "seconds": 78.76140633400064,
+         "engine_seconds": 78.735635,
+         "python_seconds": 0.02577133400063758,
          "python_note": "python_seconds is the tool's start and exit, outside its own clock. engine_seconds is tick_roundtrip's own wall time: mapping the source, parsing ITCH, coding and writing the store, and its commit",
          "input": "tick-store ingests the day's ITCH file itself, so its write time holds ITCH parsing. The other systems ingest the columns tools/tick_export wrote from the same day, already parsed, and their times do not. Nothing is subtracted.",
          "input_resident": {
           "pages": 503626,
-          "resident_pages": 503626
+          "resident_pages": 503626,
+          "warms": 1
          },
          "records": 268744780,
          "stored_file_bytes": 1808255218,
-         "tool_peak_rss_bytes": 8584380416,
+         "tool_peak_rss_bytes": 8566980608,
          "flushes": [
           {
            "call": "F_FULLFSYNC",
@@ -4201,9 +5230,33 @@
            "result": 0
           }
          ],
-         "clock_stops": "when tick_roundtrip exits, after the rename that publishes the store and, under device_flush, its flushes"
+         "clock_stops": "when tick_roundtrip exits, after the rename that publishes the store and, under device_flush, its flushes",
+         "engine_only_seconds": 78.735635,
+         "input_at_clock_start": {
+          "files": [
+           "12302019.NASDAQ_ITCH50"
+          ],
+          "pages": 503626,
+          "resident_pages": 503626,
+          "page_size": 16384,
+          "read": "mincore on a fresh mapping, after the input was made ready and just before the write's clock",
+          "made_ready": {
+           "pages": 503626,
+           "resident_pages": 503626,
+           "warms": 1
+          }
+         },
+         "device_read": {
+          "bytes": 0,
+          "counter": "bytes the device read for the processes that did the write: proc_pid_rusage's ri_diskio_bytesread of the worker, of each server process, and of each child the worker ran, read before it was reaped",
+          "slack": 0,
+          "by_process": {
+           "worker": 0,
+           "waited children": 0
+          }
+         }
         },
-        "peak_rss_bytes_client": 8584380416,
+        "peak_rss_bytes_client": 8566980608,
         "peak_rss_bytes_service": 0,
         "clock": "stops when every row is readable and durable for its class"
        },
@@ -4216,19 +5269,19 @@
          "segment_records": 1048576,
          "hot_columns": "the writer's default column specs: the eight hot dictionary columns held to ranked PFOR. Not read back: the footer names each block's codec id, not its dictionary mode",
          "codecs": "each column's codec as docs/store.md lists it, zstd where the writer finds it smaller",
-         "query_worker": "tools/tick_query, one process per store, opened before the clock, path indexed, block CRCs checked",
+         "query_worker": "tools/tick_query, one process per store, path indexed, block CRCs checked; a cold figure adds the open its ready line reports to the query's round trip",
          "kernel_level": "neon",
          "TICK_STORE_SIMD": "neon",
          "threads": "one: the writer and the query worker each run on one thread"
         }
        },
        "stored": {
-        "allocated_bytes": 1812545536,
+        "allocated_bytes": 1812439040,
         "apparent_bytes": 1808255218,
         "files": 1,
         "method": "sum of st_blocks * 512 over every file, each inode once",
-        "store_root_allocated_bytes": 1812545536,
-        "ratio_stored_over_source": 0.21966500214139395,
+        "store_root_allocated_bytes": 1812439040,
+        "ratio_stored_over_source": 0.21965209573788386,
         "denominator": "the day's source bytes",
         "measured": "at rest, after commit, service stopped, every file flushed first",
         "settle": {}
@@ -4260,12 +5313,12 @@
          "stored_matches_expected": true,
          "first_difference": null,
          "store_error": null,
-         "wall_seconds": 19.749487,
-         "peak_rss_bytes": 32160907264,
+         "wall_seconds": 19.644382,
+         "peak_rss_bytes": 32146227200,
          "exit_code": 0
         },
-        "seconds": 40.6155212080339,
-        "peak_rss_bytes": 10449403904,
+        "seconds": 39.15842762502143,
+        "peak_rss_bytes": 10423238656,
         "stored_settings": {
          "checks_passed": 44,
          "store_format": "itch-store-v3",
@@ -4728,7 +5781,7 @@
         "streamed": {
          "windows": "none: tick_export --store reads the whole store in order",
          "rows": 268744780,
-         "write_columns_seconds": 0.0004141259705647826,
+         "write_columns_seconds": 0.00043887499487027526,
          "method": "tick_export --store, every record through the store's read path and the ITCH encoder, straight into one column directory",
          "inputs_evicted_before": {
           "what": "the day's ITCH file and its export",
@@ -4793,21 +5846,61 @@
          "neon": 28204,
          "avx2": 0
         },
-        "digest_ns": 99718791,
+        "digest_ns": 100645708,
         "method": "tools/tick_query's own counters for the last repetition: stored bytes and values decoded, segments and blocks read"
        },
        "warm": {
         "n": 30,
-        "median_us": 36400.68747336045,
-        "p99_us": 43646.04200236499,
-        "mean_us": 36722.361063584685,
-        "min_us": 36138.6250006035,
-        "max_us": 43646.04200236499,
+        "median_us": 35592.91650890373,
+        "tail_us": 37806.16700532846,
+        "tail_rank": 30,
+        "tail_is_slowest": true,
+        "tail": "slowest of 30",
+        "p99_us": 37806.16700532846,
+        "mean_us": 35778.91106930717,
+        "min_us": 34115.124988602474,
+        "max_us": 37806.16700532846,
+        "seconds_by_repetition": [
+         0.03780616700532846,
+         0.03591449998202734,
+         0.035608209000201896,
+         0.03566304099513218,
+         0.03553845899295993,
+         0.035769417008850724,
+         0.034500125009799376,
+         0.036584500019671395,
+         0.03544883299036883,
+         0.035569333005696535,
+         0.03499995800666511,
+         0.035384290997171775,
+         0.03560400000424124,
+         0.03518866599188186,
+         0.03433137500542216,
+         0.035603958007413894,
+         0.03549816700979136,
+         0.034115124988602474,
+         0.035128084011375904,
+         0.03536941698985174,
+         0.03558187501039356,
+         0.03574187500635162,
+         0.03514950000680983,
+         0.0350933330191765,
+         0.03749937500106171,
+         0.037532332993578166,
+         0.03758220802410506,
+         0.036281832988606766,
+         0.03653716700500809,
+         0.036742208001669496
+        ],
+        "warm_up_seconds": [
+         0.044383500004187226
+        ],
         "proof": {
          "method": "mincore on a fresh mapping of every store file",
          "pages": 110368,
          "resident_before": 110368,
-         "resident_after": 110368
+         "resident_after": 110368,
+         "warm_up_runs": 1
         },
         "swap_timed": {
          "pages_in": 0,
@@ -4816,20 +5909,69 @@
         },
         "engine": {
          "n": 30,
-         "median_us": 36320.875,
-         "p99_us": 43517.792,
-         "mean_us": 36652.04173333333,
-         "min_us": 36078.083,
-         "max_us": 43517.792
+         "median_us": 35524.16649999999,
+         "tail_us": 37660.166000000005,
+         "tail_rank": 30,
+         "tail_is_slowest": true,
+         "tail": "slowest of 30",
+         "p99_us": 37660.166000000005,
+         "mean_us": 35702.374899999995,
+         "min_us": 34057.917,
+         "max_us": 37660.166000000005,
+         "seconds_by_repetition": [
+          0.037660166,
+          0.0358305,
+          0.035534083,
+          0.035580583,
+          0.035462833,
+          0.035695,
+          0.034417958,
+          0.03651475,
+          0.0353795,
+          0.035500041,
+          0.034922625,
+          0.035315083,
+          0.035531333,
+          0.035117333,
+          0.034264625,
+          0.035537291,
+          0.035435709,
+          0.034057917,
+          0.035041375,
+          0.035309,
+          0.035517,
+          0.03566475,
+          0.035077542,
+          0.035023208,
+          0.0374065,
+          0.03746225,
+          0.0374995,
+          0.036197,
+          0.036454792,
+          0.036661
+         ]
         }
        },
        "cold": {
         "n": 7,
-        "median_us": 56326.250080019236,
-        "p99_us": 57358.416030183434,
-        "mean_us": 55805.98829380635,
-        "min_us": 53214.83395528048,
-        "max_us": 57358.416030183434,
+        "median_us": 63217.2499724552,
+        "tail_us": 68232.66598762515,
+        "tail_rank": 7,
+        "tail_is_slowest": true,
+        "tail": "slowest of 7",
+        "p99_us": 68232.66598762515,
+        "mean_us": 64287.86328198768,
+        "min_us": 62409.54300260285,
+        "max_us": 68232.66598762515,
+        "seconds_by_repetition": [
+         0.06450000000933744,
+         0.06654429100254121,
+         0.06246154200664106,
+         0.0626497509927109,
+         0.062409543002602846,
+         0.0632172499724552,
+         0.06823266598762515
+        ],
         "proofs": [
          {
           "evicted_pages": 110368,
@@ -4839,62 +5981,14 @@
           "eviction_attempts": 1,
           "eviction_waited_seconds": 1.1,
           "resident_bytes_after_run": 13565952,
-          "device_bytes_read": 19451085,
-          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
-          "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
-         },
-         {
-          "evicted_pages": 110368,
-          "resident_after_eviction": 0,
-          "eviction_passes": 1,
-          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
-          "eviction_attempts": 1,
-          "eviction_waited_seconds": 1.1,
-          "resident_bytes_after_run": 13565952,
           "device_bytes_read": 13579059,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
-         },
-         {
-          "evicted_pages": 110368,
-          "resident_after_eviction": 0,
-          "eviction_passes": 1,
-          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
-          "eviction_attempts": 1,
-          "eviction_waited_seconds": 1.1,
-          "resident_bytes_after_run": 13565952,
-          "device_bytes_read": 15906898,
-          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
-          "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
-         },
-         {
-          "evicted_pages": 110368,
-          "resident_after_eviction": 0,
-          "eviction_passes": 1,
-          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
-          "eviction_attempts": 1,
-          "eviction_waited_seconds": 1.1,
-          "resident_bytes_after_run": 13565952,
-          "device_bytes_read": 13579059,
-          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
-          "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
-         },
-         {
-          "evicted_pages": 110368,
-          "resident_after_eviction": 0,
-          "eviction_passes": 1,
-          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
-          "eviction_attempts": 1,
-          "eviction_waited_seconds": 1.1,
-          "resident_bytes_after_run": 13565952,
-          "device_bytes_read": 17574134,
-          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
-          "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
          },
          {
           "evicted_pages": 110368,
@@ -4907,7 +6001,11 @@
           "device_bytes_read": 13579060,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
          },
          {
           "evicted_pages": 110368,
@@ -4920,7 +6018,79 @@
           "device_bytes_read": 13579059,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
+         },
+         {
+          "evicted_pages": 110368,
+          "resident_after_eviction": 0,
+          "eviction_passes": 1,
+          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
+          "eviction_attempts": 1,
+          "eviction_waited_seconds": 1.1,
+          "resident_bytes_after_run": 13565952,
+          "device_bytes_read": 13568573,
+          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
+          "device_slack": 20972,
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
+         },
+         {
+          "evicted_pages": 110368,
+          "resident_after_eviction": 0,
+          "eviction_passes": 1,
+          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
+          "eviction_attempts": 1,
+          "eviction_waited_seconds": 1.1,
+          "resident_bytes_after_run": 13565952,
+          "device_bytes_read": 13694403,
+          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
+          "device_slack": 20972,
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
+         },
+         {
+          "evicted_pages": 110368,
+          "resident_after_eviction": 0,
+          "eviction_passes": 1,
+          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
+          "eviction_attempts": 1,
+          "eviction_waited_seconds": 1.1,
+          "resident_bytes_after_run": 13565952,
+          "device_bytes_read": 13579059,
+          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
+          "device_slack": 20972,
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
+         },
+         {
+          "evicted_pages": 110368,
+          "resident_after_eviction": 0,
+          "eviction_passes": 1,
+          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
+          "eviction_attempts": 1,
+          "eviction_waited_seconds": 1.1,
+          "resident_bytes_after_run": 13565952,
+          "device_bytes_read": 13568573,
+          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
+          "device_slack": 20972,
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
          }
         ],
         "run_again_refilled_pages": [],
@@ -4940,11 +6110,45 @@
         },
         "engine": {
          "n": 7,
-         "median_us": 56208.75,
-         "p99_us": 57241.709,
-         "mean_us": 55687.07757142856,
-         "min_us": 53099.542,
-         "max_us": 57241.709
+         "median_us": 54391.917,
+         "tail_us": 59499.625,
+         "tail_rank": 7,
+         "tail_is_slowest": true,
+         "tail": "slowest of 7",
+         "p99_us": 59499.625,
+         "mean_us": 55535.81557142857,
+         "min_us": 53492.75,
+         "max_us": 59499.625,
+         "seconds_by_repetition": [
+          0.055696167,
+          0.057761042,
+          0.05349275,
+          0.053568417,
+          0.054391917,
+          0.054340791,
+          0.059499625
+         ]
+        },
+        "parts": {
+         "open_seconds_by_repetition": [
+          0.008664625,
+          0.008634833,
+          0.008842458,
+          0.008960334,
+          0.007888959,
+          0.008758875,
+          0.008586083
+         ],
+         "query_seconds_by_repetition": [
+          0.05583537500933744,
+          0.057909458002541214,
+          0.05361908400664106,
+          0.0536894169927109,
+          0.054520584002602845,
+          0.054458374972455204,
+          0.05964658298762515
+         ],
+         "what": "each cold figure is the open the engine reported plus the query's round trip"
         }
        }
       },
@@ -4969,21 +6173,61 @@
          "neon": 48583,
          "avx2": 0
         },
-        "digest_ns": 136911750,
+        "digest_ns": 135467125,
         "method": "tools/tick_query's own counters for the last repetition: stored bytes and values decoded, segments and blocks read"
        },
        "warm": {
         "n": 30,
-        "median_us": 36783.646035473794,
-        "p99_us": 41292.95807797462,
-        "mean_us": 36927.36379647007,
-        "min_us": 36609.75000821054,
-        "max_us": 41292.95807797462,
+        "median_us": 35641.81250112597,
+        "tail_us": 37486.16701341234,
+        "tail_rank": 30,
+        "tail_is_slowest": true,
+        "tail": "slowest of 30",
+        "p99_us": 37486.16701341234,
+        "mean_us": 35690.28750159001,
+        "min_us": 34628.29202180728,
+        "max_us": 37486.16701341234,
+        "seconds_by_repetition": [
+         0.035868250008206815,
+         0.03654049997567199,
+         0.03634720799163915,
+         0.03528758298489265,
+         0.035602624993771315,
+         0.03573299999698065,
+         0.03568133298540488,
+         0.03568266599904746,
+         0.035622916999273,
+         0.0348103329888545,
+         0.035660708002978936,
+         0.035620000009657815,
+         0.035600584000349045,
+         0.03462829202180728,
+         0.03485437500057742,
+         0.03497495802002959,
+         0.03507916702073999,
+         0.03497437501209788,
+         0.03464749999693595,
+         0.03552329199737869,
+         0.035581834003096446,
+         0.03593991699744947,
+         0.03674687500461005,
+         0.03748616701341234,
+         0.03577779102488421,
+         0.0354894170013722,
+         0.03608454199275002,
+         0.03572508299839683,
+         0.03685712500009686,
+         0.036280208005337045
+        ],
+        "warm_up_seconds": [
+         0.0402957089827396
+        ],
         "proof": {
          "method": "mincore on a fresh mapping of every store file",
          "pages": 110368,
          "resident_before": 110368,
-         "resident_after": 110368
+         "resident_after": 110368,
+         "warm_up_runs": 1
         },
         "swap_timed": {
          "pages_in": 0,
@@ -4992,20 +6236,69 @@
         },
         "engine": {
          "n": 30,
-         "median_us": 36723.416999999994,
-         "p99_us": 41177.875,
-         "mean_us": 36864.9556,
-         "min_us": 36557.417,
-         "max_us": 41177.875
+         "median_us": 35569.6045,
+         "tail_us": 37408.875,
+         "tail_rank": 30,
+         "tail_is_slowest": true,
+         "tail": "slowest of 30",
+         "p99_us": 37408.875,
+         "mean_us": 35616.49873333333,
+         "min_us": 34562.125,
+         "max_us": 37408.875,
+         "seconds_by_repetition": [
+          0.035752833,
+          0.0364585,
+          0.036266708,
+          0.035213167,
+          0.035531583,
+          0.035666708,
+          0.035611708,
+          0.03561675,
+          0.035547959,
+          0.034744833,
+          0.035586417,
+          0.035552792,
+          0.035535875,
+          0.034565084,
+          0.03478525,
+          0.034906084,
+          0.0350215,
+          0.03491325,
+          0.034562125,
+          0.035453417,
+          0.035517792,
+          0.035860709,
+          0.036675417,
+          0.037408875,
+          0.035695834,
+          0.035419042,
+          0.036004333,
+          0.035646625,
+          0.036774667,
+          0.036199125
+         ]
         }
        },
        "cold": {
         "n": 7,
-        "median_us": 208795.2089495957,
-        "p99_us": 211472.16600365937,
-        "mean_us": 209153.77973246254,
-        "min_us": 207196.7499796301,
-        "max_us": 211472.16600365937,
+        "median_us": 220759.91600275226,
+        "tail_us": 231884.25000257904,
+        "tail_rank": 7,
+        "tail_is_slowest": true,
+        "tail": "slowest of 7",
+        "p99_us": 231884.25000257904,
+        "mean_us": 223332.39871290122,
+        "min_us": 219182.54199131692,
+        "max_us": 231884.25000257904,
+        "seconds_by_repetition": [
+         0.21918254199131693,
+         0.22636812500517703,
+         0.22462300000157337,
+         0.2204213330072457,
+         0.22008762497966422,
+         0.22075991600275227,
+         0.23188425000257903
+        ],
         "proofs": [
          {
           "evicted_pages": 110368,
@@ -5015,10 +6308,14 @@
           "eviction_attempts": 1,
           "eviction_waited_seconds": 1.1,
           "resident_bytes_after_run": 87785472,
-          "device_bytes_read": 88122327,
+          "device_bytes_read": 87786783,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
          },
          {
           "evicted_pages": 110368,
@@ -5028,10 +6325,14 @@
           "eviction_attempts": 1,
           "eviction_waited_seconds": 1.1,
           "resident_bytes_after_run": 87785472,
-          "device_bytes_read": 88027955,
+          "device_bytes_read": 87786782,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
          },
          {
           "evicted_pages": 110368,
@@ -5041,10 +6342,14 @@
           "eviction_attempts": 1,
           "eviction_waited_seconds": 1.1,
           "resident_bytes_after_run": 87785472,
-          "device_bytes_read": 87807755,
+          "device_bytes_read": 88237670,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
          },
          {
           "evicted_pages": 110368,
@@ -5054,10 +6359,14 @@
           "eviction_attempts": 1,
           "eviction_waited_seconds": 1.1,
           "resident_bytes_after_run": 87785472,
-          "device_bytes_read": 87849697,
+          "device_bytes_read": 87902126,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
          },
          {
           "evicted_pages": 110368,
@@ -5067,10 +6376,14 @@
           "eviction_attempts": 1,
           "eviction_waited_seconds": 1.1,
           "resident_bytes_after_run": 87785472,
-          "device_bytes_read": 87797269,
+          "device_bytes_read": 87807754,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
          },
          {
           "evicted_pages": 110368,
@@ -5080,10 +6393,14 @@
           "eviction_attempts": 1,
           "eviction_waited_seconds": 1.1,
           "resident_bytes_after_run": 87785472,
-          "device_bytes_read": 87986012,
+          "device_bytes_read": 87786783,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
          },
          {
           "evicted_pages": 110368,
@@ -5093,10 +6410,14 @@
           "eviction_attempts": 1,
           "eviction_waited_seconds": 1.1,
           "resident_bytes_after_run": 87785472,
-          "device_bytes_read": 87944069,
+          "device_bytes_read": 87786782,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
          }
         ],
         "run_again_refilled_pages": [],
@@ -5116,11 +6437,45 @@
         },
         "engine": {
          "n": 7,
-         "median_us": 208687.25,
-         "p99_us": 211351.708,
-         "mean_us": 209041.92857142858,
-         "min_us": 207097.167,
-         "max_us": 211351.708
+         "median_us": 212421.0,
+         "tail_us": 222860.833,
+         "tail_rank": 7,
+         "tail_is_slowest": true,
+         "tail": "slowest of 7",
+         "p99_us": 222860.833,
+         "mean_us": 214528.94642857142,
+         "min_us": 210358.959,
+         "max_us": 222860.833,
+         "seconds_by_repetition": [
+          0.210358959,
+          0.217139333,
+          0.216029167,
+          0.2116255,
+          0.211267833,
+          0.212421,
+          0.222860833
+         ]
+        },
+        "parts": {
+         "open_seconds_by_repetition": [
+          0.008693834,
+          0.009080416,
+          0.008467583,
+          0.008672583,
+          0.008698417,
+          0.008202375,
+          0.008884584
+         ],
+         "query_seconds_by_repetition": [
+          0.21048870799131691,
+          0.21728770900517702,
+          0.21615541700157337,
+          0.2117487500072457,
+          0.2113892079796642,
+          0.21255754100275226,
+          0.22299966600257903
+         ],
+         "what": "each cold figure is the open the engine reported plus the query's round trip"
         }
        }
       },
@@ -5145,21 +6500,61 @@
          "neon": 27359,
          "avx2": 0
         },
-        "digest_ns": 9083,
+        "digest_ns": 10917,
         "method": "tools/tick_query's own counters for the last repetition: stored bytes and values decoded, segments and blocks read"
        },
        "warm": {
         "n": 30,
-        "median_us": 18236.66598647833,
-        "p99_us": 19074.75001644343,
-        "mean_us": 18331.876420415938,
-        "min_us": 18129.12500463426,
-        "max_us": 19074.75001644343,
+        "median_us": 17837.70849579014,
+        "tail_us": 18362.583010457456,
+        "tail_rank": 30,
+        "tail_is_slowest": true,
+        "tail": "slowest of 30",
+        "p99_us": 18362.583010457456,
+        "mean_us": 17784.84873357229,
+        "min_us": 17070.499976398423,
+        "max_us": 18362.583010457456,
+        "seconds_by_repetition": [
+         0.018304833996808156,
+         0.018362583010457456,
+         0.018128041992895305,
+         0.01800162499421276,
+         0.01791245798813179,
+         0.017755334003595635,
+         0.01762337499530986,
+         0.017858916020486504,
+         0.0177115410042461,
+         0.017641959013417363,
+         0.017774667008779943,
+         0.017657166987191886,
+         0.017987500003073364,
+         0.018000250012846664,
+         0.017070499976398423,
+         0.017772040999261662,
+         0.017763417010428384,
+         0.017861416999949142,
+         0.017843291978351772,
+         0.017832125013228506,
+         0.017367749998811632,
+         0.017443083022953942,
+         0.017855416983366013,
+         0.017942167003639042,
+         0.017880291998153552,
+         0.017911292001372203,
+         0.017851000011432916,
+         0.01725591698777862,
+         0.017497916996944696,
+         0.017677583993645385
+        ],
+        "warm_up_seconds": [
+         0.018455207988154143
+        ],
         "proof": {
          "method": "mincore on a fresh mapping of every store file",
          "pages": 110368,
          "resident_before": 110368,
-         "resident_after": 110368
+         "resident_after": 110368,
+         "warm_up_runs": 1
         },
         "swap_timed": {
          "pages_in": 0,
@@ -5168,20 +6563,69 @@
         },
         "engine": {
          "n": 30,
-         "median_us": 18209.062499999996,
-         "p99_us": 19020.334,
-         "mean_us": 18296.91946666667,
-         "min_us": 18101.542,
-         "max_us": 19020.334
+         "median_us": 17808.958,
+         "tail_us": 18298.291,
+         "tail_rank": 30,
+         "tail_is_slowest": true,
+         "tail": "slowest of 30",
+         "p99_us": 18298.291,
+         "mean_us": 17745.2569,
+         "min_us": 17034.708,
+         "max_us": 18298.291,
+         "seconds_by_repetition": [
+          0.018178208,
+          0.018298291,
+          0.018067292,
+          0.017944084,
+          0.017866875,
+          0.017719459,
+          0.017589916,
+          0.017822667,
+          0.017679958,
+          0.017601,
+          0.01773325,
+          0.017618375,
+          0.017950166,
+          0.017960541,
+          0.017034708,
+          0.017737208,
+          0.017731459,
+          0.017826625,
+          0.017812916,
+          0.017805,
+          0.017329917,
+          0.017408292,
+          0.017824042,
+          0.017913417,
+          0.017851625,
+          0.017882292,
+          0.017822166,
+          0.017227542,
+          0.017470208,
+          0.017650208
+         ]
         }
        },
        "cold": {
         "n": 7,
-        "median_us": 111683.66600759327,
-        "p99_us": 118719.91597581655,
-        "mean_us": 112828.04157651428,
-        "min_us": 111273.8330848515,
-        "max_us": 118719.91597581655,
+        "median_us": 120690.87501456645,
+        "tail_us": 126242.29200372231,
+        "tail_rank": 7,
+        "tail_is_slowest": true,
+        "tail": "slowest of 7",
+        "p99_us": 126242.29200372231,
+        "mean_us": 121344.80956714957,
+        "min_us": 119802.91599823421,
+        "max_us": 126242.29200372231,
+        "seconds_by_repetition": [
+         0.11980291599823421,
+         0.12100741597977839,
+         0.12112329199195467,
+         0.12069087501456645,
+         0.11986575099025909,
+         0.12068112499153184,
+         0.1262422920037223
+        ],
         "proofs": [
          {
           "evicted_pages": 110368,
@@ -5194,7 +6638,11 @@
           "device_bytes_read": 45875200,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
          },
          {
           "evicted_pages": 110368,
@@ -5207,7 +6655,28 @@
           "device_bytes_read": 45864714,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
+         },
+         {
+          "evicted_pages": 110368,
+          "resident_after_eviction": 0,
+          "eviction_passes": 1,
+          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
+          "eviction_attempts": 1,
+          "eviction_waited_seconds": 1.1,
+          "resident_bytes_after_run": 45858816,
+          "device_bytes_read": 45906657,
+          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
+          "device_slack": 20972,
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
          },
          {
           "evicted_pages": 110368,
@@ -5220,7 +6689,11 @@
           "device_bytes_read": 45864714,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
          },
          {
           "evicted_pages": 110368,
@@ -5233,7 +6706,11 @@
           "device_bytes_read": 45875200,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
          },
          {
           "evicted_pages": 110368,
@@ -5246,7 +6723,11 @@
           "device_bytes_read": 45875200,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
          },
          {
           "evicted_pages": 110368,
@@ -5259,20 +6740,11 @@
           "device_bytes_read": 45864714,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
-         },
-         {
-          "evicted_pages": 110368,
-          "resident_after_eviction": 0,
-          "eviction_passes": 1,
-          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
-          "eviction_attempts": 1,
-          "eviction_waited_seconds": 1.1,
-          "resident_bytes_after_run": 45858816,
-          "device_bytes_read": 45864714,
-          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
-          "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
          }
         ],
         "run_again_refilled_pages": [],
@@ -5292,11 +6764,45 @@
         },
         "engine": {
          "n": 7,
-         "median_us": 111581.084,
-         "p99_us": 118560.125,
-         "mean_us": 112725.85142857143,
-         "min_us": 111191.459,
-         "max_us": 118560.125
+         "median_us": 111866.083,
+         "tail_us": 117038.667,
+         "tail_rank": 7,
+         "tail_is_slowest": true,
+         "tail": "slowest of 7",
+         "p99_us": 117038.667,
+         "mean_us": 112452.36299999998,
+         "min_us": 111128.958,
+         "max_us": 117038.667,
+         "seconds_by_repetition": [
+          0.111314083,
+          0.112274625,
+          0.112036792,
+          0.111507333,
+          0.111128958,
+          0.111866083,
+          0.117038667
+         ]
+        },
+        "parts": {
+         "open_seconds_by_repetition": [
+          0.008383291,
+          0.008624125,
+          0.008974,
+          0.009063167,
+          0.008633542,
+          0.008707708,
+          0.009057208
+         ],
+         "query_seconds_by_repetition": [
+          0.11141962499823421,
+          0.1123832909797784,
+          0.11214929199195467,
+          0.11162770801456645,
+          0.1112322089902591,
+          0.11197341699153185,
+          0.1171850840037223
+         ],
+         "what": "each cold figure is the open the engine reported plus the query's round trip"
         }
        }
       },
@@ -5321,21 +6827,61 @@
          "neon": 28204,
          "avx2": 0
         },
-        "digest_ns": 64625,
+        "digest_ns": 78667,
         "method": "tools/tick_query's own counters for the last repetition: stored bytes and values decoded, segments and blocks read"
        },
        "warm": {
         "n": 30,
-        "median_us": 21071.895956993103,
-        "p99_us": 21664.542029611766,
-        "mean_us": 21127.920935396105,
-        "min_us": 20965.042058378458,
-        "max_us": 21664.542029611766,
+        "median_us": 20289.68749800697,
+        "tail_us": 21205.958997597918,
+        "tail_rank": 30,
+        "tail_is_slowest": true,
+        "tail": "slowest of 30",
+        "p99_us": 21205.958997597918,
+        "mean_us": 20230.797200929374,
+        "min_us": 19542.666006600484,
+        "max_us": 21205.958997597918,
+        "seconds_by_repetition": [
+         0.020028041006298736,
+         0.02002341698971577,
+         0.020065000018803403,
+         0.020398708002176136,
+         0.019845916016492993,
+         0.021205958997597918,
+         0.02093199998489581,
+         0.020078750007087365,
+         0.020483874977799132,
+         0.020154750003712252,
+         0.020455958001548424,
+         0.019723999983398244,
+         0.019594416982727125,
+         0.020287708000978455,
+         0.020390417019370943,
+         0.020428000018000603,
+         0.02066020801430568,
+         0.02051591602503322,
+         0.020453832985367626,
+         0.0201343749940861,
+         0.019542666006600484,
+         0.020133084006374702,
+         0.020291666995035484,
+         0.01990566699532792,
+         0.019626709021395072,
+         0.019888791983248666,
+         0.020297791983466595,
+         0.020434041012777016,
+         0.02046654198784381,
+         0.020475708006415516
+        ],
+        "warm_up_seconds": [
+         0.02059599998756312
+        ],
         "proof": {
          "method": "mincore on a fresh mapping of every store file",
          "pages": 110368,
          "resident_before": 110368,
-         "resident_after": 110368
+         "resident_after": 110368,
+         "warm_up_runs": 1
         },
         "swap_timed": {
          "pages_in": 0,
@@ -5344,20 +6890,69 @@
         },
         "engine": {
          "n": 30,
-         "median_us": 21041.9585,
-         "p99_us": 21621.75,
-         "mean_us": 21094.009666666665,
-         "min_us": 20937.375,
-         "max_us": 21621.75
+         "median_us": 20253.1665,
+         "tail_us": 21161.458000000002,
+         "tail_rank": 30,
+         "tail_is_slowest": true,
+         "tail": "slowest of 30",
+         "p99_us": 21161.458000000002,
+         "mean_us": 20190.627666666667,
+         "min_us": 19507.916,
+         "max_us": 21161.458000000002,
+         "seconds_by_repetition": [
+          0.019940875,
+          0.019981208,
+          0.020025791,
+          0.020361208,
+          0.01981,
+          0.021161458,
+          0.020873416,
+          0.020028708,
+          0.020438833,
+          0.020103834,
+          0.020419291,
+          0.019691292,
+          0.019555125,
+          0.020255375,
+          0.020358959,
+          0.020395083,
+          0.020618292,
+          0.020475333,
+          0.020416209,
+          0.020095791,
+          0.019507916,
+          0.020104,
+          0.020250958,
+          0.019857792,
+          0.019592,
+          0.019853792,
+          0.020262625,
+          0.020401541,
+          0.020436625,
+          0.0204455
+         ]
         }
        },
        "cold": {
         "n": 7,
-        "median_us": 33996.91707454622,
-        "p99_us": 35826.541017740965,
-        "mean_us": 34370.470176717005,
-        "min_us": 33311.208011582494,
-        "max_us": 35826.541017740965,
+        "median_us": 43620.625008366995,
+        "tail_us": 48327.041983172865,
+        "tail_rank": 7,
+        "tail_is_slowest": true,
+        "tail": "slowest of 7",
+        "p99_us": 48327.041983172865,
+        "mean_us": 44140.970282439484,
+        "min_us": 42649.8740161199,
+        "max_us": 48327.041983172865,
+        "seconds_by_repetition": [
+         0.043620625008367,
+         0.048327041983172864,
+         0.043639583993808566,
+         0.043954873991941465,
+         0.04331945898064039,
+         0.043475334003026236,
+         0.0426498740161199
+        ],
         "proofs": [
          {
           "evicted_pages": 110368,
@@ -5367,62 +6962,14 @@
           "eviction_attempts": 1,
           "eviction_waited_seconds": 1.1,
           "resident_bytes_after_run": 13565952,
-          "device_bytes_read": 13568573,
+          "device_bytes_read": 13568574,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
-         },
-         {
-          "evicted_pages": 110368,
-          "resident_after_eviction": 0,
-          "eviction_passes": 1,
-          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
-          "eviction_attempts": 1,
-          "eviction_waited_seconds": 1.1,
-          "resident_bytes_after_run": 13565952,
-          "device_bytes_read": 13568573,
-          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
-          "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
-         },
-         {
-          "evicted_pages": 110368,
-          "resident_after_eviction": 0,
-          "eviction_passes": 1,
-          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
-          "eviction_attempts": 1,
-          "eviction_waited_seconds": 1.1,
-          "resident_bytes_after_run": 13565952,
-          "device_bytes_read": 13579059,
-          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
-          "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
-         },
-         {
-          "evicted_pages": 110368,
-          "resident_after_eviction": 0,
-          "eviction_passes": 1,
-          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
-          "eviction_attempts": 1,
-          "eviction_waited_seconds": 1.1,
-          "resident_bytes_after_run": 13565952,
-          "device_bytes_read": 15456011,
-          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
-          "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
-         },
-         {
-          "evicted_pages": 110368,
-          "resident_after_eviction": 0,
-          "eviction_passes": 1,
-          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
-          "eviction_attempts": 1,
-          "eviction_waited_seconds": 1.1,
-          "resident_bytes_after_run": 13565952,
-          "device_bytes_read": 13799260,
-          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
-          "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
          },
          {
           "evicted_pages": 110368,
@@ -5435,7 +6982,11 @@
           "device_bytes_read": 13579059,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
          },
          {
           "evicted_pages": 110368,
@@ -5445,10 +6996,82 @@
           "eviction_attempts": 1,
           "eviction_waited_seconds": 1.1,
           "resident_bytes_after_run": 13565952,
-          "device_bytes_read": 16840131,
+          "device_bytes_read": 13568574,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
+         },
+         {
+          "evicted_pages": 110368,
+          "resident_after_eviction": 0,
+          "eviction_passes": 1,
+          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
+          "eviction_attempts": 1,
+          "eviction_waited_seconds": 1.1,
+          "resident_bytes_after_run": 13565952,
+          "device_bytes_read": 13589544,
+          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
+          "device_slack": 20972,
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
+         },
+         {
+          "evicted_pages": 110368,
+          "resident_after_eviction": 0,
+          "eviction_passes": 1,
+          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
+          "eviction_attempts": 1,
+          "eviction_waited_seconds": 1.1,
+          "resident_bytes_after_run": 13565952,
+          "device_bytes_read": 13568574,
+          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
+          "device_slack": 20972,
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
+         },
+         {
+          "evicted_pages": 110368,
+          "resident_after_eviction": 0,
+          "eviction_passes": 1,
+          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
+          "eviction_attempts": 1,
+          "eviction_waited_seconds": 1.1,
+          "resident_bytes_after_run": 13565952,
+          "device_bytes_read": 13579059,
+          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
+          "device_slack": 20972,
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
+         },
+         {
+          "evicted_pages": 110368,
+          "resident_after_eviction": 0,
+          "eviction_passes": 1,
+          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
+          "eviction_attempts": 1,
+          "eviction_waited_seconds": 1.1,
+          "resident_bytes_after_run": 13565952,
+          "device_bytes_read": 13568573,
+          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
+          "device_slack": 20972,
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
          }
         ],
         "run_again_refilled_pages": [],
@@ -5468,11 +7091,45 @@
         },
         "engine": {
          "n": 7,
-         "median_us": 33909.041,
-         "p99_us": 35717.792,
-         "mean_us": 34268.70242857143,
-         "min_us": 33230.125,
-         "max_us": 35717.792
+         "median_us": 34516.917,
+         "tail_us": 39163.292,
+         "tail_rank": 7,
+         "tail_is_slowest": true,
+         "tail": "slowest of 7",
+         "p99_us": 39163.292,
+         "mean_us": 35270.86314285714,
+         "min_us": 34004.125,
+         "max_us": 39163.292,
+         "seconds_by_repetition": [
+          0.034442375,
+          0.039163292,
+          0.035102292,
+          0.035219,
+          0.034448041,
+          0.034516917,
+          0.034004125
+         ]
+        },
+        "parts": {
+         "open_seconds_by_repetition": [
+          0.009071,
+          0.009010667,
+          0.008434459,
+          0.008620958,
+          0.008749625,
+          0.008838042,
+          0.008535416
+         ],
+         "query_seconds_by_repetition": [
+          0.034549625008367,
+          0.039316374983172864,
+          0.03520512499380857,
+          0.03533391599194147,
+          0.034569833980640396,
+          0.03463729200302623,
+          0.0341144580161199
+         ],
+         "what": "each cold figure is the open the engine reported plus the query's round trip"
         }
        }
       },
@@ -5497,21 +7154,61 @@
          "neon": 759625,
          "avx2": 0
         },
-        "digest_ns": 750,
+        "digest_ns": 584,
         "method": "tools/tick_query's own counters for the last repetition: stored bytes and values decoded, segments and blocks read"
        },
        "warm": {
         "n": 30,
-        "median_us": 296691.12496776506,
-        "p99_us": 303394.2920155823,
-        "mean_us": 296809.5165289318,
-        "min_us": 293036.8750821799,
-        "max_us": 303394.2920155823,
+        "median_us": 286865.707981633,
+        "tail_us": 295938.16699343733,
+        "tail_rank": 30,
+        "tail_is_slowest": true,
+        "tail": "slowest of 30",
+        "p99_us": 295938.16699343733,
+        "mean_us": 288035.91106358607,
+        "min_us": 283337.2079767287,
+        "max_us": 295938.16699343733,
+        "seconds_by_repetition": [
+         0.2859322500007693,
+         0.2864114999829326,
+         0.2857889579900075,
+         0.2842659580055624,
+         0.2852967499929946,
+         0.28621820799889974,
+         0.29593816699343733,
+         0.29463287501130253,
+         0.2884784580091946,
+         0.29121625001425855,
+         0.28980899997986853,
+         0.29077608400257304,
+         0.2861239580088295,
+         0.28756833300576545,
+         0.28862204201868735,
+         0.2838108750001993,
+         0.2833372079767287,
+         0.2843556249863468,
+         0.2833596660057083,
+         0.2846175000013318,
+         0.28510437498334795,
+         0.28594191698357463,
+         0.29551483399700373,
+         0.29525445797480643,
+         0.29232174999197014,
+         0.28854520799359307,
+         0.287676250009099,
+         0.2908165840199217,
+         0.28731991598033346,
+         0.28602237498853356
+        ],
+        "warm_up_seconds": [
+         0.2907593749987427
+        ],
         "proof": {
          "method": "mincore on a fresh mapping of every store file",
          "pages": 110368,
          "resident_before": 110368,
-         "resident_after": 110368
+         "resident_after": 110368,
+         "warm_up_runs": 1
         },
         "swap_timed": {
          "pages_in": 0,
@@ -5520,20 +7217,69 @@
         },
         "engine": {
          "n": 30,
-         "median_us": 296621.0,
-         "p99_us": 303285.167,
-         "mean_us": 296735.81386666663,
-         "min_us": 292965.95800000004,
-         "max_us": 303285.167
+         "median_us": 286797.54150000005,
+         "tail_us": 295868.20800000004,
+         "tail_rank": 30,
+         "tail_is_slowest": true,
+         "tail": "slowest of 30",
+         "p99_us": 295868.20800000004,
+         "mean_us": 287972.10823333333,
+         "min_us": 283280.0,
+         "max_us": 295868.20800000004,
+         "seconds_by_repetition": [
+          0.285830583,
+          0.286338875,
+          0.285727625,
+          0.284213375,
+          0.285239791,
+          0.286152583,
+          0.295868208,
+          0.294571,
+          0.288414125,
+          0.291155167,
+          0.289748041,
+          0.290709958,
+          0.286055083,
+          0.287498959,
+          0.288549625,
+          0.283746042,
+          0.28328,
+          0.284303458,
+          0.283305208,
+          0.284565208,
+          0.285055709,
+          0.285889375,
+          0.295442292,
+          0.295187916,
+          0.292259958,
+          0.288484583,
+          0.287601208,
+          0.290752,
+          0.287256208,
+          0.285961084
+         ]
         }
        },
        "cold": {
         "n": 7,
-        "median_us": 453820.7910954952,
-        "p99_us": 466953.165945597,
-        "mean_us": 456034.23186444805,
-        "min_us": 449979.9999175593,
-        "max_us": 466953.165945597,
+        "median_us": 463252.50000185333,
+        "tail_us": 485409.0820027877,
+        "tail_rank": 7,
+        "tail_is_slowest": true,
+        "tail": "slowest of 7",
+        "p99_us": 485409.0820027877,
+        "mean_us": 467450.725999467,
+        "min_us": 458366.9579765741,
+        "max_us": 485409.0820027877,
+        "seconds_by_repetition": [
+         0.458595666987182,
+         0.471414125007445,
+         0.45836695797657406,
+         0.47471708400977647,
+         0.46039966601065063,
+         0.4632525000018533,
+         0.48540908200278765
+        ],
         "proofs": [
          {
           "evicted_pages": 110368,
@@ -5546,7 +7292,11 @@
           "device_bytes_read": 158859264,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
          },
          {
           "evicted_pages": 110368,
@@ -5556,10 +7306,65 @@
           "eviction_attempts": 1,
           "eviction_waited_seconds": 1.1,
           "resident_bytes_after_run": 158842880,
-          "device_bytes_read": 158869750,
+          "device_bytes_read": 158848778,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
+         },
+         {
+          "evicted_pages": 110368,
+          "resident_after_eviction": 0,
+          "eviction_passes": 1,
+          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
+          "eviction_attempts": 1,
+          "eviction_waited_seconds": 1.1,
+          "resident_bytes_after_run": 158842880,
+          "device_bytes_read": 158848778,
+          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
+          "device_slack": 20972,
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
+         },
+         {
+          "evicted_pages": 110368,
+          "resident_after_eviction": 0,
+          "eviction_passes": 1,
+          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
+          "eviction_attempts": 1,
+          "eviction_waited_seconds": 1.1,
+          "resident_bytes_after_run": 158842880,
+          "device_bytes_read": 158848778,
+          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
+          "device_slack": 20972,
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
+         },
+         {
+          "evicted_pages": 110368,
+          "resident_after_eviction": 0,
+          "eviction_passes": 1,
+          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
+          "eviction_attempts": 1,
+          "eviction_waited_seconds": 1.1,
+          "resident_bytes_after_run": 158842880,
+          "device_bytes_read": 158869749,
+          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
+          "device_slack": 20972,
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
          },
          {
           "evicted_pages": 110368,
@@ -5572,20 +7377,11 @@
           "device_bytes_read": 158859264,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
-         },
-         {
-          "evicted_pages": 110368,
-          "resident_after_eviction": 0,
-          "eviction_passes": 1,
-          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
-          "eviction_attempts": 1,
-          "eviction_waited_seconds": 1.1,
-          "resident_bytes_after_run": 158842880,
-          "device_bytes_read": 159089951,
-          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
-          "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
          },
          {
           "evicted_pages": 110368,
@@ -5598,33 +7394,11 @@
           "device_bytes_read": 159341609,
           "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
           "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
-         },
-         {
-          "evicted_pages": 110368,
-          "resident_after_eviction": 0,
-          "eviction_passes": 1,
-          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
-          "eviction_attempts": 1,
-          "eviction_waited_seconds": 1.1,
-          "resident_bytes_after_run": 158842880,
-          "device_bytes_read": 158859264,
-          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
-          "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
-         },
-         {
-          "evicted_pages": 110368,
-          "resident_after_eviction": 0,
-          "eviction_passes": 1,
-          "method": "msync(MS_INVALIDATE) on a fresh read-only MAP_SHARED mapping of every file",
-          "eviction_attempts": 1,
-          "eviction_waited_seconds": 1.1,
-          "resident_bytes_after_run": 158842880,
-          "device_bytes_read": 159184322,
-          "device_counter": "iostat's total for disk0, MiB read and written, machine-wide",
-          "device_slack": 20972,
-          "metadata": "stays warm: neither method reaches file system metadata"
+          "metadata": "stays warm: neither method reaches file system metadata",
+          "open_inside_clock": true,
+          "resident_bytes_before_clock": 0,
+          "resident_bytes_before_open": 0,
+          "resident_bytes_before_query": 5537792
          }
         ],
         "run_again_refilled_pages": [],
@@ -5644,11 +7418,45 @@
         },
         "engine": {
          "n": 7,
-         "median_us": 453720.708,
-         "p99_us": 466855.083,
-         "mean_us": 455935.64285714284,
-         "min_us": 449885.33400000003,
-         "max_us": 466855.083
+         "median_us": 454726.54099999997,
+         "tail_us": 477281.25,
+         "tail_rank": 7,
+         "tail_is_slowest": true,
+         "tail": "slowest of 7",
+         "p99_us": 477281.25,
+         "mean_us": 458807.86299999995,
+         "min_us": 449727.625,
+         "max_us": 477281.25,
+         "seconds_by_repetition": [
+          0.449808875,
+          0.462245708,
+          0.449727625,
+          0.4660025,
+          0.451862542,
+          0.454726541,
+          0.47728125
+         ]
+        },
+        "parts": {
+         "open_seconds_by_repetition": [
+          0.008670583,
+          0.009057625,
+          0.008536375,
+          0.008591167,
+          0.008419916,
+          0.00841875,
+          0.007994791
+         ],
+         "query_seconds_by_repetition": [
+          0.449925083987182,
+          0.462356500007445,
+          0.4498305829765741,
+          0.46612591700977646,
+          0.4519797500106506,
+          0.45483375000185333,
+          0.47741429100278765
+         ],
+         "what": "each cold figure is the open the engine reported plus the query's round trip"
         }
        }
       }
@@ -5656,14 +7464,125 @@
      "query_store_class": "B",
      "python_floor": {
       "n": 100,
-      "median_us": 24.16700590401888,
-      "p99_us": 63.000014051795006,
-      "mean_us": 25.873250560835004,
-      "min_us": 20.1669754460454,
-      "max_us": 86.24990005046129,
+      "median_us": 20.709005184471607,
+      "tail_us": 49.375026719644666,
+      "tail_rank": 99,
+      "tail_is_slowest": false,
+      "tail": "99th percentile, nearest rank: run 99 of 100",
+      "p99_us": 49.375026719644666,
+      "mean_us": 22.455870639532804,
+      "min_us": 19.791012164205313,
+      "max_us": 68.20898852311075,
+      "seconds_by_repetition": [
+       6.820898852311075e-05,
+       4.9375026719644666e-05,
+       4.162502591498196e-05,
+       3.162497887387872e-05,
+       2.7292000595480204e-05,
+       2.549999044276774e-05,
+       2.4874985683709383e-05,
+       2.4125009076669812e-05,
+       2.245799987576902e-05,
+       2.187499194405973e-05,
+       2.1624990040436387e-05,
+       2.3541011614724994e-05,
+       2.274999860674143e-05,
+       2.154201501980424e-05,
+       2.1499989088624716e-05,
+       2.549999044276774e-05,
+       2.1458021365106106e-05,
+       2.1249987185001373e-05,
+       2.0708015654236078e-05,
+       2.129099448211491e-05,
+       2.0917010260745883e-05,
+       2.054200740531087e-05,
+       2.1167012164369226e-05,
+       2.0915991626679897e-05,
+       2.0333012798801064e-05,
+       2.0915991626679897e-05,
+       2.054200740531087e-05,
+       2.041697734966874e-05,
+       2.0749983377754688e-05,
+       2.0584004232659936e-05,
+       2.1750020096078515e-05,
+       2.158299321308732e-05,
+       2.083301660604775e-05,
+       2.058298559859395e-05,
+       2.0583014702424407e-05,
+       2.066700835712254e-05,
+       2.037500962615013e-05,
+       2.0000006770715117e-05,
+       2.0915991626679897e-05,
+       2.0208011846989393e-05,
+       2.0292005501687527e-05,
+       2.0374980522319674e-05,
+       2.0333012798801064e-05,
+       1.9917002646252513e-05,
+       2.129198401235044e-05,
+       2.0709005184471607e-05,
+       2.0249979570508003e-05,
+       2.0583014702424407e-05,
+       2.0709005184471607e-05,
+       2.0333973225206137e-05,
+       2.0792009308934212e-05,
+       2.2541993530467153e-05,
+       2.2499996703118086e-05,
+       2.3333996068686247e-05,
+       2.0334002329036593e-05,
+       2.2958993213251233e-05,
+       2.3041997337713838e-05,
+       2.2041989723220468e-05,
+       2.1915999241173267e-05,
+       2.070798655040562e-05,
+       1.9875005818903446e-05,
+       2.0750012481585145e-05,
+       2.0500010577961802e-05,
+       2.0167004549875855e-05,
+       2.0584004232659936e-05,
+       2.066700835712254e-05,
+       1.9875005818903446e-05,
+       2.070897608064115e-05,
+       2.0334002329036593e-05,
+       2.2833002731204033e-05,
+       2.3416010662913322e-05,
+       3.1333009246736765e-05,
+       3.4374999813735485e-05,
+       2.045798464678228e-05,
+       2.0625011529773474e-05,
+       2.045798464678228e-05,
+       2.0167004549875855e-05,
+       2.0209001377224922e-05,
+       2.0249979570508003e-05,
+       2.0167004549875855e-05,
+       2.083400613628328e-05,
+       2.0749983377754688e-05,
+       2.125001628883183e-05,
+       2.1249987185001373e-05,
+       2.0709005184471607e-05,
+       2.041697734966874e-05,
+       2.0083010895177722e-05,
+       2.0708015654236078e-05,
+       2.0332983694970608e-05,
+       1.9791012164205313e-05,
+       2.0750012481585145e-05,
+       2.045798464678228e-05,
+       2.0166015019640326e-05,
+       2.0332983694970608e-05,
+       2.041601692326367e-05,
+       1.9917002646252513e-05,
+       2.1000014385208488e-05,
+       2.0042003598064184e-05,
+       2.012500772252679e-05,
+       2.083400613628328e-05
+      ],
       "what": "the same Python call over an empty window: the path's cost, with no data"
      },
-     "query_worker_peak_rss_bytes": 419463168,
+     "warm_worker_open": {
+      "seconds": 0.011101417010650039,
+      "reported_open_seconds": 0.007271833,
+      "what": "the worker's system.open(), timed from Python before any query, and the open the engine reports where it reports one; no warm figure holds it"
+     },
+     "query_worker_peak_rss_bytes": 406503424,
      "swap": {
       "warm_queries": {
        "pages_in": 0,
@@ -5695,17 +7614,17 @@
     }
    },
    "mem_available_bytes": "not-available",
-   "wall_seconds": 1040.6,
+   "wall_seconds": 1009.7,
    "pinning": {
     "status": "not-available",
     "cpus": []
    },
    "threads": 2,
-   "children_peak_rss_bytes": 32160907264,
+   "children_peak_rss_bytes": 32149372928,
    "peak_memory": {
-    "maximum_resident_set_size_bytes": 32160907264,
-    "peak_memory_footprint_bytes": 756584192,
-    "real_seconds": 1040.69,
+    "maximum_resident_set_size_bytes": 32149372928,
+    "peak_memory_footprint_bytes": 756862720,
+    "real_seconds": 1009.8,
     "source": "BSD time -l around the system's whole run, inside the measured command: the largest resident set of compare/run_system.py and every process it waited for, which counts the clean file-backed pages of every mapped file, and run_system.py's own peak memory footprint. Each worker's and tool's own peak is in its step."
    }
   }

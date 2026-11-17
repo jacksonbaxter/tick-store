@@ -1,0 +1,219 @@
+{
+  "schema": "tick-store disturbances 1",
+  "commit": "ede0176b10bb49e505226285530d0b91a33b4f34",
+  "how": "Made by hand, after the campaign, from the Linux host's window log, its backup job's log and this project's session records, with each time in UTC. The host does not record logins: its login record was last written before the campaign began, so each login's time is the session records', known to the minute. A query phase with no query named is the whole phase of that kind for the variant, since the documents keep no time per query.",
+  "not_listed": [
+    {
+      "what": "the backup job's short routine runs, about ten seconds every fifteen minutes",
+      "why": "they ran through every timed step, so every phase may hold one, and the comparison documents keep no time per query or per write to place them; the kernel benchmark's file keeps no time per case, so only the run its attempt record ties to a case is listed"
+    },
+    {
+      "what": "a queued window request by this project, waiting from the slice's ArcticDB write on until the benchmark campaign took the window",
+      "why": "a waiting process whose processor use nothing records; it spans every phase from then on"
+    },
+    {
+      "what": "a queued window request by another project on the host during the benchmark campaign",
+      "why": "a waiting process whose processor use nothing records"
+    },
+    {
+      "what": "the refused attempts of the kernel benchmark and the fuzz step that was no result",
+      "why": "no committed file holds their figures"
+    }
+  ],
+  "entries": [
+    {
+      "start": "2026-11-14T15:57:41Z",
+      "end": "2026-11-14T15:57:41Z",
+      "precision": "second",
+      "what": "a file copy and process launch by this project",
+      "document": "compare/Linux-12302019-open-ede0176b10bb.json",
+      "phase": "cold queries",
+      "system": "parquet",
+      "variant": "zstd1-rg1Mi-ts-default",
+      "query": "Q2",
+      "timed": true
+    },
+    {
+      "start": "2026-11-14T16:02:00Z",
+      "end": "2026-11-14T16:03:00Z",
+      "precision": "minute",
+      "what": "a remote login by this project",
+      "document": "compare/Linux-12302019-open-ede0176b10bb.json",
+      "phase": "read back",
+      "system": "arcticdb",
+      "variant": "rows10M-cols127",
+      "class": "B",
+      "timed": false
+    },
+    {
+      "start": "2026-11-14T16:05:28Z",
+      "end": "2026-11-14T16:05:30Z",
+      "precision": "second",
+      "what": "process launches by this project",
+      "document": "compare/Linux-12302019-open-ede0176b10bb.json",
+      "phase": "write",
+      "system": "arcticdb",
+      "variant": "rows100k-cols1",
+      "class": "B",
+      "repetition": 3,
+      "timed": true
+    },
+    {
+      "start": "2026-11-14T16:45:00Z",
+      "end": "2026-11-14T16:46:00Z",
+      "precision": "minute",
+      "what": "a remote login by this project",
+      "document": "compare/Linux-12302019-open-ede0176b10bb.json",
+      "phase": "read back",
+      "system": "questdb",
+      "variant": "plain",
+      "class": "B",
+      "timed": false
+    },
+    {
+      "start": "2026-11-14T17:03:00Z",
+      "end": "2026-11-14T17:04:00Z",
+      "precision": "minute",
+      "what": "a remote login by this project",
+      "document": "compare/Linux-12302019-open-ede0176b10bb.json",
+      "phase": "cold queries",
+      "system": "tickstore",
+      "variant": "v3-seg1Mi",
+      "query": "Q2",
+      "timed": true
+    },
+    {
+      "start": "2026-11-14T18:14:00Z",
+      "end": "2026-11-14T18:15:00Z",
+      "precision": "minute",
+      "what": "a remote login by this project",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "warm queries",
+      "system": "parquet",
+      "variant": "zstd1-rg128k",
+      "query": null,
+      "timed": true
+    },
+    {
+      "start": "2026-11-14T19:05:00Z",
+      "end": "2026-11-14T19:06:00Z",
+      "precision": "minute",
+      "what": "a remote login by this project",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "read back",
+      "system": "parquet",
+      "variant": "none-rg1Mi",
+      "class": "A",
+      "timed": false
+    },
+    {
+      "start": "2026-11-14T19:56:45Z",
+      "end": "2026-11-14T19:58:48Z",
+      "precision": "second",
+      "what": "the host's scheduled backup job",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "read back",
+      "system": "arcticdb",
+      "variant": "rows100k-cols127",
+      "class": "A",
+      "timed": false
+    },
+    {
+      "start": "2026-11-14T21:21:00Z",
+      "end": "2026-11-14T21:22:00Z",
+      "precision": "minute",
+      "what": "a remote login by this project",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "warm queries",
+      "system": "arcticdb",
+      "variant": "rows10M-cols127",
+      "query": null,
+      "timed": true
+    },
+    {
+      "start": "2026-11-14T23:01:00Z",
+      "end": "2026-11-14T23:02:00Z",
+      "precision": "minute",
+      "what": "a remote login by this project",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "warm queries",
+      "system": "arcticdb",
+      "variant": "rows100k-cols127-per-security",
+      "query": null,
+      "timed": true
+    },
+    {
+      "start": "2026-11-15T00:00:00Z",
+      "end": "2026-11-15T00:01:00Z",
+      "precision": "minute",
+      "what": "a remote login by this project",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "read back",
+      "system": "questdb",
+      "variant": "plain",
+      "class": "A",
+      "timed": false
+    },
+    {
+      "start": "2026-11-15T00:13:09Z",
+      "end": "2026-11-15T00:17:11Z",
+      "precision": "second",
+      "what": "the host's scheduled backup job",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "write",
+      "system": "questdb",
+      "variant": "plain",
+      "class": "B",
+      "repetition": 1,
+      "timed": true
+    },
+    {
+      "start": "2026-11-15T01:58:00Z",
+      "end": "2026-11-15T01:59:00Z",
+      "precision": "minute",
+      "what": "a remote login by this project",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "write",
+      "system": "questdb",
+      "variant": "locate-index",
+      "class": "B",
+      "repetition": 1,
+      "timed": true
+    },
+    {
+      "start": "2026-11-15T03:22:00Z",
+      "end": "2026-11-15T03:23:00Z",
+      "precision": "minute",
+      "what": "a remote login by this project",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "write",
+      "system": "tickstore",
+      "variant": "v3-seg4Mi",
+      "class": "B",
+      "repetition": 1,
+      "timed": true
+    },
+    {
+      "start": "2026-11-15T04:25:00Z",
+      "end": "2026-11-15T04:26:00Z",
+      "precision": "minute",
+      "what": "a remote login by this project",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "cold queries",
+      "system": "tickstore",
+      "variant": "v3-seg1Mi",
+      "query": "Q1",
+      "timed": true
+    },
+    {
+      "start": "2026-11-15T07:15:01Z",
+      "end": "2026-11-15T07:15:11Z",
+      "precision": "second",
+      "what": "the host's scheduled backup job",
+      "document": "bench/Linux-simd_kernel-ede0176b10bb.json",
+      "phase": "case",
+      "case": "pfor_delta_two_pass/w=31/avx2",
+      "timed": true
+    }
+  ]
+}

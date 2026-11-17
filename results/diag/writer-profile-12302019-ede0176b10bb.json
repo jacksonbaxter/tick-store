@@ -1,0 +1,609 @@
+{
+ "schema": "tick-store-diag-1",
+ "kind": "writer-profile",
+ "day": "12302019",
+ "commit": "ede0176b10bb49e505226285530d0b91a33b4f34",
+ "host": "Linux",
+ "measurement": "diagnostic",
+ "statement": "A diagnostic, one run at commit ede0176b10bb, judging no target: the writer's sampled user-mode cycles (cycles:u) while it stores the whole day, as shares by group of functions. Shares of samples, not times; no time is reported.",
+ "runs": 1,
+ "input": "the day 12302019",
+ "build": {
+  "preset": "bench",
+  "used": "bench-lines",
+  "extra_flags": "-gline-tables-only",
+  "text_identical": true,
+  "note": "the bench preset's build with -gline-tables-only added to every compile and link through the clang driver's CCC_OVERRIDE_OPTIONS, so no CMake variable differs; tools/tick_roundtrip's .text is byte for byte the measured build's"
+ },
+ "wrapper": "heavy.sh, taskset -c 2,6,7",
+ "not_established": [],
+ "event": "cycles:u",
+ "frequency_hz": 199,
+ "call_graph": "dwarf,16384, user callchains",
+ "records": 268744780,
+ "samples_recorded": 37184,
+ "samples_in_report": 37184,
+ "samples_header": "37K",
+ "lost_samples": 0,
+ "groups": [
+  {
+   "name": "kernel_addresses",
+   "self_share_percent": 0.1
+  },
+  {
+   "name": "parse",
+   "self_share_percent": 2.739
+  },
+  {
+   "name": "book_state",
+   "self_share_percent": 18.709
+  },
+  {
+   "name": "segment_assembly",
+   "self_share_percent": 19.125
+  },
+  {
+   "name": "sort",
+   "self_share_percent": 4.782
+  },
+  {
+   "name": "pfor_encode",
+   "self_share_percent": 41.041
+  },
+  {
+   "name": "dictionary_encode",
+   "self_share_percent": 6.778
+  },
+  {
+   "name": "zstd",
+   "self_share_percent": 1.226
+  },
+  {
+   "name": "crc",
+   "self_share_percent": 0.151
+  },
+  {
+   "name": "store_writer",
+   "self_share_percent": 0.602
+  },
+  {
+   "name": "containers",
+   "self_share_percent": 0.098
+  },
+  {
+   "name": "memory",
+   "self_share_percent": 0.247
+  },
+  {
+   "name": "libc",
+   "self_share_percent": 3.705
+  },
+  {
+   "name": "libcxx",
+   "self_share_percent": 0.0
+  },
+  {
+   "name": "tool",
+   "self_share_percent": 0.679
+  },
+  {
+   "name": "unresolved",
+   "self_share_percent": 0.002
+  },
+  {
+   "name": "unmatched",
+   "self_share_percent": 0.017,
+   "largest": [
+    {
+     "symbol": "tick_store::codec::(anonymous namespace)::begin_payload(tick_store::codec::DictMode, std::__1::span<unsigned long const,",
+     "self_share_percent": 0.006
+    },
+    {
+     "symbol": "tick_store::codec::(anonymous namespace)::Scratch::~Scratch()",
+     "self_share_percent": 0.006
+    },
+    {
+     "symbol": "tick_store::store::ItchStoreWriter::add_block(tick_store::codec::CodecId, std::__1::span<std::byte const, 18446744073709",
+     "self_share_percent": 0.003
+    },
+    {
+     "symbol": "tick_store::codec::begin_block(std::__1::vector<std::byte, std::__1::allocator<std::byte> >&, unsigned int)",
+     "self_share_percent": 0.003
+    }
+   ]
+  }
+ ],
+ "lost_samples_at_most": "0.1% of the samples kept and lost",
+ "inclusive": {
+  "limit_percent": 0.5,
+  "note": "null: under the report's limit, or not called",
+  "children_share_percent": {
+   "ItchStoreWriter::append": 96.46,
+   "ItchStoreWriter::write_segment": 94.48,
+   "SegmentBuilder::finish": 38.74,
+   "encode_column": 55.51,
+   "encode_pfor": 28.96,
+   "encode_pfor_block": 13.81,
+   "encode_dict": 24.7,
+   "encode_zstd_payload": 1.26,
+   "itch::decode": 2.77
+  }
+ },
+ "source_files": [
+  {
+   "file": "pfor.cpp",
+   "self_share_percent": 26.657
+  },
+  {
+   "file": "itch_segment.cpp",
+   "self_share_percent": 17.048
+  },
+  {
+   "file": "variant",
+   "self_share_percent": 12.71
+  },
+  {
+   "file": "(no line table)",
+   "self_share_percent": 8.551
+  },
+  {
+   "file": "bit_width.h",
+   "self_share_percent": 5.556
+  },
+  {
+   "file": "vector.h",
+   "self_share_percent": 4.0
+  },
+  {
+   "file": "wrap_iter.h",
+   "self_share_percent": 3.725
+  },
+  {
+   "file": "lower_bound.h",
+   "self_share_percent": 3.165
+  },
+  {
+   "file": "itch_store.cpp",
+   "self_share_percent": 2.776
+  },
+  {
+   "file": "codec.cpp",
+   "self_share_percent": 2.547
+  },
+  {
+   "file": "layout.h",
+   "self_share_percent": 1.798
+  },
+  {
+   "file": "comp.h",
+   "self_share_percent": 1.232
+  },
+  {
+   "file": "gcd_lcm.h",
+   "self_share_percent": 1.232
+  },
+  {
+   "file": "lane_pack.cpp",
+   "self_share_percent": 1.107
+  },
+  {
+   "file": "dictionary.cpp",
+   "self_share_percent": 1.024
+  },
+  {
+   "file": "int_transform.hpp",
+   "self_share_percent": 0.594
+  },
+  {
+   "file": "simd_utils.h",
+   "self_share_percent": 0.556
+  },
+  {
+   "file": "roundtrip_cli.cpp",
+   "self_share_percent": 0.478
+  },
+  {
+   "file": "zstd_fast.c",
+   "self_share_percent": 0.451
+  },
+  {
+   "file": "columns.cpp",
+   "self_share_percent": 0.423
+  },
+  {
+   "file": "huf_compress.c",
+   "self_share_percent": 0.389
+  },
+  {
+   "file": "itch_store_writer.cpp",
+   "self_share_percent": 0.371
+  },
+  {
+   "file": "construct_at.h",
+   "self_share_percent": 0.318
+  },
+  {
+   "file": "constexpr_c_functions.h",
+   "self_share_percent": 0.314
+  },
+  {
+   "file": "itch_store.hpp",
+   "self_share_percent": 0.265
+  },
+  {
+   "file": "min.h",
+   "self_share_percent": 0.265
+  },
+  {
+   "file": "bit_stream.hpp",
+   "self_share_percent": 0.188
+  },
+  {
+   "file": "find.h",
+   "self_share_percent": 0.18
+  },
+  {
+   "file": "patch_list.cpp",
+   "self_share_percent": 0.17
+  },
+  {
+   "file": "big_endian.hpp",
+   "self_share_percent": 0.162
+  },
+  {
+   "file": "any_of.h",
+   "self_share_percent": 0.146
+  },
+  {
+   "file": "sort.h",
+   "self_share_percent": 0.139
+  },
+  {
+   "file": "crc32c_sse42.cpp",
+   "self_share_percent": 0.137
+  },
+  {
+   "file": "hist.c",
+   "self_share_percent": 0.129
+  },
+  {
+   "file": "array",
+   "self_share_percent": 0.114
+  },
+  {
+   "file": "zstd_compress_internal.h",
+   "self_share_percent": 0.082
+  },
+  {
+   "file": "frame.hpp",
+   "self_share_percent": 0.079
+  },
+  {
+   "file": "optional",
+   "self_share_percent": 0.075
+  },
+  {
+   "file": "unwrap_iter.h",
+   "self_share_percent": 0.07
+  },
+  {
+   "file": "span",
+   "self_share_percent": 0.066
+  },
+  {
+   "file": "copy_move_common.h",
+   "self_share_percent": 0.064
+  },
+  {
+   "file": "invoke.h",
+   "self_share_percent": 0.061
+  },
+  {
+   "file": "pair.h",
+   "self_share_percent": 0.053
+  },
+  {
+   "file": "fse_compress.c",
+   "self_share_percent": 0.045
+  },
+  {
+   "file": "unique_ptr.h",
+   "self_share_percent": 0.042
+  },
+  {
+   "file": "expected.h",
+   "self_share_percent": 0.037
+  },
+  {
+   "file": "half_positive.h",
+   "self_share_percent": 0.034
+  },
+  {
+   "file": "find_if.h",
+   "self_share_percent": 0.034
+  },
+  {
+   "file": "ranges_operations.h",
+   "self_share_percent": 0.031
+  },
+  {
+   "file": "mem.h",
+   "self_share_percent": 0.028
+  },
+  {
+   "file": "countr.h",
+   "self_share_percent": 0.028
+  },
+  {
+   "file": "bitstream.h",
+   "self_share_percent": 0.025
+  },
+  {
+   "file": "vector_bool.h",
+   "self_share_percent": 0.025
+  },
+  {
+   "file": "fse.h",
+   "self_share_percent": 0.02
+  },
+  {
+   "file": "zstd_internal.h",
+   "self_share_percent": 0.019
+  },
+  {
+   "file": "synth_three_way.h",
+   "self_share_percent": 0.017
+  },
+  {
+   "file": "allocate.h",
+   "self_share_percent": 0.017
+  },
+  {
+   "file": "swap.h",
+   "self_share_percent": 0.017
+  },
+  {
+   "file": "zstd_compress.c",
+   "self_share_percent": 0.016
+  },
+  {
+   "file": "__bit_reference",
+   "self_share_percent": 0.014
+  },
+  {
+   "file": "stable_sort.h",
+   "self_share_percent": 0.014
+  },
+  {
+   "file": "bits.h",
+   "self_share_percent": 0.011
+  },
+  {
+   "file": "ordering.h",
+   "self_share_percent": 0.011
+  },
+  {
+   "file": "ranges_transform.h",
+   "self_share_percent": 0.008
+  },
+  {
+   "file": "zstd_compress_sequences.c",
+   "self_share_percent": 0.006
+  },
+  {
+   "file": "max.h",
+   "self_share_percent": 0.006
+  },
+  {
+   "file": "raw_counters.hpp",
+   "self_share_percent": 0.005
+  },
+  {
+   "file": "allocator.h",
+   "self_share_percent": 0.003
+  },
+  {
+   "file": "container_writer.cpp",
+   "self_share_percent": 0.003
+  },
+  {
+   "file": "sift_down.h",
+   "self_share_percent": 0.003
+  },
+  {
+   "file": "__split_buffer",
+   "self_share_percent": 0.003
+  },
+  {
+   "file": "uninitialized_algorithms.h",
+   "self_share_percent": 0.003
+  },
+  {
+   "file": "byte_cursor.hpp",
+   "self_share_percent": 0.003
+  },
+  {
+   "file": "block.cpp",
+   "self_share_percent": 0.003
+  }
+ ],
+ "group_table": {
+  "rule": "a symbol goes to the first group with a pattern that matches it: name patterns are matched from the start of the function's qualified name, its return type and parameters dropped; dso against the shared object; level against perf's [k] or [.] mark",
+  "groups": [
+   {
+    "name": "kernel_addresses",
+    "what": "samples perf placed at a kernel address though only user mode was counted",
+    "patterns": [
+     "level: k"
+    ]
+   },
+   {
+    "name": "parse",
+    "what": "ITCH framing and decoding",
+    "patterns": [
+     "name: tick_store::itch::"
+    ]
+   },
+   {
+    "name": "book_state",
+    "what": "each message taken into the segment: the builder's per-order state, the reference map, the symbol table and the dispatch on each message's type",
+    "patterns": [
+     "name: tick_store::store::SegmentBuilder::State::",
+     "name: tick_store::store::(?:\\(anonymous namespace\\)::)?RefMap::",
+     "name: tick_store::store::SymbolTable::",
+     "name: tick_store::store::SegmentBuilder::add$",
+     "name: tick_store::store::ItchStoreWriter::append$",
+     "name: tick_store::store::(?:\\(anonymous namespace\\)::)?(?:column_form_plain|hot_fields)$",
+     "name: tick_store::store::SegmentBuilder::records$",
+     "name: std::(?:__1::)?__variant_detail::"
+    ]
+   },
+   {
+    "name": "segment_assembly",
+    "what": "turning a full segment's messages into columns: the builder's finish, grouping, time bases, seek and maxima",
+    "patterns": [
+     "name: tick_store::store::SegmentBuilder::finish$",
+     "name: tick_store::store::(?:\\(anonymous namespace\\)::)?(?:compute_seek|column_maxima|group_by_key|order_by_key|time_bases|time_residuals|column_form_\\w+)$"
+    ]
+   },
+   {
+    "name": "sort",
+    "what": "the standard library's sorts",
+    "patterns": [
+     "name: std::(?:__1::)?(?:ranges::)?(?:__)?(?:introsort|bitset_partition|insertion_sort\\w*|partition_with_equals\\w*|pdqsort\\w*|sort\\w*|floyd_sift_down|sift_down|partial_sort\\w*|nth_element\\w*|stable_sort\\w*|merge\\w*)"
+    ]
+   },
+   {
+    "name": "pfor_encode",
+    "what": "PFOR encoding, the dictionary's code streams included: width and scale search, packing, patches",
+    "patterns": [
+     "name: tick_store::codec::(?:\\(anonymous namespace\\)::)?(?:choose_width|encode_scaled|encode_block_with|encode_pfor\\w*|plan_vector|emit_vector|scale_candidates|pack_\\w+|append_words_le|append_patches)$",
+     "name: tick_store::codec::BitWriter::"
+    ]
+   },
+   {
+    "name": "dictionary_encode",
+    "what": "the dictionary encoder's own work, outside the PFOR it calls",
+    "patterns": [
+     "name: tick_store::codec::(?:\\(anonymous namespace\\)::)?(?:encode_dict\\w*|encode_ranked_\\w+|encode_sorted_mtf|huffman_lengths|scan_for_repeats)$"
+    ]
+   },
+   {
+    "name": "zstd",
+    "what": "zstd and its entropy coders",
+    "patterns": [
+     "name: (?:ZSTD|HUF|FSE|HIST|ZSTDMT|POOL|ZDICT|ERR|XXH)\\w*",
+     "name: tick_store::codec::(?:\\(anonymous namespace\\)::)?(?:encode|decode)_zstd_payload$"
+    ]
+   },
+   {
+    "name": "crc",
+    "what": "CRC32C",
+    "patterns": [
+     "name: tick_store::store::.*crc32c"
+    ]
+   },
+   {
+    "name": "store_writer",
+    "what": "the per-column driver, metadata and container writing",
+    "patterns": [
+     "name: tick_store::store::(?:ContainerWriter|ContainerLayout)::",
+     "name: tick_store::store::ItchStoreWriter::(?:write_segment|finish|write_last)$",
+     "name: tick_store::store::(?:\\(anonymous namespace\\)::)?(?:encode_column|encode_column_metadata|encode_store_header|code_pfor|code_values|pfor_options)$"
+    ]
+   },
+   {
+    "name": "containers",
+    "what": "the standard library's vectors, strings and hash tables, as compiled into the binary: growth, copies, assignment",
+    "patterns": [
+     "name: std::(?:__1::)?(?:vector|basic_string|deque|unordered_map|__hash_table)<"
+    ]
+   },
+   {
+    "name": "memory",
+    "what": "allocation and copies, where the C library's symbols resolve",
+    "patterns": [
+     "name: (?:malloc|free|calloc|realloc|cfree|_int_malloc|_int_free\\w*|_int_realloc|malloc_consolidate|sysmalloc|tcache\\w*|unlink_chunk\\w*|__libc_(?:malloc|free|calloc|realloc)|operator new|operator delete|__mem(?:move|cpy|set|cmp)\\w*|__mempcpy\\w*|mem(?:cpy|move|set|cmp)|mmap\\w*|munmap|brk|sbrk)(?:@plt)?$"
+    ]
+   },
+   {
+    "name": "libc",
+    "what": "the C library, its addresses unresolved",
+    "patterns": [
+     "dso: libc\\.so"
+    ]
+   },
+   {
+    "name": "libcxx",
+    "what": "the C++ library outside its sorts",
+    "patterns": [
+     "dso: libc\\+\\+(?:abi)?\\.so"
+    ]
+   },
+   {
+    "name": "tool",
+    "what": "the command-line driver",
+    "patterns": [
+     "name: tick_store::harness::"
+    ]
+   },
+   {
+    "name": "unresolved",
+    "what": "addresses with no symbol",
+    "patterns": [
+     "name: (?:0x[0-9a-f]+|\\[unknown\\])$"
+    ]
+   },
+   {
+    "name": "unmatched",
+    "what": "symbols no pattern above matches, kept apart and never spread over the groups",
+    "patterns": []
+   }
+  ]
+ },
+ "store_layout": {
+  "segments": 65,
+  "segment_records": 4194304,
+  "records": 268744780,
+  "codecs": {
+   "dictionary": {
+    "pieces": 58525,
+    "payload_bytes": 306431241,
+    "values_in_single_codec_columns": 953553365
+   },
+   "pfor": {
+    "pieces": 21175,
+    "payload_bytes": 863099758,
+    "values_in_single_codec_columns": 338630325
+   },
+   "raw": {
+    "pieces": 50,
+    "payload_bytes": 2035,
+    "values_in_single_codec_columns": 0
+   },
+   "run_length": {
+    "pieces": 63,
+    "payload_bytes": 8719,
+    "values_in_single_codec_columns": 99917
+   },
+   "zstd": {
+    "pieces": 32524,
+    "payload_bytes": 583585098,
+    "values_in_single_codec_columns": 409015303
+   }
+  },
+  "columns_with_several_codecs": [
+   "add_price",
+   "imbalance_flags",
+   "rare_bytes"
+  ],
+  "note": "values are counted only for columns whose every piece has one codec; a column with several is listed instead"
+ },
+ "commands": [
+  "perf record --no-buildid-cache -e cycles:u --user-callchains --call-graph dwarf\\,16384 -F 199 -o writer.data -- tick_roundtrip ingest 12302019.NASDAQ_ITCH50 diag-day.tsc --durability page_cache",
+  "perf report -i writer.data --stdio --no-children -g none -n --show-total-period --sort dso\\,sym >writer-self.txt",
+  "perf report -i writer.data --stdio --children -g none -n --sort dso\\,sym --percent-limit 0.5 >writer-children.txt",
+  "perf report -i writer.data --stdio --no-children -g none -n --show-total-period --sort srcfile >writer-srcfile.txt",
+  "perf report -i writer.data --stdio --no-children -g none -n --sort srcline --percent-limit 0.2 >writer-srcline.txt"
+ ]
+}

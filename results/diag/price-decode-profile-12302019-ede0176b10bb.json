@@ -1,0 +1,324 @@
+{
+ "schema": "tick-store-diag-1",
+ "kind": "price-decode-profile",
+ "day": "12302019",
+ "commit": "ede0176b10bb49e505226285530d0b91a33b4f34",
+ "host": "Linux",
+ "measurement": "diagnostic",
+ "statement": "A diagnostic, one run at commit ede0176b10bb, judging no target: the sampled user-mode cycles (cycles:u) of the price column's decode, store_decode/add_price, recorded only inside column_decode_bench's timed passes, as shares by group of functions. Shares of samples, not times; no time is reported.",
+ "runs": 1,
+ "input": "store_decode/add_price on the slice 12302019-open, the timed throughput passes only (perf's control FIFOs)",
+ "build": {
+  "preset": "bench",
+  "used": "bench-lines",
+  "extra_flags": "-gline-tables-only",
+  "text_identical": true,
+  "note": "the bench preset's build with -gline-tables-only added to every compile and link through the clang driver's CCC_OVERRIDE_OPTIONS, so no CMake variable differs; bench/column_decode_bench's .text is byte for byte the measured build's"
+ },
+ "wrapper": "heavy.sh, taskset -c 2,6,7",
+ "not_established": [],
+ "event": "cycles:u",
+ "frequency_hz": 4000,
+ "call_graph": "dwarf,16384, user callchains",
+ "case": "store_decode/add_price",
+ "isa": "x86-64 baseline, avx2 kernels",
+ "values": 3153991,
+ "samples_recorded": 827,
+ "samples_in_report": 827,
+ "samples_header": "827",
+ "lost_samples": 0,
+ "groups": [
+  {
+   "name": "kernel_addresses",
+   "self_share_percent": 0.0
+  },
+  {
+   "name": "zstd",
+   "self_share_percent": 11.602
+  },
+  {
+   "name": "pfor_block_decode",
+   "self_share_percent": 25.277
+  },
+  {
+   "name": "unpack_kernels",
+   "self_share_percent": 20.399
+  },
+  {
+   "name": "codec_column_decode",
+   "self_share_percent": 0.13
+  },
+  {
+   "name": "store_column_decode",
+   "self_share_percent": 4.556
+  },
+  {
+   "name": "containers",
+   "self_share_percent": 0.228
+  },
+  {
+   "name": "memory",
+   "self_share_percent": 0.373
+  },
+  {
+   "name": "libc",
+   "self_share_percent": 19.388
+  },
+  {
+   "name": "libcxx",
+   "self_share_percent": 0.0
+  },
+  {
+   "name": "bench_harness",
+   "self_share_percent": 0.0
+  },
+  {
+   "name": "unresolved",
+   "self_share_percent": 12.409
+  },
+  {
+   "name": "unmatched",
+   "self_share_percent": 5.638,
+   "largest": [
+    {
+     "symbol": "tick_store::codec::read_patches(tick_store::codec::ByteCursor&, unsigned long, unsigned long, unsigned int, tick_store::",
+     "self_share_percent": 5.513
+    },
+    {
+     "symbol": "tick_store::codec::ByteCursor::read_le(unsigned int, std::__1::basic_string_view<char, std::__1::char_traits<char> >)",
+     "self_share_percent": 0.125
+    }
+   ]
+  }
+ ],
+ "lost_samples_at_most": "0.1% of the samples kept and lost",
+ "inclusive": {
+  "limit_percent": 0.5,
+  "note": "null: under the report's limit, or not called",
+  "children_share_percent": {
+   "store decode_column": 75.35,
+   "codec decode_column": 58.43,
+   "decode_pfor": null,
+   "decode_zstd_payload": 12.11
+  }
+ },
+ "source_files": [
+  {
+   "file": "(no line table)",
+   "self_share_percent": 19.767
+  },
+  {
+   "file": "wrap_iter.h",
+   "self_share_percent": 19.705
+  },
+  {
+   "file": "kernels_avx2.cpp",
+   "self_share_percent": 15.358
+  },
+  {
+   "file": "huf_decompress_amd64.S",
+   "self_share_percent": 12.404
+  },
+  {
+   "file": "pfor.cpp",
+   "self_share_percent": 4.738
+  },
+  {
+   "file": "itch_store.cpp",
+   "self_share_percent": 4.556
+  },
+  {
+   "file": "driver.hpp",
+   "self_share_percent": 4.062
+  },
+  {
+   "file": "ranges_max.h",
+   "self_share_percent": 3.782
+  },
+  {
+   "file": "zstd_decompress_block.c",
+   "self_share_percent": 3.542
+  },
+  {
+   "file": "huf_decompress.c",
+   "self_share_percent": 3.415
+  },
+  {
+   "file": "zstd_internal.h",
+   "self_share_percent": 1.843
+  },
+  {
+   "file": "patch_list.cpp",
+   "self_share_percent": 1.361
+  },
+  {
+   "file": "bitstream.h",
+   "self_share_percent": 1.345
+  },
+  {
+   "file": "lane_pack.cpp",
+   "self_share_percent": 0.496
+  },
+  {
+   "file": "accumulate.h",
+   "self_share_percent": 0.494
+  },
+  {
+   "file": "entropy_common.c",
+   "self_share_percent": 0.492
+  },
+  {
+   "file": "layout.h",
+   "self_share_percent": 0.475
+  },
+  {
+   "file": "byte_cursor.hpp",
+   "self_share_percent": 0.464
+  },
+  {
+   "file": "zstd_decompress.c",
+   "self_share_percent": 0.368
+  },
+  {
+   "file": "dispatch.cpp",
+   "self_share_percent": 0.36
+  },
+  {
+   "file": "fse_decompress.c",
+   "self_share_percent": 0.235
+  },
+  {
+   "file": "block.cpp",
+   "self_share_percent": 0.13
+  },
+  {
+   "file": "unpack_impl.hpp",
+   "self_share_percent": 0.124
+  },
+  {
+   "file": "ranges_min.h",
+   "self_share_percent": 0.123
+  },
+  {
+   "file": "fse.h",
+   "self_share_percent": 0.122
+  },
+  {
+   "file": "span",
+   "self_share_percent": 0.12
+  },
+  {
+   "file": "mem.h",
+   "self_share_percent": 0.12
+  },
+  {
+   "file": "counter_gate.cpp",
+   "self_share_percent": 0.0
+  }
+ ],
+ "group_table": {
+  "rule": "a symbol goes to the first group with a pattern that matches it: name patterns are matched from the start of the function's qualified name, its return type and parameters dropped; dso against the shared object; level against perf's [k] or [.] mark",
+  "groups": [
+   {
+    "name": "kernel_addresses",
+    "what": "samples perf placed at a kernel address though only user mode was counted",
+    "patterns": [
+     "level: k"
+    ]
+   },
+   {
+    "name": "zstd",
+    "what": "zstd inflate and its entropy decoders",
+    "patterns": [
+     "name: (?:ZSTD|HUF|FSE|HIST|ZSTDMT|POOL|ZDICT|ERR|XXH)\\w*",
+     "name: tick_store::codec::(?:\\(anonymous namespace\\)::)?(?:encode|decode)_zstd_payload$"
+    ]
+   },
+   {
+    "name": "pfor_block_decode",
+    "what": "PFOR block decode: header, scale and patches, and what is inlined into it",
+    "patterns": [
+     "name: tick_store::codec::(?:\\(anonymous namespace\\)::)?decode_pfor\\w*$"
+    ]
+   },
+   {
+    "name": "unpack_kernels",
+    "what": "the unpack, delta and add kernels of every kernel set",
+    "patterns": [
+     "name: tick_store::codec::simd::",
+     "name: tick_store::codec::(?:unpack_vector|unpack_linear)$"
+    ]
+   },
+   {
+    "name": "codec_column_decode",
+    "what": "the codec's column driver: block headers, value checks, reserving",
+    "patterns": [
+     "name: tick_store::codec::(?:\\(anonymous namespace\\)::)?(?:decode_column|read_block_header|check_block_values|reserve_for_block)$"
+    ]
+   },
+   {
+    "name": "store_column_decode",
+    "what": "the store's column decode: its block decoder, range check and append",
+    "patterns": [
+     "name: tick_store::store::(?:\\(anonymous namespace\\)::)?(?:decode_column|column_block_decoder|block_decoder|unwrap_column|widen)$"
+    ]
+   },
+   {
+    "name": "containers",
+    "what": "the standard library's vectors, strings and hash tables, as compiled into the binary: growth, copies, assignment",
+    "patterns": [
+     "name: std::(?:__1::)?(?:vector|basic_string|deque|unordered_map|__hash_table)<"
+    ]
+   },
+   {
+    "name": "memory",
+    "what": "allocation and copies, where the C library's symbols resolve",
+    "patterns": [
+     "name: (?:malloc|free|calloc|realloc|cfree|_int_malloc|_int_free\\w*|_int_realloc|malloc_consolidate|sysmalloc|tcache\\w*|unlink_chunk\\w*|__libc_(?:malloc|free|calloc|realloc)|operator new|operator delete|__mem(?:move|cpy|set|cmp)\\w*|__mempcpy\\w*|mem(?:cpy|move|set|cmp)|mmap\\w*|munmap|brk|sbrk)(?:@plt)?$"
+    ]
+   },
+   {
+    "name": "libc",
+    "what": "the C library, its addresses unresolved",
+    "patterns": [
+     "dso: libc\\.so"
+    ]
+   },
+   {
+    "name": "libcxx",
+    "what": "the C++ library",
+    "patterns": [
+     "dso: libc\\+\\+(?:abi)?\\.so"
+    ]
+   },
+   {
+    "name": "bench_harness",
+    "what": "the benchmark's own loop and checks",
+    "patterns": [
+     "name: benchmark::",
+     "name: tick_store::bench_support::",
+     "name: \\(anonymous namespace\\)::"
+    ]
+   },
+   {
+    "name": "unresolved",
+    "what": "addresses with no symbol",
+    "patterns": [
+     "name: (?:0x[0-9a-f]+|\\[unknown\\])$"
+    ]
+   },
+   {
+    "name": "unmatched",
+    "what": "symbols no pattern above matches, kept apart and never spread over the groups",
+    "patterns": []
+   }
+  ]
+ },
+ "commands": [
+  "perf record --no-buildid-cache -e cycles:u --user-callchains --call-graph dwarf\\,16384 -F 4000 --delay=-1 --control=fifo:ctl\\,ack -o price-decode.data -- column_decode_bench --slice=12302019-open.itch --expect-sha256=6ef692fc1f1478614aace94dfa50cdcdad4cfa835dc5b228cfd25339bd0fdb0a --expect-messages=6125294 --case=store_decode/add_price --report=report.json --perf-control=ctl --perf-ack=ack --benchmark_color=false",
+  "perf report -i price-decode.data --stdio --no-children -g none -n --show-total-period --sort dso\\,sym >price-decode-self.txt",
+  "perf report -i price-decode.data --stdio --children -g none -n --sort dso\\,sym --percent-limit 0.5 >price-decode-children.txt",
+  "perf report -i price-decode.data --stdio --no-children -g none -n --show-total-period --sort srcfile >price-decode-srcfile.txt",
+  "perf report -i price-decode.data --stdio --no-children -g none -n --sort srcline --percent-limit 0.2 >price-decode-srcline.txt"
+ ]
+}

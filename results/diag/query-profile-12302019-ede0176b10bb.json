@@ -1,0 +1,975 @@
+{
+ "schema": "tick-store-diag-1",
+ "kind": "query-profile",
+ "day": "12302019",
+ "commit": "ede0176b10bb49e505226285530d0b91a33b4f34",
+ "host": "Linux",
+ "measurement": "diagnostic",
+ "statement": "A diagnostic, one run at commit ede0176b10bb, judging no target: each query process's sampled user-mode cycles (cycles:u), store open, engine and digest together, as shares by group of functions. Shares of samples, not times; no time is reported.",
+ "runs": 1,
+ "input": "the store L15 wrote, by bench-lines",
+ "build": {
+  "preset": "bench",
+  "used": "bench-lines",
+  "extra_flags": "-gline-tables-only",
+  "text_identical": true,
+  "note": "the bench preset's build with -gline-tables-only added to every compile and link through the clang driver's CCC_OVERRIDE_OPTIONS, so no CMake variable differs; tools/tick_query's .text is byte for byte the measured build's"
+ },
+ "wrapper": "heavy.sh, taskset -c 2,6,7",
+ "not_established": [],
+ "event": "cycles:u",
+ "frequency_hz": 499,
+ "call_graph": "dwarf,16384, user callchains",
+ "query_parameters_from": "Linux-12302019-full-ede0176b10bb.json",
+ "parameters": [
+  {
+   "name": "Q1",
+   "kind": "rows",
+   "start_ns": 34200000000000,
+   "end_ns": 34201000000000,
+   "locate": -1
+  },
+  {
+   "name": "Q2",
+   "kind": "rows",
+   "start_ns": 34200000000000,
+   "end_ns": 37800000000000,
+   "locate": 6556
+  },
+  {
+   "name": "Q3",
+   "kind": "minute_aggregate",
+   "start_ns": 34200000000000,
+   "end_ns": 37800000000000,
+   "locate": 6556
+  },
+  {
+   "name": "Q4",
+   "kind": "rows",
+   "start_ns": 34200000000000,
+   "end_ns": 34200001000000,
+   "locate": -1
+  },
+  {
+   "name": "Q5",
+   "kind": "column_sum",
+   "start_ns": 0,
+   "end_ns": 0,
+   "locate": -1
+  }
+ ],
+ "store": {
+  "records": 268744780,
+  "segments": 65,
+  "store_version": 3,
+  "segment_records": 4194304,
+  "kernel_level": "avx2"
+ },
+ "queries": [
+  {
+   "name": "Q1",
+   "repetitions": 30,
+   "values_decoded": 27037000,
+   "segments": 1,
+   "kernel_runs": {
+    "avx2": 107809,
+    "neon": 0,
+    "scalar": 0
+   },
+   "samples_recorded": 7415,
+   "samples_in_report": 7415,
+   "samples_header": "7K",
+   "lost_samples": 0,
+   "groups": [
+    {
+     "name": "kernel_addresses",
+     "self_share_percent": 0.197
+    },
+    {
+     "name": "digest",
+     "self_share_percent": 41.621
+    },
+    {
+     "name": "dictionary_decode",
+     "self_share_percent": 3.336
+    },
+    {
+     "name": "pfor_decode",
+     "self_share_percent": 2.004
+    },
+    {
+     "name": "unpack_kernels",
+     "self_share_percent": 4.735
+    },
+    {
+     "name": "zstd",
+     "self_share_percent": 2.138
+    },
+    {
+     "name": "run_positions",
+     "self_share_percent": 6.136
+    },
+    {
+     "name": "time_bases",
+     "self_share_percent": 0.0
+    },
+    {
+     "name": "scan_and_rows",
+     "self_share_percent": 4.111
+    },
+    {
+     "name": "column_decode",
+     "self_share_percent": 0.166
+    },
+    {
+     "name": "store_open",
+     "self_share_percent": 0.305
+    },
+    {
+     "name": "crc",
+     "self_share_percent": 1.21
+    },
+    {
+     "name": "answer_io",
+     "self_share_percent": 0.0
+    },
+    {
+     "name": "containers",
+     "self_share_percent": 0.72
+    },
+    {
+     "name": "memory",
+     "self_share_percent": 0.028
+    },
+    {
+     "name": "libc",
+     "self_share_percent": 7.585
+    },
+    {
+     "name": "libcxx",
+     "self_share_percent": 0.0
+    },
+    {
+     "name": "unresolved",
+     "self_share_percent": 3.546
+    },
+    {
+     "name": "unmatched",
+     "self_share_percent": 22.161,
+     "largest": [
+      {
+       "symbol": "std::__1::expected<void, tick_store::store::ItchStoreError> tick_store::store::(anonymous namespace)::scan_run<tick_stor",
+       "self_share_percent": 13.829
+      },
+      {
+       "symbol": "tick_store::store::(anonymous namespace)::ColumnAccess::ensure(unsigned long, unsigned long)",
+       "self_share_percent": 4.548
+      },
+      {
+       "symbol": "tick_store::codec::read_patches(tick_store::codec::ByteCursor&, unsigned long, unsigned long, unsigned int, tick_store::",
+       "self_share_percent": 1.645
+      },
+      {
+       "symbol": "tick_store::codec::head_delta_decode(std::__1::span<unsigned long, 18446744073709551615ul>)",
+       "self_share_percent": 1.279
+      },
+      {
+       "symbol": "tick_store::store::(anonymous namespace)::PlainSegment::types(unsigned long, unsigned long) const",
+       "self_share_percent": 0.653
+      },
+      {
+       "symbol": "tick_store::codec::scan_for_repeats(std::__1::span<unsigned long const, 18446744073709551615ul>)",
+       "self_share_percent": 0.084
+      },
+      {
+       "symbol": "tick_store::codec::ByteCursor::read_le(unsigned int, std::__1::basic_string_view<char, std::__1::char_traits<char> >)",
+       "self_share_percent": 0.084
+      },
+      {
+       "symbol": "tick_store::store::ContainerParser::block_info(unsigned long) const",
+       "self_share_percent": 0.014
+      },
+      {
+       "symbol": "tick_store::codec::stated_block_count(std::__1::span<std::byte const, 18446744073709551615ul>)",
+       "self_share_percent": 0.014
+      },
+      {
+       "symbol": "tick_store::store::ContainerParser::block_with(unsigned long, tick_store::store::Checksums) const",
+       "self_share_percent": 0.014
+      }
+     ]
+    }
+   ],
+   "lost_samples_at_most": "0.1% of the samples kept and lost",
+   "inclusive": {
+    "limit_percent": 1.0,
+    "note": "null: under the report's limit, or not called",
+    "children_share_percent": {
+     "engine": 54.38,
+     "digest": 42.02,
+     "store_open": null,
+     "decode_dict": null,
+     "decode_pfor": null,
+     "positions_from_runs": 6.41,
+     "decode_zstd_payload": 2.65
+    }
+   },
+   "source_files": null,
+   "engine_share_percent": 54.38,
+   "digest_share_percent": 42.02,
+   "store_open_share_percent": null
+  },
+  {
+   "name": "Q2",
+   "repetitions": 100,
+   "values_decoded": 7559833,
+   "segments": 16,
+   "kernel_runs": {
+    "avx2": 29907,
+    "neon": 0,
+    "scalar": 0
+   },
+   "samples_recorded": 17499,
+   "samples_in_report": 17499,
+   "samples_header": "17K",
+   "lost_samples": 0,
+   "groups": [
+    {
+     "name": "kernel_addresses",
+     "self_share_percent": 0.066
+    },
+    {
+     "name": "digest",
+     "self_share_percent": 79.518
+    },
+    {
+     "name": "dictionary_decode",
+     "self_share_percent": 1.473
+    },
+    {
+     "name": "pfor_decode",
+     "self_share_percent": 0.747
+    },
+    {
+     "name": "unpack_kernels",
+     "self_share_percent": 2.128
+    },
+    {
+     "name": "zstd",
+     "self_share_percent": 0.329
+    },
+    {
+     "name": "run_positions",
+     "self_share_percent": 0.0
+    },
+    {
+     "name": "time_bases",
+     "self_share_percent": 0.0
+    },
+    {
+     "name": "scan_and_rows",
+     "self_share_percent": 0.394
+    },
+    {
+     "name": "column_decode",
+     "self_share_percent": 0.025
+    },
+    {
+     "name": "store_open",
+     "self_share_percent": 0.777
+    },
+    {
+     "name": "crc",
+     "self_share_percent": 0.848
+    },
+    {
+     "name": "answer_io",
+     "self_share_percent": 0.0
+    },
+    {
+     "name": "containers",
+     "self_share_percent": 0.805
+    },
+    {
+     "name": "memory",
+     "self_share_percent": 0.006
+    },
+    {
+     "name": "libc",
+     "self_share_percent": 4.492
+    },
+    {
+     "name": "libcxx",
+     "self_share_percent": 0.0
+    },
+    {
+     "name": "unresolved",
+     "self_share_percent": 0.647
+    },
+    {
+     "name": "unmatched",
+     "self_share_percent": 7.746,
+     "largest": [
+      {
+       "symbol": "std::__1::expected<void, tick_store::store::ItchStoreError> tick_store::store::(anonymous namespace)::scan_run<tick_stor",
+       "self_share_percent": 3.257
+      },
+      {
+       "symbol": "tick_store::store::(anonymous namespace)::locate_segment<tick_store::store::ItchQuery::rows(unsigned long, unsigned long",
+       "self_share_percent": 1.77
+      },
+      {
+       "symbol": "tick_store::store::(anonymous namespace)::ColumnAccess::ensure(unsigned long, unsigned long)",
+       "self_share_percent": 1.572
+      },
+      {
+       "symbol": "tick_store::codec::read_patches(tick_store::codec::ByteCursor&, unsigned long, unsigned long, unsigned int, tick_store::",
+       "self_share_percent": 0.57
+      },
+      {
+       "symbol": "tick_store::codec::head_delta_decode(std::__1::span<unsigned long, 18446744073709551615ul>)",
+       "self_share_percent": 0.29
+      },
+      {
+       "symbol": "tick_store::codec::scan_for_repeats(std::__1::span<unsigned long const, 18446744073709551615ul>)",
+       "self_share_percent": 0.113
+      },
+      {
+       "symbol": "tick_store::store::(anonymous namespace)::PlainSegment::open(tick_store::store::Column) const",
+       "self_share_percent": 0.094
+      },
+      {
+       "symbol": "tick_store::store::ContainerParser::block_info(unsigned long) const",
+       "self_share_percent": 0.029
+      },
+      {
+       "symbol": "tick_store::store::(anonymous namespace)::PlainSegment::before(unsigned long) const",
+       "self_share_percent": 0.028
+      },
+      {
+       "symbol": "tick_store::codec::ByteCursor::take(unsigned long, std::__1::basic_string_view<char, std::__1::char_traits<char> >)",
+       "self_share_percent": 0.006
+      }
+     ]
+    }
+   ],
+   "lost_samples_at_most": "0.1% of the samples kept and lost",
+   "inclusive": {
+    "limit_percent": 1.0,
+    "note": "null: under the report's limit, or not called",
+    "children_share_percent": {
+     "engine": 19.13,
+     "digest": 80.2,
+     "store_open": null,
+     "decode_dict": null,
+     "decode_pfor": null,
+     "positions_from_runs": null,
+     "decode_zstd_payload": null
+    }
+   },
+   "source_files": null,
+   "engine_share_percent": 19.13,
+   "digest_share_percent": 80.2,
+   "store_open_share_percent": null
+  },
+  {
+   "name": "Q3",
+   "repetitions": 100,
+   "values_decoded": 5558116,
+   "segments": 16,
+   "kernel_runs": {
+    "avx2": 21393,
+    "neon": 0,
+    "scalar": 0
+   },
+   "samples_recorded": 2030,
+   "samples_in_report": 2030,
+   "samples_header": "2K",
+   "lost_samples": 0,
+   "groups": [
+    {
+     "name": "kernel_addresses",
+     "self_share_percent": 0.057
+    },
+    {
+     "name": "digest",
+     "self_share_percent": 0.056
+    },
+    {
+     "name": "dictionary_decode",
+     "self_share_percent": 8.232
+    },
+    {
+     "name": "pfor_decode",
+     "self_share_percent": 4.659
+    },
+    {
+     "name": "unpack_kernels",
+     "self_share_percent": 12.374
+    },
+    {
+     "name": "zstd",
+     "self_share_percent": 1.465
+    },
+    {
+     "name": "run_positions",
+     "self_share_percent": 0.0
+    },
+    {
+     "name": "time_bases",
+     "self_share_percent": 0.0
+    },
+    {
+     "name": "scan_and_rows",
+     "self_share_percent": 31.448
+    },
+    {
+     "name": "column_decode",
+     "self_share_percent": 0.046
+    },
+    {
+     "name": "store_open",
+     "self_share_percent": 5.444
+    },
+    {
+     "name": "crc",
+     "self_share_percent": 3.727
+    },
+    {
+     "name": "answer_io",
+     "self_share_percent": 0.0
+    },
+    {
+     "name": "containers",
+     "self_share_percent": 0.444
+    },
+    {
+     "name": "memory",
+     "self_share_percent": 0.165
+    },
+    {
+     "name": "libc",
+     "self_share_percent": 13.141
+    },
+    {
+     "name": "libcxx",
+     "self_share_percent": 0.0
+    },
+    {
+     "name": "unresolved",
+     "self_share_percent": 3.545
+    },
+    {
+     "name": "unmatched",
+     "self_share_percent": 15.197,
+     "largest": [
+      {
+       "symbol": "tick_store::store::(anonymous namespace)::ColumnAccess::ensure(unsigned long, unsigned long)",
+       "self_share_percent": 10.009
+      },
+      {
+       "symbol": "tick_store::codec::read_patches(tick_store::codec::ByteCursor&, unsigned long, unsigned long, unsigned int, tick_store::",
+       "self_share_percent": 4.151
+      },
+      {
+       "symbol": "tick_store::store::(anonymous namespace)::PlainSegment::open(tick_store::store::Column) const",
+       "self_share_percent": 0.709
+      },
+      {
+       "symbol": "tick_store::codec::scan_for_repeats(std::__1::span<unsigned long const, 18446744073709551615ul>)",
+       "self_share_percent": 0.056
+      },
+      {
+       "symbol": "tick_store::store::ContainerParser::block_with(unsigned long, tick_store::store::Checksums) const",
+       "self_share_percent": 0.056
+      },
+      {
+       "symbol": "tick_store::store::primary_codec(tick_store::store::Column)",
+       "self_share_percent": 0.056
+      },
+      {
+       "symbol": "tick_store::codec::ByteCursor::read_le(unsigned int, std::__1::basic_string_view<char, std::__1::char_traits<char> >)",
+       "self_share_percent": 0.055
+      },
+      {
+       "symbol": "_ZNSt3__18__format26__handle_replacement_fieldB9nqe230104ITkNS_19contiguous_iteratorEPKcNS_26basic_format_parse_contextI",
+       "self_share_percent": 0.055
+      },
+      {
+       "symbol": "tick_store::store::locate_runs_of(tick_store::store::SegmentSummary const&)",
+       "self_share_percent": 0.05
+      }
+     ]
+    }
+   ],
+   "lost_samples_at_most": "0.1% of the samples kept and lost",
+   "inclusive": {
+    "limit_percent": 1.0,
+    "note": "null: under the report's limit, or not called",
+    "children_share_percent": {
+     "engine": 96.29,
+     "digest": null,
+     "store_open": null,
+     "decode_dict": null,
+     "decode_pfor": null,
+     "positions_from_runs": null,
+     "decode_zstd_payload": 2.11
+    }
+   },
+   "source_files": null
+  },
+  {
+   "name": "Q4",
+   "repetitions": 30,
+   "values_decoded": 25558344,
+   "segments": 1,
+   "kernel_runs": {
+    "avx2": 102027,
+    "neon": 0,
+    "scalar": 0
+   },
+   "samples_recorded": 3152,
+   "samples_in_report": 3152,
+   "samples_header": "3K",
+   "lost_samples": 0,
+   "groups": [
+    {
+     "name": "kernel_addresses",
+     "self_share_percent": 0.166
+    },
+    {
+     "name": "digest",
+     "self_share_percent": 0.163
+    },
+    {
+     "name": "dictionary_decode",
+     "self_share_percent": 8.858
+    },
+    {
+     "name": "pfor_decode",
+     "self_share_percent": 4.166
+    },
+    {
+     "name": "unpack_kernels",
+     "self_share_percent": 10.186
+    },
+    {
+     "name": "zstd",
+     "self_share_percent": 5.022
+    },
+    {
+     "name": "run_positions",
+     "self_share_percent": 14.149
+    },
+    {
+     "name": "time_bases",
+     "self_share_percent": 0.0
+    },
+    {
+     "name": "scan_and_rows",
+     "self_share_percent": 5.622
+    },
+    {
+     "name": "column_decode",
+     "self_share_percent": 0.097
+    },
+    {
+     "name": "store_open",
+     "self_share_percent": 0.164
+    },
+    {
+     "name": "crc",
+     "self_share_percent": 2.505
+    },
+    {
+     "name": "answer_io",
+     "self_share_percent": 0.0
+    },
+    {
+     "name": "containers",
+     "self_share_percent": 0.672
+    },
+    {
+     "name": "memory",
+     "self_share_percent": 0.129
+    },
+    {
+     "name": "libc",
+     "self_share_percent": 14.723
+    },
+    {
+     "name": "libcxx",
+     "self_share_percent": 0.0
+    },
+    {
+     "name": "unresolved",
+     "self_share_percent": 7.811
+    },
+    {
+     "name": "unmatched",
+     "self_share_percent": 25.567,
+     "largest": [
+      {
+       "symbol": "tick_store::store::(anonymous namespace)::ColumnAccess::ensure(unsigned long, unsigned long)",
+       "self_share_percent": 8.271
+      },
+      {
+       "symbol": "std::__1::expected<void, tick_store::store::ItchStoreError> tick_store::store::(anonymous namespace)::scan_run<tick_stor",
+       "self_share_percent": 8.147
+      },
+      {
+       "symbol": "tick_store::codec::read_patches(tick_store::codec::ByteCursor&, unsigned long, unsigned long, unsigned int, tick_store::",
+       "self_share_percent": 4.323
+      },
+      {
+       "symbol": "tick_store::codec::head_delta_decode(std::__1::span<unsigned long, 18446744073709551615ul>)",
+       "self_share_percent": 2.945
+      },
+      {
+       "symbol": "tick_store::store::(anonymous namespace)::PlainSegment::types(unsigned long, unsigned long) const",
+       "self_share_percent": 1.426
+      },
+      {
+       "symbol": "tick_store::codec::scan_for_repeats(std::__1::span<unsigned long const, 18446744073709551615ul>)",
+       "self_share_percent": 0.195
+      },
+      {
+       "symbol": "tick_store::codec::ByteCursor::read_le(unsigned int, std::__1::basic_string_view<char, std::__1::char_traits<char> >)",
+       "self_share_percent": 0.195
+      },
+      {
+       "symbol": "tick_store::store::ContainerParser::block_info(unsigned long) const",
+       "self_share_percent": 0.033
+      },
+      {
+       "symbol": "tick_store::store::(anonymous namespace)::PlainSegment::open(tick_store::store::Column) const",
+       "self_share_percent": 0.033
+      }
+     ]
+    }
+   ],
+   "lost_samples_at_most": "0.1% of the samples kept and lost",
+   "inclusive": {
+    "limit_percent": 1.0,
+    "note": "null: under the report's limit, or not called",
+    "children_share_percent": {
+     "engine": 91.99,
+     "digest": null,
+     "store_open": null,
+     "decode_dict": null,
+     "decode_pfor": null,
+     "positions_from_runs": 14.88,
+     "decode_zstd_payload": 6.24
+    }
+   },
+   "source_files": null
+  },
+  {
+   "name": "Q5",
+   "repetitions": 30,
+   "values_decoded": 152004760,
+   "segments": 65,
+   "kernel_runs": {
+    "avx2": 747040,
+    "neon": 0,
+    "scalar": 0
+   },
+   "samples_recorded": 13640,
+   "samples_in_report": 13640,
+   "samples_header": "13K",
+   "lost_samples": 0,
+   "groups": [
+    {
+     "name": "kernel_addresses",
+     "self_share_percent": 0.021
+    },
+    {
+     "name": "digest",
+     "self_share_percent": 0.0
+    },
+    {
+     "name": "dictionary_decode",
+     "self_share_percent": 30.495
+    },
+    {
+     "name": "pfor_decode",
+     "self_share_percent": 5.139
+    },
+    {
+     "name": "unpack_kernels",
+     "self_share_percent": 13.652
+    },
+    {
+     "name": "zstd",
+     "self_share_percent": 0.0
+    },
+    {
+     "name": "run_positions",
+     "self_share_percent": 0.0
+    },
+    {
+     "name": "time_bases",
+     "self_share_percent": 0.0
+    },
+    {
+     "name": "scan_and_rows",
+     "self_share_percent": 7.157
+    },
+    {
+     "name": "column_decode",
+     "self_share_percent": 0.066
+    },
+    {
+     "name": "store_open",
+     "self_share_percent": 1.068
+    },
+    {
+     "name": "crc",
+     "self_share_percent": 1.376
+    },
+    {
+     "name": "answer_io",
+     "self_share_percent": 0.0
+    },
+    {
+     "name": "containers",
+     "self_share_percent": 0.574
+    },
+    {
+     "name": "memory",
+     "self_share_percent": 0.057
+    },
+    {
+     "name": "libc",
+     "self_share_percent": 20.615
+    },
+    {
+     "name": "libcxx",
+     "self_share_percent": 0.0
+    },
+    {
+     "name": "unresolved",
+     "self_share_percent": 0.007
+    },
+    {
+     "name": "unmatched",
+     "self_share_percent": 19.772,
+     "largest": [
+      {
+       "symbol": "tick_store::store::(anonymous namespace)::ColumnAccess::ensure(unsigned long, unsigned long)",
+       "self_share_percent": 11.485
+      },
+      {
+       "symbol": "tick_store::codec::read_patches(tick_store::codec::ByteCursor&, unsigned long, unsigned long, unsigned int, tick_store::",
+       "self_share_percent": 6.822
+      },
+      {
+       "symbol": "tick_store::codec::scan_for_repeats(std::__1::span<unsigned long const, 18446744073709551615ul>)",
+       "self_share_percent": 1.295
+      },
+      {
+       "symbol": "tick_store::codec::ByteCursor::read_le(unsigned int, std::__1::basic_string_view<char, std::__1::char_traits<char> >)",
+       "self_share_percent": 0.066
+      },
+      {
+       "symbol": "tick_store::codec::ByteCursor::take(unsigned long, std::__1::basic_string_view<char, std::__1::char_traits<char> >)",
+       "self_share_percent": 0.052
+      },
+      {
+       "symbol": "tick_store::store::(anonymous namespace)::PlainSegment::open(tick_store::store::Column) const",
+       "self_share_percent": 0.022
+      },
+      {
+       "symbol": "tick_store::store::ContainerParser::block_info(unsigned long) const",
+       "self_share_percent": 0.015
+      },
+      {
+       "symbol": "tick_store::store::(anonymous namespace)::PlainSegment::parse()",
+       "self_share_percent": 0.007
+      },
+      {
+       "symbol": "tick_store::store::ContainerParser::block(unsigned long) const",
+       "self_share_percent": 0.007
+      }
+     ]
+    }
+   ],
+   "lost_samples_at_most": "0.1% of the samples kept and lost",
+   "inclusive": {
+    "limit_percent": 1.0,
+    "note": "null: under the report's limit, or not called",
+    "children_share_percent": {
+     "engine": 99.96,
+     "digest": null,
+     "store_open": null,
+     "decode_dict": null,
+     "decode_pfor": null,
+     "positions_from_runs": null,
+     "decode_zstd_payload": null
+    }
+   },
+   "source_files": null
+  }
+ ],
+ "group_table": {
+  "rule": "a symbol goes to the first group with a pattern that matches it: name patterns are matched from the start of the function's qualified name, its return type and parameters dropped; dso against the shared object; level against perf's [k] or [.] mark",
+  "groups": [
+   {
+    "name": "kernel_addresses",
+    "what": "samples perf placed at a kernel address though only user mode was counted",
+    "patterns": [
+     "level: k"
+    ]
+   },
+   {
+    "name": "digest",
+    "what": "the answer's SHA-256 digest, made after the engine's clock stops",
+    "patterns": [
+     "name: tick_store::harness::(?:\\(anonymous namespace\\)::)?(?:rows_digest|aggregate_digest|load_be32)$",
+     "name: tick_store::harness::(?:Sha256::|sha256$|to_hex$)"
+    ]
+   },
+   {
+    "name": "dictionary_decode",
+    "what": "dictionary and ranked decode",
+    "patterns": [
+     "name: tick_store::codec::(?:\\(anonymous namespace\\)::)?(?:decode_dict\\w*|read_huffman)$"
+    ]
+   },
+   {
+    "name": "pfor_decode",
+    "what": "PFOR block decode",
+    "patterns": [
+     "name: tick_store::codec::(?:\\(anonymous namespace\\)::)?decode_pfor\\w*$"
+    ]
+   },
+   {
+    "name": "unpack_kernels",
+    "what": "the unpack, delta and add kernels of every kernel set",
+    "patterns": [
+     "name: tick_store::codec::simd::",
+     "name: tick_store::codec::(?:unpack_vector|unpack_linear)$"
+    ]
+   },
+   {
+    "name": "zstd",
+    "what": "zstd and its entropy coders",
+    "patterns": [
+     "name: (?:ZSTD|HUF|FSE|HIST|ZSTDMT|POOL|ZDICT|ERR|XXH)\\w*",
+     "name: tick_store::codec::(?:\\(anonymous namespace\\)::)?(?:encode|decode)_zstd_payload$"
+    ]
+   },
+   {
+    "name": "run_positions",
+    "what": "positions from the per-locate runs",
+    "patterns": [
+     "name: tick_store::store::(?:\\(anonymous namespace\\)::)?positions_from_runs$"
+    ]
+   },
+   {
+    "name": "time_bases",
+    "what": "timestamps from their time bases",
+    "patterns": [
+     "name: tick_store::store::(?:\\(anonymous namespace\\)::)?(?:time_bases|time_residuals|each_with_base)$"
+    ]
+   },
+   {
+    "name": "scan_and_rows",
+    "what": "the query engine's scan and its rows",
+    "patterns": [
+     "name: tick_store::store::ItchQuery::",
+     "name: tick_store::store::(?:\\(anonymous namespace\\)::)?(?:scan_run|locate_segment|all_segment|all_positions|open_scan_columns|plain_segment|open_stocks|stock_of|count_whole_segment|exact_segment|zone_range|file_range|seed_before|may_hold|bit_of|rank_of)$"
+    ]
+   },
+   {
+    "name": "column_decode",
+    "what": "the column and block decode drivers",
+    "patterns": [
+     "name: tick_store::codec::(?:\\(anonymous namespace\\)::)?(?:decode_column|read_block_header|check_block_values|reserve_for_block)$",
+     "name: tick_store::store::(?:\\(anonymous namespace\\)::)?(?:decode_column|column_block_decoder|block_decoder|unwrap_column|widen)$"
+    ]
+   },
+   {
+    "name": "store_open",
+    "what": "opening the store: container, footer, metadata and symbols",
+    "patterns": [
+     "name: tick_store::store::(?:ItchStoreReader|ContainerReader|MappedFile)::",
+     "name: tick_store::store::(?:\\(anonymous namespace\\)::)?(?:parse_store_header|parse_column_metadata|parse_seek|check_run_directory)$",
+     "name: tick_store::store::SymbolTable::"
+    ]
+   },
+   {
+    "name": "crc",
+    "what": "CRC32C",
+    "patterns": [
+     "name: tick_store::store::.*crc32c"
+    ]
+   },
+   {
+    "name": "answer_io",
+    "what": "reading requests and writing answers",
+    "patterns": [
+     "name: tick_store::harness::",
+     "name: std::(?:__1::)?(?:__format\\w*|vformat\\w*|format\\w*|__formatter\\w*|basic_ostream|basic_istream|getline|__put_character_sequence)"
+    ]
+   },
+   {
+    "name": "containers",
+    "what": "the standard library's vectors, strings and hash tables, as compiled into the binary: growth, copies, assignment",
+    "patterns": [
+     "name: std::(?:__1::)?(?:vector|basic_string|deque|unordered_map|__hash_table)<"
+    ]
+   },
+   {
+    "name": "memory",
+    "what": "allocation and copies, where the C library's symbols resolve",
+    "patterns": [
+     "name: (?:malloc|free|calloc|realloc|cfree|_int_malloc|_int_free\\w*|_int_realloc|malloc_consolidate|sysmalloc|tcache\\w*|unlink_chunk\\w*|__libc_(?:malloc|free|calloc|realloc)|operator new|operator delete|__mem(?:move|cpy|set|cmp)\\w*|__mempcpy\\w*|mem(?:cpy|move|set|cmp)|mmap\\w*|munmap|brk|sbrk)(?:@plt)?$"
+    ]
+   },
+   {
+    "name": "libc",
+    "what": "the C library, its addresses unresolved",
+    "patterns": [
+     "dso: libc\\.so"
+    ]
+   },
+   {
+    "name": "libcxx",
+    "what": "the C++ library",
+    "patterns": [
+     "dso: libc\\+\\+(?:abi)?\\.so"
+    ]
+   },
+   {
+    "name": "unresolved",
+    "what": "addresses with no symbol",
+    "patterns": [
+     "name: (?:0x[0-9a-f]+|\\[unknown\\])$"
+    ]
+   },
+   {
+    "name": "unmatched",
+    "what": "symbols no pattern above matches, kept apart and never spread over the groups",
+    "patterns": []
+   }
+  ]
+ },
+ "commands": [
+  "perf record --no-buildid-cache -e cycles:u --user-callchains --call-graph dwarf\\,16384 -F 499 -o Q1.data -- tick_query diag-day.tsc --day 12302019 <Q1.jsonl",
+  "perf record --no-buildid-cache -e cycles:u --user-callchains --call-graph dwarf\\,16384 -F 499 -o Q2.data -- tick_query diag-day.tsc --day 12302019 <Q2.jsonl",
+  "perf record --no-buildid-cache -e cycles:u --user-callchains --call-graph dwarf\\,16384 -F 499 -o Q3.data -- tick_query diag-day.tsc --day 12302019 <Q3.jsonl",
+  "perf record --no-buildid-cache -e cycles:u --user-callchains --call-graph dwarf\\,16384 -F 499 -o Q4.data -- tick_query diag-day.tsc --day 12302019 <Q4.jsonl",
+  "perf record --no-buildid-cache -e cycles:u --user-callchains --call-graph dwarf\\,16384 -F 499 -o Q5.data -- tick_query diag-day.tsc --day 12302019 <Q5.jsonl",
+  "perf report -i Q1.data --stdio --no-children -g none -n --show-total-period --sort dso\\,sym >Q1-self.txt",
+  "perf report -i Q1.data --stdio --children -g none -n --sort dso\\,sym --percent-limit 1 >Q1-children.txt",
+  "perf report -i Q2.data --stdio --no-children -g none -n --show-total-period --sort dso\\,sym >Q2-self.txt",
+  "perf report -i Q2.data --stdio --children -g none -n --sort dso\\,sym --percent-limit 1 >Q2-children.txt",
+  "perf report -i Q3.data --stdio --no-children -g none -n --show-total-period --sort dso\\,sym >Q3-self.txt",
+  "perf report -i Q3.data --stdio --children -g none -n --sort dso\\,sym --percent-limit 1 >Q3-children.txt",
+  "perf report -i Q4.data --stdio --no-children -g none -n --show-total-period --sort dso\\,sym >Q4-self.txt",
+  "perf report -i Q4.data --stdio --children -g none -n --sort dso\\,sym --percent-limit 1 >Q4-children.txt",
+  "perf report -i Q5.data --stdio --no-children -g none -n --show-total-period --sort dso\\,sym >Q5-self.txt",
+  "perf report -i Q5.data --stdio --children -g none -n --sort dso\\,sym --percent-limit 1 >Q5-children.txt"
+ ]
+}

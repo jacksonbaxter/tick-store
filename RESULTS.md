@@ -24,39 +24,39 @@ Every target in BENCHMARKS.md, on each host it states. Each value is read from t
 | G-1 | any | every record bit-exact, both stream hashes equal; judged on the full pinned day, on each host it ran, and the second day | 12302019 macOS: verdict pass, records mismatched 0, hashes match true; 12302019 Linux: verdict pass, records mismatched 0, hashes match true; 10302019 macOS: verdict pass, records mismatched 0, hashes match true | met | `results/roundtrip-12302019.json`, `results/roundtrip-12302019-linux.json`, `results/roundtrip-10302019.json` |
 | G-2 | any | a flipped bit is caught, and the restored store passes; judged on a data block and the footer flipped, CRCs on and off | 12302019: flipped store exits 1, data block, CRCs on: mismatch, data block, CRCs off: mismatch, footer, CRCs on: mismatch, footer, CRCs off: mismatch, restored store exits 0; 10302019: flipped store exits 1, data block, CRCs on: mismatch, data block, CRCs off: mismatch, footer, CRCs on: mismatch, footer, CRCs off: mismatch, restored store exits 0 | met | `results/roundtrip-12302019.json`, `results/roundtrip-10302019.json` |
 | G-3 | any | each libFuzzer target clean for 30 minutes under heavy.sh; judged on every target of fuzz/CMakeLists.txt on macOS, and on Linux, at avx2, each target whose decode reaches the AVX2 kernels or that verifies CRC32C, which runs the SSE4.2 kernel there; check_fuzz.py refuses the file if one is missing | macOS: targets clean for 1,800 s: 13 against 13, shortest run 1,801 s against 1,800 s; Linux, AVX2 and SSE4.2 CRC32C paths: targets clean for 1,800 s: 7 against 7, shortest run 1,801 s against 1,800 s | not judged on this code: `fuzz-g3-ea1dde4c02e4.json` was made at `ea1dde4c02e4`, before G-3 was tied to the code it judged, and each timed run held its corpus replay | `results/fuzz-g3-ea1dde4c02e4.json` |
-| G-4 | any | Gorilla delta-of-delta and XOR built, exact, and measured on this data; judged on codec-eval's exactness on the whole day, and the decode benchmark | delta-of-delta exact: true; XOR on doubles exact: true; XOR decode measured, values/s: 119,148,490 | met | `results/codec-eval-12302019.json`, `results/bench/macOS-column_decode-bcbf8738d892.json` |
+| G-4 | any | Gorilla delta-of-delta and XOR built, exact, and measured on this data; judged on codec-eval's exactness on the whole day, and the decode benchmark | delta-of-delta exact: true; XOR on doubles exact: true; XOR decode measured, values/s: 112,402,492 | met | `results/codec-eval-12302019.json`, `results/bench/macOS-column_decode-ede0176b10bb.json` |
 | CR-1 | any | at least 2.3415 | 4.6930 | met | `results/store-size-12302019.json` |
-| CR-2 | Linux | smaller than each system's smallest variant, class B, full day | against Parquet: 1,758,240,768 B against 3,191,406,592 B; against ArcticDB: 1,758,240,768 B against 5,666,115,584 B; against QuestDB: 1,758,240,768 B against 22,897,786,880 B | met | `results/compare/Linux-12302019-full-67ae574f5666.json` |
+| CR-2 | Linux | smaller than each system's smallest variant, class B, full day | against Parquet: 1,758,240,768 B against 3,091,881,984 B; against ArcticDB: 1,758,240,768 B against 5,665,198,080 B; against QuestDB: 1,758,240,768 B against 22,897,786,880 B | met | `results/compare/Linux-12302019-full-ede0176b10bb.json` |
 | CR-3 | any | at most 20.000 bits; judged on the best codec in each order (codec-eval), and the store as built | file order: 18.757 bits; per locate: 25.488 bits, leaving out the locate sequence that rebuilds file order; store as built, with its time bases: 22.819 bits | met on (file order); missed on (per locate), (store as built, with its time bases) | `results/codec-eval-12302019.json`, `results/store-size-12302019.json` |
 | CR-4 | any | at most 7.900 bits; judged on the best codec in each order (codec-eval), and the store as built | file order: 15.254 bits; per locate: 6.264 bits, leaving out the locate sequence that rebuilds file order; per locate and side: 5.480 bits, leaving out the locate sequence that rebuilds file order; store as built: 4.606 bits | met on (per locate), (per locate and side), (store as built); missed on (file order) | `results/codec-eval-12302019.json`, `results/store-size-12302019.json` |
 | CR-5 | any | at least 1.530x; judged on Gorilla's bits over the best integer codec's, same column and order, against XOR on the dollar doubles and against the best Gorilla variant | add, file order, over XOR on dollars: 3.554x; add, per locate, over XOR on dollars: 5.889x, leaving out the locate sequence that rebuilds file order; add, per locate and side, over XOR on dollars: 5.976x, leaving out the locate sequence that rebuilds file order; U, over XOR on dollars: 3.559x; C, over XOR on dollars: 2.987x; P, over XOR on dollars: 3.017x; add, file order, over the best Gorilla: 1.503x; add, per locate, over the best Gorilla: 2.117x, leaving out the locate sequence that rebuilds file order; add, per locate and side, over the best Gorilla: 2.122x, leaving out the locate sequence that rebuilds file order; U, over the best Gorilla: 1.511x; C, over the best Gorilla: 1.237x; P, over the best Gorilla: 1.339x | met on (add, file order, over XOR on dollars), (add, per locate, over XOR on dollars), (add, per locate and side, over XOR on dollars), (U, over XOR on dollars), (C, over XOR on dollars), (P, over XOR on dollars), (add, per locate, over the best Gorilla), (add, per locate and side, over the best Gorilla); missed on (add, file order, over the best Gorilla), (U, over the best Gorilla), (C, over the best Gorilla), (P, over the best Gorilla) | `results/codec-eval-12302019.json` |
 | CR-6 | any | at most 11.200 bits; judged on creations, and references that name an order as distances within its stock (codec-eval), and the store as built | A, F and U new together: 7.797 bits; E as stock distance: 9.217 bits; C as stock distance: 6.110 bits; X as stock distance: 7.068 bits; D as stock distance: 7.478 bits; U original as stock distance: 6.755 bits; store's creation_ref: 11.363 bits; store's ref_distance: 7.563 bits; store's import_ref: 25.943 bits | met on (A, F and U new together), (E as stock distance), (C as stock distance), (X as stock distance), (D as stock distance), (U original as stock distance), (store's ref_distance); missed on (store's creation_ref), (store's import_ref) | `results/codec-eval-12302019.json`, `results/store-size-12302019.json` |
 | CR-7 | any | at most 3.800 bits; judged on the best codec on each shares column (codec-eval), and the store as built | A and F, file order: 3.687 bits; A and F, per locate: 2.614 bits, leaving out the locate sequence that rebuilds file order; U: 2.570 bits; E: 6.077 bits; C: 4.842 bits; X: 5.275 bits; E, C and X against the remaining shares: 3.907 bits; P: 5.711 bits; Q: 7.758 bits; I: 5.068 bits; store's add_shares: 4.165 bits; store's reduce_shares: 7.284 bits; store's replace_shares: 2.899 bits | met on (A and F, file order), (A and F, per locate), (U), (store's replace_shares); missed on (E), (C), (X), (E, C and X against the remaining shares), (P), (Q), (I), (store's add_shares), (store's reduce_shares) | `results/codec-eval-12302019.json`, `results/store-size-12302019.json` |
-| DS-1 | macOS | at most 2.120 ns | 8.393 ns | missed | `results/bench/macOS-column_decode-bcbf8738d892.json` |
-| DS-2 | Linux | at most 21.30 cycles | 60.91 cycles | missed | `results/bench/Linux-column_decode-bcbf8738d892.json` |
-| DS-3 | macOS | at least 3.60 G values/s | 3.35 G values/s | missed | `results/bench/macOS-simd_kernel-bcbf8738d892.json` |
-| DS-4 | Linux | at most 0.377 cycles | no figure | not judged: no reported Linux kernel file: all five runs, two at bcbf873 and three at b053aff, were refused by check_results.py's sibling rule, cpu5 over 5% busy in 4 to 13 of 314 cases (docs/NOTES.md, DS-4: three more refusals) | none |
-| DS-5 | macOS | at least 4,605 MB/s | 3,674 MB/s | missed | `results/bench/macOS-column_decode-bcbf8738d892.json` |
-| DS-5 | Linux | at least 4,605 MB/s | 1,280 MB/s | missed | `results/bench/Linux-column_decode-bcbf8738d892.json` |
-| DS-6 | macOS | at least 14.00x; judged on Gorilla's ns a value over the layout's, the same values, one results file | timestamps: 16.06x; prices: 3.85x | met on (timestamps); missed on (prices) | `results/bench/macOS-column_decode-bcbf8738d892.json` |
-| DS-7 | Linux | none published (UNCONFIRMED); the speedup and the instruction set, AVX2 | timestamps: 7.58x; prices: 3.29x | not judged: no published figure, reported as measured | `results/bench/Linux-column_decode-bcbf8738d892.json` |
-| DS-8 | macOS | at least 8.20 GB/s; judged on counted as 32-bit values, values a second times 4 | 11.77 GB/s | met | `results/bench/macOS-simd_kernel-bcbf8738d892.json` |
-| DS-9 | macOS | none published (UNCONFIRMED); the figure, NEON build | Gorilla: 9.650 ns; PFOR delta-of-delta: 0.880 ns | not judged: no published figure, reported as measured | `results/bench/macOS-column_decode-bcbf8738d892.json` |
-| DS-9 | Linux | none published (UNCONFIRMED); the figure, AVX2 build | Gorilla: 22.204 ns; PFOR delta-of-delta: 3.151 ns | not judged: no published figure, reported as measured | `results/bench/Linux-column_decode-bcbf8738d892.json` |
-| WT-1 | Linux | at least 8.59 M records/s | 1.376 M records/s | missed | `results/compare/Linux-12302019-full-67ae574f5666.json` |
-| WT-1 | macOS | at least 8.59 M records/s | 3.215 M records/s | missed | `results/compare/macOS-12302019-full-tickstore-2503d1e7c5f6.json` |
-| WT-2 | Linux | above 2,732,762 messages/s | class A: 1.376 M messages/s; class B: 1.423 M messages/s | missed | `results/compare/Linux-12302019-full-67ae574f5666.json` |
-| WT-2 | macOS | above 2,732,762 messages/s | class A: 3.215 M messages/s; class B: 3.208 M messages/s | met | `results/compare/macOS-12302019-full-tickstore-2503d1e7c5f6.json` |
-| WT-3 | Linux | class A write no slower than each system's headline; judged on both clocks, met against a system only if tick-store is no slower on its total seconds, the whole write clock, and on its engine-only seconds, that clock less reading the input and putting it in the form the system's call takes (compare/README.md, A write's two times); a write that keeps no engine-only figure is not judged on it | against Parquet: total 195.3 s against 158.4 s, engine-only 195.0 s against 81.1 s; against ArcticDB: total 195.3 s against 120.1 s, engine-only 195.0 s against 34.6 s; against QuestDB: total 195.3 s against 273.6 s, engine-only 195.0 s against 151.0 s | missed; inputs of the class A writes, from each write's record: tick-store's input is in memory before the clock starts: 2,014,504 of its 2,014,504 pages resident at the clock's start, with no device-read figure; the records of Parquet, ArcticDB and QuestDB keep no residency or device-read figure. Engine-only, by each write's record: the total less python_seconds | `results/compare/Linux-12302019-full-67ae574f5666.json` |
+| DS-1 | macOS | at most 2.120 ns | 8.897 ns | missed | `results/bench/macOS-column_decode-ede0176b10bb.json` |
+| DS-2 | Linux | at most 21.30 cycles | 60.66 cycles | missed | `results/bench/Linux-column_decode-ede0176b10bb.json` |
+| DS-3 | macOS | at least 3.60 G values/s | 3.40 G values/s | missed | `results/bench/macOS-simd_kernel-ede0176b10bb.json` |
+| DS-4 | Linux | at most 0.377 cycles | 2.709 cycles | missed | `results/bench/Linux-simd_kernel-ede0176b10bb.json` |
+| DS-5 | macOS | at least 4,605 MB/s | 3,367 MB/s | missed | `results/bench/macOS-column_decode-ede0176b10bb.json` |
+| DS-5 | Linux | at least 4,605 MB/s | 1,301 MB/s | missed | `results/bench/Linux-column_decode-ede0176b10bb.json` |
+| DS-6 | macOS | at least 14.00x; judged on Gorilla's ns a value over the layout's, the same values, one results file | timestamps: 15.44x; prices: 3.74x | met on (timestamps); missed on (prices) | `results/bench/macOS-column_decode-ede0176b10bb.json` |
+| DS-7 | Linux | none published (UNCONFIRMED); the speedup and the instruction set, AVX2 | timestamps: 7.76x; prices: 3.35x | not judged: no published figure, reported as measured | `results/bench/Linux-column_decode-ede0176b10bb.json` |
+| DS-8 | macOS | at least 8.20 GB/s; judged on counted as 32-bit values, values a second times 4 | 11.09 GB/s | met | `results/bench/macOS-simd_kernel-ede0176b10bb.json` |
+| DS-9 | macOS | none published (UNCONFIRMED); the figure, NEON build | Gorilla: 9.886 ns; PFOR delta-of-delta: 0.924 ns | not judged: no published figure, reported as measured | `results/bench/macOS-column_decode-ede0176b10bb.json` |
+| DS-9 | Linux | none published (UNCONFIRMED); the figure, AVX2 build | Gorilla: 22.456 ns; PFOR delta-of-delta: 3.146 ns | not judged: no published figure, reported as measured | `results/bench/Linux-column_decode-ede0176b10bb.json` |
+| WT-1 | Linux | at least 8.59 M records/s | 1.270 M records/s | missed | `results/compare/Linux-12302019-full-ede0176b10bb.json` |
+| WT-1 | macOS | at least 8.59 M records/s | 3.302 M records/s | missed | `results/compare/macOS-12302019-full-tickstore-ede0176b10bb.json` |
+| WT-2 | Linux | above 2,732,762 messages/s | class A: 1.270 M messages/s; class B: 1.410 M messages/s | missed; (class B) rests on tick-store's `v3-seg4Mi` class B write 1, which held a remote login by this project, 2026-11-15 03:22 UTC, to the minute | `results/compare/Linux-12302019-full-ede0176b10bb.json` |
+| WT-2 | macOS | above 2,732,762 messages/s | class A: 3.302 M messages/s; class B: 3.360 M messages/s | met | `results/compare/macOS-12302019-full-tickstore-ede0176b10bb.json` |
+| WT-3 | Linux | class A write no slower than each system's headline; judged on both clocks, met against a system only if tick-store is no slower on its total seconds, the whole write clock, and on its engine-only seconds, that clock less reading the input and putting it in the form the system's call takes (compare/README.md, A write's two times); a write that keeps no engine-only figure is not judged on it | against Parquet: total 211.7 s against 168.7 s, engine-only 211.3 s against 80.9 s; against ArcticDB: total 211.7 s against 111.5 s, engine-only 211.3 s against 35.1 s; against QuestDB: total 211.7 s against 678.7 s, engine-only 211.3 s against 193.8 s | missed; inputs of the class A writes, from each write's record: tick-store's input, `12302019.NASDAQ_ITCH50`, is in memory before the clock starts: 2,014,504 of its 2,014,504 pages resident at the clock's start, made resident by 1 warm, and 250,916,864 B read from the device inside the clock, block device stat, sectors read, machine-wide; Parquet's input, `12302019-full`, is read from disk inside the clock: 2,259,585 of its 5,825,603 pages resident at the clock's start, made ready by nothing: the input is taken as the cache holds it, and 19,501,752,320 B read from the device inside the clock, block device stat, sectors read, machine-wide; ArcticDB's input, `12302019-full`, is read from disk inside the clock: 2,373,595 of its 5,825,603 pages resident at the clock's start, made ready by nothing: the input is taken as the cache holds it, and 18,411,094,016 B read from the device inside the clock, block device stat, sectors read, machine-wide; QuestDB's input, `12302019-full`, is read from disk inside the clock: 2,533,467 of its 5,825,603 pages resident at the clock's start, made ready by nothing: the input is taken as the cache holds it, and 21,521,625,088 B read from the device inside the clock, block device stat, sectors read, machine-wide. Engine-only, by each write's record: for tick-store, the total less python_seconds, the process's start and exit: tick_roundtrip's own wall time; for Parquet, the total less python_seconds, the reading of the chunks: the writer and, under class B, the flush; for ArcticDB, the total less python_seconds, the reading, the frames and the partitioning by locate: ArcticDB's write, append, write_batch and list_symbols calls, and LMDB's commits; for QuestDB, the total less python_seconds, the reading and the dictionary encoding: the client's send, the server's WAL apply and the wait until every row is visible. Engine-only does not remove the difference in where the inputs are: the device bytes are counted over the whole clock, so engine-only may hold them as well, and Parquet's engine-only went from 81.1 s on the replaced run to 80.9 s, ArcticDB's engine-only went from 34.6 s on the replaced run to 35.1 s, QuestDB's engine-only went from 151.0 s on the replaced run to 193.8 s | `results/compare/Linux-12302019-full-ede0176b10bb.json` |
 | WT-3 | macOS | class A write no slower than each system's headline | no figure | not judged: the four-system full day runs on Linux only; on macOS tick-store ran the day alone, and the slice files make no claim about a full day | none |
-| WT-4 | Linux | class B write no slower than each system's headline, at its stated flush; judged on both clocks, met against a system only if tick-store is no slower on its total seconds, the whole write clock, and on its engine-only seconds, that clock less reading the input and putting it in the form the system's call takes (compare/README.md, A write's two times); a write that keeps no engine-only figure is not judged on it | against Parquet: total 188.9 s against 266.3 s, engine-only 188.5 s against 98.4 s; against ArcticDB: total 188.9 s against 123.6 s, engine-only 188.5 s against 42.6 s; against QuestDB, not like-for-like: total 188.9 s against 1,269.2 s, engine-only 188.5 s against 1,137.3 s | met on (against QuestDB, not like-for-like); missed on (against Parquet), (against ArcticDB); inputs of the class B writes, from each write's record: tick-store's input is in memory before the clock starts: 2,014,504 of its 2,014,504 pages resident at the clock's start, with no device-read figure; the records of Parquet, ArcticDB and QuestDB keep no residency or device-read figure. Engine-only, by each write's record: the total less python_seconds | `results/compare/Linux-12302019-full-67ae574f5666.json` |
-| QL-1 | Linux | at most 16.90 ms | 74.32 ms | missed | `results/compare/Linux-12302019-full-67ae574f5666.json` |
-| QL-1 | macOS | at most 16.90 ms | 25.79 ms | missed | `results/compare/macOS-12302019-full-tickstore-2503d1e7c5f6.json` |
-| QL-2 | Linux | at most 0.41 ms | 35.81 ms | missed | `results/compare/Linux-12302019-full-67ae574f5666.json` |
-| QL-2 | macOS | at most 0.41 ms | 14.69 ms | missed | `results/compare/macOS-12302019-full-tickstore-2503d1e7c5f6.json` |
-| QL-3 | Linux | at most 10.00 ms | 308.83 ms | missed | `results/compare/Linux-12302019-full-67ae574f5666.json` |
-| QL-3 | macOS | at most 10.00 ms | 133.63 ms | missed | `results/compare/macOS-12302019-full-tickstore-2503d1e7c5f6.json` |
-| QL-4 | Linux | lowest median and p99 of the four headlines, each query, warm and cold | Q1 warm: 297.58 ms / 325.72 ms against ArcticDB's 37.41 ms / 67.98 ms (median / slowest of 30); Q1 cold: 406.96 ms / 461.20 ms against ArcticDB's 83.18 ms / 89.98 ms (median / slowest of 7); Q2 warm: 74.32 ms / 83.95 ms against QuestDB's 319.30 ms / 364.42 ms (median / slowest of 30), met among the four headline variants, though ArcticDB's `rows100k-cols127-per-security` is faster, 49.65 ms / 70.43 ms; Q2 cold: 485.13 ms / 500.41 ms against Parquet's 3,957.57 ms / 4,081.60 ms (median / slowest of 7), met among the four headline variants, though ArcticDB's `rows100k-cols127-per-security` is faster, 111.23 ms / 113.65 ms; Q3 warm: 35.81 ms / 36.53 ms against QuestDB's 68.71 ms / 85.62 ms (median / slowest of 30), met among the four headline variants, though ArcticDB's `rows100k-cols127-per-security` is faster, 26.19 ms / 33.20 ms; Q3 cold: 214.40 ms / 226.00 ms against Parquet's 2,112.55 ms / 2,513.76 ms (median / slowest of 7), met among the four headline variants, though ArcticDB's `rows100k-cols127-per-security` is faster, 91.93 ms / 99.04 ms; Q4 warm: 207.10 ms / 217.01 ms against QuestDB's 1.18 ms / 1.75 ms (median / slowest of 30); Q4 cold: 302.45 ms / 341.35 ms against ArcticDB's 23.46 ms / 25.08 ms (median / slowest of 7); Q5 warm: 907.64 ms / 936.87 ms against QuestDB's 61.07 ms / 73.75 ms (median / slowest of 30); Q5 cold: 1,233.89 ms / 1,283.58 ms against Parquet's 1,718.55 ms / 1,725.01 ms (median / slowest of 7), met among the four headline variants | met on (Q2 warm), (Q2 cold), (Q3 warm), (Q3 cold), (Q5 cold); missed on (Q1 warm), (Q1 cold), (Q4 warm), (Q4 cold), (Q5 warm); p99 measured as the slowest of 30 runs warm and the slowest of 7 runs cold | `results/compare/Linux-12302019-full-67ae574f5666.json` |
+| WT-4 | Linux | class B write no slower than each system's headline, at its stated flush; judged on both clocks, met against a system only if tick-store is no slower on its total seconds, the whole write clock, and on its engine-only seconds, that clock less reading the input and putting it in the form the system's call takes (compare/README.md, A write's two times); a write that keeps no engine-only figure is not judged on it | against Parquet: total 190.7 s against 211.9 s, engine-only 190.3 s against 92.5 s; against ArcticDB: total 190.7 s against 381.4 s, engine-only 190.3 s against 291.8 s, and on the replaced run, `results/compare/replaced/Linux-12302019-full-67ae574f5666.json`, total 188.9 s against 123.6 s, engine-only 188.5 s against 42.6 s; against QuestDB, not like-for-like: total 190.7 s against 1,595.6 s, engine-only 190.3 s against 1,459.5 s | met on (against QuestDB, not like-for-like); missed on (against Parquet), (against ArcticDB); (against ArcticDB) met on this run's figures, a change that favours tick-store, and missed on the replaced run's, so counted missed; every part rests on tick-store's `v3-seg4Mi` class B write 1, which held a remote login by this project, 2026-11-15 03:22 UTC, to the minute, where the replaced run's total is 188.9 s; (against QuestDB, not like-for-like) rests on QuestDB's `plain` class B write 1, which held the host's scheduled backup job, 2026-11-15 00:13:09 to 00:17:11 UTC, where the replaced run's total is 1,269.2 s; inputs of the class B writes, from each write's record: tick-store's input, `12302019.NASDAQ_ITCH50`, is in memory before the clock starts: 2,014,504 of its 2,014,504 pages resident at the clock's start, made resident by 1 warm, and 274,239,488 B read from the device inside the clock, block device stat, sectors read, machine-wide; Parquet's input, `12302019-full`, is read from disk inside the clock: 4,033 of its 5,825,603 pages resident at the clock's start, made ready by nothing: the input is taken as the cache holds it, and 23,846,309,888 B read from the device inside the clock, block device stat, sectors read, machine-wide; ArcticDB's input, `12302019-full`, is read from disk inside the clock: 4,033 of its 5,825,603 pages resident at the clock's start, made ready by nothing: the input is taken as the cache holds it, and 23,850,713,088 B read from the device inside the clock, block device stat, sectors read, machine-wide; QuestDB's input, `12302019-full`, is read from disk inside the clock: 4,033 of its 5,825,603 pages resident at the clock's start, made ready by nothing: the input is taken as the cache holds it, and 24,631,062,528 B read from the device inside the clock, block device stat, sectors read, machine-wide. Engine-only, by each write's record: for tick-store, the total less python_seconds, the process's start and exit: tick_roundtrip's own wall time; for Parquet, the total less python_seconds, the reading of the chunks: the writer and, under class B, the flush; for ArcticDB, the total less python_seconds, the reading, the frames and the partitioning by locate: ArcticDB's write, append, write_batch and list_symbols calls, and LMDB's commits; for QuestDB, the total less python_seconds, the reading and the dictionary encoding: the client's send, the server's WAL apply and the wait until every row is visible. Engine-only does not remove the difference in where the inputs are: the device bytes are counted over the whole clock, so engine-only may hold them as well, and Parquet's engine-only went from 98.4 s on the replaced run to 92.5 s, ArcticDB's engine-only went from 42.6 s on the replaced run to 291.8 s, QuestDB's engine-only went from 1,137.3 s on the replaced run to 1,459.5 s | `results/compare/Linux-12302019-full-ede0176b10bb.json`, `results/compare/replaced/Linux-12302019-full-67ae574f5666.json` |
+| QL-1 | Linux | at most 16.90 ms | 74.04 ms | missed | `results/compare/Linux-12302019-full-ede0176b10bb.json` |
+| QL-1 | macOS | at most 16.90 ms | 25.28 ms | missed | `results/compare/macOS-12302019-full-tickstore-ede0176b10bb.json` |
+| QL-2 | Linux | at most 0.41 ms | 36.07 ms | missed | `results/compare/Linux-12302019-full-ede0176b10bb.json` |
+| QL-2 | macOS | at most 0.41 ms | 15.06 ms | missed | `results/compare/macOS-12302019-full-tickstore-ede0176b10bb.json` |
+| QL-3 | Linux | at most 10.00 ms | 356.09 ms | missed | `results/compare/Linux-12302019-full-ede0176b10bb.json` |
+| QL-3 | macOS | at most 10.00 ms | 136.16 ms | missed | `results/compare/macOS-12302019-full-tickstore-ede0176b10bb.json` |
+| QL-4 | Linux | lowest median and p99 of the four headlines, each query, warm and cold | Q1 warm: 296.78 ms / 308.43 ms against ArcticDB's 34.16 ms / 69.63 ms (median / slowest of 30); Q1 cold: 446.75 ms / 522.02 ms against ArcticDB's 105.94 ms / 112.48 ms (median / slowest of 7); Q2 warm: 74.04 ms / 83.86 ms against QuestDB's 283.77 ms / 399.85 ms (median / slowest of 30), met among the four headline variants, though ArcticDB's `rows100k-cols127-per-security` is faster, 44.58 ms / 70.46 ms; Q2 cold: 532.30 ms / 548.55 ms against Parquet's 3,271.51 ms / 3,327.25 ms (median / slowest of 7), met among the four headline variants, though ArcticDB's `rows100k-cols127-per-security` is faster, 110.55 ms / 115.52 ms; Q3 warm: 36.07 ms / 36.75 ms against QuestDB's 64.95 ms / 98.21 ms (median / slowest of 30), met among the four headline variants, though ArcticDB's `rows100k-cols127-per-security` is faster, 25.00 ms / 30.91 ms; Q3 cold: 251.42 ms / 257.67 ms against Parquet's 2,032.29 ms / 2,176.39 ms (median / slowest of 7), met among the four headline variants, though ArcticDB's `rows100k-cols127-per-security` is faster, 93.88 ms / 95.73 ms; Q4 warm: 207.95 ms / 211.25 ms against QuestDB's 1.24 ms / 5.92 ms (median / slowest of 30); Q4 cold: 357.95 ms / 364.04 ms against ArcticDB's 36.99 ms / 40.64 ms (median / slowest of 7); Q5 warm: 912.75 ms / 961.75 ms against QuestDB's 54.46 ms / 69.06 ms (median / slowest of 30); Q5 cold: 1,263.33 ms / 1,325.35 ms against Parquet's 1,659.31 ms / 1,680.47 ms (median / slowest of 7), met among the four headline variants | met on (Q2 warm), (Q2 cold), (Q3 warm), (Q3 cold), (Q5 cold); missed on (Q1 warm), (Q1 cold), (Q4 warm), (Q4 cold), (Q5 warm); p99 measured as the slowest of 30 runs warm and the slowest of 7 runs cold | `results/compare/Linux-12302019-full-ede0176b10bb.json` |
 | QL-4 | macOS | lowest median and p99 of the four headlines, each query, warm and cold | no figure | not judged: the four-system full day runs on Linux only; on macOS tick-store ran the day alone, and the slice files make no claim about a full day | none |
 <!-- targets:end -->
 
@@ -82,50 +82,50 @@ in "Full-day comparison" in `docs/NOTES.md`. The slice blocks after it prove the
 claims about a full day.
 
 <!-- compare:begin, generated by scripts/render_results.py, do not edit -->
-**Linux, full day 12302019.** AMD Ryzen Embedded V1605B with Radeon Vega Gfx, commit `67ae574f5666`. Each system ran under taskset -c 4, and the run then widened its own mask to cpu4 and cpu6. Every thread of every system shares those two CPUs, client and server alike. QuestDB's JVM has more threads than CPUs. A full day: every record of the pinned day in every system, every query as BENCHMARKS.md defines it with nothing clipped. These are the numbers the targets are judged on.
+**Linux, full day 12302019.** AMD Ryzen Embedded V1605B with Radeon Vega Gfx, commit `ede0176b10bb`. Each system ran under taskset -c 4, and the run then widened its own mask to cpu4 and cpu6. Every thread of every system shares those two CPUs, client and server alike. QuestDB's JVM has more threads than CPUs. A full day: every record of the pinned day in every system, every query as BENCHMARKS.md defines it with nothing clipped. These are the numbers the targets are judged on.
 
 Queries, on each system's class B store, in milliseconds. Each latency is the median of its runs and its tail figure, the 99th percentile by nearest rank, which is the slowest of 30 runs warm and the slowest of 7 runs cold. "Lowest" names the measures, warm or cold, on which a system had both the lowest median and the lowest tail figure of the four.
 
 | Query | System | Variant | Rows | Warm median ms | Warm slowest of 30 ms | Cold median ms | Cold slowest of 7 ms | Lowest |
 |---|---|---|---|---|---|---|---|---|
-| Q1 | Parquet | `zstd1-rg1Mi` | 527,644 | 66.45 | 97.79 | 118.82 | 141.25 | no |
-| Q1 | ArcticDB | `rows100k-cols127` | 527,644 | 37.41 | 67.98 | 83.18 | 89.98 | warm, cold |
-| Q1 | QuestDB | `plain` | 527,644 | 58.57 (swap-in) | 95.96 (swap-in) | 550.62 | 588.18 | no |
-| Q1 | tick-store | `v3-seg4Mi` | 527,644 | 297.58 | 325.72 | 406.96 | 461.20 | no |
-| Q2 | Parquet | `zstd1-rg1Mi` | 739,944 | 2,702.10 (swap-in) | 2,808.72 (swap-in) | 3,957.57 (swap-in) | 4,081.60 (swap-in) | no |
-| Q2 | ArcticDB | `rows100k-cols127` | 739,944 | 2,050.34 (swap-in) | 2,475.90 (swap-in) | 5,190.59 | 5,211.48 | no |
-| Q2 | QuestDB | `plain` | 739,944 | 319.30 (swap-in) | 364.42 (swap-in) | 17,592.34 (swap-in) | 17,607.18 (swap-in) | no |
-| Q2 | tick-store | `v3-seg4Mi` | 739,944 | 74.32 | 83.95 | 485.13 | 500.41 | warm, cold |
-| Q3 | Parquet | `zstd1-rg1Mi` | 60 | 1,638.97 (swap-in) | 1,707.02 (swap-in) | 2,112.55 | 2,513.76 | no |
-| Q3 | ArcticDB | `rows100k-cols127` | 60 | 1,175.26 (swap-in) | 1,224.26 (swap-in) | 4,389.00 | 4,475.13 | no |
-| Q3 | QuestDB | `plain` | 60 | 68.71 (swap-in) | 85.62 (swap-in) | 7,613.49 (swap-in) | 8,834.35 (swap-in) | no |
-| Q3 | tick-store | `v3-seg4Mi` | 60 | 35.81 | 36.53 | 214.40 | 226.00 | warm, cold |
-| Q4 | Parquet | `zstd1-rg1Mi` | 338 | 60.75 | 99.96 | 112.02 | 248.31 | no |
-| Q4 | ArcticDB | `rows100k-cols127` | 338 | 6.95 | 8.84 | 23.46 | 25.08 | cold |
-| Q4 | QuestDB | `plain` | 338 | 1.18 | 1.75 | 73.26 | 97.23 | warm |
-| Q4 | tick-store | `v3-seg4Mi` | 338 | 207.10 | 217.01 | 302.45 | 341.35 | no |
-| Q5 | Parquet | `zstd1-rg1Mi` | 1 | 1,011.17 (swap-in) | 1,333.77 (swap-in) | 1,718.55 | 1,725.01 | no |
-| Q5 | ArcticDB | `rows100k-cols127` | 1 | 3,004.35 (swap-in) | 3,081.97 (swap-in) | 12,209.75 (swap-in) | 12,272.84 (swap-in) | no |
-| Q5 | QuestDB | `plain` | 1 | 61.07 | 73.75 | 4,110.39 (swap-in) | 4,135.53 (swap-in) | warm |
-| Q5 | tick-store | `v3-seg4Mi` | 1 | 907.64 (swap-in) | 936.87 (swap-in) | 1,233.89 | 1,283.58 | cold |
+| Q1 | Parquet | `zstd1-rg1Mi` | 527,644 | 83.23 | 138.39 | 121.72 | 130.92 | no |
+| Q1 | ArcticDB | `rows100k-cols127` | 527,644 | 34.16 | 69.63 | 105.94 | 112.48 | warm, cold |
+| Q1 | QuestDB | `plain` | 527,644 | 53.49 (swap-in) | 71.61 (swap-in) | 512.01 | 523.48 | no |
+| Q1 | tick-store | `v3-seg4Mi` | 527,644 | 296.78 | 308.43 | 446.75 | 522.02 | no |
+| Q2 | Parquet | `zstd1-rg1Mi` | 739,944 | 2,908.31 | 3,521.90 | 3,271.51 | 3,327.25 | no |
+| Q2 | ArcticDB | `rows100k-cols127` | 739,944 | 2,191.87 (swap-in) | 3,256.48 (swap-in) | 6,414.70 | 6,453.83 | no |
+| Q2 | QuestDB | `plain` | 739,944 | 283.77 (swap-in) | 399.85 (swap-in) | 18,269.34 (swap-in) | 19,033.06 (swap-in) | no |
+| Q2 | tick-store | `v3-seg4Mi` | 739,944 | 74.04 | 83.86 | 532.30 | 548.55 | warm, cold |
+| Q3 | Parquet | `zstd1-rg1Mi` | 60 | 1,629.10 | 1,720.30 | 2,032.29 | 2,176.39 | no |
+| Q3 | ArcticDB | `rows100k-cols127` | 60 | 1,481.02 (swap-in) | 1,975.80 (swap-in) | 5,565.50 | 5,583.28 | no |
+| Q3 | QuestDB | `plain` | 60 | 64.95 | 98.21 | 7,700.08 (swap-in) | 7,769.57 (swap-in) | no |
+| Q3 | tick-store | `v3-seg4Mi` | 60 | 36.07 | 36.75 | 251.42 | 257.67 | warm, cold |
+| Q4 | Parquet | `zstd1-rg1Mi` | 338 | 60.11 | 72.92 | 119.64 | 127.24 | no |
+| Q4 | ArcticDB | `rows100k-cols127` | 338 | 7.12 | 8.85 | 36.99 | 40.64 | cold |
+| Q4 | QuestDB | `plain` | 338 | 1.24 | 5.92 | 58.45 | 61.45 | warm |
+| Q4 | tick-store | `v3-seg4Mi` | 338 | 207.95 | 211.25 | 357.95 | 364.04 | no |
+| Q5 | Parquet | `zstd1-rg1Mi` | 1 | 1,254.67 | 1,926.80 | 1,659.31 | 1,680.47 | no |
+| Q5 | ArcticDB | `rows100k-cols127` | 1 | 3,105.98 (swap-in) | 3,576.70 (swap-in) | 14,924.32 | 14,993.70 | no |
+| Q5 | QuestDB | `plain` | 1 | 54.46 (swap-in) | 69.06 (swap-in) | 3,971.64 (swap-in) | 4,147.66 (swap-in) | warm |
+| Q5 | tick-store | `v3-seg4Mi` | 1 | 912.75 | 961.75 | 1,263.33 (swap-in) | 1,325.35 (swap-in) | cold |
 
 Ingest and size, class A: returns once data is in the OS page cache. Stored bytes are allocated at rest, and the ratio is the day's source bytes over them. "Total s" is the whole write clock; "engine-only s" is that less the time reading the input and putting it in the form the system's call takes, as "A write's two times" in compare/README.md sets out for each system. tick-store's both hold its ITCH parsing. A write of several repetitions measured before protocol 2 kept medians alone, so its engine-only seconds are not recorded.
 
 | System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Like-for-like |
 |---|---|---|---|---|---|---|---|---|
-| Parquet | `zstd1-rg1Mi` | 158.442 | 81.064 | 1.70 | 3,191,406,592 | 2.586 | proven | yes |
-| ArcticDB | `rows100k-cols127` | 120.112 | 34.557 | 2.24 | 6,352,621,568 | 1.299 | proven | yes |
-| QuestDB | `plain` | 273.597 | 151.029 | 0.98 | 22,897,786,880 | 0.360 | proven | yes |
-| tick-store (parses ITCH) | `v3-seg4Mi` | 195.262 | 195.001 | 1.38 | 1,758,240,768 | 4.693 | proven | yes |
+| Parquet | `zstd1-rg1Mi` | 168.748 | 80.911 | 1.59 | 3,191,406,592 | 2.586 | proven | yes |
+| ArcticDB | `rows100k-cols127` | 111.523 | 35.060 | 2.41 | 6,352,617,472 | 1.299 | proven | yes |
+| QuestDB | `plain` | 678.677 | 193.832 | 0.40 | 22,897,786,880 | 0.360 | proven | yes |
+| tick-store (parses ITCH) | `v3-seg4Mi` | 211.651 | 211.348 | 1.27 | 1,758,240,768 | 4.693 | proven | yes |
 
 Ingest and size, class B: returns after a flush to the device. Stored bytes are allocated at rest, and the ratio is the day's source bytes over them. "Total s" is the whole write clock; "engine-only s" is that less the time reading the input and putting it in the form the system's call takes, as "A write's two times" in compare/README.md sets out for each system. tick-store's both hold its ITCH parsing. A write of several repetitions measured before protocol 2 kept medians alone, so its engine-only seconds are not recorded.
 
 | System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Like-for-like |
 |---|---|---|---|---|---|---|---|---|
-| Parquet | `zstd1-rg1Mi` | 266.337 | 98.377 | 1.01 | 3,191,406,592 | 2.586 | proven | yes |
-| ArcticDB | `rows100k-cols127` | 123.559 | 42.615 | 2.18 | 6,352,642,048 | 1.299 | proven | yes |
-| QuestDB | `plain` | 1269.246 | 1137.282 | 0.21 | 22,897,786,880 | 0.360 | NOT PROVEN | no |
-| tick-store (parses ITCH) | `v3-seg4Mi` | 188.904 | 188.545 | 1.42 | 1,758,240,768 | 4.693 | proven | yes |
+| Parquet | `zstd1-rg1Mi` | 211.856 | 92.468 | 1.27 | 3,191,406,592 | 2.586 | proven | yes |
+| ArcticDB | `rows100k-cols127` | 381.423 | 291.821 | 0.70 | 6,352,666,624 | 1.299 | proven | yes |
+| QuestDB | `plain` | 1595.634 | 1459.491 | 0.17 | 22,897,786,880 | 0.360 | NOT PROVEN | no |
+| tick-store (parses ITCH) | `v3-seg4Mi` | 190.659 | 190.286 | 1.41 | 1,758,240,768 | 4.693 | proven | yes |
 
 tick-store ingests the day's ITCH file itself, so its write time holds ITCH parsing. The other systems ingest the columns tools/tick_export wrote from the same day, already parsed, and their times do not. Nothing is subtracted.
 
@@ -133,58 +133,59 @@ Every variant run on the full day, by the rule in compare/README.md. Queries are
 
 | System | Variant | Stored bytes, B | Ratio | Total write s, A / B | Q1 ms, warm / cold | Q2 ms, warm / cold | Q3 ms, warm / cold | Q4 ms, warm / cold | Q5 ms, warm / cold |
 |---|---|---|---|---|---|---|---|---|---|
-| Parquet | `zstd1-rg1Mi` (headline) | 3,191,406,592 | 2.586 | 158.4 / 266.3 | 66.45 / 118.82 | 2,702.10 / 3,957.57 | 1,638.97 / 2,112.55 | 60.75 / 112.02 | 1,011.17 / 1,718.55 |
-| Parquet | `zstd1-rg128k` | 3,212,275,712 | 2.569 | 174.7 / 200.4 | 122.37 / 186.42 | 2,834.14 / 5,974.43 | 1,850.52 / 3,847.62 | 101.70 / 161.28 | 1,033.71 / 2,415.21 |
-| Parquet | `none-rg1Mi` | 6,569,455,616 | 1.256 | 170.6 / 153.8 | 59.09 / 122.81 | 2,225.39 / 3,433.41 | 1,318.83 / 2,018.66 | 53.18 / 114.03 | 782.03 / 2,246.75 |
-| ArcticDB | `rows100k-cols127` (headline) | 6,352,642,048 | 1.299 | 120.1 / 123.6 | 37.41 / 83.18 | 2,050.34 / 5,190.59 | 1,175.26 / 4,389.00 | 6.95 / 23.46 | 3,004.35 / 12,209.75 |
-| ArcticDB | `rows100k-cols1` | 25,346,945,024 | 0.326 | 305.9 / 815.9 | 69.27 / 211.36 | 3,804.07 / 16,688.59 | 2,731.90 / 7,893.66 | 15.89 / 57.67 | 2,836.61 / 8,761.21 |
-| ArcticDB | `rows100k-cols127-per-security` | 5,666,115,584 | 1.456 | 543.9 / 507.3 | 9,791.10 / 23,519.03 | 49.65 / 111.23 | 26.19 / 91.93 | 9,721.33 / 23,437.79 | 5,675.31 / 22,651.92 |
-| QuestDB | `plain` (headline) | 22,897,786,880 | 0.360 | 273.6 / 1269.2 | 58.57 / 550.62 | 319.30 / 17,592.34 | 68.71 / 7,613.49 | 1.18 / 73.26 | 61.07 / 4,110.39 |
-| QuestDB | `locate-index` | 25,074,798,592 | 0.329 | 616.8 / 1434.3 | 147.19 / 566.94 | 365.56 / 22,771.81 | 88.30 / 12,134.42 | 1.45 / 105.86 | 56.58 / 4,137.23 |
-| tick-store | `v3-seg4Mi` (headline) | 1,758,240,768 | 4.693 | 195.3 / 188.9 | 297.58 / 406.96 | 74.32 / 485.13 | 35.81 / 214.40 | 207.10 / 302.45 | 907.64 / 1,233.89 |
-| tick-store | `v3-seg1Mi` | 1,808,261,120 | 4.563 | 182.6 / 197.4 | 115.88 / 160.05 | 97.58 / 1,117.32 | 40.17 / 552.37 | 51.40 / 88.76 | 896.61 / 1,774.63 |
+| Parquet | `zstd1-rg1Mi` (headline) | 3,191,406,592 | 2.586 | 168.7 / 211.9 | 83.23 / 121.72 | 2,908.31 / 3,271.51 | 1,629.10 / 2,032.29 | 60.11 / 119.64 | 1,254.67 / 1,659.31 |
+| Parquet | `zstd1-rg128k` | 3,212,275,712 | 2.569 | 165.6 / 255.8 | 125.64 / 210.03 | 3,161.26 / 6,116.55 | 1,870.37 / 3,853.68 | 103.96 / 164.54 | 1,065.25 / 2,449.38 |
+| Parquet | `zstd9-rg1Mi` | 3,091,881,984 | 2.669 | 273.0 / 327.0 | 67.07 / 124.04 | 3,123.32 / 3,356.54 | 1,677.87 / 2,104.34 | 59.69 / 116.89 | 1,257.40 / 1,625.92 |
+| Parquet | `none-rg1Mi` | 6,569,455,616 | 1.256 | 188.1 / 322.3 | 74.38 / 137.38 | 2,624.20 / 4,122.86 | 1,335.60 / 2,654.38 | 52.70 / 124.44 | 1,040.22 / 2,673.37 |
+| ArcticDB | `rows100k-cols127` (headline) | 6,352,666,624 | 1.299 | 111.5 / 381.4 | 34.16 / 105.94 | 2,191.87 / 6,414.70 | 1,481.02 / 5,565.50 | 7.12 / 36.99 | 3,105.98 / 14,924.32 |
+| ArcticDB | `rows10M-cols127` | 6,237,339,648 | 1.323 | 209.7 / 369.5 | 433.95 / 791.48 | 2,463.48 / 7,160.10 | 1,366.05 / 3,843.52 | 383.78 / 748.75 | 1,941.94 / 7,203.12 |
+| ArcticDB | `rows100k-cols127-per-security` | 5,665,198,080 | 1.457 | 830.5 / 1146.2 | 10,175.59 / 24,655.79 | 44.58 / 110.55 | 25.00 / 93.88 | 10,119.85 / 24,563.62 | 5,796.95 / 24,028.36 |
+| QuestDB | `plain` (headline) | 22,897,786,880 | 0.360 | 678.7 / 1595.6 | 53.49 / 512.01 | 283.77 / 18,269.34 | 64.95 / 7,700.08 | 1.24 / 58.45 | 54.46 / 3,971.64 |
+| QuestDB | `locate-index` | 25,074,798,592 | 0.329 | 1097.8 / 1925.9 | 221.62 / 579.56 | 479.57 / 23,836.78 | 119.36 / 12,390.33 | 1.92 / 99.34 | 74.70 / 4,106.51 |
+| tick-store | `v3-seg4Mi` (headline) | 1,758,240,768 | 4.693 | 211.7 / 190.7 | 296.78 / 446.75 | 74.04 / 532.30 | 36.07 / 251.42 | 207.95 / 357.95 | 912.75 / 1,263.33 |
+| tick-store | `v3-seg1Mi` | 1,808,261,120 | 4.563 | 184.6 / 188.4 | 115.78 / 206.42 | 97.96 / 1,177.96 | 40.82 / 603.37 | 55.81 / 123.32 | 1,061.36 / 1,814.02 |
 
 Peak memory per system, from compare/guard.py across the system's whole run.
 
 | System | Largest VmHWM | Peak RSS of its processes together | MemAvailable, lowest | Swap in / out over the run, MiB |
 |---|---|---|---|---|
-| Parquet | 13.59 GiB (`tick_roundtrip`) | 13.64 GiB | 11.64 GiB | 6.7 / 4.5 |
-| ArcticDB | 13.37 GiB (`tick_roundtrip`) | 13.46 GiB | 10.59 GiB | 414.5 / 642.1 |
-| QuestDB | 11.66 GiB (`java`) | 13.81 GiB | 7.13 GiB | 1,765.7 / 3,030.1 |
-| tick-store | 13.51 GiB (`tick_roundtrip`) | 13.54 GiB | 12.96 GiB | 12.8 / 0.2 |
+| Parquet | 10.63 GiB (`tick_roundtrip`) | 10.70 GiB | 12.17 GiB | 0.0 / 0.1 |
+| ArcticDB | 10.50 GiB (`tick_roundtrip`) | 10.61 GiB | 10.23 GiB | 288.9 / 781.3 |
+| QuestDB | 13.43 GiB (`tick_roundtrip`) | 13.46 GiB | 7.60 GiB | 1,183.5 / 2,092.3 |
+| tick-store | 13.20 GiB (`tick_roundtrip`) | 13.22 GiB | 12.82 GiB | 7.5 / 0.1 |
 
 Swap per phase, host-wide, over every variant and class each system ran. Swap-out alone does not stop a run. A timed query with any page swapped in is kept and marked (swap-in). See "The guard's swap rule" in docs/NOTES.md.
 
 | System | Write, in / out MiB | Read-back, in / out MiB | Warm queries, in / out MiB | Cold queries, in / out MiB | Timed queries with swap-in |
 |---|---|---|---|---|---|
-| Parquet | 1.8 / 3.3 | 3.8 / 1.2 | 0.7 / 0.0 | 0.2 / 0.0 | `zstd1-rg1Mi` Q2 warm, `zstd1-rg1Mi` Q2 cold, `zstd1-rg1Mi` Q3 warm, `zstd1-rg1Mi` Q5 warm, `zstd1-rg128k` Q2 warm, `zstd1-rg128k` Q2 cold, `none-rg1Mi` Q2 warm, `none-rg1Mi` Q3 warm, `none-rg1Mi` Q5 warm, `none-rg1Mi` Q5 cold |
-| ArcticDB | 35.3 / 181.4 | 317.7 / 443.8 | 17.1 / 16.9 | 7.7 / 0.0 | `rows100k-cols127` Q2 warm, `rows100k-cols127` Q3 warm, `rows100k-cols127` Q5 warm, `rows100k-cols127` Q5 cold, `rows100k-cols1` Q1 warm, `rows100k-cols1` Q2 warm, `rows100k-cols1` Q2 cold, `rows100k-cols1` Q3 warm, `rows100k-cols1` Q3 cold, `rows100k-cols1` Q5 warm, `rows100k-cols1` Q5 cold, `rows100k-cols127-per-security` Q1 warm, `rows100k-cols127-per-security` Q1 cold, `rows100k-cols127-per-security` Q2 warm, `rows100k-cols127-per-security` Q4 warm, `rows100k-cols127-per-security` Q4 cold, `rows100k-cols127-per-security` Q5 warm, `rows100k-cols127-per-security` Q5 cold |
-| QuestDB | 124.7 / 255.4 | 1,563.9 / 2,774.7 | 11.7 / 0.0 | 60.8 / 0.0 | `plain` Q1 warm, `plain` Q2 warm, `plain` Q2 cold, `plain` Q3 warm, `plain` Q3 cold, `plain` Q5 cold, `locate-index` Q1 warm, `locate-index` Q1 cold, `locate-index` Q2 warm, `locate-index` Q2 cold, `locate-index` Q3 warm, `locate-index` Q3 cold, `locate-index` Q4 cold, `locate-index` Q5 warm, `locate-index` Q5 cold |
-| tick-store | 4.2 / 0.0 | 8.4 / 0.2 | 0.0 / 0.0 | 0.1 / 0.0 | `v3-seg4Mi` Q5 warm, `v3-seg1Mi` Q5 warm |
+| Parquet | 0.0 / 0.0 | 0.0 / 0.1 | 0.0 / 0.0 | 0.0 / 0.0 | none |
+| ArcticDB | 36.8 / 354.4 | 145.8 / 352.5 | 57.4 / 74.4 | 1.9 / 0.0 | `rows100k-cols127` Q2 warm, `rows100k-cols127` Q3 warm, `rows100k-cols127` Q5 warm, `rows10M-cols127` Q2 warm, `rows10M-cols127` Q3 warm, `rows100k-cols127-per-security` Q1 warm, `rows100k-cols127-per-security` Q1 cold, `rows100k-cols127-per-security` Q4 warm, `rows100k-cols127-per-security` Q4 cold, `rows100k-cols127-per-security` Q5 warm, `rows100k-cols127-per-security` Q5 cold |
+| QuestDB | 70.2 / 11.2 | 1,051.1 / 2,078.5 | 26.8 / 2.6 | 18.6 / 0.0 | `plain` Q1 warm, `plain` Q2 warm, `plain` Q2 cold, `plain` Q3 cold, `plain` Q5 warm, `plain` Q5 cold, `locate-index` Q1 warm, `locate-index` Q2 warm, `locate-index` Q2 cold, `locate-index` Q3 cold |
+| tick-store | 1.8 / 0.0 | 5.6 / 0.1 | 0.0 / 0.0 | 0.1 / 0.0 | `v3-seg4Mi` Q5 cold, `v3-seg1Mi` Q4 warm |
 
-**macOS, full day 12302019, tick-store alone.** Apple M4 Max, commit `2503d1e7c5f6`. Unpinned. No hardware counters. macOS has no thread pinning, and no unprivileged hardware counters. Each system gets the same thread budget. A full day of tick-store alone: every record of the pinned day, every query as BENCHMARKS.md defines it with nothing clipped, and no other system. The four-system full day runs on Linux only; this gives the targets whose host is Both their figure on this host. No figure here is compared with another system's.
+**macOS, full day 12302019, tick-store alone.** Apple M4 Max, commit `ede0176b10bb`. Unpinned. No hardware counters. macOS has no thread pinning, and no unprivileged hardware counters. Each system gets the same thread budget. A full day of tick-store alone: every record of the pinned day, every query as BENCHMARKS.md defines it with nothing clipped, and no other system. The four-system full day runs on Linux only; this gives the targets whose host is Both their figure on this host. No figure here is compared with another system's.
 
 Queries, on each system's class B store, in milliseconds. Each latency is the median of its runs and its tail figure, the 99th percentile by nearest rank, which is the slowest of 30 runs warm and the slowest of 7 runs cold. No other system ran, so nothing is ranked.
 
 | Query | System | Variant | Rows | Warm median ms | Warm slowest of 30 ms | Cold median ms | Cold slowest of 7 ms | Lowest |
 |---|---|---|---|---|---|---|---|---|
-| Q1 | tick-store | `v3-seg4Mi` | 527,644 | 107.09 | 128.46 | 166.22 | 172.98 | not ranked: alone |
-| Q2 | tick-store | `v3-seg4Mi` | 739,944 | 25.79 | 30.28 | 106.24 | 110.64 | not ranked: alone |
-| Q3 | tick-store | `v3-seg4Mi` | 60 | 14.69 | 15.30 | 52.78 | 53.80 | not ranked: alone |
-| Q4 | tick-store | `v3-seg4Mi` | 338 | 78.92 | 79.62 | 133.21 | 134.60 | not ranked: alone |
-| Q5 | tick-store | `v3-seg4Mi` | 1 | 282.88 | 288.40 | 410.52 | 411.24 | not ranked: alone |
+| Q1 | tick-store | `v3-seg4Mi` | 527,644 | 104.89 | 109.62 | 173.60 | 181.46 | not ranked: alone |
+| Q2 | tick-store | `v3-seg4Mi` | 739,944 | 25.28 | 26.56 | 116.07 | 120.99 | not ranked: alone |
+| Q3 | tick-store | `v3-seg4Mi` | 60 | 15.06 | 15.29 | 63.11 | 66.06 | not ranked: alone |
+| Q4 | tick-store | `v3-seg4Mi` | 338 | 76.55 | 78.43 | 135.82 | 138.02 | not ranked: alone |
+| Q5 | tick-store | `v3-seg4Mi` | 1 | 277.43 | 285.53 | 408.14 | 425.63 | not ranked: alone |
 
 Ingest and size, class A: returns once data is in the OS page cache. Stored bytes are allocated at rest, and the ratio is the day's source bytes over them. On macOS, APFS can keep blocks allocated past the end of a file that grew in many small writes over time, so a stored figure here can exceed the file's own bytes: compare stored sizes from Linux. "Total s" is the whole write clock; "engine-only s" is that less the time reading the input and putting it in the form the system's call takes, as "A write's two times" in compare/README.md sets out for each system. tick-store's both hold its ITCH parsing. A write of several repetitions measured before protocol 2 kept medians alone, so its engine-only seconds are not recorded.
 
 | System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Like-for-like |
 |---|---|---|---|---|---|---|---|---|
-| tick-store (parses ITCH) | `v3-seg4Mi` | 83.596 | 83.565 | 3.21 | 1,762,254,848 | 4.682 | proven | yes |
+| tick-store (parses ITCH) | `v3-seg4Mi` | 81.391 | 81.356 | 3.30 | 1,762,254,848 | 4.682 | proven | yes |
 
 Ingest and size, class B: returns after a flush to the device. Stored bytes are allocated at rest, and the ratio is the day's source bytes over them. On macOS, APFS can keep blocks allocated past the end of a file that grew in many small writes over time, so a stored figure here can exceed the file's own bytes: compare stored sizes from Linux. "Total s" is the whole write clock; "engine-only s" is that less the time reading the input and putting it in the form the system's call takes, as "A write's two times" in compare/README.md sets out for each system. tick-store's both hold its ITCH parsing. A write of several repetitions measured before protocol 2 kept medians alone, so its engine-only seconds are not recorded.
 
 | System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Like-for-like |
 |---|---|---|---|---|---|---|---|---|
-| tick-store (parses ITCH) | `v3-seg4Mi` | 83.774 | 83.743 | 3.21 | 1,762,250,752 | 4.682 | proven | yes |
+| tick-store (parses ITCH) | `v3-seg4Mi` | 79.978 | 79.950 | 3.36 | 1,762,250,752 | 4.682 | proven | yes |
 
 tick-store ingests the day's ITCH file itself, so its write time holds ITCH parsing. The other systems ingest the columns tools/tick_export wrote from the same day, already parsed, and their times do not. Nothing is subtracted.
 
@@ -192,10 +193,10 @@ Every variant run on the full day, every variant tick-store has, since it ran al
 
 | System | Variant | Stored bytes, B | Ratio | Total write s, A / B | Q1 ms, warm / cold | Q2 ms, warm / cold | Q3 ms, warm / cold | Q4 ms, warm / cold | Q5 ms, warm / cold |
 |---|---|---|---|---|---|---|---|---|---|
-| tick-store | `v3-seg4Mi` (headline) | 1,762,250,752 | 4.682 | 83.6 / 83.8 | 107.09 / 166.22 | 25.79 / 106.24 | 14.69 / 52.78 | 78.92 / 133.21 | 282.88 / 410.52 |
-| tick-store | `v3-seg1Mi` | 1,812,545,536 | 4.552 | 82.5 / 82.6 | 36.40 / 56.33 | 36.78 / 208.80 | 18.24 / 111.68 | 21.07 / 34.00 | 296.69 / 453.82 |
+| tick-store | `v3-seg4Mi` (headline) | 1,762,250,752 | 4.682 | 81.4 / 80.0 | 104.89 / 173.60 | 25.28 / 116.07 | 15.06 / 63.11 | 76.55 / 135.82 | 277.43 / 408.14 |
+| tick-store | `v3-seg1Mi` | 1,812,439,040 | 4.553 | 77.3 / 78.8 | 35.59 / 63.22 | 35.64 / 220.76 | 17.84 / 120.69 | 20.29 / 43.62 | 286.87 / 463.25 |
 
-Peak memory of tick-store's whole run, by BSD time -l: maximum resident set 29.95 GiB, which counts the mapped day and store, and run_system.py's peak memory footprint 0.70 GiB, over 1,041 s.
+Peak memory of tick-store's whole run, by BSD time -l: maximum resident set 29.94 GiB, which counts the mapped day and store, and run_system.py's peak memory footprint 0.70 GiB, over 1,010 s.
 
 Swap per phase, host-wide, over every variant and class each system ran. No guard ran beside tick-store alone. A timed query with any page swapped in is kept and marked (swap-in). See "The guard's swap rule" in docs/NOTES.md.
 
@@ -203,97 +204,97 @@ Swap per phase, host-wide, over every variant and class each system ran. No guar
 |---|---|---|---|---|---|
 | tick-store | 0.0 / 0.0 | 0.0 / 0.0 | 0.0 / 0.0 | 0.0 / 0.0 | none |
 
-**Linux, slice only.** AMD Ryzen Embedded V1605B with Radeon Vega Gfx, commit `67ae574f5666`. Each system ran under taskset -c 4, and the run then widened its own mask to cpu4 and cpu6. Every thread of every system shares those two CPUs, client and server alike. QuestDB's JVM has more threads than CPUs. These numbers come from a five-minute slice and prove that the harness works. They are not claims about a full day, and no target changes because of them.
+**Linux, slice only.** AMD Ryzen Embedded V1605B with Radeon Vega Gfx, commit `ede0176b10bb`. Each system ran under taskset -c 4, and the run then widened its own mask to cpu4 and cpu6. Every thread of every system shares those two CPUs, client and server alike. QuestDB's JVM has more threads than CPUs. These numbers come from a five-minute slice and prove that the harness works. They are not claims about a full day, and no target changes because of them.
 
 Queries, on each system's class B store, in milliseconds. Each latency is the median of its runs and its tail figure, the 99th percentile by nearest rank, which is the slowest of 30 runs warm and the slowest of 7 runs cold. "Lowest" names the measures, warm or cold, on which a system had both the lowest median and the lowest tail figure of the four.
 
 | Query | System | Variant | Rows | Warm median ms | Warm slowest of 30 ms | Cold median ms | Cold slowest of 7 ms | Lowest |
 |---|---|---|---|---|---|---|---|---|
-| Q1 | Parquet | `zstd1-rg1Mi` | 527,644 | 55.79 | 111.74 | 136.65 | 144.26 | no |
-| Q1 | ArcticDB | `rows100k-cols127` | 527,644 | 32.57 (swap-in) | 63.79 (swap-in) | 74.17 | 75.05 | warm, cold |
-| Q1 | QuestDB | `plain` | 527,644 | 59.77 (swap-in) | 286.29 (swap-in) | 460.83 | 621.91 | no |
-| Q1 | tick-store | `v3-seg4Mi` | 527,644 | 278.73 | 336.86 | 373.40 | 381.05 | no |
-| Q2 | Parquet | `zstd1-rg1Mi` | 66,741 | 247.26 | 285.37 | 496.92 | 509.69 | no |
-| Q2 | ArcticDB | `rows100k-cols127` | 66,741 | 138.73 | 174.62 | 455.71 | 462.96 | no |
-| Q2 | QuestDB | `plain` | 66,741 | 27.76 | 105.66 | 1,627.08 | 1,689.42 | no |
-| Q2 | tick-store | `v3-seg4Mi` | 66,741 | 7.29 | 11.08 | 82.59 | 92.25 | warm, cold |
-| Q3 | Parquet | `zstd1-rg1Mi` | 5 | 149.16 | 173.30 | 309.63 | 331.46 | no |
-| Q3 | ArcticDB | `rows100k-cols127` | 5 | 96.74 | 141.78 | 375.38 | 379.53 | no |
-| Q3 | QuestDB | `plain` | 5 | 18.23 | 99.26 | 823.03 | 866.16 | no |
-| Q3 | tick-store | `v3-seg4Mi` | 5 | 3.71 | 3.98 | 43.29 | 46.65 | warm, cold |
-| Q4 | Parquet | `zstd1-rg1Mi` | 338 | 47.28 | 56.41 | 128.48 | 133.24 | no |
-| Q4 | ArcticDB | `rows100k-cols127` | 338 | 6.56 | 7.48 | 20.60 | 20.99 | cold |
-| Q4 | QuestDB | `plain` | 338 | 1.61 | 5.76 | 85.05 | 106.90 | warm |
-| Q4 | tick-store | `v3-seg4Mi` | 338 | 197.28 | 203.18 | 293.62 (swap-in) | 295.99 (swap-in) | no |
-| Q5 | Parquet | `zstd1-rg1Mi` | 1 | 24.24 | 35.47 | 43.40 | 43.82 | no |
-| Q5 | ArcticDB | `rows100k-cols127` | 1 | 48.37 | 76.77 | 261.56 | 264.68 | no |
-| Q5 | QuestDB | `plain` | 1 | 3.28 | 14.00 | 120.79 | 171.36 | warm |
-| Q5 | tick-store | `v3-seg4Mi` | 1 | 25.33 | 25.71 | 42.80 | 62.22 | no |
+| Q1 | Parquet | `zstd1-rg1Mi` | 527,644 | 60.54 | 92.42 | 86.91 | 98.44 | no |
+| Q1 | ArcticDB | `rows100k-cols127` | 527,644 | 30.77 | 46.95 | 90.84 | 94.21 | warm |
+| Q1 | QuestDB | `plain` | 527,644 | 55.52 | 147.90 | 513.29 | 525.94 | no |
+| Q1 | tick-store | `v3-seg4Mi` | 527,644 | 278.77 | 297.56 | 414.49 | 429.54 | no |
+| Q2 | Parquet | `zstd1-rg1Mi` | 66,741 | 249.90 | 302.51 | 358.54 | 376.81 | no |
+| Q2 | ArcticDB | `rows100k-cols127` | 66,741 | 142.57 | 160.56 | 489.46 | 498.44 | no |
+| Q2 | QuestDB | `plain` | 66,741 | 28.23 | 50.23 | 1,556.69 | 1,583.50 | no |
+| Q2 | tick-store | `v3-seg4Mi` | 66,741 | 7.28 | 9.08 | 114.56 | 120.23 | warm, cold |
+| Q3 | Parquet | `zstd1-rg1Mi` | 5 | 150.41 | 188.38 | 217.36 | 240.17 | no |
+| Q3 | ArcticDB | `rows100k-cols127` | 5 | 97.67 | 105.81 | 402.55 | 408.37 | no |
+| Q3 | QuestDB | `plain` | 5 | 13.61 | 60.78 | 817.78 | 858.82 | no |
+| Q3 | tick-store | `v3-seg4Mi` | 5 | 3.69 | 4.02 | 58.93 | 60.79 | warm, cold |
+| Q4 | Parquet | `zstd1-rg1Mi` | 338 | 47.66 | 58.88 | 87.95 | 90.43 | no |
+| Q4 | ArcticDB | `rows100k-cols127` | 338 | 6.26 | 7.06 | 23.84 | 26.65 | cold |
+| Q4 | QuestDB | `plain` | 338 | 1.53 | 4.20 | 54.22 | 92.62 | warm |
+| Q4 | tick-store | `v3-seg4Mi` | 338 | 199.60 | 203.04 | 367.15 | 374.16 | no |
+| Q5 | Parquet | `zstd1-rg1Mi` | 1 | 24.62 | 42.59 | 38.65 | 59.31 | no |
+| Q5 | ArcticDB | `rows100k-cols127` | 1 | 47.65 | 104.12 | 289.60 | 292.21 | no |
+| Q5 | QuestDB | `plain` | 1 | 3.05 | 5.12 | 144.10 | 184.17 | warm |
+| Q5 | tick-store | `v3-seg4Mi` | 1 | 26.65 | 28.45 | 49.62 | 50.70 | no |
 
 Ingest and size, class A: returns once data is in the OS page cache. Stored bytes are allocated at rest, and the ratio is the slice's source bytes over them. "Total s" is the whole write clock; "engine-only s" is that less the time reading the input and putting it in the form the system's call takes, as "A write's two times" in compare/README.md sets out for each system. tick-store's both hold its ITCH parsing. A write of several repetitions measured before protocol 2 kept medians alone, so its engine-only seconds are not recorded.
 
 | System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Like-for-like |
 |---|---|---|---|---|---|---|---|---|
-| Parquet | `zstd1-rg1Mi` | 1.870 | not recorded | 3.28 | 70,483,968 | 2.925 | proven | yes |
-| ArcticDB | `rows100k-cols127` | 1.026 | not recorded | 5.97 | 141,168,640 | 1.460 | proven | yes |
-| QuestDB | `plain` | 4.172 | not recorded | 1.47 | 537,550,848 | 0.383 | proven | yes |
-| tick-store (parses ITCH) | `v3-seg4Mi` | 4.890 | not recorded | 1.25 | 43,270,144 | 4.764 | proven | yes |
+| Parquet | `zstd1-rg1Mi` | 2.247 | 2.247 | 2.73 | 70,479,872 | 2.925 | proven | yes |
+| ArcticDB | `rows100k-cols127` | 1.050 | 0.787 | 5.83 | 141,164,544 | 1.460 | proven | yes |
+| QuestDB | `plain` | 4.262 | 4.030 | 1.44 | 537,550,848 | 0.383 | proven | yes |
+| tick-store (parses ITCH) | `v3-seg4Mi` | 4.879 | 4.846 | 1.26 | 43,266,048 | 4.764 | proven | yes |
 
 Ingest and size, class B: returns after a flush to the device. Stored bytes are allocated at rest, and the ratio is the slice's source bytes over them. "Total s" is the whole write clock; "engine-only s" is that less the time reading the input and putting it in the form the system's call takes, as "A write's two times" in compare/README.md sets out for each system. tick-store's both hold its ITCH parsing. A write of several repetitions measured before protocol 2 kept medians alone, so its engine-only seconds are not recorded.
 
 | System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Like-for-like |
 |---|---|---|---|---|---|---|---|---|
-| Parquet | `zstd1-rg1Mi` | 4.885 | not recorded | 1.25 | 70,479,872 | 2.925 | proven | yes |
-| ArcticDB | `rows100k-cols127` | 1.232 | not recorded | 4.97 | 141,168,640 | 1.460 | proven | yes |
-| QuestDB | `plain` | 23.747 | not recorded | 0.26 | 537,550,848 | 0.383 | proven | no |
-| tick-store (parses ITCH) | `v3-seg4Mi` | 5.001 | not recorded | 1.22 | 43,266,048 | 4.764 | proven | yes |
+| Parquet | `zstd1-rg1Mi` | 2.375 | 2.375 | 2.58 | 70,479,872 | 2.925 | proven | yes |
+| ArcticDB | `rows100k-cols127` | 1.287 | 1.014 | 4.76 | 141,168,640 | 1.460 | proven | yes |
+| QuestDB | `plain` | 23.596 | 23.366 | 0.26 | 537,550,848 | 0.383 | proven | no |
+| tick-store (parses ITCH) | `v3-seg4Mi` | 6.555 | 6.518 | 0.93 | 43,266,048 | 4.764 | proven | yes |
 
 tick-store ingests the ITCH slice itself, so its write time holds ITCH parsing. The other systems ingest the columns tools/tick_export wrote from the same slice, already parsed, and their times do not. Nothing is subtracted.
 
-**macOS, slice only.** Apple M4 Max, commit `67ae574f5666`. Unpinned. No hardware counters. macOS has no thread pinning, and no unprivileged hardware counters. Each system gets the same thread budget. These numbers come from a five-minute slice and prove that the harness works. They are not claims about a full day, and no target changes because of them.
+**macOS, slice only.** Apple M4 Max, commit `ede0176b10bb`. Unpinned. No hardware counters. macOS has no thread pinning, and no unprivileged hardware counters. Each system gets the same thread budget. These numbers come from a five-minute slice and prove that the harness works. They are not claims about a full day, and no target changes because of them.
 
 Queries, on each system's class B store, in milliseconds. Each latency is the median of its runs and its tail figure, the 99th percentile by nearest rank, which is the slowest of 30 runs warm and the slowest of 7 runs cold. "Lowest" names the measures, warm or cold, on which a system had both the lowest median and the lowest tail figure of the four.
 
 | Query | System | Variant | Rows | Warm median ms | Warm slowest of 30 ms | Cold median ms | Cold slowest of 7 ms | Lowest |
 |---|---|---|---|---|---|---|---|---|
-| Q1 | Parquet | `zstd1-rg1Mi` | 527,644 | 16.62 | 19.13 | 21.45 | 22.37 | no |
-| Q1 | ArcticDB | `rows100k-cols127` | 527,644 | 7.02 | 8.72 | 17.84 | 18.54 | warm, cold |
-| Q1 | QuestDB | `plain` | 527,644 | 14.56 | 57.21 | 92.15 | 93.39 | no |
-| Q1 | tick-store | `v3-seg4Mi` | 527,644 | 88.68 | 107.62 | 154.19 | 156.31 | no |
-| Q2 | Parquet | `zstd1-rg1Mi` | 66,741 | 79.10 | 88.94 | 85.32 | 87.62 | no |
-| Q2 | ArcticDB | `rows100k-cols127` | 66,741 | 38.45 | 45.87 | 113.06 | 113.83 | no |
-| Q2 | QuestDB | `plain` | 66,741 | 7.83 | 23.89 | 314.25 | 319.06 | no |
-| Q2 | tick-store | `v3-seg4Mi` | 66,741 | 2.34 | 2.54 | 18.96 | 19.63 | warm, cold |
-| Q3 | Parquet | `zstd1-rg1Mi` | 5 | 54.16 | 57.68 | 58.03 | 59.03 | no |
-| Q3 | ArcticDB | `rows100k-cols127` | 5 | 25.51 | 32.81 | 84.90 | 86.22 | no |
-| Q3 | QuestDB | `plain` | 5 | 2.02 | 24.88 | 119.99 | 124.86 | no |
-| Q3 | tick-store | `v3-seg4Mi` | 5 | 1.23 | 1.51 | 11.74 | 12.36 | warm, cold |
-| Q4 | Parquet | `zstd1-rg1Mi` | 338 | 15.94 | 18.12 | 20.16 | 21.49 | no |
-| Q4 | ArcticDB | `rows100k-cols127` | 338 | 1.69 | 3.00 | 6.56 | 6.82 | cold |
-| Q4 | QuestDB | `plain` | 338 | 0.31 | 1.19 | 10.91 | 11.50 | warm |
-| Q4 | tick-store | `v3-seg4Mi` | 338 | 67.44 | 68.73 | 126.79 | 129.45 | no |
-| Q5 | Parquet | `zstd1-rg1Mi` | 1 | 7.10 | 8.09 | 10.18 | 10.37 | cold |
-| Q5 | ArcticDB | `rows100k-cols127` | 1 | 11.15 | 13.58 | 58.71 | 59.57 | no |
-| Q5 | QuestDB | `plain` | 1 | 0.99 | 6.45 | 23.65 | 24.19 | warm |
-| Q5 | tick-store | `v3-seg4Mi` | 1 | 7.13 | 7.63 | 12.27 | 12.89 | no |
+| Q1 | Parquet | `zstd1-rg1Mi` | 527,644 | 17.96 | 20.74 | 22.91 | 23.44 | no |
+| Q1 | ArcticDB | `rows100k-cols127` | 527,644 | 7.63 | 9.15 | 19.03 | 19.65 | warm, cold |
+| Q1 | QuestDB | `plain` | 527,644 | 14.49 | 29.84 | 91.21 | 94.69 | no |
+| Q1 | tick-store | `v3-seg4Mi` | 527,644 | 90.36 | 94.12 | 157.39 | 164.73 | no |
+| Q2 | Parquet | `zstd1-rg1Mi` | 66,741 | 82.41 | 88.55 | 90.16 | 91.76 | no |
+| Q2 | ArcticDB | `rows100k-cols127` | 66,741 | 41.78 | 42.56 | 115.06 | 119.97 | no |
+| Q2 | QuestDB | `plain` | 66,741 | 8.26 | 11.81 | 316.74 | 320.17 | no |
+| Q2 | tick-store | `v3-seg4Mi` | 66,741 | 2.35 | 2.43 | 20.08 | 20.63 | warm, cold |
+| Q3 | Parquet | `zstd1-rg1Mi` | 5 | 56.97 | 60.73 | 62.08 | 64.25 | no |
+| Q3 | ArcticDB | `rows100k-cols127` | 5 | 26.41 | 28.09 | 87.50 | 89.38 | no |
+| Q3 | QuestDB | `plain` | 5 | 2.02 | 8.71 | 119.33 | 123.49 | no |
+| Q3 | tick-store | `v3-seg4Mi` | 5 | 1.19 | 1.33 | 13.13 | 13.67 | warm, cold |
+| Q4 | Parquet | `zstd1-rg1Mi` | 338 | 16.95 | 19.38 | 21.93 | 22.36 | no |
+| Q4 | ArcticDB | `rows100k-cols127` | 338 | 1.79 | 2.68 | 6.65 | 7.13 | cold |
+| Q4 | QuestDB | `plain` | 338 | 0.30 | 0.47 | 10.37 | 32.74 | warm |
+| Q4 | tick-store | `v3-seg4Mi` | 338 | 69.01 | 71.15 | 129.80 | 134.00 | no |
+| Q5 | Parquet | `zstd1-rg1Mi` | 1 | 7.64 | 8.79 | 10.74 | 11.19 | cold |
+| Q5 | ArcticDB | `rows100k-cols127` | 1 | 12.56 | 15.53 | 59.76 | 62.01 | no |
+| Q5 | QuestDB | `plain` | 1 | 0.97 | 1.53 | 23.73 | 24.77 | warm |
+| Q5 | tick-store | `v3-seg4Mi` | 1 | 7.53 | 8.22 | 14.68 | 15.12 | no |
 
 Ingest and size, class A: returns once data is in the OS page cache. Stored bytes are allocated at rest, and the ratio is the slice's source bytes over them. On macOS, APFS can keep blocks allocated past the end of a file that grew in many small writes over time, so a stored figure here can exceed the file's own bytes: compare stored sizes from Linux. "Total s" is the whole write clock; "engine-only s" is that less the time reading the input and putting it in the form the system's call takes, as "A write's two times" in compare/README.md sets out for each system. tick-store's both hold its ITCH parsing. A write of several repetitions measured before protocol 2 kept medians alone, so its engine-only seconds are not recorded.
 
 | System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Like-for-like |
 |---|---|---|---|---|---|---|---|---|
-| Parquet | `zstd1-rg1Mi` | 1.016 | not recorded | 6.03 | 87,244,800 | 2.363 | proven | yes |
-| ArcticDB | `rows100k-cols127` | 0.458 | not recorded | 13.38 | 141,860,864 | 1.453 | proven | yes |
-| QuestDB | `plain` | 0.860 | not recorded | 7.12 | 537,772,032 | 0.383 | proven | yes |
-| tick-store (parses ITCH) | `v3-seg4Mi` | 1.995 | not recorded | 3.07 | 43,638,784 | 4.724 | proven | yes |
+| Parquet | `zstd1-rg1Mi` | 1.092 | 1.092 | 5.61 | 84,086,784 | 2.451 | proven | yes |
+| ArcticDB | `rows100k-cols127` | 0.503 | 0.376 | 12.18 | 141,860,864 | 1.453 | proven | yes |
+| QuestDB | `plain` | 0.867 | 0.754 | 7.06 | 537,772,032 | 0.383 | proven | yes |
+| tick-store (parses ITCH) | `v3-seg4Mi` | 2.036 | 2.025 | 3.01 | 43,638,784 | 4.724 | proven | yes |
 
 Ingest and size, class B: returns after a flush to the device. Stored bytes are allocated at rest, and the ratio is the slice's source bytes over them. On macOS, APFS can keep blocks allocated past the end of a file that grew in many small writes over time, so a stored figure here can exceed the file's own bytes: compare stored sizes from Linux. "Total s" is the whole write clock; "engine-only s" is that less the time reading the input and putting it in the form the system's call takes, as "A write's two times" in compare/README.md sets out for each system. tick-store's both hold its ITCH parsing. A write of several repetitions measured before protocol 2 kept medians alone, so its engine-only seconds are not recorded.
 
 | System | Variant | Total s, median | Engine-only s, median | M records/s | Stored bytes | Ratio | Proof | Like-for-like |
 |---|---|---|---|---|---|---|---|---|
-| Parquet | `zstd1-rg1Mi` | 1.019 | not recorded | 6.01 | 87,220,224 | 2.363 | proven | yes |
-| ArcticDB | `rows100k-cols127` | 0.516 | not recorded | 11.87 | 141,860,864 | 1.453 | proven | yes |
-| QuestDB | `plain` | 0.899 | not recorded | 6.81 | 537,772,032 | 0.383 | proven | no |
-| tick-store (parses ITCH) | `v3-seg4Mi` | 2.005 | not recorded | 3.06 | 43,638,784 | 4.724 | proven | yes |
+| Parquet | `zstd1-rg1Mi` | 1.095 | 1.095 | 5.59 | 84,086,784 | 2.451 | proven | yes |
+| ArcticDB | `rows100k-cols127` | 0.536 | 0.410 | 11.43 | 141,860,864 | 1.453 | proven | yes |
+| QuestDB | `plain` | 0.944 | 0.836 | 6.49 | 537,772,032 | 0.383 | proven | no |
+| tick-store (parses ITCH) | `v3-seg4Mi` | 2.048 | 2.037 | 2.99 | 43,638,784 | 4.724 | proven | yes |
 
 tick-store ingests the ITCH slice itself, so its write time holds ITCH parsing. The other systems ingest the columns tools/tick_export wrote from the same slice, already parsed, and their times do not. Nothing is subtracted.
 <!-- compare:end -->
@@ -306,12 +307,12 @@ An ITCH codec file gets a row a case. A column file gets a row a case too, and a
 row a kernel and set, the median across the widths it ran.
 
 <!-- results:begin, generated by scripts/render_results.py, do not edit -->
-**Linux.** AMD Ryzen Embedded V1605B with Radeon Vega Gfx, Clang 23.1.4, `-O3 -DNDEBUG -std=c++23`, x86-64 baseline, scalar kernels. Pinned with taskset -c 4 and verified by sched_getcpu. Counters come from perf stat user-mode events. perf cycles and timer ticks are different units.
+**Linux.** AMD Ryzen Embedded V1605B with Radeon Vega Gfx, Clang 23.1.4, `-O3 -DNDEBUG -std=c++23`, x86-64 baseline, avx2 kernels. Pinned with taskset -c 4 and verified by sched_getcpu. Counters come from perf stat user-mode events. perf cycles and timer ticks are different units.
 
 | Case | Commit | Passes | Messages/s | Spread (CV) | Batch | p50 µs | p99 µs | p99.9 µs | Cycles/msg | Instr/msg | Branch misses/msg | Load at start |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `itch_decode` | `1b7cfe196483` | 10 | 59.79 M | 0.25% | 1024 msgs | 17.44 | 21.80 | 35.08 | 59.76 | 134.96 | 0.51 | 0.78 |
-| `itch_decode_encode` | `1b7cfe196483` | 10 | 33.88 M | 0.24% | 1024 msgs | 29.98 | 39.27 | 51.19 | 105.18 | 271.38 | 0.51 | 0.81 |
+| `itch_decode` | `ede0176b10bb` | 10 | 59.85 M | 0.21% | 1024 msgs | 17.28 | 19.84 | 35.49 | 59.50 | 134.96 | 0.51 | 0.15 |
+| `itch_decode_encode` | `ede0176b10bb` | 10 | 33.97 M | 9.40% | 1024 msgs | 29.98 | 38.12 | 61.18 | 107.26 | 271.38 | 0.51 | 0.28 |
 
 Percentiles are the time for one whole batch, in microseconds, with the timer resolving 10.01 ns.
 
@@ -319,19 +320,48 @@ Percentiles are the time for one whole batch, in microseconds, with the timer re
 
 | Case | Commit | Kernels | Values | Bits/value | ns/value | MB/s of 8-byte values | Spread (CV) | Cycles/value | Instr/value | Branch misses/value | Load at start |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| `gorilla_xor/add_price` | `bcbf8738d892` | avx2 kernels | 3,153,991 | 37.18 | 20.558 | 389 | 0.52% | 73.35 | 218.11 | 0.391 | 1.49 |
-| `gorilla_xor_l1/add_price` | `bcbf8738d892` | avx2 kernels | 3,072 | 33.34 | 17.115 | 467 | 0.50% | 60.91 | 198.40 | 0.419 | 1.41 |
-| `store_decode/add_price` | `bcbf8738d892` | avx2 kernels | 3,153,991 | 6.30 | 6.252 | 1,280 | 0.66% | 22.32 | 47.00 | 0.051 | 1.32 |
-| `gorilla_dod/timestamp` | `bcbf8738d892` | avx2 kernels | 6,125,294 | 16.95 | 22.204 | 360 | 0.63% | 79.54 | 274.19 | 0.404 | 1.29 |
-| `pfor_delta/timestamp` | `bcbf8738d892` | avx2 kernels | 6,125,294 | 16.82 | 2.931 | 2,730 | 1.01% | 10.45 | 12.08 | 0.020 | 1.30 |
-| `pfor_dod/timestamp` | `bcbf8738d892` | avx2 kernels | 6,125,294 | 18.07 | 3.151 | 2,539 | 1.45% | 11.21 | 14.57 | 0.020 | 1.27 |
+| `gorilla_xor/add_price` | `ede0176b10bb` | avx2 kernels | 3,153,991 | 37.18 | 20.578 | 389 | 0.92% | 73.72 | 218.11 | 0.403 | 0.44 |
+| `gorilla_xor_l1/add_price` | `ede0176b10bb` | avx2 kernels | 3,072 | 33.34 | 17.122 | 467 | 3.03% | 60.66 | 198.40 | 0.427 | 0.53 |
+| `store_decode/add_price` | `ede0176b10bb` | avx2 kernels | 3,153,991 | 6.30 | 6.148 | 1,301 | 0.85% | 21.99 | 47.00 | 0.051 | 0.70 |
+| `gorilla_dod/timestamp` | `ede0176b10bb` | avx2 kernels | 6,125,294 | 16.95 | 22.456 | 356 | 12.50% | 79.91 | 274.19 | 0.401 | 0.73 |
+| `pfor_delta/timestamp` | `ede0176b10bb` | avx2 kernels | 6,125,294 | 16.82 | 2.894 | 2,764 | 1.91% | 10.31 | 12.09 | 0.020 | 0.79 |
+| `pfor_dod/timestamp` | `ede0176b10bb` | avx2 kernels | 6,125,294 | 18.07 | 3.146 | 2,543 | 0.87% | 11.17 | 14.57 | 0.020 | 0.80 |
 
-**macOS.** Apple M4 Max, Clang 23.1.4, `-O3 -DNDEBUG -std=c++23`, arm64 baseline, scalar kernels. Unpinned. No hardware counters. macOS has no thread pinning, and no unprivileged hardware counters.
+**Linux, decode kernels on seeded L1-resident input.** AMD Ryzen Embedded V1605B with Radeon Vega Gfx, Clang 23.1.4, `-O3 -DNDEBUG -std=c++23`. Pinned with taskset -c 4 and verified by sched_getcpu. Counters come from perf stat user-mode events. perf cycles and timer ticks are different units.
+
+Each row is one kernel on one set. A kernel with a width ran at each width listed, one case each, and the row gives the median across them.
+
+| Kernel | Set | Commit | Cases | G values/s, median | Range | Largest CV | Cycles/value, median | Instr/value, median | Branch misses/value, median | Load at start |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `pfor_unpack` | scalar | `ede0176b10bb` | 8 | 2.73 | 2.01 to 3.32 | 18.30% | 1.293 | 3.528 | 0.0010 | 1.04 to 1.11 |
+| `linear_unpack` | scalar | `ede0176b10bb` | 8 | 0.59 | 0.55 to 0.59 | 6.11% | 6.068 | 25.125 | 0.0010 | 1.06 to 1.11 |
+| `pfor_delta_two_pass` | scalar | `ede0176b10bb` | 65 | 0.96 | 0.82 to 1.30 | 9.03% | 3.689 | 7.976 | 0.0021 | 0.91 to 1.11 |
+| `pfor_delta_fused` | scalar | `ede0176b10bb` | 65 | 0.96 | 0.82 to 1.30 | 10.11% | 3.698 | 7.951 | 0.0021 | 0.92 to 1.11 |
+| `pfor_delta_narrow` | scalar | `ede0176b10bb` | 5 | 1.05 | 1.00 to 1.08 | 1.31% | 3.395 | 7.075 | 0.0020 | 1.02 to 1.05 |
+| `prefix_sum/vector` | scalar | `ede0176b10bb` | 1 | 2.11 | 2.11 to 2.11 | 6.02% | 1.682 | 3.563 | 0.0020 | 1.02 to 1.02 |
+| `prefix_sum/tree` | scalar | `ede0176b10bb` | 1 | 2.06 | 2.06 to 2.06 | 3.00% | 1.725 | 4.063 | 0.0020 | 1.02 to 1.02 |
+| `for_add` | scalar | `ede0176b10bb` | 1 | 2.21 | 2.21 to 2.21 | 2.14% | 1.586 | 3.072 | 0.0020 | 1.01 to 1.01 |
+| `for_add_zigzag` | scalar | `ede0176b10bb` | 1 | 2.03 | 2.03 to 2.03 | 18.83% | 1.735 | 6.073 | 0.0020 | 1.01 to 1.01 |
+| `svb_decode` | scalar | `ede0176b10bb` | 1 | 0.42 | 0.42 to 0.42 | 7.30% | 8.409 | 36.049 | 0.0097 | 1.08 to 1.08 |
+| `dod_reconstruct` | scalar | `ede0176b10bb` | 1 | 1.80 | 1.80 to 1.80 | 10.15% | 1.975 | 4.785 | 0.0020 | 1.06 to 1.06 |
+| `restore_copy` | scalar | `ede0176b10bb` | 1 | 6.76 | 6.76 to 6.76 | 11.07% | 0.523 | 0.785 | 0.0010 | 1.05 to 1.05 |
+| `pfor_unpack` | avx2 | `ede0176b10bb` | 8 | 3.38 | 2.66 to 3.39 | 16.26% | 1.052 | 0.777 | 0.0000 | 1.01 to 1.04 |
+| `linear_unpack` | avx2 | `ede0176b10bb` | 8 | 2.23 | 0.58 to 2.27 | 18.59% | 1.567 | 3.888 | 0.0010 | 1.01 to 1.09 |
+| `pfor_delta_two_pass` | avx2 | `ede0176b10bb` | 65 | 1.20 | 1.08 to 1.53 | 25.08% | 2.930 | 4.309 | 0.0010 | 0.92 to 1.10 |
+| `pfor_delta_fused` | avx2 | `ede0176b10bb` | 65 | 1.30 | 1.27 to 1.55 | 26.84% | 2.709 | 5.456 | 0.0010 | 0.94 to 1.11 |
+| `pfor_delta_narrow` | avx2 | `ede0176b10bb` | 5 | 1.17 | 1.16 to 1.17 | 18.34% | 3.016 | 5.399 | 0.0010 | 1.00 to 1.00 |
+| `prefix_sum/vector` | avx2 | `ede0176b10bb` | 1 | 1.60 | 1.60 to 1.60 | 18.29% | 2.198 | 3.948 | 0.0020 | 1.07 to 1.07 |
+| `prefix_sum/tree` | avx2 | `ede0176b10bb` | 1 | 2.07 | 2.07 to 2.07 | 0.36% | 1.720 | 4.063 | 0.0020 | 1.06 to 1.06 |
+| `for_add` | avx2 | `ede0176b10bb` | 1 | 2.26 | 2.26 to 2.26 | 0.55% | 1.576 | 1.947 | 0.0020 | 1.05 to 1.05 |
+| `for_add_zigzag` | avx2 | `ede0176b10bb` | 1 | 2.22 | 2.22 to 2.22 | 7.35% | 1.580 | 2.949 | 0.0020 | 1.04 to 1.04 |
+| `svb_decode` | avx2 | `ede0176b10bb` | 1 | 2.18 | 2.18 to 2.18 | 18.06% | 1.600 | 5.951 | 0.0010 | 1.03 to 1.03 |
+
+**macOS.** Apple M4 Max, Clang 23.1.4, `-O3 -DNDEBUG -std=c++23`, arm64 baseline, neon kernels. Unpinned. No hardware counters. macOS has no thread pinning, and no unprivileged hardware counters.
 
 | Case | Commit | Passes | Messages/s | Spread (CV) | Batch | p50 µs | p99 µs | p99.9 µs | Cycles/msg | Instr/msg | Branch misses/msg | Load at start |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `itch_decode` | `ad2bab57a412` | 10 | 130.06 M | 0.80% | 1024 msgs | 8.21 | 9.46 | 12.79 | n/a | n/a | n/a | 3.80 |
-| `itch_decode_encode` | `ad2bab57a412` | 10 | 69.86 M | 0.67% | 1024 msgs | 14.42 | 17.08 | 21.92 | n/a | n/a | n/a | 3.65 |
+| `itch_decode` | `ede0176b10bb` | 10 | 125.03 M | 0.64% | 1024 msgs | 8.54 | 10.63 | 14.42 | n/a | n/a | n/a | 3.95 |
+| `itch_decode_encode` | `ede0176b10bb` | 10 | 67.95 M | 0.82% | 1024 msgs | 14.71 | 18.12 | 24.83 | n/a | n/a | n/a | 3.86 |
 
 Percentiles are the time for one whole batch, in microseconds, with the timer resolving 41.67 ns.
 
@@ -339,12 +369,12 @@ Percentiles are the time for one whole batch, in microseconds, with the timer re
 
 | Case | Commit | Kernels | Values | Bits/value | ns/value | MB/s of 8-byte values | Spread (CV) | Cycles/value | Instr/value | Branch misses/value | Load at start |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| `gorilla_xor/add_price` | `bcbf8738d892` | neon kernels | 3,153,991 | 37.18 | 8.393 | 953 | 2.33% | n/a | n/a | n/a | 3.92 |
-| `gorilla_xor_l1/add_price` | `bcbf8738d892` | neon kernels | 3,072 | 33.34 | 4.649 | 1,721 | 2.80% | n/a | n/a | n/a | 3.68 |
-| `store_decode/add_price` | `bcbf8738d892` | neon kernels | 3,153,991 | 6.30 | 2.177 | 3,674 | 0.86% | n/a | n/a | n/a | 3.85 |
-| `gorilla_dod/timestamp` | `bcbf8738d892` | neon kernels | 6,125,294 | 16.95 | 9.650 | 829 | 1.66% | n/a | n/a | n/a | 3.85 |
-| `pfor_delta/timestamp` | `bcbf8738d892` | neon kernels | 6,125,294 | 16.82 | 0.601 | 13,314 | 1.46% | n/a | n/a | n/a | 3.41 |
-| `pfor_dod/timestamp` | `bcbf8738d892` | neon kernels | 6,125,294 | 18.07 | 0.880 | 9,096 | 1.32% | n/a | n/a | n/a | 3.22 |
+| `gorilla_xor/add_price` | `ede0176b10bb` | neon kernels | 3,153,991 | 37.18 | 8.897 | 899 | 2.10% | n/a | n/a | n/a | 3.79 |
+| `gorilla_xor_l1/add_price` | `ede0176b10bb` | neon kernels | 3,072 | 33.34 | 4.747 | 1,685 | 5.62% | n/a | n/a | n/a | 3.73 |
+| `store_decode/add_price` | `ede0176b10bb` | neon kernels | 3,153,991 | 6.30 | 2.376 | 3,367 | 0.76% | n/a | n/a | n/a | 3.62 |
+| `gorilla_dod/timestamp` | `ede0176b10bb` | neon kernels | 6,125,294 | 16.95 | 9.886 | 809 | 0.68% | n/a | n/a | n/a | 3.62 |
+| `pfor_delta/timestamp` | `ede0176b10bb` | neon kernels | 6,125,294 | 16.82 | 0.640 | 12,496 | 0.93% | n/a | n/a | n/a | 3.52 |
+| `pfor_dod/timestamp` | `ede0176b10bb` | neon kernels | 6,125,294 | 18.07 | 0.924 | 8,659 | 0.99% | n/a | n/a | n/a | 3.56 |
 
 **macOS, decode kernels on seeded L1-resident input.** Apple M4 Max, Clang 23.1.4, `-O3 -DNDEBUG -std=c++23`. Unpinned. No hardware counters. macOS has no thread pinning, and no unprivileged hardware counters.
 
@@ -352,26 +382,26 @@ Each row is one kernel on one set. A kernel with a width ran at each width liste
 
 | Kernel | Set | Commit | Cases | G values/s, median | Range | Largest CV | Cycles/value, median | Instr/value, median | Branch misses/value, median | Load at start |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `pfor_unpack` | scalar | `bcbf8738d892` | 8 | 7.49 | 4.95 to 9.03 | 11.21% | n/a | n/a | n/a | 3.17 to 3.36 |
-| `linear_unpack` | scalar | `bcbf8738d892` | 8 | 1.40 | 1.32 to 1.41 | 2.67% | n/a | n/a | n/a | 2.76 to 3.08 |
-| `pfor_delta_two_pass` | scalar | `bcbf8738d892` | 65 | 2.02 | 1.77 to 2.44 | 3.73% | n/a | n/a | n/a | 1.28 to 3.84 |
-| `pfor_delta_fused` | scalar | `bcbf8738d892` | 65 | 1.65 | 1.48 to 2.00 | 4.54% | n/a | n/a | n/a | 1.26 to 3.84 |
-| `pfor_delta_narrow` | scalar | `bcbf8738d892` | 5 | 1.73 | 1.69 to 1.76 | 2.14% | n/a | n/a | n/a | 1.26 to 1.32 |
-| `prefix_sum/vector` | scalar | `bcbf8738d892` | 1 | 3.25 | 3.25 to 3.25 | 1.32% | n/a | n/a | n/a | 1.29 to 1.29 |
-| `prefix_sum/tree` | scalar | `bcbf8738d892` | 1 | 3.22 | 3.22 to 3.22 | 1.41% | n/a | n/a | n/a | 1.29 to 1.29 |
-| `for_add` | scalar | `bcbf8738d892` | 1 | 5.27 | 5.27 to 5.27 | 2.33% | n/a | n/a | n/a | 1.29 to 1.29 |
-| `for_add_zigzag` | scalar | `bcbf8738d892` | 1 | 4.00 | 4.00 to 4.00 | 2.49% | n/a | n/a | n/a | 1.35 to 1.35 |
-| `svb_decode` | scalar | `bcbf8738d892` | 1 | 0.74 | 0.74 to 0.74 | 1.15% | n/a | n/a | n/a | 1.35 to 1.35 |
-| `dod_reconstruct` | scalar | `bcbf8738d892` | 1 | 2.94 | 2.94 to 2.94 | 1.37% | n/a | n/a | n/a | 1.35 to 1.35 |
-| `restore_copy` | scalar | `bcbf8738d892` | 1 | 13.36 | 13.36 to 13.36 | 18.64% | n/a | n/a | n/a | 1.32 to 1.32 |
-| `pfor_unpack` | neon | `bcbf8738d892` | 8 | 7.78 | 6.19 to 8.88 | 4.04% | n/a | n/a | n/a | 1.29 to 1.35 |
-| `linear_unpack` | neon | `bcbf8738d892` | 8 | 7.39 | 1.41 to 8.04 | 8.04% | n/a | n/a | n/a | 1.32 to 1.46 |
-| `pfor_delta_two_pass` | neon | `bcbf8738d892` | 65 | 3.35 | 2.92 to 4.42 | 5.58% | n/a | n/a | n/a | 1.35 to 2.40 |
-| `pfor_delta_fused` | neon | `bcbf8738d892` | 65 | 3.27 | 3.06 to 4.27 | 6.36% | n/a | n/a | n/a | 1.35 to 2.40 |
-| `pfor_delta_narrow` | neon | `bcbf8738d892` | 5 | 3.63 | 3.62 to 3.64 | 1.90% | n/a | n/a | n/a | 1.39 to 1.44 |
-| `prefix_sum/vector` | neon | `bcbf8738d892` | 1 | 4.72 | 4.72 to 4.72 | 2.79% | n/a | n/a | n/a | 1.44 to 1.44 |
-| `prefix_sum/tree` | neon | `bcbf8738d892` | 1 | 3.08 | 3.08 to 3.08 | 1.56% | n/a | n/a | n/a | 1.48 to 1.48 |
-| `for_add` | neon | `bcbf8738d892` | 1 | 5.43 | 5.43 to 5.43 | 2.06% | n/a | n/a | n/a | 1.48 to 1.48 |
-| `for_add_zigzag` | neon | `bcbf8738d892` | 1 | 3.94 | 3.94 to 3.94 | 1.15% | n/a | n/a | n/a | 1.48 to 1.48 |
-| `svb_decode` | neon | `bcbf8738d892` | 1 | 6.21 | 6.21 to 6.21 | 4.40% | n/a | n/a | n/a | 1.52 to 1.52 |
+| `pfor_unpack` | scalar | `ede0176b10bb` | 8 | 7.19 | 5.26 to 8.27 | 3.49% | n/a | n/a | n/a | 3.34 to 3.95 |
+| `linear_unpack` | scalar | `ede0176b10bb` | 8 | 1.30 | 1.24 to 1.31 | 0.71% | n/a | n/a | n/a | 3.38 to 3.94 |
+| `pfor_delta_two_pass` | scalar | `ede0176b10bb` | 65 | 1.89 | 1.71 to 2.22 | 1.65% | n/a | n/a | n/a | 2.25 to 3.98 |
+| `pfor_delta_fused` | scalar | `ede0176b10bb` | 65 | 1.56 | 1.45 to 1.75 | 1.83% | n/a | n/a | n/a | 2.06 to 3.99 |
+| `pfor_delta_narrow` | scalar | `ede0176b10bb` | 5 | 1.61 | 1.60 to 1.70 | 2.31% | n/a | n/a | n/a | 1.76 to 2.96 |
+| `prefix_sum/vector` | scalar | `ede0176b10bb` | 1 | 3.03 | 3.03 to 3.03 | 0.55% | n/a | n/a | n/a | 2.81 to 2.81 |
+| `prefix_sum/tree` | scalar | `ede0176b10bb` | 1 | 3.04 | 3.04 to 3.04 | 0.51% | n/a | n/a | n/a | 2.76 to 2.76 |
+| `for_add` | scalar | `ede0176b10bb` | 1 | 4.91 | 4.91 to 4.91 | 0.80% | n/a | n/a | n/a | 2.95 to 2.95 |
+| `for_add_zigzag` | scalar | `ede0176b10bb` | 1 | 3.84 | 3.84 to 3.84 | 0.78% | n/a | n/a | n/a | 3.25 to 3.25 |
+| `svb_decode` | scalar | `ede0176b10bb` | 1 | 0.70 | 0.70 to 0.70 | 1.52% | n/a | n/a | n/a | 3.28 to 3.28 |
+| `dod_reconstruct` | scalar | `ede0176b10bb` | 1 | 2.77 | 2.77 to 2.77 | 0.84% | n/a | n/a | n/a | 2.93 to 2.93 |
+| `restore_copy` | scalar | `ede0176b10bb` | 1 | 12.62 | 12.62 to 12.62 | 4.05% | n/a | n/a | n/a | 2.57 to 2.57 |
+| `pfor_unpack` | neon | `ede0176b10bb` | 8 | 7.32 | 6.04 to 8.45 | 3.38% | n/a | n/a | n/a | 2.35 to 3.07 |
+| `linear_unpack` | neon | `ede0176b10bb` | 8 | 7.40 | 1.37 to 7.90 | 5.01% | n/a | n/a | n/a | 2.09 to 3.03 |
+| `pfor_delta_two_pass` | neon | `ede0176b10bb` | 65 | 3.40 | 2.96 to 4.27 | 2.27% | n/a | n/a | n/a | 1.40 to 3.60 |
+| `pfor_delta_fused` | neon | `ede0176b10bb` | 65 | 3.25 | 3.16 to 4.10 | 2.03% | n/a | n/a | n/a | 1.47 to 3.59 |
+| `pfor_delta_narrow` | neon | `ede0176b10bb` | 5 | 3.47 | 3.47 to 3.48 | 0.69% | n/a | n/a | n/a | 3.30 to 3.60 |
+| `prefix_sum/vector` | neon | `ede0176b10bb` | 1 | 4.55 | 4.55 to 4.55 | 0.47% | n/a | n/a | n/a | 3.84 to 3.84 |
+| `prefix_sum/tree` | neon | `ede0176b10bb` | 1 | 2.93 | 2.93 to 2.93 | 0.41% | n/a | n/a | n/a | 3.63 to 3.63 |
+| `for_add` | neon | `ede0176b10bb` | 1 | 5.18 | 5.18 to 5.18 | 0.61% | n/a | n/a | n/a | 3.93 to 3.93 |
+| `for_add_zigzag` | neon | `ede0176b10bb` | 1 | 3.79 | 3.79 to 3.79 | 0.64% | n/a | n/a | n/a | 3.71 to 3.71 |
+| `svb_decode` | neon | `ede0176b10bb` | 1 | 5.93 | 5.93 to 5.93 | 2.51% | n/a | n/a | n/a | 3.52 to 3.52 |
 <!-- results:end -->

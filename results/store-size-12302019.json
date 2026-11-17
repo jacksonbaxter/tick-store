@@ -3,7 +3,7 @@
   "source": "12302019.NASDAQ_ITCH50",
   "host": "macOS",
   "build_preset": "bench",
-  "commit": "1669ae0",
+  "commit": "ede0176b10bb",
   "store_format": "itch-store-v3",
   "segment_records": 4194304,
   "segments": 65,

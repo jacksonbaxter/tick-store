@@ -11,7 +11,8 @@
     "build_type": "Release",
     "sanitizers": "none",
     "isa": "arm64 baseline, neon kernels",
-    "commit": "bcbf8738d892dd89a206bbfb8058ff88ba0b8483",
+    "commit": "ede0176b10bb49e505226285530d0b91a33b4f34",
+    "commit_source": "git",
     "core": "not-available",
     "sibling": "not-available",
     "sibling_busy_percent": "not-available",
@@ -27,25 +28,25 @@
       "ticks_per_second": 23999999.96,
       "resolution_ticks": 1,
       "resolution_ns": 41.666667,
-      "read_cost_ns": 4.446098,
+      "read_cost_ns": 5.08189,
       "min_publishable_ns": 416.666667,
-      "calibration_window_ns": 200000042.0
+      "calibration_window_ns": 200000167.0
     },
     "load_lines": [
-      "measure.sh: start load1=3.92 at=2026-11-10T02:42:13Z",
-      "measure.sh: end load1=3.68 exit=0 at=2026-11-10T02:42:18Z",
-      "measure.sh: start load1=3.68 at=2026-11-10T02:42:18Z",
-      "measure.sh: end load1=4.19 exit=0 at=2026-11-10T02:42:23Z",
-      "measure.sh: start load1=3.85 at=2026-11-10T02:42:29Z",
-      "measure.sh: end load1=3.85 exit=0 at=2026-11-10T02:42:32Z",
-      "measure.sh: start load1=3.85 at=2026-11-10T02:42:32Z",
-      "measure.sh: end load1=3.41 exit=0 at=2026-11-10T02:42:39Z",
-      "measure.sh: start load1=3.41 at=2026-11-10T02:42:39Z",
-      "measure.sh: end load1=3.22 exit=0 at=2026-11-10T02:42:43Z",
-      "measure.sh: start load1=3.22 at=2026-11-10T02:42:43Z",
-      "measure.sh: end load1=3.22 exit=0 at=2026-11-10T02:42:47Z"
+      "measure.sh: start load1=3.79 at=2026-11-14T16:37:24Z",
+      "measure.sh: end load1=3.73 exit=0 at=2026-11-14T16:37:29Z",
+      "measure.sh: start load1=3.73 at=2026-11-14T16:37:29Z",
+      "measure.sh: end load1=3.62 exit=0 at=2026-11-14T16:37:35Z",
+      "measure.sh: start load1=3.62 at=2026-11-14T16:37:35Z",
+      "measure.sh: end load1=3.62 exit=0 at=2026-11-14T16:37:39Z",
+      "measure.sh: start load1=3.62 at=2026-11-14T16:37:39Z",
+      "measure.sh: end load1=3.52 exit=0 at=2026-11-14T16:37:46Z",
+      "measure.sh: start load1=3.52 at=2026-11-14T16:37:46Z",
+      "measure.sh: end load1=3.56 exit=0 at=2026-11-14T16:37:50Z",
+      "measure.sh: start load1=3.56 at=2026-11-14T16:37:50Z",
+      "measure.sh: end load1=3.56 exit=0 at=2026-11-14T16:37:54Z"
     ],
-    "peak_rss_bytes": 1783332864
+    "peak_rss_bytes": 1785856000
   },
   "benchmark": "column_decode",
   "input": {
@@ -68,16 +69,16 @@
         "ticks_per_second": 23999999.96,
         "resolution_ticks": 1,
         "resolution_ns": 41.666667,
-        "read_cost_ns": 4.446098,
+        "read_cost_ns": 5.08189,
         "min_publishable_ns": 416.666667,
-        "calibration_window_ns": 200000042.0
+        "calibration_window_ns": 200000167.0
       },
       "timer_end_ticks_per_second": 24000000.0,
       "warmup": {
         "passes_per_repetition": 2,
         "first_repetition_pass_ms": [
-          26.210833,
-          26.447583
+          28.390125,
+          27.983917
         ]
       },
       "verification": {
@@ -96,14 +97,14 @@
       },
       "throughput": {
         "repetitions": 10,
-        "pass_ms_median": 26.471145974937826,
+        "pass_ms_median": 28.059937510988675,
         "values_per_second": {
-          "median": 119148489.50884292,
-          "mean": 118690641.14143729,
-          "stddev": 2765991.2417994225,
-          "cv": 0.02330420676136831
+          "median": 112402491.53955273,
+          "mean": 112331692.2930438,
+          "stddev": 2354664.534837181,
+          "cv": 0.020961711577303414
         },
-        "bytes_per_second_median": 953187916.0707433
+        "bytes_per_second_median": 899219932.3164219
       },
       "counters": {
         "cycles": {
@@ -137,28 +138,29 @@
         "timer_resolution_ns": 41.666667,
         "min_publishable_ns": 416.666667,
         "significant_figures": 3,
-        "min_ns": 26389333.377316,
-        "max_ns": 27647958.379413,
-        "percentiles": [
+        "min_ns": 27242666.712071,
+        "max_ns": 28991958.381653,
+        "percentiles": [],
+        "omitted_percentiles": [
           {
             "percentile": 50.0,
-            "value_ns": 26645291.711075
+            "reason": "5 of 10 batches lie above it, and publishing needs 10"
           },
           {
             "percentile": 90.0,
-            "value_ns": 27071958.378453
+            "reason": "1 of 10 batches lie above it, and publishing needs 10"
           },
           {
             "percentile": 99.0,
-            "value_ns": 27647958.379413
+            "reason": "0.1 of 10 batches lie above it, and publishing needs 10"
           },
           {
             "percentile": 99.9,
-            "value_ns": 27647958.379413
+            "reason": "0.01 of 10 batches lie above it, and publishing needs 10"
           },
           {
             "percentile": 99.99,
-            "value_ns": 27647958.379413
+            "reason": "0.001 of 10 batches lie above it, and publishing needs 10"
           }
         ]
       }
@@ -170,19 +172,19 @@
       "timer": {
         "source": "mach_absolute_time",
         "calibrated_against": "CLOCK_MONOTONIC_RAW",
-        "ticks_per_second": 24000000.04,
+        "ticks_per_second": 24000000.0,
         "resolution_ticks": 1,
         "resolution_ns": 41.666667,
-        "read_cost_ns": 4.431474,
-        "min_publishable_ns": 416.666666,
-        "calibration_window_ns": 200000333.0
+        "read_cost_ns": 5.065359,
+        "min_publishable_ns": 416.666667,
+        "calibration_window_ns": 200000250.0
       },
-      "timer_end_ticks_per_second": 24000000.08,
+      "timer_end_ticks_per_second": 24000000.0,
       "warmup": {
         "passes_per_repetition": 2,
         "first_repetition_pass_ms": [
-          38.784292,
-          39.057833
+          39.83675,
+          39.815833
         ]
       },
       "verification": {
@@ -201,14 +203,14 @@
       },
       "throughput": {
         "repetitions": 10,
-        "pass_ms_median": 38.99741655914113,
+        "pass_ms_median": 39.820541482185945,
         "values_per_second": {
-          "median": 215106879.18833923,
-          "mean": 212502055.7301605,
-          "stddev": 5954443.016523227,
-          "cv": 0.02802063724072534
+          "median": 210660319.7415195,
+          "mean": 205299225.79333138,
+          "stddev": 11545764.642904438,
+          "cv": 0.05623871496976426
         },
-        "bytes_per_second_median": 1720855033.5067139
+        "bytes_per_second_median": 1685282557.932156
       },
       "counters": {
         "cycles": {
@@ -240,30 +242,32 @@
         "batch_items": 16384,
         "batches": 5120,
         "timer_resolution_ns": 41.666667,
-        "min_publishable_ns": 416.666666,
+        "min_publishable_ns": 416.666667,
         "significant_figures": 3,
-        "min_ns": 69208.333218,
-        "max_ns": 95208.333175,
+        "min_ns": 76833.333333,
+        "max_ns": 112375.0,
         "percentiles": [
           {
             "percentile": 50.0,
-            "value_ns": 76666.666539
+            "value_ns": 78000.0
           },
           {
             "percentile": 90.0,
-            "value_ns": 78583.333202
+            "value_ns": 90708.333333
           },
           {
             "percentile": 99.0,
-            "value_ns": 88374.999853
-          },
+            "value_ns": 93458.333333
+          }
+        ],
+        "omitted_percentiles": [
           {
             "percentile": 99.9,
-            "value_ns": 92374.999846
+            "reason": "5.12 of 5120 batches lie above it, and publishing needs 10"
           },
           {
             "percentile": 99.99,
-            "value_ns": 93458.333178
+            "reason": "0.512 of 5120 batches lie above it, and publishing needs 10"
           }
         ]
       }
@@ -278,16 +282,16 @@
         "ticks_per_second": 24000000.0,
         "resolution_ticks": 1,
         "resolution_ns": 41.666667,
-        "read_cost_ns": 4.43211,
+        "read_cost_ns": 5.065359,
         "min_publishable_ns": 416.666667,
-        "calibration_window_ns": 200000000.0
+        "calibration_window_ns": 200000250.0
       },
-      "timer_end_ticks_per_second": 24000000.0,
+      "timer_end_ticks_per_second": 24000000.08,
       "warmup": {
         "passes_per_repetition": 2,
         "first_repetition_pass_ms": [
-          6.990542,
-          6.7835
+          7.745208,
+          7.516542
         ]
       },
       "verification": {
@@ -306,14 +310,14 @@
       },
       "throughput": {
         "repetitions": 10,
-        "pass_ms_median": 6.867187505122274,
+        "pass_ms_median": 7.493312514270656,
         "values_per_second": {
-          "median": 459284623.7830382,
-          "mean": 460218770.86623573,
-          "stddev": 3957868.441319281,
-          "cv": 0.008599971778355928
+          "median": 420908338.42674416,
+          "mean": 420534822.73132557,
+          "stddev": 3187792.0804915186,
+          "cv": 0.007580328448871781
         },
-        "bytes_per_second_median": 3674276990.2643056
+        "bytes_per_second_median": 3367266707.4139533
       },
       "counters": {
         "cycles": {
@@ -347,28 +351,29 @@
         "timer_resolution_ns": 41.666667,
         "min_publishable_ns": 416.666667,
         "significant_figures": 3,
-        "min_ns": 6773333.333333,
-        "max_ns": 6991958.333333,
-        "percentiles": [
+        "min_ns": 7392000.0,
+        "max_ns": 7573291.666667,
+        "percentiles": [],
+        "omitted_percentiles": [
           {
             "percentile": 50.0,
-            "value_ns": 6901291.666667
+            "reason": "5 of 10 batches lie above it, and publishing needs 10"
           },
           {
             "percentile": 90.0,
-            "value_ns": 6981291.666667
+            "reason": "1 of 10 batches lie above it, and publishing needs 10"
           },
           {
             "percentile": 99.0,
-            "value_ns": 6991958.333333
+            "reason": "0.1 of 10 batches lie above it, and publishing needs 10"
           },
           {
             "percentile": 99.9,
-            "value_ns": 6991958.333333
+            "reason": "0.01 of 10 batches lie above it, and publishing needs 10"
           },
           {
             "percentile": 99.99,
-            "value_ns": 6991958.333333
+            "reason": "0.001 of 10 batches lie above it, and publishing needs 10"
           }
         ]
       }
@@ -380,19 +385,19 @@
       "timer": {
         "source": "mach_absolute_time",
         "calibrated_against": "CLOCK_MONOTONIC_RAW",
-        "ticks_per_second": 24000000.04,
+        "ticks_per_second": 24000000.08,
         "resolution_ticks": 1,
         "resolution_ns": 41.666667,
-        "read_cost_ns": 4.43211,
-        "min_publishable_ns": 416.666666,
-        "calibration_window_ns": 200000208.0
+        "read_cost_ns": 5.08189,
+        "min_publishable_ns": 416.666665,
+        "calibration_window_ns": 200000666.0
       },
-      "timer_end_ticks_per_second": 24000000.04,
+      "timer_end_ticks_per_second": 23999999.96,
       "warmup": {
         "passes_per_repetition": 2,
         "first_repetition_pass_ms": [
-          59.809125,
-          59.012625
+          61.283291,
+          60.319458
         ]
       },
       "verification": {
@@ -411,14 +416,14 @@
       },
       "throughput": {
         "repetitions": 10,
-        "pass_ms_median": 59.10997948376462,
+        "pass_ms_median": 60.5567084858194,
         "values_per_second": {
-          "median": 103625387.74013095,
-          "mean": 103155705.04958433,
-          "stddev": 1717327.5866997538,
-          "cv": 0.016647916718462424
+          "median": 101149728.84926969,
+          "mean": 100895548.99206993,
+          "stddev": 684737.8249909475,
+          "cv": 0.006786600913829863
         },
-        "bytes_per_second_median": 829003101.9210476
+        "bytes_per_second_median": 809197830.7941575
       },
       "counters": {
         "cycles": {
@@ -450,30 +455,31 @@
         "batch_items": 6125294,
         "batches": 10,
         "timer_resolution_ns": 41.666667,
-        "min_publishable_ns": 416.666666,
+        "min_publishable_ns": 416.666665,
         "significant_figures": 3,
-        "min_ns": 58709333.235485,
-        "max_ns": 59605291.567325,
-        "percentiles": [
+        "min_ns": 60245333.132516,
+        "max_ns": 61311958.128961,
+        "percentiles": [],
+        "omitted_percentiles": [
           {
             "percentile": 50.0,
-            "value_ns": 58922624.901796
+            "reason": "5 of 10 batches lie above it, and publishing needs 10"
           },
           {
             "percentile": 90.0,
-            "value_ns": 59178624.901369
+            "reason": "1 of 10 batches lie above it, and publishing needs 10"
           },
           {
             "percentile": 99.0,
-            "value_ns": 59605291.567325
+            "reason": "0.1 of 10 batches lie above it, and publishing needs 10"
           },
           {
             "percentile": 99.9,
-            "value_ns": 59605291.567325
+            "reason": "0.01 of 10 batches lie above it, and publishing needs 10"
           },
           {
             "percentile": 99.99,
-            "value_ns": 59605291.567325
+            "reason": "0.001 of 10 batches lie above it, and publishing needs 10"
           }
         ]
       }
@@ -485,19 +491,19 @@
       "timer": {
         "source": "mach_absolute_time",
         "calibrated_against": "CLOCK_MONOTONIC_RAW",
-        "ticks_per_second": 24000000.08,
+        "ticks_per_second": 24000000.04,
         "resolution_ticks": 1,
         "resolution_ns": 41.666667,
-        "read_cost_ns": 4.446097,
-        "min_publishable_ns": 416.666665,
-        "calibration_window_ns": 200000666.0
+        "read_cost_ns": 5.068538,
+        "min_publishable_ns": 416.666666,
+        "calibration_window_ns": 200000083.0
       },
-      "timer_end_ticks_per_second": 24000000.0,
+      "timer_end_ticks_per_second": 24000000.08,
       "warmup": {
         "passes_per_repetition": 2,
         "first_repetition_pass_ms": [
-          4.640875,
-          3.605292
+          3.959792,
+          3.896458
         ]
       },
       "verification": {
@@ -516,14 +522,14 @@
       },
       "throughput": {
         "repetitions": 10,
-        "pass_ms_median": 3.6805830313824117,
+        "pass_ms_median": 3.9214165008161217,
         "values_per_second": {
-          "median": 1664218932.0494418,
-          "mean": 1657930091.2337718,
-          "stddev": 24256200.46810153,
-          "cv": 0.014630412100217653
+          "median": 1562037250.4547524,
+          "mean": 1560056873.0987966,
+          "stddev": 14500597.241565527,
+          "cv": 0.00929491577621941
         },
-        "bytes_per_second_median": 13313751456.395535
+        "bytes_per_second_median": 12496298003.63802
       },
       "counters": {
         "cycles": {
@@ -555,30 +561,31 @@
         "batch_items": 6125294,
         "batches": 10,
         "timer_resolution_ns": 41.666667,
-        "min_publishable_ns": 416.666665,
+        "min_publishable_ns": 416.666666,
         "significant_figures": 3,
-        "min_ns": 3621333.321262,
-        "max_ns": 3791958.320694,
-        "percentiles": [
+        "min_ns": 3863999.99356,
+        "max_ns": 3957291.660071,
+        "percentiles": [],
+        "omitted_percentiles": [
           {
             "percentile": 50.0,
-            "value_ns": 3671958.321094
+            "reason": "5 of 10 batches lie above it, and publishing needs 10"
           },
           {
             "percentile": 90.0,
-            "value_ns": 3701291.654329
+            "reason": "1 of 10 batches lie above it, and publishing needs 10"
           },
           {
             "percentile": 99.0,
-            "value_ns": 3791958.320694
+            "reason": "0.1 of 10 batches lie above it, and publishing needs 10"
           },
           {
             "percentile": 99.9,
-            "value_ns": 3791958.320694
+            "reason": "0.01 of 10 batches lie above it, and publishing needs 10"
           },
           {
             "percentile": 99.99,
-            "value_ns": 3791958.320694
+            "reason": "0.001 of 10 batches lie above it, and publishing needs 10"
           }
         ]
       }
@@ -590,19 +597,19 @@
       "timer": {
         "source": "mach_absolute_time",
         "calibrated_against": "CLOCK_MONOTONIC_RAW",
-        "ticks_per_second": 23999999.92,
+        "ticks_per_second": 24000000.0,
         "resolution_ticks": 1,
         "resolution_ns": 41.666667,
-        "read_cost_ns": 4.431474,
-        "min_publishable_ns": 416.666668,
-        "calibration_window_ns": 200000209.0
+        "read_cost_ns": 5.065359,
+        "min_publishable_ns": 416.666667,
+        "calibration_window_ns": 200000375.0
       },
       "timer_end_ticks_per_second": 24000000.0,
       "warmup": {
         "passes_per_repetition": 2,
         "first_repetition_pass_ms": [
-          5.878208,
-          5.234667
+          5.71775,
+          5.70775
         ]
       },
       "verification": {
@@ -621,14 +628,14 @@
       },
       "throughput": {
         "repetitions": 10,
-        "pass_ms_median": 5.3872084827162325,
+        "pass_ms_median": 5.659166505211033,
         "values_per_second": {
-          "median": 1137007045.693552,
-          "mean": 1142250424.8235652,
-          "stddev": 15051971.151188582,
-          "cv": 0.013177470390097291
+          "median": 1082366820.350552,
+          "mean": 1080776552.7215266,
+          "stddev": 10682321.665242793,
+          "cv": 0.00988393173255231
         },
-        "bytes_per_second_median": 9096056365.548416
+        "bytes_per_second_median": 8658934562.804417
       },
       "counters": {
         "cycles": {
@@ -660,30 +667,31 @@
         "batch_items": 6125294,
         "batches": 10,
         "timer_resolution_ns": 41.666667,
-        "min_publishable_ns": 416.666668,
+        "min_publishable_ns": 416.666667,
         "significant_figures": 3,
-        "min_ns": 5205333.350684,
-        "max_ns": 5471958.351573,
-        "percentiles": [
+        "min_ns": 5594666.666667,
+        "max_ns": 5711958.333333,
+        "percentiles": [],
+        "omitted_percentiles": [
           {
             "percentile": 50.0,
-            "value_ns": 5410625.018035
+            "reason": "5 of 10 batches lie above it, and publishing needs 10"
           },
           {
             "percentile": 90.0,
-            "value_ns": 5429291.684764
+            "reason": "1 of 10 batches lie above it, and publishing needs 10"
           },
           {
             "percentile": 99.0,
-            "value_ns": 5471958.351573
+            "reason": "0.1 of 10 batches lie above it, and publishing needs 10"
           },
           {
             "percentile": 99.9,
-            "value_ns": 5471958.351573
+            "reason": "0.01 of 10 batches lie above it, and publishing needs 10"
           },
           {
             "percentile": 99.99,
-            "value_ns": 5471958.351573
+            "reason": "0.001 of 10 batches lie above it, and publishing needs 10"
           }
         ]
       }
