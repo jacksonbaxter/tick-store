@@ -6424,20 +6424,29 @@ conditions-check `fix2` folder, show more and less than that:
 on any results page that says what that record keeps. Neither `quote_problem` nor
 `method_problem` reads it; `keeps_problem` is its check.
 
-**What decides a part.** `deciding_reads` defines it once:
+**What decides a part.** `deciding_reads` defines it once. A "rests on" mark tells the reader
+the outcome might differ without that figure:
 - tick-store's own figure always decides;
 - for a part met, every rival figure tick-store had to beat decides;
-- for a part missed, only the rival figures that beat it decide;
-- of a part's conditions, all decide when the part is met, and only those missed when it is
-  missed.
+- for a part missed, each missed condition is carried by the rival figures that beat tick-store
+  on it. If one of those is neither flagged nor disturbed, or the target is a constant, the miss
+  stands on it, and no flagged or disturbed rival figure decides. Only when every rival figure
+  that beat tick-store there is flagged or disturbed do they decide;
+- for a part of several conditions, missed, a miss that stands on any missed condition stands for
+  the part. A ranking's median and tail are its conditions.
 
 A "rests on" mark, for a swap-in or a disturbance, now names only deciding figures. A flagged
 figure that does not decide is left to its own cell in the comparison tables, which already mark
 every flagged figure "(swap-in)". A second mark there would only repeat that cell, and the first
-screen has no room for it. One mark changed: QL-4's Q5 warm now rests on QuestDB's flagged figure
-alone, since ArcticDB's, 3,105.98 ms, is slower than tick-store's 912.75 ms. Q1 warm keeps its
-mark: its miss is on ArcticDB's unflagged 34.16 ms, but QuestDB's flagged 53.49 ms also beat
-tick-store's 296.78 ms, so by the rule it decides too. The write-input clause says what each
+screen has no room for it. Two marks changed:
+- QL-4's Q5 warm now rests on QuestDB's flagged figure alone, since ArcticDB's, 3,105.98 ms, is
+  slower than tick-store's 912.75 ms. QuestDB's 54.46 ms is the only figure that beat it.
+- Q1 warm no longer carries a mark. Its miss stands on ArcticDB's unflagged 34.16 ms against
+  tick-store's 296.78 ms; QuestDB's flagged 53.49 ms beat it too, but the miss would stand
+  without it. In `2beb61c` the rule still marked it, and `f01b349` narrowed the rule for missed
+  parts to this.
+
+The write-input clause says what each
 write's record holds and claims nothing rests on it, so it was left as it is. No count moved.
 
 **The first screen.** The marks there take short forms defined once in the renderer:
@@ -6469,6 +6478,13 @@ full re-proof:
   `compare-replaced-figures-hidden`, `compare-swap-in-unmarked`, `compare-disturbance-unmarked`,
   `compare-replaced-change-unmarked`, `headline-value-mark-dropped`,
   `headline-verdict-all-parts`, `quote-input-clause-dropped`, `quote-mark-unchecked`.
+
+The narrowed rule's two new faults, `decide-standing-ignores-unflagged` and
+`decide-tainted-unread`, and the four it moved, `decide-every-compared-figure`,
+`decide-missed-by-every-rival`, `decide-met-condition-in-a-miss` and `compare-swap-in-unmarked`,
+were shown by hand the same way at `f01b349`, under the `fix2/proofs2` folder. Two more patches
+that only moved, `compare-replaced-favourable-counted` and `compare-replaced-figures-hidden`,
+were shown there too. Their proof is owed to the full re-proof as well.
 
 ## Process notes
 
