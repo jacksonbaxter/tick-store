@@ -169,6 +169,18 @@ exists, a missing file or a page that differs from a fresh render fails. What it
 that the prose is true beyond its figures and verdicts: a sentence can misread a right figure, and
 a number written in words is not seen.
 
+`check_ties.py` examines every file under `results/`, and fails one of no kind. It refuses a
+commit not in HEAD's history, a symbolic link git tracks in a compared path, and any git command
+that fails, naming it: a missing object, a `.git` git cannot read, a folder inside a checkout
+given as the checkout, or a results folder outside it. A pin names its file by its exact path
+under `results/`, from a set fixed in the script, and a line in the pins file for any other name
+is refused. A results file not committed as it is is not judged against what assembled it, but
+told to be committed first, a skip, which `--no-skips` fails. What it does not check: what
+assembled a file is compared with the last commit that wrote the file, so any later commit of
+the file, by hand or not, resets that comparison, and nothing shows the bytes are what the
+assembler wrote; a new file this checkout's own excludes hide is not seen; and it compares the
+work tree, which CI's clean checkout makes the commit.
+
 A skip is never a pass. A step that cannot run shows as `SKIP`, as `py-compare` does with no
 `.venv`, and a test skipped inside a passing step is named in that row. `ItchRealDay` skips
 this way where the data is absent. The four sources a host does not compile, the other
@@ -306,6 +318,16 @@ Results for both pinned days are in `results/roundtrip-12302019.json` and
 G-1 and G-2 are proved on the real store, not the stub: G-1 re-serialises every record the store
 decodes and matches the whole stream's SHA-256 against the pin, and G-2 flips one bit in a data
 block and one in the footer, each caught with CRCs on and with them off.
+
+That is what G-2 shows: the two flips `g2_plan.py` plans, on each day's store. What other flips
+do is known from two small stores, every bit of every byte flipped in turn, header to trailer,
+in `tests/scripts/oracle_fixtures/all-bit-sweep.json`, whose counts
+`tests/scripts/test_check_oracle.py` holds. With CRCs on, every flip is caught. With them off, a
+flip in a block or section entry's CRC32C or in the trailer's footer CRC32C passes, since nothing
+reads them then, and so do 57 of the 5,920 bit positions of the smaller store's block payloads
+and 74 of 22,592 of the larger one's, 0.96% and 0.33%, each leaving every record intact; every
+other footer bit is caught. The footer flip is steered past the CRC32Cs; the data flip is not
+steered, and was caught on both days.
 
 `tick_roundtrip ingest-stub` still writes the Phase 2 stub store, the day's frames behind a
 40-byte header with no checksum, which `verify` recognises by its magic.

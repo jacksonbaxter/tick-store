@@ -5256,7 +5256,7 @@ what verify compares:
 | Block metadata: value count (8-11) | not 0, a piece's count, the segment's sum, and the decoded values | `itch_store.cpp:385-388`, `itch_store_reader.cpp:186-189`, `:221-247`, `:269-273`, `src/store/itch_segment.cpp:1095-1100` |
 | Segment summary: first record (12-19), records (52-55) | the running record count and the header's | `itch_store_reader.cpp:182-189`, `:119-135`, `itch_store.cpp:418-420` |
 | Segment summary: first, last, min and max time (20-51), typed records (56-59) | their own rules, then the decoded times and typed count | `itch_store.cpp:421-438`, `itch_segment.cpp:1149-1180` |
-| Segment summary: plain (60) | must be 0 or 1, so bit 1 is refused; bit 0 would pass, since only queries read the flag | `itch_store.cpp:406-410`, `src/store/itch_query.cpp:1318` |
+| Segment summary: plain (60) | must be 0 or 1, so bit 1 is refused; bit 0 is refused too, since the decoder recomputes the flag from the records and refuses a summary that disagrees (corrected 2026-11-16: this said bit 0 would pass, since only queries read the flag; review TD-11) | `itch_store.cpp:406-410`, `src/store/itch_segment.cpp:1333-1342`, `src/store/itch_query.cpp:1318` |
 | Segment summary: bitmap size (61-62), locate bitmap (63 on) | the metadata's size, a non-zero last byte, then the bitmap of the decoded locates | `itch_store.cpp:411-417`, `:439-446`, `itch_segment.cpp:1182-1203` |
 
 The summary has no padding: its fields run from byte 12 to the bitmap's end.
@@ -5299,6 +5299,9 @@ said no later commit changes; TASKS says why this one does. Raw logs are kept
 outside the repository.
 
 ### The results files tied to their code
+
+(2026-11-16: the rules below changed after the delta review; what holds now is under The tie
+check and G-2 after the delta review.)
 
 2026-11-14. The freeze's claim, that the figures measured at `ede0176` stand at a later commit,
 rested on a diff someone ran by hand: TASKS lists the paths, and `git diff --stat ede0176..HEAD
@@ -5776,6 +5779,161 @@ day equals the committed RESULTS.md's. The essay on that tree runs to 4,077 word
 files.
 
 Nineteen faults hold the new rules, from `compare-replaced-favourable-counted` to `ties-disturbances-no-kind`, and four were remade on their moved lines: `headline-left-out-writer-class-shared`, `render-ql4-p99-unexplained`, `headline-verdict-all-parts` and `writeup-verdict-own-code`. One proof run at `57215e2` took all 23, and all came out PROVEN.
+
+### The tie check and G-2 after the delta review
+
+2026-11-16. A reviewer read `scripts/check_ties.py`, `scripts/g2_plan.py` and the oracle step's
+footer sweep at `8e616bf` and wrote down fifteen findings, TD-1 to TD-15 in docs/REVIEW.md. Each
+was reproduced first at `85aa3da`, whose three scripts are `8e616bf`'s, on small scratch
+repositories under `build/`, before anything was changed. No C++ was built: the sweeps and the
+live oracle runs below used an existing dev build of `tick_roundtrip`, read only, built from the
+sources `8e616bf` and HEAD hold (no file under `src/`, `include/`, `tools/` or `cmake/` differs
+between them or since `ede0176`). This entry corrects The results files tied to their code and
+G-2's footer flip at the freeze where they say otherwise; both stay as written.
+
+**Every file under `results/`** (TD-3). The check walked only `*.json`: a CSV naming a made-up
+commit, a `.json.gz` that was not gzip and a `.txt` beside one good file gave `1 files: 1 same`,
+exit 0. It now examines every file, and those three are of no kind, exit 1. A file that is not a
+results file must be listed in `NOT_RESULTS` with its reason, and is then named and not judged;
+the list is empty.
+
+**A git command that fails is a refusal** (TD-1, TD-7). Its exit code was not read, so an error
+read as empty output. With the object of the commit that changed `store_results.py` deleted from
+a scratch clone, `git log -1` printed nothing, the file had no writer, and it passed: `ok,
+nothing it measures changed since`, exit 0. Now every git command the check runs is a refusal
+naming the command, its exit code and what git said, here `cannot compare: git merge-base
+--is-ancestor ... exited 128: error: Could not read ...`, exit 1. A `.git/HEAD`
+overwritten and a `--repo` that is a folder inside a checkout each read as an exported tree,
+exit 3, a skip; both are now refused, and so are a `--results` folder outside the checkout,
+which passed (exit 0), and git missing from `PATH`, which was a traceback.
+Only a folder with no `.git`, inside no checkout that tracks files in it, is still "not judged:
+no history here".
+
+**What assembled a file** (TD-2). The assembled paths are compared with the last commit that
+wrote the file. That is a limit, now stated in the docstring, README's Checks section and here:
+any later commit of the file, by hand or not, resets the comparison, and nothing shows the bytes
+are what the assembler wrote. A figure edited by hand and committed with no reassembly passes, as
+it did at `8e616bf`. What changed is the uncommitted file: a hand edit not yet committed was
+compared with its last writer and passed (exit 0); a file that is not committed, or differs from
+its committed blob, is now "not judged against what assembled it: commit it first", which exits
+3 if nothing else fails, a skip under check.sh, a failure under `--no-skips`. That is the step's
+one rule for what it cannot compare, as for a missing history; check.sh's skip now names both.
+In this repository an uncommitted results file also unties `check-proofs.json`, since the
+prover's key holds `results/`, so there the step exits 1.
+
+**Pins** (TD-4). The comparison pin took any name: a fifth file under `compare/`, an existing
+file's bytes and a space, with its SHA-256 added to a copy of the pins file, was reported pinned,
+9 pinned, and `check_compare.py` passed it. A pin now names its file by its exact path under
+`results/`, from `PIN_NAMES`, fixed in the script: the four protocol 1 files,
+`check_roundtrip.PINNED_NAMES` and `check_fuzz.PRE_TIE_FILE`. A line in the pins file under one of
+these keys for any other name is refused, so on that copy the run says `check_ties:
+protocol_1_comparison_files in the pins file pins Linux-12302019-open-0000aaaa0000.json, and
+check_ties.py lets only ... be pinned there`, judges the file, `16 differs`, and exits 1.
+`check_compare.py` still takes any SHA-256 under its key; its rules are final for the freeze, so
+the restriction is in `check_ties.py`. For a file the freeze replaces but keeps, the reason
+"replaced, kept for the record": key `replaced_kept_for_the_record` in the pins file, keyed by
+path, and `REPLACED_KEPT` in the script, each entry a path and a SHA-256; such a file is pinned
+only under a `replaced/` folder, and only when its bytes' SHA-256 is the one in both places.
+`REPLACED_KEPT` is empty, and its test requires it to be until the results commit adds the file.
+
+**The disturbances file.** `results/disturbances-ede0176b10bb.json`, which the freeze's runners
+assembled by hand, measures nothing and names its commit. The table now has its kind,
+`disturbances-*.json`, with no measured or assembled path and the reason why, so such a file
+passes if it names a commit in HEAD's history and fails if it names none or one outside it. The
+file itself is not added here.
+
+**Ancestry and links** (TD-5, TD-6). A commit this clone still held after a rebase, or one on
+another branch, was judged, and passed locally (exit 0), though a fresh clone refused the first.
+A commit not in HEAD's history is now refused; CI fetches the whole history, and in a shallow
+clone, where git cannot tell, the file is not judged. A commit a full clone lacks is counted as
+refused, not as differs. A symbolic link git tracks inside a compared path, whose target
+changed outside it, passed; it is now refused, since the comparison sees the link and not what
+it points at. No link is tracked today. Still not seen, and stated: a new file that this
+checkout's own excludes hide, `.git/info/exclude` or a global excludes file (still exit 0); CI
+has neither, and the repository's `.gitignore` matches nothing a measured path builds. The check
+compares the work tree.
+
+**The kinds' paths** (TD-10). The fuzz kind's assembled paths lacked `scripts/build_preset.py`,
+from which `fuzz_host.py` writes the header's preset and build type; it and `scripts/check_fuzz.py`,
+whose `STATUS` and `TIED_PATHS` `fuzz_results.py` reads, are now listed. Every other kind's lists
+were read against the scripts that write its files, and nothing else was missing.
+
+**Tests and mutations** (TD-8). Each refusal and exit path has a test of its own: an unreadable
+results file, a git error, committed refused and no-kind files with the proofs brought up to
+date so that the exit is the file's own, a difference beside a commit a shallow clone lacks, an
+empty results folder, an unreadable pins file and a missing input pins key. Run against
+`85aa3da`'s script, 40 of the 56 tests then in the file fail, many only because that script has
+no disturbances kind or `NOT_RESULTS`. Of 59 mutations of the check's rules, the reviewer's 41 and
+18 for the new ones, each run against `test_check_ties.py` in a copy, 58 are caught; the one not
+caught, a pin of one kind held for another, changes nothing now that a pin names its exact path,
+and the control passes. `ties-kind-dropped` is described as what it does (TD-9): it renames the
+census kind so that no file matches it, and the census files are refused as of no kind.
+
+**G-2's plain flag** (TD-11). The footer table said a flip of bit 0 of a segment summary's plain
+flag would pass with checksums off. It does not: the decoder recomputes the flag from the records
+and refuses a summary that disagrees, `src/store/itch_segment.cpp:1333-1342`. On a one-segment
+store with a record of unknown type, so the flag is 0, a flip of bit 0 exits 1 with checksums and
+without, `bad block metadata: plain records, segment 0, column type: expected 0, have 1`. The row
+is corrected, dated; the sentence above the table holds for every bit.
+
+**The committed plans** (TD-12). `check_ties.py` leaves `g2_plan.py` out of the round-trip kind
+because the committed flips are the planner's, but only constants copied from the files said so:
+with `roundtrip-10302019.json`'s footer flip moved one byte back onto the CRC32C, its seed
+unchanged, `test_g2_plan.py` and `test_check_oracle.py` both passed. `CommittedPlans` now
+rebuilds each committed day's layout from the round-trip file and its day's store-size file,
+the same run's, and requires the planner's flips and seed to be the file's. The one fact the
+files do not record is the block listing: that the flipped block is piece 0 of its segment's
+timestamp column and the only one there, which the test takes from the file's own `g2` block.
+Both days' files pass, and so do the freeze's staged round-trip and store-size files, run from a
+copy outside the repository; the Linux file records no G-2.
+
+**What G-2 shows** (TD-13). Every bit of every byte of two small stores was flipped in turn on a
+fresh copy, header to trailer, and `verify` run with and without checksums: the oracle's own
+store, 2,283 bytes, 4 records in 2 segments, 26 blocks and 3 sections, and a larger one, 6,793
+bytes, 79 records in 5 segments, 77 blocks. `tests/scripts/oracle_fixtures/all-bit-sweep.json`
+holds every pair that passed, `all_bit_sweep.py` beside it makes it, and `AllBits` in
+`test_check_oracle.py` holds the counts the pages quote to it. With checksums, nothing passes.
+Without, the footer passes exactly its entries' CRC32C bytes, all 8 bits, 928 and 2,560 pairs
+(29 and 80 entries); the trailer passes its footer CRC32C, bytes 8 to 11, 32 pairs each; header
+and sections pass nothing; and 57 of the 5,920 and 74 of the 22,592 block payload pairs pass,
+0.96% and 0.33%, each leaving every record verify compares intact. G-2's verdict holds for the
+two flips planned on each day, and README's Round-trip check and BENCHMARKS, under the gates,
+now say so. The gate's wording in BENCHMARKS is the brief's and stays; `scripts/targets.json`'s
+`judged` text already names the flips judged, so it stays too. The data flip is not steered
+away from the payload bits that pass, and was caught on both days.
+
+**The planner's and the oracle's untested rules** (TD-14). New tests: the middle of an even
+segment count, a footer with no bytes before the trailer (its own message), two first timestamp
+blocks in the middle segment, and a data block inside the header. The oracle step's live
+refusals, which no test ran, each get a test through a stand-in tool that gives each wrong answer
+in turn. The sweep's third rule, that the byte moved to was caught, follows from the first and
+has no test of its own. Live, with the dev build: `check_oracle.py` with
+`g2-plan-section-crc-classed-read` applied exits 1, `G-2 failed: the footer sweep disagrees with
+the rule in 24 places, first: footer byte 872, which the rule may flip, passed verify
+--no-checksums flipped`; clean, it exits 0. A proven fault on the `oracle` step itself needs the
+prover's clone to build the dev tools, which this round did not do, so
+`oracle-sweep-disagreement-passes` proves that refusal in `py-scripts`.
+
+**The freeze diff** (TD-15). TASKS said `git diff --stat ede0176..HEAD` over the measured paths
+printed only `scripts/g2_plan.py`. It prints `compare/README.md` and `fuzz/README.md` too, prose
+from `ebb1ae2`, which no kind measures; the item is corrected, dated.
+
+**Faults.** Fourteen are new, each in `py-scripts`: `ties-git-error-passes`,
+`ties-results-outside-passes`, `ties-unreadable-git-dir-unjudged`, `ties-subfolder-unjudged`,
+`ties-uncommitted-assembled-judged`, `ties-non-json-unseen`, `ties-pin-any-listed-name`,
+`ties-stray-pin-accepted`, `ties-replaced-pin-outside-folder`, `ties-non-ancestor-passes`,
+`ties-symlink-passes`, `ties-refused-exits-0`, `ties-fuzz-build-preset-dropped` and
+`oracle-sweep-disagreement-passes`, with a data mutation, `g2-committed-plan-moved`, that moves a
+committed round-trip file's footer flip back onto the CRC32C. The seven earlier `ties-*` patches
+were made again on the moved lines, and `check-sh-untied-results-pass` on check.sh's new skip
+text. `ties-results-outside-passes` fails its test as an error, a traceback where the refusal
+should be. The fourteen new faults were each PROVEN with `--only` through `heavy.sh`, two to
+four at a time, about 5 minutes a fault, at `94b2cc7`; `results/check-proofs.json` was
+restored from git after each run.
+
+**Today.** `python3 -I scripts/check_ties.py` on this tree says what it said before:
+`23 files: 0 same, 8 pinned, 15 differs, 0 no commit, 0 no kind, 0 refused, 0 unjudged`, exit 1,
+the same files failing for the same paths.
 
 ## Process notes
 

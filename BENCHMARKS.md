@@ -53,6 +53,16 @@ These come from the project brief, so they need no published source. Each one mu
 | G-3 | Every parser and decoder is fuzzed | Each libFuzzer target runs clean for 30 minutes under the heavy-job lock (`heavy.sh`) |
 | G-4 | Gorilla is built and measured | Delta-of-delta timestamps and XOR floats exist and run on this data, whatever the result |
 
+G-2 is judged on the flips `scripts/g2_plan.py` plans for each pinned day's store: bit 1 of the
+middle byte of the middle segment's first timestamp block, and bit 1 of the footer's middle
+byte, moved on past a block or section entry's CRC32C, each with CRCs on and off. Its verdict
+holds for those flips, not for any flip. What other flips do is known from two small stores,
+every bit of every byte flipped in turn (`tests/scripts/oracle_fixtures/all-bit-sweep.json`,
+held by `tests/scripts/test_check_oracle.py`): with CRCs on, every flip is caught; with them
+off, the entries' CRC32Cs and the trailer's footer CRC32C, which nothing then reads, pass, and so
+do 0.96% and 0.33% of the two stores' block payload bit positions, each leaving every record
+intact. The data flip is not steered away from such bits.
+
 ## Compression targets
 
 Ratio does not depend on the host.
