@@ -6073,6 +6073,65 @@ new files for size, `results/bench/Linux-simd_kernel-ede0176b10bb.json` at 1,141
 limit, whose allowance names only the slice files: a recorded decision, not done here. The essay
 is on another branch.
 
+### Two allowances and a rule made stricter
+
+2026-11-17. **The hygiene step's size rule.** `scripts/check_hygiene.py` refused the freeze's
+`results/bench/Linux-simd_kernel-ede0176b10bb.json`, 1,141,409 bytes, and
+`results/compare/Linux-12302019-full-ede0176b10bb.json`, 1,102,687, over its 1,000,000-byte limit.
+Both are records the benchmark and the comparison harness wrote, so they are not trimmed;
+`9e2e49e` names the two kinds, `results/bench/*-simd_kernel-*.json` and
+`results/compare/*-12302019-full-*.json`, each with its argument in the script from the file's
+keys. The SIMD kernel file is 314 result rows, about 3 KB each, 939 KB in all, and 628 load lines
+and frequency snapshots, 83 KB; the macOS file of the kind is 929,369 bytes. The full day is four
+systems in 11 variants and 22 write classes, five queries timed warm 30 times and cold 7 times:
+the cold eviction proofs, 239 KB, warm proofs 62 KB, per-repetition timings 43 KB and the Python
+floor's 31 KB, write details 107 KB, of which QuestDB's write-ahead-log states are 82 KB, and the
+settings and stored settings 127 KB. Against the replaced run's 811,417 bytes, protocol 2 added
+the warm per-repetition timings, 35 KB, 72 KB of cold proofs, 29 KB of Python floor timings and
+the input record. A walk of every key of both files and of the macOS and Linux slices, the kind
+allowed before, found no rows or values of the market data: every value is a timing, count,
+rate, size, frequency, setting, commit or SHA-256, each query's answer is its row count and
+SHA-256, a query's parameters are a time window and a locate number, and the kernel benchmark's
+input is generated from a recorded seed; `1396e7f` says so in both arguments. The rule is now
+stricter: an allowed kind had no limit at all, and each now has its own, 2,000,000 bytes, the
+largest allowed file being the macOS slice at 1,306,366; and a file of an allowed kind must be a
+JSON object at any size, so no pattern lets a data file through under a result's name.
+`tests/scripts/test_check_hygiene.py` holds it: `test_an_allowed_kind_over_its_limit_is_refused`,
+`test_an_allowed_name_that_is_not_a_json_object_is_refused` (a data file's bytes, a JSON list,
+an object with bytes after it, bytes that are not text, a columnar file's magic, a torn object),
+`test_a_json_object_of_no_allowed_kind_is_still_refused` and
+`test_the_freezes_large_kinds_pass_at_their_sizes`; `test_a_named_kind_of_result_may_be_large_at_any_commit`
+now tracks a JSON object, since its run of `x` bytes is what the new rule refuses. No existing fault
+patch touched the script or its test. `python3 -I scripts/check_hygiene.py`: `712 tracked files
+clean`.
+
+**The faster-write rule reads every results page.** The render check applied
+`faster_write_problem` to the generated blocks and the README's pitch only. Since `38b95d5` it reads
+the whole prose of `README.md`, `RESULTS.md`, `BENCHMARKS.md`, `compare/README.md` and
+`fuzz/README.md`, a wrapped paragraph or list item joined so a sentence is read across its line
+breaks, and names the page and line. Of the other tracked pages, `docs/NOTES.md`, `docs/TASKS.md`,
+`docs/REVIEW.md` and `research/` are the working record, which quotes each run's verdicts as they
+stood, and are left out, as the code's comment and the README's Checks section say;
+`docs/format.md` and `docs/store.md` describe the store and state no comparison;
+`tests/unit/crashers/README.md` says where a crash input goes; and the essay is
+`render_writeup.py`'s. The five pages pass as they are. In the left-out files the rule, run the
+same way, refuses one sentence, `docs/NOTES.md` line 6023 in the freeze's results, quoting the
+verdict on this run before the replaced run's: "WT-4, Linux, against ArcticDB: on this run
+tick-store's class B write, 190.7 s total and 190.3 s engine-only, is no slower than ArcticDB's
+381.4 s and 291.8 s, so met;". It is left as it is. Tests:
+`test_every_results_page_is_read_whole_and_named_with_its_line`, a wrapped sentence below a heading,
+a table and a list on each of the five pages, and `test_the_results_pages_are_the_repositorys`.
+
+**Faults.** Three are new, each in `py-scripts`: `hygiene-allowed-kind-no-limit`,
+`hygiene-large-result-not-json` and `compare-faster-write-pages-unread`; and
+`compare-faster-write-readme-unread` was remade on its moved line, the README dropped from the
+pages read. All four were PROVEN in one `prove_checks.py --only` call through `heavy.sh` at
+`1396e7f`, 4 of 4 as expected, each baseline passing; `results/check-proofs.json` was restored
+from git after it.
+
+`scripts/check.sh --only py-scripts,hygiene,render-check` through `heavy.sh` at `38b95d5`: all
+three PASS, 986 tests with 6 skipped.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
