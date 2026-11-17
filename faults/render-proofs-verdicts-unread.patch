@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -3286,7 +3286,7 @@ def proof_verdicts(entries, control):
+     of them or a count, first, then each other verdict with its count."""
+     counts = {}
+     for entry in entries:
+-        verdict = entry.get("verdict")
++        verdict = PROOF_EXPECTED[control]
+         if not isinstance(verdict, str) or not verdict:
+             raise TargetError(f"{PROOFS_FILE}: {entry.get('fault_id')!r} has no verdict")
+         counts[verdict] = counts.get(verdict, 0) + 1

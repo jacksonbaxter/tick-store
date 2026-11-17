@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -3470,7 +3470,7 @@ def main(argv=None):
+ 
+     proofs_path = args.targets_root / PROOFS_FILE
+     has_proofs = readme is not None and block_of(readme, PROOFS_BEGIN, PROOFS_END) is not None
+-    if readme is not None and has_proofs != proofs_path.is_file():
++    if readme is not None and has_proofs and not proofs_path.is_file():
+         print(f"render_results: {args.readme.name} has the proofs markers and there is no "
+               f"{PROOFS_FILE}, or the reverse: both or neither", file=sys.stderr)
+         return EXIT_USAGE

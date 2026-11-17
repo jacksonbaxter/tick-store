@@ -2772,5 +2772,88 @@ class ConditionsTest(Scratch):
                 self.assertIsNone(RENDER.method_problem([(name, said)], self.tree))
 
 
+def proofs_document(verdicts, controls=("UNDETECTED",)):
+    """A proofs file as prove_checks.py writes it, with a verdict for each fault and control."""
+    faults = [{"fault_id": f"fault-{index}", "verdict": verdict}
+              for index, verdict in enumerate(verdicts)]
+    faults += [{"fault_id": f"control-{index}", "verdict": verdict, "control": True}
+               for index, verdict in enumerate(controls)]
+    return {"schema": "tick-store-check-proofs-1", "source_commit": "0123456789ab",
+            "platform": "Darwin arm64", "faults": faults}
+
+
+class ProofsBlockTest(Scratch):
+    """The README's paragraph on the fault proofs says what results/check-proofs.json holds,
+    every count read from it, so a re-proof that rewrites the file is shown by a regeneration."""
+
+    README = (f"# Title\n\nBefore.\n\n{RENDER.PROOFS_BEGIN}\n{RENDER.PROOFS_END}\n\n"
+              "After.\n")
+
+    def write_proofs(self, document, markers=True):
+        path = self.tree / "results" / "check-proofs.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(document), encoding="utf-8")
+        if markers:
+            self.readme.write_text(self.README, encoding="utf-8")
+
+    def paragraph(self):
+        text = self.readme.read_text(encoding="utf-8")
+        return " ".join(text[text.index(RENDER.PROOFS_BEGIN):].split())
+
+    def test_the_paragraph_counts_what_the_proof_file_holds(self):
+        self.write_proofs(proofs_document(["PROVEN", "PROVEN", "UNDETECTED"]))
+        result = self.render()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("`results/check-proofs.json` holds 4 runs, made at source commit `0123456` "
+                      "on Darwin arm64: 3 faults that a check must catch, 2 PROVEN, "
+                      "1 UNDETECTED, and 1 control, a change that no check may notice, "
+                      "UNDETECTED, as a control must be.", self.paragraph())
+
+    def test_every_fault_as_expected_is_said_as_all(self):
+        self.write_proofs(proofs_document(["PROVEN"] * 3, ("UNDETECTED", "CONTROL FAILED")))
+        self.assertEqual(self.render().returncode, 0)
+        self.assertIn("3 faults that a check must catch, all 3 PROVEN, and 2 controls, a change "
+                      "that no check may notice, 1 UNDETECTED, 1 CONTROL FAILED.",
+                      self.paragraph())
+
+    def test_a_hand_edit_inside_the_proofs_block_is_stale(self):
+        self.write_proofs(proofs_document(["PROVEN", "UNDETECTED"]))
+        self.render()
+        text = self.readme.read_text(encoding="utf-8")
+        self.readme.write_text(text.replace("1 PROVEN", "2 PROVEN"), encoding="utf-8")
+        result = self.render("--check")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("the table in README.md is stale or was edited by hand", result.stderr)
+
+    def test_the_markers_and_the_file_go_together(self):
+        self.readme.write_text(self.README, encoding="utf-8")
+        result = self.render("--check")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("has the proofs markers and there is no results/check-proofs.json, or the "
+                      "reverse: both or neither", result.stderr)
+        self.readme.write_text(PLAIN_README, encoding="utf-8")
+        self.write_proofs(proofs_document(["PROVEN"]), markers=False)
+        result = self.render("--check")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("both or neither", result.stderr)
+
+    def test_a_file_with_no_runs_or_no_commit_stops_the_render(self):
+        for document, said in ((dict(proofs_document([]), faults=[]), "holds no runs"),
+                               (dict(proofs_document(["PROVEN"]), source_commit=None),
+                                "names no source commit")):
+            with self.subTest(said=said):
+                self.write_proofs(document)
+                result = self.render("--check")
+                self.assertEqual(result.returncode, 2)
+                self.assertIn(said, result.stderr)
+
+    def test_the_readme_gives_the_committed_file(self):
+        text = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+        block = text[text.index(RENDER.PROOFS_BEGIN) + len(RENDER.PROOFS_BEGIN):
+                     text.index(RENDER.PROOFS_END)]
+        self.assertEqual(block.strip().split("\n"),
+                         RENDER.render_proofs(REPO_ROOT / "results" / "check-proofs.json"))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -291,6 +291,11 @@ def hand_edit_compare_value():
     edit_table_cells("RESULTS.md", "| Q2 | tick-store |", {4: "1.00"})
 
 
+def hand_edit_proofs_paragraph():
+    """The README's proofs paragraph with words typed into it by hand."""
+    edit_text("README.md", " runs, made at source commit", " runs in all, made at source commit")
+
+
 def hand_edit_headline_value():
     """The README's headline, its one-thread ingest typed past the bar and the verdict met."""
     edit_table_cells("README.md", "| One-thread ingest |", {2: "9.000 M messages/s", 3: "met"})
@@ -1975,6 +1980,18 @@ FAULTS = (
     Fault("readme-headline-hand-edit", "render-check", "a hand edit of a figure in the "
           "README's headline: one-thread ingest typed as 9.000 M messages/s and met", CHECK_FAILED,
           "the table in README.md is stale or was edited by hand", hand_edit_headline_value),
+    # The README's proofs paragraph is counted from results/check-proofs.json.
+    Fault("readme-proofs-hand-edit", "render-check", "a hand edit inside the README's proofs "
+          "paragraph", CHECK_FAILED, "the table in README.md is stale or was edited by hand",
+          hand_edit_proofs_paragraph),
+    Fault("render-proofs-verdicts-unread", "py-scripts", "render_results.py counts every fault "
+          "of the proofs file as PROVEN and every control as UNDETECTED, whatever their "
+          "verdicts", CHECK_FAILED,
+          "FAIL: test_the_paragraph_counts_what_the_proof_file_holds (__main__.ProofsBlockTest"),
+    Fault("render-proofs-markers-optional", "py-scripts", "render_results.py lets the README "
+          "leave out the proofs paragraph's markers while the proofs file exists, so a typed "
+          "count could stand in its place", CHECK_FAILED,
+          "FAIL: test_the_markers_and_the_file_go_together (__main__.ProofsBlockTest"),
     Fault("readme-headline-markers-removed", "render-check", "the README without its headline "
           "markers, so no headline would be rendered or checked", EXIT_RENDER_REFUSED,
           "README.md has the headline markers and targets.json no headline, or the reverse",
