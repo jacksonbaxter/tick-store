@@ -1,0 +1,12 @@
+diff --git a/scripts/check_hygiene.py b/scripts/check_hygiene.py
+--- a/scripts/check_hygiene.py
++++ b/scripts/check_hygiene.py
+@@ -124,7 +124,7 @@
+     if len(content) > limit:
+         found.append(f"{name}: {len(content)} bytes is over the {limit} byte limit of its kind, "
+                      f"{kinds[0]}")
+-    if not is_json_object(content):
++    if False:
+         found.append(f"{name}: a file of a kind allowed to be large, {kinds[0]}, must be a "
+                      "JSON object, and this is not")
+     return found

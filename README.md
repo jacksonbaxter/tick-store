@@ -103,7 +103,7 @@ which fails if the first screen's generated part or any table of RESULTS.md diff
 render, `scripts/render_writeup.py --check`, which fails if the essay, `WRITEUP.md`, differs from a
 fresh render of its template and figure list and is not judged until every results file it reads
 is committed, actionlint, and a check of what git tracks: no home path, no data file, nothing over 1 MB
-but the named results. No step loads a whole day. `ItchRealDay` reads the first 2 million messages.
+but the named kinds of result, each argued for in the script, a JSON object and under 2 MB. No step loads a whole day. `ItchRealDay` reads the first 2 million messages.
 
 `render_results.py --check` also holds the first screen to its rules. The pitch, headings
 included, runs to at most `max_words` words, 100; a line is a heading only as GitHub shows one,

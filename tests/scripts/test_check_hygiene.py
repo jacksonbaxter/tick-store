@@ -24,6 +24,11 @@ MAC_HOME = b"/Us" b"ers/alice"
 LINUX_HOME = b"/ho" b"me/alice"
 
 
+def json_object(size):
+    """A JSON object of exactly size bytes."""
+    return b'{"pad": "' + b"x" * (size - 11) + b'"}'
+
+
 class Hygiene(unittest.TestCase):
     def setUp(self):
         SCRATCH_ROOT.mkdir(parents=True, exist_ok=True)
@@ -90,8 +95,49 @@ class Hygiene(unittest.TestCase):
         self.assert_refused("big.txt: 1000001 bytes is over")
 
     def test_a_named_kind_of_result_may_be_large_at_any_commit(self):
-        self.track("results/compare/macOS-12302019-open-0123456789ab.json", b"x" * 1_000_001)
-        self.assertEqual(self.run_check().returncode, 0)
+        self.track("results/compare/macOS-12302019-open-0123456789ab.json",
+                   json_object(1_000_001))
+        done = self.run_check()
+        self.assertEqual(done.returncode, 0, done.stderr)
+
+    def test_the_freezes_large_kinds_pass_at_their_sizes(self):
+        self.track("results/bench/Linux-simd_kernel-ede0176b10bb.json", json_object(1_141_409))
+        self.track("results/compare/Linux-12302019-full-ede0176b10bb.json",
+                   json_object(1_102_687))
+        self.track("results/compare/macOS-12302019-open-ede0176b10bb.json",
+                   json_object(1_306_366))
+        done = self.run_check()
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn("4 tracked files clean", done.stdout)
+
+    def test_an_allowed_kind_over_its_limit_is_refused(self):
+        for name in ("results/compare/macOS-12302019-open-0123456789ab.json",
+                     "results/bench/Linux-simd_kernel-0123456789ab.json",
+                     "results/compare/Linux-12302019-full-0123456789ab.json"):
+            with self.subTest(name=name):
+                self.track(name, json_object(2_000_001))
+                self.assert_refused(f"{name}: 2000001 bytes is over the 2000000 byte limit of "
+                                    "its kind")
+                subprocess.run(["git", "-C", str(self.root), "rm", "-q", "-f", name],
+                               check=True)
+
+    def test_an_allowed_name_that_is_not_a_json_object_is_refused(self):
+        # Refused at any size: a data file under an allowed name, a JSON list, an object with
+        # bytes after it, bytes that are not text, a columnar file's magic, a small torn object.
+        name = "results/bench/macOS-simd_kernel-0123456789ab.json"
+        for content in (b"x" * 1_000_001, b"[" + b"1," * 500_000 + b"1]",
+                        b'{"a": 1}' + b" x" * 500_000, b"\xff" * 1_000_001,
+                        b"PAR1" + b"\0" * 1_000_001, b"{"):
+            with self.subTest(content=content[:8]):
+                self.track(name, content)
+                self.assert_refused(f"{name}: a file of a kind allowed to be large, "
+                                    "results/bench/*-simd_kernel-*.json, must be a JSON object")
+
+    def test_a_json_object_of_no_allowed_kind_is_still_refused(self):
+        self.track("results/compare/Linux-12302019-slice-0123456789ab.json",
+                   json_object(1_000_001))
+        self.assert_refused("results/compare/Linux-12302019-slice-0123456789ab.json: 1000001 "
+                            "bytes is over the 1000000 byte limit")
 
     def test_another_kind_of_result_may_not_be_large(self):
         self.track("results/bench/macOS-itch_codec-0123456789ab.json", b"x" * 1_000_001)

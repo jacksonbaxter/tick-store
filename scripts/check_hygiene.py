@@ -4,7 +4,8 @@
     python3 -I scripts/check_hygiene.py [--root DIR]
 
 This repository is public, so three rules hold for every tracked file: no absolute home
-path, no market data, and nothing over 1 MB except the results matched below. Only tracked
+path, no market data, and nothing over 1 MB except the kinds of result matched below, each a
+JSON object under a limit of its own. Only tracked
 files count, since the data and the build tree stay on disk by design. The patterns are
 generic. They catch the shape of a leak, and name nobody.
 
@@ -18,6 +19,7 @@ injected fault.
 
 import argparse
 import fnmatch
+import json
 import re
 import subprocess
 import sys
@@ -38,8 +40,30 @@ DATA_SUFFIXES = (".gz", ".zip", ".zst", ".tar", ".itch", ".bin", ".parquet", ".a
 DATA_FOLDERS = ("data/",)
 
 # Tracked results that may pass the size limit. Each kind is named by a pattern, so a
-# re-measure keeps its allowance and a new kind of large file has to be argued for here.
-LARGE_RESULTS = ("results/compare/*-12302019-open-*.json",)
+# re-measure keeps its allowance and a new kind of large file has to be argued for here. Each
+# kind has a limit of its own, and a file of an allowed kind must be a JSON object at any size,
+# so no pattern lets a data file or an unbounded record through.
+LARGE_RESULTS = {
+    "results/compare/*-12302019-open-*.json": 2_000_000,
+    # The SIMD kernel benchmark, 1,141,409 bytes on Linux and 929,369 on macOS at ede0176b10bb:
+    # 314 result rows, one a case and kernel, about 3 KB each and 939 KB in all, each with its
+    # timer calibration, warm-up, verification, throughput statistics over ten repetitions,
+    # latency percentiles and, on Linux, its perf counters; and the header's 628 load lines,
+    # 83 KB, and 628 frequency snapshots, measure.sh's start and end for each run. The
+    # validator reads every row, and the rules keep each run's load lines with its figures.
+    "results/bench/*-simd_kernel-*.json": 2_000_000,
+    # The four-system comparison's full day, 1,102,687 bytes on Linux at ede0176b10bb, where
+    # the protocol 1 run it replaced was 811,417: four systems in 11 variants and 22 write
+    # classes, each of five queries timed warm over 30 repetitions and cold over 7. The bytes
+    # are the cold runs' eviction proofs, 239 KB, one for each cold run, which the validator
+    # counts against n; the warm proofs, 62 KB; the per-repetition timings the medians and
+    # tails are read from, warm and cold, 43 KB, and the Python floor's, 31 KB; each write's
+    # detail, 107 KB, with QuestDB's 66 write-ahead-log states a class, 82 KB, showing its
+    # rows applied before the clock stopped, and where its input was when the clock started;
+    # and each class's settings and stored settings, 127 KB, the setup the comparison fixed.
+    # Protocol 2 added the per-repetition timings, more cold proofs and the input record.
+    "results/compare/*-12302019-full-*.json": 2_000_000,
+}
 
 
 def tracked_files(root):
@@ -91,10 +115,26 @@ def problems_in(root, name):
             found.append(f"{name}:{line}: absolute home path")
     if name.startswith(DATA_FOLDERS) or name.endswith(DATA_SUFFIXES):
         found.append(f"{name}: data file is tracked")
-    if len(content) > MAX_BYTES and not any(fnmatch.fnmatchcase(name, pattern)
-                                            for pattern in LARGE_RESULTS):
-        found.append(f"{name}: {len(content)} bytes is over the {MAX_BYTES} byte limit")
+    kinds = [pattern for pattern in LARGE_RESULTS if fnmatch.fnmatchcase(name, pattern)]
+    if not kinds:
+        if len(content) > MAX_BYTES:
+            found.append(f"{name}: {len(content)} bytes is over the {MAX_BYTES} byte limit")
+        return found
+    limit = min(LARGE_RESULTS[pattern] for pattern in kinds)
+    if len(content) > limit:
+        found.append(f"{name}: {len(content)} bytes is over the {limit} byte limit of its kind, "
+                     f"{kinds[0]}")
+    if not is_json_object(content):
+        found.append(f"{name}: a file of a kind allowed to be large, {kinds[0]}, must be a "
+                     "JSON object, and this is not")
     return found
+
+
+def is_json_object(content):
+    try:
+        return isinstance(json.loads(content), dict)
+    except (ValueError, RecursionError):
+        return False
 
 
 def main(argv=None):

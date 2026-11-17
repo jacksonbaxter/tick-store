@@ -1770,6 +1770,14 @@ FAULTS = (
           "notes-injected.txt:1: absolute home path", inject_home_path),
     Fault("hygiene-data-file", "hygiene", "a tracked market data file", CHECK_FAILED,
           "12302019.NASDAQ_ITCH50: data file is tracked", inject_data_file),
+    Fault("hygiene-allowed-kind-no-limit", "py-scripts", "check_hygiene.py letting a file of a "
+          "kind allowed to be large through at any size, past its kind's 2,000,000-byte limit",
+          CHECK_FAILED, "FAIL: test_an_allowed_kind_over_its_limit_is_refused "
+          "(__main__.Hygiene"),
+    Fault("hygiene-large-result-not-json", "py-scripts", "check_hygiene.py letting a file of a "
+          "kind allowed to be large through when it is not a JSON object, as a data file under "
+          "a result's name", CHECK_FAILED,
+          "FAIL: test_an_allowed_name_that_is_not_a_json_object_is_refused (__main__.Hygiene"),
     Fault("check-sh-failing-step", "hygiene", "check.sh with a failing step, then a passing "
           "step: non-zero exit, the step named, and the next step still run", CHECK_FAILED,
           "notes-injected.txt:1: absolute home path", inject_home_path,
