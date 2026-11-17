@@ -4,8 +4,8 @@
     python3 -I scripts/fetch_data.py [--day 12302019|10302019|all] [--from PATH]
                                      [--data-dir data] [--verify-only] [--pins PATH]
 
-The reference day is 12302019, the same file as the sibling project itch-orderbook,
-so results on the two projects can be compared. 10302019 is the second day. Python
+The reference day is 12302019, the same file as another project that uses the same
+files, so results on the two projects can be compared. 10302019 is the second day. Python
 standard library only, 3.11 or newer, and nothing outside this file and its pins.
 
 Trust. Nasdaq publishes no usable checksum: every `.md5sum` sidecar listed next to
