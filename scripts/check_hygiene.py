@@ -51,6 +51,8 @@ LARGE_RESULTS = {
     # latency percentiles and, on Linux, its perf counters; and the header's 628 load lines,
     # 83 KB, and 628 frequency snapshots, measure.sh's start and end for each run. The
     # validator reads every row, and the rules keep each run's load lines with its figures.
+    # It holds no market data: every value is a timing, a count, a rate, a frequency, a
+    # setting or the commit, and each case's input is generated from the seed it records.
     "results/bench/*-simd_kernel-*.json": 2_000_000,
     # The four-system comparison's full day, 1,102,687 bytes on Linux at ede0176b10bb, where
     # the protocol 1 run it replaced was 811,417: four systems in 11 variants and 22 write
@@ -62,6 +64,9 @@ LARGE_RESULTS = {
     # rows applied before the clock stopped, and where its input was when the clock started;
     # and each class's settings and stored settings, 127 KB, the setup the comparison fixed.
     # Protocol 2 added the per-repetition timings, more cold proofs and the input record.
+    # It holds no rows or values of the market data: only timings, counts, sizes, settings
+    # and hashes. Each query's answer is its row count and SHA-256, a query's parameters a
+    # time window and a locate number, and every list of numbers a timing or a count.
     "results/compare/*-12302019-full-*.json": 2_000_000,
 }
 
