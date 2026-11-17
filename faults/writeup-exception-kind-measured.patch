@@ -1,0 +1,15 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index a38833a..0c9f0bb 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1508,7 +1508,9 @@ def commits(resolver):
+                           "commit measure, by check_ties.py's kinds, and to nothing else")
+         if commit is None:
+             raise Refused(f"kind {kind!r}: no measured commit to compare its own with")
+-        changed = measured_changes(resolver.root, commit, own, measured[commit])
++        changed = measured_changes(resolver.root, commit, own, measured[commit] + [
++            path.relative_to(resolver.root).as_posix() for path, (read, _) in
++            resolver.read.items() if read == kind])
+         if changed:
+             raise Refused(f"kind {kind!r}: its files name {own[:COMMIT_SHOWN]}, and what the "
+                           f"figures read at {commit[:COMMIT_SHOWN]} measure differs there: "

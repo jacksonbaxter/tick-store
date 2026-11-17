@@ -2220,10 +2220,20 @@ FAULTS = (
     Fault("writeup-commits-mixed-accepted", "py-scripts", "render_writeup.py reads results files "
           "that name two measured commits", CHECK_FAILED,
           "FAIL: test_a_file_at_another_commit_is_refused (__main__.Commits"),
-    Fault("writeup-differs-only-unchecked", "py-scripts", "render_writeup.py takes a commit "
-          "exception's claim to differ only in some paths without asking git", CHECK_FAILED,
-          "FAIL: test_a_claim_of_differing_only_in_some_paths_that_git_contradicts "
-          "(__main__.Commits"),
+    # A kind measured at another commit holds only where what the other figures measure is
+    # unchanged between the two, by check_ties.py's kinds.
+    Fault("writeup-measured-change-ignored", "py-scripts", "render_writeup.py takes a kind "
+          "measured at another commit though the library code the other figures measure "
+          "differs between the two", CHECK_FAILED,
+          "FAIL: test_a_library_change_between_the_commits_refuses (__main__.Commits"),
+    Fault("writeup-every-path-compared", "py-scripts", "render_writeup.py compares every path "
+          "of the tree between the two commits, so a docs commit, which no figure is measured "
+          "from, refuses the essay", CHECK_FAILED,
+          "FAIL: test_a_change_only_to_prose_and_docs_passes (__main__.Commits"),
+    Fault("writeup-exception-kind-measured", "py-scripts", "render_writeup.py also compares "
+          "what the later kind itself measures, so the fuzz harness's own change, the reason "
+          "it was measured again, refuses the essay", CHECK_FAILED,
+          "FAIL: test_a_change_only_the_later_kind_measures_passes (__main__.Commits"),
     # Review WD-2 and WD-3.
     Fault("writeup-judging-word-unclaimed", "py-scripts", "render_writeup.py lets a sentence "
           "judge the results in words no claim or token carries", CHECK_FAILED,

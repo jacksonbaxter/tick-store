@@ -1,0 +1,14 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index a38833a..8f254ff 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1460,8 +1460,7 @@ def measured_changes(root, first, second, names):
+     for specs in dict.fromkeys(check_ties.pathspecs(kind.measured, kind.excluded)
+                                for kind in kinds):
+         if specs:
+-            changed.update(git_out(root, "diff", "--name-only", first, second, "--",
+-                                   *specs).split())
++            changed.update(git_out(root, "diff", "--name-only", first, second).split())
+     members = sorted({member for kind in kinds for member in kind.pin_members})
+     if members:
+         before, after = pins_at(root, first), pins_at(root, second)
