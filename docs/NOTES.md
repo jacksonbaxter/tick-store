@@ -5633,6 +5633,92 @@ the five older diagnostics faults was PROVEN with `--only` through the heavy-job
 seven at a time, 18 of 18 as expected, and `results/check-proofs.json` was restored from git
 after each run.
 
+### The README's first screen after review DX
+
+2026-11-16. The same reviewer read the first screen's checks at `8e616bf` (review rows DX-1 to
+DX-5, DX-10, DX-11, DX-13 and DX-14 in `docs/REVIEW.md`). Each finding was shown again at
+`78afed7` first: the reviewer's screen and targets cases and writer mutants rerun on a clone of
+this tree, and the reviewer's 45 mutants of `render_results.py` run against its tests. All held:
+the three widened, moved and negated sentences, the five false sentences with no ranking word,
+the heading, the `#It` line, the sentence after the end marker, the zero-width spaces, the
+fraction character and the reused year each passed `--check`; a claim re-tied to WT-1 and a "vs"
+over two systems rendered; three writer mutants passed the check on the real targets, and five
+passed the tests. The raw output is kept with the project's other raw logs outside the
+repository.
+
+**The wording.** "Fastest of the four default setups" said something not measured: QL-4 compares
+the headline variant of each system, the one its module fixes, and Parquet's, `zstd1-rg1Mi`, is
+not pyarrow's default, which `compare/README.md` itself names as snappy. The verdicts stand; the
+words change. The pitch says tick-store answers queries about one stock "fastest of the four,
+each in the setup the comparison fixed for it", the words linked once to `compare/README.md`'s
+table of variants, and both query rows' bars say "fastest of the four, each in the setup the
+comparison fixed for it, by median and tail". The essay's template and figure list said
+"default" the same way in three sentences and four figure descriptions; each now says the
+fixed setups. `compare/README.md` and `BENCHMARKS.md` use "default" only for real defaults. The
+earlier entries of this file that quote the old bar are left as they were written.
+
+**What the first screen now holds.** A claim is its whole sentence, so nothing can be added
+around a tied ranking: the claim's text must be one of the pitch's sentences word for word. A
+claim may rest on several conditions, each of which must hold, and the query sentence rests on
+two: QL-4's one-stock parts met and ArcticDB or QuestDB fastest on Q1 and Q4. A target condition's
+sentence must hold the words its target row lists under `pitch` for those parts, so a claim
+cannot be pointed at another target of the same verdict, and each such list of words is one
+row's. A claim judged on one machine names it, and names no other; so "one thread ingests below
+Nasdaq's peak" now says "on the Ryzen", where it is missed, since on the laptop it is met. Every
+heading and sentence of the pitch is a claim, a sentence holding a checked figure, or a text
+listed under `no_result_sentences` with its reason, and the ranking words are the second line of
+defence over all of them, headings included; they now include less, fewer, more, better, worse,
+ahead, behind, trail, lead, keeps up, clean, pass, fail, twice, half, third and the reviewer's
+other words. A heading is a line GitHub shows as one, so `#It` is prose, and headings count in
+the word limit, which the pitch now meets at 100 words exactly. The figure check refuses a
+number written in a character other than the digits, and a text kept out of it is kept out once.
+The first screen refuses a character a reader cannot see and any text between the headline's
+end marker and the next heading. The fastest claim is judged on median and tail alike, as the
+bar above it says. The pitch was rewritten to these rules: the bit-exact clause became a sentence
+of its own, and the figure sentence before it states the figures alone.
+
+**The line under the table.** Its check no longer shares the writer's verdict classes: it works
+out each row's and part's class from the raw verdicts itself. It reads each class sentence back
+into its machine groups and whole names, and requires exactly the left-out parts the targets
+give, each under its machine, and nothing else; it reads each "among them" under its own count;
+and it refuses a sentence of no class. The sentence under the table must give its row's verdict
+when the row is met or missed in whole, and neither word otherwise. A plain name may hold no
+list's or machine's words, and on one machine it is one target's and one part's, so G-1's two
+reference-day parts are now "the reference day's round trip on the laptop" and "... on the
+Ryzen". A headline value that is the lowest of the other systems must take every other system
+the comparison ran, and where its target ranks among some, exactly those.
+
+**Tests and mutants.** `tests/scripts/test_render_results.py` has 25 new tests and a class,
+`LeftOutLineTest`, whose targets give the line a machine, two misses of one class, a row missed
+in part among the others, a target named among its count and a sentence under the table that is
+missed; each of its tests breaks the writer and requires the check to stop it. Of the
+reviewer's 45 mutants and 35 added for the new rules, 77 are killed; the three left are an added
+alternative in the ranking pattern, the total of shown, named and counted parts, which the exact
+names and counts now imply, and a laxer heading pattern, since headings and prose are under the
+same rules. The three writer mutants that passed the check on the real targets are each refused
+now, with its own reason; of the other two, the dropped miss was refused there already, and the
+sentence under the table always met is right on today's results and is refused by its test.
+
+**What is still not checked**, and the README's Checks section says so: a sentence holding a
+figure, or one listed as stating no result, is read only for ranking words, so it can mislead
+without one, as a number written in words can; a claim's words beyond those its target lists are
+held only as written, so a change to them needs the same change in `scripts/targets.json`.
+
+**Faults.** Nineteen are new, each in `py-scripts`: `render-pitch-claim-a-phrase`,
+`render-pitch-sentence-unaccounted`, `render-pitch-claim-other-target`,
+`render-pitch-claim-machine-unnamed`, `render-pitch-fastest-median-only`,
+`render-pitch-headings-skipped`, `render-pitch-word-limit-skips-a-heading`,
+`render-pitch-ranking-words-dropped`, `render-pitch-not-result-reused`,
+`render-screen-invisible-accepted`, `render-pitch-numeric-character-accepted`,
+`render-screen-after-the-headline-unread`, `headline-left-out-writer-class-shared`,
+`headline-left-out-machine-unchecked`, `headline-left-out-named-count-unchecked`,
+`headline-left-out-extra-name-accepted`, `headline-under-verdict-unchecked`,
+`headline-lowest-of-a-subset` and `headline-plain-name-shared`. Three patches were remade on their
+moved lines, `render-pitch-claim-unchecked`, `render-pitch-word-limit-removed` and
+`render-pitch-shared-format-accepted`, and three mutations or expected lines follow the new
+pitch: `readme-pitch-unchecked-figure`, `readme-first-screen-host-by-system` and
+`readme-pitch-claim-reworded`. The first proof run took 15 of them, the pitch's and the headline's that render-check proves among them, and 13 came out PROVEN; `readme-pitch-unchecked-figure` and `readme-first-screen-host-by-system` came out WRONG REASON, since each added a word to a pitch at its 100 and the word limit stopped the check first, so each now puts its word in another's place, the typed 42 for one and Linux for trading (`8a9cdfb`). The second run, at `8a9cdfb`, took those two and the 19 new faults, and all 21 came out PROVEN: 34 faults for the first screen, each failing for its own reason.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
