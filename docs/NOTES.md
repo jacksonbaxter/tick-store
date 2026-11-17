@@ -6057,6 +6057,10 @@ on the new ones only each day's `commit` changes, since every column's bytes are
 `tests/scripts/test_g2_plan.py CommittedPlans` passed on the new round-trip files.
 `test_check_compare.py`'s test that a protocol 1 file is held to its bytes read one of the dropped
 files; it now holds a fixture pinned as written, and fails if the pin is not made.
+`test_check_roundtrip.py`'s test that a pinned name with other bytes is checked in full expected
+the replaced file's first refusal, its missing exit codes; the freeze's file records them, so at
+`9066cbf` alone that test fails, and `aa5b804` makes it expect the refusal of its own edit, the
+data block verdict turned to a pass.
 `python3 -I scripts/check_ties.py`: `30 files: 26 same, 2 pinned, 2 differs, 0 no commit, 0 no
 kind, 0 refused, 0 unjudged`, the two differing `check-proofs.json` and
 `fullday-capacity-12302019.json`.
