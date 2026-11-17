@@ -313,7 +313,7 @@ judged at the second commit: 13 of 13 targets ran clean on the M4 and
 ## How the results were checked
 
 `scripts/check.sh` runs the builds, tests, sanitizers, fuzzing and results validators. A prover applies a fault to a throwaway clone and
-requires the named step to fail; it lists 456 faults and a harmless control. Its
+requires the named step to fail; it lists 461 faults and a harmless control. Its
 record ([prover record](results/check-proofs.json)) is of a run over 99 of the listed
 faults, 99 of them proven, and its control passed. The final review recorded
 193 findings, each fixed with a test seen failing first or closed with its reason
