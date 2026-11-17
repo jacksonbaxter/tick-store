@@ -6398,6 +6398,78 @@ its own test, run alone, passes without it and fails with it applied:
 `test_a_row_of_some_parts_is_judged_on_them_and_names_the_rest_below`. The raw logs are under
 the phase's conditions-check proofs folder.
 
+### The four conditions, second look, review C2
+
+2026-11-17. The reviewer of C1 read `d8f5c51` again and found every C1 fix holding but four
+(docs/REVIEW.md, C2-1 to C2-4).
+
+**A move's cause.** Every system's write moved between the replaced run and this one: ArcticDB's
+class B engine-only from 42.6 s to 291.8 s and its total from 123.6 s to 381.4 s, the largest.
+WT-3's and WT-4's cells had joined those moves onto the sentence on the inputs' difference, which
+read as their cause. The moves now stand in a sentence of their own, which says their cause was
+not measured and is not known. Beside them are what this run's records give and what the
+replaced record keeps. `move_problem` refuses, on every results page, a sentence that states a
+move between the runs without `CAUSE_UNKNOWN`'s words or that holds a causal word. BENCHMARKS.md
+and compare/README.md say it the same way. The essay and the README quote no move.
+
+**What the replaced record keeps.** The pages said it keeps no residency or device-read figure for
+any system but tick-store. Its fields, listed per system and phase under the phase's
+conditions-check `fix2` folder, show more and less than that:
+- Of the writes, it keeps tick-store's input residency (`input_resident`) and nothing for another
+  system's write.
+- It keeps no device-read figure for any write.
+- Of every system's read-back, it keeps the inputs' eviction before it.
+
+`replaced_keeps` writes that sentence from the fields. `keeps_problem` refuses any other sentence
+on any results page that says what that record keeps. Neither `quote_problem` nor
+`method_problem` reads it; `keeps_problem` is its check.
+
+**What decides a part.** `deciding_reads` defines it once:
+- tick-store's own figure always decides;
+- for a part met, every rival figure tick-store had to beat decides;
+- for a part missed, only the rival figures that beat it decide;
+- of a part's conditions, all decide when the part is met, and only those missed when it is
+  missed.
+
+A "rests on" mark, for a swap-in or a disturbance, now names only deciding figures. A flagged
+figure that does not decide is left to its own cell in the comparison tables, which already mark
+every flagged figure "(swap-in)". A second mark there would only repeat that cell, and the first
+screen has no room for it. One mark changed: QL-4's Q5 warm now rests on QuestDB's flagged figure
+alone, since ArcticDB's, 3,105.98 ms, is slower than tick-store's 912.75 ms. Q1 warm keeps its
+mark: its miss is on ArcticDB's unflagged 34.16 ms, but QuestDB's flagged 53.49 ms also beat
+tick-store's 296.78 ms, so by the rule it decides too. The write-input clause says what each
+write's record holds and claims nothing rests on it, so it was left as it is. No count moved.
+
+**The first screen.** The marks there take short forms defined once in the renderer:
+- "swap-in: <systems>";
+- "<kind> during <whose phase>; replaced run <figure>";
+- "swap-in" beside a figure.
+
+Each is explained in full words under RESULTS.md's targets table, where the screen links, and
+RESULTS.md keeps every mark in full. A quote may give a mark in full or in its own short form,
+nothing else. A disturbance with no short form stops the render.
+
+Counted from the top through the headline block, the block's comment lines and the table's rule
+row left out, the screen went from 434 words at `d8f5c51` to 351. The pitch stays at 100 words.
+
+**Proofs.** prove_checks.py could not run: the judged G-3 run held the machine. Each of the 16
+new faults and the 10 remade on moved lines was shown by hand instead, in a clone under the
+worktree's `build/`. Each fault's one test or render-check ran as committed (exit 0) and with
+the fault in, which failed as its entry expects. The outputs are under the phase's
+conditions-check `fix2/proofs` folder. All 26 are shown by hand, and their proof is owed to the
+full re-proof:
+- New: `move-cause-unknown-dropped`, `move-joined-to-the-inputs`, `move-unknown-unchecked`,
+  `move-cause-unchecked`, `keeps-sentence-unchecked`, `keeps-residency-unread`,
+  `render-move-checks-unwired`, `benchmarks-move-cause-unsaid`,
+  `benchmarks-replaced-record-widened`, `decide-every-compared-figure`,
+  `decide-missed-by-every-rival`, `decide-met-condition-in-a-miss`,
+  `short-form-screen-unmarked`, `short-form-quote-loose`, `short-forms-kinds-unexplained`,
+  `short-disturbance-unknown-kind`.
+- Remade: `compare-faster-write-pages-unread`, `compare-replaced-favourable-counted`,
+  `compare-replaced-figures-hidden`, `compare-swap-in-unmarked`, `compare-disturbance-unmarked`,
+  `compare-replaced-change-unmarked`, `headline-value-mark-dropped`,
+  `headline-verdict-all-parts`, `quote-input-clause-dropped`, `quote-mark-unchecked`.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
