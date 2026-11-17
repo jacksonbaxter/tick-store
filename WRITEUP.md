@@ -317,7 +317,7 @@ AddressSanitizer and UndefinedBehaviorSanitizer at the second commit: 13 of
 13 targets ran clean on the M4 and 7 of 7 on the
 Zen 1, the shortest run 1,801 s ([fuzz results](results/fuzz-g3-8616263b7561.json)). The checks, the faults
 that prove each fails when it should, and what each does not check are in the README; the prover's
-record covers 99 of its 461 listed faults.
+record covers 99 of its 462 listed faults.
 
 ## Limits
 
