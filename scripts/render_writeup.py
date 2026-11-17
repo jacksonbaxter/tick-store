@@ -409,9 +409,22 @@ class Resolver:
         return pattern
 
     def file_of(self, kind, host, name):
-        """The one results file of a kind on a host, or Waiting if there is none yet."""
+        """The one results file of a kind on a host, or Waiting if there is none yet. A kind
+        whose files are one a run, such as the disturbance records, names under record_of the
+        kind whose run it records: its file is the one its pattern gives at that kind's file's
+        commit, so no commit is named and a run measured again carries its own."""
         pattern = self.pattern_of(kind, host, name)
+        spec = self.kinds[kind]
         try:
+            if "record_of" in spec:
+                other = spec["record_of"]
+                other_host = host if host in (self.kinds.get(other, {}).get("files") or {}) \
+                    else "any"
+                run, _ = self.file_of(other, other_host, name)
+                commit = commit_of(self, run, other)
+                if commit is None:
+                    raise Refused(f"kind {kind!r}: the kind {other!r} it records names no commit")
+                pattern = pattern.replace("*", commit[:COMMIT_SHOWN])
             path = render_results.target_file(self.root, pattern)
         except render_results.TargetError as error:
             raise Refused(f"{show(name)}: {error}, and a token reads one") from error

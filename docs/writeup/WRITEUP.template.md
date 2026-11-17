@@ -324,7 +324,9 @@ in `docs/REVIEW.md`.
 Performance comes from a pinned day on a single host, the Zen 1, whose {{cap_mem_gib}} GiB of memory
 is smaller than the other systems' {{cmpL_others_input_gb}} GB of input, and with a repetition count of {{cmpL_write_reps}} for
 each day write; {{disturbance:timed}} events the host's logs record, a backup job and logins among
-them, fell inside timed phases, each named beside the verdict it touches. A fair protocol would
+them, fell inside the campaign's timed phases and {{disturbance:timed_fuzz}} inside the fuzz run's,
+each named beside the verdict it touches, and the host's own scheduled jobs ran through every
+phase and were not stopped. A fair protocol would
 give every system its input resident before its clock, or none, and repeat every write. Sizes on
 the M4 are file-system allocation, so sizes come from the Zen 1. Beyond boost, not measured and not
 estimated: the cycles a mispredict costs and any memory-level counter.

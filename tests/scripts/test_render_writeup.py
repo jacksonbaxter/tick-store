@@ -1544,5 +1544,35 @@ class TheList(unittest.TestCase):
                 resolver.kind_of_pattern(spec["file"], row["id"])
 
 
+
+class RecordOf(unittest.TestCase):
+    """Review R-D1: a kind of one file a run, such as the disturbance records, takes the file at
+    the commit of the kind whose run it records, so two records never make a token read two."""
+
+    def setUp(self):
+        SCRATCH_ROOT.mkdir(parents=True, exist_ok=True)
+        self.root = Path(tempfile.mkdtemp(dir=SCRATCH_ROOT))
+        self.addCleanup(shutil.rmtree, self.root)
+        (self.root / "results").mkdir()
+        for commit in ("aaaaaaaaaaaa", "bbbbbbbbbbbb"):
+            (self.root / "results" / f"run-{commit}.json").write_text(
+                json.dumps({"header": {"commit": commit + "0" * 28}}))
+            (self.root / "results" / f"record-{commit}.json").write_text(
+                json.dumps({"commit": commit + "0" * 28}))
+        (self.root / "results" / "run-bbbbbbbbbbbb.json").unlink()
+
+    def resolver(self, **record):
+        kinds = {"run": {"what": "a run", "files": {"any": "results/run-*.json"}},
+                 "record": {"what": "its record", "files": {"Linux": "results/record-*.json"},
+                            "commit": ["commit"], **record}}
+        return RENDER.Resolver(self.root, {"kinds": kinds})
+
+    def test_the_record_of_the_runs_commit_is_read(self):
+        path, _ = self.resolver(record_of="run").file_of("record", "Linux", "t")
+        self.assertEqual(path.name, "record-aaaaaaaaaaaa.json")
+        with self.assertRaisesRegex(RENDER.Refused, "matches 2 files"):
+            self.resolver().file_of("record", "Linux", "t")
+
+
 if __name__ == "__main__":
     unittest.main()
