@@ -614,9 +614,10 @@ class Commits(Tree):
         self.assertIn("at commit `0123456789ab`.", self.renders())
 
     def test_an_exception_is_named_in_the_essay_s_own_sentence(self):
-        self.other("fedcba987654" + "0" * 28,
-                   {"why": "measured at its own commit", "says": "the other benchmark"})
-        self.assertIn("at commit `0123456789ab`, except the other benchmark, at `fedcba987654`.",
+        self.later({"why": "measured at its own commit", "says": "the other result"})
+        first, second = self.history("docs/notes.md")
+        self.assertIn(f"at commit `{first[:12]}`, except the other result, at `{second[:12]}`, "
+                      "where the code every other figure measures is unchanged.",
                       self.renders())
 
     def test_an_exception_at_the_measured_commit_is_not_named(self):
@@ -637,46 +638,85 @@ class Commits(Tree):
         self.assertIn("at commit `0123456789ab`, except the prover's record, a run of its own.",
                       self.renders())
 
-    def differing(self):
-        return {"why": "the harness changed after the freeze", "says": "the other benchmark",
-                "differs_only_in": {"paths": ["fuzz/"], "says": "the fuzz harness"}}
+    LATER = "results/fuzz-g3-fedcba987654.json"
 
-    def test_a_claim_of_differing_only_in_some_paths_waits_with_no_history(self):
-        self.other("fedcba987654" + "0" * 28, self.differing())
-        done = self.run_script("--check")
-        self.assertEqual(done.returncode, RENDER.EXIT_UNJUDGED, done.stdout + done.stderr)
-        self.assertIn("history (git)", done.stdout)
+    def later(self, exception):
+        """A kind read at a later commit, a G-3 file as check_ties.py names one, so it measures
+        what check_ties.py's fuzz kind measures."""
+        self.figures["kinds"]["later"] = {"what": "a result measured later",
+                                          "files": {"any": "results/fuzz-g3-*.json"},
+                                          "exception": exception}
+        self.figure("later", {"what": "the later result's runs", "kind": "later",
+                              "host": "any", "value": {"path": ["runs"]}, "format": "{:,}"})
+        self.write(self.LATER, json.dumps({"header": {"commit": "fedcba987654" + "0" * 28},
+                                           "runs": 7}))
+        self.insert("The later result ran {{later}} times.")
 
     def git(self, *arguments):
         return subprocess.run(["git", "-C", str(self.root), "-c", "user.name=t",
                                "-c", "user.email=t@t", "-c", "commit.gpgsign=false",
                                *arguments], capture_output=True, text=True, check=True).stdout
 
-    def history(self, second_path):
+    def history(self, second_path, text="changed\n"):
+        """Two commits, the second changing one path; the demo file names the first, the later
+        file the second."""
         self.git("init", "-q")
         self.git("add", "-A")
         self.git("commit", "-qm", "first")
         first = self.git("rev-parse", "HEAD").strip()
-        self.write(second_path, "changed\n")
+        self.write(second_path, text)
         self.git("add", "-A")
         self.git("commit", "-qm", "second")
         second = self.git("rev-parse", "HEAD").strip()
         self.write(RESULT, json.dumps(dict(RESULTS, header={"commit": first})))
-        self.write("results/bench/macOS-other-fedcba987654.json",
-                   json.dumps({"header": {"commit": second}, "runs": 7}))
+        self.write(self.LATER, json.dumps({"header": {"commit": second}, "runs": 7}))
         return first, second
 
-    def test_a_claim_of_differing_only_in_some_paths_is_checked_with_git(self):
-        self.other("fedcba987654" + "0" * 28, self.differing())
-        first, second = self.history("fuzz/harness.cpp")
-        self.assertIn(f"at commit `{first[:12]}`, except the other benchmark, at "
-                      f"`{second[:12]}`, which differs from it only in the fuzz harness.",
+    EXCEPTION = {"why": "the harness changed after the freeze", "says": "the later result"}
+
+    def test_an_exception_at_another_commit_waits_with_no_history(self):
+        self.later(self.EXCEPTION)
+        done = self.run_script("--check")
+        self.assertEqual(done.returncode, RENDER.EXIT_UNJUDGED, done.stdout + done.stderr)
+        self.assertIn("history (git)", done.stdout)
+
+    def test_a_library_change_between_the_commits_refuses(self):
+        for path in ("src/store.cpp", "include/tick_store/store.hpp"):
+            with self.subTest(path=path):
+                shutil.rmtree(self.root / ".git", ignore_errors=True)
+                self.later(self.EXCEPTION)
+                self.history(path)
+                self.refused("kind 'later': its files name ", f"differs there: ['{path}']")
+
+    def test_a_change_only_to_prose_and_docs_passes(self):
+        self.later(self.EXCEPTION)
+        first, second = self.history("docs/NOTES.md")
+        self.assertIn(f"at commit `{first[:12]}`, except the later result, at `{second[:12]}`, "
+                      "where the code every other figure measures is unchanged.",
                       self.renders())
 
-    def test_a_claim_of_differing_only_in_some_paths_that_git_contradicts(self):
-        self.other("fedcba987654" + "0" * 28, self.differing())
+    def test_a_change_only_the_later_kind_measures_passes(self):
+        # The fuzz harness and its unit tests, and the coverage script: what the later result
+        # measures, and no figure read at the measured commit does.
+        for path in ("fuzz/fuzz_pfor.cpp", "tests/unit/fuzz_regression_test.cpp",
+                     "scripts/coverage.sh"):
+            with self.subTest(path=path):
+                shutil.rmtree(self.root / ".git", ignore_errors=True)
+                self.later(self.EXCEPTION)
+                self.history(path)
+                self.assertIn("where the code every other figure measures is unchanged.",
+                              self.renders())
+
+    def test_an_input_pin_moved_between_the_commits_refuses(self):
+        self.write("scripts/data_pins.json", json.dumps({"days": {"12302019": "a"}}))
+        self.later(self.EXCEPTION)
+        self.history("scripts/data_pins.json", json.dumps({"days": {"12302019": "b"}}))
+        self.refused("differs there: ['scripts/data_pins.json (days)']")
+
+    def test_an_allow_list_of_paths_is_no_rule(self):
+        self.later(dict(self.EXCEPTION, differs_only_in={"paths": ["src/"], "says": "the code"}))
         self.history("src/store.cpp")
-        self.refused("differ in ['src/store.cpp'], outside ['fuzz/']")
+        self.refused("kind 'later': differs_only_in is no rule")
 
 
 class Pins(Tree):

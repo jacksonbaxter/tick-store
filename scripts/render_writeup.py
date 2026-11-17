@@ -22,8 +22,9 @@ What the render holds, each a refusal (exit 2) when it fails:
   list's declared factors;
 - every results file a token reads names the one measured commit, but for the kinds the list
   declares exceptions with their reasons, and the essay's own sentence names each exception it
-  reads through a token; a fuzz file's commit may differ from it only in the paths declared, as
-  git tells where the history is present;
+  reads through a token; an exception that names another commit holds only where nothing the
+  files read at the measured commit measure, by scripts/check_ties.py's kinds, differs between
+  the two commits, as git tells where the history is present;
 - a file under a pin of scripts/data_pins.json is read only by a kind that declares the pin,
   and every paragraph that shows one of its figures says so through the pin's token; a kind with
   a note, as the diagnostics' summaries have, puts the note in each paragraph that shows them;
@@ -75,6 +76,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
+import check_ties  # noqa: E402
 import render_results  # noqa: E402
 
 FIGURES_PATH = Path("docs") / "writeup" / "figures.json"
@@ -1420,21 +1422,52 @@ def git_tree(root):
     return done.returncode == 0 and Path(done.stdout.strip()).resolve() == Path(root).resolve()
 
 
-def differs_only(root, first, second, paths):
-    """None if git holds both commits and the tree between them changed only under paths; a
-    Waiting if this tree has no history to tell; else a refusal naming what else changed."""
+def git_out(root, *arguments):
+    """git's output, or a Waiting naming what git could not tell."""
+    done = subprocess.run(["git", "-C", str(root), *arguments], capture_output=True, text=True,
+                          check=False)
+    if done.returncode != 0:
+        raise Waiting("history", "git", f"git {arguments[0]} cannot tell: "
+                      f"{done.stderr.strip()[:80]}")
+    return done.stdout
+
+
+def pins_at(root, commit):
+    """scripts/data_pins.json as of a commit, or {} where it has none."""
+    if not git_out(root, "ls-tree", "--name-only", commit, "--", PINS_PATH.as_posix()).strip():
+        return {}
+    try:
+        return json.loads(git_out(root, "show", f"{commit}:{PINS_PATH.as_posix()}"))
+    except json.JSONDecodeError as error:
+        raise Refused(f"{PINS_PATH.as_posix()} at {commit[:12]} is not JSON: {error}") from None
+
+
+def measured_changes(root, first, second, names):
+    """What the files read at the measured commit `first` measure, by check_ties.py's own kinds,
+    that differs between it and `second`: each path, and each input pin by member. A Waiting if
+    this tree has no history to tell; a refusal for a file check_ties.py gives no kind."""
     if not git_tree(root):
         raise Waiting("history", "git", "this tree has no git history to tell what the two "
                       "commits differ in")
-    done = subprocess.run(["git", "-C", str(root), "diff", "--name-only", first, second],
-                          capture_output=True, text=True, check=False)
-    if done.returncode != 0:
-        raise Waiting("history", "git", f"git cannot compare {first[:12]} with {second[:12]}: "
-                      f"{done.stderr.strip()[:80]}")
-    other = [path for path in done.stdout.split() if not path.startswith(tuple(paths))]
-    if other:
-        raise Refused(f"the commits {first[:12]} and {second[:12]} differ in {other[:5]}, "
-                      f"outside {paths}, where the essay says they differ only there")
+    kinds = []
+    for name in names:
+        kind = check_ties.kind_of(Path(name).relative_to("results").as_posix())
+        if kind is None:
+            raise Refused(f"{name}: check_ties.py has no kind for it, so nothing says what its "
+                          "figures measure")
+        kinds.append(kind)
+    changed = set()
+    for specs in dict.fromkeys(check_ties.pathspecs(kind.measured, kind.excluded)
+                               for kind in kinds):
+        if specs:
+            changed.update(git_out(root, "diff", "--name-only", first, second, "--",
+                                   *specs).split())
+    members = sorted({member for kind in kinds for member in kind.pin_members})
+    if members:
+        before, after = pins_at(root, first), pins_at(root, second)
+        changed.update(f"{PINS_PATH.as_posix()} ({member})" for member in members
+                       if before.get(member) != after.get(member))
+    return sorted(changed)
 
 
 def commits(resolver):
@@ -1469,14 +1502,20 @@ def commits(resolver):
             continue
         if own == commit:
             continue
-        text = f"{spec['says']}, at `{own[:COMMIT_SHOWN]}`"
-        only = spec.get("differs_only_in")
-        if only:
-            if commit is None:
-                raise Refused(f"kind {kind!r}: no measured commit to compare its own with")
-            differs_only(resolver.root, commit, own, only["paths"])
-            text += f", which differs from it only in {only['says']}"
-        phrases.append(text)
+        if "differs_only_in" in spec:
+            raise Refused(f"kind {kind!r}: differs_only_in is no rule: a kind measured at "
+                          "another commit is held to what the figures read at the measured "
+                          "commit measure, by check_ties.py's kinds, and to nothing else")
+        if commit is None:
+            raise Refused(f"kind {kind!r}: no measured commit to compare its own with")
+        changed = measured_changes(resolver.root, commit, own, measured[commit])
+        if changed:
+            raise Refused(f"kind {kind!r}: its files name {own[:COMMIT_SHOWN]}, and what the "
+                          f"figures read at {commit[:COMMIT_SHOWN]} measure differs there: "
+                          f"{changed[:5]}{' and more' if len(changed) > 5 else ''}; measure "
+                          "them at one commit")
+        phrases.append(f"{spec['says']}, at `{own[:COMMIT_SHOWN]}`, where the code every other "
+                       "figure measures is unchanged")
     if not phrases:
         return commit, ""
     joined = phrases[0] if len(phrases) == 1 else \
