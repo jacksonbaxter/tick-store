@@ -548,7 +548,8 @@ FAULTS = (
     Fault("werror-unused-variable", "dev-build", "an unused variable in our code", EXIT_BUILD,
           "-Werror,-Wunused-variable"),
     Fault("werror-dependency-tolerated", "dev-build", "unused variables in GoogleTest, in a "
-          "source file and in a header our tests include", 0,
+          "source file and in a header our tests include, patched into its fetched copy under "
+          "build/_deps/, so the patch applies only once a configure has fetched it", 0,
           "unused variable 'never_used_in_source'", tolerated=True),
     Fault("fuzz-itch-message-trailing", "fuzz-itch-message", "the strict decoder stops refusing "
           "trailing bytes", EXIT_LIBFUZZER, "check_message:", arguments=FUZZ_ARGUMENTS),
