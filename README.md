@@ -120,12 +120,15 @@ sanitizer build at once have run the M4 Max, which other work shares, out of mem
 a failure. It then prints a summary table, and exits 1 if any step failed.
 
 ```sh
-scripts/check.sh                          # everything, about 37 minutes on the Mac, warm build tree
+scripts/check.sh                          # everything
 scripts/check.sh --quick                  # no sanitizers, fuzzing or coverage, and it says so
 scripts/check.sh --fuzz-seconds 60        # each fuzz target's budget, 20 s by default
 scripts/check.sh --only dev-test,hygiene  # chosen steps, plus the builds they need
 scripts/check.sh --list                   # the step names
 ```
+
+One full run on the Mac with a warm build tree took about 37 minutes by that run's log, which no
+results file holds.
 
 `CC`, `CXX` and `clang-tidy` come from the environment, from the same upstream LLVM. A missing
 one is a clear error, and so is a missing `actionlint`, which `scripts/install_tools.sh

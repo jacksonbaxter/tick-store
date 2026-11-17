@@ -539,7 +539,8 @@ the unit binary once rather than through ctest, leaves out the first two; both s
 `FuzzOracles.*`, the rest of `FuzzRegression` and every other test. These tests are
 single-threaded re-runs of the fuzz oracles on fixed inputs, each already run in full under the
 plain build and under AddressSanitizer and UBSan, and they are what took the Linux tsan and
-coverage jobs from 16 and 9 minutes to over 55. On the Mac dev build, one ctest entry at a time on
+coverage jobs from 16 and 9 minutes to over 55, by those CI runs' logs, which no results file
+holds. On the Mac dev build, one ctest entry at a time on
 a loaded machine, 137 of the grid's tests took 3,373 s and the 62 seed tests 757 s by that run's
 log, which no results file holds (the run was stopped before the grid's last 7 and the
 scalar-capped parts).
