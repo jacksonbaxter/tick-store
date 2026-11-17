@@ -101,7 +101,7 @@ per add, the store pays in the `locate` column, at {{ss_locate_bits}} bits per r
 ideal code for a delta in file order is {{ce_ts_ideal_delta_bits}} bits, for a delta-of-delta
 {{ce_ts_ideal_dod_bits}}. PFOR delta reaches {{ce_ts_best_bits}}, patching saving
 {{ce_ts_patch_saving_bits}} bits; per stock, PFOR patches {{ce_tspl_pfor_exception_pct}}% of
-values. The store keeps timestamps per stock as residuals from a `time_base` column, the earliest
+values. I keep timestamps per stock as residuals from a `time_base` column, the earliest
 time of each {{code:time_base_records}} records in file order.
 
 **Segment size, the layout choice measured on the full day.** The comparison ran {{seg1_records}}-record segments beside the default {{seg_records}}. At the default, each stock's run is {{seg_run_ratio}} times
@@ -249,7 +249,7 @@ and {{cmpL_arcps_q3_warm_med_ms}} ms warm on them, and {{cmpL_arcps_q1_warm_med_
 
 ## Tried and not kept
 
-Tried and not kept: Gorilla for timestamps and prices, which {{verdict:gorilla_bits}} to the integer codecs in size (Codecs); delta-of-delta
+I tried and did not keep Gorilla for timestamps and prices, which {{verdict:gorilla_bits}} to the integer codecs in size (Codecs); delta-of-delta
 timestamps; references in file order and as distances in the day's orders; the comparison's
 second segment size, which cost Q2 time and disk (Segment size); the fused delta kernel on NEON, and Stream
 VByte. Not built: a stored per-stock minute aggregate (Q3), a sum over ranked dictionary counts
@@ -314,7 +314,7 @@ requires the named step to fail; it lists {{proofs_listed}} faults and a harmles
 record ([prover record]({{path:proofs}})) is of a run over {{proofs_covered}} of the listed
 faults, {{proofs_proven}} of them proven, and {{proofs_control}}. The final review recorded
 {{review_rows}} findings, each fixed with a test seen failing first or closed with its reason
-([docs/REVIEW.md](docs/REVIEW.md)).
+in `docs/REVIEW.md`.
 
 ## Limits
 
