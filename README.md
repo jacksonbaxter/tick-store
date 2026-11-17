@@ -486,8 +486,8 @@ in this repository. Each case runs as its own process, so `perf stat` counts one
 Linux, the case runs on `cpu4` under `taskset`, and `perf` counts only the timed passes.
 Nothing keeps that core's SMT sibling idle, so each case records in `sibling_busy_percent`
 how busy the sibling was, from `/proc/stat` once the lock is held and again at the end. The
-validator refuses a reported result where it exceeds 5% in any case. That limit is a choice
-of ours, not a measured threshold.
+validator refuses a reported result where it exceeds 5% in any case. I chose that limit; it is
+not a measured threshold.
 
 Before any time counts, the input must match its SHA-256 pin, and decoding then encoding
 it must rebuild exactly those bytes. Each timed pass is checked afterwards too. Batch

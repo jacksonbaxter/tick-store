@@ -15,7 +15,7 @@ Full evidence, with quotes and locations, is in `research/evidence/`.
 - **Context**: measured on other hardware or another workload. It shows what good looks like and proves nothing about this
   target. Almost every target here is context, because no published source measures columnar storage of ITCH.
 - **Relative**: the target is to beat a comparison system on the same harness, so the number comes from our own run.
-- **UNCONFIRMED**: no source supports a number. The row says where we looked. No figure has been invented to fill the gap.
+- **UNCONFIRMED**: no source supports a number. The row says where I looked. No figure has been invented to fill the gap.
 - **Derived**: arithmetic on published figures, shown in the row. The source does not state the result.
 - A missed target stays in this file, with the measured number, the gap and the reason. Targets are not lowered to fit.
 
@@ -26,7 +26,7 @@ Results from the two hosts are kept apart and never mixed.
 | Label | Machine | Measurement limits |
 |---|---|---|
 | macOS | Apple M4 Max, 12 P and 4 E cores, 64 GiB, macOS 27.2, APFS on internal SSD | No pinning. 24 MHz timer, about 42 ns per tick. Results are unpinned and have no hardware counters. NEON only: no SVE, no bit-deposit instructions. Run under the machine's measurement lock (`measure.sh`): the machine's wrapper that runs one measurement at a time, with the governor set on Linux. It is not in this repository; [README.md](README.md#benchmarks) states what such a wrapper must do. |
-| Linux | AMD Ryzen Embedded V1605B (Zen 1), 4 cores and 8 threads, 2.0 GHz base, 4 MB L3, 15 GB RAM, Debian 13, kernel 6.12 | Pin with `taskset -c 4`. Nothing keeps its SMT sibling, `cpu5`, idle: each run records how busy `cpu5` was, case by case or system by system, and the validators refuse a run with it over 5% busy in any of them. Boost stays on and the clock is free to move, so no run used a fixed clock; the reported benchmark runs at `ede0176` averaged 2.74 to 3.57 GHz in their timed passes, case by case. TSC resolution about 10 ns. `perf` `:u` events only. AVX2 runs as two 128-bit halves; PEXT and PDEP are microcoded. Run under the host's measurement lock (`measure.sh`). Headline pinned numbers come from here. |
+| Linux | AMD Ryzen Embedded V1605B (Zen 1), 4 cores and 8 threads, 2.0 GHz base, 4 MB L3, 15.33 GiB RAM (`host.mem_total_bytes` in `results/fullday-capacity-12302019.json`), Debian 13, kernel 6.12 | Pin with `taskset -c 4`. Nothing keeps its SMT sibling, `cpu5`, idle: each run records how busy `cpu5` was, case by case or system by system, and the validators refuse a run with it over 5% busy in any of them. Boost stays on and the clock is free to move, so no run used a fixed clock; the reported benchmark runs at `ede0176` averaged 2.74 to 3.57 GHz in their timed passes, case by case. TSC resolution about 10 ns. `perf` `:u` events only. AVX2 runs as two 128-bit halves; PEXT and PDEP are microcoded. Run under the host's measurement lock (`measure.sh`). Headline pinned numbers come from here. |
 
 ## Definitions
 
@@ -172,7 +172,7 @@ residency figure for tick-store's write (`input_resident`, 2,014,504 of 2,014,50
 and none for Parquet's, ArcticDB's and QuestDB's, and no device-read figure for any write; and of
 their read-backs, every system's: that the day's ITCH file and its export were evicted before it,
 with 0 of their 7,840,107 pages resident after (`inputs_evicted_before`). So that record cannot show
-what the cache held when ArcticDB's write started or how much it read. Each figure comes from one host, whose 15 GB of memory is less than the export, and one write per class.
+what the cache held when ArcticDB's write started or how much it read. Each figure comes from one host, whose 15.33 GiB of memory is less than the export, and one write per class.
 A fair protocol would start every system's clock with its input in the same proven state: on this
 host every input evicted before the clock, tick-store's included, or on a host that can hold them
 every input resident, as on the slice, with more than one write per class. RESULTS.md gives these

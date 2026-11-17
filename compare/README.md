@@ -93,8 +93,8 @@ and cpu6, so every thread of a system shares those two CPUs. macOS has no pinnin
 Nothing keeps cpu4's SMT sibling idle, so the header's `sibling_busy_percent` records how busy it
 was, per system: the sibling is read from `thread_siblings_list`, or `core_cpus_list` failing that,
 and its busy and total jiffies from `/proc/stat` once the lock is held and when the wrapper exits.
-`scripts/check_compare.py` refuses a reported result where any system exceeds 5%, a limit that is
-our choice and not a measured threshold, and macOS records `not-available`. cpu6's sibling, cpu7
+`scripts/check_compare.py` refuses a reported result where any system exceeds 5%, a limit I
+chose, not a measured threshold, and macOS records `not-available`. cpu6's sibling, cpu7
 on the Linux host, is measured the same way from the same first reading and recorded as
 `second_sibling_busy_percent`, held to the same 5% rule by the same check from protocol 2. The
 files measured before it, protocol 1, record cpu5 alone.
@@ -388,7 +388,8 @@ class B writes, an input residency figure for tick-store's write (`input_residen
 figure for any write; and of their read-backs, every system's: that the day's ITCH file and its
 export were evicted before it, with 0 of their 7,840,107 pages resident after
 (`inputs_evicted_before`). So that record cannot show what the cache held when ArcticDB's write
-started or how much it read. Each of these figures is from one host, with 15 GB of memory, less than the export's
+started or how much it read. Each of these figures is from one host, with 15.33 GiB of memory (`host.mem_total_bytes` in
+`results/fullday-capacity-12302019.json`), less than the export's
 23,861,669,888 bytes, and from one write per class, a single repetition, with nothing to show its
 spread.
 
@@ -645,7 +646,7 @@ TICK_STORE_MEASURE=<wrapper> <venv>/bin/python -I compare/run.py --day 12302019 
 - **Class A's store goes after its read-back,** since queries run on class B alone and two stores
   of QuestDB's 23 GB beside a 24 GB read-back would crowd the disk the guard watches.
 - **Warm is proven query by query.** QuestDB's store, 22.9 GB in the capacity check, is larger
-  than this host's 15 GB of memory, so no store is held resident whole. Each query runs once
+  than this host's 15.33 GiB of memory, so no store is held resident whole. Each query runs once
   untimed, its answer checked, and then the processes that answer it must cause 0 bytes of
   storage reads across all 30 repetitions: the worker, tick-store's `tick_query` or QuestDB's
   server, each by `read_bytes` in its own `/proc/<pid>/io`, which counts page faults on a

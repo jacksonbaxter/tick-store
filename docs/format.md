@@ -186,7 +186,9 @@ cannot come from the file's contents. It can come only from the file shrinking u
 from a device error under a mapped page, and either raises SIGBUS.
 
 Nothing catches the signal. A handler cannot tell which read faulted or resume it safely, and code that
-tried would turn a lost page into wrong answers. ClickHouse and QuestDB reached the same conclusion.
+tried would turn a lost page into wrong answers. ClickHouse and QuestDB reached the same conclusion
+([research/evidence/code-quality.md](../research/evidence/code-quality.md), sections 3 and
+"SIGBUS handling: prevention at each read site").
 The process dies, and the cause is prevented instead:
 
 - A file is published whole by rename and never written, truncated or extended after. A writer that
