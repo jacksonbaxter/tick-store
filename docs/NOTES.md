@@ -4198,7 +4198,7 @@ after the freeze rerun (docs/TASKS.md).
 
 **RF-2, engine-only seconds as defined.** Confirmed by a test: every class B Parquet write repetition set to 0.5 s of engine-only time, its median 0.5, passed, though each total was 1.9 to 2.1 s with 0.1 s of Python. Each repetition's `engine_only_seconds` must now equal its `seconds` less its `python_seconds`, the worker's own subtraction, to 1 part in 10^9.
 
-**RF-7, tick-store's engine time per repetition.** Confirmed by a test: a cold engine time of 80 and 100 us beside queries of 60 and 70 us passed, since the cold median it was held to holds the open too. Each repetition's engine time must now be within its own round trip warm and its query's cold. On the debian protocol 2 slice of the last round (`85a4912`, iteration-only) the engine's largest share of a round trip is 0.9995 warm and cold, so the rule holds on real runs; that file passes every rule of this round with the three wrapper-only header fields taken from the reported `67ae574` slice.
+**RF-7, tick-store's engine time per repetition.** Confirmed by a test: a cold engine time of 80 and 100 us beside queries of 60 and 70 us passed, since the cold median it was held to holds the open too. Each repetition's engine time must now be within its own round trip warm and its query's cold. On the debian protocol 2 slice of the last round (`85a4912`, iteration-only; a commit before the rebase, not in the history) the engine's largest share of a round trip is 0.9995 warm and cold, so the rule holds on real runs; that file passes every rule of this round with the three wrapper-only header fields taken from the reported `67ae574` slice.
 
 **RF-5, a macOS write's device reads.** Confirmed: a macOS write's `device_bytes_read` was `iostat`'s `disk0` total, which counts the write's own output. What macOS offers a Python process without installing anything, by a probe on the Mac (`rf5-probe.log`): `proc_pid_rusage(pid, RUSAGE_INFO_V2)` through `ctypes`, whose `ri_diskio_bytesread` is the bytes the device read for that process. Reading a 64 MiB file just evicted counted 67,108,864 bytes, and reading it again resident 0; the same for a running child, a process of the same user that is not a child, and a child that has exited but is not yet reaped (`waitid` with `WNOWAIT`). After the child is reaped its reads are gone: macOS adds them to no parent, where Linux puts them in `ru_inblock`. `getrusage`'s `ru_inblock` counts operations, not bytes. So a macOS write now counts the reads of the processes that did it: the worker, QuestDB's server, and tick-store's `tick_roundtrip`, which the worker runs through `coldcache.run_counting_reads` and reads before reaping; Linux keeps the block device's machine-wide sectors read. On the real tools a 200,000-record tick-store write read 0 bytes from its resident slice and 9,175,040 bytes once the slice was evicted. A process's own executable counts when it is not cached: with `tick_roundtrip` evicted, a write from a resident slice read 1,310,720 bytes, so the test runs the tool once first, as a run's flush probe does. The cold proof keeps `iostat`, where only a shortfall counts. Nothing is left as a gap for the macOS files. In the final run of the real-systems tests the resident write once read 8,192 bytes, less than one 16 KiB page, and 0 in three runs after it; what those bytes were is not known. The test now holds a resident write to less than one page and an evicted one to more than one.
 **F-5 and RF-6, the protocol's repetitions, and tick-store alone on a Linux day.** Confirmed by
@@ -4271,7 +4271,8 @@ overlayfs, now stops the write with the path and the device named, not a bare
 **RF-10, statements and the code.** Confirmed. The warm proof's `warm_up_runs` was the constant:
 a test with the untimed runs made to run none still stated 1. It now states the fewest any query
 ran, and `check_compare.py` holds a protocol 2 slice's warm block to `warm_up_seconds`, one
-positive figure per stated run, which the debian `85a4912` slice meets. `run.py`'s docstring now
+positive figure per stated run, which the debian slice at `85a4912` (a commit before the rebase,
+not in the history) meets. `run.py`'s docstring now
 names both siblings the `/proc/stat` copy measures, and `TICKSTORE_ONLY_WARM`, the warm method of
 the macOS tick-store day, says each query first runs once untimed. `compare/README.md` says a
 write's device window is the whole ingest call, wider than its clock by QuestDB's `CREATE TABLE`
@@ -4555,7 +4556,8 @@ before any measured run. Every protocol 2 run so far is iteration-only. `scripts
 at the freeze commit is final for the freeze: no rule of it changes between the first measured
 run and the last. The spread below comes from `spread.py`, kept with the raw logs,
 over three sources: the repetitions inside the committed files; the protocol 2 Linux slice at
-`85a4912`, against the `67ae574` Linux slice; and the
+`85a4912` (a commit before the rebase, not in the history), against the `67ae574` Linux slice;
+and the
 iteration day's tick-store part at `4c049c7`, against
 tick-store's `v3-seg4Mi` block in the `67ae574` Linux day. The first comparison is the only
 second run of the three other systems. Neither has a second run on macOS. The families the
@@ -4646,7 +4648,8 @@ second run, is named.
   (QuestDB `locate-index`, 1.14 to 7.18 ms; 16 variants); Linux day, tick-store: 7.12% and
   32.38%. Peak memory, Linux day, tick-store: Largest VmHWM 16.61%, session RSS peak 16.81%
   (14.5 to 12.1 GB, `tick_roundtrip`). Durability verdicts: equal in all 32 slice and 2 day
-  pairs. `warm_worker_open` is in the `85a4912` slice alone.
+  pairs. `warm_worker_open` is in the slice at `85a4912`
+  (a commit before the rebase, not in the history) alone.
 
 **Past a threshold.** A figure past its threshold never holds a file back and never causes a
 rerun. Its cause is looked for in that run's own evidence (its load lines, sibling busy
@@ -5939,9 +5942,11 @@ four at a time, about 5 minutes a fault. After the rebase onto `81cec1f` and the
 replaced-file and disturbances rules, every fault whose patch edits `check_ties.py` or the pins,
 the twenty-one `ties-*` above, `57215e2`'s `ties-disturbances-no-kind`,
 `compare-replaced-unpinned-accepted` and the three `compare-protocol-*`, was PROVEN again at
-`e8c04c7` in one `heavy.sh` call, 25 of 25 as expected; `g2-committed-plan-moved`,
+`e8c04c7` (a commit before the rebase, not in the history) in one `heavy.sh` call, 25 of 25 as
+expected; `g2-committed-plan-moved`,
 `oracle-sweep-disagreement-passes` and `check-sh-untied-results-pass` stand from the run before,
-at `ad702b8`, their edited files unchanged since. `results/check-proofs.json` was restored from
+at `ad702b8` (a commit before the rebase, not in the history), their edited files unchanged
+since. `results/check-proofs.json` was restored from
 git after each run. `ties-measured-code-changed` is still BASELINE FAILED, as before, until the step passes.
 
 **Today.** `python3 -I scripts/check_ties.py` on this tree says what it said before:
@@ -6128,10 +6133,12 @@ a table and a list on each of the five pages, and `test_the_results_pages_are_th
 `hygiene-large-result-not-json` and `compare-faster-write-pages-unread`; and
 `compare-faster-write-readme-unread` was remade on its moved line, the README dropped from the
 pages read. All four were PROVEN in one `prove_checks.py --only` call through `heavy.sh` at
-`1396e7f`, 4 of 4 as expected, each baseline passing; `results/check-proofs.json` was restored
+`1396e7f` (a commit before the rebase, not in the history), 4 of 4 as expected, each baseline
+passing; `results/check-proofs.json` was restored
 from git after it.
 
-`scripts/check.sh --only py-scripts,hygiene,render-check` through `heavy.sh` at `38b95d5`: all
+`scripts/check.sh --only py-scripts,hygiene,render-check` through `heavy.sh` at `38b95d5`
+(a commit before the rebase, not in the history): all
 three PASS, 986 tests with 6 skipped.
 
 ### The essay's render, derived rather than asserted
@@ -6238,7 +6245,8 @@ faults whose patches the rebase moved, `verdict-class-met-on-any-part` among the
 again with `--only`, 11 of 11 as expected. `results/check-proofs.json` was restored from git
 after each run.
 After the rebase onto `81cec1f` and the marks, `check.sh --only py-scripts` passed at `f552e89`
-(1,022 Python tests, 129 of them the render's), and one `heavy.sh` run took the essay's 38
+(a commit before the rebase, not in the history) (1,022 Python tests, 129 of them the render's),
+and one `heavy.sh` run took the essay's 38
 faults, upstream's `writeup-faster-write-unchecked` and `writeup-not-established-read` and the
 three new `Marks` faults among them. It reached its two-hour limit after 28, all PROVEN, and was
 stopped during `writeup-sub-operands-swapped`; that one and `writeup-constant-from-a-comment`,
