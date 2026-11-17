@@ -178,7 +178,8 @@ changes the warm engine median by {{d3_simd_q1_pct}}%, {{d3_simd_q2_pct}}%, {{d3
 {{d3_simd_q4_pct}}% and {{d3_simd_q5_pct}}% on Q1 to Q5, a negative change being time saved. A
 query's own runs range {{cmpL_ts_warm_spread_min}}% to {{cmpL_ts_warm_spread_max}}% of their
 median, so on whole queries SIMD's effect is inside or near the run-to-run spread
-([counters run]({{path:d3}}): {{note:diag-counters}}).
+([counters run]({{path:d3}}): {{note:diag-counters}}). SIMD cost {{simd_src_lines}} lines of kernels and dispatch, {{simd_src_share}}% of the
+{{src_include_lines}} source lines.
 
 **The store's price column.** Per piece, the reader inflates any zstd frame, allocates, decodes
 PFOR with scale and patches, range-checks every value and appends. On the Zen 1 those steps take
@@ -199,7 +200,7 @@ instructions and {{cdL_gorilla_xor_bm}} mispredicts per price, the store's price
 
 ## Memory
 
-On the M4 its peak memory footprint, the memory it owns, is
+On the M4 the writer's peak memory footprint, the memory it owns, is
 {{rtM_ingest_footprint_mb}} MB at segments of {{rtM_segment_records}} records; its peak resident
 set, which also counts the mapped source file, is {{cmpM_seg_rss_diff_mb}} MB smaller at
 {{cmpM_seg1_records}}. tick-store's query process (`tick_query`) peaks at {{cmpL_tick_query_vmhwm_mb}} MB resident,
