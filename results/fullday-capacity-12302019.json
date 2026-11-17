@@ -8,10 +8,10 @@
   "os": "Linux",
   "kernel": "6.12",
   "cpu": "AMD Ryzen Embedded V1605B, 4 cores, 8 threads",
-  "mem_total_bytes": 16463536128,
+  "mem_total_bytes": 16463527936,
   "avx2": true,
   "avx512f": false,
-  "swap_note": "swap was already full before the first run, and stayed so"
+  "swap_note": "swap held 137,887,744 of its 1,023,406,080 bytes before the first part and 255,541,248 after the last"
  },
  "method": {
   "ingest": "bounded chunks read from the export: 4 Mi rows for Parquet and QuestDB, 4 M rows for ArcticDB, whose first chunk is a write and the rest appends",
@@ -22,10 +22,14 @@
    "sample_seconds": 2,
    "stop_under_mem_available_bytes": 3221225472,
    "stop_under_free_disk_bytes": 53687091200,
-   "stop_over_swap_bytes_per_second": 10485760
+   "max_swap_in_bytes_per_second": 10485760,
+   "swap_in_strikes": 3,
+   "swap_exhausted_fraction": 0.02,
+   "swap_exhausted_floor": "min_available_bytes plus SwapTotal",
+   "swap_out": "recorded, never a stop"
   },
   "sigill_scope": "only the paths run here: streamed write, one column read, one window read, stored-settings reads. It says nothing of the wheels' other kernels",
-  "peak_memory": "VmHWM. A worker's figure comes from wait4 where it exceeds the runner's VmHWM, since ru_maxrss cannot read below that, and otherwise from /proc samples every 2 s"
+  "peak_memory": "VmHWM. A library system's workers' figures are wait4's ru_maxrss for their steps, each above the runner's own VmHWM, below which ru_maxrss cannot read; the runner's, the QuestDB client's and every RssAnon and RssFile come from /proc samples every 2 s; the QuestDB server's VmHWM is read from /proc as its service stops"
  },
  "export": {
   "verdict": "pass",
@@ -36,20 +40,21 @@
    "code": 0,
    "signal": null
   },
-  "wall_seconds": 318.8,
-  "stored_bytes": 23861605383,
+  "wall_seconds": 358.0,
+  "stored_bytes": 23861739520,
+  "stored_bytes_note": "allocated bytes, st_blocks x 512, as each system's stored_bytes; the export's apparent size was 23,861,605,383 bytes",
   "peak_memory_bytes": {
-   "VmHWM": 12329242624,
-   "RssAnon": 15044608,
-   "RssFile": 12308434944
+   "VmHWM": 12939968512,
+   "RssAnon": 24285184,
+   "RssFile": 12921610240
   },
-  "mem_available_lowest_bytes": 13532024832
+  "mem_available_lowest_bytes": 15090642944
  },
  "systems": {
   "parquet": {
    "variant": "zstd1-rg1Mi",
    "durability_class": "B",
-   "commit": "9c8b09f91e8a44e99a2448932fa1b8e1b7087e1a",
+   "commit": "ede0176b10bb49e505226285530d0b91a33b4f34",
    "cpu_mask": [
     2,
     6,
@@ -72,28 +77,28 @@
     "answers_match_ground_truth": true
    },
    "hs_err_files": 0,
-   "mem_available_start_bytes": 13585420288,
-   "mem_available_lowest_bytes": 11445825536,
-   "swapped_pages_during_run": 0,
+   "mem_available_start_bytes": 15200034816,
+   "mem_available_lowest_bytes": 13853429760,
+   "swapped_pages_during_run": 1,
    "stored_bytes": 3191406592,
    "stored_over_source": 0.387,
-   "disk_used_at_peak_bytes": 3120988160,
+   "disk_used_at_peak_bytes": 3191554048,
    "wall_seconds": {
-    "whole_run": 196.7,
-    "ingest": 187.5,
-    "full_scan": 3.4,
-    "window": 1.0
+    "whole_run": 187.2,
+    "ingest": 178.5,
+    "full_scan": 2.7,
+    "window": 0.9
    },
    "peak_memory_bytes": {
-    "ingest_worker_VmHWM": 1529008128,
-    "full_scan_worker_VmHWM": 1521938432,
-    "driver_VmHWM": 1193680896
+    "ingest_worker_VmHWM": 1517129728,
+    "full_scan_worker_VmHWM": 1522831360,
+    "driver_VmHWM": 1190162432
    }
   },
   "arcticdb": {
    "variant": "rows100k-cols127",
    "durability_class": "B",
-   "commit": "9c8b09f91e8a44e99a2448932fa1b8e1b7087e1a",
+   "commit": "ede0176b10bb49e505226285530d0b91a33b4f34",
    "cpu_mask": [
     2,
     6,
@@ -116,28 +121,28 @@
     "answers_match_ground_truth": true
    },
    "hs_err_files": 0,
-   "mem_available_start_bytes": 12840230912,
-   "mem_available_lowest_bytes": 9326624768,
-   "swapped_pages_during_run": 1,
-   "stored_bytes": 6352666624,
+   "mem_available_start_bytes": 15070498816,
+   "mem_available_lowest_bytes": 12210810880,
+   "swapped_pages_during_run": 1986,
+   "stored_bytes": 6352654336,
    "stored_over_source": 0.77,
-   "disk_used_at_peak_bytes": 6211543040,
+   "disk_used_at_peak_bytes": 6352715776,
    "wall_seconds": {
-    "whole_run": 184.4,
-    "ingest": 164.1,
-    "full_scan": 12.3,
-    "window": 1.7
+    "whole_run": 147.1,
+    "ingest": 131.4,
+    "full_scan": 11.2,
+    "window": 1.0
    },
    "peak_memory_bytes": {
-    "ingest_worker_VmHWM": 1317203968,
-    "full_scan_worker_VmHWM": 5838458880,
-    "driver_VmHWM": 1224720384
+    "ingest_worker_VmHWM": 1357586432,
+    "full_scan_worker_VmHWM": 5840121856,
+    "driver_VmHWM": 1225617408
    }
   },
   "questdb": {
    "variant": "plain",
    "durability_class": "B",
-   "commit": "9c8b09f91e8a44e99a2448932fa1b8e1b7087e1a",
+   "commit": "ede0176b10bb49e505226285530d0b91a33b4f34",
    "cpu_mask": [
     2,
     6,
@@ -160,33 +165,33 @@
     "answers_match_ground_truth": true
    },
    "hs_err_files": 0,
-   "mem_available_start_bytes": 12833505280,
-   "mem_available_lowest_bytes": 6520430592,
-   "swapped_pages_during_run": 3,
+   "mem_available_start_bytes": 15185063936,
+   "mem_available_lowest_bytes": 8154644480,
+   "swapped_pages_during_run": 20228,
    "stored_bytes": 22897786880,
    "stored_over_source": 2.775,
-   "disk_used_at_peak_bytes": 23957028864,
+   "disk_used_at_peak_bytes": 24431222784,
    "wall_seconds": {
-    "whole_run": 998.9,
-    "ingest": 959.0,
-    "full_scan": 3.7,
-    "window": 1.4
+    "whole_run": 487.9,
+    "ingest": 444.8,
+    "full_scan": 3.4,
+    "window": 1.6
    },
    "peak_memory_bytes": {
     "server_ingest": {
-     "VmHWM": 1539555328,
-     "RssAnon": 1349836800,
-     "RssFile": 181026816
+     "VmHWM": 1539317760,
+     "RssAnon": 1352028160,
+     "RssFile": 163115008
     },
     "server_queries": {
-     "VmHWM": 2584330240,
-     "RssAnon": 1351315456,
-     "RssFile": 1222656000
+     "VmHWM": 2598608896,
+     "RssAnon": 1353338880,
+     "RssFile": 1223155712
     },
     "ingest_client": {
-     "VmHWM": 5889290240,
-     "RssAnon": 5760458752,
-     "RssFile": 67887104
+     "VmHWM": 5889925120,
+     "RssAnon": 5724598272,
+     "RssFile": 68546560
     }
    },
    "heap": {
@@ -202,12 +207,12 @@
        "Metadata GC Threshold",
        "System.gc()"
       ],
-      "pause_total_ms": 180.0,
-      "pause_longest_ms": 107.83,
-      "last_pause_uptime_seconds": 4.389,
-      "server_uptime_seconds": 965.673,
-      "peak_heap_after_gc_mib": 115,
-      "heap_used_at_exit_mib": 300,
+      "pause_total_ms": 204.2,
+      "pause_longest_ms": 132.082,
+      "last_pause_uptime_seconds": 5.185,
+      "server_uptime_seconds": 452.616,
+      "peak_heap_after_gc_mib": 116,
+      "heap_used_at_exit_mib": 242,
       "heap_capacity_mib": 982,
       "out_of_memory_error": false
      },
@@ -219,10 +224,10 @@
        "Metadata GC Threshold",
        "System.gc()"
       ],
-      "pause_total_ms": 192.5,
-      "pause_longest_ms": 134.931,
-      "last_pause_uptime_seconds": 3.094,
-      "server_uptime_seconds": 18.712,
+      "pause_total_ms": 181.8,
+      "pause_longest_ms": 114.268,
+      "last_pause_uptime_seconds": 3.433,
+      "server_uptime_seconds": 23.218,
       "peak_heap_after_gc_mib": 116,
       "heap_used_at_exit_mib": 155,
       "heap_capacity_mib": 982,
@@ -236,11 +241,11 @@
        "Metadata GC Threshold",
        "System.gc()"
       ],
-      "pause_total_ms": 191.2,
-      "pause_longest_ms": 111.906,
-      "last_pause_uptime_seconds": 3.234,
-      "server_uptime_seconds": 9.134,
-      "peak_heap_after_gc_mib": 115,
+      "pause_total_ms": 184.4,
+      "pause_longest_ms": 126.506,
+      "last_pause_uptime_seconds": 3.1,
+      "server_uptime_seconds": 8.916,
+      "peak_heap_after_gc_mib": 116,
       "heap_used_at_exit_mib": 158,
       "heap_capacity_mib": 982,
       "out_of_memory_error": false
@@ -265,7 +270,7 @@
   "questdb_class_a": {
    "variant": "plain",
    "durability_class": "A",
-   "commit": "87a5bb80c9cd915929c6c1219fb1c33362fb6c36",
+   "commit": "ede0176b10bb49e505226285530d0b91a33b4f34",
    "cpu_mask": [
     2,
     6,
@@ -288,33 +293,33 @@
     "answers_match_ground_truth": true
    },
    "hs_err_files": 0,
-   "mem_available_start_bytes": 13566373888,
-   "mem_available_lowest_bytes": 6519263232,
-   "swapped_pages_during_run": 1,
+   "mem_available_start_bytes": 15283044352,
+   "mem_available_lowest_bytes": 8112078848,
+   "swapped_pages_during_run": 29185,
    "stored_bytes": 22897786880,
    "stored_over_source": 2.775,
-   "disk_used_at_peak_bytes": null,
+   "disk_used_at_peak_bytes": 24808550400,
    "wall_seconds": {
-    "whole_run": 689.9,
-    "ingest": 632.3,
-    "full_scan": 3.8,
-    "window": 1.4
+    "whole_run": 704.5,
+    "ingest": 652.8,
+    "full_scan": 3.9,
+    "window": 1.6
    },
    "peak_memory_bytes": {
     "server_ingest": {
-     "VmHWM": 1532809216,
-     "RssAnon": 1336344576,
-     "RssFile": 191369216
+     "VmHWM": 1543000064,
+     "RssAnon": 1358069760,
+     "RssFile": 194478080
     },
     "server_queries": {
-     "VmHWM": 2570604544,
-     "RssAnon": 1340493824,
-     "RssFile": 1223569408
+     "VmHWM": 2584424448,
+     "RssAnon": 1340727296,
+     "RssFile": 1205362688
     },
     "ingest_client": {
-     "VmHWM": 5884186624,
-     "RssAnon": 5742665728,
-     "RssFile": 68268032
+     "VmHWM": 5888757760,
+     "RssAnon": 5732696064,
+     "RssFile": 71106560
     }
    },
    "heap": {
@@ -330,12 +335,12 @@
        "Metadata GC Threshold",
        "System.gc()"
       ],
-      "pause_total_ms": 164.0,
-      "pause_longest_ms": 104.558,
-      "last_pause_uptime_seconds": 3.452,
-      "server_uptime_seconds": 637.814,
-      "peak_heap_after_gc_mib": 114,
-      "heap_used_at_exit_mib": 261,
+      "pause_total_ms": 195.5,
+      "pause_longest_ms": 124.127,
+      "last_pause_uptime_seconds": 3.804,
+      "server_uptime_seconds": 659.659,
+      "peak_heap_after_gc_mib": 115,
+      "heap_used_at_exit_mib": 264,
       "heap_capacity_mib": 982,
       "out_of_memory_error": false
      },
@@ -347,12 +352,12 @@
        "Metadata GC Threshold",
        "System.gc()"
       ],
-      "pause_total_ms": 225.9,
-      "pause_longest_ms": 150.843,
-      "last_pause_uptime_seconds": 6.702,
-      "server_uptime_seconds": 25.888,
-      "peak_heap_after_gc_mib": 116,
-      "heap_used_at_exit_mib": 155,
+      "pause_total_ms": 190.5,
+      "pause_longest_ms": 125.189,
+      "last_pause_uptime_seconds": 6.075,
+      "server_uptime_seconds": 25.312,
+      "peak_heap_after_gc_mib": 115,
+      "heap_used_at_exit_mib": 157,
       "heap_capacity_mib": 982,
       "out_of_memory_error": false
      },
@@ -364,10 +369,10 @@
        "Metadata GC Threshold",
        "System.gc()"
       ],
-      "pause_total_ms": 177.8,
-      "pause_longest_ms": 108.956,
-      "last_pause_uptime_seconds": 3.249,
-      "server_uptime_seconds": 9.235,
+      "pause_total_ms": 191.4,
+      "pause_longest_ms": 126.192,
+      "last_pause_uptime_seconds": 3.744,
+      "server_uptime_seconds": 10.048,
       "peak_heap_after_gc_mib": 116,
       "heap_used_at_exit_mib": 158,
       "heap_capacity_mib": 982,
@@ -388,8 +393,7 @@
      "lines_error_or_critical": 0,
      "lines_naming_oom_backpressure_or_suspension": 0
     }
-   },
-   "disk_note": "not measured: the run began by deleting the class B store, so free disk rose as it wrote"
+   }
   }
  },
  "questdb_heap_verdict": {
@@ -397,9 +401,8 @@
   "chosen_heap": "-Xms1g -Xmx1g",
   "tested_at_that_value": true,
   "default_heap_tested": false,
-  "why": "A full day ran to WAL fully applied in class B and again in class A, with no collection at all after start-up. The only pauses are the three full collections every server start makes, 2 for metadata and 1 System.gc(), under 0.25 s in total. The most used after any collection was 116 MiB, and at the end of ingest at most 300 MiB of 982 MiB was in use, with eden never filled. No OutOfMemoryError, no memory pressure, no suspension, no error line. The evidence gives no reason to test another heap.",
-  "phase_3_setting": "-Xms1g -Xmx1g for QuestDB on the Linux host, with the launcher's AlwaysPreTouch and ParallelGC",
-  "risk": "Neither the heap nor mapped pages. The server's resident mapped pages stayed under 200 MiB during ingest and near 1.1 GiB during queries, and its VmHWM peaked at 2.4 GiB. Most of the lowest MemAvailable comes from the Python ingest client, not the server",
-  "client": "The client's anonymous memory climbs about 300 MiB per 4 Mi-row chunk to a ceiling near 5.4 GiB, then falls, and repeats. Arrow's pool stayed under 514 MiB, so the rest is held outside Arrow, by the client's native side. It does not grow with the day: the first peak came at about a quarter of the rows, and later ones were no higher."
+  "criteria": "the conditions and figures the old verdict was reached by, as quoted in docs/NOTES.md (QuestDB's heap at the freeze); the figures are read as bounds, at or under the old run's, by the coordinator's rule written before this run was read, which the old record did not state",
+  "why": "A full day ran to WAL fully applied in class B and again in class A, with no collection after start-up. The only pauses are the three full collections every server start makes, 2 for metadata and 1 System.gc(), from 181.8 to 204.2 ms in total per start, under 0.25 s. The most used after any collection was 116 MiB, and at the end of ingest 242 MiB (class B) and 264 MiB (class A) of 982 MiB were in use, with eden never filled. WAL lag stayed at 3 transactions or fewer. No OutOfMemoryError, no memory pressure, no suspension, no error line.",
+  "phase_3_setting": "-Xms1g -Xmx1g for QuestDB on the Linux host, with the launcher's AlwaysPreTouch and ParallelGC"
  }
 }

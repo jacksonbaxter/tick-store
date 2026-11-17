@@ -361,9 +361,9 @@
       },
       "arcticdb": {
         "variant": "rows100k-cols127",
-        "stored_bytes": 6352666624,
+        "stored_bytes": 6352654336,
         "outcome": "finished",
-        "ours_over_theirs": 0.2767711359757952,
+        "ours_over_theirs": 0.2767716713368489,
         "smaller": true
       },
       "questdb": {

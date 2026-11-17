@@ -708,8 +708,8 @@
                   "smaller": true
                 },
                 "arcticdb": {
-                  "stored_bytes": 6352666624,
-                  "estimate_over_system": 0.2616242773894379,
+                  "stored_bytes": 6352654336,
+                  "estimate_over_system": 0.26162478345177825,
                   "smaller": true
                 },
                 "questdb": {
@@ -1420,8 +1420,8 @@
                   "smaller": true
                 },
                 "arcticdb": {
-                  "stored_bytes": 6352666624,
-                  "estimate_over_system": 0.24317703264385876,
+                  "stored_bytes": 6352654336,
+                  "estimate_over_system": 0.24317750302351726,
                   "smaller": true
                 },
                 "questdb": {
@@ -2138,8 +2138,8 @@
                   "smaller": true
                 },
                 "arcticdb": {
-                  "stored_bytes": 6352666624,
-                  "estimate_over_system": 0.2881219408059402,
+                  "stored_bytes": 6352654336,
+                  "estimate_over_system": 0.28812249812296414,
                   "smaller": true
                 },
                 "questdb": {
@@ -2856,8 +2856,8 @@
                   "smaller": true
                 },
                 "arcticdb": {
-                  "stored_bytes": 6352666624,
-                  "estimate_over_system": 0.26571940775590747,
+                  "stored_bytes": 6352654336,
+                  "estimate_over_system": 0.2657199217394976,
                   "smaller": true
                 },
                 "questdb": {
@@ -3575,8 +3575,8 @@
                   "smaller": true
                 },
                 "arcticdb": {
-                  "stored_bytes": 6352666624,
-                  "estimate_over_system": 0.23637516855158053,
+                  "stored_bytes": 6352654336,
+                  "estimate_over_system": 0.2363756257743283,
                   "smaller": true
                 },
                 "questdb": {
@@ -4294,8 +4294,8 @@
                   "smaller": true
                 },
                 "arcticdb": {
-                  "stored_bytes": 6352666624,
-                  "estimate_over_system": 0.21723222918489482,
+                  "stored_bytes": 6352654336,
+                  "estimate_over_system": 0.217232649379272,
                   "smaller": true
                 },
                 "questdb": {
