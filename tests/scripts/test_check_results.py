@@ -83,6 +83,7 @@ def valid_document(host):
         "sanitizers": "none",
         "isa": "x86-64 baseline, scalar kernels" if linux else "arm64 baseline, scalar kernels",
         "commit": COMMIT,
+        "commit_source": "git",
         "core": 4 if linux else "not-available",
         "sibling": "cpu5 idle as stated, not enforced" if linux else "not-available",
         "sibling_busy_percent": sibling_block() if linux else "not-available",
@@ -230,9 +231,10 @@ class CheckResultsTest(unittest.TestCase):
 
     def test_every_header_field_is_required(self):
         fields = ("schema", "host", "measurement", "statement", "cpu_model", "kernel", "compiler",
-                  "compile_flags", "build_type", "sanitizers", "isa", "commit", "core", "sibling",
-                  "sibling_busy_percent", "second_thread", "governor", "frequency", "turbo",
-                  "pinning", "counters", "timer", "load_lines", "peak_rss_bytes")
+                  "compile_flags", "build_type", "sanitizers", "isa", "commit", "commit_source",
+                  "core", "sibling", "sibling_busy_percent", "second_thread", "governor",
+                  "frequency", "turbo", "pinning", "counters", "timer", "load_lines",
+                  "peak_rss_bytes")
         for field in fields:
             with self.subTest(field=field):
                 self.assert_fails("Linux", lambda d, f=field: remove(d, "header", f),
@@ -563,6 +565,20 @@ class CheckResultsTest(unittest.TestCase):
     def test_a_commit_that_is_not_a_commit(self):
         self.assert_fails("Linux", lambda d: set_value(d, "unknown", "header", "commit"),
                           "not a full commit hash")
+
+    def test_a_commit_source_that_is_neither_git_nor_export(self):
+        # Review RA-5: the build says how it established its commit, by git or an export.
+        for stated in ("unknown", "", None, "GIT"):
+            with self.subTest(stated=stated):
+                self.assert_fails("Linux", lambda d, s=stated: set_value(
+                    d, s, "header", "commit_source"), "header.commit_source:")
+
+    def test_both_commit_sources_pass(self):
+        for stated in ("git", "export"):
+            with self.subTest(stated=stated):
+                result = self.check("Linux", lambda d, s=stated: set_value(
+                    d, s, "header", "commit_source"))
+                self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_a_counter_simply_missing(self):
         self.assert_fails("Linux", lambda d: remove(d, "results", 0, "counters", "cache_misses"),

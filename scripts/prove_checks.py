@@ -140,6 +140,13 @@ def claim_pinned_on_macos():
     edit_json(macos_results("bench", benchmark=BENCH_FAULT_BENCHMARK), lambda d: d["header"].update(pinning="pinned"))
 
 
+def drop_commit_source():
+    """The macOS ITCH codec file without the header's commit_source, as the files from before
+    review RA-5 were."""
+    edit_json(macos_results("bench", benchmark=BENCH_FAULT_BENCHMARK),
+              lambda d: d["header"].pop("commit_source"))
+
+
 def sub_resolution_percentile():
     def change(document):
         document["results"][0]["latency"]["percentiles"][0]["value_ns"] = 0.5
@@ -1343,6 +1350,14 @@ FAULTS = (
     Fault("results-linux-turbo-unmeasured", "check-results", "the pinned host's Linux results "
           "file with turbo unavailable, as a hosted runner records it", CHECK_FAILED,
           "header.turbo: Linux must record it", unmeasured_turbo_on_linux),
+    # Review RA-5: a benchmark file says how its build established its commit.
+    Fault("results-commit-source-missing", "check-results", "a macOS results file whose header "
+          "does not say how its build established its commit", CHECK_FAILED,
+          "header: missing field 'commit_source'", drop_commit_source),
+    Fault("results-commit-source-any-value", "py-scripts", "check_results.py takes any "
+          "commit_source but an empty one, so a build that named its commit some other way "
+          "passes", CHECK_FAILED,
+          "FAIL: test_a_commit_source_that_is_neither_git_nor_export (__main__.CheckResultsTest"),
     Fault("results-empty-folder", "check-results", "no results files at all, which must not "
           "pass as nothing wrong", CHECK_FAILED, "no results files in", empty_the_results_folder),
     Fault("guard-sub-resolution-data", "check-results", "a percentile below the timer's floor "

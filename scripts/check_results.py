@@ -5,7 +5,8 @@
 
 A results file is a claim that a number was measured under stated conditions. This
 checks that the file can back the claim: a header comes first and is complete, the
-host cannot be mistaken, a measurement lock really was held, the input was verified,
+host cannot be mistaken, the build says how it established its commit, a measurement lock
+really was held, the input was verified,
 no latency sits below what the timer can resolve, and on Linux the core's SMT sibling
 was measured and stayed under the limit. It also checks that the file is safe to
 publish, with no path, username or hostname anywhere in it.
@@ -48,6 +49,7 @@ HEADER_FIELDS = (
     "sanitizers",
     "isa",
     "commit",
+    "commit_source",
     "core",
     "sibling",
     "sibling_busy_percent",
@@ -61,6 +63,11 @@ HEADER_FIELDS = (
     "load_lines",
     "peak_rss_bytes",
 )
+# How the build established its commit (review RA-5): "git" when git named it and compared the
+# tracked files with it, "export" when an exported tree's COMMIT file named it, so that a tree
+# not compared with git is not taken for a known clean one. run_bench.py writes it since RA-5,
+# and every file in results/bench/ has carried it since the freeze's files replaced the older ones.
+COMMIT_SOURCES = ("git", "export")
 TIMER_FIELDS = ("source", "calibrated_against", "ticks_per_second", "resolution_ns",
                 "read_cost_ns", "min_publishable_ns")
 COUNTER_FIELDS = ("cycles", "instructions", "branch_misses", "cache_misses")
@@ -157,6 +164,10 @@ def check_header(header, top_keys):
                 problems.append(f"header.timer: missing field '{field}'")
     elif "timer" in header:
         problems.append("header.timer: not an object")
+    if "commit_source" in header and header["commit_source"] not in COMMIT_SOURCES:
+        problems.append(f"header.commit_source: {header['commit_source']!r}, and a build "
+                        "establishes its commit by git or by an export's COMMIT file, 'git' or "
+                        "'export'")
     if header.get("schema", SCHEMA) != SCHEMA:
         problems.append(f"header.schema: expected {SCHEMA}")
     return problems

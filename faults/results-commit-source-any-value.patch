@@ -1,0 +1,12 @@
+diff --git a/scripts/check_results.py b/scripts/check_results.py
+--- a/scripts/check_results.py
++++ b/scripts/check_results.py
+@@ -164,7 +164,7 @@ def check_header(header, top_keys):
+                 problems.append(f"header.timer: missing field '{field}'")
+     elif "timer" in header:
+         problems.append("header.timer: not an object")
+-    if "commit_source" in header and header["commit_source"] not in COMMIT_SOURCES:
++    if "commit_source" in header and not header["commit_source"]:
+         problems.append(f"header.commit_source: {header['commit_source']!r}, and a build "
+                         "establishes its commit by git or by an export's COMMIT file, 'git' or "
+                         "'export'")
