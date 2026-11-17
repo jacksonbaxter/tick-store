@@ -68,6 +68,23 @@ Presets, each building into `build/<preset>`: `dev`, `asan-ubsan`, `tsan`, `fuzz
 `coverage`, `bench`. Every build preset caps itself at 6 parallel jobs. Fuzzing is described in
 `fuzz/README.md`.
 
+Fuzzing compares the SIMD kernels with the scalar ones on every codec block that ends within
+an input's compare limit: 1,310,720 values from its start for the dictionary, and 2,097,152
+for run-length and PFOR. Blocks hold up to 1,048,576 values, the format's largest.
+
+The blocks within the cap also get the refusal, cut, block and column checks. A block is
+within the cap while twice the values before it plus its own count stay within 262,144 values
+(dictionary) or 1,048,576 (run-length, PFOR).
+
+The re-encode checks take the first 5,123 values (dictionary) or 17,410 (run-length, PFOR),
+and the first 64 values of each of the next 64 blocks.
+
+Past the compare limit, PFOR decodes each block that ends within 3,145,728 values once, in
+place, with the chosen kernel set; nothing more is examined.
+
+The store writes codec blocks of 4,096 values, which every codec target takes whole as an
+input's first block.
+
 ## Checks
 
 `scripts/check.sh` runs every check, one step at a time, because a clang-tidy run and a

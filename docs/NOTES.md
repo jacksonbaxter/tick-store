@@ -897,7 +897,7 @@ the columns named, for exploring.
 
 - `fuzz_dictionary` and `fuzz_run_length` are new, with seeds from the real encoders on short, repeated, low-cardinality and
   wide inputs, and a hand-built block for each refusal the decoders make. Their oracles decode, re-encode with every mode and
-  check values, and also require a dictionary's entry count to equal the block's distinct values and a run-length block's run
+  check values (the fuzz targets bound this; see fuzz/README.md, "Bounds"), and also require a dictionary's entry count to equal the block's distinct values and a run-length block's run
   count to equal its maximal runs, since a decoder that accepts a repeated entry or a split run would otherwise pass.
 - They are registered in `scripts/check.sh`, CI's scheduled fuzz matrix, whose timeout rose from 300 to 360 minutes for ten
   targets, and the coverage list, which gains 14 required functions.
@@ -6246,6 +6246,72 @@ stopped during `writeup-sub-operands-swapped`; that one and `writeup-constant-fr
 `writeup-opening-any-length`, `writeup-tokens-glued-accepted`, `writeup-numeral-forms-accepted`,
 `writeup-pitch-condition-skipped` and `writeup-template-not-rendered` were not proven again at
 this commit, though each was shown failing on its remade patch before it was committed.
+
+### The fuzz oracle's bound
+
+2026-11-17. The Linux replay of `fuzz_dictionary` in the final run at `ede0176` stopped on a
+timeout of 11 s or more. The input was `seed-01128`, a 31-byte block of 2^20 equal values. It
+was not a decoder fault: the oracle's own work on one input had no bound. That stays in the
+record as it happened.
+
+**The bounds.** Each bound is one named constant, with the figures it was set from beside it.
+They are in `fuzz/codec_oracles.hpp`, `itch_store_oracles.hpp` and `itch_query_oracles.hpp`.
+
+- Codec targets:
+  - The cap holds 262,144 values for the dictionary and 1,048,576 for run-length and PFOR. A
+    block is within the cap while twice the values before it plus its own count fit.
+  - The compare limit is the cap plus one maximal block.
+  - PFOR alone has a decode-once tier of one block more: decoded once, in place, with the
+    chosen kernel set.
+  - The budget holds 5,123 values for the dictionary and 17,410 for run-length and PFOR.
+  - The prefix is the first 64 values of each of the next 64 blocks.
+- Store: the cap is 2^20 stated values and the compare limit 4 x 2^20.
+- Query: the cap and the compare limit are 450M and the budget 365M, in ns of the fitted
+  measures.
+
+What each tier runs is in fuzz/README.md, "Bounds".
+
+**The bar.** One execution must take under 5 s on the Linux host with its sibling cpu busy.
+Each target is held to it through its Mac median times the target's measured Linux factor,
+predicting at most 4.4 s. That gives Mac limits of 728, 612, 571, 554 and 598 ms.
+
+Run-length's dearest seed is at 617 ms, 0.8% over its limit. It is taken as the least constant
+the bound's form allows, within the 3% the ruling tolerates.
+
+**The count table.** The oracles count what they decode, encode and compare, and which blocks
+and segments they examine (`fuzz/oracle_counts.hpp`). `FuzzOracles.TheCountTableHoldsTheConstants`
+holds each target's most to its expression in the constants. Those mosts:
+
+| Target | Decoded | Encoded | Compared | Blocks or segments |
+|---|---|---|---|---|
+| Dictionary | 3,457,048 | 90,148 | 1,314,816 | 547 blocks |
+| Run-length | 7,413,768 | 118,796 | 2,099,200 | 373 blocks |
+| PFOR | 9,359,464 | 1,040,496 | 2,129,920 | 1,024 blocks |
+| Store | 8,388,608 | 2,097,152 | 4,194,304 | 1,910 segment reads |
+
+`FuzzRegression/BoundSeeds.CountWhatTheTableGivesThem` holds each of the 28 bounded named
+seeds to its counts and to its target's most. The query's value counts are a ceiling derived
+from its work measure, not a bound of their own.
+
+**The terms each named seed reaches:**
+
+- The decoded totals: the dictionary's and run-length's costliest seeds, and
+  `pfor/bound-decode-limit`.
+- The block term: the `bound-most-blocks` seeds, 546 of 547, 373 and 1,024 blocks.
+- The store's segment term: `itch_store/bound-most-segments`, 219 segments, the writer's most,
+  of the format's 382.
+
+Each costs less than its target's dearest seed: 95, 34, 100 and 232 ms.
+
+**The query's compare tier.** The two shapes its compare measure prices least each have a
+seed: the most plain values and the most plain segments. They take 199 and 74 ms, under every
+other query seed.
+
+**Proofs.** On the Mac at `0dbdb95`, `prove_checks.py --only` took the bounds' faults. 18 were
+PROVEN. Two were UNDETECTED: `codec-count-the-cut-as-decoded` and
+`neon-unpack-delta-overread-past-cap`. The first was retargeted in `126b03f`.
+
+The raw logs are under the phase's oracle-bound proofs folder.
 
 ## Process notes
 
