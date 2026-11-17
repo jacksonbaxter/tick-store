@@ -61,8 +61,34 @@ from 09:29:30, as `scripts/data_pins.json` records.
 
 ## Build and test
 
-CMake 3.28 or newer and Ninja. The compiler comes from the environment (`CC`,
-`CXX`), so nothing here names a toolchain path.
+What a build, the checks and the measurements need, each as a file in this repository gives it:
+
+- **Compiler:** upstream Clang, with clang-tidy from the same LLVM. The results were built with
+  Clang 23.1.4 ([RESULTS.md](RESULTS.md#benchmarks)), and fuzzing needs upstream clang, since Apple
+  clang has no fuzzer runtime ([fuzz/README.md](fuzz/README.md#build)). It comes from the
+  environment (`CC`, `CXX`), so nothing here names a toolchain path.
+- **Build tools:** CMake 3.28 or newer (`CMakeLists.txt`) and Ninja.
+- **Python:** `python3` for the scripts. The comparison's environment is Python 3.13, which
+  `compare/setup.py` makes with `uv` ([compare/README.md](compare/README.md#setup)).
+- **Check tools:** `scripts/check.sh` also needs `actionlint`, uses `shellcheck` through it, and
+  runs `py-compare` in the comparison's `.venv`. `scripts/install_tools.sh actionlint shellcheck
+  ninja llvm` puts actionlint 1.7.12, ShellCheck 0.11.0, Ninja 1.13.2 and LLVM 23.1.4 into the
+  gitignored `.tools/`, each once its SHA-256 matches the pin in the script.
+- **Data and disk:** the reference day is 3,524,013,057 bytes compressed and 8,251,407,909
+  (8.25 GB) decompressed (`scripts/data_pins.json`, "Data" above). The full-day comparison also
+  needs the day's export, 23.9 GB, and at least 50 GiB free on its work folder's disk
+  ([compare/README.md](compare/README.md#full-day-comparison)).
+- **Memory:** on the full day, `tick_roundtrip` peaked at 14,171,181,056 B resident on Linux
+  (`systems.tickstore.peak_memory.vmhwm_bytes_by_process.tick_roundtrip` in
+  `results/compare/Linux-12302019-full-ede0176b10bb.json`), and on the Mac its ingest at
+  9,383,100,416 B and its verify at 11,346,673,664 B (`g1.ingest.peak_rss_bytes` and
+  `g1.verify.peak_rss_bytes` in `results/roundtrip-12302019.json`), so a full day needs 16 GB of
+  memory or more.
+- **The headline figures:** the full-day comparison, `compare/run.py --day 12302019` with a
+  `--variant-source`, as [compare/README.md](compare/README.md#full-day-comparison) gives it. It
+  runs under the wrapper `TICK_STORE_MEASURE` names, which must take the machine, run its
+  arguments, print a load line at each end, and exit 75 when it cannot have the machine
+  ([Benchmarks](#benchmarks)).
 
 ```sh
 cmake --preset dev && cmake --build --preset dev && ctest --preset dev
