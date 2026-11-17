@@ -2818,17 +2818,31 @@ def proofs_document(verdicts, controls=("UNDETECTED",)):
             "platform": "Darwin arm64", "faults": faults}
 
 
+def prover_text(faults, controls=("control-0",)):
+    """A prover whose FAULTS lists these fault ids and controls, as scripts/prove_checks.py
+    writes its list."""
+    calls = [f"    Fault({fault!r}, 'check', 'what', 1, 'FAIL')," for fault in faults]
+    calls += [f"    Fault({fault!r}, 'check', 'what', 0, '', control=True)," for fault in controls]
+    return "FAULTS = (\n" + "\n".join(calls) + "\n)\n"
+
+
 class ProofsBlockTest(Scratch):
     """The README's paragraph on the fault proofs says what results/check-proofs.json holds,
-    every count read from it, so a re-proof that rewrites the file is shown by a regeneration."""
+    every count read from it, so a re-proof that rewrites the file is shown by a regeneration,
+    and beside it what scripts/prove_checks.py lists now, read from its list (review P1-4)."""
 
     README = (f"# Title\n\nBefore.\n\n{RENDER.PROOFS_BEGIN}\n{RENDER.PROOFS_END}\n\n"
               "After.\n")
 
-    def write_proofs(self, document, markers=True):
+    def write_proofs(self, document, markers=True, prover=None):
         path = self.tree / "results" / "check-proofs.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(document), encoding="utf-8")
+        listed = prover if prover is not None else prover_text(
+            [entry["fault_id"] for entry in document.get("faults", [])
+             if not entry.get("control")])
+        (self.tree / "scripts").mkdir(parents=True, exist_ok=True)
+        (self.tree / "scripts" / "prove_checks.py").write_text(listed, encoding="utf-8")
         if markers:
             self.readme.write_text(self.README, encoding="utf-8")
 
@@ -2883,12 +2897,121 @@ class ProofsBlockTest(Scratch):
                 self.assertEqual(result.returncode, 2)
                 self.assertIn(said, result.stderr)
 
+    def test_the_listed_faults_are_counted_beside_the_record(self):
+        document = proofs_document(["PROVEN", "PROVEN", "UNDETECTED"])
+        self.write_proofs(document, prover=prover_text(
+            ["fault-0", "fault-2", "new-a", "new-b"], ("control-0", "control-1")))
+        result = self.render()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        paragraph = self.paragraph()
+        self.assertIn("`scripts/prove_checks.py` lists 4 faults and 2 controls now. "
+                      "`results/check-proofs.json` holds 4 runs", paragraph)
+        self.assertIn("Of the 2 faults it proves, 1 is still listed. 1 listed fault has a run "
+                      "there that did not prove it. The other 2 listed faults have no run in "
+                      "that record yet: each added since it was written was shown failing by "
+                      "hand, as [docs/NOTES.md](docs/NOTES.md) records, and the record is "
+                      "replaced when the full run over every listed fault finishes.", paragraph)
+        # A fault added to the list is counted at the next regeneration, and --check sees it.
+        prover = self.tree / "scripts" / "prove_checks.py"
+        prover.write_text(prover_text(["fault-0", "fault-2", "new-a", "new-b", "new-c"]),
+                          encoding="utf-8")
+        result = self.render("--check")
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("the table in README.md is stale or was edited by hand", result.stderr)
+
+    def test_every_listed_fault_with_a_run_says_no_more(self):
+        self.write_proofs(proofs_document(["PROVEN", "PROVEN"]))
+        self.assertEqual(self.render().returncode, 0)
+        self.assertIn("lists 2 faults and 1 control now.", self.paragraph())
+        self.assertIn("Of the 2 faults it proves, 2 are still listed. <!--", self.paragraph())
+
+    def test_the_markers_need_the_prover_and_its_list(self):
+        self.write_proofs(proofs_document(["PROVEN"]))
+        (self.tree / "scripts" / "prove_checks.py").unlink()
+        result = self.render("--check")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("has the proofs markers and there is no scripts/prove_checks.py to count "
+                      "the listed faults from", result.stderr)
+        for text, said in (("FAULTS = (\n", "does not parse"), ("OTHER = ()\n", "has no FAULTS"),
+                           ("FAULTS = ()\n", "lists no fault"),
+                           ("FAULTS = (print(),)\n", "holds something other than a Fault")):
+            with self.subTest(said=said):
+                self.write_proofs(proofs_document(["PROVEN"]), prover=text)
+                result = self.render("--check")
+                self.assertEqual(result.returncode, 2)
+                self.assertIn(said, result.stderr)
+
+    def test_the_listed_count_is_the_one_the_essay_reads(self):
+        from importlib import util
+        spec = util.spec_from_file_location("render_writeup",
+                                            REPO_ROOT / "scripts" / "render_writeup.py")
+        essay = util.module_from_spec(spec)
+        spec.loader.exec_module(essay)
+        text = (REPO_ROOT / "scripts" / "prove_checks.py").read_text(encoding="utf-8")
+        self.assertEqual(RENDER.listed_faults(text),
+                         essay.listed_faults(text, "scripts/prove_checks.py"))
+
     def test_the_readme_gives_the_committed_file(self):
         text = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
         block = text[text.index(RENDER.PROOFS_BEGIN) + len(RENDER.PROOFS_BEGIN):
                      text.index(RENDER.PROOFS_END)]
         self.assertEqual(block.strip().split("\n"),
-                         RENDER.render_proofs(REPO_ROOT / "results" / "check-proofs.json"))
+                         RENDER.render_proofs(REPO_ROOT / "results" / "check-proofs.json",
+                                              REPO_ROOT / "scripts" / "prove_checks.py"))
+
+
+class RoundtripBlockTest(Scratch):
+    """The README's sentence on the round trip's times and store size is read from
+    results/roundtrip-12302019.json, so --check fails when the two drift (review P1-3)."""
+
+    README = (f"# Title\n\nBefore.\n\n{RENDER.ROUNDTRIP_BEGIN}\n{RENDER.ROUNDTRIP_END}\n\n"
+              "After.\n")
+
+    def write_roundtrip(self):
+        """The committed file, which the render validates as it does every round-trip file."""
+        path = self.tree / "results" / "roundtrip-12302019.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(REPO_ROOT / "results" / "roundtrip-12302019.json", path)
+        self.readme.write_text(self.README, encoding="utf-8")
+
+    def test_the_sentence_gives_the_file_figures(self):
+        self.write_roundtrip()
+        result = self.render()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("On macOS, `ingest` took 96.6 s and `verify` 41.5 s; the store is 1.76 GB, "
+                      "4.69 times smaller than the day. `results/roundtrip-12302019.json` "
+                      "records all four.",
+                      " ".join(self.readme.read_text(encoding="utf-8").split()))
+
+    def test_a_drifted_figure_is_stale(self):
+        self.write_roundtrip()
+        self.render()
+        text = self.readme.read_text(encoding="utf-8")
+        self.readme.write_text(text.replace("96.6 s", "85 s"), encoding="utf-8")
+        result = self.render("--check")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("the table in README.md is stale or was edited by hand", result.stderr)
+
+    def test_a_file_without_its_figures_is_refused(self):
+        path = self.dir / "roundtrip.json"
+        whole = json.loads((REPO_ROOT / "results" / "roundtrip-12302019.json").read_text())
+        for where in (("g1", "verify", "wall_seconds"), ("g1", "ingest", "ratio"), ("host",)):
+            with self.subTest(where=where):
+                document = json.loads(json.dumps(whole))
+                parent = document
+                for key in where[:-1]:
+                    parent = parent[key]
+                parent[where[-1]] = None
+                path.write_text(json.dumps(document), encoding="utf-8")
+                with self.assertRaisesRegex(RENDER.TargetError, "roundtrip-12302019.json"):
+                    RENDER.render_roundtrip(path)
+
+    def test_the_readme_gives_the_committed_file(self):
+        text = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+        block = text[text.index(RENDER.ROUNDTRIP_BEGIN) + len(RENDER.ROUNDTRIP_BEGIN):
+                     text.index(RENDER.ROUNDTRIP_END)]
+        self.assertEqual(block.strip().split("\n"),
+                         RENDER.render_roundtrip(REPO_ROOT / "results" / "roundtrip-12302019.json"))
 
 
 class ShortFormTest(unittest.TestCase):

@@ -293,7 +293,12 @@ def hand_edit_compare_value():
 
 def hand_edit_proofs_paragraph():
     """The README's proofs paragraph with words typed into it by hand."""
-    edit_text("README.md", " runs, made at source commit", " runs in all, made at source commit")
+    edit_text("README.md", "runs, made at source commit", "runs in all, made at source commit")
+
+
+def hand_edit_roundtrip_sentence():
+    """The README's sentence on the round trip's times with words typed into it (review P1-3)."""
+    edit_text("README.md", " records all four.", " records all four of them.")
 
 
 def hand_edit_headline_value():
@@ -2025,6 +2030,29 @@ FAULTS = (
           "leave out the proofs paragraph's markers while the proofs file exists, so a typed "
           "count could stand in its place", CHECK_FAILED,
           "FAIL: test_the_markers_and_the_file_go_together (__main__.ProofsBlockTest"),
+    # Review P1-4: the faults the prover lists are counted beside its record.
+    Fault("render-proofs-list-unread", "py-scripts", "render_results.py gives the proofs "
+          "paragraph without the faults the prover lists now", CHECK_FAILED,
+          "FAIL: test_the_listed_faults_are_counted_beside_the_record (__main__.ProofsBlockTest"),
+    Fault("render-proofs-unproven-counted-proven", "py-scripts", "render_results.py counts a "
+          "listed fault whose run did not prove it among the proven ones still listed",
+          CHECK_FAILED,
+          "FAIL: test_the_listed_faults_are_counted_beside_the_record (__main__.ProofsBlockTest"),
+    Fault("render-proofs-prover-optional", "py-scripts", "render_results.py renders the proofs "
+          "paragraph with no prover to count the listed faults from", CHECK_FAILED,
+          "FAIL: test_the_markers_need_the_prover_and_its_list (__main__.ProofsBlockTest"),
+    # Review P1-3: the round trip's times and store size are read from its results file.
+    Fault("readme-roundtrip-hand-edit", "render-check", "a hand edit inside the README's "
+          "sentence on the round trip's times", CHECK_FAILED,
+          "the table in README.md is stale or was edited by hand",
+          hand_edit_roundtrip_sentence),
+    Fault("render-roundtrip-unrendered", "py-scripts", "render_results.py leaves the README's "
+          "round-trip sentence as it finds it, so a typed figure could drift from the file",
+          CHECK_FAILED,
+          "FAIL: test_the_sentence_gives_the_file_figures (__main__.RoundtripBlockTest"),
+    Fault("readme-roundtrip-markers-removed", "py-scripts", "the README without the round-trip "
+          "sentence's markers, so its figures would be typed and go unchecked", CHECK_FAILED,
+          "ERROR: test_the_readme_gives_the_committed_file (__main__.RoundtripBlockTest"),
     Fault("readme-headline-markers-removed", "render-check", "the README without its headline "
           "markers, so no headline would be rendered or checked", EXIT_RENDER_REFUSED,
           "README.md has the headline markers and targets.json no headline, or the reverse",

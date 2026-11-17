@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -3693,7 +3693,7 @@
+         listed, listed_controls = listed_faults(Path(prover).read_text(encoding="utf-8"))
+         proven = {entry.get("fault_id") for entry in faults if entry.get("verdict") == "PROVEN"}
+         held = {entry.get("fault_id") for entry in faults}
+-        still = sum(1 for fault in listed if fault in proven)
++        still = sum(1 for fault in listed if fault in held)
+         unproven = sum(1 for fault in listed if fault in held and fault not in proven)
+         unrun = sum(1 for fault in listed if fault not in held)
+         text = (f"`{PROVER_FILE.as_posix()}` lists {counted_with(len(listed), 'fault')} and "

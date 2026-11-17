@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -3887,7 +3887,7 @@
+         return EXIT_USAGE
+     if has_proofs:
+         try:
+-            headline.append((PROOFS_BEGIN, PROOFS_END, render_proofs(proofs_path, prover)))
++            headline.append((PROOFS_BEGIN, PROOFS_END, render_proofs(proofs_path)))
+         except (OSError, json.JSONDecodeError, TargetError) as error:
+             print(f"render_results: proofs: {error}", file=sys.stderr)
+             return EXIT_USAGE

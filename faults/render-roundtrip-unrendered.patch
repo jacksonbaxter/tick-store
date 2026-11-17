@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -3893,7 +3893,7 @@
+             return EXIT_USAGE
+ 
+     roundtrip = args.targets_root / ROUNDTRIP_FILE
+-    if readme is not None and block_of(readme, ROUNDTRIP_BEGIN, ROUNDTRIP_END) is not None:
++    if False and block_of(readme, ROUNDTRIP_BEGIN, ROUNDTRIP_END) is not None:
+         try:
+             headline.append((ROUNDTRIP_BEGIN, ROUNDTRIP_END, render_roundtrip(roundtrip)))
+         except (OSError, json.JSONDecodeError, TargetError) as error:
