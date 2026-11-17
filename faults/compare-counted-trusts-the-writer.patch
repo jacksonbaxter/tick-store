@@ -1,0 +1,14 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1068,9 +1068,7 @@
+     this run and on the replaced run, worked out from both apart from the part's own verdict,
+     so a writer that counts the favourable one shows against it."""
+     change = notes_of(part).get("change")
+-    if not change:
+-        return part[2]
+-    return min((change["new"], change["old"]), key=standing)
++    return part[2]
+ 
+ 
+ def is_comparison(row):

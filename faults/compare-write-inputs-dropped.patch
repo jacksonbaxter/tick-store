@@ -1,0 +1,13 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -898,8 +898,7 @@
+     write against other systems, whose input each write read from where."""
+     tails = lowest_tails(row, parts[0][4])
+     inputs = write_inputs(row, parts)
+-    return verdict_of(parts, row) + (f"; {tails}" if tails else "") + \
+-        (f"; {inputs}" if inputs else "")
++    return verdict_of(parts, row) + (f"; {tails}" if tails else "")
+ 
+ 
+ def and_list(items):

@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -795,8 +795,7 @@
+         raise Refused(f"the essay runs to {count:,} words"
+                       + (", each token not yet resolved one" if waiting else "")
+                       + f", outside its {WORDS_AT_LEAST:,} to {WORDS_AT_MOST:,}")
+-    problem = opening_problem(text) or render_results.faster_write_problem(
+-        [text], render_results.disk_read_writers(root))
++    problem = opening_problem(text)
+     if problem:
+         raise Refused(problem)
+     return Rendered(text, values, waiting, states, notes, len(dict.fromkeys(names)))

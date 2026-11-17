@@ -73,6 +73,7 @@ check_roundtrip.py, so G-2's exit codes are the ones its runs exited with.
 
 import argparse
 import fnmatch
+import hashlib
 import json
 import operator
 import re
@@ -893,9 +894,97 @@ def lowest_tails(row, document):
 
 
 def verdict_text(row, parts):
-    """The verdict, and beside it what a tail figure judged against a p99 target is."""
+    """The verdict, and beside it what a tail figure judged against a p99 target is and, for a
+    write against other systems, whose input each write read from where."""
     tails = lowest_tails(row, parts[0][4])
-    return verdict_of(parts) + (f"; {tails}" if tails else "")
+    inputs = write_inputs(row, parts)
+    return verdict_of(parts, row) + (f"; {tails}" if tails else "") + \
+        (f"; {inputs}" if inputs else "")
+
+
+def and_list(items):
+    return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
+
+
+def counted_with(value, singular, plural=None):
+    return f"{value:,} {singular if value == 1 else plural or singular + 's'}"
+
+
+def input_of(write, label):
+    """Where one write's input was when its clock started, from its own record: (whether it was
+    wholly resident, the words), or None for a record that keeps no residency figure."""
+    detail = write.get("detail") or {}
+    start = detail.get("input_at_clock_start")
+    if not isinstance(start, dict) and isinstance(detail.get("input_resident"), dict):
+        start = {**detail["input_resident"], "made_ready": detail["input_resident"]}
+    if not isinstance(start, dict):
+        return None
+    files = ", ".join(f"`{name}`" for name in start.get("files", []))
+    files = f", {files}," if files else ""
+    ready = start.get("made_ready") or {}
+    resident, pages = start["resident_pages"], start["pages"]
+    how = (f", made ready by {ready['what']}" if "what" in ready else
+           f", made resident by {counted_with(ready['warms'], 'warm')}" if "warms" in ready else
+           "")
+    where = "in memory before the clock starts" if resident == pages else \
+        "read from disk inside the clock"
+    device = detail.get("device_read") or {}
+    read = (f", and {device['bytes']:,} B read from the device inside the clock, "
+            f"{device['counter']}" if "bytes" in device else ", with no device-read figure")
+    return resident == pages, (f"{label} input{files} is {where}: {resident:,} of its "
+                               f"{pages:,} pages resident at the clock's start{how}{read}")
+
+
+def write_inputs(row, parts):
+    """For a write against other systems, from each write's own record: whose input is in
+    memory before the clock starts and whose is read from disk inside it, the bytes read from
+    the device inside the clock, what engine-only holds, and, where the inputs differ, that
+    engine-only does not take the reads out, with each other system's engine-only on the
+    replaced run where there is one."""
+    classes = [notes_of(part).get("write") for part in parts if notes_of(part).get("write")]
+    if not classes:
+        return ""
+    class_name, document = classes[0], parts[0][4]
+    systems = [*dict.fromkeys(["tickstore", *ordered_systems(document)])]
+    writes = {system: walk(document, ["systems", system, "variants", "@headline", "classes",
+                                      class_name, "write"]) for system in systems}
+    inputs = {system: input_of(writes[system], f"{SYSTEM_LABEL[system]}'s")
+              for system in systems}
+    pieces = [found[1] for found in inputs.values() if found]
+    unrecorded = [SYSTEM_LABEL[system] for system, found in inputs.items() if not found]
+    if unrecorded:
+        pieces.append("the records of " + and_list(unrecorded) +
+                      f" keep{'s' if len(unrecorded) == 1 else ''} no residency or device-read "
+                      "figure")
+    held = "; ".join(f"for {SYSTEM_LABEL[system]}, {writes[system]['times']['engine_only_seconds']}"
+                     for system in systems if "engine_only_seconds" in
+                     (writes[system].get("times") or {}))
+    text = (f"inputs of the class {class_name} writes, from each write's record: "
+            + "; ".join(pieces) + ". Engine-only, by each write's record: "
+            + (held or "the total less python_seconds"))
+    if len({found[0] for found in inputs.values() if found}) < 2:
+        return text
+    text += (". Engine-only does not remove the difference in where the inputs are: the device "
+             "bytes are counted over the whole clock, so engine-only may hold them as well")
+    replaced = next((notes_of(part)["replaced"] for part in parts
+                     if notes_of(part).get("replaced")), None)
+    if replaced is not None:
+        moved = []
+        for system in systems:
+            if system == "tickstore":
+                continue
+            try:
+                before = engine_only(walk(replaced[1], ["systems", system, "variants",
+                                                        "@headline", "classes", class_name,
+                                                        "write"]))
+                after = engine_only(writes[system])
+            except (NoFigure, TargetError):
+                continue
+            moved.append(f"{SYSTEM_LABEL[system]}'s engine-only went from {shown(before, row)} "
+                         f"on the replaced run to {shown(after, row)}")
+        if moved:
+            text += ", and " + ", ".join(moved)
+    return text
 
 
 def target_text_of(row):
@@ -927,7 +1016,8 @@ def judged_parts(row, root):
                               "the four-system day")
     if "lowest_of" in row:
         document = documents[files[0]]
-        return [(*part, files[0], document) for part in lowest_parts(row, document)], None
+        parts = [(*part, files[0], document) for part in lowest_parts(row, document)]
+        return finished(row, root, [row["lowest_of"]] * len(parts), parts), None
     parts = []
     for spec, path in zip(row["parts"], files):
         conditions = spec.get("all") or [{key: value for key, value in spec.items()
@@ -952,7 +1042,320 @@ def judged_parts(row, root):
             met = Unjudged(untied)
         parts.append((spec["label"], ", ".join(text for text, _ in judged), met, path,
                       documents[path]))
-    return parts, None
+    return finished(row, root, row["parts"], parts), None
+
+
+# A comparison file a later run replaced is kept, bytes unchanged, in this folder beside the
+# comparison files, so a verdict the new figures change shows the replaced run's figures and
+# outcome beside its own, and counts take the less favourable of the two.
+REPLACED = "replaced"
+# The pins key that holds each replaced file's SHA-256: it is kept as it was validated when it
+# was the reported file, and check_compare.py cannot judge it again away from its slice.
+REPLACED_PINS = "replaced_comparison_files"
+
+
+def standing(met):
+    """How far an outcome favours tick-store: missed, then not judged, then met."""
+    return 0 if met is False else 2 if met is True else 1
+
+
+def notes_of(part):
+    return part[5] if len(part) > 5 else {}
+
+
+def counted(part):
+    """The outcome counts and claims take for a part: the less favourable of its outcome on
+    this run and on the replaced run, worked out from both apart from the part's own verdict,
+    so a writer that counts the favourable one shows against it."""
+    change = notes_of(part).get("change")
+    if not change:
+        return part[2]
+    return min((change["new"], change["old"]), key=standing)
+
+
+def is_comparison(row):
+    """A row judged against other systems: QL-4's ranking, or a part whose target is a figure
+    read from a comparison file, such as another system's write seconds."""
+    if "lowest_of" in row:
+        return True
+    for spec in row.get("parts", []):
+        if not spec.get("file", "").startswith("results/compare/"):
+            continue
+        for item in spec.get("all") or [spec]:
+            comparison = comparison_of(item, row)
+            if comparison is not None and isinstance(comparison[1], dict):
+                return True
+    return False
+
+
+def replaced_pattern(pattern):
+    found = Path(pattern)
+    return (found.parent / REPLACED / found.name).as_posix()
+
+
+def judged_on_what_it_has(conditions, row, document):
+    """A part judged on a replaced run's file: (met, text, the labels judged, what it lacks).
+    A condition whose figure the older file does not keep is left out, and the rest decide."""
+    judged = [judge(item, row, document) for item in conditions]
+    with_target = [(item, met) for item, (_, met) in zip(conditions, judged)
+                   if comparison_of(item, row) is not None]
+    kept = [(item, met) for item, met in with_target if not isinstance(met, Unjudged)]
+    missing = list(dict.fromkeys(met.what for _, met in with_target if isinstance(met, Unjudged)))
+    if not kept:
+        met = Unjudged(missing[0]) if missing else None
+    else:
+        met = False if any(met is False for _, met in kept) else True
+    labels = [item.get("label") or "its figure" for item, _ in kept] if missing else None
+    return met, ", ".join(text for text, _ in judged), labels, missing
+
+
+def replaced_parts(row, root, specs):
+    """Each part of a comparison row judged on the replaced run's file, by label: (met, text,
+    the labels judged where the file lacks a figure, what it lacks, its path, its document), or
+    None with no replaced file."""
+    if not is_comparison(row):
+        return None
+    old = {}
+    for spec in dict.fromkeys(json.dumps(spec, sort_keys=True) for spec in specs):
+        spec = json.loads(spec)
+        path = target_file(root, replaced_pattern(spec["file"]))
+        if path is None:
+            return None
+        data = path.read_bytes()
+        pins_path = root / "scripts" / "data_pins.json"
+        pins = json.loads(pins_path.read_text(encoding="utf-8")) if pins_path.exists() else {}
+        if (pins.get(REPLACED_PINS) or {}).get(path.name) != hashlib.sha256(data).hexdigest():
+            raise TargetError(f"{path.relative_to(root)} is not pinned by its SHA-256 under "
+                              f"{REPLACED_PINS} in scripts/data_pins.json, so its bytes could "
+                              "have changed since it was the reported file")
+        document = json.loads(data.decode("utf-8"))
+        if "lowest_of" in row:
+            for label, text, met in lowest_parts(row, document):
+                old[label] = (met, text, None, [], path, document)
+            continue
+        for part in row["parts"]:
+            if part["file"] != spec["file"]:
+                continue
+            conditions = part.get("all") or [{key: value for key, value in part.items()
+                                              if key != "label"}]
+            old[part["label"]] = (*judged_on_what_it_has(conditions, row, document), path,
+                                  document)
+    return old
+
+
+def finished(row, root, specs, parts):
+    """Each part with its notes: where the replaced run's outcome differs, both figures, both
+    outcomes and the less favourable as the part's verdict; the disturbances recorded in the
+    phases it rests on; and, for a write against another system, the write it compares."""
+    old = replaced_parts(row, root, specs)
+    entries = disturbance_entries(root)
+    done = []
+    for spec, (label, text, met, path, document) in zip(specs, parts):
+        notes = {}
+        if old is not None and label in old:
+            old_met, old_text, labels, missing, old_path, old_document = old[label]
+            notes["replaced"] = (old_path, old_document)
+            if standing(old_met) != standing(met):
+                notes["change"] = {"new": met, "old": old_met}
+                clock = (f", judged on {' and '.join(labels)} alone, as it keeps no "
+                         f"{' and no '.join(missing)}" if labels else "")
+                text = (f"{text}, and on the replaced run, `{old_path.relative_to(root)}`"
+                        f"{clock}, {old_text}")
+                met = min((met, old_met), key=standing)
+        reads = reads_of_part(row, spec, label, document)
+        found = disturbed(entries, root, path, reads)
+        if found:
+            notes["disturbed"] = found
+        writes = [read for read in reads if read[0] == "write"]
+        if writes and is_comparison(row):
+            notes["write"] = writes[0][3]
+        done.append((label, text, met, path, document, notes))
+    return done
+
+
+def phase_of_path(path, document):
+    """The timed phase a path into a comparison file reads, or None: a write of a class, or a
+    query of a kind, of a system's variant."""
+    if len(path) < 7 or path[0] != "systems" or path[2] != "variants":
+        return None
+    system = path[1]
+    variant = path[3]
+    if variant == "@headline":
+        variant = walk(document, ["systems", system, "headline_variant"])
+    if path[4] == "classes" and path[6] == "write":
+        return ("write", system, variant, path[5])
+    if path[4] == "queries":
+        return ("queries", system, variant, path[6], path[5])
+    return None
+
+
+def reads_of(expression, document):
+    """The timed phases an expression reads."""
+    found = []
+    if not isinstance(expression, dict):
+        return found
+    for key in ("path", "engine_only"):
+        if key in expression:
+            phase = phase_of_path(expression[key], document)
+            found += [phase] if phase else []
+    for key in ("case", "cases_median"):
+        if key in expression:
+            found.append(("case", expression[key]))
+    for key in ("div", "mul"):
+        for item in expression.get(key, ()):
+            found += reads_of(item, document)
+    return found
+
+
+def reads_of_part(row, spec, label, document):
+    """The timed phases a part's verdict rests on: every figure its conditions read."""
+    if "lowest_of" in row:
+        query, kind = label.split(" ", 1)
+        return [("queries", system, walk(document, ["systems", system, "headline_variant"]),
+                 kind, query) for system in [spec["ours"], *spec["others"]]]
+    found = []
+    for item in spec.get("all") or [spec]:
+        found += reads_of(item.get("value"), document)
+        comparison = comparison_of(item, row)
+        if comparison is not None:
+            found += reads_of(comparison[1], document)
+    return list(dict.fromkeys(found))
+
+
+# The record of what else ran on the host during a campaign's timed steps, one per campaign.
+DISTURBANCES = "results/disturbances-*.json"
+DISTURBANCE_SCHEMA = "tick-store disturbances 1"
+DISTURBANCE_PHASES = {"write": ("system", "variant", "class", "repetition"),
+                      "read back": ("system", "variant", "class"),
+                      "warm queries": ("system", "variant", "query"),
+                      "cold queries": ("system", "variant", "query"),
+                      "case": ("case",)}
+DISTURBANCE_COMMON = ("start", "end", "precision", "what", "document", "phase", "timed")
+UTC = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ")
+FULL_COMMIT = re.compile(r"[0-9a-f]{40}")
+_DISTURBANCES = {}
+
+
+def disturbance_entries(root):
+    """Every entry of the tree's disturbance files, each checked."""
+    entries = []
+    for path in sorted(Path(root).glob(DISTURBANCES)):
+        stat = path.stat()
+        key = (str(path.resolve()), stat.st_mtime_ns, stat.st_size)
+        if key not in _DISTURBANCES:
+            _DISTURBANCES[key] = check_disturbances(path, Path(root))
+        entries += _DISTURBANCES[key]
+    return entries
+
+
+def check_disturbances(path, root):
+    """A disturbance file's entries, its shape refused unless whole: its commit, matching its
+    name and the commit of every document it places an entry in; how the list was made; what
+    it leaves out and why; and each entry's UTC span, what it was in words, and the document,
+    system, variant and phase it fell in, which must exist there, with whether that phase is
+    timed."""
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise TargetError(f"{path.name}: {error}") from error
+    what = path.name
+    if not isinstance(document, dict) or document.get("schema") != DISTURBANCE_SCHEMA:
+        raise TargetError(f"{what} is not a {DISTURBANCE_SCHEMA!r} file")
+    unknown = sorted(set(document) - {"schema", "commit", "how", "not_listed", "entries"})
+    if unknown:
+        raise TargetError(f"{what} holds {unknown[0]!r}, which no disturbance file has")
+    commit = document.get("commit")
+    if not isinstance(commit, str) or not FULL_COMMIT.fullmatch(commit) or \
+            what != f"disturbances-{commit[:12]}.json":
+        raise TargetError(f"{what}: its commit {commit!r} is not a full commit its name gives")
+    if not isinstance(document.get("how"), str) or not document["how"].strip():
+        raise TargetError(f"{what} says nothing of how its list was made")
+    for item in document.get("not_listed", []):
+        if not isinstance(item, dict) or set(item) != {"what", "why"} or \
+                not all(isinstance(item[key], str) and item[key].strip() for key in item):
+            raise TargetError(f"{what}: each thing it leaves out gives what it was and why")
+    entries = document.get("entries")
+    if not isinstance(entries, list) or not entries:
+        raise TargetError(f"{what} lists no disturbance")
+    checked = []
+    for index, entry in enumerate(entries):
+        where = f"{what} entry {index + 1}"
+        if not isinstance(entry, dict):
+            raise TargetError(f"{where} is not an object")
+        phase = entry.get("phase")
+        if phase not in DISTURBANCE_PHASES:
+            raise TargetError(f"{where}: no phase {phase!r}; one of {sorted(DISTURBANCE_PHASES)}")
+        wanted = {*DISTURBANCE_COMMON, *DISTURBANCE_PHASES[phase]}
+        if set(entry) != wanted:
+            raise TargetError(f"{where} gives {sorted(entry)}, and a {phase} entry gives "
+                              f"{sorted(wanted)}")
+        start, end = entry["start"], entry["end"]
+        if not all(isinstance(value, str) and UTC.fullmatch(value) for value in (start, end)) \
+                or end < start:
+            raise TargetError(f"{where}: its span {start!r} to {end!r} is not UTC, start first")
+        if entry["precision"] not in ("second", "minute"):
+            raise TargetError(f"{where}: its precision is the second or the minute")
+        if entry["precision"] == "minute" and (not start.endswith(":00Z") or
+                                               not end.endswith(":00Z") or start == end):
+            raise TargetError(f"{where}: a time known to the minute spans whole minutes")
+        if not isinstance(entry["what"], str) or not entry["what"].strip() or \
+                NUMBER.search(entry["what"]):
+            raise TargetError(f"{where} says in words, with no figure, what it was")
+        timed = phase != "read back"
+        if entry["timed"] is not timed:
+            raise TargetError(f"{where}: a {phase} phase is {'' if timed else 'not '}timed")
+        name = Path(str(entry["document"]))
+        source = root / "results" / name
+        if ".." in name.parts or name.is_absolute() or not source.is_file():
+            raise TargetError(f"{where}: no results file {entry['document']!r}")
+        placed = json.loads(source.read_text(encoding="utf-8"))
+        if (placed.get("header") or {}).get("commit") != commit:
+            raise TargetError(f"{where}: {entry['document']} was not measured at {commit[:12]}")
+        try:
+            if phase == "case":
+                if entry["case"] not in [case.get("case") for case in placed["results"]]:
+                    raise KeyError(entry["case"])
+            else:
+                variant = placed["systems"][entry["system"]]["variants"][entry["variant"]]
+                if "class" in entry:
+                    variant["classes"][entry["class"]]
+                if phase == "write" and (isinstance(entry["repetition"], bool) or not isinstance(
+                        entry["repetition"], int) or not 1 <= entry["repetition"] <=
+                        variant["classes"][entry["class"]]["write"]["repetitions"]):
+                    raise KeyError(f"repetition {entry['repetition']!r}")
+                if "query" in entry and entry["query"] is not None and \
+                        entry["query"] not in QUERY_NAMES:
+                    raise KeyError(entry["query"])
+        except (KeyError, TypeError) as error:
+            raise TargetError(f"{where}: {entry['document']} has no {error}") from error
+        checked.append(entry)
+    return checked
+
+
+def disturbed(entries, root, path, reads):
+    """The entries that fall in a timed phase a part rests on: (entry, the phase's read)."""
+    try:
+        name = Path(path).resolve().relative_to((Path(root) / "results").resolve()).as_posix()
+    except ValueError:
+        return []
+    found = []
+    for entry in entries:
+        if entry["document"] != name:
+            continue
+        for read in reads:
+            if read[0] == "case":
+                hit = entry["phase"] == "case" and fnmatch.fnmatchcase(entry["case"], read[1])
+            elif read[0] == "write":
+                hit = entry["phase"] == "write" and \
+                    (entry["system"], entry["variant"], entry["class"]) == read[1:4]
+            else:
+                hit = entry["phase"] == f"{read[3]} queries" and \
+                    (entry["system"], entry["variant"]) == read[1:3] and \
+                    entry["query"] in (None, read[4])
+            if hit:
+                found.append((entry, read))
+                break
+    return found
 
 
 def made_before_the_tie(path, root):
@@ -983,7 +1386,77 @@ def verdict_word(met):
     return VERDICT_WORD[met]
 
 
-def verdict_of(parts):
+def utc_span(entry):
+    """An entry's span as it reads: its date, then its times, UTC."""
+    start, end = entry["start"], entry["end"]
+    date = start[:10]
+    if entry["precision"] == "minute":
+        return f"{date} {start[11:16]} UTC, to the minute"
+    if start == end:
+        return f"{date} {start[11:19]} UTC"
+    return f"{date} {start[11:19]} to {end[11:19]} UTC"
+
+
+def phase_words(entry, read):
+    if read[0] == "case":
+        return f"the case `{entry['case']}`"
+    system = SYSTEM_LABEL.get(entry["system"], entry["system"])
+    if read[0] == "write":
+        return f"{system}'s `{entry['variant']}` class {entry['class']} write {entry['repetition']}"
+    return f"{system}'s `{entry['variant']}` {read[3]} {read[4]}"
+
+
+def replaced_figure(read, replaced, row):
+    """The replaced run's figure of a phase: a write's total seconds, or a query's median."""
+    if read[0] == "case" or replaced is None:
+        return None
+    try:
+        variant = walk(replaced[1], ["systems", read[1], "variants", read[2]])
+        if read[0] == "write":
+            return "total", walk(variant, ["classes", read[3], "write", "seconds_median"])
+        return "median", walk(variant, ["queries", read[4], read[3], "median_us"])
+    except TargetError:
+        return None
+
+
+def verdict_marks(parts, row=None):
+    """What stands beside a verdict: each part whose outcome the replaced run's figures
+    change, with both outcomes, whether the change favours tick-store and the one counts take;
+    and each disturbance recorded in a phase a part rests on, with the replaced run's figure
+    there where there is one."""
+    marks = []
+    for part in parts:
+        change = notes_of(part).get("change")
+        if change:
+            favours = ", a change that favours tick-store," if \
+                standing(change["new"]) > standing(change["old"]) else ""
+            marks.append(f"({part[0]}) {verdict_word(change['new'])} on this run's figures"
+                         f"{favours} and {verdict_word(change['old'])} on the replaced run's, "
+                         f"so counted {verdict_word(counted(part))}")
+    held = {}
+    for part in parts:
+        for entry, read in notes_of(part).get("disturbed", []):
+            text = (f"rests on {phase_words(entry, read)}, which held {entry['what']}, "
+                    f"{utc_span(entry)}")
+            figure = replaced_figure(read, notes_of(part).get("replaced"), row or {})
+            if figure is not None:
+                text += f", where the replaced run's {figure[0]} is {shown(figure[1], row or {})}"
+            held.setdefault(text, []).append(part[0])
+    for text, labels in held.items():
+        who = "every part" if len(labels) == len(parts) > 1 else \
+            ", ".join(f"({label})" for label in labels)
+        marks.append(f"{who} {text}")
+    return marks
+
+
+def verdict_of(parts, row=None):
+    """The verdict on the parts' counted outcomes, with its marks beside it."""
+    marks = verdict_marks(parts, row)
+    return core_verdict(parts) + "".join(f"; {mark}" for mark in marks)
+
+
+def core_verdict(parts):
+    """The verdict word or words on the parts' counted outcomes, with nothing beside them."""
     verdicts = [part[2] for part in parts]
     if all(met is None for met in verdicts):
         return "not judged: no published figure, reported as measured"
@@ -1008,7 +1481,9 @@ def verdict_of(parts):
 
 
 def files_of(parts, root):
-    paths = dict.fromkeys(part[3] for part in parts)
+    paths = dict.fromkeys([*(part[3] for part in parts),
+                           *(notes_of(part)["replaced"][0] for part in parts
+                             if notes_of(part).get("change"))])
     return ", ".join(f"`{path.relative_to(root)}`" for path in paths)
 
 
@@ -1407,7 +1882,8 @@ def check_left_out(line, definitions, root, shown, names, hosts):
         key = (row["id"], row["host"])
         parts, _ = judged_parts(row, root)
         if key not in shown:
-            kind = class_of([part[2] for part in parts]) if parts is not None else "not judged"
+            kind = class_of([counted(part) for part in parts]) if parts is not None else \
+                "not judged"
             expected[kind] = expected.get(kind, 0) + 1
             if key in asked and kind != "met":
                 expected_named.setdefault(kind, []).append(names[key]["name"])
@@ -1417,7 +1893,7 @@ def check_left_out(line, definitions, root, shown, names, hosts):
             if part[0] in shown[key]:
                 shown_parts_count += 1
                 continue
-            kind = class_of([part[2]])
+            kind = class_of([counted(part)])
             if kind == "met":
                 met_parts += 1
                 continue
@@ -1471,23 +1947,24 @@ def check_left_out(line, definitions, root, shown, names, hosts):
 def under_sentence(under, row, parts, hosts):
     """The sentence under the table, with its row's figure and verdict."""
     return filled([under["text"]], under, row, parts, hosts, "the sentence under the table",
-                  {"verdict": verdict_of(parts)})[0]
+                  {"verdict": verdict_of(parts, row)})[0]
 
 
 def check_under(sentence, under, row, parts, hosts):
     """The sentence under the table, checked apart from the code that writes it: a row met or
     missed in whole says that word, and any other says neither (review DX-4)."""
-    kind = class_of([part[2] for part in parts])
+    kind = class_of([counted(part) for part in parts])
+    marks = "".join(f"; {mark}" for mark in verdict_marks(parts, row))
     if kind in ("met", "missed"):
         expected = filled([under["text"]], under, row, parts, hosts,
-                          "the sentence under the table", {"verdict": kind})[0]
+                          "the sentence under the table", {"verdict": kind + marks})[0]
         if sentence != expected:
             raise TargetError(f"the sentence under the table reads {sentence!r}, and its row is "
                               f"{kind}: {expected!r}")
         return
     for word in ("met", "missed"):
         if sentence == filled([under["text"]], under, row, parts, hosts,
-                              "the sentence under the table", {"verdict": word})[0]:
+                              "the sentence under the table", {"verdict": word + marks})[0]:
             raise TargetError(f"the sentence under the table says {word}, and its row is {kind}")
 
 
@@ -1505,7 +1982,7 @@ def headline_cells(entry, rows, root, hosts):
     _, parts = shown_parts(entry, row, root)
     bar, measured = filled([entry["bar"], entry["measured"]], entry, row, parts, hosts,
                            "its bar and measured")
-    return (entry["what"], f"{bar} ({entry['source']})", measured, verdict_of(parts)), parts
+    return (entry["what"], f"{bar} ({entry['source']})", measured, verdict_of(parts, row)), parts
 
 
 def render_headline(definitions_path, root):
@@ -1861,7 +2338,8 @@ def claim_problem(claim, definitions, root):
             if unknown:
                 raise TargetError(f"pitch: no part {unknown} in {spec['id']} on {spec['host']}")
             parts = [part for part in parts if part[0] in spec["parts"]]
-        verdict = verdict_of(parts)
+        # A claim takes each part's less favourable outcome, worked out here from both runs.
+        verdict = core_verdict([(part[0], part[1], counted(part), *part[3:]) for part in parts])
         return None if verdict == spec["verdict"] else \
             f"{spec['id']} on {spec['host']} is {verdict}, not {spec['verdict']}"
     path = target_file(root, claim["file"])
@@ -1889,6 +2367,56 @@ def claim_problem(claim, definitions, root):
                         return f"{query} {kind}: {fastest} has the lowest {field}"
         return None
     raise TargetError(f"pitch: the claim {claim.get('text', 'condition')!r} names no condition")
+
+
+# A sentence that says one system writes faster than another: a word for a write, and after a
+# word for faster, the other system's name.
+WRITE_WORDS = re.compile(r"\b(?:writes?|wrote|written|writing|ingest(?:s|ed|ing)?|loads?|loaded|"
+                         r"loading)\b", re.IGNORECASE)
+FASTER_WORDS = re.compile(r"\b(?:faster|quicker|sooner|fastest|quickest|no slower|not slower|"
+                          r"less time|outpac(?:e|es|ed|ing)|outruns?|beats?|beating|ahead of)\b",
+                          re.IGNORECASE)
+
+
+def disk_read_writers(root):
+    """Each other system whose headline write, in a four-system comparison file of the tree,
+    read its input from disk inside its clock, by its record: its input not wholly resident
+    when the clock started. Where is that write, by name, for the reason."""
+    found = {}
+    for path in sorted((Path(root) / "results" / "compare").glob("*.json")):
+        document = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(document.get("systems"), dict) or is_alone(document):
+            continue
+        for system in ordered_systems(document):
+            if system == "tickstore":
+                continue
+            variant, entry = headline(document, system)
+            for class_name, result in sorted(entry.get("classes", {}).items()):
+                start = ((result.get("write") or {}).get("detail") or {}).get(
+                    "input_at_clock_start") or {}
+                if "pages" in start and start["resident_pages"] < start["pages"]:
+                    found.setdefault(SYSTEM_LABEL[system],
+                                     f"`{path.name}`, `{variant}` class {class_name}")
+    return found
+
+
+def faster_write_problem(texts, writers):
+    """Why one of the texts says tick-store writes faster than a system on a clock that holds
+    that system's disk reads, or None: no generated sentence on any page may, since tick-store's
+    input is in memory before its clock starts and the other's is read inside it."""
+    for text in texts:
+        for sentence in re.split(r"(?<=[.;!?])\s+|\s+\|\s+|\n", text):
+            if not WRITE_WORDS.search(sentence):
+                continue
+            for found in FASTER_WORDS.finditer(sentence):
+                after = sentence[found.end():]
+                for label, where in writers.items():
+                    if re.search(rf"\b{re.escape(label)}\b", after):
+                        return (f"the sentence {sentence.strip()!r} says a write is "
+                                f"{found.group(0)!r} than {label}'s, whose clock holds its "
+                                f"disk reads ({where}: its input was not resident when the "
+                                "clock started); say what each clock holds instead")
+    return None
 
 
 def block_of(text, begin=BEGIN, end=END):
@@ -2012,6 +2540,13 @@ def main(argv=None):
             check_pitch(args.targets, args.targets_root, readme)
         if headline:
             check_screen(args.targets, readme, headline[0][2])
+        disturbance_entries(args.targets_root)
+        pages = [line for _, _, lines in blocks + headline for line in lines]
+        if readme is not None:
+            pages.append(readme.split(HEADLINE_BEGIN)[0])
+        problem = faster_write_problem(pages, disk_read_writers(args.targets_root))
+        if problem:
+            raise TargetError(problem)
     except (OSError, json.JSONDecodeError, TargetError) as error:
         print(f"render_results: targets: {error}", file=sys.stderr)
         return EXIT_USAGE

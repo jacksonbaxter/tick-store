@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1441,7 +1441,7 @@
+             figure = replaced_figure(read, notes_of(part).get("replaced"), row or {})
+             if figure is not None:
+                 text += f", where the replaced run's {figure[0]} is {shown(figure[1], row or {})}"
+-            held.setdefault(text, []).append(part[0])
++            pass
+     for text, labels in held.items():
+         who = "every part" if len(labels) == len(parts) > 1 else \
+             ", ".join(f"({label})" for label in labels)

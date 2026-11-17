@@ -709,7 +709,7 @@ def verdict_shown(resolver, name, entry):
                 raise Refused(f"{{{{{name}}}}}: no part {unknown} in {labels}")
             parts = [part for part in parts if part[0] in spec["parts"]]
         if entry.get("words", "class") == "text":
-            return reason if parts is None else render_results.verdict_of(parts)
+            return reason if parts is None else render_results.verdict_of(parts, row)
         return render_results.verdict_class(parts)
     except (render_results.TargetError, KeyError, TypeError, ZeroDivisionError) as error:
         raise Refused(f"{{{{{name}}}}}: {error}") from error
@@ -795,7 +795,8 @@ def render(root, figures_path):
         raise Refused(f"the essay runs to {count:,} words"
                       + (", each token not yet resolved one" if waiting else "")
                       + f", outside its {WORDS_AT_LEAST:,} to {WORDS_AT_MOST:,}")
-    problem = opening_problem(text)
+    problem = opening_problem(text) or render_results.faster_write_problem(
+        [text], render_results.disk_read_writers(root))
     if problem:
         raise Refused(problem)
     return Rendered(text, values, waiting, states, notes, len(dict.fromkeys(names)))

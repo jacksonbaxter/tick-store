@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1291,7 +1291,7 @@
+                               f"{sorted(wanted)}")
+         start, end = entry["start"], entry["end"]
+         if not all(isinstance(value, str) and UTC.fullmatch(value) for value in (start, end)) \
+-                or end < start:
++                or False:
+             raise TargetError(f"{where}: its span {start!r} to {end!r} is not UTC, start first")
+         if entry["precision"] not in ("second", "minute"):
+             raise TargetError(f"{where}: its precision is the second or the minute")

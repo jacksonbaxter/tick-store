@@ -11,6 +11,7 @@ either file by hand and require --check to call the table stale.
 import hashlib
 import importlib.util
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -2015,6 +2016,261 @@ class RenderCompareTest(Scratch):
         result = self.render()
         self.assertEqual(result.returncode, 2)
         self.assertIn("comparison markers are not in", result.stderr)
+
+
+FREEZE = "ede0176b10bb49e505226285530d0b91a33b4f34"
+B_WRITE = ["classes", "B", "write"]
+
+
+def b_write(system):
+    return ["systems", system, "variants", "@headline", *B_WRITE]
+
+
+# A class B write against ArcticDB on both clocks, read from the comparison files, as WT-4.
+CHANGE_ROW = {"id": "T-11", "host": "Linux", "target_text": "class B write no slower",
+              "digits": 1, "unit": " s",
+              "parts": [{"label": "against ArcticDB", "file": "results/compare/Linux-day-*.json",
+                         "all": [{"label": "total",
+                                  "value": {"path": [*b_write("tickstore"), "seconds_median"]},
+                                  "at_most": {"path": [*b_write("arcticdb"), "seconds_median"]}},
+                                 {"label": "engine-only",
+                                  "value": {"engine_only": b_write("tickstore")},
+                                  "at_most": {"engine_only": b_write("arcticdb")}}]}]}
+
+
+def recorded_write(seconds, python, resident=None, pages=10, device=None, what=None):
+    """A class B write, with the record of its input at the clock's start when resident is
+    given, as the harness writes it from 1d104da."""
+    write = {"repetitions": 1, "seconds_median": seconds, "python_seconds": python,
+             "times": {"engine_only_seconds": f"the total less python_seconds, {what or 'its call'}"},
+             "detail": {}}
+    if resident is not None:
+        ready = {"what": "nothing: the input is taken as the cache holds it"} \
+            if resident < pages else {"pages": pages, "resident_pages": pages, "warms": 1}
+        write["detail"]["input_at_clock_start"] = {"files": [what or "input"], "pages": pages,
+                                                   "resident_pages": resident,
+                                                   "made_ready": ready}
+        write["detail"]["device_read"] = {"bytes": device or 0, "counter": "machine-wide"}
+    return write
+
+
+def change_document(ours, theirs, commit=FREEZE):
+    def system(write):
+        return {"headline_variant": "h", "variants": {"h": {"classes": {"B": {"write": write}}}}}
+    return {"header": {"host": "Linux", "commit": commit},
+            "systems": {"tickstore": system(ours), "arcticdb": system(theirs)}}
+
+
+LOGIN = {"start": "2026-11-15T03:22:00Z", "end": "2026-11-15T03:23:00Z", "precision": "minute",
+         "what": "a remote login by this project", "document": f"compare/Linux-day-{FREEZE[:12]}.json",
+         "phase": "write", "system": "tickstore", "variant": "h", "class": "B", "repetition": 1,
+         "timed": True}
+
+
+def disturbances(*entries, **changes):
+    return {"schema": "tick-store disturbances 1", "commit": FREEZE,
+            "how": "from the host's logs", "not_listed": [{"what": "short runs", "why": "brief"}],
+            "entries": list(entries) or [LOGIN], **changes}
+
+
+class ReplacedRunTest(Scratch):
+    """Group 3, rulings 1, 2 and 4: a comparison verdict the new figures change shows both runs'
+    figures and outcomes, counts and claims take the less favourable, a write against another
+    system says whose input was where, and a disturbed phase is named beside the verdict."""
+
+    def setUp(self):
+        super().setUp()
+        self.compare_dir = self.tree / "results" / "compare"
+        (self.compare_dir / "replaced").mkdir(parents=True)
+        (self.tree / "scripts").mkdir()
+        self.new = self.compare_dir / f"Linux-day-{FREEZE[:12]}.json"
+        self.old = self.compare_dir / "replaced" / "Linux-day-67ae574f5666.json"
+
+    def write(self, new, old=None, pin=True):
+        self.new.write_text(json.dumps(new), encoding="utf-8")
+        pins = {}
+        if old is not None:
+            self.old.write_text(json.dumps(old), encoding="utf-8")
+            if pin:
+                pins = {"replaced_comparison_files": {self.old.name: hashlib.sha256(
+                    self.old.read_bytes()).hexdigest()}}
+        (self.tree / "scripts" / "data_pins.json").write_text(json.dumps(pins), encoding="utf-8")
+
+    def parts(self, row=CHANGE_ROW):
+        parts, _ = RENDER.judged_parts(row, self.tree)
+        return parts
+
+    def favourable_change(self):
+        # Met on this run, ArcticDB's write slower on both clocks; missed on the replaced run.
+        self.write(change_document(recorded_write(190.0, 0.4, 10, 10, 2, "itch"),
+                                   recorded_write(381.0, 90.0, 1, 10, 9, "cols")),
+                   change_document((lambda w: w)(recorded_write(189.0, 0.4)),
+                                   recorded_write(124.0, 81.0), commit="67ae574f5666"))
+
+    def test_with_no_replaced_file_the_verdict_is_this_runs_alone(self):
+        self.write(change_document(recorded_write(190.0, 0.4), recorded_write(381.0, 90.0)))
+        parts = self.parts()
+        self.assertIs(parts[0][2], True)
+        self.assertNotIn("change", RENDER.notes_of(parts[0]))
+        self.assertEqual(RENDER.core_verdict(parts), "met")
+        self.assertNotIn("replaced", RENDER.verdict_of(parts, CHANGE_ROW))
+
+    def test_a_changed_outcome_shows_both_and_counts_the_less_favourable(self):
+        self.favourable_change()
+        parts = self.parts()
+        self.assertIs(parts[0][2], False)
+        self.assertIs(RENDER.counted(parts[0]), False)
+        self.assertIn("total 190.0 s against 381.0 s, engine-only 189.6 s against 291.0 s, and on "
+                      "the replaced run, `results/compare/replaced/Linux-day-67ae574f5666.json`, "
+                      "total 189.0 s against 124.0 s, engine-only 188.6 s against 43.0 s",
+                      parts[0][1])
+        verdict = RENDER.verdict_of(parts, CHANGE_ROW)
+        self.assertTrue(verdict.startswith("missed; (against ArcticDB) met on this run's figures, "
+                                           "a change that favours tick-store, and missed on the "
+                                           "replaced run's, so counted missed"), verdict)
+        self.assertEqual(RENDER.verdict_class(parts), "missed")
+        self.assertIn("replaced/Linux-day-67ae574f5666.json", RENDER.files_of(parts, self.tree))
+
+    def test_an_unfavourable_change_is_shown_and_not_marked_as_favouring(self):
+        self.write(change_document(recorded_write(190.0, 0.4), recorded_write(150.0, 90.0)),
+                   change_document(recorded_write(189.0, 0.4), recorded_write(381.0, 90.0),
+                                   commit="67ae574f5666"))
+        parts = self.parts()
+        verdict = RENDER.verdict_of(parts, CHANGE_ROW)
+        self.assertIn("(against ArcticDB) missed on this run's figures and met on the replaced "
+                      "run's, so counted missed", verdict)
+        self.assertNotIn("favours", verdict)
+
+    def test_an_older_file_is_judged_on_the_clock_it_keeps_and_says_so(self):
+        self.write(change_document(recorded_write(190.0, 0.4), recorded_write(381.0, 90.0)),
+                   change_document(recorded_write(189.0, 0.4),
+                                   {"repetitions": 3, "seconds_median": 124.0},
+                                   commit="67ae574f5666"))
+        parts = self.parts()
+        self.assertIn("judged on total alone, as it keeps no engine-only seconds", parts[0][1])
+        self.assertIs(parts[0][2], False)
+
+    def test_a_replaced_file_must_be_pinned_by_its_bytes(self):
+        self.favourable_change()
+        self.write(json.loads(self.new.read_text()), json.loads(self.old.read_text()), pin=False)
+        with self.assertRaisesRegex(RENDER.TargetError, "not pinned by its SHA-256 under "
+                                                        "replaced_comparison_files"):
+            self.parts()
+
+    def test_counts_and_claims_take_the_less_favourable_worked_out_from_both(self):
+        self.favourable_change()
+        parts = self.parts()
+        definitions = {"rows": [CHANGE_ROW]}
+        claim = {"target": {"id": "T-11", "host": "Linux", "verdict": "met"}}
+        self.assertIn("is missed, not met",
+                      RENDER.claim_problem(claim, definitions, self.tree) or "")
+        # The check's count is its own: a part whose writer kept the favourable outcome still
+        # counts as the less favourable.
+        written = (*parts[0][:2], True, *parts[0][3:])
+        self.assertIs(RENDER.counted(written), False)
+        self.assertEqual(RENDER.class_of([RENDER.counted(written)]), "missed")
+
+    def test_a_write_says_whose_input_was_where_from_its_record(self):
+        self.favourable_change()
+        text = RENDER.verdict_text(CHANGE_ROW, self.parts())
+        for words in ("tick-store's input, `itch`, is in memory before the clock starts: 10 of "
+                      "its 10 pages resident at the clock's start, made resident by 1 warm, and 2 "
+                      "B read from the device inside the clock, machine-wide",
+                      "ArcticDB's input, `cols`, is read from disk inside the clock: 1 of its 10 "
+                      "pages resident at the clock's start, made ready by nothing: the input is "
+                      "taken as the cache holds it, and 9 B read from the device inside the clock",
+                      "Engine-only, by each write's record: for tick-store, the total less "
+                      "python_seconds, itch; for ArcticDB, the total less python_seconds, cols",
+                      "Engine-only does not remove the difference in where the inputs are",
+                      "ArcticDB's engine-only went from 43.0 s on the replaced run to 291.0 s"):
+            self.assertIn(words, text)
+
+    def test_a_write_whose_record_keeps_no_residency_says_so(self):
+        self.write(change_document(recorded_write(190.0, 0.4), recorded_write(381.0, 90.0)))
+        text = RENDER.verdict_text(CHANGE_ROW, self.parts())
+        self.assertIn("the records of tick-store and ArcticDB keep no residency or device-read "
+                      "figure", text)
+        self.assertNotIn("does not remove", text)
+
+    def test_a_disturbed_timed_phase_is_named_with_the_replaced_figure(self):
+        self.favourable_change()
+        (self.tree / "results" / f"disturbances-{FREEZE[:12]}.json").write_text(
+            json.dumps(disturbances()), encoding="utf-8")
+        verdict = RENDER.verdict_of(self.parts(), CHANGE_ROW)
+        self.assertIn("(against ArcticDB) rests on tick-store's `h` class B write 1, which held a "
+                      "remote login by this project, 2026-11-15 03:22 UTC, to the minute, where "
+                      "the replaced run's total is 189.0 s", verdict)
+
+    def test_an_untimed_phase_or_another_variant_is_not_named(self):
+        self.favourable_change()
+        read_back = {key: value for key, value in LOGIN.items() if key != "repetition"}
+        document = change_document(recorded_write(190.0, 0.4, 10, 10, 2, "itch"),
+                                   recorded_write(381.0, 90.0, 1, 10, 9, "cols"))
+        document["systems"]["tickstore"]["variants"]["other"] = \
+            document["systems"]["tickstore"]["variants"]["h"]
+        self.new.write_text(json.dumps(document), encoding="utf-8")
+        (self.tree / "results" / f"disturbances-{FREEZE[:12]}.json").write_text(json.dumps(
+            disturbances(dict(read_back, phase="read back", timed=False),
+                         dict(LOGIN, variant="other"))), encoding="utf-8")
+        self.assertNotIn("rests on", RENDER.verdict_of(self.parts(), CHANGE_ROW))
+
+    def test_a_disturbance_file_is_refused_unless_whole(self):
+        self.favourable_change()
+        path = self.tree / "results" / f"disturbances-{FREEZE[:12]}.json"
+        no_repetition = {key: value for key, value in LOGIN.items() if key != "repetition"}
+        cases = {
+            "not a 'tick-store disturbances 1' file": disturbances(schema="other"),
+            "is not a full commit its name gives": disturbances(commit="0" * 40),
+            "says nothing of how": disturbances(how=" "),
+            "gives what it was and why": disturbances(not_listed=[{"what": "x"}]),
+            "lists no disturbance": disturbances(entries=[]),
+            "no phase 'idle'": disturbances(dict(LOGIN, phase="idle")),
+            "a write entry gives": disturbances(no_repetition),
+            "is not UTC, start first": disturbances(dict(LOGIN, end="2026-11-15T03:21:00Z")),
+            "spans whole minutes": disturbances(dict(LOGIN, start="2026-11-15T03:22:30Z")),
+            "with no figure, what it was": disturbances(dict(LOGIN, what="login 2")),
+            "a write phase is timed": disturbances(dict(LOGIN, timed=False)),
+            "no results file": disturbances(dict(LOGIN, document="compare/missing.json")),
+            "has no 'other'": disturbances(dict(LOGIN, variant="other")),
+            "has no 'repetition 2'": disturbances(dict(LOGIN, repetition=2)),
+        }
+        for words, document in cases.items():
+            with self.subTest(words=words):
+                path.write_text(json.dumps(document), encoding="utf-8")
+                with self.assertRaisesRegex(RENDER.TargetError, re.escape(words)):
+                    RENDER.disturbance_entries(self.tree)
+        self.new.write_text(json.dumps(change_document(
+            recorded_write(1.0, 0.1), recorded_write(2.0, 0.1), commit="67ae574f5666")))
+        path.write_text(json.dumps(disturbances()), encoding="utf-8")
+        with self.assertRaisesRegex(RENDER.TargetError, "was not measured at ede0176b10bb"):
+            RENDER.disturbance_entries(self.tree)
+
+    def test_a_sentence_saying_a_write_is_faster_than_a_disk_read_clock_is_refused(self):
+        writers = {"ArcticDB": "`day.json`, `h` class B"}
+        for sentence in ("tick-store writes the day faster than ArcticDB.",
+                         "Its flushed ingest beats ArcticDB by half.",
+                         "| Ingest | the flushed write, no slower than ArcticDB | met |"):
+            with self.subTest(sentence=sentence):
+                self.assertIn("whose clock holds its disk reads",
+                              RENDER.faster_write_problem([sentence], writers) or "")
+        for sentence in ("tick-store writes the day faster than Parquet.",
+                         "ArcticDB answers faster than tick-store.",
+                         "tick-store's write is slower than ArcticDB's."):
+            with self.subTest(sentence=sentence):
+                self.assertIsNone(RENDER.faster_write_problem([sentence], writers))
+
+    def test_a_system_whose_input_was_not_resident_is_one_whose_clock_holds_its_reads(self):
+        self.favourable_change()
+        self.assertEqual(RENDER.disk_read_writers(self.tree),
+                         {"ArcticDB": f"`{self.new.name}`, `h` class B"})
+
+    def test_the_render_refuses_a_page_saying_so(self):
+        self.favourable_change()
+        self.readme.write_text("# Title\n\nIt writes the day faster than ArcticDB.\n",
+                               encoding="utf-8")
+        result = self.render()
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("says a write is 'faster' than ArcticDB's", result.stderr)
 
 
 if __name__ == "__main__":

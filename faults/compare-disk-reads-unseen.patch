@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -2394,7 +2394,7 @@
+             for class_name, result in sorted(entry.get("classes", {}).items()):
+                 start = ((result.get("write") or {}).get("detail") or {}).get(
+                     "input_at_clock_start") or {}
+-                if "pages" in start and start["resident_pages"] < start["pages"]:
++                if False:
+                     found.setdefault(SYSTEM_LABEL[system],
+                                      f"`{path.name}`, `{variant}` class {class_name}")
+     return found

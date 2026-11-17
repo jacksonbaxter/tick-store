@@ -192,6 +192,19 @@ class Renders(Tree):
 
 
 class Refuses(Tree):
+    def test_a_sentence_saying_a_write_is_faster_than_a_disk_read_clock(self):
+        # Group 3, ruling 3: ArcticDB's input was not resident when its write's clock started,
+        # so no sentence of the page may say tick-store writes faster than it.
+        start = {"files": ["cols"], "pages": 10, "resident_pages": 1,
+                 "made_ready": {"what": "nothing"}}
+        system = {"headline_variant": "h", "variants": {"h": {"classes": {"B": {"write": {
+            "detail": {"input_at_clock_start": start}}}}}}}
+        self.write("results/compare/Linux-day-fedcba987654.json", json.dumps(
+            {"header": {"host": "Linux"}, "systems": {"tickstore": {}, "arcticdb": system}}))
+        self.edit("docs/writeup/WRITEUP.template.md", "## Method",
+                  "It writes the day faster than ArcticDB.\n\n## Method")
+        self.refused("says a write is 'faster' than ArcticDB's, whose clock holds its disk reads")
+
     def test_an_unknown_token(self):
         self.edit("docs/writeup/WRITEUP.template.md", "## Method", "{{nowhere}}\n\n## Method")
         self.refused("the template's {{nowhere}} is not in the figure list")

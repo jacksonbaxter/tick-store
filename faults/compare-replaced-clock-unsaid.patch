@@ -1,0 +1,13 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1157,8 +1157,7 @@
+             notes["replaced"] = (old_path, old_document)
+             if standing(old_met) != standing(met):
+                 notes["change"] = {"new": met, "old": old_met}
+-                clock = (f", judged on {' and '.join(labels)} alone, as it keeps no "
+-                         f"{' and no '.join(missing)}" if labels else "")
++                clock = ""
+                 text = (f"{text}, and on the replaced run, `{old_path.relative_to(root)}`"
+                         f"{clock}, {old_text}")
+                 met = min((met, old_met), key=standing)

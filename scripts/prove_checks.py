@@ -1476,6 +1476,84 @@ FAULTS = (
           "for two targets, or two parts, on one machine", CHECK_FAILED,
           "FAIL: test_a_plain_name_is_whole_and_one_parts_on_a_machine "
           "(__main__.RenderHeadlineTest"),
+    Fault("compare-replaced-favourable-counted", "py-scripts", "render_results.py counting the "
+          "favourable of a part's outcome on this run and on the replaced run", CHECK_FAILED,
+          "FAIL: test_a_changed_outcome_shows_both_and_counts_the_less_favourable "
+          "(__main__.ReplacedRunTest"),
+    Fault("compare-replaced-figures-hidden", "py-scripts", "render_results.py showing this run's "
+          "figures alone for a part whose outcome the replaced run's figures change", CHECK_FAILED,
+          "FAIL: test_a_changed_outcome_shows_both_and_counts_the_less_favourable "
+          "(__main__.ReplacedRunTest"),
+    Fault("compare-replaced-unpinned-accepted", "py-scripts", "render_results.py reading a "
+          "replaced comparison file that no pin holds to its bytes", CHECK_FAILED,
+          "FAIL: test_a_replaced_file_must_be_pinned_by_its_bytes "
+          "(__main__.ReplacedRunTest"),
+    Fault("compare-replaced-change-unmarked", "py-scripts", "render_results.py giving a changed "
+          "part's counted verdict with no word beside it of both outcomes and the one that "
+          "favours tick-store", CHECK_FAILED,
+          "FAIL: test_a_changed_outcome_shows_both_and_counts_the_less_favourable "
+          "(__main__.ReplacedRunTest"),
+    Fault("compare-replaced-clock-unsaid", "py-scripts", "render_results.py judging a replaced "
+          "file on the clock it keeps without saying which", CHECK_FAILED,
+          "FAIL: test_an_older_file_is_judged_on_the_clock_it_keeps_and_says_so "
+          "(__main__.ReplacedRunTest"),
+    Fault("compare-counted-trusts-the-writer", "py-scripts", "render_results.py's checks taking "
+          "the writer's verdict for a part's counted outcome instead of the less favourable of "
+          "both runs", CHECK_FAILED,
+          "FAIL: test_counts_and_claims_take_the_less_favourable_worked_out_from_both "
+          "(__main__.ReplacedRunTest"),
+    Fault("compare-claim-takes-this-run", "py-scripts", "render_results.py judging a pitch claim "
+          "on this run's outcome where the replaced run's is less favourable", CHECK_FAILED,
+          "FAIL: test_counts_and_claims_take_the_less_favourable_worked_out_from_both "
+          "(__main__.ReplacedRunTest"),
+    Fault("compare-disturbance-unmarked", "py-scripts", "render_results.py giving a verdict that "
+          "rests on a disturbed timed phase with nothing beside it", CHECK_FAILED,
+          "FAIL: test_a_disturbed_timed_phase_is_named_with_the_replaced_figure "
+          "(__main__.ReplacedRunTest"),
+    Fault("compare-disturbance-variant-ignored", "py-scripts", "render_results.py naming a "
+          "disturbance of another variant beside a verdict", CHECK_FAILED,
+          "FAIL: test_an_untimed_phase_or_another_variant_is_not_named "
+          "(__main__.ReplacedRunTest"),
+    Fault("compare-disturbance-commit-unchecked", "py-scripts", "render_results.py taking a "
+          "disturbance file whose entry falls in a document measured at another commit", CHECK_FAILED,
+          "FAIL: test_a_disturbance_file_is_refused_unless_whole "
+          "(__main__.ReplacedRunTest"),
+    Fault("compare-disturbance-timed-unchecked", "py-scripts", "render_results.py taking a "
+          "disturbance entry that calls a timed phase untimed", CHECK_FAILED,
+          "FAIL: test_a_disturbance_file_is_refused_unless_whole "
+          "(__main__.ReplacedRunTest"),
+    Fault("compare-disturbance-span-unchecked", "py-scripts", "render_results.py taking a "
+          "disturbance entry that ends before it starts", CHECK_FAILED,
+          "FAIL: test_a_disturbance_file_is_refused_unless_whole "
+          "(__main__.ReplacedRunTest"),
+    Fault("compare-write-inputs-dropped", "py-scripts", "render_results.py giving a write verdict "
+          "against other systems with no word of whose input was where", CHECK_FAILED,
+          "FAIL: test_a_write_says_whose_input_was_where_from_its_record "
+          "(__main__.ReplacedRunTest"),
+    Fault("compare-write-asymmetry-unsaid", "py-scripts", "render_results.py saying where each "
+          "write's input was and not that engine-only leaves the difference in", CHECK_FAILED,
+          "FAIL: test_a_write_says_whose_input_was_where_from_its_record "
+          "(__main__.ReplacedRunTest"),
+    Fault("compare-faster-write-accepted", "py-scripts", "render_results.py letting a sentence "
+          "say tick-store writes faster than a system whose clock holds its disk reads", CHECK_FAILED,
+          "FAIL: test_a_sentence_saying_a_write_is_faster_than_a_disk_read_clock_is_refused "
+          "(__main__.ReplacedRunTest"),
+    Fault("compare-faster-write-readme-unread", "py-scripts", "render_results.py reading every "
+          "generated page for a faster write and not the README's pitch", CHECK_FAILED,
+          "FAIL: test_the_render_refuses_a_page_saying_so "
+          "(__main__.ReplacedRunTest"),
+    Fault("compare-disk-reads-unseen", "py-scripts", "render_results.py finding no system whose "
+          "write read its input from disk inside the clock", CHECK_FAILED,
+          "FAIL: test_a_system_whose_input_was_not_resident_is_one_whose_clock_holds_its_reads "
+          "(__main__.ReplacedRunTest"),
+    Fault("writeup-faster-write-unchecked", "py-scripts", "render_writeup.py rendering an essay "
+          "that says tick-store writes faster than a system whose clock holds its disk reads", CHECK_FAILED,
+          "FAIL: test_a_sentence_saying_a_write_is_faster_than_a_disk_read_clock "
+          "(__main__.Refuses"),
+    Fault("ties-disturbances-no-kind", "py-scripts", "check_ties.py with no kind for the "
+          "disturbance file", CHECK_FAILED,
+          "FAIL: test_a_disturbance_file_and_a_replaced_comparison_file_have_kinds "
+          "(__main__.Repository"),
     Fault("headline-fuzz-row-names-its-id", "render-check", "the fuzz target added to the "
           "headline's table, whose verdict cell, written from the results, names its id",
           EXIT_RENDER_REFUSED, "the README's first screen names 'G-3'", show_the_fuzz_row),

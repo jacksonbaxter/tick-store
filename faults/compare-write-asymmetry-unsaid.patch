@@ -1,0 +1,13 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -962,8 +962,7 @@
+     text = (f"inputs of the class {class_name} writes, from each write's record: "
+             + "; ".join(pieces) + ". Engine-only, by each write's record: "
+             + (held or "the total less python_seconds"))
+-    if len({found[0] for found in inputs.values() if found}) < 2:
+-        return text
++    return text
+     text += (". Engine-only does not remove the difference in where the inputs are: the device "
+              "bytes are counted over the whole clock, so engine-only may hold them as well")
+     replaced = next((notes_of(part)["replaced"] for part in parts

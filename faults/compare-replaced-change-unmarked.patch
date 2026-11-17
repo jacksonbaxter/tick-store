@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1427,7 +1427,7 @@
+     marks = []
+     for part in parts:
+         change = notes_of(part).get("change")
+-        if change:
++        if False:
+             favours = ", a change that favours tick-store," if \
+                 standing(change["new"]) > standing(change["old"]) else ""
+             marks.append(f"({part[0]}) {verdict_word(change['new'])} on this run's figures"

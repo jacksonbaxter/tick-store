@@ -1,0 +1,12 @@
+diff --git a/scripts/check_ties.py b/scripts/check_ties.py
+--- a/scripts/check_ties.py
++++ b/scripts/check_ties.py
+@@ -262,7 +262,7 @@
+          pin=(check_fuzz.PRE_TIE_PINS, (check_fuzz.PRE_TIE_FILE,))),
+     # The record of what else ran on the host during a campaign's timed steps: made by hand
+     # from the host's logs and the project's session records, so no code makes its entries.
+-    Kind("disturbances", ("disturbances-*.json",),
++    Kind("disturbances", ("no-such-file",),
+          measured=(),
+          left_out=(("the host's window log, its backup job's log and this project's session "
+                     "records", "the list is made by hand from them after the campaign; nothing "

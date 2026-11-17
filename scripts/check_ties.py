@@ -260,6 +260,15 @@ KINDS = (
          left_out=(("scripts/check.sh", "check_fuzz.py's reason: its fuzz steps read "
                     "fuzz/launch.txt"), VALIDATORS, RENDER, PROSE),
          pin=(check_fuzz.PRE_TIE_PINS, (check_fuzz.PRE_TIE_FILE,))),
+    # The record of what else ran on the host during a campaign's timed steps: made by hand
+    # from the host's logs and the project's session records, so no code makes its entries.
+    Kind("disturbances", ("disturbances-*.json",),
+         measured=(),
+         left_out=(("the host's window log, its backup job's log and this project's session "
+                    "records", "the list is made by hand from them after the campaign; nothing "
+                    "in the tree writes or measures it, and render_results.py checks its shape "
+                    "and that every document it places an entry in was measured at its commit"),
+                   RENDER, PROSE)),
     # prove_checks.py keys its proofs by the last commit that changed anything outside
     # NOT_CODE, and each fault's fingerprint holds what of NOT_CODE made its verdict.
     Kind("proofs", ("check-proofs.json",),

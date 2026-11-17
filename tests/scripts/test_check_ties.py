@@ -547,6 +547,16 @@ class Repository(unittest.TestCase):
                 self.assertTrue(check_ties.commits_named(
                     json.loads(path.read_text(encoding="utf-8"))))
 
+    def test_a_disturbance_file_and_a_replaced_comparison_file_have_kinds(self):
+        # Group 3: the record of what else ran is its own kind, measuring no code, and a
+        # comparison file a later run replaced, kept under compare/replaced/, is a comparison
+        # file, so its protocol 1 pin still holds it.
+        kind = check_ties.kind_of("disturbances-ede0176b10bb.json")
+        self.assertEqual(getattr(kind, "name", None), "disturbances")
+        self.assertEqual(getattr(kind, "measured", None), ())
+        self.assertEqual(check_ties.kind_of(
+            "compare/replaced/Linux-12302019-full-67ae574f5666.json").name, "compare")
+
     def test_the_table_has_a_reason_for_every_path(self):
         for kind in check_ties.KINDS:
             for path, why in (*kind.measured, *kind.assembled, *kind.excluded, *kind.left_out):
