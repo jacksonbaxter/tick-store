@@ -1,0 +1,12 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1293,7 +1293,7 @@
+     give."""
+     page = [(PAGE_PATH.as_posix(), text)]
+     problem = render_results.move_problem(page) or \
+-        render_results.keeps_problem(page, resolver.root)
++        None
+     if problem:
+         raise Refused(problem)
+ 

@@ -1057,9 +1057,59 @@ class Marks(Tree):
         self.assertIn("The day write is missed; (against ArcticDB) met on this run's figures, a "
                       "change that favours tick-store, and missed on the replaced run's, so "
                       "counted as missed in every count, ranking and first screen on these "
-                      "pages; inputs of the class B writes, from each write's record: "
-                      "tick-store's input, `input`, is in memory before the clock starts", page)
-        self.assertIn("ArcticDB's input, `input`, is read from disk inside the clock", page)
+                      "pages; inputs not alike, by each write's record: tick-store's input is in "
+                      "memory before the clock starts, with 0 B read from the device inside the "
+                      "clock; ArcticDB's is read from disk inside it", page)
+        # The input clause stands for the long note; the moves and the replaced record's
+        # sentence are the targets table's, linked, not carried.
+        self.assertNotIn("from each write's record: tick-store's input, `input`", page)
+
+    def phase_mark(self):
+        """A disturbed phase's mark, in full and short, on every part of the row."""
+        own = RENDER.render_results.phase_mark_pairs
+        self.addCleanup(setattr, RENDER.render_results, "phase_mark_pairs", own)
+        RENDER.render_results.phase_mark_pairs = lambda parts, row=None, labelled=True: [
+            ("every part rests on tick-store's write, which held a remote login", "a login "
+             "during tick-store's write")][:parts[0][0] == "against ArcticDB"] + own(
+                 parts, row, labelled)
+
+    def test_a_phase_mark_is_given_in_its_short_form(self):
+        self.phase_mark()
+        page = RENDER.render(self.root).text
+        self.assertIn("so counted as missed in every count, ranking and first screen on these "
+                      "pages; a login during tick-store's write; inputs not alike", page)
+        self.assertNotIn("which held a remote login", page)
+
+    def test_a_phase_mark_in_neither_form_is_refused(self):
+        self.phase_mark()
+        own = RENDER.verdict_value
+        self.addCleanup(setattr, RENDER, "verdict_value", own)
+        RENDER.verdict_value = lambda resolver, name, entry, marks=True: own(
+            resolver, name, entry, marks).replace("; a login during tick-store's write", "")
+        with self.assertRaisesRegex(RENDER.Refused, r"\{\{verdict:t11\}\} drops a mark "
+                                                    r"RESULTS.md sets beside its verdict: "
+                                                    r".every part rests on tick-store's write"):
+            RENDER.render(self.root)
+
+    def test_a_move_between_the_runs_with_no_unknown_cause(self):
+        self.insert("Between the replaced run and the current run ArcticDB's write rose.")
+        self.refused("states a move between the replaced run and this one and does not say its "
+                     "cause was not measured and is not known")
+
+    def test_a_move_joined_to_a_cause(self):
+        self.insert("Between the replaced run and the current run ArcticDB's write rose, the cause of "
+                    "this move was not measured and is not known, as its input asymmetry shows.")
+        self.refused("joins a move between the runs to a cause with 'asymmetry'")
+
+    def test_a_move_said_as_the_results_pages_say_it(self):
+        self.insert("Between the replaced run and the current run ArcticDB's write rose; the cause of "
+                    "this move was not measured and is not known.")
+        self.renders()
+
+    def test_what_the_replaced_record_keeps_said_otherwise(self):
+        self.insert("The replaced run's record keeps every figure of the writes.")
+        self.refused("says what the replaced run's record keeps, and is not the sentence its "
+                     "fields give")
 
     def test_a_verdict_that_drops_a_mark_is_refused(self):
         own = RENDER.verdict_value

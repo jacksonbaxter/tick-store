@@ -194,11 +194,16 @@ commits, as `git diff` shows; that is not judged in a tree with no history. A fi
 through a kind that declares the pin, and each paragraph showing its figures says so. A word that
 compares, ranks or judges, or a number in words, must sit inside a claim of the list whose
 condition reads the figures its sentence prints, or be carried by a token; the Missed targets and
-Not judged sections hold exactly the rows of those verdicts; every verdict carries the marks RESULTS.md sets beside it, taken from render_results.py's own
-functions: an outcome the replaced run judges otherwise, a disturbed phase, and whose write
-input was where; a verdict the replaced run judges otherwise rests no claim; and
-render_results.py's rule that no sentence says tick-store writes faster than a system whose
-clock holds its disk reads holds on the essay as on the other pages. A figure read on one host must be
+Not judged sections hold exactly the rows of those verdicts; every verdict carries each mark RESULTS.md sets beside it, taken from render_results.py's own
+functions and held as its rule for a hand-written quote holds the other pages: an outcome the
+replaced run judges otherwise in full, a disturbed or swapped-in phase in full or in the short
+form the README's first screen uses, and, for a write against other systems, the clause saying
+whose input was in memory and whose was read from disk inside the clock, with the bytes read; a
+verdict the replaced run judges otherwise rests no claim; and render_results.py's rules that no
+sentence says tick-store writes faster than a system whose clock holds its disk reads, that a move
+between the replaced run and this one is said with its cause not measured and not known, and that
+what the replaced record keeps is said as its fields give it, hold on the essay as on the other
+pages. A figure read on one host must be
 described as that host's. The essay must run 2,500 to 4,000 words and open with one paragraph of
 three sentences, each holding a token. Until every file it reads is committed there is no
 `WRITEUP.md`, and the step is not judged, naming how many tokens and checks wait and on what, which

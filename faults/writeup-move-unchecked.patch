@@ -1,0 +1,12 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1292,7 +1292,7 @@
+     joins it to no cause, and a sentence on what the replaced record keeps is the one its fields
+     give."""
+     page = [(PAGE_PATH.as_posix(), text)]
+-    problem = render_results.move_problem(page) or \
++    problem = None or \
+         render_results.keeps_problem(page, resolver.root)
+     if problem:
+         raise Refused(problem)

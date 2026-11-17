@@ -1235,22 +1235,31 @@ def verdict_parts(resolver, name, entry):
 
 
 def marks_of(row, parts, name):
-    """What RESULTS.md sets beside the verdict, by render_results.py's own functions: each part
-    the replaced run judges otherwise, each disturbed phase with the replaced run's figure, and,
-    for a write against other systems, whose input was where."""
+    """Each mark RESULTS.md sets beside the verdict on these parts, as the forms a quote of it may
+    give, by render_results.py's own functions and its rule for a hand-written quote (row_marks,
+    quote_problem) on the token's parts: each part the replaced run judges otherwise, in full,
+    with both outcomes, which way the change leans and the outcome counted; each disturbed phase
+    and each swapped-in figure, in full or in the short form the README's first screen uses and
+    RESULTS.md explains; and, for a write against other systems whose inputs did not start alike,
+    the input clause, whose input was in memory before the clock and whose was read from disk
+    inside it, with the bytes read. Each is a tuple of forms, the shortest last."""
     if parts is None:
         return []
     try:
-        marks = render_results.verdict_marks(parts, row)
-        inputs = render_results.write_inputs(row, parts)
+        forms = [(mark,) for mark in render_results.change_marks(parts)]
+        forms += [tuple(pair) for pair in render_results.phase_mark_pairs(parts, row)]
+        classes = [render_results.notes_of(part)["write"] for part in parts
+                   if render_results.notes_of(part).get("write")]
+        clause = render_results.input_clause(parts[0][4], classes[0]) if classes else None
     except (render_results.TargetError, KeyError, TypeError) as error:
         raise Refused(f"{show(name)}: {error}") from error
-    return marks + ([inputs] if inputs else [])
+    return forms + ([(clause,)] if clause else [])
 
 
 def verdict_value(resolver, name, entry, marks=True):
     """A target's verdict, the Targets block's own: render_results.py judges the row on its
-    files, its verdict code names the parts the token takes, and its marks stand beside it."""
+    files, its verdict code names the parts the token takes, and its marks stand beside it, each
+    in its shortest form, once."""
     row, parts, reason = verdict_parts(resolver, name, entry)
     if entry.get("words", "class") == "text":
         word = reason if parts is None else render_results.core_verdict(parts)
@@ -1258,20 +1267,35 @@ def verdict_value(resolver, name, entry, marks=True):
         word = verdict_class_of(parts, {}, name)
     if not marks:
         return word
-    return word + "".join(f"; {mark}" for mark in marks_of(row, parts, name))
+    shown = dict.fromkeys(forms[-1] for forms in marks_of(row, parts, name))
+    return word + "".join(f"; {mark}" for mark in shown)
 
 
 def check_marks(resolver, values):
-    """Every verdict on the page carries each mark RESULTS.md gives it."""
+    """Every verdict on the page carries each mark RESULTS.md gives it, in one of the forms
+    marks_of allows: a changed outcome and the input clause word for word, a phase's mark in
+    full or in its short form, and no other."""
     for name, value in values.items():
         entry = resolver.entries.get(name, {})
         if "verdict" not in entry:
             continue
         row, parts, _ = verdict_parts(resolver, name, entry)
-        for mark in marks_of(row, parts, name):
-            if mark not in value:
+        for forms in marks_of(row, parts, name):
+            if not any(form in value for form in forms):
                 raise Refused(f"{show(name)} drops a mark RESULTS.md sets beside its verdict: "
-                              f"{mark[:100]!r}")
+                              f"{forms[0][:100]!r}")
+
+
+def moves_and_keeps(resolver, text):
+    """render_results.py's rules for every results page, on the essay: a sentence stating a move
+    between the replaced run and this one says its cause was not measured and is not known and
+    joins it to no cause, and a sentence on what the replaced record keeps is the one its fields
+    give."""
+    page = [(PAGE_PATH.as_posix(), text)]
+    problem = render_results.move_problem(page) or \
+        render_results.keeps_problem(page, resolver.root)
+    if problem:
+        raise Refused(problem)
 
 
 def prose(text):
@@ -1839,6 +1863,7 @@ def render(root):
     text = TOKEN.sub(lambda found: values.get(found.group(1), found.group(0)), body)
     text = text.rstrip("\n") + "\n\n" + MARKER + "\n"
     faster_write(resolver, prose(text))
+    moves_and_keeps(resolver, text)
     notes = sum(1 for comment in comments if CUT_NOTE in comment)
     count = word_count(text)
     if not WORDS_AT_LEAST <= count <= WORDS_AT_MOST:

@@ -2256,6 +2256,20 @@ FAULTS = (
     Fault("writeup-verdict-mark-unchecked", "py-scripts", "render_writeup.py lets a verdict "
           "that drops a mark RESULTS.md gives it through", CHECK_FAILED,
           "FAIL: test_a_verdict_that_drops_a_mark_is_refused (__main__.Marks"),
+    Fault("writeup-phase-mark-unchecked", "py-scripts", "render_writeup.py lets a verdict "
+          "that gives a disturbed or swapped-in phase's mark in neither its full nor its short "
+          "form through", CHECK_FAILED,
+          "FAIL: test_a_phase_mark_in_neither_form_is_refused (__main__.Marks"),
+    Fault("writeup-marks-in-full", "py-scripts", "render_writeup.py gives a phase's mark beside "
+          "an essay verdict in full where RESULTS.md defines a short form", CHECK_FAILED,
+          "FAIL: test_a_phase_mark_is_given_in_its_short_form (__main__.Marks"),
+    Fault("writeup-move-unchecked", "py-scripts", "render_writeup.py lets the essay state a move "
+          "between the replaced run and this one without saying its cause was not measured and "
+          "is not known", CHECK_FAILED,
+          "FAIL: test_a_move_between_the_runs_with_no_unknown_cause (__main__.Marks"),
+    Fault("writeup-keeps-unchecked", "py-scripts", "render_writeup.py lets the essay say what the "
+          "replaced run's record keeps other than as its fields give it", CHECK_FAILED,
+          "FAIL: test_what_the_replaced_record_keeps_said_otherwise (__main__.Marks"),
     Fault("writeup-claim-on-changed-outcome", "py-scripts", "render_writeup.py lets a claim "
           "rest on a verdict the replaced run judged otherwise", CHECK_FAILED,
           "FAIL: test_a_claim_that_rests_on_a_changed_outcome (__main__.Marks"),

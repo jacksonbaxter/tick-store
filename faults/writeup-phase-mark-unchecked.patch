@@ -1,0 +1,12 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1281,7 +1281,7 @@
+             continue
+         row, parts, _ = verdict_parts(resolver, name, entry)
+         for forms in marks_of(row, parts, name):
+-            if not any(form in value for form in forms):
++            if len(forms) == 1 and not any(form in value for form in forms):
+                 raise Refused(f"{show(name)} drops a mark RESULTS.md sets beside its verdict: "
+                               f"{forms[0][:100]!r}")
+ 

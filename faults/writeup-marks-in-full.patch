@@ -1,0 +1,12 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1267,7 +1267,7 @@
+         word = verdict_class_of(parts, {}, name)
+     if not marks:
+         return word
+-    shown = dict.fromkeys(forms[-1] for forms in marks_of(row, parts, name))
++    shown = dict.fromkeys(forms[0] for forms in marks_of(row, parts, name))
+     return word + "".join(f"; {mark}" for mark in shown)
+ 
+ 
