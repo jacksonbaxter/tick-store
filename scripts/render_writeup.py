@@ -974,7 +974,8 @@ def flagged(reads, context):
         system = read["system"]
         if isinstance(system, dict):
             system = evaluate(system, context)
-        variant = walk(document, ["systems", system, "headline_variant"])
+        # A read names its variant, or takes the system's headline one.
+        variant = read.get("variant") or walk(document, ["systems", system, "headline_variant"])
         if "write" in read:
             phases.append(("write", system, variant, read["write"]))
         else:

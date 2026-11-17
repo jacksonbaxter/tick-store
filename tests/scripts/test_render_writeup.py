@@ -1131,6 +1131,17 @@ class Marks(Tree):
             [{"system": "tickstore", "write": "B"},
              {"system": "arcticdb", "query": "Q1", "kind": "warm"}]))
 
+    def test_a_read_that_names_its_variant_reads_that_variant(self):
+        # Review P1-1: a figure from a setup other than the headline one, as ArcticDB's table
+        # per stock, takes its dagger from its own phase.
+        path = self.root / f"results/compare/Linux-day-{COMMIT[:12]}.json"
+        document = json.loads(path.read_text())
+        document["systems"]["arcticdb"]["variants"]["p"] = {"queries": {
+            "Q1": {"warm": {"swap_timed": {"flagged": False}}}}}
+        path.write_text(json.dumps(document))
+        self.assertIn("The phase is clean.", self.flag(
+            [{"system": "arcticdb", "variant": "p", "query": "Q1", "kind": "warm"}]))
+
     def test_a_phase_with_nothing_recorded_is_clean(self):
         self.assertIn("The phase is clean.", self.flag([{"system": "tickstore", "write": "B"}]))
 

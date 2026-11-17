@@ -1,0 +1,12 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -975,7 +975,7 @@
+         if isinstance(system, dict):
+             system = evaluate(system, context)
+         # A read names its variant, or takes the system's headline one.
+-        variant = read.get("variant") or walk(document, ["systems", system, "headline_variant"])
++        variant = walk(document, ["systems", system, "headline_variant"])
+         if "write" in read:
+             phases.append(("write", system, variant, read["write"]))
+         else:

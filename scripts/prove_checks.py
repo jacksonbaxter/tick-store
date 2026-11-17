@@ -2308,6 +2308,9 @@ FAULTS = (
           "another setup beats beside a setup mark, leaving the other parts met unnamed",
           CHECK_FAILED, "FAIL: test_every_part_met_is_named_beside_the_setup_mark "
           "(__main__.SetupMark"),
+    Fault("writeup-flag-variant-ignored", "py-scripts", "render_writeup.py reads a dagger's "
+          "phase in the headline setup when the read names another", CHECK_FAILED,
+          "FAIL: test_a_read_that_names_its_variant_reads_that_variant (__main__.Marks"),
     Fault("writeup-keeps-unchecked", "py-scripts", "render_writeup.py lets the essay say what the "
           "replaced run's record keeps other than as its fields give it", CHECK_FAILED,
           "FAIL: test_what_the_replaced_record_keeps_said_otherwise (__main__.Marks"),
