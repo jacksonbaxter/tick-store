@@ -738,14 +738,15 @@ Parquet `zstd1-rg128k`, `zstd9-rg1Mi` and `none-rg1Mi`, ArcticDB `rows10M-cols12
 security, QuestDB `locate-index`, and tick-store `v3-seg1Mi`. Against `67ae574`, Parquet gained
 `zstd9-rg1Mi`, and ArcticDB gained `rows10M-cols127` and lost `rows100k-cols1`.
 
-At `dd5de38` the full day has not finished. The guard stopped QuestDB `plain` twice on swap
+At `dd5de38` the full day did not finish. The guard stopped QuestDB `plain` twice on swap
 traffic: in its class A write, and on a freshly booted host in its read-back. Both times the kernel
 paged out QuestDB's own idle heap, 0.65 to 0.93 GB, to keep the store's mapped pages. The free swap
 filled in about 6 s, at up to 81 MB/s, with 11.6 GB or more still available. The capacity check met
 none of this, because swap was already full when it started. See "Full-day comparison" in
 `docs/NOTES.md`. The guard's swap rule then changed, as registered in "The guard's swap rule" in
 `docs/NOTES.md` before the rerun: swap-out alone no longer stops a run, and QuestDB's heap stays
-`-Xms1g -Xmx1g`.
+`-Xms1g -Xmx1g`. The full day ran to its end at `ede0176`:
+`results/compare/Linux-12302019-full-ede0176b10bb.json`.
 
 **Reproducing tick-store's Linux figures at a later commit.** `--variant-source` wants Linux slice
 results of the same commit, and the only ones committed are `ede0176`'s, so at any other commit
