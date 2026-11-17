@@ -196,21 +196,21 @@ three scripts are `8e616bf`'s, before its fix.
 | DX-12 | at `8e616bf`: `scripts/diag_summary.py:408`, `:491-501`, `:75-94`, `:703-705`, `:752-777` | Five smaller gaps: a percent-only report was allowed 0.005 a line of missing lines; an inclusive share summed every matching row, so two engine entry points that nest gave 118%; the statement said "at the freeze commit" for any commit; the store block was Q1's ready line only; and a multiplexed counter fed IPC with only its coverage beside it. The second showed in the freeze's own query profiles: a lambda local to the engine function, `ItchQuery::rows(...)::$_0::operator()`, is named by that function, so its entry was added to it, Q1's engine share 54.38 + 1.76 = 56.14 and Q3's 96.29 + 5.12 = 101.41%. Now a summary's self report must have its Samples and Period columns; an inclusive share two entries would add up is refused and a function's own lambdas are left out of it; the statement names the commit; every query run must open the same store; a counter multiplexed is refused. The last point, that C-library addresses land in `libc`, not `memory`, is a note for the essay: its D4 sentence must not read `memory` alone (docs/TASKS.md). | Cases 10, 11, 13 and 14 and 8 again at `979fb58`, each accepted. After: 11, 14 and 8 refused, 13 refused in a summary by the column rule, 10 states its commit; the freeze's Q1 and Q3 engine shares read 54.38 and 96.29. Tests `Inclusive` (two), `Refusals.test_query_runs_on_other_stores_are_refused`, `test_a_counter_missing_not_counted_or_multiplexed_is_refused`, `test_the_statement_names_the_commit_it_was_run_at`, `Recording.test_a_report_with_no_sample_or_period_column_or_event_count_is_refused`; faults `diag-inclusive-added-up`, `diag-store-unchecked`, `diag-multiplexed-accepted`. | `85aa3da` |
 | DX-13 | at `8e616bf`: `scripts/render_results.py:1311`; `scripts/targets.json` `headline.names[0].parts` | A left-out part was found by substring, `f" {name}" in sentence`, so "one-thread ingest" was found inside "flushed one-thread ingest"; and G-1's two reference-day parts shared one name. Names are now read back whole (DX-4); a plain name may hold no list's or machine's words, and on one machine it is one target's and one part's, so G-1's parts are now "the reference day's round trip on the laptop" and "... on the Ryzen". | Not reachable with the committed results, so shown on them with one row moved: with both of WT-2 Linux's parts left out, at `78afed7` a line naming only "flushed one-thread ingest" passed the check; after, "does not name 'one-thread ingest', which is missed (WT-2 on Linux)". Test `test_a_plain_name_is_whole_and_one_parts_on_a_machine`; fault `headline-plain-name-shared`. | `e1f7286` |
 | DX-14 | at `8e616bf`: `README.md:8`; `scripts/targets.json` the fastest claim's `field` | Two readings an outsider may take: the ingest sentence named no machine, and the laptop meets the bar; and "ArcticDB or QuestDB is fastest" was judged by median alone. A claim judged on one machine must now name it and no other, so the sentence reads "One thread on the Ryzen ingests below Nasdaq's peak message rate.", and a fastest claim is judged on each field it lists, now median and tail, as the bar above it says. | At `78afed7` the sentence named no machine and `--check` passed. After: the old sentence is refused, "judged on Linux alone, and does not name the machine; say 'the Ryzen' in it", and the claim holds on both fields on the committed file. Tests `test_a_claim_judged_on_one_machine_names_it_and_no_other`, `test_a_fastest_claim_is_judged_on_every_field_it_names`; faults `render-pitch-claim-machine-unnamed`, `render-pitch-fastest-median-only`. | `e1f7286` |
-| TD-1 | at `8e616bf`: `scripts/check_ties.py:355-365`, `:368-375` | `written_at` ignored the exit codes of `git status` and `git log -1`, so a git error read as empty output, as a file with no writer, and the assembled comparison compared nothing; a `--results` folder outside the checkout took the same silent path. Every git command the check runs is now a refusal naming the command, its exit code and what git said, and a results folder outside the checkout is refused. | On a scratch clone with the object of the commit that changed `store_results.py` deleted, the file that differed before passed, `ok, nothing it measures changed since`, exit 0; a copy of `results/` outside the checkout passed, exit 0. `GitErrors.test_a_missing_object_is_a_refusal_naming_the_command` and `test_a_results_folder_outside_the_checkout_is_refused` failed first. Faults `ties-git-error-passes`, `ties-results-outside-passes`. | `ae9b028` |
-| TD-2 | at `8e616bf`: `scripts/check_ties.py:355-375`, docstring `:16-19` | The assembled paths are compared with the last commit that wrote the file, which any later commit of the file resets, and an uncommitted edit was compared with its last writer and passed; neither limit was stated. A file not committed as it is is now "not judged against what assembled it: commit it first", exit 3, a skip that `--no-skips` fails, the step's one rule for what it cannot compare; the reset by a later commit, and that nothing shows the bytes are the assembler's, are stated in the docstring, README's Checks section and NOTES. | A round-trip file edited by hand after its assembler changed, not committed: `ok`, exit 0. `AssembledChange.test_a_file_not_committed_as_it_is_is_not_judged_against_what_assembled_it` failed first. Fault `ties-uncommitted-assembled-judged`. The same edit committed still passes, the stated limit. | `ae9b028`, `ece94e1` |
-| TD-3 | at `8e616bf`: `scripts/check_ties.py:509`, docstring `:7-8` | The check said every file under `results/` names its commit, but walked only `*.json`, so a results file of any other form was never examined and never met "no kind". It now walks every file; one that is not a results file must be in the published `NOT_RESULTS` list with its reason, which is empty. | A CSV naming a made-up commit, a `.json.gz` that was not gzip and a `.txt` beside one good file: `1 files: 1 same`, exit 0. `NoCommit.test_every_file_under_results_is_examined` failed first. Fault `ties-non-json-unseen`. | `ae9b028` |
-| TD-4 | at `8e616bf`: `scripts/check_ties.py:171`, `:378-389` | The comparison pin took any file name, since `check_compare.py` accepts any SHA-256 under its key, so one line in the pins file exempted a new file from the tie. A pin now names its file by its exact path under `results/`, from `PIN_NAMES`, fixed in the script; a pins line under one of those keys for any other name is refused; and a comparison file the freeze replaces but keeps is pinned only at the exact path in `compare/replaced/` that `REPLACED_KEPT` fixes, with its SHA-256 both there and under `replaced_comparison_files`, the key `render_results.py` reads. | A fifth `compare/` file, an existing one's bytes and a space, its SHA-256 added to a copy of the pins: reported pinned, 9 pinned, and `check_compare.py` passed it. `Pinned.test_a_fifth_comparison_file_is_no_pin_and_its_line_is_refused` failed first. Faults `ties-pin-any-listed-name`, `ties-stray-pin-accepted`, `ties-replaced-pin-outside-folder`. | `ae9b028`, `6144664` |
-| TD-5 | at `8e616bf`: docstring `scripts/check_ties.py:26-27` | A commit rebased away that this clone still held, or one on another branch, was judged and passed locally, though a fresh clone refused the first; the missing commit was counted as differs. A commit not in HEAD's history is now refused (CI fetches the whole history), not judged in a shallow clone, and a missing commit is counted as refused. | A results file naming a deleted branch's commit, and one naming a live branch's: `ok`, exit 0 each. `MissingCommit.test_a_commit_not_in_heads_history_fails` failed first. Fault `ties-non-ancestor-passes`. | `ae9b028` |
-| TD-6 | at `8e616bf`: `scripts/check_ties.py:324-329` | A symbolic link git tracks in a measured path was compared as the link, so a change to its target outside the path passed; and a new file a local exclude hides is not seen. The link is now refused; the excludes, which CI does not have, and the comparison of the work tree are stated limits. | `src/shared.hpp` a link to `../docs/shared.hpp`, the target changed and committed: `ok`, exit 0. `GitErrors.test_a_symbolic_link_in_a_measured_path_is_refused` failed first. Fault `ties-symlink-passes`. The excluded new file still passes, as stated. | `ae9b028`, `ece94e1` |
-| TD-7 | at `8e616bf`: `scripts/check_ties.py:302-304`, `:432-436`, `:533-537` | A `.git` git cannot read and a `--repo` that is a folder inside a checkout read as an exported tree, "no history here", a skip; git missing from `PATH` was a traceback. Each is now a refusal, exit 1, naming why; only a folder with no `.git` inside no checkout that tracks files in it stays not judged. | `.git/HEAD` overwritten, and `--repo` a subfolder: exit 3 each. `GitErrors.test_a_git_dir_git_cannot_read_is_refused`, `test_a_folder_inside_a_checkout_is_refused` and `test_git_that_cannot_be_run_is_a_refusal` failed first. Faults `ties-unreadable-git-dir-unjudged`, `ties-subfolder-unjudged`. | `ae9b028` |
-| TD-8 | at `8e616bf`: `scripts/check_ties.py:409-412`, `:326-328`, `:485`, `:457-460`, `:504-512`, `:522-523`, `:347`, `:76` | Ten refusals or exits had no test, and the tests of a refused and a no-kind file passed on the proofs file's refusal, not their own. Each now has a test, the refused and no-kind files committed with the proofs brought up to date so the exit is theirs. | The reviewer's mutations of these rules, each run against `test_check_ties.py`, were not caught; of 59 mutations now, 58 are caught, and the one left changes nothing under exact pin paths. Fault `ties-refused-exits-0`. | `ae9b028` |
-| TD-9 | at `8e616bf`: `scripts/prove_checks.py`, fault `ties-kind-dropped` | The fault's description, "so a census file has no measured paths", was not what it does: it renames the census kind so that no file matches it, and the census files are refused as of no kind. The description now says so. | Read against the patch and its run: `test_unchanged_code_passes_for_every_kind` fails on census files of no kind. | `ae9b028` |
-| TD-10 | at `8e616bf`: `scripts/check_ties.py:255-257` | The fuzz kind's assembled paths left out `scripts/build_preset.py`, from which `fuzz_host.py` writes the header's preset and build type, and `scripts/check_fuzz.py`, whose `STATUS` and `TIED_PATHS` `fuzz_results.py` reads. Both are listed; the other kinds' lists were read against what writes their files. | `check_ties.py --table`'s fuzz section listed only `fuzz_results.py` and `fuzz_host.py`; `AssembledChange.test_a_change_to_what_assembled_a_file_after_it_was_written_fails_it` failed first for `scripts/build_preset.py`. Fault `ties-fuzz-build-preset-dropped`. | `ae9b028` |
-| TD-11 | at `8e616bf`: `docs/NOTES.md:5254` | The footer table said a flip of bit 0 of a segment summary's plain flag would pass with checksums off, since only queries read it. The decoder recomputes the flag and refuses a summary that disagrees, `src/store/itch_segment.cpp:1333-1342`. The row is corrected, dated. | On a one-segment store whose flag is 0, bit 0 flipped: `verify` exits 1 with checksums and without, `bad block metadata: plain records, segment 0, column type: expected 0, have 1`. | `ece94e1` |
-| TD-12 | at `8e616bf`: `scripts/check_ties.py:201-205`, `tests/scripts/test_g2_plan.py` | `check_ties.py` leaves the planner out of the round-trip kind because the committed plans are the planner's, but only constants copied from the files said so. `CommittedPlans` now rebuilds each committed day's layout from its round-trip and store-size files and requires the planner's flips and seed to be the file's, naming the one fact the files do not record, the block listing. | `roundtrip-10302019.json`'s footer flip moved one byte back onto the CRC32C, its seed unchanged: `test_g2_plan.py` and `test_check_oracle.py` both passed. Fault `g2-committed-plan-moved`, a data mutation. | `3d6b81d` |
-| TD-13 | at `8e616bf`: `BENCHMARKS.md:52`, `:166`, `README.md:256-258` | The pages did not say that G-2 holds for the two planned flips and not for any flip: with checksums off the entries' CRC32Cs, the trailer's footer CRC32C and a small share of payload bits pass. README's Round-trip check and BENCHMARKS, below the gates, now say what G-2 shows, from a committed sweep of every bit of every byte of two small stores that `test_check_oracle.py`'s `AllBits` holds the counts to. The gate's wording and `targets.json` stay. | The sweep: with checksums every flip exits 1; without, 928 and 2,560 entry CRC32C pairs, 32 trailer pairs each, and 57 of 5,920 and 74 of 22,592 payload pairs exit 0. | `3d6b81d`, `ece94e1` |
-| TD-14 | at `8e616bf`: `scripts/g2_plan.py:121-131`, `scripts/check_oracle.py:140-144`, `:186-235` | Rules of the planner and the oracle step's live refusals that nothing failed on: an even segment count, a footer with no bytes before the trailer, two first timestamp blocks, a data block in the header, and every refusal in `check()`. Each has a test now, the live refusals through a stand-in tool; the sweep's third rule follows from its first and is left as it is. | Each mutation of those lines passed every test. Live with the dev build, `g2-plan-section-crc-classed-read` applied makes `check_oracle.py` exit 1, `the footer sweep disagrees with the rule in 24 places`. Fault `oracle-sweep-disagreement-passes`; a fault on the `oracle` step itself needs a C++ build and is not made. | `3d6b81d` |
-| TD-15 | at `8e616bf`: `docs/TASKS.md:197` | TASKS said the freeze diff prints only `scripts/g2_plan.py`; it also prints `compare/README.md` and `fuzz/README.md`, prose from `ebb1ae2`, which no kind measures. Corrected, dated. | `git diff --stat ede0176..HEAD --` over the listed paths prints the three files. | `ece94e1` |
+| TD-1 | at `8e616bf`: `scripts/check_ties.py:355-365`, `:368-375` | `written_at` ignored the exit codes of `git status` and `git log -1`, so a git error read as empty output, as a file with no writer, and the assembled comparison compared nothing; a `--results` folder outside the checkout took the same silent path. Every git command the check runs is now a refusal naming the command, its exit code and what git said, and a results folder outside the checkout is refused. | On a scratch clone with the object of the commit that changed `store_results.py` deleted, the file that differed before passed, `ok, nothing it measures changed since`, exit 0; a copy of `results/` outside the checkout passed, exit 0. `GitErrors.test_a_missing_object_is_a_refusal_naming_the_command` and `test_a_results_folder_outside_the_checkout_is_refused` failed first. Faults `ties-git-error-passes`, `ties-results-outside-passes`. | `6eb15b7` |
+| TD-2 | at `8e616bf`: `scripts/check_ties.py:355-375`, docstring `:16-19` | The assembled paths are compared with the last commit that wrote the file, which any later commit of the file resets, and an uncommitted edit was compared with its last writer and passed; neither limit was stated. A file not committed as it is is now "not judged against what assembled it: commit it first", exit 3, a skip that `--no-skips` fails, the step's one rule for what it cannot compare; the reset by a later commit, and that nothing shows the bytes are the assembler's, are stated in the docstring, README's Checks section and NOTES. | A round-trip file edited by hand after its assembler changed, not committed: `ok`, exit 0. `AssembledChange.test_a_file_not_committed_as_it_is_is_not_judged_against_what_assembled_it` failed first. Fault `ties-uncommitted-assembled-judged`. The same edit committed still passes, the stated limit. | `6eb15b7`, `60ed86b` |
+| TD-3 | at `8e616bf`: `scripts/check_ties.py:509`, docstring `:7-8` | The check said every file under `results/` names its commit, but walked only `*.json`, so a results file of any other form was never examined and never met "no kind". It now walks every file; one that is not a results file must be in the published `NOT_RESULTS` list with its reason, which is empty. | A CSV naming a made-up commit, a `.json.gz` that was not gzip and a `.txt` beside one good file: `1 files: 1 same`, exit 0. `NoCommit.test_every_file_under_results_is_examined` failed first. Fault `ties-non-json-unseen`. | `6eb15b7` |
+| TD-4 | at `8e616bf`: `scripts/check_ties.py:171`, `:378-389` | The comparison pin took any file name, since `check_compare.py` accepts any SHA-256 under its key, so one line in the pins file exempted a new file from the tie. A pin now names its file by its exact path under `results/`, from `PIN_NAMES`, fixed in the script; a pins line under one of those keys for any other name is refused; and a comparison file the freeze replaces but keeps is pinned only at the exact path in `compare/replaced/` that `REPLACED_KEPT` fixes, with its SHA-256 both there and under `replaced_comparison_files`, the key `render_results.py` reads. | A fifth `compare/` file, an existing one's bytes and a space, its SHA-256 added to a copy of the pins: reported pinned, 9 pinned, and `check_compare.py` passed it. `Pinned.test_a_fifth_comparison_file_is_no_pin_and_its_line_is_refused` failed first. Faults `ties-pin-any-listed-name`, `ties-stray-pin-accepted`, `ties-replaced-pin-outside-folder`. | `6eb15b7`, `9584375` |
+| TD-5 | at `8e616bf`: docstring `scripts/check_ties.py:26-27` | A commit rebased away that this clone still held, or one on another branch, was judged and passed locally, though a fresh clone refused the first; the missing commit was counted as differs. A commit not in HEAD's history is now refused (CI fetches the whole history), not judged in a shallow clone, and a missing commit is counted as refused. | A results file naming a deleted branch's commit, and one naming a live branch's: `ok`, exit 0 each. `MissingCommit.test_a_commit_not_in_heads_history_fails` failed first. Fault `ties-non-ancestor-passes`. | `6eb15b7` |
+| TD-6 | at `8e616bf`: `scripts/check_ties.py:324-329` | A symbolic link git tracks in a measured path was compared as the link, so a change to its target outside the path passed; and a new file a local exclude hides is not seen. The link is now refused; the excludes, which CI does not have, and the comparison of the work tree are stated limits. | `src/shared.hpp` a link to `../docs/shared.hpp`, the target changed and committed: `ok`, exit 0. `GitErrors.test_a_symbolic_link_in_a_measured_path_is_refused` failed first. Fault `ties-symlink-passes`. The excluded new file still passes, as stated. | `6eb15b7`, `60ed86b` |
+| TD-7 | at `8e616bf`: `scripts/check_ties.py:302-304`, `:432-436`, `:533-537` | A `.git` git cannot read and a `--repo` that is a folder inside a checkout read as an exported tree, "no history here", a skip; git missing from `PATH` was a traceback. Each is now a refusal, exit 1, naming why; only a folder with no `.git` inside no checkout that tracks files in it stays not judged. | `.git/HEAD` overwritten, and `--repo` a subfolder: exit 3 each. `GitErrors.test_a_git_dir_git_cannot_read_is_refused`, `test_a_folder_inside_a_checkout_is_refused` and `test_git_that_cannot_be_run_is_a_refusal` failed first. Faults `ties-unreadable-git-dir-unjudged`, `ties-subfolder-unjudged`. | `6eb15b7` |
+| TD-8 | at `8e616bf`: `scripts/check_ties.py:409-412`, `:326-328`, `:485`, `:457-460`, `:504-512`, `:522-523`, `:347`, `:76` | Ten refusals or exits had no test, and the tests of a refused and a no-kind file passed on the proofs file's refusal, not their own. Each now has a test, the refused and no-kind files committed with the proofs brought up to date so the exit is theirs. | The reviewer's mutations of these rules, each run against `test_check_ties.py`, were not caught; of 59 mutations now, 58 are caught, and the one left changes nothing under exact pin paths. Fault `ties-refused-exits-0`. | `6eb15b7` |
+| TD-9 | at `8e616bf`: `scripts/prove_checks.py`, fault `ties-kind-dropped` | The fault's description, "so a census file has no measured paths", was not what it does: it renames the census kind so that no file matches it, and the census files are refused as of no kind. The description now says so. | Read against the patch and its run: `test_unchanged_code_passes_for_every_kind` fails on census files of no kind. | `6eb15b7` |
+| TD-10 | at `8e616bf`: `scripts/check_ties.py:255-257` | The fuzz kind's assembled paths left out `scripts/build_preset.py`, from which `fuzz_host.py` writes the header's preset and build type, and `scripts/check_fuzz.py`, whose `STATUS` and `TIED_PATHS` `fuzz_results.py` reads. Both are listed; the other kinds' lists were read against what writes their files. | `check_ties.py --table`'s fuzz section listed only `fuzz_results.py` and `fuzz_host.py`; `AssembledChange.test_a_change_to_what_assembled_a_file_after_it_was_written_fails_it` failed first for `scripts/build_preset.py`. Fault `ties-fuzz-build-preset-dropped`. | `6eb15b7` |
+| TD-11 | at `8e616bf`: `docs/NOTES.md:5254` | The footer table said a flip of bit 0 of a segment summary's plain flag would pass with checksums off, since only queries read it. The decoder recomputes the flag and refuses a summary that disagrees, `src/store/itch_segment.cpp:1333-1342`. The row is corrected, dated. | On a one-segment store whose flag is 0, bit 0 flipped: `verify` exits 1 with checksums and without, `bad block metadata: plain records, segment 0, column type: expected 0, have 1`. | `60ed86b` |
+| TD-12 | at `8e616bf`: `scripts/check_ties.py:201-205`, `tests/scripts/test_g2_plan.py` | `check_ties.py` leaves the planner out of the round-trip kind because the committed plans are the planner's, but only constants copied from the files said so. `CommittedPlans` now rebuilds each committed day's layout from its round-trip and store-size files and requires the planner's flips and seed to be the file's, naming the one fact the files do not record, the block listing. | `roundtrip-10302019.json`'s footer flip moved one byte back onto the CRC32C, its seed unchanged: `test_g2_plan.py` and `test_check_oracle.py` both passed. Fault `g2-committed-plan-moved`, a data mutation. | `5eb0948` |
+| TD-13 | at `8e616bf`: `BENCHMARKS.md:52`, `:166`, `README.md:256-258` | The pages did not say that G-2 holds for the two planned flips and not for any flip: with checksums off the entries' CRC32Cs, the trailer's footer CRC32C and a small share of payload bits pass. README's Round-trip check and BENCHMARKS, below the gates, now say what G-2 shows, from a committed sweep of every bit of every byte of two small stores that `test_check_oracle.py`'s `AllBits` holds the counts to. The gate's wording and `targets.json` stay. | The sweep: with checksums every flip exits 1; without, 928 and 2,560 entry CRC32C pairs, 32 trailer pairs each, and 57 of 5,920 and 74 of 22,592 payload pairs exit 0. | `5eb0948`, `60ed86b` |
+| TD-14 | at `8e616bf`: `scripts/g2_plan.py:121-131`, `scripts/check_oracle.py:140-144`, `:186-235` | Rules of the planner and the oracle step's live refusals that nothing failed on: an even segment count, a footer with no bytes before the trailer, two first timestamp blocks, a data block in the header, and every refusal in `check()`. Each has a test now, the live refusals through a stand-in tool; the sweep's third rule follows from its first and is left as it is. | Each mutation of those lines passed every test. Live with the dev build, `g2-plan-section-crc-classed-read` applied makes `check_oracle.py` exit 1, `the footer sweep disagrees with the rule in 24 places`. Fault `oracle-sweep-disagreement-passes`; a fault on the `oracle` step itself needs a C++ build and is not made. | `5eb0948` |
+| TD-15 | at `8e616bf`: `docs/TASKS.md:197` | TASKS said the freeze diff prints only `scripts/g2_plan.py`; it also prints `compare/README.md` and `fuzz/README.md`, prose from `ebb1ae2`, which no kind measures. Corrected, dated. | `git diff --stat ede0176..HEAD --` over the listed paths prints the three files. | `60ed86b` |
 | Fuzz oracle bound | at `ede0176`: `fuzz/codec_oracles.hpp` (`check_one_block`, `check_as_column`), `fuzz/itch_store_oracles.hpp` (`read_store` to `check_itch_store`), `fuzz/itch_query_oracles.hpp` (`check_itch_query`) | The fuzz oracles' work on one input had no bound. One codec input held up to 528 blocks of 2^20 values in 16,384 bytes. Each value was decoded about five times and re-encoded at block sizes 3, 64 and 4,096 with every encoder. A store or query file's raw records inflate to 65,535 bytes each. So a valid input could pass libFuzzer's 10 s limit with no fault in the code under test: the Linux replay of `fuzz_dictionary` stopped at 11 s or more on a valid seed. Every bounded target now has a cap, a compare limit and a budget, each a named constant with the figures it was set from. The codec targets also take a 64 x 64 prefix past the budget. The query target is bounded by a fitted work measure. A count table gives each target's most decoded, encoded and compared values and its most blocks or segments. The unit suite holds the count table to the constants and each named seed's counts to it. The unit suite also runs the same oracles unbounded on every named seed. | Before: a PFOR block of 2^20 zeros took 10.2 s an execution on the Mac, and five 31-byte dictionary blocks 10.1 s. After, the dearest named seed of each target as a Mac median: dictionary 685 ms, run-length 617, PFOR 564, store 514, query 423. Predicted on the Linux host: 4,137, 4,436, 4,348, 4,081 and 3,113 ms, against a 5 s bar; none of these seeds has been timed there. The faults in `scripts/prove_checks.py` for the bounds are listed in TASKS below. | `aadd628` to `126b03f` |
 
 ## The essay's render, reviewed at `979fb58`
@@ -236,7 +236,7 @@ than asserted).
   differ only in the fuzz harness and its tests is put to `git diff --name-only` and is not judged
   in a tree with no history; the prover's record, which names no commit; and the replaced day.
 - Tests: `Commits` (ten). Faults: `writeup-commits-mixed-accepted`,
-  `writeup-differs-only-unchecked`, PROVEN. Commit: `af2816c`.
+  `writeup-differs-only-unchecked`, PROVEN. Commit: `848fa0c`.
 
 ### WD-2 (blocker) Comparison and ranking words around a figure were held by nothing
 
@@ -248,7 +248,7 @@ than asserted).
   leaves and reads a figure the sentence prints, or a token that carries the word, and a claim the
   results answer false stops the render.
 - Tests: `Claims` (nine). Faults: `writeup-judging-word-unclaimed`, `writeup-claim-not-held`,
-  `writeup-pitch-condition-skipped`, PROVEN. Commit: `af2816c`.
+  `writeup-pitch-condition-skipped`, PROVEN. Commit: `848fa0c`.
 
 ### WD-3 (blocker) Results typed in words and verdicts typed by hand
 
@@ -261,11 +261,11 @@ than asserted).
 - After the rebase onto `81cec1f`, where render_results.py judges every comparison verdict on
   the replaced run too, the essay's own changed-outcome tokens gave way to its marks: each verdict
   carries what RESULTS.md sets beside it, from `verdict_marks` and `write_inputs`, and a verdict
-  that drops one is refused (`ef16746`).
+  that drops one is refused (`156a85e`).
 - Tests: `Refuses.test_a_number_in_words`, `Census` (three), `Marks` (three). Faults:
   `writeup-number-word-unseen`, `writeup-census-missing-row`, `writeup-census-met-row-kept`,
   `writeup-verdict-marks-dropped`, `writeup-verdict-mark-unchecked`,
-  `writeup-claim-on-changed-outcome`, PROVEN. Commit: `af2816c`.
+  `writeup-claim-on-changed-outcome`, PROVEN. Commit: `848fa0c`.
 
 ### WD-4 (blocker) The figure list could type any number
 
@@ -275,14 +275,14 @@ than asserted).
 - Fixed: every value must reach a results file, a tree count, a code constant or a bar at its
   leaves; a number in the list must be one of its declared `factors`, each with its reason, and
   words and concat pieces may hold no number.
-- Tests: `Literals` (seven). Fault: `writeup-literal-value-accepted`, PROVEN. Commit: `af2816c`.
+- Tests: `Literals` (seven). Fault: `writeup-literal-value-accepted`, PROVEN. Commit: `848fa0c`.
 
 ### WD-5 (should-fix) A figure from one host could sit under a description of the other
 
 - Shown: a macOS file under a Zen 1 description passed.
 - Fixed: an entry read from one host's files must name that host and not the other; one read
   across hosts must say so with `across_hosts` and name both.
-- Tests: `Hosts` (four). Fault: `writeup-host-word-unchecked`, PROVEN. Commit: `af2816c`.
+- Tests: `Hosts` (four). Fault: `writeup-host-word-unchecked`, PROVEN. Commit: `848fa0c`.
 
 ### WD-6 (should-fix) The essay recomputed each target's figure with a copy of its expression
 
@@ -291,7 +291,7 @@ than asserted).
   row's unit; a test holds every such token to the Targets block's figure for the same part. The
   Missed-targets table is generated from the verdicts (WD-3).
 - Tests: `Forms.test_a_target_s_figure_is_the_targets_block_s`, `Census`. Fault:
-  `writeup-census-missing-row`, PROVEN. Commit: `af2816c`.
+  `writeup-census-missing-row`, PROVEN. Commit: `848fa0c`.
 
 ### WD-7 (should-fix) Formats could round a bar or a gap into a contradiction
 
@@ -299,7 +299,7 @@ than asserted).
 - Fixed: a bar is shown exactly with its sign and unit, a printed figure must stand on its
   verdict's side of the bar, and a gap printed as a ratio of 1 or a difference of 0 is refused.
 - Tests: `Gaps` (three). Faults: `writeup-bar-rounded`, `writeup-figure-across-its-bar`,
-  `writeup-gap-shown-as-none`, PROVEN. Commit: `af2816c`.
+  `writeup-gap-shown-as-none`, PROVEN. Commit: `848fa0c`.
 
 ### WD-8 (blocker) The prover sentence counted the control as a fault
 
@@ -311,7 +311,7 @@ than asserted).
   passed; a fault the list no longer has is not counted, and a record with no control is refused.
   The sentence comes out right today and after a full run.
 - Test: `Prover.test_the_counts`. Fault: `writeup-prover-counts-control`, PROVEN. Commit:
-  `af2816c`.
+  `848fa0c`.
 
 ### WD-9 (should-fix) A kind could still pin a commit, and a pattern could leave results/
 
@@ -319,7 +319,7 @@ than asserted).
 - Fixed: a pattern is a path under `results/` with one `*`, in place of the commit, before
   `.json`, and no hex run or glob in a folder.
 - Test: `Refuses.test_a_kind_named_by_a_commit_prefix_or_folder_or_leaving_results`. Fault:
-  `writeup-pattern-glob-accepted`, PROVEN. Commit: `af2816c`.
+  `writeup-pattern-glob-accepted`, PROVEN. Commit: `848fa0c`.
 
 ### WD-10 (should-fix) The figure list chose which template and which page were checked
 
@@ -327,7 +327,7 @@ than asserted).
 - Fixed: the page, template and targets paths are the script's; a list naming any of them is
   refused, and `--figures` is gone.
 - Test: `Refuses.test_the_list_naming_its_page_template_or_targets`. Fault:
-  `writeup-list-names-the-page`, PROVEN. Commit: `af2816c`.
+  `writeup-list-names-the-page`, PROVEN. Commit: `848fa0c`.
 
 ### WD-11 (should-fix) Most of the expression language was pinned by no test
 
@@ -335,7 +335,7 @@ than asserted).
 - Fixed: `Forms` computes every form and format on a small document and holds each to an answer
   worked out in plain Python beside it, with a test for every refusal.
 - Tests: `Forms` (six), `Refuses`. Fault: `writeup-sub-operands-swapped`, PROVEN. Commit:
-  `af2816c`.
+  `848fa0c`.
 
 ### WD-12 (should-fix) A bug in verdict_class passed writeup-check
 
@@ -343,7 +343,7 @@ than asserted).
 - Fixed: `Verdicts` holds `verdict_class` and `verdict_of` on hand-built parts, met, missed, not
   judged and each mix.
 - Test: `Verdicts.test_verdict_class`. Fault: `verdict-class-met-on-any-part`, which patches
-  `render_results.py` in the prover's clone, PROVEN. Commit: `af2816c`.
+  `render_results.py` in the prover's clone, PROVEN. Commit: `848fa0c`.
 
 ### WD-13 (should-fix) Byte sizes read from comments, and a lane width typed
 
@@ -353,7 +353,7 @@ than asserted).
   the lane word's width is read from `lane_pack.hpp`'s declaration, and a constant's source is
   read with its comments blanked.
 - Test: `Refuses.test_a_constant_read_from_a_comment`. Fault: `writeup-constant-from-a-comment`,
-  PROVEN. Commit: `af2816c`.
+  PROVEN. Commit: `848fa0c`.
 
 ### WD-14 (should-fix) Non-results were removed everywhere, and some were measurements
 
@@ -362,7 +362,7 @@ than asserted).
   text in the shape of a measurement, a number with a unit, is refused; the host's memory is read
   from the capacity file's host block, in GiB.
 - Tests: `Refuses.test_a_non_result_used_outside_its_place` and its neighbours. Fault:
-  `writeup-non-result-anywhere`, PROVEN. Commit: `af2816c`.
+  `writeup-non-result-anywhere`, PROVEN. Commit: `848fa0c`.
 
 ### WD-15 (should-fix) The essay read files under a pin, and files no validator checks, saying neither
 
@@ -372,14 +372,14 @@ than asserted).
   paragraph that cites it, that its summaries are assembled by a script that refuses inconsistent
   recordings and that no separate validator re-reads them.
 - Tests: `Pins` (four). Faults: `writeup-pin-unsaid`, `writeup-pinned-file-undeclared`, PROVEN.
-  Commit: `af2816c`.
+  Commit: `848fa0c`.
 
 ### WD-16 (should-fix) "Opens with its conclusion" was checked as a full stop
 
 - Shown: an opening of "Read on." passed.
 - Fixed: after the title, one paragraph of exactly three sentences, each holding a token.
 - Test: `Refuses.test_an_opening_that_is_not_three_sentences_each_with_a_token`. Fault:
-  `writeup-opening-any-length`, PROVEN. Commit: `af2816c`.
+  `writeup-opening-any-length`, PROVEN. Commit: `848fa0c`.
 
 ### WD-17 (note) Other things the check did not hold
 
@@ -393,7 +393,7 @@ than asserted).
   `Refuses.test_a_character_reference`,
   `Refuses.test_a_multiplier_or_a_numeral_that_is_not_a_digit`. Faults:
   `writeup-tokens-glued-accepted`, PROVEN; `writeup-numeral-forms-accepted`, PROVEN. Commits:
-  `af2816c`, `dc3c24b`.
+  `848fa0c`, `66b7715`.
 
 ### WD-18 (should-fix) README's account of the step claimed more than the check held
 
@@ -401,4 +401,4 @@ than asserted).
   narrower in the code, and the account left out the judging words, the trusted list, the commits
   and the pins.
 - Fixed: the paragraph states each rule as the code enforces it and lists what it does not hold.
-- No test or fault: prose. Commit: `e2ac9b2`.
+- No test or fault: prose. Commit: `8c32019`.

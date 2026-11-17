@@ -5950,13 +5950,13 @@ the same files failing for the same paths.
 
 ### The freeze's results
 
-2026-11-17. The files measured at the freeze commit `ede0176` are committed in `9066cbf`, after an
+2026-11-17. The files measured at the freeze commit `ede0176` are committed in `c88ff7e`, after an
 audit of every step's record. They replace the six benchmark files, the four comparison files, both
 codec evaluation files, both census files, `coverage.json`, the three round-trip files and the two
 store-size files, and add the Linux kernel file, four diagnostic summaries and the disturbance
 record. Every one of the 24 audited files matched the SHA-256 the audit took of it. The Linux day at
 `67ae574` stays, bytes unchanged, in `results/compare/replaced/`, pinned under
-`replaced_comparison_files`; the other three protocol 1 pins went with their files, and `1c17c0a`
+`replaced_comparison_files`; the other three protocol 1 pins went with their files, and `b7e9bd4`
 drops their paths from `check_ties.PIN_NAMES`. All times below are UTC.
 
 **What ran, where and when.** Each step ran from its runner's private copy at `ede0176`, every
@@ -6061,7 +6061,7 @@ on the new ones only each day's `commit` changes, since every column's bytes are
 files; it now holds a fixture pinned as written, and fails if the pin is not made.
 `test_check_roundtrip.py`'s test that a pinned name with other bytes is checked in full expected
 the replaced file's first refusal, its missing exit codes; the freeze's file records them, so at
-`9066cbf` alone that test fails, and `aa5b804` makes it expect the refusal of its own edit, the
+`c88ff7e` alone that test fails, and `9d0ba8d` makes it expect the refusal of its own edit, the
 data block verdict turned to a pass.
 `python3 -I scripts/check_ties.py`: `30 files: 26 same, 2 pinned, 2 differs, 0 no commit, 0 no
 kind, 0 refused, 0 unjudged`, the two differing `check-proofs.json` and
@@ -6081,7 +6081,7 @@ is on another branch.
 `results/bench/Linux-simd_kernel-ede0176b10bb.json`, 1,141,409 bytes, and
 `results/compare/Linux-12302019-full-ede0176b10bb.json`, 1,102,687, over its 1,000,000-byte limit.
 Both are records the benchmark and the comparison harness wrote, so they are not trimmed;
-`9e2e49e` names the two kinds, `results/bench/*-simd_kernel-*.json` and
+`d7093d0` names the two kinds, `results/bench/*-simd_kernel-*.json` and
 `results/compare/*-12302019-full-*.json`, each with its argument in the script from the file's
 keys. The SIMD kernel file is 314 result rows, about 3 KB each, 939 KB in all, and 628 load lines
 and frequency snapshots, 83 KB; the macOS file of the kind is 929,369 bytes. The full day is four
@@ -6094,7 +6094,7 @@ the input record. A walk of every key of both files and of the macOS and Linux s
 allowed before, found no rows or values of the market data: every value is a timing, count,
 rate, size, frequency, setting, commit or SHA-256, each query's answer is its row count and
 SHA-256, a query's parameters are a time window and a locate number, and the kernel benchmark's
-input is generated from a recorded seed; `1396e7f` says so in both arguments. The rule is now
+input is generated from a recorded seed; `97c82fe` says so in both arguments. The rule is now
 stricter: an allowed kind had no limit at all, and each now has its own, 2,000,000 bytes, the
 largest allowed file being the macOS slice at 1,306,366; and a file of an allowed kind must be a
 JSON object at any size, so no pattern lets a data file through under a result's name.
@@ -6108,7 +6108,7 @@ patch touched the script or its test. `python3 -I scripts/check_hygiene.py`: `71
 clean`.
 
 **The faster-write rule reads every results page.** The render check applied
-`faster_write_problem` to the generated blocks and the README's pitch only. Since `38b95d5` it reads
+`faster_write_problem` to the generated blocks and the README's pitch only. Since `bda8928` it reads
 the whole prose of `README.md`, `RESULTS.md`, `BENCHMARKS.md`, `compare/README.md` and
 `fuzz/README.md`, a wrapped paragraph or list item joined so a sentence is read across its line
 breaks, and names the page and line. Of the other tracked pages, `docs/NOTES.md`, `docs/TASKS.md`,
