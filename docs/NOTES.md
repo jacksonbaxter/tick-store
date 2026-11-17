@@ -6313,6 +6313,76 @@ PROVEN. Two were UNDETECTED: `codec-count-the-cut-as-decoded` and
 
 The raw logs are under the phase's oracle-bound proofs folder.
 
+### The four conditions on the results pages, review C1
+
+2026-11-17. An outside reviewer read the results pages at `3e2d1b3` against the four conditions
+set for the comparison's verdicts (docs/REVIEW.md, C1-1 to C1-11). Conditions 2 and 4 failed,
+condition 3 was in doubt and condition 1 held but for one line. Of every comparison part on the
+two Linux runs, only WT-4 against ArcticDB differs, on both clocks.
+
+**A changed part.** WT-4's ArcticDB part now carries the word the rule gives on this run's
+figures, met, with its mark straight after it. The mark gives both runs' outcomes, says the
+change favours tick-store, and says the part is counted as missed in every count, ranking and
+first screen. `shown_verdict` builds it from `change_text`, and `verdict_marks` gives the essay
+the same marks. BENCHMARKS.md's line 3 and WT-4 row quote it the same way. The counts did not
+move: of the other 32 rows, 4 met, 15 missed, 7 missed in part and 6 not judged.
+
+**Where each write's input was.** The README's and RESULTS.md's "Comparison" sections, the
+full-day block's header and each class's ingest table now say it, from each write's record:
+tick-store's input is in memory before the clock starts, with the bytes read from the device
+inside its clock, and Parquet's, ArcticDB's and QuestDB's are read from disk inside theirs, with
+the range of bytes read. They also say what engine-only leaves out, and that device reads are
+inside both clocks, so the two-clock rule does not remove the difference. Beside each class's
+ingest table: the rates below are not like for like. `method_problem` refuses either "Comparison"
+section without the note. A rule-given met on a "no slower" target (WT-4 against QuestDB,
+BENCHMARKS.md's target row and WT-4 row) stays, always with the class's input clause beside it.
+
+**Disturbed phases.** A row judged against no other system now gives the replaced run's figure
+beside its disturbance: WT-2 Linux's class B rests on tick-store's `v3-seg4Mi` class B write 1,
+where the replaced run's rate is 1.423 M messages/s. The README's line under the table names
+that miss, flushed one-thread ingest, which is class B (1.410 M), with the same mark; the first
+screen's own ingest row is class A (1.270 M), whose phase holds no disturbance, and the pitch's
+WT-2 claim now rests on class A only. A headline or ranking figure from a disturbed phase carries
+its mark where it is shown: the table-per-stock 44.58 ms on the first screen, the per-security
+figures in QL-4's row. The comparison tables mark each disturbed cell "(disturbed)", and say so
+under the table only where a cell is marked.
+
+**Pages swapped in.** The full day's record flags figures timed while pages were swapped in, and
+its `timed_policy` says a verdict resting on one says so. QL-4 on Linux now does, part by part:
+Q1 warm, Q2 cold and Q3 cold on QuestDB's `plain`; Q2 warm and Q5 warm on ArcticDB's
+`rows100k-cols127` and QuestDB's `plain`; Q3 warm on ArcticDB's `rows100k-cols127`; Q5 cold on
+tick-store's own `v3-seg4Mi` and QuestDB's `plain`. The README's Q2 warm row and the line under
+the table carry the same marks. No other verdict rests on a flagged figure.
+
+**Hand-written quotes.** `quote_problem` reads every hand-written row and sentence of
+README.md, BENCHMARKS.md and compare/README.md outside the generated blocks. One that quotes a
+marked verdict, by its id and machine, is refused unless it holds each of that verdict's
+marks: changed parts, disturbances, swapped-in figures and, for a write against other systems,
+the input clause.
+
+**ArcticDB's engine-only move.** BENCHMARKS.md and compare/README.md no longer treat 42.6 s to
+291.8 s as showing how far a cache moves the clock. The cause is not known. This run's record
+shows 4,033 of 5,825,603 pages resident at the clock's start and 23,850,713,088 B read inside
+it; the replaced record keeps no residency or device-read figure for any system but tick-store.
+
+**Left as it is.** The README's pitch sentence on queries about one stock rests on QL-4's Q2 and
+Q3 parts, all four flagged as swapped in. The pitch is at its 100-word limit, so the mark cannot
+be added without a word limit or the marking rule giving way; the pitch names no target, and
+the quote check does not read it. "Met: 5 more of their parts" and the class counts carry no
+marks. The essay's text is unchanged: it takes the new marks through `verdict_marks`, so it grows.
+
+**Proofs.** On the Mac at `066c34a`, one `prove_checks.py --only` call took the 16 new
+faults and the 10 remade on lines the fix moved, and was stopped at its time limit after 24.
+All 24 were PROVEN: the 14 new py-scripts faults, the two new render-check faults
+(`benchmarks-wt4-old-word`, `readme-comparison-input-unsaid`) and 8 of the 10 remade ones.
+The two it did not reach, `render-macos-allocation-unqualified` and `headline-verdict-all-parts`,
+are existing faults whose patches were remade on moved lines. They are not proven again at
+this commit, and the full re-proof owes them. Each patch applies with `git apply --check`, and
+its own test, run alone, passes without it and fails with it applied:
+`test_macos_stored_bytes_say_they_can_exceed_the_files_own` and
+`test_a_row_of_some_parts_is_judged_on_them_and_names_the_rest_below`. The raw logs are under
+the phase's conditions-check proofs folder.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
