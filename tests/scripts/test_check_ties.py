@@ -100,9 +100,6 @@ ASSEMBLED = {
 # script's PIN_NAMES.
 PIN_NAMES = {
     "protocol_1_comparison_files": ("compare/Linux-12302019-full-67ae574f5666.json",),
-    "roundtrip_files_before_exit_codes": ("roundtrip-10302019.json",
-                                          "roundtrip-12302019-linux.json",
-                                          "roundtrip-12302019.json"),
     "fuzz_g3_file_before_the_tie": ("fuzz-g3-ea1dde4c02e4.json",),
 }
 
@@ -425,7 +422,7 @@ class ChangeElsewhere(TieTest):
         self.assert_same(result, "store-size")
 
     def test_the_exemption_pins_change_no_input(self):
-        self.change_pins("roundtrip_files_before_exit_codes", {"roundtrip-10302019.json": "00"})
+        self.change_pins("fuzz_g3_file_before_the_tie", {"fuzz-g3-ea1dde4c02e4.json": "00"})
         result = run_check()
         for kind in MEASURED:
             self.assert_same(result, kind)
@@ -434,8 +431,7 @@ class ChangeElsewhere(TieTest):
 class Pinned(TieTest):
     def pins_for(self, *kinds, names=None):
         pins = {}
-        keys = {"compare": "protocol_1_comparison_files", "fuzz": "fuzz_g3_file_before_the_tie",
-                "roundtrip": "roundtrip_files_before_exit_codes"}
+        keys = {"compare": "protocol_1_comparison_files", "fuzz": "fuzz_g3_file_before_the_tie"}
         for kind in kinds:
             path = REPO / FILES[kind]
             name = (names or {}).get(kind, path.name)
@@ -446,12 +442,11 @@ class Pinned(TieTest):
         return target
 
     def test_a_pinned_file_is_reported_and_not_judged(self):
-        pins = self.pins_for("compare", "fuzz", "roundtrip")
+        pins = self.pins_for("compare", "fuzz")
         self.change(FILE_OF["src"])
         result = run_check(REPO, "--pins", str(pins))
         for kind, key in (("compare", "protocol_1_comparison_files"),
-                          ("fuzz", "fuzz_g3_file_before_the_tie"),
-                          ("roundtrip", "roundtrip_files_before_exit_codes")):
+                          ("fuzz", "fuzz_g3_file_before_the_tie")):
             with self.subTest(kind=kind):
                 said = result.said(FILES[kind])
                 self.assertIn(f"pinned under {key} in the pins file: measured at", said)
@@ -460,23 +455,23 @@ class Pinned(TieTest):
         # The others are judged, and refused.
         self.assertEqual(result.code, check_ties.EXIT_REFUSED)
         self.assert_measured_change(result, "store-size", FILE_OF["src"])
-        self.assertIn("9 differs", result.out)
-        self.assertIn("3 pinned", result.out)
+        self.assertIn("10 differs", result.out)
+        self.assertIn("2 pinned", result.out)
 
     def test_pinned_files_alone_pass(self):
-        pins = self.pins_for("compare", "fuzz", "roundtrip")
+        pins = self.pins_for("compare", "fuzz")
         result = run_check(REPO, "--pins", str(pins))
         self.assertEqual(result.code, check_ties.EXIT_OK, result.err)
 
     def test_a_pin_of_other_bytes_does_not_hold(self):
-        pins = self.pins_for("roundtrip")
-        document = json.loads((REPO / FILES["roundtrip"]).read_text(encoding="utf-8"))
+        pins = self.pins_for("fuzz")
+        document = json.loads((REPO / FILES["fuzz"]).read_text(encoding="utf-8"))
         document["edited"] = True
-        write_json(REPO, FILES["roundtrip"], document)
+        write_json(REPO, FILES["fuzz"], document)
         self.change(FILE_OF["src"])
         result = run_check(REPO, "--pins", str(pins))
-        self.assertNotIn("pinned", result.said(FILES["roundtrip"]))
-        self.assert_measured_change(result, "roundtrip", FILE_OF["src"])
+        self.assertNotIn("pinned", result.said(FILES["fuzz"]))
+        self.assert_measured_change(result, "fuzz", FILE_OF["src"])
 
     def test_a_fifth_comparison_file_is_no_pin_and_its_line_is_refused(self):
         # Review TD-4: check_compare.py takes any SHA-256 under its key, whatever the name.
@@ -566,20 +561,16 @@ class Pinned(TieTest):
                       "another.json", result.err)
         self.assertNotIn("pinned", result.said(kept))
 
-    def test_a_pin_only_its_validator_allows_holds(self):
-        # Only the three round-trip files from before the exit codes may be pinned there, and
-        # only G-3's file from before the tie, so a pin of another name is no pin.
-        name, document = results_of(CODE)["roundtrip"]
-        write_json(REPO, "results/roundtrip-20202020.json", document)
-        git(REPO, "add", "-A")
-        git(REPO, "commit", "-q", "-m", "another day")
+    def test_a_round_trip_file_is_never_pinned(self):
+        # The round-trip files from before the exit codes were replaced at the freeze, and
+        # their key went with them: a line under it for a file's own name and bytes pins nothing.
         pins = self.dir / "pins.json"
         write_json(self.dir, "pins.json", {"roundtrip_files_before_exit_codes": {
-            "roundtrip-20202020.json": hashlib.sha256(
-                (REPO / "results/roundtrip-20202020.json").read_bytes()).hexdigest()}})
+            Path(FILES["roundtrip"]).name: hashlib.sha256(
+                (REPO / FILES["roundtrip"]).read_bytes()).hexdigest()}})
         self.change(FILE_OF["src"])
         result = run_check(REPO, "--pins", str(pins))
-        self.assertNotIn("pinned", result.said("results/roundtrip-20202020.json"))
+        self.assertNotIn("pinned", result.said(FILES["roundtrip"]))
         self.assert_measured_change(result, "roundtrip", FILE_OF["src"])
 
     def test_a_pin_holds_only_for_its_own_kind(self):

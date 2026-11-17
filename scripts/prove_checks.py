@@ -248,17 +248,17 @@ def edit_table_cells(path, prefix, cells):
 
 
 def roundtrip_exit_codes_typed():
-    """12302019's round-trip file as the assembler of 1669ae0 wrote it, G-2's two exit codes
-    typed and none recorded on a run, from any later commit: check_roundtrip.py takes that
-    form only from the three files pinned by their bytes (reviews E-1 and RG-5)."""
-    edit_json("results/roundtrip-12302019.json", lambda d: d.update(commit="0123456789ab"))
-
-
-def edit_a_pinned_roundtrip_file():
-    """12302019's round-trip file, its commit kept, with a field added by hand, which nothing
-    renders: only its bytes tell it from the file pinned (review RG-5)."""
-    edit_json("results/roundtrip-12302019.json",
-              lambda d: d["g2"]["data_crc"].update(detail="typed by hand"))
+    """12302019's round-trip file in the form the assembler of 1669ae0 wrote: G-2's two exit
+    codes typed as summaries and no exit code on any run. The three committed files of that
+    form were taken by their bytes until the freeze replaced them; every file now carries each
+    run's exit code (reviews E-1 and RG-5)."""
+    def change(document):
+        runs = [document["g1"]["ingest"], document["g1"]["verify"]]
+        runs += [document["g2"][name] for name in ("data_crc", "data_no_checksums", "footer_crc",
+                                                   "footer_no_checksums", "restored")]
+        for run in runs:
+            run.pop("exit_code", None)
+    edit_json("results/roundtrip-12302019.json", change)
 
 
 def hand_edit_targets_value():
@@ -1446,18 +1446,16 @@ FAULTS = (
     Fault("roundtrip-corrupt-summary-unchecked", "py-scripts", "check_roundtrip.py stops "
           "holding G-2's exit_code_corrupt to each corrupt run's exit code", CHECK_FAILED,
           "FAIL: test_a_summary_no_run_bears_out_is_refused (__main__.CheckRoundtrip"),
-    Fault("roundtrip-exit-codes-typed", "render-check", "a round-trip file from a later commit "
-          "with G-2's two exit codes typed and none observed on its runs, as the assembler "
-          "wrote them before review E-1", EXIT_RENDER_REFUSED,
+    Fault("roundtrip-exit-codes-typed", "render-check", "12302019's round-trip file with "
+          "G-2's two exit codes typed and none observed on its runs, as the assembler wrote "
+          "them before review E-1", EXIT_RENDER_REFUSED,
           "g2.data_crc: no exit_code observed", roundtrip_exit_codes_typed),
-    # Review RG-5: the files from before the exit codes are known by their bytes alone.
-    Fault("roundtrip-pinned-name-other-bytes", "render-check", "12302019's round-trip file "
-          "edited by hand, its commit kept, so only its bytes differ from the pinned file's",
-          EXIT_RENDER_REFUSED, "roundtrip-12302019.json: g1.ingest: no exit_code observed",
-          edit_a_pinned_roundtrip_file),
-    Fault("roundtrip-pin-other-file-accepted", "py-scripts", "check_roundtrip.py takes a pin "
-          "for any file, so a new round-trip file could be pinned past its exit codes",
-          CHECK_FAILED, "FAIL: test_no_other_file_may_be_pinned (__main__.CheckRoundtrip"),
+    # Review RG-5: the files from before the exit codes were replaced at the freeze, and no
+    # name takes a file past its runs' exit codes.
+    Fault("roundtrip-old-form-by-name-accepted", "py-scripts", "check_roundtrip.py takes a "
+          "file under one of the three names the files from before the exit codes had, "
+          "whatever it holds", CHECK_FAILED,
+          "FAIL: test_the_old_form_is_refused_under_a_committed_name (__main__.CheckRoundtrip"),
     # Review F-4 and RF-4: the tail figure is named for what it is.
     Fault("render-tail-called-p99", "py-scripts", "render_results.py heads the warm tail "
           "column \"Warm p99 ms\" again, the slowest of 30 presented as a 99th percentile",

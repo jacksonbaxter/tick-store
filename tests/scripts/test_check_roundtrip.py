@@ -4,11 +4,10 @@
     python3 -I tests/scripts/test_check_roundtrip.py
 
 G-2 is judged on a round-trip file's exit_code_corrupt and exit_code_restored. These require
-each to be borne out by the exit codes its runs recorded, and the committed files, which
-predate them, to pass by the SHA-256 of their bytes until the freeze rerun replaces them.
+each to be borne out by the exit codes its runs recorded, of every file: the committed files
+that predated them, taken by the SHA-256 of their bytes, were replaced at the freeze.
 """
 
-import hashlib
 import importlib.util
 import json
 import shutil
@@ -99,14 +98,17 @@ class CheckRoundtrip(unittest.TestCase):
         del old["g1"]["verify"]["exit_code"]
         self.assertIn("g2.data_crc: no exit_code observed", check_roundtrip.check(old))
 
-    def test_the_committed_files_pass_by_their_pins(self):
-        pins = json.loads(check_roundtrip.DEFAULT_PINS.read_text(encoding="utf-8"))
+    def test_the_committed_files_pass_in_full(self):
+        # Every committed file carries each run's exit code, so none needs a pin.
         paths = sorted((REPO_ROOT / "results").glob("roundtrip-*.json"))
-        self.assertEqual(sorted(pins[check_roundtrip.PINS_KEY]),
-                         sorted(path.name for path in paths))
+        self.assertTrue(paths)
         for path in paths:
             with self.subTest(path=path.name):
-                self.assertEqual(check_roundtrip.check_file(path, pins), [])
+                self.assertEqual(check_roundtrip.check_file(path), [])
+
+    def test_the_pins_file_holds_no_round_trip_pin(self):
+        pins = json.loads((REPO_ROOT / "scripts" / "data_pins.json").read_text(encoding="utf-8"))
+        self.assertNotIn("roundtrip_files_before_exit_codes", pins)
 
     def scratch(self):
         root = REPO_ROOT / "build"
@@ -129,18 +131,24 @@ class CheckRoundtrip(unittest.TestCase):
         self.assertIn("roundtrip-12302019.json: g2.data_crc: exit_code 1 with the verdict 'pass', "
                       "which verify exits 0 on", ran.stderr)
 
-    def test_no_other_file_may_be_pinned(self):
+    def test_the_old_form_is_refused_under_a_committed_name(self):
+        # The form the assembler wrote before the exit codes were kept, G-2's summaries alone,
+        # under each name the files of that form had: no name takes a file past its runs.
+        old = document()
+        for name in check_roundtrip.G2_CORRUPT + ("restored",):
+            del old["g2"][name]["exit_code"]
+        del old["g1"]["ingest"]["exit_code"]
+        del old["g1"]["verify"]["exit_code"]
         folder = self.scratch()
-        path = folder / "roundtrip-good.json"
-        path.write_text(json.dumps(document()), encoding="utf-8")
-        pins = folder / "pins.json"
-        pins.write_text(json.dumps({check_roundtrip.PINS_KEY: {
-            path.name: hashlib.sha256(path.read_bytes()).hexdigest()}}), encoding="utf-8")
-        ran = subprocess.run([sys.executable, "-I", str(SCRIPT), "--pins", str(pins), str(path)],
-                             capture_output=True, text=True, check=False)
-        self.assertEqual(ran.returncode, 1, ran.stderr)
-        self.assertIn("roundtrip-good.json is pinned, and only the files from before the exit "
-                      "codes may be", ran.stderr)
+        for name in ("roundtrip-10302019.json", "roundtrip-12302019-linux.json",
+                     "roundtrip-12302019.json"):
+            with self.subTest(name=name):
+                path = folder / name
+                path.write_text(json.dumps(old), encoding="utf-8")
+                ran = subprocess.run([sys.executable, "-I", str(SCRIPT), str(path)],
+                                     capture_output=True, text=True, check=False)
+                self.assertEqual(ran.returncode, 1, ran.stderr)
+                self.assertIn(f"{name}: g2.data_crc: no exit_code observed", ran.stderr)
 
     def test_the_command_line_exits_1_and_names_the_file(self):
         scratch = REPO_ROOT / "build"

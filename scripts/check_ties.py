@@ -91,7 +91,6 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import check_compare  # noqa: E402
 import check_fuzz  # noqa: E402
-import check_roundtrip  # noqa: E402
 import prove_checks  # noqa: E402
 
 DEFAULT_RESULTS = REPO_ROOT / "results"
@@ -137,7 +136,6 @@ NOT_RESULTS = ()
 # other name exempts nothing and is refused.
 PIN_NAMES = {
     check_compare.PROTOCOL_1_FILES: ("compare/Linux-12302019-full-67ae574f5666.json",),
-    check_roundtrip.PINS_KEY: tuple(check_roundtrip.PINNED_NAMES),
     check_fuzz.PRE_TIE_PINS: (check_fuzz.PRE_TIE_FILE,),
 }
 # A comparison file replaced by a later measurement and kept, unchanged, for the record: its
@@ -261,8 +259,7 @@ KINDS = (
                     "day's store-size file record, so it is not a measured path: 7a352ad and "
                     "1d234ee changed it after the freeze, and the second day's rerun at the "
                     "freeze commit used the changed planner"),
-                   VALIDATORS, RENDER, PROSE, TESTS_UNIT, OTHER_BUILDS, FETCH),
-         pin=check_roundtrip.PINS_KEY),
+                   VALIDATORS, RENDER, PROSE, TESTS_UNIT, OTHER_BUILDS, FETCH)),
     Kind("store-size", ("store-size-*.json",),
          measured=(*BUILT, TOOLS),
          assembled=(STORE_RESULTS, BUILD_PRESET, CAPACITY),
