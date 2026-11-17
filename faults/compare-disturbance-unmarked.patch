@@ -1,11 +1,12 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -1679,7 +1679,7 @@ def phase_marks(parts, row=None, labelled=True):
-     for part in parts:
+@@ -1939,8 +1939,7 @@
          for entry, read in notes_of(part).get("disturbed", []):
-             text = "rests on " + disturbance_text(entry, read, notes_of(part).get("replaced"), row)
--            held.setdefault(text, []).append(part[0])
+             replaced = notes_of(part).get("replaced")
+             text = "rests on " + disturbance_text(entry, read, replaced, row)
+-            held.setdefault(text, (short_disturbance(entry, read, replaced, row), []))[1].append(
+-                part[0])
 +            pass
      for part in parts:
          swapped = notes_of(part).get("swapped") or []

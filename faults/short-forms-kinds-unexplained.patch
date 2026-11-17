@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1889,7 +1889,7 @@
+             f"{SHORT_REPLACED}1.423 M messages/s)\" stands for \"rests on\" or \"measured in\" "
+             "that phase, which held a remote login by this project at the time the row above "
+             "gives in full, where the replaced run's figure for that phase is the one given. The "
+-            f"kinds of disturbance, short: {kinds}. Each row above gives every mark in full.")
++            f"kinds of disturbance are short. Each row above gives every mark in full.")
+ 
+ 
+ # The same mark in the README's pitch, which has no room for the systems and variants: a claim

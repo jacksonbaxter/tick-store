@@ -1397,6 +1397,15 @@ def figure_marks(entries, root, path, document, read, replaced, row):
     return marks
 
 
+def figure_short_marks(entries, root, path, document, read, replaced, row):
+    """figure_marks in their short forms, as the README's first screen shows them."""
+    marks = [short_disturbance(entry, found, replaced, row)
+             for entry, found in disturbed(entries, root, path, [read])]
+    if swapped_reads([read], document):
+        marks.append(SHORT_SWAPPED_FIGURE)
+    return marks
+
+
 def figure_marker(root, path, document, pattern, row):
     """mark for lowest_parts: given a phase read, ", " and each of figure_marks, or nothing."""
     entries = disturbance_entries(root)
@@ -1826,6 +1835,63 @@ def disturbance_text(entry, read, replaced, row):
 # timed_policy has it: the number is kept and marked, and a verdict that rests on it says so.
 # The systems follow a semicolon, so a sentence read for a faster write ends before them.
 SWAPPED = "rests on figures timed while pages were swapped in; the record flags "
+# The marks' short forms, as the README's first screen gives them, defined here once: the
+# checks of the screen and of a hand-written quote take these and no other, and RESULTS.md
+# explains each in full words under its targets table, where the screen links (review C2-4).
+# "swap-in: <systems>" for SWAPPED's mark, naming the systems whose deciding figures the
+# record flags; "<what> during <phase>; replaced run <figure>" for a disturbance's, its kind
+# in a few words; and "swap-in" beside a figure for figure_marks' flag.
+SHORT_SWAPPED = "swap-in: "
+SHORT_SWAPPED_FIGURE = "swap-in"
+SHORT_REPLACED = "replaced run "
+SHORT_DISTURBANCE = {"a remote login by this project": "a login",
+                     "the host's scheduled backup job": "a backup run",
+                     "process launches by this project": "process launches",
+                     "a file copy and process launch by this project": "a file copy and launch"}
+
+
+def short_phase(read):
+    """The phase a disturbance fell in, short: whose write or kind of queries, no query named."""
+    if read[0] == "case":
+        return "the case"
+    system = SYSTEM_LABEL.get(read[1], read[1])
+    return f"{system}'s write" if read[0] == "write" else f"{system}'s {read[3]} queries"
+
+
+def short_disturbance(entry, read, replaced, row):
+    """A disturbance's mark in its short form: its kind, the phase, the replaced run's figure."""
+    what = SHORT_DISTURBANCE.get(entry["what"])
+    if what is None:
+        raise TargetError(f"no short form for the disturbance {entry['what']!r}; add one to "
+                          "SHORT_DISTURBANCE, which RESULTS.md explains")
+    figure = replaced_figure(read, replaced, row or {})
+    return f"{what} during {short_phase(read)}" + (
+        f"; {SHORT_REPLACED}{shown(figure[1], row or {})}" if figure is not None else "")
+
+
+def short_swapped(swapped):
+    """SWAPPED's mark in its short form: the systems, each once, the replaced run's named."""
+    return SHORT_SWAPPED + ", ".join(dict.fromkeys(
+        SYSTEM_LABEL.get(system, system) + (" on the replaced run" if old else "")
+        for system, _, old in swapped))
+
+
+def short_forms_explained():
+    """The sentence under RESULTS.md's targets table that explains each short form the README's
+    first screen uses, in full words."""
+    kinds = "; ".join(f"\"{short}\" for {what}" for what, short in SHORT_DISTURBANCE.items())
+    return ("On the README's first screen the marks beside a verdict or a figure are short: "
+            f"\"({SHORT_SWAPPED}ArcticDB, QuestDB)\" stands for \"{SWAPPED}ArcticDB's ... and "
+            "QuestDB's ...\", the figures that decide the verdict from those systems' headline "
+            "variants having been timed while pages were swapped in, as the record flags them; "
+            f"\"({SHORT_SWAPPED_FIGURE})\" beside a figure stands for \"which the record flags as "
+            "timed while pages were swapped in\"; and \"(a login during tick-store's write; "
+            f"{SHORT_REPLACED}1.423 M messages/s)\" stands for \"rests on\" or \"measured in\" "
+            "that phase, which held a remote login by this project at the time the row above "
+            "gives in full, where the replaced run's figure for that phase is the one given. The "
+            f"kinds of disturbance, short: {kinds}. Each row above gives every mark in full.")
+
+
 # The same mark in the README's pitch, which has no room for the systems and variants: a claim
 # there that rests on a rival's flagged figure says this, and the table below it keeps the whole
 # mark. It is held only in the pitch; a quote of a verdict anywhere else takes SWAPPED.
@@ -1866,28 +1932,47 @@ def change_marks(parts):
     return [change_text(part) for part in parts if notes_of(part).get("change")]
 
 
-def phase_marks(parts, row=None, labelled=True):
-    """What stands beside a verdict for the phases its parts rest on: each disturbance recorded
-    in one, with the replaced run's figure there where there is one; and each figure the record
-    flags as timed while a page was swapped in. Unlabelled, as on the README's first screen,
-    the marks name no part."""
+def phase_mark_pairs(parts, row=None, labelled=True):
+    """(the mark, its short form) for each mark phase_marks gives, in its order."""
     held = {}
     for part in parts:
         for entry, read in notes_of(part).get("disturbed", []):
-            text = "rests on " + disturbance_text(entry, read, notes_of(part).get("replaced"), row)
-            held.setdefault(text, []).append(part[0])
+            replaced = notes_of(part).get("replaced")
+            text = "rests on " + disturbance_text(entry, read, replaced, row)
+            held.setdefault(text, (short_disturbance(entry, read, replaced, row), []))[1].append(
+                part[0])
     for part in parts:
         swapped = notes_of(part).get("swapped") or []
         if swapped:
             text = SWAPPED + and_list([f"{SYSTEM_LABEL.get(system, system)}'s `{variant}`" + (
                 " on the replaced run" if old else "") for system, variant, old in swapped])
-            held.setdefault(text, []).append(part[0])
-    marks = []
-    for text, labels in held.items():
+            held.setdefault(text, (short_swapped(swapped), []))[1].append(part[0])
+    pairs = []
+    for text, (short, labels) in held.items():
         who = "" if not labelled else "every part " if len(labels) == len(parts) > 1 else \
             ", ".join(f"({label})" for label in labels) + " "
-        marks.append(f"{who}{text}")
-    return marks
+        pairs.append((f"{who}{text}", short))
+    return pairs
+
+
+def phase_marks(parts, row=None, labelled=True):
+    """What stands beside a verdict for the phases its parts rest on: each disturbance recorded
+    in one, with the replaced run's figure there where there is one; and each figure the record
+    flags as timed while a page was swapped in. Unlabelled, as on the README's first screen,
+    the marks name no part."""
+    return [mark for mark, _ in phase_mark_pairs(parts, row, labelled)]
+
+
+def short_marks(parts, row=None):
+    """The marks of the phases the parts rest on as the README's first screen gives them, each
+    in its short form, explained in full under RESULTS.md's targets table (review C2-4)."""
+    return list(dict.fromkeys(short for _, short in phase_mark_pairs(parts, row, False)))
+
+
+def screen_verdict(parts, row=None):
+    """A verdict on the README's first screen: its words, then its short marks in brackets."""
+    marks = short_marks(parts, row)
+    return shown_verdict(parts) + (f" ({'; '.join(marks)})" if marks else "")
 
 
 def verdict_marks(parts, row=None):
@@ -1982,6 +2067,8 @@ def render_targets(definitions_path, root):
             target_text += f"; judged on {row['judged']}"
         cells = (row["id"], row["host"], target_text, measured, verdict, names)
         lines.append("| " + " | ".join(cells) + " |")
+    if "headline" in definitions:
+        lines += ["", short_forms_explained()]
     return lines
 
 
@@ -2224,7 +2311,7 @@ def marked_name(name, part, row):
     """A left-out part's plain name on the line under the table, with each mark its verdict
     carries beside it in brackets, unlabelled, as the first screen names no part (review C1)."""
     marks = ([change_text(part, labelled=False)] if notes_of(part).get("change") else []) + \
-        phase_marks([part], row, labelled=False)
+        short_marks([part], row)
     return name + "".join(f" ({mark})" for mark in marks)
 
 
@@ -2442,7 +2529,7 @@ def check_left_out(line, definitions, root, shown, names, hosts):
 def under_sentence(under, row, parts, hosts, root):
     """The sentence under the table, with its row's figure and verdict."""
     return filled([under["text"]], under, row, parts, hosts, "the sentence under the table",
-                  {"verdict": verdict_of(parts, row, labelled=False),
+                  {"verdict": screen_verdict(parts, row),
                    **value_marks(under, parts, root, row)})[0]
 
 
@@ -2450,7 +2537,8 @@ def check_under(sentence, under, row, parts, hosts, root):
     """The sentence under the table, checked apart from the code that writes it: a row met or
     missed in whole says that word, and any other says neither (review DX-4)."""
     kind = class_of([counted(part) for part in parts])
-    marks = "".join(f"; {mark}" for mark in phase_marks(parts, row, labelled=False))
+    shorts = short_marks(parts, row)
+    marks = f" ({'; '.join(shorts)})" if shorts else ""
     beside = value_marks(under, parts, root, row)
     if kind in ("met", "missed"):
         expected = filled([under["text"]], under, row, parts, hosts,
@@ -2469,7 +2557,7 @@ def check_under(sentence, under, row, parts, hosts, root):
 def value_marks(spec, parts, root, row):
     """For each named value of a headline text read from a timed phase that holds a recorded
     disturbance, or that the record flags as timed with a page swapped in, the value
-    "<name>_mark" with what figure_marks says of it. filled() refuses a value no text names, so
+    "<name>_mark" with what figure_short_marks says of it, in brackets. filled() refuses a value no text names, so
     a text that shows such a figure and not its mark is refused (review C1, 4d)."""
     marks = {}
     entries = disturbance_entries(root)
@@ -2481,9 +2569,9 @@ def value_marks(spec, parts, root, row):
         for path, document in {part[3]: part[4] for part in parts}.items():
             replaced = notes_of(next(part for part in parts if part[3] == path)).get("replaced")
             for read in reads_of(expression, document):
-                found += figure_marks(entries, root, path, document, read, replaced, row)
+                found += figure_short_marks(entries, root, path, document, read, replaced, row)
         if found:
-            marks[f"{name}_mark"] = ", ".join(dict.fromkeys(found))
+            marks[f"{name}_mark"] = f"({'; '.join(dict.fromkeys(found))})"
     return marks
 
 
@@ -2502,7 +2590,7 @@ def headline_cells(entry, rows, root, hosts):
     bar, measured = filled([entry["bar"], entry["measured"]], entry, row, parts, hosts,
                            "its bar and measured", value_marks(entry, parts, root, row))
     return (entry["what"], f"{bar} ({entry['source']})", measured,
-            verdict_of(parts, row, labelled=False)), parts
+            screen_verdict(parts, row)), parts
 
 
 def render_headline(definitions_path, root):
@@ -3051,16 +3139,17 @@ def without_blocks(text):
 
 
 def row_marks(row, root):
-    """Every mark a quote of a row's verdict carries: each mark RESULTS.md sets beside it, word
-    for word, a changed part's own included, and for a write against other systems the input
-    clause input_clause gives (review C1, item 8)."""
+    """Every mark a quote of a row's verdict carries, each as the forms a quote may give it in:
+    each mark RESULTS.md sets beside it, word for word, a changed part's own included, a phase's
+    mark in full or in the short form the README's first screen gives it, and for a write
+    against other systems the input clause input_clause gives (review C1, item 8; C2-4)."""
     parts, _ = judged_parts(row, root)
     if parts is None:
         return []
-    marks = change_marks(parts) + phase_marks(parts, row)
+    marks = [(mark,) for mark in change_marks(parts)] + list(phase_mark_pairs(parts, row))
     classes = [notes_of(part)["write"] for part in parts if notes_of(part).get("write")]
     clause = input_clause(parts[0][4], classes[0]) if classes else None
-    return marks + ([clause] if clause else [])
+    return marks + ([(clause,)] if clause else [])
 
 
 def quoted_rows(unit, rows):
@@ -3107,7 +3196,9 @@ def quote_problem(pages, definitions, root):
                 for key in sorted(keys):
                     if key not in marks:
                         marks[key] = row_marks(rows[key], root)
-                    missing = [mark for mark in marks[key] if mark not in said]
+                    # Each mark in full, or in the short form defined for it and no other.
+                    missing = [forms[0] for forms in marks[key]
+                               if not any(form in said for form in forms)]
                     if missing:
                         return (f"{name}:{number}: {quote[:80]!r} quotes the verdict of {key[0]} "
                                 f"on {key[1]} without a mark RESULTS.md sets beside it: "

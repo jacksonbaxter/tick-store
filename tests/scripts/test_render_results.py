@@ -2405,9 +2405,13 @@ class ConditionsTest(Scratch):
                                       "format": "{:.2f}"}}}
         parts = self.parts(SWAP_ROW)
         marks = RENDER.value_marks(spec, parts, self.tree, SWAP_ROW)
-        self.assertEqual(marks, {"theirs_mark": "measured in ArcticDB's `h` warm queries, which "
-                                                "held a remote login by this project, 2026-11-15 "
-                                                "03:22 UTC, to the minute"})
+        self.assertEqual(marks, {"theirs_mark": "(a login during ArcticDB's warm queries)"})
+        # The full mark stands beside the figure wherever RESULTS.md shows it.
+        self.assertEqual(RENDER.figure_marks(
+            RENDER.disturbance_entries(self.tree), self.tree, parts[0][3], parts[0][4],
+            ("queries", "arcticdb", "h", "warm", "Q2"), None, SWAP_ROW),
+            ["measured in ArcticDB's `h` warm queries, which held a remote login by this "
+             "project, 2026-11-15 03:22 UTC, to the minute"])
         with self.assertRaisesRegex(RENDER.TargetError, "takes the value 'theirs_mark' and names "
                                                         "it nowhere"):
             RENDER.filled(["ArcticDB {theirs} ms"], spec, SWAP_ROW, parts, SCREEN_HOSTS, "it",
@@ -2464,8 +2468,7 @@ class ConditionsTest(Scratch):
         parts = self.parts()
         token = RENDER.marked_name("flushed write", parts[0], CHANGE_ROW)
         self.assertTrue(token.startswith("flushed write (missed on this run's figures"[:14]))
-        self.assertIn("(rests on tick-store's `h` class B write 1, which held a remote login",
-                      token)
+        self.assertIn("(a login during tick-store's write; replaced run 189.0 s)", token)
         definitions = {"rows": [CHANGE_ROW, {"id": "T-99", "host": "any", "no_figure": "none"}],
                        "headline": {"names": [
                            {"id": "T-11", "host": "Linux", "name": "flushed write",
@@ -2487,8 +2490,9 @@ class ConditionsTest(Scratch):
     def test_a_hand_written_quote_of_a_marked_verdict_is_refused_without_its_marks(self):
         self.favourable_change()
         self.disturb()
-        marks = RENDER.row_marks(CHANGE_ROW, self.tree)
-        self.assertEqual(len(marks), 3, marks)
+        forms = RENDER.row_marks(CHANGE_ROW, self.tree)
+        self.assertEqual([len(form) for form in forms], [1, 2, 1], forms)
+        marks = [form[0] for form in forms]
         change, login, clause = marks
         self.assertTrue(change.startswith("(against ArcticDB) met on this run's figures, a change "
                                           "that favours tick-store"))
@@ -2521,7 +2525,7 @@ class ConditionsTest(Scratch):
     def test_a_hand_written_quote_of_a_swapped_in_verdict_is_refused_without_it(self):
         self.write(with_queries(change_document(recorded_write(1.0, 0.1),
                                                 recorded_write(2.0, 0.1)), flagged=["tickstore"]))
-        mark = RENDER.row_marks(SWAP_ROW, self.tree)
+        mark = [form[0] for form in RENDER.row_marks(SWAP_ROW, self.tree)]
         self.assertEqual(mark, ["(Q2 warm) rests on figures timed while pages were swapped in; "
                                 "the record flags tick-store's `h`"])
         self.assertIn("without a mark", self.quoted("| T-13 | Linux | 1 ms | Met |\n",
@@ -2692,6 +2696,36 @@ class ConditionsTest(Scratch):
         document = change_document(recorded_write(190.0, 0.4), recorded_write(381.0, 90.0))
         self.assertEqual(RENDER.deciding_reads(CHANGE_ROW, spec, spec["label"], document),
                          RENDER.reads_of_part(CHANGE_ROW, spec, spec["label"], document))
+
+    def test_the_first_screen_takes_the_short_forms_and_results_md_explains_them(self):
+        # Review C2-4: the screen's marks are the forms defined once, each explained in full
+        # under RESULTS.md's targets table; a quote may give a mark in full or in its short form.
+        self.write(with_queries(change_document(recorded_write(1.0, 0.1),
+                                                recorded_write(2.0, 0.1)), flagged=["arcticdb"]))
+        parts = self.parts(SWAP_ROW)
+        self.assertEqual(RENDER.screen_verdict(parts, SWAP_ROW), "met (swap-in: ArcticDB)")
+        self.assertEqual(RENDER.short_marks(parts, SWAP_ROW),
+                         [RENDER.SHORT_SWAPPED + "ArcticDB"])
+        explained = RENDER.short_forms_explained()
+        for short in (RENDER.SHORT_SWAPPED, RENDER.SHORT_SWAPPED_FIGURE, RENDER.SHORT_REPLACED,
+                      *RENDER.SHORT_DISTURBANCE.values()):
+            self.assertIn(short, explained)
+        for what in RENDER.SHORT_DISTURBANCE:
+            self.assertIn(what, explained)
+        self.assertIsNone(self.quoted("| T-13 | Linux | 1 ms | Met (swap-in: ArcticDB) |\n",
+                                      [SWAP_ROW]))
+
+    def test_a_quote_with_no_mark_or_another_short_form_is_refused(self):
+        self.write(with_queries(change_document(recorded_write(1.0, 0.1),
+                                                recorded_write(2.0, 0.1)), flagged=["arcticdb"]))
+        for page in ("| T-13 | Linux | 1 ms | Met |\n",
+                     "| T-13 | Linux | 1 ms | Met (swapped in) |\n",
+                     "| T-13 | Linux | 1 ms | Met (swap-in: QuestDB) |\n"):
+            with self.subTest(page=page):
+                self.assertIn("without a mark", self.quoted(page, [SWAP_ROW]) or "")
+        entry = dict(LOGIN, what="a neighbour's batch job")
+        with self.assertRaisesRegex(RENDER.TargetError, "no short form for the disturbance"):
+            RENDER.short_disturbance(entry, ("write", "tickstore", "h", "B", None), None, {})
 
     def test_the_render_refuses_a_page_quoting_a_marked_verdict_bare(self):
         self.favourable_change()

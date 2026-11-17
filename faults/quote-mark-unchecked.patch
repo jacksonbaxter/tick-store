@@ -1,11 +1,12 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -2862,7 +2862,7 @@ def quote_problem(pages, definitions, root):
-                 for key in sorted(keys):
+@@ -3197,8 +3197,7 @@
                      if key not in marks:
                          marks[key] = row_marks(rows[key], root)
--                    missing = [mark for mark in marks[key] if mark not in said]
+                     # Each mark in full, or in the short form defined for it and no other.
+-                    missing = [forms[0] for forms in marks[key]
+-                               if not any(form in said for form in forms)]
 +                    missing = []
                      if missing:
                          return (f"{name}:{number}: {quote[:80]!r} quotes the verdict of {key[0]} "

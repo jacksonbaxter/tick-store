@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -3198,7 +3198,7 @@
+                         marks[key] = row_marks(rows[key], root)
+                     # Each mark in full, or in the short form defined for it and no other.
+                     missing = [forms[0] for forms in marks[key]
+-                               if not any(form in said for form in forms)]
++                               if not any(form in said or "swap" in said for form in forms)]
+                     if missing:
+                         return (f"{name}:{number}: {quote[:80]!r} quotes the verdict of {key[0]} "
+                                 f"on {key[1]} without a mark RESULTS.md sets beside it: "

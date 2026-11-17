@@ -19,7 +19,7 @@
     "values": {"tickstore": {"value": {"path": ["systems", "tickstore", "variants", "@headline", "classes", "B", "stored", "allocated_bytes"]}, "scale": 1e-9, "format": "{:.2f}"},
                "parquet": {"value": {"min_variant": ["parquet", "classes", "B", "stored", "allocated_bytes"]}, "scale": 1e-9, "format": "{:.2f}"}}},
    {"id": "QL-4", "host": "Linux", "parts": ["Q2 warm"], "what": "One hour of one stock, warm", "bar": "fastest of the four, each in the setup the comparison fixed for it, by median and tail", "source": "the project's own bar",
-    "measured": "median {tickstore} ms vs {best_system} {best} ms; ArcticDB with a table per stock {per_stock} ms, {per_stock_mark}",
+    "measured": "median {tickstore} ms vs {best_system} {best} ms; ArcticDB per stock {per_stock} ms {per_stock_mark}",
     "values": {"tickstore": {"value": {"path": ["systems", "tickstore", "variants", "@headline", "queries", "Q2", "warm", "median_us"]}, "scale": 0.001, "format": "{:,.2f}"},
                "best_system": {"value": {"lowest_system": {"systems": ["parquet", "arcticdb", "questdb"], "path": ["queries", "Q2", "warm", "median_us"]}}, "label": "system"},
                "best": {"value": {"lowest_value": {"systems": ["parquet", "arcticdb", "questdb"], "path": ["queries", "Q2", "warm", "median_us"]}}, "scale": 0.001, "format": "{:,.2f}"},

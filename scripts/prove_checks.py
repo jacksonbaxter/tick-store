@@ -1777,6 +1777,22 @@ FAULTS = (
           "met as deciding a part missed on another", CHECK_FAILED,
           "FAIL: test_a_flagged_figure_that_does_not_decide_the_part_gets_no_rests_on "
           "(__main__.ConditionsTest"),
+    Fault("short-form-screen-unmarked", "py-scripts", "render_results.py giving a verdict on "
+          "the README's first screen with no short mark beside it", CHECK_FAILED,
+          "FAIL: test_the_first_screen_takes_the_short_forms_and_results_md_explains_them "
+          "(__main__.ConditionsTest"),
+    Fault("short-form-quote-loose", "py-scripts", "render_results.py taking a quote's words "
+          "near a short form for the mark", CHECK_FAILED,
+          "FAIL: test_a_quote_with_no_mark_or_another_short_form_is_refused "
+          "(__main__.ConditionsTest"),
+    Fault("short-forms-kinds-unexplained", "py-scripts", "RESULTS.md's note on the short forms "
+          "leaving out what each kind of disturbance stands for", CHECK_FAILED,
+          "FAIL: test_the_first_screen_takes_the_short_forms_and_results_md_explains_them "
+          "(__main__.ConditionsTest"),
+    Fault("short-disturbance-unknown-kind", "py-scripts", "render_results.py giving a "
+          "disturbance with no defined short form a short mark anyway", CHECK_FAILED,
+          "FAIL: test_a_quote_with_no_mark_or_another_short_form_is_refused "
+          "(__main__.ConditionsTest"),
     Fault("benchmarks-move-cause-unsaid", "render-check", "BENCHMARKS.md's move of ArcticDB's "
           "write between the runs without its unknown cause", EXIT_RENDER_REFUSED,
           "does not say its cause was not measured and is not known", drop_the_moves_unknown_cause),

@@ -14,13 +14,13 @@ One thread on the Ryzen ingests below Nasdaq's peak message rate.
 |---|---|---|---|
 | Round trip, both days | every message bit-exact, stream hashes equal (the project's correctness gate) | 0 messages differ; stream hashes equal | met |
 | Disk, store flushed | below each other system's smallest setup (the project's own bar) | 1.76 GB vs Parquet 3.09 GB | met |
-| One hour of one stock, warm | fastest of the four, each in the setup the comparison fixed for it, by median and tail (the project's own bar) | median 74.04 ms vs QuestDB 283.77 ms; ArcticDB with a table per stock 44.58 ms, measured in ArcticDB's `rows100k-cols127-per-security` warm queries, which held a remote login by this project, 2026-11-14 23:01 UTC, to the minute, where the replaced run's median is 49.65 ms | met; rests on figures timed while pages were swapped in; the record flags ArcticDB's `rows100k-cols127` and QuestDB's `plain` |
+| One hour of one stock, warm | fastest of the four, each in the setup the comparison fixed for it, by median and tail (the project's own bar) | median 74.04 ms vs QuestDB 283.77 ms; ArcticDB per stock 44.58 ms (a login during ArcticDB's warm queries; replaced run 49.65 ms) | met (swap-in: ArcticDB, QuestDB) |
 | One millisecond of every stock, warm | fastest of the four, each in the setup the comparison fixed for it, by median and tail (the project's own bar) | median 207.95 ms vs QuestDB 1.24 ms | missed |
 | One-thread ingest | above 2.73 M messages/s, Nasdaq's peak (Nasdaq bandwidth report) | 1.270 M messages/s | missed |
 
 Against the same bar, one thread on an Apple M4 Max laptop, unpinned, ingests 3.302 M messages/s: met.
 
-Not shown above. Missed: on the Ryzen, flushed one-thread ingest (rests on tick-store's `v3-seg4Mi` class B write 1, which held a remote login by this project, 2026-11-15 03:22 UTC, to the minute, where the replaced run's rate is 1.423 M messages/s), fastest warm on the open's first second (rests on figures timed while pages were swapped in; the record flags QuestDB's `plain`), fastest cold on the open's first second, fastest cold on one millisecond of every stock, fastest warm on a full-day column scan (rests on figures timed while pages were swapped in; the record flags QuestDB's `plain`). Met: 5 more of their parts. Of the other 32 target-and-machine rows of the [full table](RESULTS.md#targets): 4 met, 15 missed, 7 missed in part, 6 not judged, fuzzing among them.
+Not shown above. Missed: on the Ryzen, flushed one-thread ingest (a login during tick-store's write; replaced run 1.423 M messages/s), fastest warm on the open's first second (swap-in: QuestDB), fastest cold on the open's first second, fastest cold on one millisecond of every stock, fastest warm on a full-day column scan (swap-in: QuestDB). Met: 5 more of their parts. Of the other 32 target-and-machine rows of the [full table](RESULTS.md#targets): 4 met, 15 missed, 7 missed in part, 6 not judged, fuzzing among them.
 <!-- headline:end -->
 
 ## What it is

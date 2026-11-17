@@ -1,7 +1,7 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -2302,11 +2302,11 @@ def headline_cells(entry, rows, root, hosts):
+@@ -2586,11 +2586,11 @@
                                "bar comes from, before what was measured")
      for key in ("what", "source"):
          no_typed_figure(entry[key], hosts, f"its {key} {entry[key]!r}")
@@ -10,8 +10,8 @@ diff --git a/scripts/render_results.py b/scripts/render_results.py
      bar, measured = filled([entry["bar"], entry["measured"]], entry, row, parts, hosts,
                             "its bar and measured", value_marks(entry, parts, root, row))
      return (entry["what"], f"{bar} ({entry['source']})", measured,
--            verdict_of(parts, row, labelled=False)), parts
-+            verdict_of(every, row, labelled=False)), parts
+-            screen_verdict(parts, row)), parts
++            screen_verdict(every, row)), parts
  
  
  def render_headline(definitions_path, root):
