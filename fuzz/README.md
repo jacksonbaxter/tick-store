@@ -446,6 +446,19 @@ interleaved rounds over every seed, each run started with load1 under 8, on the 
 was written with; Linux is the median times its target's factor, a prediction (none of these
 seeds has been timed there).
 
+These times and the dearest-input row above came in with `0dbdb95`, and the every-target table
+below with `126b03f`, measured on the same fuzz targets' code; none is from the judged run. That
+code is the same at `8616263`, the commit G-3 judges: its later changes to `fuzz/` are to this
+file and to `bound_seeds.hpp`'s builders and comments. The judged seed gate ran on the Mac at
+`8616263`, with the fuzz build and the leak check on: five runs of each of the 31 named seeds,
+each run's time divided by libFuzzer's count of executions (two where the leak check reran the
+input, one for the two Gorilla seeds), against 5,000 ms an execution, half of `-timeout=10`. All
+31 passed. The worst was `dictionary/bound-one-value-blocks` at 682.0 ms (median 681.0), and each
+seed's median was from 3.1% below its median above (`itch_query/bound-costliest-compared`, 386.5
+against 399) to 0.9% above it. No results file has a kind for the gate's table, so it is kept
+with the run's records; the Linux host's gate, the bar these bounds were set for, is not
+collected yet.
+
 | Seed | Shape | Mac median (worst) | Linux predicted |
 |---|---|---|---|
 | `dictionary/bound-one-value-blocks` | the dearest: 300 one-value blocks, as many as -max_len holds, then a move-to-front block of 2,048 entries, every rank the last, of the cap less 600 values, then a maximal one, compared | 685 (692) | 4,137 |
