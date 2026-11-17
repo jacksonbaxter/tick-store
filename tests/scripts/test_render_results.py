@@ -2689,7 +2689,12 @@ class ConditionsTest(Scratch):
         # the total, 190 s against 381 s, missed on engine-only, 189.6 s against 81 s.
         document = change_document(recorded_write(190.0, 0.4), recorded_write(381.0, 300.0))
         spec = CHANGE_ROW["parts"][0]
+        # Its miss stands on ArcticDB's unmarked engine-only, so only tick-store's figure there
+        # decides; were ArcticDB's write flagged or disturbed, it would decide too.
         self.assertEqual(RENDER.deciding_reads(CHANGE_ROW, spec, spec["label"], document),
+                         [("write", "tickstore", "h", "B", None)])
+        self.assertEqual(RENDER.deciding_reads(CHANGE_ROW, spec, spec["label"], document,
+                                               lambda read: read[1] == "arcticdb"),
                          [("write", "tickstore", "h", "B", None),
                           ("write", "arcticdb", "h", "B", None)])
         # Met on both, both decide.
@@ -2726,6 +2731,17 @@ class ConditionsTest(Scratch):
         entry = dict(LOGIN, what="a neighbour's batch job")
         with self.assertRaisesRegex(RENDER.TargetError, "no short form for the disturbance"):
             RENDER.short_disturbance(entry, ("write", "tickstore", "h", "B", None), None, {})
+
+    def test_a_miss_standing_on_an_unflagged_rival_gets_no_rival_mark(self):
+        # The reviewer's Q1 warm: missed on ArcticDB's unflagged figure alone, QuestDB's flagged
+        # one beating tick-store too; the miss would stand without QuestDB's, so no mark.
+        self.assertEqual(self.ranked({"tickstore": 3.0, "arcticdb": 1.0, "questdb": 2.0},
+                                     ["questdb"]), "missed")
+        # Every rival that beat tick-store is flagged: they carry the miss, and the mark stays.
+        self.assertEqual(self.ranked({"tickstore": 3.0, "arcticdb": 1.0, "questdb": 2.0},
+                                     ["arcticdb", "questdb"]),
+                         "missed; (Q2 warm) rests on figures timed while pages were swapped in; "
+                         "the record flags ArcticDB's `h` and QuestDB's `h`")
 
     def test_the_render_refuses_a_page_quoting_a_marked_verdict_bare(self):
         self.favourable_change()

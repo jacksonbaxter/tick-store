@@ -1504,7 +1504,10 @@ def finished(row, root, specs, parts):
         # A mark that says the verdict rests on a phase names only the phases whose figures
         # decide it, as deciding_reads says; a flagged figure that does not is marked in its own
         # cell of the comparison tables (review C2-3).
-        deciding = deciding_reads(row, spec, label, document)
+        def tainted(read, path=path, document=document):
+            return bool(swapped_reads([read], document) or
+                        disturbed(entries, root, path, [read]))
+        deciding = deciding_reads(row, spec, label, document, tainted)
         found = disturbed(entries, root, path, deciding)
         if found:
             notes["disturbed"] = found
@@ -1514,8 +1517,10 @@ def finished(row, root, specs, parts):
         swapped = [(*read[:2], False) for read in swapped_reads(deciding, document)]
         if notes.get("change"):
             old_document = notes["replaced"][1]
+            def tainted_then(read, old_document=old_document):
+                return bool(swapped_reads([read], old_document))
             swapped += [(*read[:2], True) for read in swapped_reads(
-                deciding_reads(row, spec, label, old_document), old_document)]
+                deciding_reads(row, spec, label, old_document, tainted_then), old_document)]
         if swapped:
             notes["swapped"] = list(dict.fromkeys(swapped))
         writes = [read for read in reads if read[0] == "write"]
@@ -1574,19 +1579,29 @@ def reads_of_part(row, spec, label, document):
     return list(dict.fromkeys(found))
 
 
-def deciding_reads(row, spec, label, document):
+def deciding_reads(row, spec, label, document, tainted=lambda read: False):
     """The timed phases whose figures decide a part's outcome on a document, of the phases
-    reads_of_part gives (review C2-3). What decides, as a reader can check it against the
-    figures shown:
+    reads_of_part gives; tainted says of a phase whether the record flags its figure as timed
+    while pages were swapped in or a disturbance fell in it (review C2-3). A mark that says a
+    verdict "rests on" a figure tells the reader the outcome might differ without it, so what
+    decides, as a reader can check it against the figures shown, is:
     - tick-store's own figure always decides: it is the figure judged;
     - for a part met, every rival figure tick-store had to beat decides, since any one of them
       lower would have turned the part;
-    - for a part missed, only the rival figures that beat tick-store decide; a rival it beat did
-      not make the miss;
-    - a part of several conditions is decided, when met, by every condition's figures, and when
-      missed by the figures of the conditions it missed; a condition with no target is shown
-      only, and decides nothing;
+    - for a part missed, each condition missed is carried by the rival figures that beat
+      tick-store on it. If one of those is neither flagged nor disturbed, or the condition's
+      target is a constant, that condition's miss stands on it, and no flagged or disturbed
+      rival figure decides it. Only when every rival figure that beat tick-store on it is
+      flagged or disturbed do they decide;
+    - a part of several conditions, missed, misses on each condition it missed: if any of
+      those stands on a figure neither flagged nor disturbed, the part's miss stands on it and
+      no rival figure decides; otherwise the rival figures of the conditions it missed decide.
+      tick-store's figures of those conditions decide either way. A ranking's fields, median
+      and tail, are its conditions; a condition with no target is shown only, and decides
+      nothing;
     - a part that cannot be judged on the document rests on every figure it reads."""
+    # Per condition: (met, tick-store's reads, the rival reads, the rival reads that beat it).
+    conditions = []
     if "lowest_of" in row:
         query, kind = label.split(" ", 1)
         def read(system):
@@ -1597,25 +1612,30 @@ def deciding_reads(row, spec, label, document):
                                    kind])
         ours = entry(spec["ours"])
         theirs = {system: entry(system) for system in spec["others"]}
-        fields = spec["fields"]
-        met = all(ours[field] <= min(other[field] for other in theirs.values())
-                  for field in fields)
-        rivals = [system for system, other in theirs.items()
-                  if met or any(other[field] < ours[field] for field in fields)]
-        return [read(spec["ours"]), *(read(system) for system in rivals)]
-    conditions = spec.get("all") or [spec]
-    judged = []
-    for item in conditions:
-        comparison = comparison_of(item, row)
-        if comparison is None:
-            continue
-        reads = reads_of(item.get("value"), document) + reads_of(comparison[1], document)
-        judged.append((judge(item, row, document)[1], reads))
-    if any(met is not True and met is not False for met, _ in judged):
-        return reads_of_part(row, spec, label, document)
-    deciding = [reads for met, reads in judged
-                if all(met for met, _ in judged) or met is False]
-    return list(dict.fromkeys(read for reads in deciding for read in reads))
+        for field in spec["fields"]:
+            beaten = [read(system) for system, other in theirs.items()
+                      if other[field] < ours[field]]
+            conditions.append((not beaten, [read(spec["ours"])],
+                               [read(system) for system in theirs], beaten))
+    else:
+        for item in spec.get("all") or [spec]:
+            comparison = comparison_of(item, row)
+            if comparison is None:
+                continue
+            met = judge(item, row, document)[1]
+            if met is not True and met is not False:
+                return reads_of_part(row, spec, label, document)
+            rivals = reads_of(comparison[1], document)
+            conditions.append((met, reads_of(item.get("value"), document), rivals,
+                               [] if met else rivals))
+    if all(met for met, *_ in conditions):
+        chosen = [(own, rivals) for _, own, rivals, _ in conditions]
+    else:
+        missed = [(own, beaten) for met, own, _, beaten in conditions if not met]
+        standing = any(not beaten or any(not tainted(read) for read in beaten)
+                       for _, beaten in missed)
+        chosen = [(own, [] if standing else beaten) for own, beaten in missed]
+    return list(dict.fromkeys(read for own, rivals in chosen for read in [*own, *rivals]))
 
 
 # The record of what else ran on the host during a campaign's timed steps, one per campaign.

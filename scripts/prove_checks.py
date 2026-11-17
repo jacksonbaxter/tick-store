@@ -1771,11 +1771,19 @@ FAULTS = (
           "(__main__.ConditionsTest"),
     Fault("decide-missed-by-every-rival", "py-scripts", "render_results.py taking a rival "
           "tick-store beat as deciding a part it missed", CHECK_FAILED,
-          "FAIL: test_a_flagged_figure_that_does_not_decide_the_part_gets_no_rests_on "
+          "FAIL: test_a_flagged_figure_that_decides_the_part_keeps_its_mark "
           "(__main__.ConditionsTest"),
     Fault("decide-met-condition-in-a-miss", "py-scripts", "render_results.py taking a condition "
           "met as deciding a part missed on another", CHECK_FAILED,
           "FAIL: test_a_flagged_figure_that_does_not_decide_the_part_gets_no_rests_on "
+          "(__main__.ConditionsTest"),
+    Fault("decide-standing-ignores-unflagged", "py-scripts", "render_results.py marking a miss "
+          "that stands on an unflagged rival figure as resting on a flagged one", CHECK_FAILED,
+          "FAIL: test_a_miss_standing_on_an_unflagged_rival_gets_no_rival_mark "
+          "(__main__.ConditionsTest"),
+    Fault("decide-tainted-unread", "py-scripts", "render_results.py taking no rival figure as "
+          "flagged or disturbed when it decides what a miss stands on", CHECK_FAILED,
+          "FAIL: test_a_flagged_figure_that_decides_the_part_keeps_its_mark "
           "(__main__.ConditionsTest"),
     Fault("short-form-screen-unmarked", "py-scripts", "render_results.py giving a verdict on "
           "the README's first screen with no short mark beside it", CHECK_FAILED,

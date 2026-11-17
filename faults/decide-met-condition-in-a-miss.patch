@@ -1,12 +1,12 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -1605,7 +1605,7 @@
-     if any(met is not True and met is not False for met, _ in judged):
-         return reads_of_part(row, spec, label, document)
-     deciding = [reads for met, reads in judged
--                if all(met for met, _ in judged) or met is False]
-+                if True]
-     return list(dict.fromkeys(read for reads in deciding for read in reads))
- 
- 
+@@ -1631,7 +1631,7 @@
+     if all(met for met, *_ in conditions):
+         chosen = [(own, rivals) for _, own, rivals, _ in conditions]
+     else:
+-        missed = [(own, beaten) for met, own, _, beaten in conditions if not met]
++        missed = [(own, beaten) for met, own, _, beaten in conditions]
+         standing = any(not beaten or any(not tainted(read) for read in beaten)
+                        for _, beaten in missed)
+         chosen = [(own, [] if standing else beaten) for own, beaten in missed]

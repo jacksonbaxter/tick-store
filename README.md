@@ -20,7 +20,7 @@ One thread on the Ryzen ingests below Nasdaq's peak message rate.
 
 Against the same bar, one thread on an Apple M4 Max laptop, unpinned, ingests 3.302 M messages/s: met.
 
-Not shown above. Missed: on the Ryzen, flushed one-thread ingest (a login during tick-store's write; replaced run 1.423 M messages/s), fastest warm on the open's first second (swap-in: QuestDB), fastest cold on the open's first second, fastest cold on one millisecond of every stock, fastest warm on a full-day column scan (swap-in: QuestDB). Met: 5 more of their parts. Of the other 32 target-and-machine rows of the [full table](RESULTS.md#targets): 4 met, 15 missed, 7 missed in part, 6 not judged, fuzzing among them.
+Not shown above. Missed: on the Ryzen, flushed one-thread ingest (a login during tick-store's write; replaced run 1.423 M messages/s), fastest warm on the open's first second, fastest cold on the open's first second, fastest cold on one millisecond of every stock, fastest warm on a full-day column scan (swap-in: QuestDB). Met: 5 more of their parts. Of the other 32 target-and-machine rows of the [full table](RESULTS.md#targets): 4 met, 15 missed, 7 missed in part, 6 not judged, fuzzing among them.
 <!-- headline:end -->
 
 ## What it is

@@ -1,0 +1,13 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1505,8 +1505,7 @@
+         # decide it, as deciding_reads says; a flagged figure that does not is marked in its own
+         # cell of the comparison tables (review C2-3).
+         def tainted(read, path=path, document=document):
+-            return bool(swapped_reads([read], document) or
+-                        disturbed(entries, root, path, [read]))
++            return False
+         deciding = deciding_reads(row, spec, label, document, tainted)
+         found = disturbed(entries, root, path, deciding)
+         if found:
