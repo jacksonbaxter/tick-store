@@ -394,17 +394,15 @@ def widen_what_the_replaced_record_lacks():
 
 
 def quote_wt4_with_the_old_word():
-    """BENCHMARKS.md's WT-4 row back as the review found it: the ArcticDB part under "missed"
-    and its outcome on this run's figures in a later clause, not the mark RESULTS.md gives
-    (review C1, E)."""
-    edit_text("BENCHMARKS.md", "Met against QuestDB only, not like-for-like; (against ArcticDB) "
-              "met on this run's figures, a change that favours tick-store, and missed on the "
-              "replaced run's, so counted as missed in every count, ranking and first screen of "
-              "the project's pages; missed against Parquet", "Met against QuestDB only, not "
-              "like-for-like; missed against Parquet and ArcticDB; against ArcticDB met on this "
-              "run's figures "
-              "and missed on the replaced run's, a change that favours tick-store, so counted "
-              "missed")
+    """A WT-4 quote on BENCHMARKS.md as the review found its row: the ArcticDB part under
+    "missed" and its outcome on this run's figures in a later clause, not the mark RESULTS.md
+    gives (review C1, E). The page now links to RESULTS.md for every verdict, so the quote is
+    put back beside that link (review P1-22)."""
+    edit_text("BENCHMARKS.md", "Every verdict is in [RESULTS.md](RESULTS.md#targets).",
+              "Every verdict is in [RESULTS.md](RESULTS.md#targets). WT-4 on Linux is met against "
+              "QuestDB only, not like-for-like; missed against Parquet and ArcticDB; against "
+              "ArcticDB met on this run's figures and missed on the replaced run's, a change that "
+              "favours tick-store, so counted missed.")
 
 
 def drop_the_readme_input_note():

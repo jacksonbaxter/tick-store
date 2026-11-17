@@ -1,6 +1,8 @@
 # tick-store benchmarks and targets
 
-Status: Phase 4, the final review. The measured code is frozen at `ede0176`, and the fuzz harness is judged at `8616263`, where the library code measured at `ede0176` is identical: only `fuzz/`, two unit-test files and `scripts/coverage.sh` differ. The decode targets, DS-1 to DS-9, are measured under `measure.sh` at `ede0176`, the freeze, with verdicts under "Measured decode results": DS-6 is met on timestamps and missed on prices, DS-8 is met, DS-1 to DS-5 are missed, DS-4 on Linux with a remote login during one of the 65 cases its median takes, and DS-7 and DS-9 are reported with no target figure. The other targets' verdicts are under "Measured results for the other targets", on Linux from the full day at `ede0176` and on macOS from a full day of tick-store alone at `ede0176`. Of the targets judged on the measured hosts, CR-1, CR-2, G-1, G-2, G-3, G-4, DS-8 and WT-2 on macOS are met, G-3 with a backup run and two remote logins during its bound-seed gate, which could only have slowed them, and three remote logins during its timed fuzzing runs, which could only have slowed them. WT-1, QL-1, QL-2 and QL-3 are missed on both hosts. WT-2 is missed on Linux; (class B) rests on tick-store's `v3-seg4Mi` class B write 1, which held two remote logins, 2026-11-15 03:22 UTC, to the minute and 2026-11-15 03:22:17 to 03:22:51 UTC, where the replaced run's rate is 1.423 M messages/s. WT-3 is missed on Linux; inputs not alike, by each write's record: tick-store's input is in memory before the clock starts, with 250,916,864 B read from the device inside the clock; Parquet's, ArcticDB's and QuestDB's are read from disk inside it, with 18,411,094,016 to 21,521,625,088 B read from the device inside the clock; engine-only, the clock less reading the input and putting it in the form the system's call takes, may still hold those reads, which are counted over the whole clock, so the two-clock rule does not take the difference out. CR-3 to CR-7 and DS-6 are met on some of their cases and missed on others. WT-4 is met on some of its cases and missed on others: met against QuestDB, not like-for-like; missed against Parquet; against ArcticDB met on this run and missed on the replaced one, a change for tick-store, counted as missed; every part rests on tick-store's `v3-seg4Mi` class B write 1, which held two remote logins, 2026-11-15 03:22 UTC, to the minute and 2026-11-15 03:22:17 to 03:22:51 UTC, where the replaced run's total is 188.9 s; (against QuestDB, not like-for-like) rests on QuestDB's `plain` class B write 1, which held a backup run and a remote login, 2026-11-15 00:13:09 to 00:17:11 UTC and 2026-11-15 00:22:17 to 00:22:51 UTC, where the replaced run's total is 1,269.2 s; inputs not alike, by each write's record: tick-store's input is in memory before the clock starts, with 274,239,488 B read from the device inside the clock; Parquet's, ArcticDB's and QuestDB's are read from disk inside it, with 23,846,309,888 to 24,631,062,528 B read from the device inside the clock; engine-only, the clock less reading the input and putting it in the form the system's call takes, may still hold those reads, which are counted over the whole clock, so the two-clock rule does not take the difference out. QL-4 is met on some of its cases and missed on others: met on Q2 and Q3 against each system's chosen setup, while ArcticDB with a table per stock is faster; (Q2 warm) rests on figures timed while pages were swapped in; the record flags ArcticDB's `rows100k-cols127` and QuestDB's `plain`; (Q2 cold), (Q3 cold), (Q5 warm) rests on figures timed while pages were swapped in; the record flags QuestDB's `plain`; (Q3 warm) rests on figures timed while pages were swapped in; the record flags ArcticDB's `rows100k-cols127`; (Q5 cold) rests on figures timed while pages were swapped in; the record flags tick-store's `v3-seg4Mi` and QuestDB's `plain`. G-3 is met at `8616263`: all 13 fuzz targets ran clean for 30 minutes on macOS, and the 7 that reach the AVX2 or SSE4.2 kernels on Linux at AVX2, with a backup run and two remote logins during its bound-seed gate, which could only have slowed them, and three remote logins during its timed fuzzing runs, which could only have slowed them. WT-3 and QL-4 are not judged on macOS. Every source figure below is a published figure, or
+Status: the final review, Phase 4 of [docs/TASKS.md](docs/TASKS.md#phase-4-final-review-and-done-criteria). The measured code is `ede0176`, and the fuzz harness is judged at `8616263`, where the library code measured at `ede0176` is identical: only `fuzz/`, two unit-test files and `scripts/coverage.sh` differ. Every verdict is in [RESULTS.md](RESULTS.md#targets).
+
+Every source figure below is a published figure, or
 arithmetic on one, used as a target or as context. The exceptions are the file facts in CR-1 and Data, which come from the downloaded
 files. A research subagent opened each source, and the `Checked` column records that the project session then opened it too and
 recomputed any derived figure from the raw values.
@@ -128,17 +130,9 @@ refused for cpu5 over 5% busy, in 2 and in 4 of 314 cases (docs/NOTES.md, "The f
 `bcbf873` were refused in 19 and in 11 of 314 cases (docs/NOTES.md, "Decode targets under measure.sh"), and three at `b053aff` in 9, 7
 and 13 (docs/NOTES.md, "DS-4: three more refusals"). Gaps and reasons are there too.
 
-| ID | Measured | Host, instruction set | Verdict |
-|---|---|---|---|
-| DS-1 | 8.897 ns a value | macOS, NEON build (Gorilla is scalar code) | Missed: 4.20 times the 2.12 ns |
-| DS-2 | 60.66 cycles a value | Linux, AVX2 build (Gorilla is scalar code) | Missed: 2.85 times the 21.3 cycles |
-| DS-3 | 3.40 G values/s, two passes, median of 65 widths | macOS, NEON | Missed: 5.6% under 3.6 |
-| DS-4 | 2.709 cycles a value, fused, median of 65 widths | Linux, AVX2 | Missed: 7.2 times the 0.377 cycles; a remote login during one of the 65 cases its median takes |
-| DS-5 | 3,367 MB/s on macOS, 1,301 MB/s on Linux | macOS NEON, Linux AVX2 | Missed on both: 26.9% under 4,605, and 3.5 times under |
-| DS-6 | Timestamps 15.44 times; prices 3.74 times | macOS, NEON | Met on timestamps, missed on prices |
-| DS-7 | Timestamps 7.76 times; prices 3.35 times | Linux, AVX2 | No published figure |
-| DS-8 | 11.09 GB/s counted as 32-bit values, 2.77 G values/s | macOS, scalar code in every set | Met: 1.35 times the 8.20 GB/s |
-| DS-9 | Gorilla 9.886 ns a value on macOS, 22.456 ns on Linux; PFOR delta-of-delta 0.924 and 3.146 ns | macOS NEON, Linux AVX2 | No published figure |
+Each decode target's verdict, with its measured figure and the file it comes from, is in [RESULTS.md's targets table](RESULTS.md#targets), and every case's figures are under
+[Benchmarks](RESULTS.md#benchmarks) there. Gorilla is scalar code, so DS-1 and DS-2 time the same code in every build,
+and DS-8's kernel is scalar code in every instruction set.
 
 ## Write targets
 
@@ -194,7 +188,7 @@ Warm and cold are reported separately, with how cold was achieved and proven.
 ## Measured results for the other targets
 
 The Targets block of `RESULTS.md` is generated from `scripts/targets.json` and the committed results
-files, and `scripts/check.sh` fails if it goes stale. It holds every figure below. The decode
+files, and `scripts/check.sh` fails if it goes stale. The decode
 targets are under "Measured decode results". Linux figures are pinned to cpu4, from
 `results/compare/Linux-12302019-full-ede0176b10bb.json`, at `ede0176`, the freeze. The day it
 replaced, at `67ae574`, is kept in `results/compare/replaced/`, and a comparison verdict is judged
@@ -203,34 +197,10 @@ figures are unpinned, from `results/compare/macOS-12302019-full-tickstore-ede017
 full day of tick-store alone at `ede0176`. The CR figures come
 from `results/codec-eval-12302019.json` and `results/store-size-12302019.json`.
 
-| ID | Host | Measured | Verdict |
-|---|---|---|---|
-| G-1 | Any | Bit-exact on 12302019 on both hosts and 10302019 on macOS, both stream hashes equal | Met |
-| G-2 | Any | A flipped bit is caught in a data block and in the footer, with CRCs on and off | Met |
-| G-3 | Any | All 13 targets clean for at least 1,801 s on macOS (NEON), and on Linux at AVX2 the 6 whose decode reaches the SIMD kernels, each comparing its kernel set with the scalar set inside the run, and the 3 that verify CRC32C through the SSE4.2 kernel, 7 targets in all, each clean for at least 1,801 s, at `8616263` (`results/fuzz-g3-8616263b7561.json`), where the library code measured at `ede0176` is identical | Met; a backup run and two remote logins during its bound-seed gate, which could only have slowed them; three remote logins during its timed fuzzing runs, which could only have slowed them |
-| G-4 | Any | Gorilla delta-of-delta and XOR built, exact, and measured | Met |
-| CR-1 | Any | 4.6930 | Met |
-| CR-2 | Linux | 1,758,240,768 bytes, against Parquet's smallest 3,091,881,984, ArcticDB's 5,665,198,080, QuestDB's 22,897,786,880 | Met |
-| CR-3 | Any | 18.76 bits in file order, 25.49 per locate, 22.82 in the store as built | Met in file order only; missed per locate and by the store |
-| CR-4 | Any | 15.25 bits in file order, 6.26 per locate, 4.61 in the store | Met per locate and by the store; missed in file order |
-| CR-5 | Any | Over Gorilla XOR on dollars 2.99 to 5.98 times; over the best Gorilla 1.24 to 2.12 | Met over XOR on dollars everywhere; over the best Gorilla, met per locate only |
-| CR-6 | Any | 6.11 to 9.22 bits in the estimate; in the store, `creation_ref` 11.36, `ref_distance` 7.56, `import_ref` 25.94 | Met in the estimate; the store misses on `creation_ref` and `import_ref` |
-| CR-7 | Any | Adds 2.61 to 3.69 bits and `U` 2.57 in the estimate, `E`, `C`, `X`, `P`, `Q`, `I` 3.91 to 7.76; in the store, `add_shares` 4.17, `reduce_shares` 7.28, `replace_shares` 2.90 | Met for adds and replaces in the estimate; the store meets on `replace_shares` only |
-| WT-1 | Linux | 1.270 M records/s, class A | Missed, 14.8% of 8.59 M |
-| WT-1 | macOS | 3.302 M records/s, class A | Missed, 38.4% of 8.59 M |
-| WT-2 | Linux | 1.270 M messages/s class A, 1.410 M class B | Missed; (class B) rests on tick-store's `v3-seg4Mi` class B write 1, which held two remote logins, 2026-11-15 03:22 UTC, to the minute and 2026-11-15 03:22:17 to 03:22:51 UTC, where the replaced run's rate is 1.423 M messages/s |
-| WT-2 | macOS | 3.302 M messages/s class A, 3.360 M class B | Met, 20.8% and 23.0% over 2,732,762 |
-| WT-3 | Linux | Total 211.7 s, against Parquet 168.7, ArcticDB 111.5, QuestDB 678.7; engine-only 211.3 s, against 80.9, 35.1 and 193.8 | Missed against all three: met against a system only if no slower on both clocks; inputs not alike, by each write's record: tick-store's input is in memory before the clock starts, with 250,916,864 B read from the device inside the clock; Parquet's, ArcticDB's and QuestDB's are read from disk inside it, with 18,411,094,016 to 21,521,625,088 B read from the device inside the clock; engine-only, the clock less reading the input and putting it in the form the system's call takes, may still hold those reads, which are counted over the whole clock, so the two-clock rule does not take the difference out |
-| WT-3 | macOS | No four-system day: it runs on Linux only | Not judged |
-| WT-4 | Linux | Total 190.7 s, against Parquet 211.9, ArcticDB 381.4, QuestDB 1,595.6 (not like-for-like); engine-only 190.3 s, against 92.5, 291.8 and 1,459.5. On the replaced run, tick-store 188.9 and 188.5 s against ArcticDB 123.6 and 42.6 | Met against QuestDB only, not like-for-like; (against ArcticDB) met on this run's figures, a change that favours tick-store, and missed on the replaced run's, so counted as missed in every count, ranking and first screen of the project's pages; missed against Parquet; every part rests on tick-store's `v3-seg4Mi` class B write 1, which held two remote logins, 2026-11-15 03:22 UTC, to the minute and 2026-11-15 03:22:17 to 03:22:51 UTC, where the replaced run's total is 188.9 s; (against QuestDB, not like-for-like) rests on QuestDB's `plain` class B write 1, which held a backup run and a remote login, 2026-11-15 00:13:09 to 00:17:11 UTC and 2026-11-15 00:22:17 to 00:22:51 UTC, where the replaced run's total is 1,269.2 s; inputs not alike, by each write's record: tick-store's input is in memory before the clock starts, with 274,239,488 B read from the device inside the clock; Parquet's, ArcticDB's and QuestDB's are read from disk inside it, with 23,846,309,888 to 24,631,062,528 B read from the device inside the clock; engine-only, the clock less reading the input and putting it in the form the system's call takes, may still hold those reads, which are counted over the whole clock, so the two-clock rule does not take the difference out |
-| QL-1 | Linux | Q2 warm median 74.04 ms | Missed, 4.4 times 16.9 ms |
-| QL-1 | macOS | Q2 warm median 25.28 ms | Missed, 1.50 times 16.9 ms |
-| QL-2 | Linux | Q3 warm median 36.07 ms | Missed against 0.41 ms |
-| QL-2 | macOS | Q3 warm median 15.06 ms | Missed against 0.41 ms |
-| QL-3 | Linux | Q4 cold mean 356.09 ms | Missed against 10 ms |
-| QL-3 | macOS | Q4 cold mean 136.16 ms | Missed against 10 ms |
-| QL-4 | Linux | Lowest median and p99 on Q2 warm and cold, Q3 warm and cold, Q5 cold | Met on those five; missed on Q1 and Q4 warm and cold and on Q5 warm; (Q2 warm), (Q2 cold), (Q3 warm), (Q3 cold) met against each system's headline setup, the one the comparison chose for it before the runs, while ArcticDB's `rows100k-cols127-per-security`, set up otherwise, is faster; (Q2 warm) rests on figures timed while pages were swapped in; the record flags ArcticDB's `rows100k-cols127` and QuestDB's `plain`; (Q2 cold), (Q3 cold), (Q5 warm) rests on figures timed while pages were swapped in; the record flags QuestDB's `plain`; (Q3 warm) rests on figures timed while pages were swapped in; the record flags ArcticDB's `rows100k-cols127`; (Q5 cold) rests on figures timed while pages were swapped in; the record flags tick-store's `v3-seg4Mi` and QuestDB's `plain` |
-| QL-4 | macOS | No four-system day: it runs on Linux only | Not judged |
+Each of these targets' verdicts, with its measured figures, the marks set beside it and, for a
+write against another system, where each system's input was, is in
+[RESULTS.md's targets table](RESULTS.md#targets). G-3 is judged at `8616263`, where the library code
+measured at `ede0176` is identical.
 
 ## Reference numbers
 
