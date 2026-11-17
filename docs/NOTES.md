@@ -6494,6 +6494,112 @@ were shown by hand the same way at `f01b349`, under the `fix2/proofs2` folder. T
 that only moved, `compare-replaced-favourable-counted` and `compare-replaced-figures-hidden`,
 were shown there too. Their proof is owed to the full re-proof as well.
 
+### The pins the freeze's files retired, and the proofs paragraph
+
+2026-11-17. The freeze's files, committed in `c88ff7e`, replaced every file that three rules
+still waited on, so I closed those rules, and four smaller items with them. Before each change I
+checked its precondition against the committed results; the outputs are under the phase's
+`pages-1` folder, outside the repository.
+
+**Round-trip files (`680bab7`).** The three round-trip files were last written by `c88ff7e`. None
+has the SHA-256 its pin under `roundtrip_files_before_exit_codes` held, and `check_roundtrip.py`
+passes all three with no pin. The pins left `scripts/data_pins.json`, and `PINS_KEY`,
+`PINNED_NAMES` and `--pins` left `check_roundtrip.py`. The rule now: every round-trip file must
+carry each run's observed exit code, whatever its name, commit or bytes; the form from before the
+exit codes is refused under each of the three names it was pinned by. `check_ties.py` pins no
+round-trip file.
+
+**Protocol 1 comparison files (`55cac79`).** Every file under `results/compare/` states protocol 2
+but the Linux day kept in `results/compare/replaced/`. RV-6's rule took a file that states no
+protocol if its bytes matched any SHA-256 pinned under `protocol_1_comparison_files`, under any
+name, which the review found too loose. That key left `scripts/data_pins.json`. The rule now:
+- `check_compare.py` takes a file that states no protocol only if the pins file pins that file's
+  name to the SHA-256 of its bytes, both together, never the bytes alone;
+- the committed pins file holds no line under that key, and `check_ties.py` refuses any, so
+  `check_compare.py` passes no protocol 1 file;
+- the one protocol 1 file kept, `results/compare/replaced/Linux-12302019-full-67ae574f5666.json`,
+  is not validated by `check_compare.py`, which refuses it. `render_results.py` reads it, from
+  that folder only, through its pin under `replaced_comparison_files`, and `check_ties.py`'s
+  `REPLACED_KEPT` holds it to that exact path and SHA-256.
+
+The prover's five slice mutations no longer re-pin the slice to get past the protocol 1 pin.
+`compare/README.md` states the rule the same way since `4a0552a`.
+
+**commit_source (`d3f72b1`).** All six files in `results/bench/` carry `commit_source`, `export`
+on Linux and `git` on macOS. `check_results.py` now requires it, and refuses a missing field and
+any value but those two.
+
+**The README's fault-proof paragraph (`af72a01`).** Its counts were written by hand. They are now
+a block `render_results.py` writes from `results/check-proofs.json`: the runs, their source commit
+and host, and the verdicts counted, each against what it must be, PROVEN for a fault and
+UNDETECTED for the control. Today it says 101 runs at `5a810a2`, 100 faults all PROVEN and one
+control UNDETECTED. The README holds the block's markers if and only if the file exists, a file
+with no runs or no source commit stops the render, and the hand-written words around the block
+claim no count. The 8,532 s timing left the paragraph. Once the full re-proof rewrites the file,
+regenerating the pages updates the counts.
+
+**Four smaller items.**
+- BENCHMARKS.md's status line, hand-written, says Phase 4, the measured code frozen at `ede0176`
+  and the fuzz harness judged at `8616263`, whose 30-minute runs are not committed yet
+  (`72aef14`).
+- DS-4's note for a missing Linux kernel file in `scripts/targets.json`, rendered only when that
+  file is missing and compared by no check, gives 7 to 19 of 314 cases, as "Decode targets under
+  measure.sh" and "DS-4: three more refusals" record, not 4 to 13 (`2fb76e0`). The same stale
+  figure is in a comment in `bench/simd_kernel_bench.cpp`, left alone (docs/TASKS.md).
+- `fetch_data.py`'s docstring names no project outside this one (`11c72f6`).
+- Fault `werror-dependency-tolerated`'s description says its patch is to GoogleTest's fetched
+  copy under `build/_deps/`, so it applies only once a configure has fetched it (`c9b1377`). The
+  prover copies `build/_deps/` into its clone, and `test_prove_checks.py` checks that part of the
+  patch against the working tree's `build/_deps/`, skipping it where there is none.
+
+NOTES and REVIEW also mark each citation of a commit the rebase left out of the history
+(`841e6f2`).
+
+**Proofs.** I ran no `prove_checks.py`. Each fault below was shown by hand in a clone under the
+worktree's `build/`, at the commit named: the one test or check its entry names ran as committed
+(exit 0) and with the fault in, and failed with the exit code and string the entry expects. The
+outputs are under the phase's `pages-1/proofs` folder. Each is shown by hand, proof owed to the
+full re-proof.
+- New: `roundtrip-old-form-by-name-accepted` (`680bab7`); `compare-protocol-1-bytes-alone`,
+  `pins-protocol-1-line-restored`, `pins-roundtrip-line-restored` and
+  `ties-protocol-1-pin-allowed` (`55cac79`); `results-commit-source-missing` and
+  `results-commit-source-any-value` (`d3f72b1`); `readme-proofs-hand-edit`,
+  `render-proofs-verdicts-unread` and `render-proofs-markers-optional` (`af72a01`).
+- Remade: `roundtrip-exit-codes-typed`, which now strips the runs' exit codes (`680bab7`); the
+  patches of `compare-protocol-1-by-commit`, `compare-protocol-1-unpinned`,
+  `compare-protocol-not-an-integer`, `compare-protocol-1-declared` and
+  `compare-protocol-unknown-accepted`, on the moved lines; `ties-pin-by-name`,
+  `ties-pin-any-listed-name` and `ties-stray-pin-accepted`, on the moved tests; and the slice
+  mutations `compare-commit-mode`, `compare-read-back`, `compare-query-digest`,
+  `compare-swap-unflagged` and `compare-load-lines-a-string`, which no longer re-pin (`55cac79`).
+- Removed with the pins they tested: `roundtrip-pinned-name-other-bytes` and
+  `roundtrip-pin-other-file-accepted` (`680bab7`).
+
+`werror-dependency-tolerated` changed only in its description. I showed only that its patch
+applies where `build/_deps/` holds GoogleTest; its proof needs a dev build and is owed to the full
+re-proof.
+
+### CI on jb-build, 17 November
+
+2026-11-17. Four runs on `jb-build`; their run and job records and the failed logs are kept
+outside the repository.
+
+- Run 44057308152, at `126b03f`: clang-tidy failed on both hosts, on findings in
+  `fuzz/bound_seeds.hpp` and `tests/unit/fuzz_regression_test.cpp`, 17 on Linux (12 and 5) and 16
+  on macOS, which did not report one of the two `emplace_back` findings. `983bf32` fixed them. The
+  Linux unit job took 91 minutes, asan-ubsan 71, tsan 68 and coverage 74. I cancelled the run by
+  hand at 11:34:14Z, with its Mac unit, tsan and coverage jobs still running, so that the run for
+  `8616263` could start: the workflow's concurrency group holds a newer run back until the older
+  one ends.
+- Run 44065450119, at `983bf32`: cancelled by the concurrency group when `8616263` was pushed,
+  before any job ran to its end.
+- Run 44071803702, at `8616263`: all 14 build and test jobs passed, the Linux tsan job in 16
+  minutes and coverage in 10 with the grid and the named seeds' tests left out (fuzz/README.md,
+  Bounds). The two repo jobs failed, as expected, on check-ties, 23 files: 0 same, 8 pinned, 15
+  differs, since the freeze's files were not yet committed (`c88ff7e` came after it), and on
+  writeup-check, 35 of 310 tokens with no results file yet.
+- Run 44108908661, at `30789f9`, started at 14:58Z.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
