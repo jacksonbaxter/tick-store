@@ -183,7 +183,9 @@ queries, CRC32C in software and in this processor's hardware kernel, the SIMD ke
 dispatch, the scalar set and this processor's own set, NEON on arm64 or AVX2 and its CPUID
 check on x86-64), the fuzz oracles and the oracle's compare path: 255 functions on arm64 and
 256 on x86-64. `results/coverage.json`, written with `--output results/coverage.json`, is the
-gate's run on the Mac at the frozen code, `8616263`: all 255 required functions reached, 94.02%
+gate's run on the Mac at the frozen code, `8616263` (the freeze is `ede0176`: none of the code the
+benchmarks and the comparison build and run changed after that commit, and none of the code the
+fuzzers and this run build changed after `8616263`): all 255 required functions reached, 94.02%
 of lines (14,690 of 15,624) and 97.1% of functions (1,206 of 1,242) covered, with the four
 sources the Mac does not build listed as such. That run ran 681 of the unit binary's 889 tests,
 one of them skipped as Linux's alone, leaving out the 2 `ItchRealDay` tests, the grid's 144 and
@@ -327,7 +329,7 @@ and 74 of 22,592 of the larger one's, 0.96% and 0.33%, each leaving every record
 other footer bit is caught. The footer flip is steered past the CRC32Cs; the data flip is not
 steered, and was caught on both days.
 
-`tick_roundtrip ingest-stub` still writes the Phase 2 stub store, the day's frames behind a
+`tick_roundtrip ingest-stub` still writes the [Phase 2](docs/TASKS.md#phase-2-harness-before-any-implementation) stub store, the day's frames behind a
 40-byte header with no checksum, which `verify` recognises by its magic.
 
 `tick_census <source> <output.json>` writes the aggregate statistics in `results/`.
