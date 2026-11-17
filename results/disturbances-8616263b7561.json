@@ -1,0 +1,117 @@
+{
+  "schema": "tick-store disturbances 1",
+  "commit": "8616263b7561bdb39c642c90fde45985fcaf81fc",
+  "how": "Made by hand on 2026-11-17, after G-3's Linux run at this commit, from another project's watcher's status file and period and from the host's journal, read after the run, with each time in UTC. A login the watcher's status file records is placed by that line; one computed from the period between two recorded lines is given with its bounds as start and end. A gate entry's case names the seed and run it fell in, as the gate's own table gives them; a fuzz entry's case names the target.",
+  "not_listed": [
+    {
+      "what": "another project's watcher's remote logins, about every half hour from 2026-11-14T15:22:16Z, each reading the host's window state and a few files",
+      "why": "those that fell in the refused attempts of the kernel benchmark (four) and in the fuzz step that was no result (one) touch no committed file; the rest are listed as entries, each recorded time from the watcher's status file and each computed time with its bounds"
+    },
+    {
+      "what": "the host's own scheduled jobs: a repository backup every fifteen minutes, a health collector and two small watchers every five minutes, two sync jobs every ten minutes, a file backup about hourly and daily maintenance",
+      "why": "they run through every window and were not stopped, as nothing on the host is changed for a measurement beyond the governor; the run records keep no list of them by phase apart from the events listed here, and what guards each timed figure is the per-CPU record of the other processors' use and the load rule"
+    }
+  ],
+  "entries": [
+    {
+      "start": "2026-11-17T15:12:26Z",
+      "end": "2026-11-17T15:12:29Z",
+      "precision": "second",
+      "what": "the host's scheduled repository backup, from the host's journal as read after the run, not from the run's own records",
+      "document": "fuzz-g3-8616263b7561.json",
+      "phase": "gate run",
+      "case": "the bound-seed gate, between runs of its seeds",
+      "timed": true
+    },
+    {
+      "start": "2026-11-17T15:12:31Z",
+      "end": "2026-11-17T15:12:32Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, recorded in its status file: the login ended at the line's time and began no earlier than start",
+      "document": "fuzz-g3-8616263b7561.json",
+      "phase": "gate run",
+      "case": "run_length/bound-one-run-blocks run 4 of 5",
+      "timed": true
+    },
+    {
+      "start": "2026-11-17T15:12:57Z",
+      "end": "2026-11-17T15:12:58Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, recorded in its status file: the login ended at the line's time and began no earlier than start",
+      "document": "fuzz-g3-8616263b7561.json",
+      "phase": "gate run",
+      "case": "run_length/bound-small-blocks run 2 of 5",
+      "timed": true
+    },
+    {
+      "start": "2026-11-17T15:42:57Z",
+      "end": "2026-11-17T15:43:01Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "fuzz-g3-8616263b7561.json",
+      "phase": "fuzz run",
+      "case": "fuzz_itch_query",
+      "timed": true
+    },
+    {
+      "start": "2026-11-17T15:42:57Z",
+      "end": "2026-11-17T15:43:01Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "fuzz-g3-8616263b7561.json",
+      "phase": "fuzz run",
+      "case": "fuzz_dictionary",
+      "timed": true
+    },
+    {
+      "start": "2026-11-17T15:42:57Z",
+      "end": "2026-11-17T15:43:01Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "fuzz-g3-8616263b7561.json",
+      "phase": "fuzz run",
+      "case": "fuzz_pfor",
+      "timed": true
+    },
+    {
+      "start": "2026-11-17T16:12:57Z",
+      "end": "2026-11-17T16:13:01Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "fuzz-g3-8616263b7561.json",
+      "phase": "fuzz run",
+      "case": "fuzz_itch_store",
+      "timed": true
+    },
+    {
+      "start": "2026-11-17T16:12:57Z",
+      "end": "2026-11-17T16:13:01Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "fuzz-g3-8616263b7561.json",
+      "phase": "fuzz run",
+      "case": "fuzz_run_length",
+      "timed": true
+    },
+    {
+      "start": "2026-11-17T16:12:57Z",
+      "end": "2026-11-17T16:13:01Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "fuzz-g3-8616263b7561.json",
+      "phase": "fuzz run",
+      "case": "fuzz_stream_vbyte",
+      "timed": true
+    },
+    {
+      "start": "2026-11-17T16:42:57Z",
+      "end": "2026-11-17T16:43:01Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "fuzz-g3-8616263b7561.json",
+      "phase": "fuzz run",
+      "case": "fuzz_container",
+      "timed": true
+    }
+  ]
+}

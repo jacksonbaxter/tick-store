@@ -1408,8 +1408,8 @@ def figure_marks(entries, root, path, document, read, replaced, row):
     """What stands beside a figure shown from one timed phase, on any page: each disturbance
     recorded in that phase, with the replaced run's figure there, and the record's flag of a
     page swapped in while it was timed."""
-    marks = [f"measured in {disturbance_text(entry, found, replaced, row)}"
-             for entry, found in disturbed(entries, root, path, [read])]
+    marks = [f"measured in {group_text(found, events, replaced, row, document)}"
+             for found, events in disturbance_groups(disturbed(entries, root, path, [read]))]
     if swapped_reads([read], document):
         marks.append("which the record flags as timed while pages were swapped in")
     return marks
@@ -1417,8 +1417,8 @@ def figure_marks(entries, root, path, document, read, replaced, row):
 
 def figure_short_marks(entries, root, path, document, read, replaced, row):
     """figure_marks as the README's first screen shows them, in words that stand alone."""
-    marks = [short_disturbance(entry, found, replaced, row, screen=True)
-             for entry, found in disturbed(entries, root, path, [read])]
+    marks = [group_short(found, events, replaced, row, True, document)
+             for found, events in disturbance_groups(disturbed(entries, root, path, [read]))]
     if swapped_reads([read], document):
         marks.append(SCREEN_SWAPPED_FIGURE)
     return marks
@@ -1590,6 +1590,13 @@ def reads_of(expression, document):
     return found
 
 
+def fuzz_host(document, label):
+    """The host a fuzz file's part judges, by the label's first word, or None."""
+    host = label.split(",")[0]
+    return host if (document.get("header") or {}).get("gate") == "G-3" and host in HOSTS \
+        else None
+
+
 def reads_of_part(row, spec, label, document):
     """The timed phases a part's verdict rests on: every figure its conditions read."""
     if "lowest_of" in row:
@@ -1597,6 +1604,9 @@ def reads_of_part(row, spec, label, document):
         return [("queries", system, walk(document, ["systems", system, "headline_variant"]),
                  kind, query) for system in [spec["ours"], *spec["others"]]]
     found = []
+    # A fuzz file's part on a host rests on that host's runs: its gate and its timed fuzzing.
+    if fuzz_host(document, label):
+        found.append(("fuzz", fuzz_host(document, label)))
     for item in spec.get("all") or [spec]:
         found += reads_of(item.get("value"), document)
         comparison = comparison_of(item, row)
@@ -1661,7 +1671,10 @@ def deciding_reads(row, spec, label, document, tainted=lambda read: False):
         standing = any(not beaten or any(not tainted(read) for read in beaten)
                        for _, beaten in missed)
         chosen = [(own, [] if standing else beaten) for own, beaten in missed]
-    return list(dict.fromkeys(read for own, rivals in chosen for read in [*own, *rivals]))
+    # A fuzz pass is tick-store's own: its runs always decide it.
+    own_runs = [("fuzz", fuzz_host(document, label))] if fuzz_host(document, label) else []
+    return list(dict.fromkeys([*own_runs, *(read for own, rivals in chosen
+                                             for read in [*own, *rivals])]))
 
 
 # The record of what else ran on the host during a campaign's timed steps, one per campaign.
@@ -1671,7 +1684,14 @@ DISTURBANCE_PHASES = {"write": ("system", "variant", "class", "repetition"),
                       "read back": ("system", "variant", "class"),
                       "warm queries": ("system", "variant", "query"),
                       "cold queries": ("system", "variant", "query"),
-                      "case": ("case",)}
+                      "case": ("case",),
+                      # G-3's runs: a target's timed fuzzing, and the bound-seed gate, whose
+                      # case names the seed and run as the gate's table gives them.
+                      "fuzz run": ("case",), "gate run": ("case",),
+                      # A part of the capacity check, which reports no result.
+                      "capacity part": ("system",)}
+# The phases no figure is timed in.
+UNTIMED_PHASES = ("read back", "capacity part")
 DISTURBANCE_COMMON = ("start", "end", "precision", "what", "document", "phase", "timed")
 UTC = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ")
 FULL_COMMIT = re.compile(r"[0-9a-f]{40}")
@@ -1743,7 +1763,7 @@ def check_disturbances(path, root):
         if not isinstance(entry["what"], str) or not entry["what"].strip() or \
                 NUMBER.search(entry["what"]):
             raise TargetError(f"{where} says in words, with no figure, what it was")
-        timed = phase != "read back"
+        timed = phase not in UNTIMED_PHASES
         if entry["timed"] is not timed:
             raise TargetError(f"{where}: a {phase} phase is {'' if timed else 'not '}timed")
         name = Path(str(entry["document"]))
@@ -1751,12 +1771,23 @@ def check_disturbances(path, root):
         if ".." in name.parts or name.is_absolute() or not source.is_file():
             raise TargetError(f"{where}: no results file {entry['document']!r}")
         placed = json.loads(source.read_text(encoding="utf-8"))
-        if (placed.get("header") or {}).get("commit") != commit:
+        made = ((placed.get("systems") or {}).get(entry.get("system")) or {}).get("commit") \
+            if phase == "capacity part" else (placed.get("header") or {}).get("commit")
+        if made != commit:
             raise TargetError(f"{where}: {entry['document']} was not measured at {commit[:12]}")
         try:
             if phase == "case":
                 if entry["case"] not in [case.get("case") for case in placed["results"]]:
                     raise KeyError(entry["case"])
+            elif phase == "fuzz run":
+                if entry["case"] not in [run.get("target") for run in placed["runs"]]:
+                    raise KeyError(entry["case"])
+            elif phase == "gate run":
+                if not isinstance(entry["case"], str) or not entry["case"].strip() or \
+                        "runs" not in placed:
+                    raise KeyError("gate")
+            elif phase == "capacity part":
+                placed["systems"][entry["system"]]
             else:
                 variant = placed["systems"][entry["system"]]["variants"][entry["variant"]]
                 if "class" in entry:
@@ -1787,6 +1818,9 @@ def disturbed(entries, root, path, reads):
         for read in reads:
             if read[0] == "case":
                 hit = entry["phase"] == "case" and fnmatch.fnmatchcase(entry["case"], read[1])
+            elif read[0] == "fuzz":
+                # The disturbance records are of the Linux host, the only one shared.
+                hit = entry["phase"] in ("fuzz run", "gate run") and read[1] == "Linux"
             elif read[0] == "write":
                 hit = entry["phase"] == "write" and \
                     (entry["system"], entry["variant"], entry["class"]) == read[1:4]
@@ -1796,7 +1830,8 @@ def disturbed(entries, root, path, reads):
                     entry["query"] in (None, read[4])
             if hit:
                 found.append((entry, read))
-                break
+                if read[0] != "fuzz":
+                    break
     return found
 
 
@@ -1823,11 +1858,15 @@ def utc_span(entry):
     return f"{date} {start[11:19]} to {end[11:19]} UTC"
 
 
-def phase_words(entry, read):
+def phase_words(entry, read, document=None):
     """The phase an entry fell in, in words: a query phase the entry names whole is its kind's
     queries, so the words hold no query's name the README's first screen refuses."""
     if read[0] == "case":
-        return f"the case `{entry['case']}`"
+        count = case_count(read, document)
+        return f"the case `{entry['case']}`" + (
+            f", one of the {count:,} its median takes" if count and count > 1 else "")
+    if read[0] == "fuzz":
+        return short_phase(read, entry)
     system = SYSTEM_LABEL.get(entry["system"], entry["system"])
     if read[0] == "write":
         return f"{system}'s `{entry['variant']}` class {entry['class']} write {entry['repetition']}"
@@ -1874,10 +1913,90 @@ SWAPPED = "rests on figures timed while pages were swapped in; the record flags 
 SHORT_SWAPPED = "swap-in: "
 SHORT_SWAPPED_FIGURE = "swap-in"
 SHORT_REPLACED = "replaced run "
-SHORT_DISTURBANCE = {"a remote login by this project": "a login",
-                     "the host's scheduled backup job": "a backup run",
-                     "process launches by this project": "process launches",
-                     "a file copy and process launch by this project": "a file copy and launch"}
+# Each kind of disturbance a record's entries say, by the words of its "what", as the marks
+# count it: its noun, then its plural. A phase that held several events says each kind once
+# with its count, "two remote logins", "a backup run and a remote login", so a mark does not
+# grow a clause per event (review R-D2). The render refuses an entry of a kind not here.
+WATCHER_COMPUTED = ("a remote login by another project's watcher, computed from its period "
+                    "between two recorded lines: at some time between start and end, not "
+                    "recorded exactly")
+SHORT_DISTURBANCE = {
+    "a remote login by this project": ("remote login", "remote logins"),
+    WATCHER_COMPUTED: ("remote login", "remote logins"),
+    WATCHER_COMPUTED + "; its bounds also overlap the phase before or after, listed beside it":
+        ("remote login", "remote logins"),
+    "a remote login by another project's watcher, recorded in its status file: the login ended "
+    "at the line's time and began no earlier than start": ("remote login", "remote logins"),
+    "the host's scheduled backup job": ("backup run", "backup runs"),
+    "the host's scheduled repository backup, from the host's journal as read after the run, not "
+    "from the run's own records": ("backup run", "backup runs"),
+    "process launches by this project": ("set of process launches", "sets of process launches"),
+    "a file copy and process launch by this project": ("file copy and launch",
+                                                       "file copies and launches")}
+COUNT_NOUNS = {2: "two", 3: "three", 4: "four", 5: "five", 6: "six"}
+
+
+def held_words(entries):
+    """The events of one phase by kind, each kind once with its count, in record order."""
+    counts = {}
+    for entry in entries:
+        kind = SHORT_DISTURBANCE.get(entry["what"])
+        if kind is None:
+            raise TargetError(f"no short form for the disturbance {entry['what']!r}; add one to "
+                              "SHORT_DISTURBANCE, which RESULTS.md explains")
+        counts[kind] = counts.get(kind, 0) + 1
+    return and_list([(f"a {single}" if count == 1 else
+                      f"{COUNT_NOUNS.get(count, str(count))} {plural}")
+                     for (single, plural), count in counts.items()])
+
+
+def disturbance_groups(found):
+    """(read, the events in it) for each phase of disturbed()'s pairs, a fuzz or gate phase
+    and each case on its own, in record order; one event listed in several fuzz targets that
+    ran at once, the same span and the same kind, is one event."""
+    groups = {}
+    for entry, read in found:
+        key = (read, entry["phase"], entry.get("case") if read[0] == "case" else None)
+        events = groups.setdefault(key, (read, []))[1]
+        if not any((other["start"], other["end"], other["what"]) ==
+                   (entry["start"], entry["end"], entry["what"]) for other in events):
+            events.append(entry)
+    return list(groups.values())
+
+
+def slowed(read):
+    """What a pass on runs that ended clean says of events inside them."""
+    return ", which could only have slowed them" if read[0] == "fuzz" else ""
+
+
+def group_text(read, entries, replaced, row, document=None):
+    """A phase's events in full: the phase, what it held by kind and count, each event's span,
+    the replaced run's figure there if any, and for a fuzz pass that they could only slow it."""
+    spans = and_list([utc_span(entry) for entry in entries])
+    # One event is said as the record says it; several, by kind and count.
+    held = entries[0]["what"] if len(entries) == 1 else held_words(entries)
+    text = f"{phase_words(entries[0], read, document)}, which held {held}, {spans}"
+    figure = replaced_figure(read, replaced, row or {})
+    if figure is not None:
+        text += f", where the replaced run's {figure[0]} is {shown(figure[1], row or {})}"
+    return text + slowed(read)
+
+
+def group_short(read, entries, replaced, row, screen=False, document=None):
+    """A phase's events short: by kind and count, the phase, the replaced run's figure; or, for
+    the README's first screen, the same in words that stand alone."""
+    held = held_words(entries)
+    figure = replaced_figure(read, replaced, row or {})
+    where = short_phase(read, entries[0], document)
+    if screen:
+        return f"{held} on the test machine fell inside the timing of {where}" + (
+            f"; {SCREEN_REPLACED}{shown(figure[1], row or {})}" if figure is not None else "") + \
+            slowed(read)
+    return f"{held} during {where}" + (
+        f"; {SHORT_REPLACED}{shown(figure[1], row or {})}" if figure is not None else "") + \
+        slowed(read)
+
+
 # The README's first screen is read by someone who has not read the rest, so its marks say what
 # happened in plain words and stand alone (review R-A3, R-A4): a swap-in mark says the host was
 # swapping while the named systems ran and which way that may lean, and a disturbance's says
@@ -1903,28 +2022,31 @@ SETUP_CHOSEN = ("met against each system's headline setup, the one the compariso
 SHORT_SETUP = "against each system's chosen setup"
 
 
-def short_phase(read):
-    """The phase a disturbance fell in, short: whose write or kind of queries, no query named."""
+def case_count(read, document):
+    """How many cases of a document a case read's pattern takes, or None."""
+    if read[0] != "case" or not isinstance(document, dict):
+        return None
+    return sum(1 for case in document.get("results") or []
+               if fnmatch.fnmatchcase(str(case.get("case")), read[1])) or None
+
+
+def short_phase(read, entry=None, document=None):
+    """The phase a disturbance fell in, short: whose write or kind of queries, no query named;
+    one case of the cases a median takes; or a fuzz pass's gate or timed runs."""
     if read[0] == "case":
-        return "the case"
+        count = case_count(read, document)
+        return f"one of the {count:,} cases its median takes" if count and count > 1 else \
+            "the case"
+    if read[0] == "fuzz":
+        return "its bound-seed gate" if entry and entry["phase"] == "gate run" else \
+            "its timed fuzzing runs"
     system = SYSTEM_LABEL.get(read[1], read[1])
     return f"{system}'s write" if read[0] == "write" else f"{system}'s {read[3]} queries"
 
 
 def short_disturbance(entry, read, replaced, row, screen=False):
-    """A disturbance's mark in its short form: its kind, the phase, the replaced run's figure;
-    or, for the README's first screen, the same in words that stand alone."""
-    what = (SCREEN_DISTURBANCE if screen else SHORT_DISTURBANCE).get(entry["what"])
-    if what is None:
-        raise TargetError(f"no short form for the disturbance {entry['what']!r}; add one to "
-                          f"{'SCREEN_DISTURBANCE' if screen else 'SHORT_DISTURBANCE'}, which "
-                          "RESULTS.md explains")
-    figure = replaced_figure(read, replaced, row or {})
-    if screen:
-        return f"{what} fell inside the timing of {short_phase(read)}" + (
-            f"; {SCREEN_REPLACED}{shown(figure[1], row or {})}" if figure is not None else "")
-    return f"{what} during {short_phase(read)}" + (
-        f"; {SHORT_REPLACED}{shown(figure[1], row or {})}" if figure is not None else "")
+    """One disturbance's mark in its short form, as group_short gives a phase of one event."""
+    return group_short(read, [entry], replaced, row, screen)
 
 
 def short_swapped(swapped):
@@ -1971,8 +2093,8 @@ def setup_forms(faster):
 def short_forms_explained():
     """The sentence under RESULTS.md's targets table that explains each short form the README's
     first screen, a hand-written quote or the essay may use, in full words."""
-    kinds = "; ".join(f"\"{short}\" for {what}" for what, short in SHORT_DISTURBANCE.items())
-    screen = "; ".join(f"\"{short}\" for {what}" for what, short in SCREEN_DISTURBANCE.items())
+    kinds = "; ".join(f"\"{single}\" for {what}" for what, (single, _) in
+                      SHORT_DISTURBANCE.items())
     return ("A mark beside a verdict or a figure may be given short: "
             f"\"({SHORT_SWAPPED}ArcticDB, QuestDB)\" stands for \"{SWAPPED}ArcticDB's ... and "
             "QuestDB's ...\", the figures that decide the verdict from those systems' headline "
@@ -1999,9 +2121,23 @@ def short_forms_explained():
             "and \"which may lean either way\" where both are; and \"a remote login on the "
             "test machine fell inside the timing of ArcticDB's warm queries; an earlier full run, "
             "which this one replaces, gave 49.65 ms\" for a disturbance's. "
-            f"The kinds of disturbance, short: {kinds}; on the first screen: {screen}. A "
+            "A phase that held several events gives each kind once with its count, such as "
+            "\"two remote logins\" or \"a backup run and a remote login\". "
+            f"The kinds of disturbance, short: {kinds}. A "
             "variant's plain words are its target row's in `scripts/targets.json`. "
-            "Each row above gives every mark in full.")
+            "Each row above gives every mark in full. " + SCHEDULED_JOBS)
+
+
+# The limit the marks leave, said once under the targets table (review R-D3): the host's own
+# scheduled jobs, named by kind only, ran through every window.
+SCHEDULED_JOBS = ("The marks name only what the disturbance records list. The host's own "
+                  "scheduled jobs, a repository backup every fifteen minutes, a health collector "
+                  "and two small watchers every five, two sync jobs every ten, a file backup "
+                  "about hourly and daily maintenance, ran through every window and were not "
+                  "stopped, as nothing on the host is changed for a measurement beyond the "
+                  "governor; the run records list none of them by phase beyond the events "
+                  "marked, and what guards each timed figure is its per-CPU record and the load "
+                  "rule.")
 
 
 # The same mark in the README's pitch, which has no room for the systems and variants: a claim
@@ -2095,11 +2231,11 @@ def phase_mark_triples(parts, row=None, labelled=True):
             full, short = setup_forms(faster)
             held.setdefault(full, (short, short, []))[2].append(part[0])
     for part in parts:
-        for entry, read in notes_of(part).get("disturbed", []):
-            replaced = notes_of(part).get("replaced")
-            text = "rests on " + disturbance_text(entry, read, replaced, row)
-            held.setdefault(text, (short_disturbance(entry, read, replaced, row),
-                                   short_disturbance(entry, read, replaced, row, screen=True),
+        replaced = notes_of(part).get("replaced")
+        for read, entries in disturbance_groups(notes_of(part).get("disturbed", [])):
+            text = "rests on " + group_text(read, entries, replaced, row, part[4])
+            held.setdefault(text, (group_short(read, entries, replaced, row, False, part[4]),
+                                   group_short(read, entries, replaced, row, True, part[4]),
                                    []))[2].append(part[0])
     every = [item for part in parts for item in notes_of(part).get("swapped") or []]
     for part in parts:

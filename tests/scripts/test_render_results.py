@@ -2747,7 +2747,7 @@ class ConditionsTest(Scratch):
                          [RENDER.SHORT_SWAPPED + "ArcticDB"])
         explained = RENDER.short_forms_explained()
         for short in (RENDER.SHORT_SWAPPED, RENDER.SHORT_SWAPPED_FIGURE, RENDER.SHORT_REPLACED,
-                      *RENDER.SHORT_DISTURBANCE.values(), *RENDER.SCREEN_DISTURBANCE.values(),
+                      *(single for single, _ in RENDER.SHORT_DISTURBANCE.values()),
                       RENDER.SCREEN_SWAPPED, RENDER.SCREEN_REPLACED, RENDER.SHORT_SETUP,
                       *RENDER.SCREEN_LEANS.values()):
             self.assertIn(short, explained)
@@ -2943,6 +2943,78 @@ class ShortFormTest(unittest.TestCase):
         self.assertEqual(RENDER.short_verdict([self.part("Q2 warm", True),
                                                self.part("Q4 warm", False)]),
                          "met on Q2 warm; missed on Q4 warm")
+
+
+
+class FuzzDisturbanceTest(unittest.TestCase):
+    """Reviews R-D1 and R-D2: a fuzz run's record, its phases checked and marked, and a phase
+    of several events said by kind and count."""
+
+    COMMIT = "8616263b7561" + "0" * 28
+    LOGIN = RENDER.WATCHER_COMPUTED
+
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp(dir=REPO_ROOT / "build"))
+        self.addCleanup(shutil.rmtree, self.root)
+        (self.root / "results").mkdir()
+        fuzz = {"header": {"gate": "G-3", "commit": self.COMMIT},
+                "runs": [{"target": "fuzz_pfor", "host": "Linux"}]}
+        (self.root / "results" / "fuzz-g3-8616263b7561.json").write_text(json.dumps(fuzz))
+
+    def entry(self, phase="fuzz run", case="fuzz_pfor", start="2026-11-17T15:42:57Z",
+              what=None, timed=True):
+        return {"start": start, "end": start, "precision": "second", "what": what or self.LOGIN,
+                "document": "fuzz-g3-8616263b7561.json", "phase": phase, "case": case,
+                "timed": timed}
+
+    def record(self, *entries):
+        path = self.root / "results" / "disturbances-8616263b7561.json"
+        path.write_text(json.dumps({"schema": RENDER.DISTURBANCE_SCHEMA, "commit": self.COMMIT,
+                                    "how": "by hand", "entries": list(entries)}))
+        return path
+
+    def test_a_fuzz_record_is_checked_like_any_other(self):
+        self.assertEqual(len(RENDER.check_disturbances(self.record(
+            self.entry(), self.entry("gate run", "seed one run 2 of 5")), self.root)), 2)
+        for entry, refused in ((self.entry(case="fuzz_none"), "has no 'fuzz_none'"),
+                               (self.entry(timed=False), "a fuzz run phase is timed"),
+                               (self.entry("capacity part"), "gives")):
+            with self.subTest(entry=entry):
+                with self.assertRaisesRegex(RENDER.TargetError, refused):
+                    RENDER.check_disturbances(self.record(entry), self.root)
+
+    def test_a_fuzz_runs_events_mark_its_linux_part_only_each_event_once(self):
+        path = self.root / "results" / "fuzz-g3-8616263b7561.json"
+        entries = [self.entry(), self.entry(case="fuzz_dictionary"),
+                   self.entry("gate run", "seed run 1", "2026-11-17T15:12:31Z"),
+                   self.entry("gate run", "seed run 2", "2026-11-17T15:12:57Z")]
+        found = RENDER.disturbed(entries, self.root, path, [("fuzz", "Linux")])
+        self.assertEqual(len(found), 4)
+        self.assertEqual(RENDER.disturbed(entries, self.root, path, [("fuzz", "macOS")]), [])
+        groups = RENDER.disturbance_groups(found)
+        self.assertEqual([len(events) for _, events in groups], [1, 2])
+        shorts = [RENDER.group_short(read, events, None, {}) for read, events in groups]
+        self.assertEqual(shorts, [
+            "a remote login during its timed fuzzing runs, which could only have slowed them",
+            "two remote logins during its bound-seed gate, which could only have slowed them"])
+
+    def test_several_events_in_one_phase_are_said_by_kind_and_count(self):
+        backup = dict(self.entry(), what="the host's scheduled backup job")
+        self.assertEqual(RENDER.held_words([backup, self.entry()]),
+                         "a backup run and a remote login")
+        self.assertEqual(RENDER.held_words([self.entry(), self.entry(), backup]),
+                         "two remote logins and a backup run")
+        with self.assertRaisesRegex(RENDER.TargetError, "no short form for the disturbance"):
+            RENDER.held_words([dict(self.entry(), what="a neighbour's batch job")])
+
+    def test_a_case_of_a_median_says_how_many_cases_the_median_takes(self):
+        document = {"results": [{"case": f"k/w={width}/avx2"} for width in range(65)]}
+        read = ("case", "k/w=*/avx2")
+        entry = dict(self.entry("case", "k/w=52/avx2"))
+        self.assertEqual(RENDER.short_phase(read, entry, document),
+                         "one of the 65 cases its median takes")
+        self.assertIn("the case `k/w=52/avx2`, one of the 65 its median takes",
+                      RENDER.group_text(read, [entry], None, {}, document))
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 {
   "schema": "tick-store disturbances 1",
   "commit": "ede0176b10bb49e505226285530d0b91a33b4f34",
-  "how": "Made by hand, after the campaign, from the Linux host's window log, its backup job's log and this project's session records, with each time in UTC. The host does not record logins: its login record was last written before the campaign began, so each login's time is the session records', known to the minute. A query phase with no query named is the whole phase of that kind for the variant, since the documents keep no time per query.",
+  "how": "Made by hand, after the campaign, from the Linux host's window log, its backup job's log and this project's session records, with each time in UTC. The host does not record logins: its login record was last written before the campaign began, so each login's time is the session records', known to the minute. A query phase with no query named is the whole phase of that kind for the variant, since the documents keep no time per query. The other project's watcher's logins were added on 2026-11-17 from its status file and its period, mapped onto the phases by the run records' own times: a login its status file records is placed by that line, and one computed from the period between two recorded lines is given with its bounds as start and end. The capacity check's part is listed here, as the file it falls in was measured at this commit.",
   "not_listed": [
     {
       "what": "the backup job's short routine runs, about ten seconds every fifteen minutes",
@@ -18,9 +18,53 @@
     {
       "what": "the refused attempts of the kernel benchmark and the fuzz step that was no result",
       "why": "no committed file holds their figures"
+    },
+    {
+      "what": "another project's watcher's remote logins, about every half hour from 2026-11-14T15:22:16Z, each reading the host's window state and a few files",
+      "why": "those that fell in the refused attempts of the kernel benchmark (four) and in the fuzz step that was no result (one) touch no committed file; the rest are listed as entries, each recorded time from the watcher's status file and each computed time with its bounds"
+    },
+    {
+      "what": "the host's own scheduled jobs: a repository backup every fifteen minutes, a health collector and two small watchers every five minutes, two sync jobs every ten minutes, a file backup about hourly and daily maintenance",
+      "why": "they run through every window and were not stopped, as nothing on the host is changed for a measurement beyond the governor; the run records keep no list of them by phase apart from the events listed here, and what guards each timed figure is the per-CPU record of the other processors' use and the load rule"
     }
   ],
   "entries": [
+    {
+      "start": "2026-11-14T15:52:17Z",
+      "end": "2026-11-14T15:52:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly; its bounds also overlap the phase before or after, listed beside it",
+      "document": "compare/Linux-12302019-open-ede0176b10bb.json",
+      "phase": "cold queries",
+      "system": "parquet",
+      "variant": "zstd1-rg1Mi-delta-price",
+      "query": "Q1",
+      "timed": true
+    },
+    {
+      "start": "2026-11-14T15:52:17Z",
+      "end": "2026-11-14T15:52:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly; its bounds also overlap the phase before or after, listed beside it",
+      "document": "compare/Linux-12302019-open-ede0176b10bb.json",
+      "phase": "cold queries",
+      "system": "parquet",
+      "variant": "zstd1-rg1Mi-delta-price",
+      "query": "Q2",
+      "timed": true
+    },
+    {
+      "start": "2026-11-14T15:52:17Z",
+      "end": "2026-11-14T15:52:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly; its bounds also overlap the phase before or after, listed beside it",
+      "document": "compare/Linux-12302019-open-ede0176b10bb.json",
+      "phase": "cold queries",
+      "system": "parquet",
+      "variant": "zstd1-rg1Mi-delta-price",
+      "query": "Q3",
+      "timed": true
+    },
     {
       "start": "2026-11-14T15:57:41Z",
       "end": "2026-11-14T15:57:41Z",
@@ -59,6 +103,18 @@
       "timed": true
     },
     {
+      "start": "2026-11-14T16:22:17Z",
+      "end": "2026-11-14T16:22:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "compare/Linux-12302019-open-ede0176b10bb.json",
+      "phase": "warm queries",
+      "system": "arcticdb",
+      "variant": "rows100k-cols127-per-security",
+      "query": null,
+      "timed": true
+    },
+    {
       "start": "2026-11-14T16:45:00Z",
       "end": "2026-11-14T16:46:00Z",
       "precision": "minute",
@@ -71,6 +127,19 @@
       "timed": false
     },
     {
+      "start": "2026-11-14T16:52:17Z",
+      "end": "2026-11-14T16:52:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "compare/Linux-12302019-open-ede0176b10bb.json",
+      "phase": "write",
+      "system": "questdb",
+      "variant": "locate-index",
+      "class": "B",
+      "repetition": 3,
+      "timed": true
+    },
+    {
       "start": "2026-11-14T17:03:00Z",
       "end": "2026-11-14T17:04:00Z",
       "precision": "minute",
@@ -80,6 +149,31 @@
       "system": "tickstore",
       "variant": "v3-seg1Mi",
       "query": "Q2",
+      "timed": true
+    },
+    {
+      "start": "2026-11-14T17:22:17Z",
+      "end": "2026-11-14T17:22:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "read back",
+      "system": "parquet",
+      "variant": "zstd1-rg1Mi",
+      "class": "B",
+      "timed": false
+    },
+    {
+      "start": "2026-11-14T17:52:17Z",
+      "end": "2026-11-14T17:52:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "write",
+      "system": "parquet",
+      "variant": "zstd1-rg128k",
+      "class": "B",
+      "repetition": 1,
       "timed": true
     },
     {
@@ -95,6 +189,31 @@
       "timed": true
     },
     {
+      "start": "2026-11-14T18:22:17Z",
+      "end": "2026-11-14T18:22:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "write",
+      "system": "parquet",
+      "variant": "zstd9-rg1Mi",
+      "class": "A",
+      "repetition": 1,
+      "timed": true
+    },
+    {
+      "start": "2026-11-14T18:52:17Z",
+      "end": "2026-11-14T18:52:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "cold queries",
+      "system": "parquet",
+      "variant": "zstd9-rg1Mi",
+      "query": "Q2",
+      "timed": true
+    },
+    {
       "start": "2026-11-14T19:05:00Z",
       "end": "2026-11-14T19:06:00Z",
       "precision": "minute",
@@ -103,6 +222,30 @@
       "phase": "read back",
       "system": "parquet",
       "variant": "none-rg1Mi",
+      "class": "A",
+      "timed": false
+    },
+    {
+      "start": "2026-11-14T19:22:17Z",
+      "end": "2026-11-14T19:22:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "read back",
+      "system": "parquet",
+      "variant": "none-rg1Mi",
+      "class": "B",
+      "timed": false
+    },
+    {
+      "start": "2026-11-14T19:52:17Z",
+      "end": "2026-11-14T19:52:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "read back",
+      "system": "arcticdb",
+      "variant": "rows100k-cols127",
       "class": "A",
       "timed": false
     },
@@ -119,6 +262,30 @@
       "timed": false
     },
     {
+      "start": "2026-11-14T20:22:17Z",
+      "end": "2026-11-14T20:22:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "read back",
+      "system": "arcticdb",
+      "variant": "rows100k-cols127",
+      "class": "B",
+      "timed": false
+    },
+    {
+      "start": "2026-11-14T20:52:17Z",
+      "end": "2026-11-14T20:52:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "read back",
+      "system": "arcticdb",
+      "variant": "rows10M-cols127",
+      "class": "A",
+      "timed": false
+    },
+    {
       "start": "2026-11-14T21:21:00Z",
       "end": "2026-11-14T21:22:00Z",
       "precision": "minute",
@@ -127,6 +294,55 @@
       "phase": "warm queries",
       "system": "arcticdb",
       "variant": "rows10M-cols127",
+      "query": null,
+      "timed": true
+    },
+    {
+      "start": "2026-11-14T21:22:17Z",
+      "end": "2026-11-14T21:22:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "warm queries",
+      "system": "arcticdb",
+      "variant": "rows10M-cols127",
+      "query": null,
+      "timed": true
+    },
+    {
+      "start": "2026-11-14T21:52:17Z",
+      "end": "2026-11-14T21:52:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "read back",
+      "system": "arcticdb",
+      "variant": "rows100k-cols127-per-security",
+      "class": "A",
+      "timed": false
+    },
+    {
+      "start": "2026-11-14T22:22:17Z",
+      "end": "2026-11-14T22:22:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "write",
+      "system": "arcticdb",
+      "variant": "rows100k-cols127-per-security",
+      "class": "B",
+      "repetition": 1,
+      "timed": true
+    },
+    {
+      "start": "2026-11-14T22:52:17Z",
+      "end": "2026-11-14T22:52:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "warm queries",
+      "system": "arcticdb",
+      "variant": "rows100k-cols127-per-security",
       "query": null,
       "timed": true
     },
@@ -141,6 +357,42 @@
       "variant": "rows100k-cols127-per-security",
       "query": null,
       "timed": true
+    },
+    {
+      "start": "2026-11-14T23:22:17Z",
+      "end": "2026-11-14T23:22:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly; its bounds also overlap the phase before or after, listed beside it",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "cold queries",
+      "system": "arcticdb",
+      "variant": "rows100k-cols127-per-security",
+      "query": "Q3",
+      "timed": true
+    },
+    {
+      "start": "2026-11-14T23:22:17Z",
+      "end": "2026-11-14T23:22:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly; its bounds also overlap the phase before or after, listed beside it",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "cold queries",
+      "system": "arcticdb",
+      "variant": "rows100k-cols127-per-security",
+      "query": "Q4",
+      "timed": true
+    },
+    {
+      "start": "2026-11-14T23:52:17Z",
+      "end": "2026-11-14T23:52:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "read back",
+      "system": "questdb",
+      "variant": "plain",
+      "class": "A",
+      "timed": false
     },
     {
       "start": "2026-11-15T00:00:00Z",
@@ -168,6 +420,57 @@
       "timed": true
     },
     {
+      "start": "2026-11-15T00:22:17Z",
+      "end": "2026-11-15T00:22:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "write",
+      "system": "questdb",
+      "variant": "plain",
+      "class": "B",
+      "repetition": 1,
+      "timed": true
+    },
+    {
+      "start": "2026-11-15T00:52:17Z",
+      "end": "2026-11-15T00:52:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "read back",
+      "system": "questdb",
+      "variant": "plain",
+      "class": "B",
+      "timed": false
+    },
+    {
+      "start": "2026-11-15T01:22:17Z",
+      "end": "2026-11-15T01:22:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "write",
+      "system": "questdb",
+      "variant": "locate-index",
+      "class": "A",
+      "repetition": 1,
+      "timed": true
+    },
+    {
+      "start": "2026-11-15T01:52:17Z",
+      "end": "2026-11-15T01:52:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "write",
+      "system": "questdb",
+      "variant": "locate-index",
+      "class": "B",
+      "repetition": 1,
+      "timed": true
+    },
+    {
       "start": "2026-11-15T01:58:00Z",
       "end": "2026-11-15T01:59:00Z",
       "precision": "minute",
@@ -178,6 +481,30 @@
       "variant": "locate-index",
       "class": "B",
       "repetition": 1,
+      "timed": true
+    },
+    {
+      "start": "2026-11-15T02:22:17Z",
+      "end": "2026-11-15T02:22:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "read back",
+      "system": "questdb",
+      "variant": "locate-index",
+      "class": "B",
+      "timed": false
+    },
+    {
+      "start": "2026-11-15T02:52:17Z",
+      "end": "2026-11-15T02:52:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "cold queries",
+      "system": "questdb",
+      "variant": "locate-index",
+      "query": "Q5",
       "timed": true
     },
     {
@@ -194,6 +521,43 @@
       "timed": true
     },
     {
+      "start": "2026-11-15T03:22:17Z",
+      "end": "2026-11-15T03:22:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "write",
+      "system": "tickstore",
+      "variant": "v3-seg4Mi",
+      "class": "B",
+      "repetition": 1,
+      "timed": true
+    },
+    {
+      "start": "2026-11-15T03:52:17Z",
+      "end": "2026-11-15T03:52:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "read back",
+      "system": "tickstore",
+      "variant": "v3-seg1Mi",
+      "class": "A",
+      "timed": false
+    },
+    {
+      "start": "2026-11-15T04:22:17Z",
+      "end": "2026-11-15T04:22:51Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "compare/Linux-12302019-full-ede0176b10bb.json",
+      "phase": "read back",
+      "system": "tickstore",
+      "variant": "v3-seg1Mi",
+      "class": "B",
+      "timed": false
+    },
+    {
       "start": "2026-11-15T04:25:00Z",
       "end": "2026-11-15T04:26:00Z",
       "precision": "minute",
@@ -206,6 +570,16 @@
       "timed": true
     },
     {
+      "start": "2026-11-15T06:52:49Z",
+      "end": "2026-11-15T06:52:53Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "bench/Linux-simd_kernel-ede0176b10bb.json",
+      "phase": "case",
+      "case": "pfor_delta_two_pass/w=48/scalar",
+      "timed": true
+    },
+    {
       "start": "2026-11-15T07:15:01Z",
       "end": "2026-11-15T07:15:11Z",
       "precision": "second",
@@ -214,6 +588,26 @@
       "phase": "case",
       "case": "pfor_delta_two_pass/w=31/avx2",
       "timed": true
+    },
+    {
+      "start": "2026-11-15T07:22:49Z",
+      "end": "2026-11-15T07:22:53Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "bench/Linux-simd_kernel-ede0176b10bb.json",
+      "phase": "case",
+      "case": "pfor_delta_fused/w=52/avx2",
+      "timed": true
+    },
+    {
+      "start": "2026-11-17T17:12:57Z",
+      "end": "2026-11-17T17:13:01Z",
+      "precision": "second",
+      "what": "a remote login by another project's watcher, computed from its period between two recorded lines: at some time between start and end, not recorded exactly",
+      "document": "fullday-capacity-12302019.json",
+      "phase": "capacity part",
+      "system": "arcticdb",
+      "timed": false
     }
   ]
 }

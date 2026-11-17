@@ -14,7 +14,7 @@ Nasdaq's peak rate.
 |---|---|---|---|
 | Round trip, both days | every message bit-exact, stream hashes (checksums of the whole message stream) equal (the project's correctness gate, the test every change must pass) | 0 messages differ; stream hashes equal | met |
 | Disk, store flushed (written through to the drive) | below each other system's smallest setup (the project's own bar) | 1.76 GB vs Parquet 3.09 GB | met |
-| One hour of one stock, warm (data already in memory) | fastest of the four, each system in the configuration chosen for it before the runs, by median and tail (the project's own bar) | median 74.04 ms vs QuestDB 283.77 ms; ArcticDB per stock 44.58 ms (a remote login on the test machine fell inside the timing of ArcticDB's warm queries; an earlier full run, which this one replaces, gave 49.65 ms) | met against each system's chosen setup, while ArcticDB with a table per stock is faster (the host was swapping during ArcticDB's and QuestDB's runs, which may flatter this) |
+| One hour of one stock, warm (data already in memory) | fastest of the four, each system in the configuration chosen for it before the runs, by median and tail (the project's own bar) | median 74.04 ms vs QuestDB 283.77 ms; ArcticDB per stock 44.58 ms (two remote logins on the test machine fell inside the timing of ArcticDB's warm queries; an earlier full run, which this one replaces, gave 49.65 ms) | met against each system's chosen setup, while ArcticDB with a table per stock is faster (the host was swapping during ArcticDB's and QuestDB's runs, which may flatter this) |
 | One millisecond of every stock, warm | fastest of the four, each in its chosen configuration, by median and tail (the project's own bar) | median 207.95 ms vs QuestDB 1.24 ms | missed |
 | One-thread ingest | above 2.73 M messages/s, Nasdaq's peak (Nasdaq bandwidth report) | 1.270 M messages/s | missed |
 
@@ -24,7 +24,7 @@ Every other result is in the [full table](RESULTS.md#targets): of the other 32 r
 
 ## The other results of the targets above
 
-Not shown in the table above. Missed: on the Ryzen, flushed one-thread ingest (a remote login on the test machine fell inside the timing of tick-store's write; an earlier full run, which this one replaces, gave 1.423 M messages/s), fastest warm on the open's first second, fastest cold on the open's first second, fastest cold on one millisecond of every stock, fastest warm on a full-day column scan (the host was swapping during QuestDB's runs, which may flatter this). Met: 5 more of their parts.
+Not shown in the table above. Missed: on the Ryzen, flushed one-thread ingest (two remote logins on the test machine fell inside the timing of tick-store's write; an earlier full run, which this one replaces, gave 1.423 M messages/s), fastest warm on the open's first second, fastest cold on the open's first second, fastest cold on one millisecond of every stock, fastest warm on a full-day column scan (the host was swapping during QuestDB's runs, which may flatter this). Met: 5 more of their parts.
 <!-- headline:end -->
 
 ## What it is
