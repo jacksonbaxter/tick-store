@@ -610,6 +610,18 @@ FAULTS = (
           "every request past the budget", EXIT_CTEST,
           "BoundSeeds.CountWhatTheTableGivesThem/itch_query (Failed)",
           arguments=("--test-regex", "BoundSeeds.CountWhatTheTableGivesThem/itch_query$")),
+    Fault("codec-count-the-cut-as-decoded", "dev-test", "the codec oracle's count takes a cut "
+          "block at the values its header states, which the decoder never decodes", EXIT_CTEST,
+          "BoundSeeds.CountWhatTheTableGivesThem/dictionary (Failed)",
+          arguments=("--test-regex", "BoundSeeds.CountWhatTheTableGivesThem/dictionary$")),
+    Fault("codec-block-examined-twice", "dev-test", "the codec oracle decodes every block in a "
+          "first pass before part 1 examines it", EXIT_CTEST,
+          "BoundSeeds.CountWhatTheTableGivesThem/pfor_most_blocks (Failed)",
+          arguments=("--test-regex", "BoundSeeds.CountWhatTheTableGivesThem/pfor_most_blocks$")),
+    Fault("store-each-segment-read-twice", "dev-test", "the store oracle reads each segment on "
+          "its own twice", EXIT_CTEST,
+          "BoundSeeds.CountWhatTheTableGivesThem/itch_store_most_segments (Failed)",
+          arguments=("--test-regex", "BoundSeeds.CountWhatTheTableGivesThem/itch_store_most_segments$")),
     Fault("fuzz-dictionary-repeated-entry", "fuzz-dictionary", "the dictionary decoder stops "
           "refusing a ranked dictionary that holds one value twice", EXIT_LIBFUZZER,
           "check_dict_column:", arguments=FUZZ_ARGUMENTS),

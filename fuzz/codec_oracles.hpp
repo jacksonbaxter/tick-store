@@ -122,17 +122,50 @@ struct CodecUnderTest {
     return out;
 }
 
-// The oracle's decodes and encodes, each counted (oracle_counts.hpp): a block decode at the
-// count its header states, a column decode at the count asked for, an encode at its values.
+// The payload bytes a block's header states (its second u32), and the values a decode of the
+// block at the front of `input` can give: the count its header states where the header and
+// that payload are all in `input`, else none, since every block decoder refuses a cut header
+// or payload before it decodes anything (block.cpp, read_block_header).
+[[nodiscard]] inline std::size_t stated_payload_bytes(std::span<const std::byte> input) {
+    std::size_t payload = 0;
+    for (std::size_t i = 0; i < 4; ++i) {
+        payload |= std::to_integer<std::size_t>(input[4 + i]) << (8U * i);
+    }
+    return payload;
+}
+[[nodiscard]] inline std::uint64_t decodable_values(std::span<const std::byte> input) {
+    const auto stated = stated_block_count(input);
+    if (!stated.has_value() || input.size() < kBlockHeaderSize ||
+        stated_payload_bytes(input) > input.size() - kBlockHeaderSize) {
+        return 0;
+    }
+    return *stated;
+}
+
+// The oracle's decodes and encodes, each counted (oracle_counts.hpp): a block decode at what
+// it can decode (decodable_values), a column decode at the values of the blocks the column
+// walk decodes before it stops, an encode at its values.
 [[nodiscard]] inline std::expected<std::size_t, CodecError> counted_decode(
     const CodecUnderTest& codec, std::span<const std::byte> input, Words& out) {
-    oracle_counts::counts.decoded += stated_block_count(input).value_or(0);
+    oracle_counts::counts.decoded += decodable_values(input);
     return codec.decode_block(input, out);
 }
 [[nodiscard]] inline std::expected<void, CodecError> counted_decode_column(
     const CodecUnderTest& codec, std::span<const std::byte> column, std::uint64_t count,
     Words& out) {
-    oracle_counts::counts.decoded += count;
+    // decode_column (block.cpp) takes each block in turn and refuses, before decoding it, one
+    // whose stated count would pass `count`.
+    std::uint64_t walked = 0;
+    for (std::size_t at = 0; at < column.size();) {
+        const std::span<const std::byte> rest = column.subspan(at);
+        const std::uint64_t values = decodable_values(rest);
+        if (values == 0 || walked + values > count) {
+            break;
+        }
+        walked += values;
+        at += kBlockHeaderSize + stated_payload_bytes(rest);
+    }
+    oracle_counts::counts.decoded += walked;
     return codec.decode_column(column, count, out);
 }
 [[nodiscard]] inline std::expected<void, CodecError> counted_encode(
@@ -233,7 +266,7 @@ inline constexpr std::size_t kPforFuzzDecodedValues = kMaxBlockValues;
 // at most three maximal blocks, each at least 5,131 bytes. The costliest input, the dearest
 // maximal block, 7 i^2 under delta of delta with the scale, within the cap, then a maximal
 // head-delta block with the scale, compared, then a head-delta block of the 646,144 values the
-// bytes left hold, decoded once, takes 568 ms. From builds of the target at other limits
+// bytes left hold, decoded once, takes 564 ms. From builds of the target at other limits
 // (before the prefix), medians of seven interleaved rounds: with every block past the cap
 // compared, that input took 583 ms, past the 571; with the compare limit at the cap and two
 // maximal blocks, 582; at the cap and one with nothing past it examined, 557 (the two blocks
@@ -245,7 +278,7 @@ inline constexpr std::size_t kPforFuzzComparedValues = kPforFuzzDecodedValues + 
 // two is decoded once.
 inline constexpr std::size_t kPforFuzzSingleDecodedValues = kPforFuzzComparedValues + kMaxBlockValues;
 // PFOR's budget: four blocks, 17,410 values (ragged 1, 2 and 1,026). The first block shortened
-// by 128 blocks of 64 values after it, compared, takes 557 ms.
+// by 128 blocks of 64 values after it, compared, takes 553 ms.
 inline constexpr std::size_t kPforFuzzCrossCheckedValues = ragged_budget(4, 1);
 inline constexpr OracleBounds kPforFuzzBounds{.decoded_values = kPforFuzzDecodedValues,
                                               .compared_values = kPforFuzzComparedValues,
@@ -260,8 +293,8 @@ inline constexpr std::size_t kRleFuzzDecodedValues = kMaxBlockValues;
 // block is not examined; its nested blocks are PFOR blocks, which fuzz_pfor compares at every
 // size. The costliest input, the dearest maximal block (2^20 runs of one value, 11,302 bytes)
 // within the cap, then a maximal block of as many runs as the 5 KB left hold (467,968),
-// compared, takes 620 ms, 1.3% over the 612, and the first block shortened by one block of 64
-// values 621, 1.5% over: taken as the least compare limit the bound's form allows, within the
+// compared, takes 617 ms, 0.8% over the 612, and the first block shortened by one block of 64
+// values 612, at it: taken as the least compare limit the bound's form allows, within the
 // 3%. From builds of the target at other limits, the dearest input at each: two maximal blocks
 // past the cap 621 to 623 ms, four 636, eight 656.
 inline constexpr std::size_t kRleFuzzComparedValues = kRleFuzzDecodedValues + kMaxBlockValues;
@@ -286,8 +319,8 @@ inline constexpr std::size_t kDictFuzzDecodedValues = std::size_t{1} << 18U;
 // block, so every block of up to 2^20 values the input starts with or holds just past the cap
 // is decoded by both kernel sets and compared. The costliest input, 300 one-value blocks (as
 // many as -max_len holds) before the dearest block of the cap less 600 values, then a maximal
-// block of it, compared, takes 695 ms; the cap's block and a maximal block alone
-// 680. From builds of the target at other limits (when its cap counted the values
+// block of it, compared, takes 685 ms; the cap's block and a maximal block alone
+// 667. From builds of the target at other limits (when its cap counted the values
 // before a block once, and each block past the budget took 64 values of the re-encodes), a
 // quarter of a maximal block further took the cap's block and a maximal block to 733 ms.
 inline constexpr std::size_t kDictFuzzComparedValues = kDictFuzzDecodedValues + kMaxBlockValues;
@@ -333,7 +366,7 @@ static_assert(std::has_single_bit(kFuzzPastBudgetBlocks), "the prefix is a power
                                         const Words& decoded) {
     const simd::ScalarKernelsOnThisThread scalar;
     Words by_scalar{0xDEAD};
-    oracle_counts::counts.compared += stated_block_count(input).value_or(0);
+    oracle_counts::counts.compared += decodable_values(input);
     const auto again = counted_decode(codec, input, by_scalar);
     if (again.has_value() != result.has_value()) {
         return false;
@@ -483,7 +516,7 @@ static_assert(std::has_single_bit(kFuzzPastBudgetBlocks), "the prefix is a power
     std::expected<std::size_t, CodecError> first = 0;
     {
         const simd::ScalarKernelsOnThisThread scalar;
-        oracle_counts::counts.compared += stated_block_count(input).value_or(0);
+        oracle_counts::counts.compared += decodable_values(input);
         first = counted_decode(codec, input, by_scalar);
     }
     if (!first.has_value()) {
@@ -543,6 +576,7 @@ static_assert(std::has_single_bit(kFuzzPastBudgetBlocks), "the prefix is a power
             break;
         }
         std::size_t taken = 0;
+        ++oracle_counts::counts.blocks;
         if (const char* failure = check_one_block(codec, rest, values, taken, budget, prefix_blocks)) {
             return failure;
         }
@@ -561,6 +595,9 @@ static_assert(std::has_single_bit(kFuzzPastBudgetBlocks), "the prefix is a power
             const std::size_t after = seen + stated.value_or(0);
             std::size_t taken = 0;
             std::size_t count = 0;
+            if (after <= bounds.single_decoded_values) {
+                ++oracle_counts::counts.blocks;
+            }
             if (after <= bounds.compared_values) {
                 if (const char* failure = compare_block(codec, rest, scratch, taken, count)) {
                     return failure;

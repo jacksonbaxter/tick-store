@@ -1,0 +1,14 @@
+diff --git a/fuzz/itch_store_oracles.hpp b/fuzz/itch_store_oracles.hpp
+--- a/fuzz/itch_store_oracles.hpp
++++ b/fuzz/itch_store_oracles.hpp
+@@ -238,6 +238,10 @@
+         std::vector<Bytes> records;
+         std::optional<ItchStoreError> error;
+         const char* failure = nullptr;
++        if (!read_segment(*reader, s, segment, records, error, failure)) {
++            return failure != nullptr ? failure : "a segment read on its own was refused";
++        }
++        records.clear();  // Planted: each segment read on its own twice.
+         if (!read_segment(*reader, s, segment, records, error, failure)) {
+             return failure != nullptr ? failure : "a segment read on its own was refused";
+         }

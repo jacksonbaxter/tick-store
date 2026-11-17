@@ -75,16 +75,17 @@ set(TICK_STORE_SCALAR_CAPPED_FILTER
 # tests on their own. simd_capped_to_scalar_partition checks that the parts together
 # list exactly the tests the filter above lists, each in one part. The bound seeds' whole
 # checks (fuzz/bound_seeds.hpp) take minutes, PFOR's and the dictionary's most, so those
-# five are parts of their own.
+# six are parts of their own.
 set(TICK_STORE_SCALAR_CAPPED_PARTS
     "codecs=Simd*:Pfor*:StreamVByte*:Dictionary*:RunLength*:LanePack*:LinearPack*:PatchList*:CodecRegistry*:CodecEval*"
     "store=ItchStore*:FuzzRegression*-FuzzRegression/BoundSeeds.*"
     "bound_seed_pfor=FuzzRegression/BoundSeeds.*/pfor"
     "bound_seed_pfor_small_blocks=FuzzRegression/BoundSeeds.*/pfor_small_blocks"
+    "bound_seed_pfor_decode_limit=FuzzRegression/BoundSeeds.*/pfor_decode_limit"
     "bound_seed_dictionary=FuzzRegression/BoundSeeds.*/dictionary"
     "bound_seed_dictionary_small_blocks=FuzzRegression/BoundSeeds.*/dictionary_small_blocks"
     "bound_seed_dictionary_one_value_blocks=FuzzRegression/BoundSeeds.*/dictionary_one_value_blocks"
-    "bound_seeds=FuzzRegression/BoundSeeds.*-FuzzRegression/BoundSeeds.*/pfor:FuzzRegression/BoundSeeds.*/pfor_small_blocks:FuzzRegression/BoundSeeds.*/dictionary:FuzzRegression/BoundSeeds.*/dictionary_small_blocks:FuzzRegression/BoundSeeds.*/dictionary_one_value_blocks"
+    "bound_seeds=FuzzRegression/BoundSeeds.*-FuzzRegression/BoundSeeds.*/pfor:FuzzRegression/BoundSeeds.*/pfor_small_blocks:FuzzRegression/BoundSeeds.*/pfor_decode_limit:FuzzRegression/BoundSeeds.*/dictionary:FuzzRegression/BoundSeeds.*/dictionary_small_blocks:FuzzRegression/BoundSeeds.*/dictionary_one_value_blocks"
     "query=ItchQuery*-ItchQuery.SegmentsWithRawRowsTakeTheExactPath"
     "query_exact_path=ItchQuery.SegmentsWithRawRowsTakeTheExactPath"
     "fuzz_oracles=FuzzOracles*-FuzzOracles.PassEveryCutAndFlipThroughTheQueryOracle"

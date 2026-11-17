@@ -1,0 +1,12 @@
+diff --git a/fuzz/codec_oracles.hpp b/fuzz/codec_oracles.hpp
+--- a/fuzz/codec_oracles.hpp
++++ b/fuzz/codec_oracles.hpp
+@@ -147,7 +147,7 @@
+ // walk decodes before it stops, an encode at its values.
+ [[nodiscard]] inline std::expected<std::size_t, CodecError> counted_decode(
+     const CodecUnderTest& codec, std::span<const std::byte> input, Words& out) {
+-    oracle_counts::counts.decoded += decodable_values(input);
++    oracle_counts::counts.decoded += stated_block_count(input).value_or(0);  // Planted: a cut block counted at its stated count.
+     return codec.decode_block(input, out);
+ }
+ [[nodiscard]] inline std::expected<void, CodecError> counted_decode_column(

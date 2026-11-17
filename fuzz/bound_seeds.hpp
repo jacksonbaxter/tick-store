@@ -40,6 +40,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <optional>
 #include <span>
@@ -553,6 +554,48 @@ template <class Encode>
     return adds_then_raw_to(store::oracle::kFuzzComparedStoreValues);
 }
 
+// ITCH store, the most segments: one-byte raw records, the record the writer stores in the
+// fewest bytes a segment (a system event takes 820), one a segment, as many as -max_len holds,
+// 219 of the format's 382. Every read of it walks each segment's directory entry, and each
+// rewrite finishes every segment (the writer's counting sort of 65,538 entries a segment,
+// itch_segment.cpp), the work a segment costs whatever its values.
+//
+// The most segments a store file of -max_len holds: a segment holds a record or more, so it
+// has a type block, whose metadata is the 63-byte segment summary at the least, a seek block
+// and, raw or typed, one more (raw_length, or locate, timestamp and tracking), each a 32-byte
+// footer entry, the two others' metadata 12 bytes each (itch_store.hpp, counts_from_types).
+// The rewrites write as many, the file's records at its segment size.
+inline constexpr std::size_t kStoreLeastSegmentBytes =
+    (3 * store::kBlockEntrySize) + store::kSegmentMetadataFixedSize + (2 * store::kColumnMetadataSize);
+inline constexpr std::size_t kStoreMostSegments = kLargeMaxLen / kStoreLeastSegmentBytes;
+static_assert(kStoreMostSegments == 382);
+// The writer's most: one-record segments of a one-byte raw record, four blocks each (type,
+// raw_length, raw_bytes, seek), 317 bytes, of which the payloads beyond the least are 90; as
+// many as -max_len holds.
+inline constexpr std::size_t kStoreWriterMostSegments = 219;
+inline constexpr std::array<std::byte, 1> kOneByteRecord{std::byte{'z'}};
+[[nodiscard]] inline Bytes itch_store_most_segments_seed() {
+    const auto file = [](std::size_t records) {
+        const std::vector<itch::Message> raw(
+            records, itch::RawMessage{.bytes = kOneByteRecord, .reason = itch::RawReason::unknown_type});
+        return written(raw, 1);
+    };
+    std::size_t low = 1;
+    std::size_t high = kStoreMostSegments;
+    while (low < high) {
+        const std::size_t middle = low + ((high - low + 1) / 2);
+        if (file(middle).size() <= kLargeMaxLen) {
+            low = middle;
+        } else {
+            high = middle - 1;
+        }
+    }
+    if (low != kStoreWriterMostSegments) {
+        throw std::runtime_error("the most-segments seed does not hold the segments the table gives");
+    }
+    return file(low);
+}
+
 // The day in segments of `segment_records`, the query target's cap unless given, with a raw
 // record of 9 bytes every `raw_every` records, so no segment is plain and the indexed path
 // decodes every record it reaches, as much as the exact path does; with none if `raw_every`
@@ -889,6 +932,24 @@ template <class Make>
                     });
 }
 
+// Past the cap, within the compare limit, the two shapes the compare measure prices least (it
+// gives a plain segment and its pieces no weight): the add orders on locate 0 in plain
+// segments of the segment cap, the most values the compare limit admits; and in plain segments
+// of one record, the most segments -max_len holds within it.
+[[nodiscard]] inline Bytes itch_query_compared_plain_values_seed() {
+    return grown_to(
+        store::oracle::kComparedAsksWork, store::oracle::kQueryFuzzComparedWork, [](std::size_t records) {
+            return dearest_steering(adds_on_locate_zero(records), store::oracle::kQueryFuzzMaxSegmentRecords,
+                                    [](Bytes file) { return file; });
+        });
+}
+[[nodiscard]] inline Bytes itch_query_compared_plain_segments_seed() {
+    return grown_to(
+        store::oracle::kComparedAsksWork, store::oracle::kQueryFuzzComparedWork, [](std::size_t records) {
+            return dearest_steering(adds_on_locate_zero(records), 1, [](Bytes file) { return file; });
+        });
+}
+
 // Move-to-front within the budget, the dictionary mode dearest a value to decode: the day with
 // a raw record every 4 in one segment, its share columns as move-to-front blocks over 2,048
 // entries, to the budget.
@@ -1169,6 +1230,65 @@ template <class Block>
         return run_length_runs_block(count, std::min(count, kSmallBlockValues));
     });
 }
+// Inputs of as many blocks as -max_len holds beside the tail's header, each the smallest block
+// the codec's encoders write, of one value: every one within the cap and the budget, so each
+// takes the whole of part 1, the re-encodes with every block encoder included, for one value.
+// They reach the count table's block term (fuzz/README.md, "Bounds"): what a block costs
+// whatever its values. The decoders' least block (kBlockHeaderSize and the codec's least
+// payload) is what the table's most blocks is taken from; the encoders' least is a byte more
+// for the dictionary and the same for the others, so these seeds hold 545 of the dictionary's
+// 565, all 1,024 of PFOR's and all 373 of run-length's, the tail's header counted as a block.
+inline constexpr std::size_t kPforMostBlocks = 1'023;
+inline constexpr std::size_t kDictMostBlocks = 545;
+inline constexpr std::size_t kRleMostBlocks = 372;
+[[nodiscard]] inline Bytes most_blocks_of(const Bytes& block, std::size_t blocks) {
+    const std::size_t count = (kSmallMaxLen - codec::kBlockHeaderSize) / block.size();
+    auto fits = fitted(copies(block, count));
+    if (!fits || count != blocks) {
+        throw std::runtime_error("a most-blocks seed does not hold the blocks its tiers give");
+    }
+    return std::move(*fits);
+}
+using EncodeInto = std::function<std::expected<void, codec::CodecError>(Bytes&)>;
+[[nodiscard]] inline Bytes pfor_smallest_block() {
+    std::vector<EncodeInto> encoders;
+    for (const codec::oracle::Encoder& encoder : codec::oracle::detail::kPforEncoders) {
+        encoders.emplace_back([&encoder](Bytes& out) { return encoder.encode_block(Words{0}, out); });
+    }
+    Bytes smallest;
+    for (const EncodeInto& encode : encoders) {
+        Bytes block = encoded(encode);
+        if (smallest.empty() || block.size() < smallest.size()) {
+            smallest = std::move(block);
+        }
+    }
+    return smallest;
+}
+[[nodiscard]] inline Bytes pfor_most_blocks_seed() {
+    return most_blocks_of(pfor_smallest_block(), kPforMostBlocks);
+}
+[[nodiscard]] inline Bytes dictionary_most_blocks_seed() {
+    return most_blocks_of(encoded([](Bytes& out) { return codec::encode_dict_block(Words{0}, out); }),
+                          kDictMostBlocks);
+}
+[[nodiscard]] inline Bytes run_length_most_blocks_seed() {
+    return most_blocks_of(encoded([](Bytes& out) { return codec::encode_rle_block(Words{0}, out); }),
+                          kRleMostBlocks);
+}
+
+// PFOR's decode limit reached in full: three maximal blocks of zeros, the smallest maximal
+// blocks (5,131 bytes), within the cap, compared, and decoded once; then the tail. It reaches
+// the count table's decoded most, which the costliest input, whose dear blocks leave room for
+// a third block of 646,144 values only, does not.
+[[nodiscard]] inline Bytes pfor_decode_limit_seed() {
+    static_assert(codec::oracle::kPforFuzzSingleDecodedValues == 3 * codec::kMaxBlockValues);
+    auto fits = fitted(copies(pfor_zeros_block(codec::kMaxBlockValues), 3));
+    if (!fits) {
+        throw std::runtime_error("three maximal PFOR blocks do not fit -max_len");
+    }
+    return std::move(*fits);
+}
+
 // Which side of its target's bounds a seed was built for, which the unit test holds it to.
 enum class Side : std::uint8_t {
     // A codec input of a bounded target: its blocks fall in the tiers `tiers` gives.
@@ -1265,7 +1385,7 @@ struct BoundSeed {
 inline constexpr CodecTiers kPrefixTiers{.within_cap = 1 + codec::oracle::kFuzzPastBudgetBlocks + 1};
 
 // One line each in fuzz/bound_seeds.txt, in this order.
-inline constexpr std::array<BoundSeed, 24> kBoundSeeds{{
+inline constexpr std::array<BoundSeed, 31> kBoundSeeds{{
     {"fuzz_dictionary", "dictionary", "bound-costliest", kSmallMaxLen, Side::codec_tiers,
      &dictionary_seed, &codec::oracle::check_dict_column, &codec::oracle::kDictCodec,
      &codec::oracle::kDictFuzzBounds, dictionary_tiers()},
@@ -1278,6 +1398,9 @@ inline constexpr std::array<BoundSeed, 24> kBoundSeeds{{
     {"fuzz_dictionary", "dictionary", "bound-prefix", kSmallMaxLen, Side::codec_tiers,
      &dictionary_prefix_seed, &codec::oracle::check_dict_column, &codec::oracle::kDictCodec,
      &codec::oracle::kDictFuzzBounds, kPrefixTiers},
+    {"fuzz_dictionary", "dictionary", "bound-most-blocks", kSmallMaxLen, Side::codec_tiers,
+     &dictionary_most_blocks_seed, &codec::oracle::check_dict_column, &codec::oracle::kDictCodec,
+     &codec::oracle::kDictFuzzBounds, CodecTiers{.within_cap = kDictMostBlocks}},
     {"fuzz_run_length", "run_length", "bound-costliest", kSmallMaxLen, Side::codec_tiers,
      &run_length_seed, &codec::oracle::check_rle_column, &codec::oracle::kRleCodec,
      &codec::oracle::kRleFuzzBounds, CodecTiers{.within_cap = 1, .compared = kRleComparedBlocks}},
@@ -1290,6 +1413,9 @@ inline constexpr std::array<BoundSeed, 24> kBoundSeeds{{
     {"fuzz_run_length", "run_length", "bound-prefix", kSmallMaxLen, Side::codec_tiers,
      &run_length_prefix_seed, &codec::oracle::check_rle_column, &codec::oracle::kRleCodec,
      &codec::oracle::kRleFuzzBounds, kPrefixTiers},
+    {"fuzz_run_length", "run_length", "bound-most-blocks", kSmallMaxLen, Side::codec_tiers,
+     &run_length_most_blocks_seed, &codec::oracle::check_rle_column, &codec::oracle::kRleCodec,
+     &codec::oracle::kRleFuzzBounds, CodecTiers{.within_cap = kRleMostBlocks}},
     {"fuzz_run_length", "run_length", "bound-repeated-run-value", kSmallMaxLen,
      Side::codec_tiers, &run_length_repeat_seed, &codec::oracle::check_rle_column,
      &codec::oracle::kRleCodec, &codec::oracle::kRleFuzzBounds,
@@ -1304,6 +1430,12 @@ inline constexpr std::array<BoundSeed, 24> kBoundSeeds{{
     {"fuzz_pfor", "pfor", "bound-prefix", kSmallMaxLen, Side::codec_tiers, &pfor_prefix_seed,
      &codec::oracle::check_pfor_column, &codec::oracle::kPforCodec, &codec::oracle::kPforFuzzBounds,
      kPrefixTiers},
+    {"fuzz_pfor", "pfor", "bound-most-blocks", kSmallMaxLen, Side::codec_tiers, &pfor_most_blocks_seed,
+     &codec::oracle::check_pfor_column, &codec::oracle::kPforCodec, &codec::oracle::kPforFuzzBounds,
+     CodecTiers{.within_cap = kPforMostBlocks}},
+    {"fuzz_pfor", "pfor", "bound-decode-limit", kSmallMaxLen, Side::codec_tiers, &pfor_decode_limit_seed,
+     &codec::oracle::check_pfor_column, &codec::oracle::kPforCodec, &codec::oracle::kPforFuzzBounds,
+     CodecTiers{.within_cap = 1, .compared = 1, .decoded_once = 1}},
     {"fuzz_pfor", "pfor", "bound-delta-past-cap", kSmallMaxLen, Side::codec_tiers,
      &pfor_delta_past_cap_seed, &codec::oracle::check_pfor_column, &codec::oracle::kPforCodec,
      &codec::oracle::kPforFuzzBounds,
@@ -1322,12 +1454,18 @@ inline constexpr std::array<BoundSeed, 24> kBoundSeeds{{
      &itch_store_seed, &store::oracle::check_itch_store},
     {"fuzz_itch_store", "itch_store", "bound-costliest-compared", kLargeMaxLen,
      Side::store_compared, &itch_store_compared_seed, &store::oracle::check_itch_store},
+    {"fuzz_itch_store", "itch_store", "bound-most-segments", kLargeMaxLen, Side::within_store_cap,
+     &itch_store_most_segments_seed, &store::oracle::check_itch_store},
     {"fuzz_itch_query", "itch_query", "bound-costliest", kQueryMaxLen, Side::past_query_budget,
      &itch_query_seed, &store::oracle::check_itch_query},
     {"fuzz_itch_query", "itch_query", "bound-costliest-within-budget", kQueryMaxLen,
      Side::within_query_budget, &itch_query_budget_seed, &store::oracle::check_itch_query},
     {"fuzz_itch_query", "itch_query", "bound-costliest-compared", kQueryMaxLen,
      Side::query_compared, &itch_query_compared_seed, &store::oracle::check_itch_query},
+    {"fuzz_itch_query", "itch_query", "bound-compared-plain-values", kQueryMaxLen, Side::query_compared,
+     &itch_query_compared_plain_values_seed, &store::oracle::check_itch_query},
+    {"fuzz_itch_query", "itch_query", "bound-compared-plain-segments", kQueryMaxLen, Side::query_compared,
+     &itch_query_compared_plain_segments_seed, &store::oracle::check_itch_query},
     {"fuzz_itch_query", "itch_query", "bound-falling-minutes", kQueryMaxLen,
      Side::past_query_budget, &itch_query_falling_minutes_seed, &store::oracle::check_itch_query},
     {"fuzz_itch_query", "itch_query", "bound-move-to-front", kQueryMaxLen,

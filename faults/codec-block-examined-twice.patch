@@ -1,0 +1,20 @@
+diff --git a/fuzz/codec_oracles.hpp b/fuzz/codec_oracles.hpp
+--- a/fuzz/codec_oracles.hpp
++++ b/fuzz/codec_oracles.hpp
+@@ -564,6 +564,16 @@
+     std::size_t budget = bounds.cross_checked_values;
+     std::size_t prefix_blocks = bounds.past_budget_blocks;
+     bool capped = false;
++    // Planted: a first pass decodes every block before part 1 examines it again.
++    for (std::size_t at = 0; at < input.size();) {
++        Words first_pass;
++        ++oracle_counts::counts.blocks;
++        const auto took = counted_decode(codec, input.subspan(at), first_pass);
++        if (!took.has_value() || *took == 0) {
++            break;
++        }
++        at += *took;
++    }
+     while (offset < input.size()) {
+         // A block whose stated count, with the values taken before it counted twice, would
+         // take part 1 past the cap goes to the tiers below (OracleBounds::decoded_values).

@@ -132,6 +132,7 @@ struct ReadResult {
                                        std::optional<ItchStoreError>& error,
                                        const char*& failure) {
     // Counted at the values the segment's entry states, which its columns decode to at most.
+    ++oracle_counts::counts.segments;
     for (const std::uint32_t values : reader.segment(segment).values) {
         oracle_counts::counts.decoded += values;
     }
