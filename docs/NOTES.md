@@ -1035,7 +1035,7 @@ logs, outside the repository):
 
 | N | Segments | Stored bytes | Ratio | References + imports | add_price | Footer | Writer footprint |
 |---|---|---|---|---|---|---|---|
-| 2^16 | 4,101 | 1,594,523,642 | 5.175 | 276.7 MB | 96.7 MB | 8.78 MB | 40 MB |
+| 2^16 | 4,101 | 1,594,523,689 | 5.175 | 276.7 MB | 96.7 MB | 8.78 MB | 40 MB |
 | 2^18 | 1,026 | 1,508,225,974 | 5.471 | 218.9 MB | 80.6 MB | 2.21 MB | 136 MB |
 | 2^20 | 257 | 1,449,464,212 | 5.693 | 173.9 MB | 71.7 MB | 0.56 MB | 283 MB |
 | 2^22 | 65 | 1,417,650,455 | 5.821 | 150.2 MB | 67.4 MB | 0.15 MB | 819 MB |
@@ -6729,7 +6729,7 @@ and `collect2/proofs-d1` folders. Each is shown by hand, proof owed to the full 
 The essay's template, figure list and renderer now render without a hand edit once the Linux G-3
 file at `8616263` and the new capacity file are committed. The one edit left is the capacity kind's
 file pattern in place of its `pending`. In a scratch clone with stand-ins for both, `--check` passes
-on 340 of 340 tokens and 3,642 words. The stand-ins were the old G-3 file's content at `8616263`
+on 340 of 340 tokens and 3,689 words. The stand-ins were the old G-3 file's content at `8616263`
 with the pre-tie pin dropped, and the committed capacity file with its commits set to `ede0176`.
 
 **What stopped the render, fixed (`32d749d`).**
@@ -6784,7 +6784,8 @@ Corrected:
 - every "Not traced" now reads "Not measured";
 - CR-3's "Bases add bits" also reads "Not measured", since no published run measured that cause.
 
-The paragraph on the checks keeps to one link, and two choices are said in the first person.
+The paragraph on the checks keeps to one link, and two choices are said in the first person. The comparison's method paragraph says once what a "swap-in" mark and a login or backup mark
+beside a verdict mean, since the opening already carries them.
 
 **Cut, to make room (`edf7353`).** The essay no longer repeats the targets table's cells:
 - each system's resident pages, files, readiness and engine-only definition in the write

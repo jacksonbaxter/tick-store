@@ -44,6 +44,9 @@ the setups a selection run on a slice kept. The queries are a second of every st
 and the day's sum of a shares column (Q5), each run {{cmpL_warm_runs}} times warm, proven to read
 nothing from storage, and {{cmpL_cold_runs}} times cold, proven evicted. An unflushed write returns
 when data is in the page cache, a flushed write after a proven flush to the device.
+A verdict marked "swap-in" rests on figures of the systems named that were timed while pages were
+swapped in; a verdict marked with a login or a backup run rests on a phase that held it, beside
+the replaced run's figure where the replaced run has it.
 
 **The inputs are not alike.** tick-store's ITCH file is resident in the page cache before its
 clock starts; the other systems read the exported columns, {{cmpL_others_input_pages}} pages
