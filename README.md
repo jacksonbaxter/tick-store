@@ -224,7 +224,9 @@ A skip is never a pass. A step that cannot run shows as `SKIP`, as `py-compare` 
 `.venv`, and a test skipped inside a passing step is named in that row. `ItchRealDay` skips
 this way where the data is absent. The four sources a host does not compile, the other
 operating system's two and the other processor's CRC32C and SIMD kernels, such as
-`src/harness/page_cache_linux.cpp` on macOS, are named as not analysed by clang-tidy.
+`src/harness/page_cache_linux.cpp` on macOS, are named as not analysed by clang-tidy. The
+`tsan` step and the coverage measurement leave out the fixed grid and the named seeds' tests,
+which the unit and `asan-ubsan` steps run in full on each host (see `fuzz/README.md`, "Bounds").
 
 A warning in a dependency cannot fail the build. `-Werror` is a `PRIVATE` option on our own
 targets (`cmake/Warnings.cmake`), so a dependency's sources never see it, and FetchContent's
@@ -234,7 +236,8 @@ source and header print a warning and the build passes.
 
 ## Coverage
 
-`scripts/coverage.sh` builds the `coverage` preset, runs the unit tests and reports line and
+`scripts/coverage.sh` builds the `coverage` preset, runs the unit tests but `ItchRealDay`, the
+fixed grid and the named seeds' tests, and reports line and
 function coverage per file for `src/` and `include/`, with llvm-cov. It fails if a function on
 the required list in `scripts/coverage_report.py` is missing or was never called: every
 `decode_as` and `encode_as` for the 23 types, every parser and validator entry point, the
