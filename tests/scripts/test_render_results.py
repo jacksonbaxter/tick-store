@@ -2808,6 +2808,33 @@ class ConditionsTest(Scratch):
                 self.assertIsNone(RENDER.method_problem([(name, said)], self.tree))
 
 
+
+class NotAlikeQuoteTest(unittest.TestCase):
+    """A hand-written quote of WT-4's verdict on Linux carries "not like-for-like", the words its
+    row labels the QuestDB part with, beside the input clause (review P1-2)."""
+
+    def test_a_quote_without_the_words_is_refused(self):
+        definitions = json.loads((REPO_ROOT / "scripts" / "targets.json").read_text())
+        row = next(row for row in definitions["rows"]
+                   if (row["id"], row["host"]) == ("WT-4", "Linux"))
+        marks = RENDER.row_marks(row, REPO_ROOT)
+        self.assertIn(("not like-for-like",), marks)
+        quote = next(line for line in (REPO_ROOT / "BENCHMARKS.md").read_text().split("\n")
+                     if line.startswith("| WT-4 | Linux | Total"))
+        # QuestDB's phase mark in its short form, which names no comparison, so only the
+        # verdict's own words say the part is not like for like.
+        full, short = next(forms for forms in marks if forms[0].startswith("(against QuestDB"))
+        self.assertIn(full, quote)
+        self.assertNotIn("not like-for-like", short)
+        quote = quote.replace(full, short)
+        self.assertIsNone(RENDER.quote_problem([("BENCHMARKS.md", quote + "\n")], definitions,
+                                               REPO_ROOT))
+        bare = quote.replace(", not like-for-like", "").replace(" (not like-for-like)", "")
+        self.assertNotIn("not like-for-like", bare)
+        self.assertIn("without a mark RESULTS.md sets beside it: 'not like-for-like'",
+                      RENDER.quote_problem([("BENCHMARKS.md", bare + "\n")], definitions,
+                                           REPO_ROOT) or "")
+
 def proofs_document(verdicts, controls=("UNDETECTED",)):
     """A proofs file as prove_checks.py writes it, with a verdict for each fault and control."""
     faults = [{"fault_id": f"fault-{index}", "verdict": verdict}

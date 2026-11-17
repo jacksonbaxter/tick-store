@@ -3509,6 +3509,10 @@ def without_blocks(text):
     return text
 
 
+# The words a part's label in scripts/targets.json gives a comparison that is not like for like.
+NOT_ALIKE = "not like-for-like"
+
+
 def row_marks(row, root):
     """Every mark a quote of a row's verdict carries, each as the forms a quote may give it in:
     each mark RESULTS.md sets beside it, word for word, a changed part's own included, a phase's
@@ -3518,6 +3522,9 @@ def row_marks(row, root):
     if parts is None:
         return []
     marks = change_mark_pairs(parts) + list(phase_mark_pairs(parts, row))
+    # A part its row labels as not like-for-like is quoted with those words (review P1-2).
+    if any(NOT_ALIKE in part[0] for part in parts):
+        marks.append((NOT_ALIKE,))
     classes = [notes_of(part)["write"] for part in parts if notes_of(part).get("write")]
     clause = input_clause(parts[0][4], classes[0]) if classes else None
     return marks + ([(clause,)] if clause else [])

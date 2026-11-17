@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -3523,7 +3523,7 @@
+         return []
+     marks = change_mark_pairs(parts) + list(phase_mark_pairs(parts, row))
+     # A part its row labels as not like-for-like is quoted with those words (review P1-2).
+-    if any(NOT_ALIKE in part[0] for part in parts):
++    if False:
+         marks.append((NOT_ALIKE,))
+     classes = [notes_of(part)["write"] for part in parts if notes_of(part).get("write")]
+     clause = input_clause(parts[0][4], classes[0]) if classes else None

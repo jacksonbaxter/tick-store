@@ -2041,6 +2041,11 @@ FAULTS = (
     Fault("render-proofs-prover-optional", "py-scripts", "render_results.py renders the proofs "
           "paragraph with no prover to count the listed faults from", CHECK_FAILED,
           "FAIL: test_the_markers_need_the_prover_and_its_list (__main__.ProofsBlockTest"),
+    # Review P1-2: a quote of a verdict whose part is not like for like says so.
+    Fault("render-quote-not-alike-unasked", "py-scripts", "render_results.py takes a quote of a "
+          "verdict whose part its row labels not like-for-like without those words",
+          CHECK_FAILED,
+          "FAIL: test_a_quote_without_the_words_is_refused (__main__.NotAlikeQuoteTest"),
     # Review P1-3: the round trip's times and store size are read from its results file.
     Fault("readme-roundtrip-hand-edit", "render-check", "a hand edit inside the README's "
           "sentence on the round trip's times", CHECK_FAILED,
