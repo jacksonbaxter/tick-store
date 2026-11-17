@@ -411,9 +411,9 @@
  },
  "claims": [
   {"text": "times smaller than the feed", "holds": {"above": [{"figure": "ss_ratio"}, 1]}},
-  {"text": "takes the least disk of the systems compared", "pitch_claim": "it takes the least disk of the four"},
+  {"text": "takes the least disk of the systems compared", "pitch_claim": "it takes the least disk"},
   {"text": "gives every message back bit-exact", "pitch_claim": "gives every message back bit-exact"},
-  {"text": "quicker to query than in the other systems' fixed setups", "pitch_claim": "fastest of the four, each in the setup"},
+  {"text": "quicker to query than in the other systems' fixed setups", "pitch_claim": "one-stock queries fastest, each system"},
   {"text": "short windows across every stock are answered quicker by ArcticDB or QuestDB", "pitch_claim": "ArcticDB or QuestDB wins short market-wide windows"},
   {"text": "ingests below Nasdaq's peak published message rate", "holds": {"verdict_is": {"id": "WT-2", "host": "Linux", "parts": ["class A"], "class": "missed"}}},
   {"text": "is exact on the whole day", "holds": {"verdict_is": {"id": "G-4", "host": "any", "class": "met"}}},

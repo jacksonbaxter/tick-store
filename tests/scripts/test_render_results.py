@@ -650,11 +650,28 @@ class RenderLowestTest(Scratch):
         parquet["fast"]["queries"]["Q1"]["warm"] = latency(500.0, 900.0, 30)
         (self.tree / "results" / "day-0123.json").write_text(json.dumps(document),
                                                             encoding="utf-8")
+        # Review R-A1: the variant needs plain words for its mark, and is refused with none.
+        result = self.render()
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("no plain words for parquet's variant 'fast'", result.stderr)
+        row = dict(LOWEST_ROW, lowest_of={**LOWEST_ROW["lowest_of"],
+                                          "setup_words": {"parquet/fast": "Parquet tuned fast"}})
+        self.targets.write_text(json.dumps({"schema": "t", "rows": [row]}), encoding="utf-8")
         result = self.render()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Q1 warm: 1.00 ms / 2.00 ms against Parquet's 3.00 ms / 4.00 ms (median / "
                       "slowest of 30), met among the two headline variants, though Parquet's "
                       "`fast` is faster, 0.50 ms / 0.90 ms;", self.row())
+        # The verdict keeps its word and says what beat it, in full; its short form names the
+        # variant in its plain words.
+        self.assertIn("(Q1 warm) met against each system's headline setup, the one the comparison "
+                      "chose for it before the runs, while Parquet's `fast`, set up otherwise, is "
+                      "faster", self.row())
+        parts = RENDER.judged_parts(row, self.tree)[0]
+        self.assertEqual(RENDER.short_marks(parts, row), [
+            "against each system's chosen setup, while Parquet tuned fast is faster"])
+        self.assertEqual(RENDER.screen_verdict(parts[:1], row), "met against each system's "
+                         "chosen setup, while Parquet tuned fast is faster")
         # A missed part says nothing more.
         self.assertIn("Q1 cold: 5.00 ms / 9.00 ms against Parquet's 4.00 ms / 6.00 ms (median / "
                       "slowest of 7) |", self.row())
@@ -1181,8 +1198,15 @@ HEADLINE = {
         {"id": "T-4", "host": "Linux", "name": "order"},
         {"id": "T-5", "host": "macOS", "name": "the four"},
         {"id": "T-6", "host": "Linux", "name": "kernel time"}]}
-LEFT_OUT_LINE = ("Not shown above. Missed: bits of two. Of the other 2 target-and-machine rows of "
-                 "the [full table](RESULTS.md#targets): 2 not judged.")
+def left_out(count, listed):
+    """The block's tail after the sentence under the table: the count sentence ending the first
+    screen, then the heading and the list under it (review R-A5)."""
+    return "\n".join(["", "Every other result is in the [full table](RESULTS.md#targets): of the "
+                      f"other {count}.", "", "## The other results of the targets above", "",
+                      "Not shown in the table above." + (f" {listed}" if listed else "")])
+
+
+LEFT_OUT_LINE = left_out("2 rows, 2 not judged", "Missed: bits of two.")
 
 
 def with_row(index, **changes):
@@ -1257,11 +1281,11 @@ class RenderHeadlineTest(Scratch):
         self.render()
         self.assertEqual(self.headline_row("Bits"),
                          "| Bits | at most 3.0 bits (a codec) | 2.0 bits | met |")
-        self.assertIn("Not shown above. Missed: bits of two.", self.headline())
+        self.assertIn("Not shown in the table above. Missed: bits of two.", self.headline())
 
     def test_the_line_under_the_table_names_every_miss_and_counts_the_met(self):
         self.render()
-        self.assertEqual(self.headline().splitlines()[-1], LEFT_OUT_LINE)
+        self.assertEqual("\n".join(self.headline().splitlines()[-6:]), LEFT_OUT_LINE)
 
     def test_a_part_another_row_shows_is_not_named_as_left_out(self):
         headline = json.loads(json.dumps(HEADLINE))
@@ -1269,7 +1293,8 @@ class RenderHeadlineTest(Scratch):
         self.write_targets(headline)
         self.assertEqual(self.render().returncode, 0)
         self.assertNotIn("bits of two", self.headline())
-        self.assertIn("Not shown above. Of the other 2 target-and-machine rows", self.headline())
+        self.assertIn("of the other 2 rows, 2 not judged.", self.headline())
+        self.assertTrue(self.headline().rstrip().endswith("Not shown in the table above."))
 
     def test_a_met_target_left_out_is_counted_not_named(self):
         headline = json.loads(json.dumps(HEADLINE))
@@ -1279,8 +1304,8 @@ class RenderHeadlineTest(Scratch):
                                encoding="utf-8")
         result = self.render()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("Of the other 3 target-and-machine rows of the [full table]"
-                      "(RESULTS.md#targets): 1 met, 2 not judged.", self.headline())
+        self.assertIn("Every other result is in the [full table](RESULTS.md#targets): of the "
+                      "other 3 rows, 1 met, 2 not judged.", self.headline())
         self.assertNotIn("latency", self.headline())
 
     def test_a_target_or_a_left_out_part_with_no_plain_name_is_refused(self):
@@ -1334,20 +1359,34 @@ class RenderHeadlineTest(Scratch):
         self.assertIn("the screen shows 4 rows and counts 3 others, 2 by verdict, of the "
                       "targets' 6", self.check_line(LEFT_OUT_LINE.replace("other 2", "other 3")))
         self.assertIn("counts 1 more parts met, and the targets give 0", self.check_line(
-            LEFT_OUT_LINE.replace("Of the", "Met: 1 more of their part. Of the")))
+            LEFT_OUT_LINE + " Met: 1 more of their part."))
         self.assertIn("gives no count of the other rows",
-                      self.check_line(LEFT_OUT_LINE.split(" Of the")[0]))
+                      self.check_line(LEFT_OUT_LINE.replace(": of the other 2 rows", "")))
+
+    def test_the_list_stays_under_its_heading_and_the_count_on_the_screen(self):
+        # Review R-A5: the first screen ends with the count; the list of what the table's
+        # targets leave out follows directly under its heading, and is refused gone or moved.
+        lines = LEFT_OUT_LINE.split("\n")
+        for text in ("\n".join(lines[:4]),
+                     "\n".join(lines[:3] + lines[5:] + ["", lines[3]]),
+                     "\n".join([lines[0], lines[5], ""] + lines[3:5] + [lines[1]]),
+                     "\n".join(lines[:3] + ["## Other", ""] + lines[5:]),
+                     "\n".join(lines[:3] + [lines[3], "", "More words.", ""] + lines[5:])):
+            with self.subTest(text=text):
+                self.assertIn("does not end with the count of the other rows followed directly",
+                              self.check_line(text))
 
     def test_a_target_asked_for_is_named_among_its_count(self):
         headline = json.loads(json.dumps(HEADLINE))
         headline["name_among_counts"] = [{"id": "T-6", "host": "Linux"}]
         self.write_targets(headline)
         self.assertEqual(self.render().returncode, 0)
-        self.assertIn(": 2 not judged, kernel time among them.", self.headline())
+        self.assertIn("other 2 rows, 2 not judged.", self.headline())
+        self.assertIn(" Among the other rows not judged: kernel time.", self.headline())
 
     def test_the_sentence_under_the_table_gives_its_figure_and_verdict(self):
         self.render()
-        self.assertIn("\n\nOn a laptop on macOS it takes 7.25 ms: met.\n\nNot shown above.",
+        self.assertIn("\n\nOn a laptop on macOS it takes 7.25 ms: met.\n\nEvery other result",
                       self.headline())
 
     def test_the_sentence_under_the_table_must_give_its_verdict(self):
@@ -1673,9 +1712,9 @@ LEFT_OUT_HEADLINE = {
         {"id": "L-7", "host": "macOS", "name": "more bits", "parts": {"a": "more bits a",
                                                                       "z": "two bits"}},
         {"id": "U-1", "host": "macOS", "name": "laptop latency"}]}
-LEFT_OUT_TEXT = ("Not shown above. Missed: on both machines, two bits; on the box, bits b, bits c. "
-                 "Of the other 3 target-and-machine rows of the [full table](RESULTS.md#targets): "
-                 "1 met, 1 missed in part, 1 not judged, kernel time among them.")
+LEFT_OUT_TEXT = left_out("3 rows, 1 met, 1 missed in part, 1 not judged",
+                         "Missed: on both machines, two bits; on the box, bits b, bits c. "
+                         "Among the other rows not judged: kernel time.")
 
 
 class LeftOutLineTest(Scratch):
@@ -1791,10 +1830,13 @@ class LeftOutLineTest(Scratch):
                  "names 'bits c' twice or empty under missed"),
                 (LEFT_OUT_TEXT.replace("Missed:", "Missed in part:"),
                  "does not name 'bits b', which is missed"),
-                (LEFT_OUT_TEXT.replace("Not shown above. ", "Not shown above. Lost: bits. "),
+                (LEFT_OUT_TEXT.replace("above. ", "above. Lost: bits. "),
                  "the line under the table says 'Lost: bits', which is no class of its own"),
                 (LEFT_OUT_TEXT.replace("1 met, ", "1 met, 2 lost, "),
-                 "counts '2 lost', which is no count of a verdict")):
+                 "counts '2 lost', which is no count of a verdict"),
+                (LEFT_OUT_TEXT.replace(" Among the other rows not judged: kernel time.", ""),
+                 "names {} among its counts, and the targets give {'not judged': 'kernel "
+                 "time'}")):
             with self.subTest(line=line):
                 with self.assertRaises(RENDER.TargetError) as caught:
                     RENDER.check_left_out(line, definitions, self.tree, shown, names,
@@ -2133,7 +2175,8 @@ class ReplacedRunTest(Scratch):
         self.assertTrue(verdict.startswith("(against ArcticDB) met on this run's figures, a "
                                            "change that favours tick-store, and missed on the "
                                            "replaced run's, so counted as missed in every count, "
-                                           "ranking and first screen on these pages, both runs' "
+                                           "ranking and first screen of the project's pages, "
+                                           "both runs' "
                                            "figures under Measured"), verdict)
         self.assertNotIn("missed on (against ArcticDB)", verdict)
         self.assertEqual(RENDER.verdict_class(parts), "missed")
@@ -2405,7 +2448,8 @@ class ConditionsTest(Scratch):
                                       "format": "{:.2f}"}}}
         parts = self.parts(SWAP_ROW)
         marks = RENDER.value_marks(spec, parts, self.tree, SWAP_ROW)
-        self.assertEqual(marks, {"theirs_mark": "(a login during ArcticDB's warm queries)"})
+        self.assertEqual(marks, {"theirs_mark": "(a remote login on the test machine fell inside "
+                                                "the timing of ArcticDB's warm queries)"})
         # The full mark stands beside the figure wherever RESULTS.md shows it.
         self.assertEqual(RENDER.figure_marks(
             RENDER.disturbance_entries(self.tree), self.tree, parts[0][3], parts[0][4],
@@ -2431,7 +2475,9 @@ class ConditionsTest(Scratch):
         entry = {key: value for key, value in LOGIN.items() if key not in ("class", "repetition")}
         self.disturb(dict(entry, document="day-0123.json", phase="warm queries",
                           system="parquet", variant="fast", query=None))
-        parts, _ = RENDER.judged_parts(LOWEST_ROW, self.tree)
+        row = dict(LOWEST_ROW, lowest_of={**LOWEST_ROW["lowest_of"],
+                                          "setup_words": {"parquet/fast": "Parquet tuned fast"}})
+        parts, _ = RENDER.judged_parts(row, self.tree)
         self.assertIn("though Parquet's `fast` is faster, 0.50 ms / 0.90 ms, measured in "
                       "Parquet's `fast` warm queries, which held a remote login by this project, "
                       "2026-11-15 03:22 UTC, to the minute", parts[0][1])
@@ -2468,7 +2514,9 @@ class ConditionsTest(Scratch):
         parts = self.parts()
         token = RENDER.marked_name("flushed write", parts[0], CHANGE_ROW)
         self.assertTrue(token.startswith("flushed write (missed on this run's figures"[:14]))
-        self.assertIn("(a login during tick-store's write; replaced run 189.0 s)", token)
+        self.assertIn("(a remote login on the test machine fell inside the timing of "
+                      "tick-store's write; an earlier full run, which this one replaces, gave "
+                      "189.0 s)", token)
         definitions = {"rows": [CHANGE_ROW, {"id": "T-99", "host": "any", "no_figure": "none"}],
                        "headline": {"names": [
                            {"id": "T-11", "host": "Linux", "name": "flushed write",
@@ -2477,8 +2525,9 @@ class ConditionsTest(Scratch):
         names = RENDER.plain_names(definitions, SCREEN_HOSTS)
         shown = {("T-11", "Linux"): set()}
         items, met, counts, named = RENDER.left_out_items(definitions, self.tree, shown, names)
-        line = RENDER.left_out_line(items, met, counts, named, SCREEN_HOSTS)
+        count, line = RENDER.left_out_line(items, met, counts, named, SCREEN_HOSTS)
         self.assertIn(token, line)
+        line = "\n".join(["", count, "", RENDER.OTHERS_HEADING, "", line])
         RENDER.check_left_out(line, definitions, self.tree, shown, names, SCREEN_HOSTS)
         bare = line.replace(token, "flushed write")
         with self.assertRaisesRegex(RENDER.TargetError, "does not name"):
@@ -2491,7 +2540,7 @@ class ConditionsTest(Scratch):
         self.favourable_change()
         self.disturb()
         forms = RENDER.row_marks(CHANGE_ROW, self.tree)
-        self.assertEqual([len(form) for form in forms], [1, 2, 1], forms)
+        self.assertEqual([len(form) for form in forms], [2, 2, 1], forms)
         marks = [form[0] for form in forms]
         change, login, clause = marks
         self.assertTrue(change.startswith("(against ArcticDB) met on this run's figures, a change "
@@ -2545,6 +2594,26 @@ class ConditionsTest(Scratch):
                                 encoding="utf-8")
         RENDER.check_pitch(self.targets, self.tree,
                            f"# Title\n\n{sentence}\n\n{RENDER.HEADLINE_BEGIN}\n")
+
+    def test_a_pitch_win_another_setup_beats_names_that_setup(self):
+        # Review R-A1: a claim resting on parts met among the setups chosen before the runs,
+        # which another system's other setup beats, says what beat it in its plain words.
+        self.write(with_queries(change_document(recorded_write(1.0, 0.1),
+                                                recorded_write(2.0, 0.1))))
+        own = RENDER.judged_parts
+        self.addCleanup(setattr, RENDER, "judged_parts", own)
+
+        def beaten(row, root):
+            parts, reason = own(row, root)
+            return [(*part[:5], {**part[5], "faster": [("arcticdb", "split", "ArcticDB split")]})
+                    for part in parts or []], reason
+        RENDER.judged_parts = beaten
+        with self.assertRaises(RENDER.TargetError) as refused:
+            self.pitch_check("On the box it answers one stock fastest.")
+        self.assertIn("a win among the setups chosen before the runs that another setup beats, "
+                      "and does not say 'ArcticDB split is faster'", str(refused.exception))
+        self.pitch_check("On the box it answers one stock fastest, though ArcticDB split is "
+                         "faster.")
 
     def test_a_pitch_claim_on_a_swapped_in_figure_says_so_in_its_short_form(self):
         self.write(with_queries(change_document(recorded_write(1.0, 0.1),
@@ -2708,12 +2777,15 @@ class ConditionsTest(Scratch):
         self.write(with_queries(change_document(recorded_write(1.0, 0.1),
                                                 recorded_write(2.0, 0.1)), flagged=["arcticdb"]))
         parts = self.parts(SWAP_ROW)
-        self.assertEqual(RENDER.screen_verdict(parts, SWAP_ROW), "met (swap-in: ArcticDB)")
+        self.assertEqual(RENDER.screen_verdict(parts, SWAP_ROW), "met (the host was swapping "
+                         "during ArcticDB's runs, which may flatter this)")
         self.assertEqual(RENDER.short_marks(parts, SWAP_ROW),
                          [RENDER.SHORT_SWAPPED + "ArcticDB"])
         explained = RENDER.short_forms_explained()
         for short in (RENDER.SHORT_SWAPPED, RENDER.SHORT_SWAPPED_FIGURE, RENDER.SHORT_REPLACED,
-                      *RENDER.SHORT_DISTURBANCE.values()):
+                      *RENDER.SHORT_DISTURBANCE.values(), *RENDER.SCREEN_DISTURBANCE.values(),
+                      RENDER.SCREEN_SWAPPED, RENDER.SCREEN_REPLACED, RENDER.SHORT_SETUP,
+                      *RENDER.SCREEN_LEANS.values()):
             self.assertIn(short, explained)
         for what in RENDER.SHORT_DISTURBANCE:
             self.assertIn(what, explained)
@@ -2853,6 +2925,60 @@ class ProofsBlockTest(Scratch):
                      text.index(RENDER.PROOFS_END)]
         self.assertEqual(block.strip().split("\n"),
                          RENDER.render_proofs(REPO_ROOT / "results" / "check-proofs.json"))
+
+
+class ShortFormTest(unittest.TestCase):
+    """Reviews R-A3, R-A4, R-B1 to R-B3: the short and screen forms of the marks, on parts made
+    here: (label, text, met, path, document, notes)."""
+
+    def part(self, label, met, **notes):
+        return (label, "", met, None, {}, notes)
+
+    def test_swap_in_marks_name_each_system_once_over_a_verdict(self):
+        parts = [self.part("Q2 warm", True, swapped=[("arcticdb", "h", False),
+                                                     ("questdb", "p", False)]),
+                 self.part("Q3 warm", True, swapped=[("questdb", "p", False)]),
+                 self.part("Q3 cold", True, swapped=[("arcticdb", "h", False)])]
+        pairs = RENDER.phase_mark_pairs(parts)
+        self.assertEqual(len(pairs), 3)
+        self.assertEqual({short for _, short in pairs}, {"swap-in: ArcticDB, QuestDB"})
+        self.assertEqual(RENDER.short_marks(parts), ["swap-in: ArcticDB, QuestDB"])
+
+    def test_the_screen_says_whose_runs_swapped_and_which_way_it_leans(self):
+        for swapped, words in (
+                ([("arcticdb", "h", False)], "during ArcticDB's runs, which may flatter this"),
+                ([("tickstore", "h", False)], "during tick-store's runs, which may understate "
+                                              "this"),
+                ([("tickstore", "h", False), ("questdb", "p", False)],
+                 "during tick-store's and QuestDB's runs, which may lean either way")):
+            with self.subTest(swapped=swapped):
+                self.assertEqual(RENDER.screen_verdict([self.part("Q2 warm", True,
+                                                                  swapped=swapped)]),
+                                 f"met (the host was swapping {words})")
+
+    def test_a_changed_outcome_has_a_short_form_and_a_full_one_true_anywhere(self):
+        part = self.part("against ArcticDB", False, change={"new": True, "old": False})
+        self.assertEqual(RENDER.change_short(part), "met on this run and missed on the replaced "
+                         "one, a change for tick-store, counted as missed")
+        self.assertTrue(RENDER.change_text(part).endswith(
+            "so counted as missed in every count, ranking and first screen of the project's "
+            "pages"))
+        self.assertEqual(RENDER.change_mark_pairs([part]), [(RENDER.change_text(part),
+                                                             RENDER.change_short(part))])
+        against = self.part("against ArcticDB", False, change={"new": False, "old": True})
+        self.assertIn("a change against tick-store", RENDER.change_short(against))
+
+    def test_a_verdict_of_several_parts_reads_as_one_sentence(self):
+        parts = [self.part("against Parquet", False),
+                 self.part("against ArcticDB", False, change={"new": True, "old": False}),
+                 self.part("against QuestDB, not like-for-like", True)]
+        self.assertEqual(RENDER.short_verdict(parts),
+                         "met against QuestDB, not like-for-like; missed against Parquet; "
+                         "against ArcticDB met on this run and missed on the replaced one, a "
+                         "change for tick-store, counted as missed")
+        self.assertEqual(RENDER.short_verdict([self.part("Q2 warm", True),
+                                               self.part("Q4 warm", False)]),
+                         "met on Q2 warm; missed on Q4 warm")
 
 
 if __name__ == "__main__":

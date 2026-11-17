@@ -923,17 +923,28 @@ def faster_variants(spec, document, query, kind, ours, row, mark=None):
     and, beside them, what mark gives for the phase they were timed in (review C1, 4d)."""
     count = 1 + len(spec["others"])
     note = f", met among the {COUNT_WORDS.get(count, str(count))} headline variants"
-    first = spec["fields"][0]
     faster = []
+    for system, name, block in faster_setups(spec, document, query, kind):
+        figures = " / ".join(shown(block[field], row) for field in spec["fields"])
+        beside = mark(("queries", system, name, kind, query)) if mark else ""
+        faster.append(f"{SYSTEM_LABEL[system]}'s `{name}` is faster, {figures}{beside}")
+    return note + (", though " + " and ".join(faster) if faster else "")
+
+
+def faster_setups(spec, document, query, kind):
+    """(system, variant, its block) for each other system's variant that is not its headline
+    and has a lower first field than tick-store's headline on that query and kind."""
+    first = spec["fields"][0]
+    ours = walk(document, ["systems", spec["ours"], "variants", "@headline", "queries", query,
+                           kind])
+    found = []
     for system in spec["others"]:
         headline_name = walk(document, ["systems", system, "headline_variant"])
         for name, variant in walk(document, ["systems", system, "variants"]).items():
             block = walk(variant, ["queries", query, kind])
             if name != headline_name and block[first] < ours[first]:
-                figures = " / ".join(shown(block[field], row) for field in spec["fields"])
-                beside = mark(("queries", system, name, kind, query)) if mark else ""
-                faster.append(f"{SYSTEM_LABEL[system]}'s `{name}` is faster, {figures}{beside}")
-    return note + (", though " + " and ".join(faster) if faster else "")
+                found.append((system, name, block))
+    return found
 
 
 # The fields that hold a latency block's tail figure: p99_us under its old name.
@@ -1411,11 +1422,11 @@ def figure_marks(entries, root, path, document, read, replaced, row):
 
 
 def figure_short_marks(entries, root, path, document, read, replaced, row):
-    """figure_marks in their short forms, as the README's first screen shows them."""
-    marks = [short_disturbance(entry, found, replaced, row)
+    """figure_marks as the README's first screen shows them, in words that stand alone."""
+    marks = [short_disturbance(entry, found, replaced, row, screen=True)
              for entry, found in disturbed(entries, root, path, [read])]
     if swapped_reads([read], document):
-        marks.append(SHORT_SWAPPED_FIGURE)
+        marks.append(SCREEN_SWAPPED_FIGURE)
     return marks
 
 
@@ -1536,6 +1547,14 @@ def finished(row, root, specs, parts):
                 deciding_reads(row, spec, label, old_document, tainted_then), old_document)]
         if swapped:
             notes["swapped"] = list(dict.fromkeys(swapped))
+        # A part met among the headline setups that another system's other setup beats carries
+        # that setup beside its verdict, so the win is never quoted bare (review R-A1).
+        if "lowest_of" in row and met is True:
+            query, kind = label.split(" ", 1)
+            faster = [(system, name, setup_words(row, system, name)) for system, name, _ in
+                      faster_setups(row["lowest_of"], document, query, kind)]
+            if faster:
+                notes["faster"] = faster
         writes = [read for read in reads if read[0] == "write"]
         if writes and is_comparison(row):
             notes["write"] = writes[0][3]
@@ -1868,12 +1887,12 @@ def disturbance_text(entry, read, replaced, row):
 # timed_policy has it: the number is kept and marked, and a verdict that rests on it says so.
 # The systems follow a semicolon, so a sentence read for a faster write ends before them.
 SWAPPED = "rests on figures timed while pages were swapped in; the record flags "
-# The marks' short forms, as the README's first screen gives them, defined here once: the
-# checks of the screen and of a hand-written quote take these and no other, and RESULTS.md
-# explains each in full words under its targets table, where the screen links (review C2-4).
-# "swap-in: <systems>" for SWAPPED's mark, naming the systems whose deciding figures the
-# record flags; "<what> during <phase>; replaced run <figure>" for a disturbance's, its kind
-# in a few words; and "swap-in" beside a figure for figure_marks' flag.
+# The marks' short forms, defined here once: a hand-written quote of a verdict and the essay
+# may give a mark in full or in its short form and no other, and RESULTS.md explains each in
+# full words under its targets table (review C2-4). "swap-in: <systems>" for SWAPPED's mark,
+# naming each system once over every part of one verdict; "<what> during <phase>; replaced run
+# <figure>" for a disturbance's, its kind in a few words; and "swap-in" beside a figure for
+# figure_marks' flag.
 SHORT_SWAPPED = "swap-in: "
 SHORT_SWAPPED_FIGURE = "swap-in"
 SHORT_REPLACED = "replaced run "
@@ -1881,6 +1900,29 @@ SHORT_DISTURBANCE = {"a remote login by this project": "a login",
                      "the host's scheduled backup job": "a backup run",
                      "process launches by this project": "process launches",
                      "a file copy and process launch by this project": "a file copy and launch"}
+# The README's first screen is read by someone who has not read the rest, so its marks say what
+# happened in plain words and stand alone (review R-A3, R-A4): a swap-in mark says the host was
+# swapping while the named systems ran and which way that may lean, and a disturbance's says
+# what fell inside the timing and what the run it replaces gave.
+SCREEN_DISTURBANCE = {"a remote login by this project": "a remote login on the test machine",
+                      "the host's scheduled backup job":
+                          "the test machine's scheduled backup job",
+                      "process launches by this project": "process launches on the test machine",
+                      "a file copy and process launch by this project":
+                          "a file copy and process launch on the test machine"}
+SCREEN_SWAPPED = "the host was swapping during "
+SCREEN_LEANS = {"rivals": "which may flatter this", "ours": "which may understate this",
+                "both": "which may lean either way"}
+SCREEN_REPLACED = "an earlier full run, which this one replaces, gave "
+SCREEN_SWAPPED_FIGURE = "timed while the host was swapping"
+# A part met against each other system's headline variant, the setup the comparison fixed for
+# it before the runs, where another system's other variant is faster (review R-A1): the verdict
+# stays as the rule gives it, and its mark says what beat it. The short form names the variant
+# in plain words, as its row's lowest_of lists them under setup_words, "<system>/<variant>";
+# the render refuses a variant with none.
+SETUP_CHOSEN = ("met against each system's headline setup, the one the comparison chose for it "
+                "before the runs")
+SHORT_SETUP = "against each system's chosen setup"
 
 
 def short_phase(read):
@@ -1891,13 +1933,18 @@ def short_phase(read):
     return f"{system}'s write" if read[0] == "write" else f"{system}'s {read[3]} queries"
 
 
-def short_disturbance(entry, read, replaced, row):
-    """A disturbance's mark in its short form: its kind, the phase, the replaced run's figure."""
-    what = SHORT_DISTURBANCE.get(entry["what"])
+def short_disturbance(entry, read, replaced, row, screen=False):
+    """A disturbance's mark in its short form: its kind, the phase, the replaced run's figure;
+    or, for the README's first screen, the same in words that stand alone."""
+    what = (SCREEN_DISTURBANCE if screen else SHORT_DISTURBANCE).get(entry["what"])
     if what is None:
         raise TargetError(f"no short form for the disturbance {entry['what']!r}; add one to "
-                          "SHORT_DISTURBANCE, which RESULTS.md explains")
+                          f"{'SCREEN_DISTURBANCE' if screen else 'SHORT_DISTURBANCE'}, which "
+                          "RESULTS.md explains")
     figure = replaced_figure(read, replaced, row or {})
+    if screen:
+        return f"{what} fell inside the timing of {short_phase(read)}" + (
+            f"; {SCREEN_REPLACED}{shown(figure[1], row or {})}" if figure is not None else "")
     return f"{what} during {short_phase(read)}" + (
         f"; {SHORT_REPLACED}{shown(figure[1], row or {})}" if figure is not None else "")
 
@@ -1909,26 +1956,80 @@ def short_swapped(swapped):
         for system, _, old in swapped))
 
 
+def screen_swapped(swapped):
+    """SWAPPED's mark on the README's first screen: whose runs the host was swapping during,
+    each system once, and which way that may lean on tick-store's verdict."""
+    systems = list(dict.fromkeys(system for system, _, _ in swapped))
+    lean = "both" if "tickstore" in systems and len(systems) > 1 else \
+        "ours" if "tickstore" in systems else "rivals"
+    names = and_list([SYSTEM_LABEL.get(system, system) + "'s" for system in systems])
+    old = " on the replaced run" if all(old for _, _, old in swapped) else ""
+    return f"{SCREEN_SWAPPED}{names} runs{old}, {SCREEN_LEANS[lean]}"
+
+
+def setup_words(row, system, variant):
+    """A variant's plain words, from its row's lowest_of setup_words."""
+    words = (row.get("lowest_of", {}).get("setup_words") or {}).get(f"{system}/{variant}")
+    if not words:
+        raise TargetError(f"no plain words for {system}'s variant {variant!r}; add them to the "
+                          "row's lowest_of setup_words, which RESULTS.md's marks use")
+    return words
+
+
+def setup_forms(faster):
+    """The mark of a part met among headline setups that a variant set up otherwise beats:
+    (in full, short). faster is (system, variant, its plain words) each."""
+    variants = list(dict.fromkeys(faster))
+    verb = "is" if len(variants) == 1 else "are"
+    full = (f"{SETUP_CHOSEN}, while " + and_list([f"{SYSTEM_LABEL.get(system, system)}'s "
+                                                    f"`{variant}`" for system, variant, _ in
+                                                    variants])
+            + f", set up otherwise, {verb} faster")
+    short = (f"{SHORT_SETUP}, while " + and_list([words for _, _, words in variants]) +
+             f" {verb} faster")
+    return full, short
+
+
 def short_forms_explained():
     """The sentence under RESULTS.md's targets table that explains each short form the README's
-    first screen uses, in full words."""
+    first screen, a hand-written quote or the essay may use, in full words."""
     kinds = "; ".join(f"\"{short}\" for {what}" for what, short in SHORT_DISTURBANCE.items())
-    return ("On the README's first screen the marks beside a verdict or a figure are short: "
+    screen = "; ".join(f"\"{short}\" for {what}" for what, short in SCREEN_DISTURBANCE.items())
+    return ("A mark beside a verdict or a figure may be given short: "
             f"\"({SHORT_SWAPPED}ArcticDB, QuestDB)\" stands for \"{SWAPPED}ArcticDB's ... and "
             "QuestDB's ...\", the figures that decide the verdict from those systems' headline "
-            "variants having been timed while pages were swapped in, as the record flags them; "
+            "variants having been timed while pages were swapped in, as the record flags them, "
+            "each system named once over every part of the verdict; "
             f"\"({SHORT_SWAPPED_FIGURE})\" beside a figure stands for \"which the record flags as "
-            "timed while pages were swapped in\"; and \"(a login during tick-store's write; "
+            "timed while pages were swapped in\"; \"(a login during tick-store's write; "
             f"{SHORT_REPLACED}1.423 M messages/s)\" stands for \"rests on\" or \"measured in\" "
             "that phase, which held a remote login by this project at the time the row above "
-            "gives in full, where the replaced run's figure for that phase is the one given. The "
-            f"kinds of disturbance, short: {kinds}. Each row above gives every mark in full.")
+            "gives in full, where the replaced run's figure for that phase is the one given; "
+            f"\"{SHORT_SETUP}, while ArcticDB with a table per stock is faster\" stands for "
+            f"\"{SETUP_CHOSEN}, while ArcticDB's `rows100k-cols127-per-security`, set up "
+            "otherwise, is faster\": the verdict compares each system's headline variant, and "
+            "a variant the comparison did not choose beats tick-store's figure; \"met on this "
+            "run and missed on the replaced one, a change for tick-store, counted as missed\" "
+            "stands for a changed outcome's mark in full, the less favourable outcome being the "
+            "one every count, ranking and first screen takes; and a verdict of several parts may "
+            "be given as \"met against QuestDB, not like-for-like; missed against Parquet; "
+            "against ArcticDB met on this run and missed on the replaced one, a change for "
+            "tick-store, counted as missed\", its parts named by what they compare. The README's "
+            "first screen says the same in words that stand alone: \"the host was swapping "
+            "during ArcticDB's and QuestDB's runs, which may flatter this\" for a swap-in mark, "
+            "\"which may understate this\" where tick-store's own figures are the swapped ones "
+            "and \"which may lean either way\" where both are; and \"a remote login on the "
+            "test machine fell inside the timing of ArcticDB's warm queries; an earlier full run, "
+            "which this one replaces, gave 49.65 ms\" for a disturbance's. "
+            f"The kinds of disturbance, short: {kinds}; on the first screen: {screen}. A "
+            "variant's plain words are its target row's in `scripts/targets.json`. "
+            "Each row above gives every mark in full.")
 
 
 # The same mark in the README's pitch, which has no room for the systems and variants: a claim
 # there that rests on a rival's flagged figure says this, and the table below it keeps the whole
 # mark. It is held only in the pitch; a quote of a verdict anywhere else takes SWAPPED.
-PITCH_SWAPPED = "some rivals' figures were timed with pages swapped in"
+PITCH_SWAPPED = "swapping in some rivals' runs may flatter it"
 
 
 def swapped_reads(reads, document):
@@ -1958,54 +2059,119 @@ def change_text(part, labelled=True):
     return ((f"({part[0]}) " if labelled else "") +
             f"{verdict_word(change['new'])} on this run's figures{favours} and "
             f"{verdict_word(change['old'])} on the replaced run's, so counted as "
-            f"{verdict_word(counted(part))} in every count, ranking and first screen on these pages")
+            f"{verdict_word(counted(part))} in every count, ranking and first screen of the "
+            "project's pages")
+
+
+def change_short(part):
+    """A changed outcome's mark, short: both outcomes, which way the change leans, the one
+    counted (review R-B1)."""
+    change = notes_of(part)["change"]
+    lean = "for" if standing(change["new"]) > standing(change["old"]) else "against"
+    return (f"{verdict_word(change['new'])} on this run and {verdict_word(change['old'])} on "
+            f"the replaced one, a change {lean} tick-store, counted as "
+            f"{verdict_word(counted(part))}")
 
 
 def change_marks(parts):
     return [change_text(part) for part in parts if notes_of(part).get("change")]
 
 
-def phase_mark_pairs(parts, row=None, labelled=True):
-    """(the mark, its short form) for each mark phase_marks gives, in its order."""
+def change_mark_pairs(parts):
+    """(in full, short) for each changed part's mark."""
+    return [(change_text(part), change_short(part)) for part in parts
+            if notes_of(part).get("change")]
+
+
+def part_phrase(label):
+    """A part named in a short verdict: "against Parquet" as it is, "Q2 warm" as "on Q2 warm"."""
+    return label if label.startswith("against ") else f"on {label}"
+
+
+def short_verdict(parts):
+    """A verdict of several parts as a sentence can carry it (review R-B3): what each part was
+    met and missed on, by what it compares, and each changed part with both outcomes, which
+    way the change leans and the one counted, in change_short's words."""
+    changed = [part for part in parts if notes_of(part).get("change")]
+    rest = [part for part in parts if not notes_of(part).get("change")]
+    pieces = []
+    for word, met in (("met", True), ("missed", False)):
+        found = [part_phrase(part[0]) for part in rest if part[2] is met]
+        if found:
+            pieces.append(f"{word} " + " and ".join(found))
+    found = [part_phrase(part[0]) for part in rest if part[2] is not True and part[2] is not False]
+    if found:
+        pieces.append("not judged " + " and ".join(found))
+    pieces += [f"{part_phrase(part[0])} {change_short(part)}" for part in changed]
+    return "; ".join(pieces)
+
+
+def phase_mark_triples(parts, row=None, labelled=True):
+    """(the mark, its short form, its form on the README's first screen) for each mark
+    phase_marks gives, in its order. A swap-in mark's short and screen forms name every system
+    swapped over all the parts, so one verdict gives each system once (review R-B2)."""
     held = {}
+    for part in parts:
+        faster = notes_of(part).get("faster") or []
+        if faster:
+            full, short = setup_forms(faster)
+            held.setdefault(full, (short, short, []))[2].append(part[0])
     for part in parts:
         for entry, read in notes_of(part).get("disturbed", []):
             replaced = notes_of(part).get("replaced")
             text = "rests on " + disturbance_text(entry, read, replaced, row)
-            held.setdefault(text, (short_disturbance(entry, read, replaced, row), []))[1].append(
-                part[0])
+            held.setdefault(text, (short_disturbance(entry, read, replaced, row),
+                                   short_disturbance(entry, read, replaced, row, screen=True),
+                                   []))[2].append(part[0])
+    every = [item for part in parts for item in notes_of(part).get("swapped") or []]
     for part in parts:
         swapped = notes_of(part).get("swapped") or []
         if swapped:
             text = SWAPPED + and_list([f"{SYSTEM_LABEL.get(system, system)}'s `{variant}`" + (
                 " on the replaced run" if old else "") for system, variant, old in swapped])
-            held.setdefault(text, (short_swapped(swapped), []))[1].append(part[0])
-    pairs = []
-    for text, (short, labels) in held.items():
+            held.setdefault(text, (short_swapped(every), screen_swapped(every), []))[2].append(
+                part[0])
+    triples = []
+    for text, (short, screen, labels) in held.items():
         who = "" if not labelled else "every part " if len(labels) == len(parts) > 1 else \
             ", ".join(f"({label})" for label in labels) + " "
-        pairs.append((f"{who}{text}", short))
-    return pairs
+        triples.append((f"{who}{text}", short, screen))
+    return triples
+
+
+def phase_mark_pairs(parts, row=None, labelled=True):
+    """(the mark, its short form) for each mark phase_marks gives, in its order."""
+    return [(full, short) for full, short, _ in phase_mark_triples(parts, row, labelled)]
 
 
 def phase_marks(parts, row=None, labelled=True):
     """What stands beside a verdict for the phases its parts rest on: each disturbance recorded
     in one, with the replaced run's figure there where there is one; and each figure the record
     flags as timed while a page was swapped in. Unlabelled, as on the README's first screen,
-    the marks name no part."""
+    the marks name no part. A part met among headline setups that another setup beats says so
+    first."""
     return [mark for mark, _ in phase_mark_pairs(parts, row, labelled)]
 
 
 def short_marks(parts, row=None):
-    """The marks of the phases the parts rest on as the README's first screen gives them, each
-    in its short form, explained in full under RESULTS.md's targets table (review C2-4)."""
+    """The marks of the phases the parts rest on in their short forms, each once."""
     return list(dict.fromkeys(short for _, short in phase_mark_pairs(parts, row, False)))
 
 
+def screen_marks(parts, row=None):
+    """The marks as the README's first screen gives them, each once: the setup mark beside the
+    verdict word, the others in brackets after it (review R-A1, R-A3, R-A4)."""
+    marks = list(dict.fromkeys(screen for _, _, screen in phase_mark_triples(parts, row, False)))
+    beside = [mark for mark in marks if mark.startswith(SHORT_SETUP)]
+    return beside, [mark for mark in marks if mark not in beside]
+
+
 def screen_verdict(parts, row=None):
-    """A verdict on the README's first screen: its words, then its short marks in brackets."""
-    marks = short_marks(parts, row)
-    return shown_verdict(parts) + (f" ({'; '.join(marks)})" if marks else "")
+    """A verdict on the README's first screen: its words, the setup mark beside them, then its
+    other marks in brackets."""
+    beside, marks = screen_marks(parts, row)
+    return shown_verdict(parts) + "".join(f" {mark}" for mark in beside) + \
+        (f" ({'; '.join(marks)})" if marks else "")
 
 
 def verdict_marks(parts, row=None):
@@ -2343,8 +2509,9 @@ def left_out_items(definitions, root, shown, names):
 def marked_name(name, part, row):
     """A left-out part's plain name on the line under the table, with each mark its verdict
     carries beside it in brackets, unlabelled, as the first screen names no part (review C1)."""
+    beside, marks = screen_marks([part], row)
     marks = ([change_text(part, labelled=False)] if notes_of(part).get("change") else []) + \
-        short_marks([part], row)
+        beside + marks
     return name + "".join(f" ({mark})" for mark in marks)
 
 
@@ -2370,23 +2537,31 @@ def host_groups(found, hosts):
 
 # The verdict classes of the count of the other rows, in the order the line gives them.
 COUNT_ORDER = ("met", "missed", "missed in part", "not judged", "not judged in part")
-# What the count of the other rows counts: rows of the Targets block, a target on a host each.
-COUNTED = "target-and-machine rows of the [full table]"
-COUNT_CLAUSE = re.compile(r"Of the other (\d+) " + re.escape(COUNTED) + r"\(" +
-                          re.escape(TARGETS_ANCHOR) + r"\): (.*)\.$")
+# The first screen's last sentence counts the other rows of the Targets block, a target on a
+# host each, by verdict and links the full table; the list of what the screen's own targets
+# leave out follows directly under OTHERS_HEADING, off the first screen (review R-A5).
+COUNT_OPENING = "Every other result is in the [full table]"
+COUNT_CLAUSE = re.compile(r"^" + re.escape(COUNT_OPENING) + r"\(" + re.escape(TARGETS_ANCHOR) +
+                          r"\): of the other (\d+) rows, (.*)\.$")
+OTHERS_HEADING = "## The other results of the targets above"
+OTHERS_OPENING = "Not shown in the table above."
+# A sentence of the list that names, among the other rows of one verdict, each target the
+# headline asks to name there.
+AMONG = "Among the other rows "
 
 
 def left_out_line(items, met_parts, counts, named, hosts):
+    """The first screen's count sentence, and the list under OTHERS_HEADING."""
     sentences = [f"{LEFT_OUT_HEADS[kind]}: {host_groups(found, hosts)}."
                  for kind, found in items.items() if found]
     if met_parts:
         sentences.append(f"Met: {met_parts} more of their {'part' if met_parts == 1 else 'parts'}.")
-    pieces = [f"{counts[kind]} {kind}" + (f", {' and '.join(named[kind])} among them"
-                                         if named[kind] else "")
-              for kind in COUNT_ORDER if counts[kind]]
-    return " ".join(["Not shown above.", *sentences,
-                     f"Of the other {sum(counts.values())} {COUNTED}({TARGETS_ANCHOR}): "
-                     + ", ".join(pieces) + "."])
+    sentences += [f"{AMONG}{kind}: {' and '.join(named[kind])}."
+                  for kind in COUNT_ORDER if named[kind]]
+    pieces = [f"{counts[kind]} {kind}" for kind in COUNT_ORDER if counts[kind]]
+    count = (f"{COUNT_OPENING}({TARGETS_ANCHOR}): of the other {sum(counts.values())} rows, "
+             + ", ".join(pieces) + ".")
+    return count, " ".join([OTHERS_OPENING, *sentences])
 
 
 def class_of(mets):
@@ -2431,7 +2606,7 @@ def where_words(where, hosts):
         where, f"on {hosts[where]['then'] if where in hosts else where}")
 
 
-def check_left_out(line, definitions, root, shown, names, hosts):
+def check_left_out(text, definitions, root, shown, names, hosts):
     """The line under the table, walked here apart from the code that writes it: its own
     verdict classes from the parts' raw verdicts, not the writer's; it names each left-out part
     of a target with a row on the screen that is missed or not judged, whole, under its verdict
@@ -2441,7 +2616,19 @@ def check_left_out(line, definitions, root, shown, names, hosts):
     every part of the targets it shows, so nothing drops out unseen. A headline never hides a
     miss. A part whose verdict carries a mark is named with it, as marked_name gives it: each
     such name is read whole before the line is split, and a name without its mark is not the
-    part's name (review C1)."""
+    part's name (review C1). text is the block's lines after the sentence under the table: the
+    count sentence ends the first screen, and OTHERS_HEADING follows it directly with the list
+    under it, so a list dropped or moved above the heading, or a count dropped, is refused
+    (review R-A5)."""
+    tail = text.split("\n")
+    shape = ["", None, "", OTHERS_HEADING, "", None]
+    if len(tail) != len(shape) or any(want is not None and got != want
+                                      for got, want in zip(tail, shape)) or \
+            not tail[1].startswith(COUNT_OPENING) or not tail[5].startswith(OTHERS_OPENING):
+        raise TargetError("the first screen does not end with the count of the other rows "
+                          f"followed directly by {OTHERS_HEADING!r} and the list of what the "
+                          "table's targets leave out under it")
+    count_line, line = tail[1], tail[5]
     tokens = {}
     for row in definitions["rows"]:
         key = (row["id"], row["host"])
@@ -2458,32 +2645,29 @@ def check_left_out(line, definitions, root, shown, names, hosts):
         line = line.replace(token, tokens[token])
     whole = {shield: token for token, shield in tokens.items()}
     sentences = {}
-    clause = COUNT_CLAUSE.search(line)
+    clause = COUNT_CLAUSE.search(count_line)
     if clause is None:
-        raise TargetError("the line under the table gives no count of the other rows")
-    body = line[:clause.start()].strip()
-    if not body.startswith("Not shown above."):
-        raise TargetError("the line under the table does not open with what it is")
-    for sentence in [piece for piece in body[len("Not shown above."):].strip().split(". ")
+        raise TargetError("the first screen gives no count of the other rows")
+    body = line.strip()
+    stated_named = {}
+    for sentence in [piece for piece in body[len(OTHERS_OPENING):].strip().split(". ")
                      if piece]:
         head = sentence.split(":", 1)[0]
+        if head.startswith(AMONG) and head[len(AMONG):] in COUNT_ORDER and \
+                head[len(AMONG):] not in stated_named:
+            stated_named[head[len(AMONG):]] = sentence[len(head) + 2:].rstrip(".")
+            continue
         if head not in [*LEFT_OUT_HEADS.values(), "Met"] or head in sentences:
             raise TargetError(f"the line under the table says {sentence!r}, which is no class "
                               "of its own or a second of one")
         sentences[head] = sentence.rstrip(".")
-    others, stated, stated_named, last = int(clause.group(1)), {}, {}, None
+    others, stated = int(clause.group(1)), {}
     for piece in clause.group(2).split(", "):
         found = re.fullmatch(r"(\d+) (.+)", piece)
         if found and found.group(2) in COUNT_ORDER and found.group(2) not in stated:
-            last = found.group(2)
-            stated[last] = int(found.group(1))
+            stated[found.group(2)] = int(found.group(1))
             continue
-        among = re.fullmatch(r"(.+) among them", piece)
-        if among and last is not None and last not in stated_named:
-            stated_named[last] = among.group(1)
-            continue
-        raise TargetError(f"the line under the table counts {piece!r}, which is no count of a "
-                          "verdict and no name among one")
+        raise TargetError(f"the first screen counts {piece!r}, which is no count of a verdict")
     met = re.fullmatch(r"Met: (\d+) more of their parts?", sentences.get("Met", "Met: 0 more of "
                                                                           "their parts"))
     asked = [(entry["id"], entry["host"]) for entry in
@@ -2570,8 +2754,8 @@ def check_under(sentence, under, row, parts, hosts, root):
     """The sentence under the table, checked apart from the code that writes it: a row met or
     missed in whole says that word, and any other says neither (review DX-4)."""
     kind = class_of([counted(part) for part in parts])
-    shorts = short_marks(parts, row)
-    marks = f" ({'; '.join(shorts)})" if shorts else ""
+    beside, shorts = screen_marks(parts, row)
+    marks = "".join(f" {mark}" for mark in beside) + (f" ({'; '.join(shorts)})" if shorts else "")
     beside = value_marks(under, parts, root, row)
     if kind in ("met", "missed"):
         expected = filled([under["text"]], under, row, parts, hosts,
@@ -2664,11 +2848,12 @@ def render_headline(definitions_path, root):
             lines += ["", sentence]
         names = plain_names(definitions, hosts)
         items, met_parts, counts, named = left_out_items(definitions, root, shown, names)
-        line = left_out_line(items, met_parts, counts, named, hosts)
-        check_left_out(line, definitions, root, shown, names, hosts)
+        count, line = left_out_line(items, met_parts, counts, named, hosts)
+        tail = ["", count, "", OTHERS_HEADING, "", line]
+        check_left_out("\n".join(tail), definitions, root, shown, names, hosts)
     except (TargetError, KeyError, TypeError, ValueError, ZeroDivisionError) as error:
         raise TargetError(f"headline: {error}") from error
-    return lines + ["", line]
+    return lines + tail
 
 
 def sentences_of(prose):
@@ -2750,8 +2935,11 @@ def check_screen(definitions_path, readme, headline_lines):
             raise TargetError(f"the README's first screen goes on past the headline with "
                               f"{line.strip()[:60]!r}, which no check reads; start a section "
                               "with a heading first")
+    # The first screen ends at the heading of the list of what the table's targets leave out.
+    shown_lines = headline_lines[:headline_lines.index(OTHERS_HEADING)] \
+        if OTHERS_HEADING in headline_lines else headline_lines
     screen = " ".join((readme.split(HEADLINE_BEGIN)[0] + "\n" +
-                       "\n".join(headline_lines)).split())
+                       "\n".join(shown_lines)).split())
     invisible_characters(screen, "the README's first screen")
     for name in [*dict.fromkeys(row["id"] for row in definitions["rows"]), *QUERY_NAMES]:
         if re.search(rf"(?<![\w-]){re.escape(name)}(?![\w-])", screen):
@@ -2858,6 +3046,25 @@ def pitch_swapped(condition, definitions, root):
     return []
 
 
+def pitch_faster(condition, definitions, root):
+    """What a pitch claim on a target must say of the parts it rests on that another system's
+    setup beats, as its row's setup_words name it: "<words> is faster", or None (review R-A1)."""
+    if "target" not in condition:
+        return None
+    spec = condition["target"]
+    row = next((row for row in definitions["rows"]
+                if (row["id"], row["host"]) == (spec["id"], spec["host"])), None)
+    parts = judged_parts(row, root)[0] if row is not None else None
+    if not parts:
+        return None
+    if spec.get("parts"):
+        parts = [part for part in parts if part[0] in spec["parts"]]
+    faster = [item for part in parts for item in notes_of(part).get("faster") or []]
+    if not faster:
+        return None
+    return setup_forms(faster)[1].split(", while ", 1)[1]
+
+
 def check_pitch(definitions_path, root, readme):
     """The README's pitch, the prose above its headline with its headings, states figures by
     hand. Each one scripts/targets.json lists under "pitch" must appear in it as the results
@@ -2872,7 +3079,8 @@ def check_pitch(definitions_path, root, readme):
     judged on one machine names that machine and no other. A word that ranks or judges must sit in a claim
     or a figure's words, headings included (review DX-3). The pitch, headings included, runs to
     at most "max_words" words, and holds no character a reader cannot see. A claim resting on a figure the record flags as timed
-    while pages were swapped in says so, in PITCH_SWAPPED's words."""
+    while pages were swapped in says so, in PITCH_SWAPPED's words, and a win among the setups
+    chosen before the runs that another setup beats names that setup, as pitch_faster gives."""
     definitions = json.loads(definitions_path.read_text(encoding="utf-8"))
     pitch = definitions.get("pitch")
     if not pitch:
@@ -2969,6 +3177,13 @@ def check_pitch(definitions_path, root, readme):
                 raise TargetError(f"the README's pitch says {claim['text']!r}, which rests on "
                                   "figures the record flags as timed while pages were swapped "
                                   f"in, and does not say {PITCH_SWAPPED!r}")
+            # A win among the setups chosen before the runs that another setup beats says what
+            # beat it, in its row's setup_words (review R-A1).
+            faster = pitch_faster(condition, definitions, root)
+            if faster and faster not in claim["text"]:
+                raise TargetError(f"the README's pitch says {claim['text']!r}, a win among the "
+                                  "setups chosen before the runs that another setup beats, and "
+                                  f"does not say {faster!r}")
             host = condition_host(condition, definitions, root)
             if host in HOSTS:
                 if not hosts or host not in hosts:
@@ -3179,7 +3394,7 @@ def row_marks(row, root):
     parts, _ = judged_parts(row, root)
     if parts is None:
         return []
-    marks = [(mark,) for mark in change_marks(parts)] + list(phase_mark_pairs(parts, row))
+    marks = change_mark_pairs(parts) + list(phase_mark_pairs(parts, row))
     classes = [notes_of(part)["write"] for part in parts if notes_of(part).get("write")]
     clause = input_clause(parts[0][4], classes[0]) if classes else None
     return marks + ([(clause,)] if clause else [])

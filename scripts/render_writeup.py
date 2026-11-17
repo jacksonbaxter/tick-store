@@ -1237,8 +1237,9 @@ def verdict_parts(resolver, name, entry):
 def marks_of(row, parts, name):
     """Each mark RESULTS.md sets beside the verdict on these parts, as the forms a quote of it may
     give, by render_results.py's own functions and its rule for a hand-written quote (row_marks,
-    quote_problem) on the token's parts: each part the replaced run judges otherwise, in full,
-    with both outcomes, which way the change leans and the outcome counted; each disturbed phase
+    quote_problem) on the token's parts: each part the replaced run judges otherwise, in full or
+    short, with both outcomes, which way the change leans and the outcome counted; a part met
+    among headline setups that another setup beats, with that setup; each disturbed phase
     and each swapped-in figure, in full or in the short form the README's first screen uses and
     RESULTS.md explains; and, for a write against other systems whose inputs did not start alike,
     the input clause, whose input was in memory before the clock and whose was read from disk
@@ -1246,7 +1247,7 @@ def marks_of(row, parts, name):
     if parts is None:
         return []
     try:
-        forms = [(mark,) for mark in render_results.change_marks(parts)]
+        forms = [tuple(pair) for pair in render_results.change_mark_pairs(parts)]
         forms += [tuple(pair) for pair in render_results.phase_mark_pairs(parts, row)]
         classes = [render_results.notes_of(part)["write"] for part in parts
                    if render_results.notes_of(part).get("write")]
@@ -1259,16 +1260,26 @@ def marks_of(row, parts, name):
 def verdict_value(resolver, name, entry, marks=True):
     """A target's verdict, the Targets block's own: render_results.py judges the row on its
     files, its verdict code names the parts the token takes, and its marks stand beside it, each
-    in its shortest form, once."""
+    in its shortest form, once. A verdict of several parts given as text is short_verdict's
+    sentence, each changed part's mark within it (review R-B3); a setup mark follows a met word
+    without a semicolon, as it says what the word was judged against, and on any other verdict
+    names the parts met that it stands beside."""
     row, parts, reason = verdict_parts(resolver, name, entry)
     if entry.get("words", "class") == "text":
-        word = reason if parts is None else render_results.core_verdict(parts)
+        word = reason if parts is None else render_results.short_verdict(parts) \
+            if len(parts) > 1 else render_results.core_verdict(parts)
     else:
         word = verdict_class_of(parts, {}, name)
     if not marks:
         return word
-    shown = dict.fromkeys(forms[-1] for forms in marks_of(row, parts, name))
-    return word + "".join(f"; {mark}" for mark in shown)
+    shown = [mark for mark in dict.fromkeys(forms[-1] for forms in marks_of(row, parts, name))
+             if mark not in word]
+    # On a verdict not met in whole, the setup mark names the parts it stands beside.
+    beaten = [part[0] for part in parts or [] if render_results.notes_of(part).get("faster")]
+    setup = " " if word == "met" or not beaten else \
+        f"; met on {render_results.and_list(beaten)} "
+    return word + "".join(f"{setup}{mark}" if mark.startswith(render_results.SHORT_SETUP) else
+                          f"; {mark}" for mark in shown)
 
 
 def check_marks(resolver, values):

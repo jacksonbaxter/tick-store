@@ -10,21 +10,21 @@
    "both": "both machines"},
   "name_among_counts": [{"id": "G-3", "host": "any"}],
   "rows": [
-   {"id": "G-1", "host": "any", "what": "Round trip, both days", "bar": "every message bit-exact, stream hashes equal", "source": "the project's correctness gate",
+   {"id": "G-1", "host": "any", "what": "Round trip, both days", "bar": "every message bit-exact, stream hashes (checksums of the whole message stream) equal", "source": "the project's correctness gate, the test every change must pass",
     "measured": "{differ} messages differ; {hashes}",
     "values": {"differ": {"value": {"path": ["g1", "verify", "mismatched_records"]}, "over": "sum", "format": "{:,}"},
                "hashes": {"value": {"path": ["g1", "verify", "hashes_match"]}, "over": "all", "words": {"true": "stream hashes equal", "false": "a stream hash differs"}}}},
-   {"id": "CR-2", "host": "Linux", "what": "Disk, store flushed", "bar": "below each other system's smallest setup", "source": "the project's own bar",
+   {"id": "CR-2", "host": "Linux", "what": "Disk, store flushed (written through to the drive)", "bar": "below each other system's smallest setup", "source": "the project's own bar",
     "measured": "{tickstore} GB vs Parquet {parquet} GB",
     "values": {"tickstore": {"value": {"path": ["systems", "tickstore", "variants", "@headline", "classes", "B", "stored", "allocated_bytes"]}, "scale": 1e-9, "format": "{:.2f}"},
                "parquet": {"value": {"min_variant": ["parquet", "classes", "B", "stored", "allocated_bytes"]}, "scale": 1e-9, "format": "{:.2f}"}}},
-   {"id": "QL-4", "host": "Linux", "parts": ["Q2 warm"], "what": "One hour of one stock, warm", "bar": "fastest of the four, each in the setup the comparison fixed for it, by median and tail", "source": "the project's own bar",
+   {"id": "QL-4", "host": "Linux", "parts": ["Q2 warm"], "what": "One hour of one stock, warm (data already in memory)", "bar": "fastest of the four, each system in the configuration chosen for it before the runs, by median and tail", "source": "the project's own bar",
     "measured": "median {tickstore} ms vs {best_system} {best} ms; ArcticDB per stock {per_stock} ms {per_stock_mark}",
     "values": {"tickstore": {"value": {"path": ["systems", "tickstore", "variants", "@headline", "queries", "Q2", "warm", "median_us"]}, "scale": 0.001, "format": "{:,.2f}"},
                "best_system": {"value": {"lowest_system": {"systems": ["parquet", "arcticdb", "questdb"], "path": ["queries", "Q2", "warm", "median_us"]}}, "label": "system"},
                "best": {"value": {"lowest_value": {"systems": ["parquet", "arcticdb", "questdb"], "path": ["queries", "Q2", "warm", "median_us"]}}, "scale": 0.001, "format": "{:,.2f}"},
                "per_stock": {"value": {"path": ["systems", "arcticdb", "variants", "rows100k-cols127-per-security", "queries", "Q2", "warm", "median_us"]}, "scale": 0.001, "format": "{:,.2f}"}}},
-   {"id": "QL-4", "host": "Linux", "parts": ["Q4 warm"], "what": "One millisecond of every stock, warm", "bar": "fastest of the four, each in the setup the comparison fixed for it, by median and tail", "source": "the project's own bar",
+   {"id": "QL-4", "host": "Linux", "parts": ["Q4 warm"], "what": "One millisecond of every stock, warm", "bar": "fastest of the four, each in its chosen configuration, by median and tail", "source": "the project's own bar",
     "measured": "median {tickstore} ms vs {best_system} {best} ms",
     "values": {"tickstore": {"value": {"path": ["systems", "tickstore", "variants", "@headline", "queries", "Q4", "warm", "median_us"]}, "scale": 0.001, "format": "{:,.2f}"},
                "best_system": {"value": {"lowest_system": {"systems": ["parquet", "arcticdb", "questdb"], "path": ["queries", "Q4", "warm", "median_us"]}}, "label": "system"},
@@ -35,7 +35,7 @@
                "rate": {"value": {"path": ["systems", "tickstore", "variants", "@headline", "classes", "A", "write", "records_per_second_median"]}, "scale": 1e-6, "format": "{:.3f}"}}}
   ],
   "under": {"id": "WT-2", "host": "macOS", "parts": ["class A"],
-   "text": "Against the same bar, one thread on an Apple M4 Max laptop, unpinned, ingests {rate} M messages/s: {verdict}.",
+   "text": "Against the same bar, one thread on an Apple M4 Max laptop, unpinned (its thread not held to one core), ingests {rate} M messages/s: {verdict}.",
    "values": {"rate": {"value": {"path": ["systems", "tickstore", "variants", "@headline", "classes", "A", "write", "records_per_second_median"]}, "scale": 1e-6, "format": "{:.3f}"}}},
   "names": [
    {"id": "G-1", "host": "any", "name": "the round trip", "parts": {"12302019 macOS": "the reference day's round trip on the laptop", "12302019 Linux": "the reference day's round trip on the Ryzen", "10302019 macOS": "the second day's round trip"}},
@@ -98,9 +98,9 @@
   ],
   "claims": [
    {"text": "It gives every message back bit-exact.", "target": {"id": "G-1", "host": "any", "verdict": "met"}},
-   {"text": "Beside Parquet, ArcticDB and QuestDB on a 2018 four-core AMD Ryzen running Linux, it takes the least disk of the four.", "target": {"id": "CR-2", "host": "Linux", "verdict": "met"}},
-   {"text": "On the Ryzen it answers queries about one stock fastest of the four, each in the setup [the comparison fixed](compare/README.md#tuning-variants-and-their-sources), but ArcticDB or QuestDB wins short market-wide windows; some rivals' figures were timed with pages swapped in.", "all": [{"target": {"id": "QL-4", "host": "Linux", "parts": ["Q2 warm", "Q2 cold", "Q3 warm", "Q3 cold"], "verdict": "met"}}, {"file": "results/compare/Linux-12302019-full-*.json", "fastest": {"systems": ["parquet", "arcticdb", "questdb", "tickstore"], "queries": ["Q1", "Q4"], "kinds": ["warm", "cold"], "fields": ["median_us", "p99_us"], "one_of": ["arcticdb", "questdb"]}}]},
-   {"text": "One thread on the Ryzen ingests below Nasdaq's peak message rate.", "target": {"id": "WT-2", "host": "Linux", "parts": ["class A"], "verdict": "missed"}}
+   {"text": "Beside Parquet, ArcticDB and QuestDB on a 2018 four-core AMD Ryzen running Linux, it takes the least disk.", "target": {"id": "CR-2", "host": "Linux", "verdict": "met"}},
+   {"text": "On the Ryzen it answers one-stock queries fastest, each system [set up as chosen before the runs](compare/README.md#tuning-variants-and-their-sources), though ArcticDB with a table per stock is faster; ArcticDB or QuestDB wins short market-wide windows; swapping in some rivals' runs may flatter it.", "all": [{"target": {"id": "QL-4", "host": "Linux", "parts": ["Q2 warm", "Q2 cold", "Q3 warm", "Q3 cold"], "verdict": "met"}}, {"file": "results/compare/Linux-12302019-full-*.json", "fastest": {"systems": ["parquet", "arcticdb", "questdb", "tickstore"], "queries": ["Q1", "Q4"], "kinds": ["warm", "cold"], "fields": ["median_us", "p99_us"], "one_of": ["arcticdb", "questdb"]}}]},
+   {"text": "One thread on the Ryzen ingests below Nasdaq's peak rate.", "target": {"id": "WT-2", "host": "Linux", "parts": ["class A"], "verdict": "missed"}}
   ]
  },
  "rows": [
@@ -162,7 +162,7 @@
      "above": 0, "digits": 0, "unit": ""}]},
   {"id": "CR-1", "host": "any", "target": {"at_least": 2.3415}, "digits": 4, "unit": "",
    "parts": [{"label": "12302019", "file": "results/store-size-12302019.json", "value": {"path": ["ratio"]}}]},
-  {"id": "CR-2", "host": "Linux", "pitch": [{"words": "the least disk of the four"}],
+  {"id": "CR-2", "host": "Linux", "pitch": [{"words": "the least disk"}],
    "target_text": "smaller than each system's smallest variant, class B, full day",
    "digits": 0, "unit": " B",
    "parts": [
@@ -305,7 +305,7 @@
   {"id": "WT-1", "host": "macOS", "target": {"at_least": 8590000}, "target_text": "at least 8.59 M records/s", "digits": 3, "scale": 1e-6, "unit": " M records/s",
    "parts": [{"label": "class A, one thread", "file": "results/compare/macOS-12302019-full-tickstore-*.json",
               "value": {"path": ["systems", "tickstore", "variants", "@headline", "classes", "A", "write", "records_per_second_median"]}}]},
-  {"id": "WT-2", "host": "Linux", "pitch": [{"words": "ingests below Nasdaq's peak message rate", "parts": ["class A"]}],
+  {"id": "WT-2", "host": "Linux", "pitch": [{"words": "ingests below Nasdaq's peak rate", "parts": ["class A"]}],
    "target": {"above": 2732762}, "target_text": "above 2,732,762 messages/s", "digits": 3, "scale": 1e-6, "unit": " M messages/s",
    "parts": [
     {"label": "class A", "file": "results/compare/Linux-12302019-full-*.json",
@@ -380,11 +380,12 @@
   {"id": "QL-3", "host": "macOS", "target": {"at_most": 10000}, "digits": 2, "scale": 0.001, "unit": " ms",
    "parts": [{"label": "Q4 cold mean", "file": "results/compare/macOS-12302019-full-tickstore-*.json",
               "value": {"path": ["systems", "tickstore", "variants", "@headline", "queries", "Q4", "cold", "mean_us"]}}]},
-  {"id": "QL-4", "host": "Linux", "pitch": [{"words": "queries about one stock fastest of the four, each in the setup", "parts": ["Q2 warm", "Q2 cold", "Q3 warm", "Q3 cold"]}],
+  {"id": "QL-4", "host": "Linux", "pitch": [{"words": "one-stock queries fastest, each system", "parts": ["Q2 warm", "Q2 cold", "Q3 warm", "Q3 cold"]}],
    "target_text": "lowest median and p99 of the four headlines, each query, warm and cold",
    "lowest_of": {"file": "results/compare/Linux-12302019-full-*.json", "ours": "tickstore",
                  "others": ["parquet", "arcticdb", "questdb"], "queries": ["Q1", "Q2", "Q3", "Q4", "Q5"],
-                 "kinds": ["warm", "cold"], "fields": ["median_us", "p99_us"]},
+                 "kinds": ["warm", "cold"], "fields": ["median_us", "p99_us"],
+                 "setup_words": {"arcticdb/rows100k-cols127-per-security": "ArcticDB with a table per stock"}},
    "digits": 2, "scale": 0.001, "unit": " ms"},
   {"id": "QL-4", "host": "macOS", "target_text": "lowest median and p99 of the four headlines, each query, warm and cold",
    "no_figure": "the four-system full day runs on Linux only; on macOS tick-store ran the day alone, and the slice files make no claim about a full day"}
