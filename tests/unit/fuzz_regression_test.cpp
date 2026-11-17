@@ -19,6 +19,7 @@
 #include "stub_fixture.hpp"
 #include "test_bytes.hpp"
 #include "tick_store/codec/block.hpp"
+#include "tick_store/codec/codec_error.hpp"
 #include "tick_store/codec/dictionary.hpp"
 #include "tick_store/codec/gorilla_timestamps.hpp"
 #include "tick_store/codec/gorilla_xor.hpp"
@@ -39,6 +40,7 @@
 #include <bit>
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <filesystem>
 #include <fstream>
 #include <ios>
@@ -372,7 +374,7 @@ oracle_counts::Counts query_table() {
     using store::oracle::kComparedAsksWork;
     using store::oracle::kQueryFuzzBounds;
     using store::oracle::kWholeCheckWork;
-    constexpr std::uint64_t kRequests = 4 * 4;
+    constexpr std::uint64_t kRequests = std::uint64_t{4} * 4;
     constexpr std::uint64_t kCalls = (2 * kRequests) + 1;
     constexpr std::uint64_t kRepeatCalls = (2 * store::oracle::kQueryPastBudgetRequests) + 1;
     const std::uint64_t within_budget =
@@ -469,7 +471,7 @@ TEST_P(BoundSeeds, CountWhatTheTableGivesThem) {
     using bound_seeds::Side;
     const auto& seed = bound_seeds::kBoundSeeds.at(GetParam());
     const std::string name = std::string{seed.seeds} + "/" + std::string{seed.name};
-    const auto row = std::ranges::find(kSeedCounts, name, &SeedCounts::seed);
+    const auto* const row = std::ranges::find(kSeedCounts, name, &SeedCounts::seed);
     if (seed.side == Side::unbounded) {
         // An unbounded codec target has no count table.
         EXPECT_EQ(row, kSeedCounts.end()) << name;
@@ -481,9 +483,13 @@ TEST_P(BoundSeeds, CountWhatTheTableGivesThem) {
     const char* failure = nullptr;
     if (seed.side == Side::codec_tiers) {
         failure = codec::oracle::check_codec(*seed.codec, bytes, *seed.bounds);
-        most = seed.codec == &codec::oracle::kDictCodec  ? codec_table(*seed.bounds, 2, 2, 2, kDictLeastBlock)
-               : seed.codec == &codec::oracle::kRleCodec ? codec_table(*seed.bounds, 1, 1, 1, kRleLeastBlock)
-                                                         : codec_table(*seed.bounds, 16, 4, 0, kPforLeastBlock);
+        if (seed.codec == &codec::oracle::kDictCodec) {
+            most = codec_table(*seed.bounds, 2, 2, 2, kDictLeastBlock);
+        } else if (seed.codec == &codec::oracle::kRleCodec) {
+            most = codec_table(*seed.bounds, 1, 1, 1, kRleLeastBlock);
+        } else {
+            most = codec_table(*seed.bounds, 16, 4, 0, kPforLeastBlock);
+        }
     } else if (seed.side == Side::within_store_cap || seed.side == Side::store_compared) {
         failure = store::oracle::check_itch_store(bytes, store::oracle::kStoreFuzzBounds);
         most = store_table();

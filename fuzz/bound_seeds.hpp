@@ -221,7 +221,7 @@ template <class Encode>
 [[nodiscard]] inline Bytes pfor_seed() {
     constexpr codec::oracle::OracleBounds kBounds = codec::oracle::kPforFuzzBounds;
     static_assert(kBounds.decoded_values == codec::kMaxBlockValues &&
-                      kBounds.compared_values == 2 * codec::kMaxBlockValues,
+                      kBounds.compared_values == 2 * std::size_t{codec::kMaxBlockValues},
                   "pfor_seed assumes a cap and a compare tier of one maximal block each");
     const auto rising = [](std::size_t count) {
         Words values(count);
@@ -761,11 +761,14 @@ template <class Edit, class SeekTop>
             encoded = codec::encode_rle(*values, per, chunk).has_value();
             part.codec = codec::CodecId::run_length;
         } else {
+            codec::IntTransform transform = codec::IntTransform::delta;
+            if (info.codec == ColumnCodec::pfor_head_delta) {
+                transform = codec::IntTransform::head_delta;
+            } else if (info.codec == ColumnCodec::pfor_for || info.codec == ColumnCodec::pfor_for_scaled) {
+                transform = codec::IntTransform::none;
+            }
             const codec::PforOptions options{
-                .transform = info.codec == ColumnCodec::pfor_head_delta ? codec::IntTransform::head_delta
-                             : info.codec == ColumnCodec::pfor_for || info.codec == ColumnCodec::pfor_for_scaled
-                                 ? codec::IntTransform::none
-                                 : codec::IntTransform::delta,
+                .transform = transform,
                 .adaptive_scale = info.codec == ColumnCodec::pfor_for_scaled ||
                                   info.codec == ColumnCodec::pfor_delta_scaled};
             encoded = codec::encode_pfor(*values, per, options, chunk).has_value();
@@ -970,9 +973,11 @@ template <class Make>
 [[nodiscard]] inline Bytes falling_minutes(std::size_t minutes) {
     constexpr std::uint64_t kTop = (std::uint64_t{1} << 48U) - 1;
     constexpr std::uint64_t kMinute = 60'000'000'000ULL;
-    static_assert(kTop / kMinute + 1 == store::oracle::kMostMinutes);
+    static_assert((kTop / kMinute) + 1 == store::oracle::kMostMinutes);
+    const std::uint64_t count = std::min<std::uint64_t>(minutes, store::oracle::kMostMinutes);
     std::vector<itch::Message> records;
-    for (std::uint64_t i = 0; i < std::min<std::uint64_t>(minutes, store::oracle::kMostMinutes); ++i) {
+    records.reserve(count);
+    for (std::uint64_t i = 0; i < count; ++i) {
         records.emplace_back(itch::AddOrder{
             itch::MessageHeader{0, 0, kTop - (i * kMinute)}, 1 + i, std::byte{'B'}, 100,
             itch::Stock{std::byte{'A'}, std::byte{'A'}, std::byte{'P'}, std::byte{'L'},
@@ -1126,7 +1131,11 @@ template <class Fits>
 // one-run blocks for the rest, all compared; then the tail, here a header alone. The unit test
 // takes them all whole.
 [[nodiscard]] inline Bytes run_length_seed() {
-    return run_length_small_blocks_of(codec::oracle::kRleFuzzDecodedValues, 0).value();
+    auto fits = run_length_small_blocks_of(codec::oracle::kRleFuzzDecodedValues, 0);
+    if (!fits) {
+        throw std::runtime_error("run-length's costliest seed does not fit -max_len");
+    }
+    return std::move(*fits);
 }
 
 // The named seeds of these shapes: the first block shortened by the small blocks' values,
@@ -1141,18 +1150,30 @@ inline constexpr std::size_t kRleSmallBlocks = 1;
     if (dictionary_small_blocks_of(cap - (kSmallBlockValues * (kDictSmallBlocks + 1)), kDictSmallBlocks + 1)) {
         throw std::runtime_error("kDictSmallBlocks is not the most small blocks -max_len holds");
     }
-    return dictionary_small_blocks_of(cap - (kSmallBlockValues * kDictSmallBlocks), kDictSmallBlocks).value();
+    auto fits = dictionary_small_blocks_of(cap - (kSmallBlockValues * kDictSmallBlocks), kDictSmallBlocks);
+    if (!fits) {
+        throw std::runtime_error("kDictSmallBlocks small blocks do not fit -max_len");
+    }
+    return std::move(*fits);
 }
 [[nodiscard]] inline Bytes pfor_small_blocks_seed() {
     const std::size_t cap = codec::oracle::kPforFuzzDecodedValues;
     if (pfor_small_blocks_of(cap - (kSmallBlockValues * (kPforSmallBlocks + 1)), kPforSmallBlocks + 1)) {
         throw std::runtime_error("kPforSmallBlocks is not the most small blocks -max_len holds");
     }
-    return pfor_small_blocks_of(cap - (kSmallBlockValues * kPforSmallBlocks), kPforSmallBlocks).value();
+    auto fits = pfor_small_blocks_of(cap - (kSmallBlockValues * kPforSmallBlocks), kPforSmallBlocks);
+    if (!fits) {
+        throw std::runtime_error("kPforSmallBlocks small blocks do not fit -max_len");
+    }
+    return std::move(*fits);
 }
 [[nodiscard]] inline Bytes run_length_small_blocks_seed() {
     const std::size_t cap = codec::oracle::kRleFuzzDecodedValues;
-    return run_length_small_blocks_of(cap - (kSmallBlockValues * kRleSmallBlocks), kRleSmallBlocks).value();
+    auto fits = run_length_small_blocks_of(cap - (kSmallBlockValues * kRleSmallBlocks), kRleSmallBlocks);
+    if (!fits) {
+        throw std::runtime_error("kRleSmallBlocks small blocks do not fit -max_len");
+    }
+    return std::move(*fits);
 }
 // The maximal blocks' values run-length's compare limit takes past its cap, in blocks.
 inline constexpr std::size_t kRleComparedBlocks =
@@ -1181,7 +1202,11 @@ inline constexpr std::size_t kDictOneValueBlocks = 300;
     if (dictionary_one_value_blocks_of(kDictOneValueBlocks + 1)) {
         throw std::runtime_error("kDictOneValueBlocks is not the most one-value blocks -max_len holds");
     }
-    return dictionary_one_value_blocks_of(kDictOneValueBlocks).value();
+    auto fits = dictionary_one_value_blocks_of(kDictOneValueBlocks);
+    if (!fits) {
+        throw std::runtime_error("kDictOneValueBlocks one-value blocks do not fit -max_len");
+    }
+    return std::move(*fits);
 }
 
 // Inputs that spend the cross-check budget and then the prefix past it within the cap, so the
@@ -1252,6 +1277,7 @@ inline constexpr std::size_t kRleMostBlocks = 372;
 using EncodeInto = std::function<std::expected<void, codec::CodecError>(Bytes&)>;
 [[nodiscard]] inline Bytes pfor_smallest_block() {
     std::vector<EncodeInto> encoders;
+    encoders.reserve(codec::oracle::detail::kPforEncoders.size());
     for (const codec::oracle::Encoder& encoder : codec::oracle::detail::kPforEncoders) {
         encoders.emplace_back([&encoder](Bytes& out) { return encoder.encode_block(Words{0}, out); });
     }
@@ -1281,7 +1307,7 @@ using EncodeInto = std::function<std::expected<void, codec::CodecError>(Bytes&)>
 // the count table's decoded most, which the costliest input, whose dear blocks leave room for
 // a third block of 646,144 values only, does not.
 [[nodiscard]] inline Bytes pfor_decode_limit_seed() {
-    static_assert(codec::oracle::kPforFuzzSingleDecodedValues == 3 * codec::kMaxBlockValues);
+    static_assert(codec::oracle::kPforFuzzSingleDecodedValues == 3 * std::size_t{codec::kMaxBlockValues});
     auto fits = fitted(copies(pfor_zeros_block(codec::kMaxBlockValues), 3));
     if (!fits) {
         throw std::runtime_error("three maximal PFOR blocks do not fit -max_len");
@@ -1373,7 +1399,7 @@ struct BoundSeed {
     constexpr std::size_t kCap = codec::oracle::kDictFuzzDecodedValues;
     constexpr std::size_t kCompared = codec::oracle::kDictFuzzComparedValues;
     constexpr std::size_t kOnce = codec::oracle::kDictFuzzSingleDecodedValues;
-    static_assert(kCap < codec::kMaxBlockValues && kOnce <= kCap + (2 * codec::kMaxBlockValues),
+    static_assert(kCap < codec::kMaxBlockValues && kOnce <= kCap + (2 * std::size_t{codec::kMaxBlockValues}),
                   "dictionary_tiers assumes a cap below one maximal block and limits -max_len holds");
     const auto blocks = [](std::size_t values) {
         return (values + codec::kMaxBlockValues - 1) / codec::kMaxBlockValues;
