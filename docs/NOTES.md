@@ -6209,8 +6209,10 @@ lines, each caught by its test on a patched copy before it was listed; `verdict-
 mutates `render_results.py` in the prover's clone only. All 33 of the essay's `py-scripts` faults,
 the 25 new, the seven remade and `check-sh-writeup-not-judged-passes`, were PROVEN with `--only`
 through `heavy.sh`, in batches of eight on clones of the fixes before their rebase onto
-`8a9cdfb`, at about four minutes a fault; the rebase changed the render only in how an essay
-claim finds its pitch sentence, which no fault mutates. `results/check-proofs.json` was restored from git
+`8a9cdfb`, at about four minutes a fault. After the rebase, which changed how an essay claim
+finds its pitch sentence, `writeup-pitch-condition-skipped` joins them, and it and the ten
+faults whose patches the rebase moved, `verdict-class-met-on-any-part` among them, were PROVEN
+again with `--only`, 11 of 11 as expected. `results/check-proofs.json` was restored from git
 after each run.
 
 ## Process notes

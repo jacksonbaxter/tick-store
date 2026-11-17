@@ -219,7 +219,8 @@ its figure list and its template, read at `979fb58`; file and line are there. Ea
 copy of that commit's scripts before it was fixed, in a tree of its own, and "passed" below means
 the old render wrote the page and `--check` exited 0. Each fault is in `scripts/prove_checks.py`
 and was first seen failing its test on a patched copy; PROVEN means the prover's `--only` runs
-through `heavy.sh` said so, on clones of the fixes before their rebase onto `8a9cdfb` (docs/NOTES.md, The essay's render, derived rather
+through `heavy.sh` said so, on clones of the fixes before their rebase onto `8a9cdfb` and,
+for the faults the rebase moved, after it (docs/NOTES.md, The essay's render, derived rather
 than asserted).
 
 ### WD-1 (blocker) The essay said every figure was measured at one commit, and nothing checked it
@@ -245,8 +246,8 @@ than asserted).
   superlative, ranking or verdict word must hold a claim whose condition reaches a file at its
   leaves and reads a figure the sentence prints, or a token that carries the word, and a claim the
   results answer false stops the render.
-- Tests: `Claims` (eight). Faults: `writeup-judging-word-unclaimed`, `writeup-claim-not-held`,
-  PROVEN. Commit: `ee91d17`.
+- Tests: `Claims` (nine). Faults: `writeup-judging-word-unclaimed`, `writeup-claim-not-held`,
+  `writeup-pitch-condition-skipped`, PROVEN. Commit: `ee91d17`.
 
 ### WD-3 (blocker) Results typed in words and verdicts typed by hand
 
