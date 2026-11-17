@@ -189,10 +189,11 @@ TEST(FuzzRegression, BoundSeedsAreTheListedOnes) {
 }
 
 // The tiers a codec input's blocks fall in under `bounds`, walked as check_as_column walks
-// them: within the cap while the values before a block and its stated count stay within it,
-// then compared, then decoded once, by the same values; a refused block ends the walk, and
-// is noted where it is the first, within the cap, or where it states values and is past the
-// cap within the compare limit (not the tail's header, which states none).
+// them: within the cap while twice the values before a block and its stated count stay
+// within it (codec::oracle::within_cap_measure), then compared, then decoded once, by the
+// values before a block and its count; a refused block ends the walk, and is noted where it
+// is the first, within the cap, or where it states values and is past the cap within the
+// compare limit (not the tail's header, which states none).
 bound_seeds::CodecTiers tiers_of(const codec::oracle::CodecUnderTest& codec,
                                  std::span<const std::byte> input,
                                  const codec::oracle::OracleBounds& bounds) {
@@ -202,16 +203,18 @@ bound_seeds::CodecTiers tiers_of(const codec::oracle::CodecUnderTest& codec,
     bool capped = false;
     while (offset < input.size()) {
         const std::span<const std::byte> rest = input.subspan(offset);
-        const std::size_t after = seen + codec::stated_block_count(rest).value_or(0);
+        const std::size_t stated = codec::stated_block_count(rest).value_or(0);
+        const std::size_t after = seen + stated;
+        const bool past_cap =
+            capped || codec::oracle::within_cap_measure(seen, stated) > bounds.decoded_values;
         std::vector<std::uint64_t> values;
         const auto taken = codec.decode_block(rest, values);
         if (!taken.has_value()) {
             tiers.first_refused_within_cap = offset == 0 && after <= bounds.decoded_values;
-            tiers.refused_compared = after > seen && (capped || after > bounds.decoded_values) &&
-                                     after <= bounds.compared_values;
+            tiers.refused_compared = after > seen && past_cap && after <= bounds.compared_values;
             break;
         }
-        capped = capped || after > bounds.decoded_values;
+        capped = past_cap;
         if (!capped) {
             ++tiers.within_cap;
         } else if (after <= bounds.compared_values) {
@@ -297,6 +300,45 @@ INSTANTIATE_TEST_SUITE_P(
         std::ranges::replace(name, '-', '_');
         return name;
     });
+
+// The counts the column checks ask the PFOR column decoder for, which the test below reads.
+std::vector<std::uint64_t>& asked_counts() {
+    static std::vector<std::uint64_t> asked;
+    return asked;
+}
+std::expected<void, codec::CodecError> counted_decode_pfor(std::span<const std::byte> column,
+                                                           std::uint64_t count,
+                                                           std::vector<std::uint64_t>& out) {
+    asked_counts().push_back(count);
+    return codec::decode_pfor(column, count, out);
+}
+
+// The cap counts the values taken before a block twice (codec_oracles.hpp, within_cap_measure),
+// since the wrong-count check decodes every block but the last again. Of a block of 100 values
+// and one of 50 after it, the second is within a cap of 250 and past one of 249, though both
+// hold the 150 values: past it, the column checks ask for the first block's 100 values, and one
+// either side, and never for 150.
+TEST(FuzzOracles, TheCapCountsTheValuesBeforeABlockTwice) {
+    std::vector<std::uint64_t> values(150);
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        values[i] = 7 * i * i;
+    }
+    std::vector<std::byte> column;
+    ASSERT_TRUE(codec::oracle::kPforCodec.encoders[0].encode_column(values, 100, column).has_value());
+    const std::vector<std::byte> input = exact_copy(column);
+    codec::oracle::CodecUnderTest counted = codec::oracle::kPforCodec;
+    counted.decode_column = &counted_decode_pfor;
+    for (const std::size_t cap : {std::size_t{250}, std::size_t{249}}) {
+        SCOPED_TRACE(cap);
+        asked_counts().clear();
+        EXPECT_EQ(codec::oracle::check_as_column(counted, input, {.decoded_values = cap}), nullptr);
+        const std::vector<std::uint64_t> wanted =
+            cap == 250 ? std::vector<std::uint64_t>{150, 151, 149} : std::vector<std::uint64_t>{100, 101, 99};
+        ASSERT_GE(asked_counts().size(), wanted.size());
+        EXPECT_EQ(std::vector<std::uint64_t>(asked_counts().begin(), asked_counts().begin() + 3), wanted);
+        EXPECT_EQ(std::ranges::count(asked_counts(), cap == 250 ? 100U : 150U), 0);
+    }
+}
 
 // The fixed grid (fuzz/README.md, "Bounds"): what a codec fuzz target's cap leaves out of
 // a block, the unit suite checks here. One block of each size between the cap and

@@ -1,8 +1,11 @@
 fuzz_dictionary dictionary/bound-costliest
+fuzz_dictionary dictionary/bound-small-blocks
 fuzz_run_length run_length/bound-costliest
 fuzz_run_length run_length/bound-one-run-blocks
+fuzz_run_length run_length/bound-small-blocks
 fuzz_run_length run_length/bound-repeated-run-value
 fuzz_pfor pfor/bound-costliest
+fuzz_pfor pfor/bound-small-blocks
 fuzz_pfor pfor/bound-delta-past-cap
 fuzz_pfor pfor/bound-refused-past-cap
 fuzz_stream_vbyte stream_vbyte/bound-costliest

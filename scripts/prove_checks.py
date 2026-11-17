@@ -571,6 +571,18 @@ FAULTS = (
           "after a maximal block of fewer runs than values, as the named seed's second block, "
           "past the cap, is", EXIT_LIBFUZZER, "AddressSanitizer: heap-buffer-overflow",
           arguments=FUZZ_ARGUMENTS),
+    # The cap counts the values before a block twice, as the wrong-count check decodes every
+    # block but the last again: the oracle's own cap test, and the tiers the named seeds of
+    # small blocks are held to.
+    Fault("codec-cap-measure-unused", "dev-test", "the codec oracle's cap counts the values "
+          "taken before a block once, as the values it adds are", EXIT_CTEST,
+          "FuzzOracles.TheCapCountsTheValuesBeforeABlockTwice (Failed)",
+          arguments=("--test-regex", "FuzzOracles.TheCapCountsTheValuesBeforeABlockTwice$")),
+    Fault("codec-cap-counts-values-before-once", "dev-test", "the measure the codec oracle's "
+          "cap and the unit test's tiers share counts the values before a block once, so the "
+          "run-length named seed's small block falls within the cap", EXIT_CTEST,
+          "BoundSeeds.PassTheWholeCheck/run_length_small_blocks (Failed)",
+          arguments=("--test-regex", "BoundSeeds.PassTheWholeCheck/run_length_small_blocks$")),
     Fault("fuzz-dictionary-repeated-entry", "fuzz-dictionary", "the dictionary decoder stops "
           "refusing a ranked dictionary that holds one value twice", EXIT_LIBFUZZER,
           "check_dict_column:", arguments=FUZZ_ARGUMENTS),

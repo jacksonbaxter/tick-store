@@ -1,0 +1,13 @@
+diff --git a/fuzz/codec_oracles.hpp b/fuzz/codec_oracles.hpp
+--- a/fuzz/codec_oracles.hpp
++++ b/fuzz/codec_oracles.hpp
+@@ -438,7 +438,8 @@
+     if (before > (kMax - stated) / 2) {
+         return kMax;
+     }
+-    return (2 * before) + stated;
++    // Planted: the values before a block are counted once, as the values it adds are.
++    return before + stated;
+ }
+ 
+ // Part 1 over the input, in the bounds' three tiers, then the column checks on the values

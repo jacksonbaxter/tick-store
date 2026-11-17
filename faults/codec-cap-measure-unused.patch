@@ -1,0 +1,13 @@
+diff --git a/fuzz/codec_oracles.hpp b/fuzz/codec_oracles.hpp
+--- a/fuzz/codec_oracles.hpp
++++ b/fuzz/codec_oracles.hpp
+@@ -457,7 +457,8 @@
+         // any other.
+         const std::span<const std::byte> rest = input.subspan(offset);
+         if (const auto stated = stated_block_count(rest);
+-            stated.has_value() && within_cap_measure(values.size(), *stated) > bounds.decoded_values) {
++            // Planted: the cap counts the values before a block once.
++            stated.has_value() && values.size() + *stated > bounds.decoded_values) {
+             capped = true;
+             break;
+         }

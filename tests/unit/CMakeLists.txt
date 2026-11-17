@@ -74,14 +74,16 @@ set(TICK_STORE_SCALAR_CAPPED_FILTER
 # for a single test (R-3), so it runs as these parts, each a gtest filter, the slowest
 # tests on their own. simd_capped_to_scalar_partition checks that the parts together
 # list exactly the tests the filter above lists, each in one part. The bound seeds' whole
-# checks (fuzz/bound_seeds.hpp) take minutes, PFOR's and the dictionary's most, so they
-# are parts of their own.
+# checks (fuzz/bound_seeds.hpp) take minutes, PFOR's and the dictionary's most, so those
+# four are parts of their own.
 set(TICK_STORE_SCALAR_CAPPED_PARTS
     "codecs=Simd*:Pfor*:StreamVByte*:Dictionary*:RunLength*:LanePack*:LinearPack*:PatchList*:CodecRegistry*:CodecEval*"
     "store=ItchStore*:FuzzRegression*-FuzzRegression/BoundSeeds.*"
     "bound_seed_pfor=FuzzRegression/BoundSeeds.*/pfor"
+    "bound_seed_pfor_small_blocks=FuzzRegression/BoundSeeds.*/pfor_small_blocks"
     "bound_seed_dictionary=FuzzRegression/BoundSeeds.*/dictionary"
-    "bound_seeds=FuzzRegression/BoundSeeds.*-FuzzRegression/BoundSeeds.*/pfor:FuzzRegression/BoundSeeds.*/dictionary"
+    "bound_seed_dictionary_small_blocks=FuzzRegression/BoundSeeds.*/dictionary_small_blocks"
+    "bound_seeds=FuzzRegression/BoundSeeds.*-FuzzRegression/BoundSeeds.*/pfor:FuzzRegression/BoundSeeds.*/pfor_small_blocks:FuzzRegression/BoundSeeds.*/dictionary:FuzzRegression/BoundSeeds.*/dictionary_small_blocks"
     "query=ItchQuery*-ItchQuery.SegmentsWithRawRowsTakeTheExactPath"
     "query_exact_path=ItchQuery.SegmentsWithRawRowsTakeTheExactPath"
     "fuzz_oracles=FuzzOracles*-FuzzOracles.PassEveryCutAndFlipThroughTheQueryOracle"
