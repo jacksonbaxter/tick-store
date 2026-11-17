@@ -99,10 +99,7 @@ ASSEMBLED = {
 # The exact paths under results/ each validator's pin may name, written out here, apart from the
 # script's PIN_NAMES.
 PIN_NAMES = {
-    "protocol_1_comparison_files": ("compare/Linux-12302019-full-67ae574f5666.json",
-                                    "compare/Linux-12302019-open-67ae574f5666.json",
-                                    "compare/macOS-12302019-full-tickstore-2503d1e7c5f6.json",
-                                    "compare/macOS-12302019-open-67ae574f5666.json"),
+    "protocol_1_comparison_files": ("compare/Linux-12302019-full-67ae574f5666.json",),
     "roundtrip_files_before_exit_codes": ("roundtrip-10302019.json",
                                           "roundtrip-12302019-linux.json",
                                           "roundtrip-12302019.json"),

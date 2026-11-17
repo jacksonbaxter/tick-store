@@ -136,10 +136,7 @@ NOT_RESULTS = ()
 # that each may pin, fixed here: a line added to the pins file under one of these keys for any
 # other name exempts nothing and is refused.
 PIN_NAMES = {
-    check_compare.PROTOCOL_1_FILES: ("compare/Linux-12302019-full-67ae574f5666.json",
-                                     "compare/Linux-12302019-open-67ae574f5666.json",
-                                     "compare/macOS-12302019-full-tickstore-2503d1e7c5f6.json",
-                                     "compare/macOS-12302019-open-67ae574f5666.json"),
+    check_compare.PROTOCOL_1_FILES: ("compare/Linux-12302019-full-67ae574f5666.json",),
     check_roundtrip.PINS_KEY: tuple(check_roundtrip.PINNED_NAMES),
     check_fuzz.PRE_TIE_PINS: (check_fuzz.PRE_TIE_FILE,),
 }
@@ -147,8 +144,8 @@ PIN_NAMES = {
 # exact path under results/, which must be in REPLACED_FOLDER, and the SHA-256 of its bytes,
 # frozen for good. The pins file names it under REPLACED_PINS, the key render_results.py reads
 # it by (render_results.REPLACED_PINS, by name, as it looks it up), with the same SHA-256. The
-# freeze's rerun replaces the Linux full day measured at 67ae574; until the results commit moves
-# it into the folder and pins it there, the entry holds nothing.
+# freeze's rerun replaced the Linux full day measured at 67ae574; the results commit moved it
+# into the folder and pinned it there.
 REPLACED_PINS = "replaced_comparison_files"
 REPLACED_FOLDER = "compare/replaced"
 REPLACED_KEPT = (("compare/replaced/Linux-12302019-full-67ae574f5666.json",
