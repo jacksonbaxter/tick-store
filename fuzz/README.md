@@ -443,8 +443,8 @@ in `fuzz/bound_seeds.txt`, so every replay (`check.sh`, CI, G-3) shows the bound
 suite runs each through its oracle with no bounds and holds it to the tiers it was built for.
 Times: one execution each on the Mac, fuzz build, `-detect_leaks=0`, median and worst of five
 interleaved rounds over every seed, each run started with load1 under 8, on the tree this section
-was written with; Linux is the median times its target's factor, a prediction (none of these
-seeds has been timed there).
+was written with; Linux is the median times its target's factor, a prediction made before any
+of these seeds was timed there.
 
 These times and the dearest-input row above came in with `0dbdb95`, and the every-target table
 below with `126b03f`, measured on the same fuzz targets' code; none is from the judged run. That
@@ -456,8 +456,13 @@ input, one for the two Gorilla seeds), against 5,000 ms an execution, half of `-
 31 passed. The worst was `dictionary/bound-one-value-blocks` at 682.0 ms (median 681.0), and each
 seed's median was from 3.1% below its median above (`itch_query/bound-costliest-compared`, 386.5
 against 399) to 0.9% above it. No results file has a kind for the gate's table, so it is kept
-with the run's records; the Linux host's gate, the bar these bounds were set for, is not
-collected yet.
+with the run's records. The Linux host's gate, the bar these bounds were set for, ran the same
+way at `8616263`, at AVX2, each run on cpu6 with its sibling, cpu7, kept busy for the whole of
+every run. All 31 passed. The worst was `run_length/bound-small-blocks` at 4,668.5 ms an
+execution (median 3,908.0) against 5,000. Each seed's median was from 21.0% below its prediction
+below (`pfor/bound-costliest`, 3,433.5 against 4,348) to 10.4% above it
+(`dictionary/bound-most-blocks`, 633.5 against 574), and the five query seeds predicted at 3,113
+at most took 2,739.5 at most.
 
 | Seed | Shape | Mac median (worst) | Linux predicted |
 |---|---|---|---|
