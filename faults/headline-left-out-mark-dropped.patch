@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -2020,7 +2020,7 @@ def left_out_items(definitions, root, shown, names):
+             if kind == "met":
+                 met_parts += 1
+             else:
+-                items[kind].append((row["host"], marked_name(name, part, row)))
++                items[kind].append((row["host"], name))
+     return items, met_parts, counts, named
+ 
+ 

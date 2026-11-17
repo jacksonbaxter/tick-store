@@ -1,11 +1,11 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -1542,7 +1542,7 @@
+@@ -2343,7 +2343,7 @@ def render_headline(definitions_path, root):
              _, parts = shown_parts(under, row, root)
              shown.setdefault((under["id"], under["host"]), set()).update(p[0] for p in parts)
-             sentence = under_sentence(under, row, parts, hosts)
--            check_under(sentence, under, row, parts, hosts)
+             sentence = under_sentence(under, row, parts, hosts, root)
+-            check_under(sentence, under, row, parts, hosts, root)
 +            pass
              lines += ["", sentence]
          names = plain_names(definitions, hosts)

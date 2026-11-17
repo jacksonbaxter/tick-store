@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1713,6 +1713,8 @@ def shown_verdict(parts):
+     outcome the rule gives it on this run, with both outcomes and the counted one beside that
+     word, and the others' counted outcomes as core_verdict gives them (review C1, E)."""
+     changed = [part for part in parts if notes_of(part).get("change")]
++    if changed:
++        return core_verdict(parts) + "".join(f"; {mark}" for mark in change_marks(parts))
+     if not changed:
+         return core_verdict(parts)
+     pieces = [change_text(part) + ", both runs' figures under Measured" for part in changed]

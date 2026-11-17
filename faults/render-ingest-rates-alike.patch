@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -607,7 +607,7 @@ def compare_for(document, entries=()):
+     for class_name, meaning in (("A", "returns once data is in the OS page cache"),
+                                 ("B", "returns after a flush to the device")):
+         unit = "day" if day else "slice"
+-        clause = input_clause(document, class_name)
++        clause = None
+         lines += ["", f"Ingest and size, class {class_name}: {meaning}. Stored bytes are "
+                       f"allocated at rest, and the ratio is the {unit}'s source bytes over them. "
+                       + (f"{MACOS_ALLOCATION} " if host == "macOS" else "")

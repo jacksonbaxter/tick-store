@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1167,7 +1167,7 @@ def judged_parts(row, root):
+     if "lowest_of" in row:
+         document = documents[files[0]]
+         mark = figure_marker(root, files[0], document, row["lowest_of"]["file"], row)
+-        parts = [(*part, files[0], document) for part in lowest_parts(row, document, mark)]
++        parts = [(*part, files[0], document) for part in lowest_parts(row, document)]
+         return finished(row, root, [row["lowest_of"]] * len(parts), parts), None
+     parts = []
+     for spec, path in zip(row["parts"], files):

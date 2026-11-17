@@ -1,12 +1,21 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -1427,7 +1427,7 @@
-     marks = []
-     for part in parts:
-         change = notes_of(part).get("change")
--        if change:
-+        if False:
-             favours = ", a change that favours tick-store," if \
-                 standing(change["new"]) > standing(change["old"]) else ""
-             marks.append(f"({part[0]}) {verdict_word(change['new'])} on this run's figures"
+@@ -1667,7 +1667,7 @@ def change_text(part, labelled=True):
+ 
+ 
+ def change_marks(parts):
+-    return [change_text(part) for part in parts if notes_of(part).get("change")]
++    return []
+ 
+ 
+ def phase_marks(parts, row=None, labelled=True):
+@@ -1712,7 +1712,7 @@ def shown_verdict(parts):
+     """The verdict words: a part the replaced run's figures change stands apart, under the
+     outcome the rule gives it on this run, with both outcomes and the counted one beside that
+     word, and the others' counted outcomes as core_verdict gives them (review C1, E)."""
+-    changed = [part for part in parts if notes_of(part).get("change")]
++    changed = []
+     if not changed:
+         return core_verdict(parts)
+     pieces = [change_text(part) + ", both runs' figures under Measured" for part in changed]

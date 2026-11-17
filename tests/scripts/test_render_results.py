@@ -2442,9 +2442,9 @@ class ConditionsTest(Scratch):
         entries = [{"phase": "write", "system": "tickstore", "variant": "v", "class": "B",
                     "repetition": 1, "timed": True}]
         lines = RENDER.compare_for(document, entries)
-        row = next(line for line in lines if line.startswith("| tick-store (parses ITCH) |")
-                   and "(disturbed)" in line)
-        self.assertEqual(row.count("(disturbed)"), 3)
+        rows = [line for line in lines if line.startswith("| tick-store (parses ITCH) |")
+                and "(disturbed)" in line]
+        self.assertEqual([row.count("(disturbed)") for row in rows], [3])
         self.assertIn("marked (disturbed); a verdict in Targets that rests on one says what it "
                       "was beside its word.", lines[0])
         self.assertIn("The rates below are not like for like: inputs not alike, by each write's "
@@ -2486,6 +2486,7 @@ class ConditionsTest(Scratch):
         self.favourable_change()
         self.disturb()
         marks = RENDER.row_marks(CHANGE_ROW, self.tree)
+        self.assertEqual(len(marks), 3, marks)
         change, login, clause = marks
         self.assertTrue(change.startswith("(against ArcticDB) met on this run's figures, a change "
                                           "that favours tick-store"))

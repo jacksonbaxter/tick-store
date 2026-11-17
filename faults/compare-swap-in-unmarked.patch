@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1359,7 +1359,7 @@ def finished(row, root, specs, parts):
+         if notes.get("change"):
+             swapped += [(*read[:2], True) for read in
+                         swapped_reads(reads, notes["replaced"][1])]
+-        if swapped:
++        if False:
+             notes["swapped"] = list(dict.fromkeys(swapped))
+         writes = [read for read in reads if read[0] == "write"]
+         if writes and is_comparison(row):

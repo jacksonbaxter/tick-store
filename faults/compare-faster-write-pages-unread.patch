@@ -1,7 +1,7 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -2590,7 +2590,7 @@
+@@ -3035,7 +3035,7 @@ def main(argv=None):
              pages.append((args.readme.name, readme))
          pages += [(name, (args.targets_root / name).read_text(encoding="utf-8"))
                    for name in RESULTS_PAGES if (args.targets_root / name).is_file()]
@@ -9,4 +9,4 @@ diff --git a/scripts/render_results.py b/scripts/render_results.py
 +        problem = None
          if problem:
              raise TargetError(problem)
-     except (OSError, json.JSONDecodeError, TargetError) as error:
+         if has_targets:

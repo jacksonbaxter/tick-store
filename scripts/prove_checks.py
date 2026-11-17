@@ -355,6 +355,26 @@ def call_a_host_by_its_system():
     edit_text("README.md", "trading day,", "Linux day,")
 
 
+def quote_wt4_with_the_old_word():
+    """BENCHMARKS.md's WT-4 row back as the review found it: the ArcticDB part under "missed"
+    and its outcome on this run's figures in a later clause, not the mark RESULTS.md gives
+    (review C1, E)."""
+    edit_text("BENCHMARKS.md", "Met against QuestDB only, not like-for-like; (against ArcticDB) "
+              "met on this run's figures, a change that favours tick-store, and missed on the "
+              "replaced run's, so counted as missed in every count, ranking and first screen on "
+              "these pages; missed against Parquet", "Met against QuestDB only, not "
+              "like-for-like; missed against Parquet and ArcticDB; against ArcticDB met on this "
+              "run's figures "
+              "and missed on the replaced run's, a change that favours tick-store, so counted "
+              "missed")
+
+
+def drop_the_readme_input_note():
+    """The README's comparison section as the review found it, with no word of where each
+    system's write input was (review C1, condition 2)."""
+    edit_text("README.md", "Write inputs are not alike on this day", "Write inputs differ")
+
+
 def headline_row(document, what):
     return next(row for row in document["headline"]["rows"] if row["what"] == what)
 
@@ -1677,6 +1697,75 @@ FAULTS = (
           "BENCHMARKS.md, compare/README.md and fuzz/README.md", CHECK_FAILED,
           "FAIL: test_every_results_page_is_read_whole_and_named_with_its_line "
           "(__main__.ReplacedRunTest"),
+    # Review C1: the four conditions on publishing a comparison verdict.
+    Fault("compare-changed-part-under-counted-word", "py-scripts", "render_results.py listing a "
+          "part the replaced run changes under its counted word, with the rule's outcome in a "
+          "later clause", CHECK_FAILED,
+          "FAIL: test_a_changed_outcome_shows_both_and_counts_the_less_favourable "
+          "(__main__.ReplacedRunTest"),
+    Fault("compare-disturbance-replaced-figure-on-comparisons-only", "py-scripts",
+          "render_results.py giving the replaced run's figure beside a disturbed phase only on "
+          "a row judged against another system", CHECK_FAILED,
+          "FAIL: test_a_disturbed_phase_of_a_row_against_no_system_gives_the_replaced_figure "
+          "(__main__.ConditionsTest"),
+    Fault("compare-swap-in-unmarked", "py-scripts", "render_results.py giving a verdict that "
+          "rests on a figure the record flags as timed with a page swapped in with nothing "
+          "beside it", CHECK_FAILED,
+          "FAIL: test_a_verdict_on_a_figure_timed_with_a_page_swapped_in_says_so "
+          "(__main__.ConditionsTest"),
+    Fault("headline-value-mark-dropped", "py-scripts", "render_results.py letting a headline "
+          "text show a figure from a disturbed phase with no mark beside it", CHECK_FAILED,
+          "FAIL: test_a_headline_figure_from_a_disturbed_phase_must_show_its_mark "
+          "(__main__.ConditionsTest"),
+    Fault("render-ql4-faster-variant-unmarked", "py-scripts", "render_results.py naming a "
+          "faster variant beside a QL-4 part with no word of the disturbance in its phase",
+          CHECK_FAILED,
+          "FAIL: test_a_faster_variant_shown_beside_a_ranking_carries_its_phases_mark "
+          "(__main__.ConditionsTest"),
+    Fault("render-disturbed-cells-unmarked", "py-scripts", "render_results.py showing a "
+          "comparison table's figure from a disturbed phase unmarked", CHECK_FAILED,
+          "FAIL: test_the_tables_mark_a_disturbed_phase_and_say_the_rates_are_not_alike "
+          "(__main__.ConditionsTest"),
+    Fault("render-ingest-rates-alike", "py-scripts", "render_results.py setting the ingest "
+          "rates side by side with no word that the inputs were not alike", CHECK_FAILED,
+          "FAIL: test_the_tables_mark_a_disturbed_phase_and_say_the_rates_are_not_alike "
+          "(__main__.ConditionsTest"),
+    Fault("headline-left-out-mark-dropped", "py-scripts", "render_results.py naming a marked "
+          "part on the line under the table without its mark", CHECK_FAILED,
+          "FAIL: test_the_line_under_the_table_names_a_marked_part_with_its_mark "
+          "(__main__.ConditionsTest"),
+    Fault("headline-left-out-mark-unchecked", "py-scripts", "render_results.py's check of the "
+          "line under the table taking a marked part's bare name", CHECK_FAILED,
+          "FAIL: test_the_line_under_the_table_names_a_marked_part_with_its_mark "
+          "(__main__.ConditionsTest"),
+    Fault("quote-mark-unchecked", "py-scripts", "render_results.py letting a hand-written row "
+          "or sentence quote a marked verdict without its marks", CHECK_FAILED,
+          "FAIL: test_a_hand_written_quote_of_a_marked_verdict_is_refused_without_its_marks "
+          "(__main__.ConditionsTest"),
+    Fault("quote-sentences-unread", "py-scripts", "render_results.py reading only table rows "
+          "for a quoted verdict and no sentence", CHECK_FAILED,
+          "FAIL: test_a_hand_written_quote_of_a_marked_verdict_is_refused_without_its_marks "
+          "(__main__.ConditionsTest"),
+    Fault("quote-tables-unread", "py-scripts", "render_results.py reading only sentences for a "
+          "quoted verdict and no table row", CHECK_FAILED,
+          "FAIL: test_a_hand_written_quote_of_a_swapped_in_verdict_is_refused_without_it "
+          "(__main__.ConditionsTest"),
+    Fault("quote-input-clause-dropped", "py-scripts", "render_results.py letting a quoted write "
+          "verdict against another system stand without where the inputs were", CHECK_FAILED,
+          "FAIL: test_a_hand_written_quote_of_a_marked_verdict_is_refused_without_its_marks "
+          "(__main__.ConditionsTest"),
+    Fault("method-input-note-unchecked", "py-scripts", "render_results.py letting a comparison "
+          "method section say nothing of where the write inputs were", CHECK_FAILED,
+          "FAIL: test_the_methods_sections_say_where_the_write_inputs_were "
+          "(__main__.ConditionsTest"),
+    Fault("benchmarks-wt4-old-word", "render-check", "BENCHMARKS.md's WT-4 row with the ArcticDB "
+          "part under missed and the rule's outcome in a later clause, as the review found it",
+          EXIT_RENDER_REFUSED, "quotes the verdict of WT-4 on Linux without a mark",
+          quote_wt4_with_the_old_word),
+    Fault("readme-comparison-input-unsaid", "render-check", "the README's comparison section "
+          "with no word of where each system's write input was", EXIT_RENDER_REFUSED,
+          "README.md's '## Comparison' does not say where the writes' inputs were",
+          drop_the_readme_input_note),
     Fault("compare-disk-reads-unseen", "py-scripts", "render_results.py finding no system whose "
           "write read its input from disk inside the clock", CHECK_FAILED,
           "FAIL: test_a_system_whose_input_was_not_resident_is_one_whose_clock_holds_its_reads "

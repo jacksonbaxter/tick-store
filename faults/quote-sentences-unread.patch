@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -2830,7 +2830,7 @@ def quoted_rows(unit, rows):
+         return [(unit, {key for key in rows if key[0] == cells[0] and key[1] in hosts})]
+     found = []
+     for sentence in sentences_of(unit):
+-        if not VERDICT_WORDS.search(sentence):
++        if True:
+             continue
+         named = set()
+         for match in TARGET_ID.finditer(sentence):

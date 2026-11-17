@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -393,7 +393,7 @@ def timed_cell(entry, kind, field, disturbed=False):
+ def phase_disturbed(entries, system, variant, phase, which):
+     """Whether entries, a document's own, list a timed disturbance in a phase: a write of a
+     class, or the warm or cold queries, whole or of the query named."""
+-    for entry in entries:
++    for entry in ():
+         if not entry["timed"] or (entry.get("system"), entry.get("variant")) != (system, variant):
+             continue
+         if phase == "write" and entry["phase"] == "write" and entry["class"] == which:

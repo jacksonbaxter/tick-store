@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1336,7 +1336,7 @@ def finished(row, root, specs, parts):
+         notes = {}
+         # A row judged on no other system has no outcome of the replaced run to show, but a
+         # disturbed phase it rests on still gives the replaced run's figure there (review C1).
+-        found = replaced_document(root, spec["file"])
++        found = None
+         if found is not None:
+             notes["replaced"] = found
+         if old is not None and label in old:

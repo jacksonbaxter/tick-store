@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -2815,7 +2815,7 @@ def row_marks(row, root):
+     marks = change_marks(parts) + phase_marks(parts, row)
+     classes = [notes_of(part)["write"] for part in parts if notes_of(part).get("write")]
+     clause = input_clause(parts[0][4], classes[0]) if classes else None
+-    return marks + ([clause] if clause else [])
++    return marks
+ 
+ 
+ def quoted_rows(unit, rows):

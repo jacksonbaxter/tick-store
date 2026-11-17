@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -2286,7 +2286,7 @@ def value_marks(spec, parts, root, row):
+             replaced = notes_of(next(part for part in parts if part[3] == path)).get("replaced")
+             for read in reads_of(expression, document):
+                 found += figure_marks(entries, root, path, document, read, replaced, row)
+-        if found:
++        if False:
+             marks[f"{name}_mark"] = ", ".join(dict.fromkeys(found))
+     return marks
+ 

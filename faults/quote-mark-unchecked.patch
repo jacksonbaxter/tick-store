@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -2862,7 +2862,7 @@ def quote_problem(pages, definitions, root):
+                 for key in sorted(keys):
+                     if key not in marks:
+                         marks[key] = row_marks(rows[key], root)
+-                    missing = [mark for mark in marks[key] if mark not in said]
++                    missing = []
+                     if missing:
+                         return (f"{name}:{number}: {quote[:80]!r} quotes the verdict of {key[0]} "
+                                 f"on {key[1]} without a mark RESULTS.md sets beside it: "

@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -2824,7 +2824,7 @@ def quoted_rows(unit, rows):
+     a target's id and a verdict word, on the host it names where the target has a row there."""
+     if unit.startswith("|"):
+         cells = [cell.strip() for cell in unit.strip().strip("|").split("|")]
+-        hosts = HOST_CELLS.get(cells[1].lower()) if len(cells) > 2 else None
++        hosts = None
+         if not hosts or not any(key[0] == cells[0] for key in rows):
+             return []
+         return [(unit, {key for key in rows if key[0] == cells[0] and key[1] in hosts})]
