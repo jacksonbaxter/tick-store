@@ -7139,6 +7139,32 @@ the heavy-job wrapper (docs/REVIEW.md, FL-1). I checked the other tests that mak
 committed to or copies one with its `.git`; `test_render_writeup.py` deletes a whole `.git`, and
 `test_prove_checks.py`'s shared clone reads only reachable objects.
 
+
+### The page review P1 and the ruling on marked wins
+
+An outside review of the generated pages at `16a5db9` raised 30 findings. Its brief from the
+coordinator said a marked verdict "is not counted as a win", which was worded more broadly than
+the conditions then in force: those asked that a marked verdict be published as the rule gives
+it, never presented as a win, with both runs' figures and outcomes where they differ, and that no
+count, ranking sentence or first screen rise on a changed outcome. The coordinator first kept the
+five QL-4 parts and G-3 met and counted with their marks (P1-1, P1-5), and kept WT-4's word
+against QuestDB with "not like-for-like" and the input clause beside it (P1-2). A ruling then
+replaced the first two decisions. In its words: "One test decides whether a disturbed 'met' may
+raise a count: which side of the verdict the disturbance fell on." A disturbance on tick-store's
+own timed side, or in a pass-or-fail check, "can only have made your figure worse": the verdict
+stays met and counted with its mark, as G-3 does. On the other system's side, or both, "the
+verdict counts only if a run without that disturbance on that side gives the same outcome, and
+both figures are shown. If the replaced run carried the same disturbance (swap in both, say), the
+two runs do not confirm each other. The verdict keeps its word and its mark, and raises no count,
+no ranking sentence and no first screen."
+
+Read from both records, all five QL-4 parts are swap-flagged on a rival's side in both runs, so
+none is counted; the swap counts are the whole host's pages swapped in while that system's query
+was timed (`compare/swap.py`), not any one process's. The replaced run has no disturbance record,
+so it cannot confirm a login or a backup on a rival's side either; WT-4's part against QuestDB is
+therefore not counted, and, being labelled not like-for-like, would not be in any case. Nothing
+counted it before. `render_results.py` now reads all of this from the records.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
