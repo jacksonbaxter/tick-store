@@ -6581,7 +6581,7 @@ re-proof.
 
 ### CI on jb-build, 17 November
 
-2026-11-17. Four runs on `jb-build`; their run and job records and the failed logs are kept
+2026-11-17. Five runs on `jb-build`; their run and job records and the failed logs are kept
 outside the repository.
 
 - Run 44057308152, at `126b03f`: clang-tidy failed on both hosts, on findings in
@@ -6598,7 +6598,24 @@ outside the repository.
   Bounds). The two repo jobs failed, as expected, on check-ties, 23 files: 0 same, 8 pinned, 15
   differs, since the freeze's files were not yet committed (`c88ff7e` came after it), and on
   writeup-check, 35 of 310 tokens with no results file yet.
-- Run 44108908661, at `30789f9`, started at 14:58Z.
+- Run 44108908661, at `30789f9`, started at 14:58:01Z: 13 jobs passed. The repo job failed on
+  both hosts, in two steps. check-ties gave 30 files: 25 same, 2 pinned, 3 differs, the three
+  `check-proofs.json`, measured at `5a810a2`, `coverage.json`, at `ede0176`, and the capacity file,
+  at `87a5bb8` and `9c8b09f`. writeup-check refused `{{verdict:g3}}`, which reads the pinned
+  `fuzz-g3-ea1dde4c02e4.json`. `clang-tidy on macos-arm64` is marked cancelled, 14:58:02Z to
+  16:08:42Z, with no step run. Not rerun.
+- Run 44157638132, at `16a5db9`, started at 19:21:07Z; as I read it at 20:24Z, still in progress.
+  Nine jobs had passed. `repo on linux-x86-64` failed, 19:21:09Z to 19:23:38Z, in "Run the
+  checks", on check-ties alone: 31 files: 29 same, 1 pinned, 1 differs, the one `check-proofs.json`,
+  measured at `5a810a2`; its other eight steps passed, writeup-check with "WRITEUP.md is current".
+  Three macOS jobs are marked cancelled with no step run: `clang-tidy` 19:21:08Z to 20:03:58Z,
+  `coverage` to 20:08:59Z and `repo` to 20:13:59Z. Three were still running: `unit` on both hosts
+  and `asan-ubsan on macos-arm64`. Not rerun.
+
+For the four macOS jobs marked cancelled in these two runs the record shows only that GitHub's
+hosted macOS runner never started a step and GitHub marked the job cancelled; no code of this
+repository ran in them. I did not cancel them and did not rerun them. The rule in force allows
+`gh run rerun <id> --failed` at most twice an hour for a failure on GitHub's side.
 
 ### The second collection's Mac half
 
