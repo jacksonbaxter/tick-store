@@ -1318,8 +1318,10 @@ def verdict_value(resolver, name, entry, marks=True):
     # parts met that no other setup beats follow it, so every part met is named and each mark
     # has its part (review P1-27).
     beaten = [part[0] for part in parts or [] if render_results.notes_of(part).get("faster")]
+    # A part met by the rule and not counted is met all the same, and named (the ruling on P1-1).
     unbeaten = [part[0] for part in parts or [] if part[0] not in beaten
-                and render_results.counted(part) is True]
+                and (render_results.counted(part) is True or
+                     isinstance(render_results.counted(part), render_results.NotCounted))]
     setup = " " if word == "met" or not beaten else \
         f"; met on {render_results.and_list(beaten)} "
     after = f", and on {render_results.and_list(unbeaten)}" \

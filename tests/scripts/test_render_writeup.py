@@ -1205,6 +1205,13 @@ class SetupMark(unittest.TestCase):
                                   ("Q5 cold", None, True, None, None, {})])
         self.assertEqual(value, f"missed in part; met on Q2 warm {mark}, and on Q5 cold")
 
+    def test_a_part_met_and_not_counted_is_named_too(self):
+        value, mark = self.value([("Q1 warm", None, False, None, None, {}),
+                                  ("Q2 warm", None, True, None, None, {"faster": {"by": 1}}),
+                                  ("Q5 cold", None, True, None, None,
+                                   {"unconfirmed": [("QuestDB", True)]})])
+        self.assertEqual(value, f"missed in part; met on Q2 warm {mark}, and on Q5 cold")
+
     def test_with_every_part_met_beaten_nothing_follows(self):
         value, mark = self.value([("Q1 warm", None, False, None, None, {}),
                                   ("Q2 warm", None, True, None, None, {"faster": {"by": 1}})])
