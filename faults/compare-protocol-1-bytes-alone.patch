@@ -1,0 +1,12 @@
+diff --git a/scripts/check_compare.py b/scripts/check_compare.py
+--- a/scripts/check_compare.py
++++ b/scripts/check_compare.py
+@@ -958,7 +958,7 @@ def check_protocol(header, name, sha256, pins):
+     the SHA-256 of its bytes, `sha256`, the two together, never its bytes alone under any name
+     nor a field of its header (RV-6)."""
+     if "protocol" not in header:
+-        if sha256 is not None and (pins.get(PROTOCOL_1_FILES) or {}).get(name) == sha256:
++        if sha256 is not None and sha256 in (pins.get(PROTOCOL_1_FILES) or {}).values():
+             return []
+         return ["header.protocol: none stated, and a file may state none only if the pins file "
+                 f"pins its name to the SHA-256 of its bytes under {PROTOCOL_1_FILES}, which "

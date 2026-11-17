@@ -37,10 +37,11 @@ memory. Its name and its scope keep the two kinds of day apart: only a file whos
 tick-store-only may carry `-full-tickstore-`, and it must, so a Linux subset can never stand in
 for the four-system day, which must hold all four systems, nor the reverse.
 
-Every file states the comparison protocol it was measured under. The committed files measured
-before the final review's protocol state none and count as protocol 1, held to the rules above;
-only those files, each pinned by the SHA-256 of its bytes in the pins file, may state none, and
-any file that states one must state exactly the integer 2. A protocol 2 file is held to more: each latency block names its tail
+Every file states the comparison protocol it was measured under, exactly the integer 2. A file
+that states none counts as protocol 1, held to the rules above, and passes only if the pins file
+pins its name to the SHA-256 of its bytes under PROTOCOL_1_FILES, both together. The freeze
+replaced every committed protocol 1 file, and scripts/data_pins.json holds no such line, so here
+every file that states no protocol is refused. A protocol 2 file is held to more: each latency block names its tail
 figure for what it is, the nearest-rank 99th percentile with n and the rank used, which below
 100 runs is the slowest run and must say so; and every latency block and every write keeps each
 repetition's seconds, from which its median, its tail figure and its write medians are
@@ -143,10 +144,14 @@ SWAP_FIELDS = ("pages_in", "pages_out")
 # A file with no protocol was measured before the final review's comparison protocol.
 PROTOCOL_1 = 1
 PROTOCOL_2 = 2
-# The committed files measured before protocol 2 are the only ones that may state no protocol
-# (review RF-1), and they are pinned by the SHA-256 of their bytes, under this key of the pins
-# file, not by anything a document says of itself (review RV-6): everything the current harness
-# writes is protocol 2. docs/TASKS.md removes the key once the freeze rerun has replaced them.
+# A file that states no protocol passes only under this key of the pins file, its name pinned to
+# the SHA-256 of its bytes (reviews RF-1 and RV-6), never by its bytes alone or anything it says
+# of itself: everything the current harness writes is protocol 2. The freeze replaced the
+# committed protocol 1 files and scripts/data_pins.json holds the key no more, so no file passes
+# by it here; check_ties.py refuses any line under it. The one protocol 1 file kept, the Linux
+# day in results/compare/replaced/, is not validated here, away from its slice: render_results.py
+# reads it by its pin under replaced_comparison_files, and check_ties.py holds it to its exact
+# path and SHA-256, REPLACED_KEPT. The test fixtures that state no protocol pin themselves here.
 PROTOCOL_1_FILES = "protocol_1_comparison_files"
 
 
@@ -947,16 +952,17 @@ def protocol_of(document):
     return (document.get("header") or {}).get("protocol", PROTOCOL_1)
 
 
-def check_protocol(header, sha256, pins):
-    """A file states protocol 2, exactly the integer, unless it is one of the committed files
-    measured before there was a protocol, which state none (review RF-1). Those are known by
-    their bytes, `sha256`, pinned in the pins file, never by a field of the header (RV-6)."""
+def check_protocol(header, name, sha256, pins):
+    """A file states protocol 2, exactly the integer, unless the pins file pins it as one
+    measured before there was a protocol, which states none (review RF-1): its name, `name`, to
+    the SHA-256 of its bytes, `sha256`, the two together, never its bytes alone under any name
+    nor a field of its header (RV-6)."""
     if "protocol" not in header:
-        if sha256 is not None and sha256 in (pins.get(PROTOCOL_1_FILES) or {}).values():
+        if sha256 is not None and (pins.get(PROTOCOL_1_FILES) or {}).get(name) == sha256:
             return []
-        return ["header.protocol: none stated, and only the committed files measured before "
-                f"protocol 2, each pinned by its SHA-256 under {PROTOCOL_1_FILES} in "
-                "scripts/data_pins.json, may state none"]
+        return ["header.protocol: none stated, and a file may state none only if the pins file "
+                f"pins its name to the SHA-256 of its bytes under {PROTOCOL_1_FILES}, which "
+                "scripts/data_pins.json does for no file"]
     stated = header["protocol"]
     if type(stated) is not int or stated != PROTOCOL_2:
         return [f"header.protocol: {stated!r}, and a file states protocol {PROTOCOL_2}, or none "
@@ -1145,7 +1151,7 @@ def check_document(document, top_keys, path, pins, capacity, real_path=None, sha
         problems.append("the file does not start with its header")
     problems += [f"header: missing field '{field}'" for field in HEADER_FIELDS
                  if field not in header]
-    stated = check_protocol(header, sha256, pins)
+    stated = check_protocol(header, (real_path or path).name, sha256, pins)
     if stated:
         return [*problems, *stated]
     systems = document.get("systems") or {}

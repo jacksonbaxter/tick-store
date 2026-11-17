@@ -53,7 +53,8 @@ its measured paths changed since, and is not judged: each validator's own key in
 and only the exact paths under results/ that PIN_NAMES below lets be pinned under that key, each
 known by the SHA-256 of its bytes, never by anything the file says of itself; a line in the pins
 file under one of those keys for any other name is refused, so a line added there exempts no
-new file. A comparison file replaced by a later measurement and kept, unchanged, for the
+new file. The comparison validator's key may pin no file: the freeze replaced every protocol 1
+comparison file, so any line under it is refused. A comparison file replaced by a later measurement and kept, unchanged, for the
 record is pinned under REPLACED_PINS, the key render_results.py reads it by, only if it lives in
 compare/replaced/, REPLACED_KEPT below names its exact path and the SHA-256 of its bytes, frozen
 for good, and the pins file gives its name the same SHA-256; a line under that key for any other
@@ -133,9 +134,12 @@ NOT_RESULTS = ()
 
 # The pins each validator keeps in the pins file, by key, and the exact paths under results/
 # that each may pin, fixed here: a line added to the pins file under one of these keys for any
-# other name exempts nothing and is refused.
+# other name exempts nothing and is refused. check_compare.py still takes a file that states no
+# protocol by a line under its key, its name and SHA-256 together, and the freeze replaced every
+# such file, so that key may pin none: any line there is refused. The protocol 1 Linux day kept
+# for the record is held by REPLACED_KEPT below, at its exact path and SHA-256.
 PIN_NAMES = {
-    check_compare.PROTOCOL_1_FILES: ("compare/Linux-12302019-full-67ae574f5666.json",),
+    check_compare.PROTOCOL_1_FILES: (),
     check_fuzz.PRE_TIE_PINS: (check_fuzz.PRE_TIE_FILE,),
 }
 # A comparison file replaced by a later measurement and kept, unchanged, for the record: its
@@ -221,8 +225,7 @@ KINDS = (
          left_out=(("results/fullday-capacity-12302019.json", "read by check_compare.py, the "
                     "validator, not by the harness"), BENCH[:1] + ("built by the same preset, "
                     "never run by the harness",), VALIDATORS, RENDER, PROSE, TESTS_UNIT,
-                   OTHER_BUILDS, FETCH),
-         pin=check_compare.PROTOCOL_1_FILES),
+                   OTHER_BUILDS, FETCH)),
     Kind("capacity", ("fullday-capacity-*.json",),
          measured=(*BUILT, TOOLS,
                    ("compare", "compare/fullday.py ran each system through the whole day, on "
@@ -548,7 +551,8 @@ def pin_problems(pins):
         for name in sorted(entries):
             if name not in allowed:
                 problems.append(f"{key} in the pins file pins {name}, and check_ties.py lets "
-                                f"only {', '.join(allowed) or 'no file'} be pinned there")
+                                + (f"only {', '.join(allowed)}" if allowed else "no file")
+                                + " be pinned there")
     for path, digest in REPLACED_KEPT:
         if (Path(path).parent.as_posix() != REPLACED_FOLDER
                 or not SHA256.fullmatch(str(digest))):

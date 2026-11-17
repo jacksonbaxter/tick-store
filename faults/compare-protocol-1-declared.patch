@@ -1,9 +1,9 @@
 diff --git a/scripts/check_compare.py b/scripts/check_compare.py
 --- a/scripts/check_compare.py
 +++ b/scripts/check_compare.py
-@@ -932,7 +932,7 @@ def check_protocol(header, sha256, pins):
-                 f"protocol 2, each pinned by its SHA-256 under {PROTOCOL_1_FILES} in "
-                 "scripts/data_pins.json, may state none"]
+@@ -964,7 +964,7 @@ def check_protocol(header, name, sha256, pins):
+                 f"pins its name to the SHA-256 of its bytes under {PROTOCOL_1_FILES}, which "
+                 "scripts/data_pins.json does for no file"]
      stated = header["protocol"]
 -    if type(stated) is not int or stated != PROTOCOL_2:
 +    if type(stated) is not int or stated not in (PROTOCOL_1, PROTOCOL_2):

@@ -151,16 +151,28 @@ def questdb_variant(document):
 
 
 def edit_compare_slice(change):
-    """The macOS slice, edited, with its pin moved to the edited bytes. A protocol 1 file is
-    known by its SHA-256 in scripts/data_pins.json, which would refuse any edit first, so a
-    fault in its content re-pins it, and only the rule the fault is about can refuse it."""
-    path = macos_results("compare", benchmark=COMPARE_FAULT_SLICE)
-    edit_json(path, change)
-    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    """The macOS slice, edited. It states protocol 2, as every file in results/compare/ does
+    since the freeze, so no pin holds its bytes, and only the rule the fault is about can
+    refuse it. A protocol 1 slice was re-pinned here once; no file is pinned that way now."""
+    edit_json(macos_results("compare", benchmark=COMPARE_FAULT_SLICE), change)
 
-    def repin(pins):
-        pins["protocol_1_comparison_files"][path.name] = digest
-    edit_json("scripts/data_pins.json", repin)
+
+def restore_a_pin(key, name, digest):
+    """A line put back under a pins key the freeze's files retired."""
+    edit_json("scripts/data_pins.json", lambda pins: pins.setdefault(key, {}).update({name: digest}))
+
+
+def protocol_1_pin_restored():
+    """The kept Linux day pinned again as a protocol 1 file, as it was before the freeze's files
+    retired the key."""
+    restore_a_pin("protocol_1_comparison_files", "Linux-12302019-full-67ae574f5666.json",
+                  "e8d447073c29d83c2341357df8ca01fa9afaa50d4f235590d5506e0d10a41a25")
+
+
+def roundtrip_pin_restored():
+    """12302019's round-trip file from before the exit codes pinned again by its bytes."""
+    restore_a_pin("roundtrip_files_before_exit_codes", "roundtrip-12302019.json",
+                  "b22de55c624c3bb1c0570a982b376d07c4bd75d777a85de318797b74d4c10001")
 
 
 def mismatched_commit_mode():
@@ -1103,6 +1115,15 @@ FAULTS = (
           "protocol 2 by the commit its header states, which a new document can copy",
           CHECK_FAILED, "FAIL: test_a_current_harness_document_stating_a_committed_files_commit "
           "(__main__.Protocol2"),
+    # A protocol 1 pin is a name and the SHA-256 of its bytes together, and the pins file holds
+    # none since the freeze replaced the protocol 1 files.
+    Fault("compare-protocol-1-bytes-alone", "py-scripts", "check_compare.py takes a file that "
+          "states no protocol by the SHA-256 of its bytes under any name", CHECK_FAILED,
+          "FAIL: test_a_protocol_1_pin_holds_only_under_its_own_name (__main__.Protocol2"),
+    Fault("pins-protocol-1-line-restored", "py-scripts", "the protocol 1 pin of the kept Linux "
+          "day put back in scripts/data_pins.json, so check_compare.py would take it again",
+          CHECK_FAILED, "FAIL: test_the_pins_file_pins_no_protocol_1_file (__main__.Protocol2",
+          protocol_1_pin_restored),
     Fault("compare-protocol-1-declared", "py-scripts", "check_compare.py takes a file that "
           "declares protocol 1, which no harness ever wrote", CHECK_FAILED,
           "FAIL: test_a_document_declaring_protocol_1 (__main__.Protocol2"),
@@ -1452,6 +1473,10 @@ FAULTS = (
           "g2.data_crc: no exit_code observed", roundtrip_exit_codes_typed),
     # Review RG-5: the files from before the exit codes were replaced at the freeze, and no
     # name takes a file past its runs' exit codes.
+    Fault("pins-roundtrip-line-restored", "py-scripts", "a pin of 12302019's round-trip file "
+          "from before the exit codes put back in scripts/data_pins.json", CHECK_FAILED,
+          "FAIL: test_the_pins_file_holds_no_round_trip_pin (__main__.CheckRoundtrip",
+          roundtrip_pin_restored),
     Fault("roundtrip-old-form-by-name-accepted", "py-scripts", "check_roundtrip.py takes a "
           "file under one of the three names the files from before the exit codes had, "
           "whatever it holds", CHECK_FAILED,
@@ -2080,11 +2105,15 @@ FAULTS = (
     # Review TD-4: a pin names its file exactly, from a set fixed in code.
     Fault("ties-pin-any-listed-name", "py-scripts", "check_ties.py takes as pinned any file "
           "whose name has a line under its validator's key, at any path", CHECK_FAILED,
-          "FAIL: test_a_fifth_comparison_file_is_no_pin_and_its_line_is_refused "
+          "FAIL: test_another_file_is_no_pin_and_its_line_is_refused "
           "(__main__.Pinned"),
+    Fault("ties-protocol-1-pin-allowed", "py-scripts", "check_ties.py lets the comparison "
+          "validator's key pin the kept Linux day's name again, though the freeze replaced every "
+          "protocol 1 file", CHECK_FAILED,
+          "FAIL: test_no_file_may_be_pinned_as_protocol_1 (__main__.Pinned"),
     Fault("ties-stray-pin-accepted", "py-scripts", "check_ties.py lets a line in the pins file "
           "for a name PIN_NAMES does not hold pass unremarked", CHECK_FAILED,
-          "FAIL: test_a_fifth_comparison_file_is_no_pin_and_its_line_is_refused "
+          "FAIL: test_another_file_is_no_pin_and_its_line_is_refused "
           "(__main__.Pinned"),
     Fault("ties-replaced-pin-outside-folder", "py-scripts", "check_ties.py takes a file kept "
           "for the record as pinned outside a replaced/ folder", CHECK_FAILED,

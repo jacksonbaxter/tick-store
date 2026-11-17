@@ -43,9 +43,6 @@
       "decodes_cleanly": true
     }
   },
-  "protocol_1_comparison_files": {
-    "Linux-12302019-full-67ae574f5666.json": "e8d447073c29d83c2341357df8ca01fa9afaa50d4f235590d5506e0d10a41a25"
-  },
   "replaced_comparison_files": {
     "Linux-12302019-full-67ae574f5666.json": "e8d447073c29d83c2341357df8ca01fa9afaa50d4f235590d5506e0d10a41a25"
   },

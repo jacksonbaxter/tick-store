@@ -99,7 +99,7 @@ ASSEMBLED = {
 # The exact paths under results/ each validator's pin may name, written out here, apart from the
 # script's PIN_NAMES.
 PIN_NAMES = {
-    "protocol_1_comparison_files": ("compare/Linux-12302019-full-67ae574f5666.json",),
+    "protocol_1_comparison_files": (),
     "fuzz_g3_file_before_the_tie": ("fuzz-g3-ea1dde4c02e4.json",),
 }
 
@@ -442,11 +442,10 @@ class Pinned(TieTest):
         return target
 
     def test_a_pinned_file_is_reported_and_not_judged(self):
-        pins = self.pins_for("compare", "fuzz")
+        pins = self.pins_for("fuzz")
         self.change(FILE_OF["src"])
         result = run_check(REPO, "--pins", str(pins))
-        for kind, key in (("compare", "protocol_1_comparison_files"),
-                          ("fuzz", "fuzz_g3_file_before_the_tie")):
+        for kind, key in (("fuzz", "fuzz_g3_file_before_the_tie"),):
             with self.subTest(kind=kind):
                 said = result.said(FILES[kind])
                 self.assertIn(f"pinned under {key} in the pins file: measured at", said)
@@ -455,11 +454,11 @@ class Pinned(TieTest):
         # The others are judged, and refused.
         self.assertEqual(result.code, check_ties.EXIT_REFUSED)
         self.assert_measured_change(result, "store-size", FILE_OF["src"])
-        self.assertIn("10 differs", result.out)
-        self.assertIn("2 pinned", result.out)
+        self.assertIn("11 differs", result.out)
+        self.assertIn("1 pinned", result.out)
 
     def test_pinned_files_alone_pass(self):
-        pins = self.pins_for("compare", "fuzz")
+        pins = self.pins_for("fuzz")
         result = run_check(REPO, "--pins", str(pins))
         self.assertEqual(result.code, check_ties.EXIT_OK, result.err)
 
@@ -473,34 +472,46 @@ class Pinned(TieTest):
         self.assertNotIn("pinned", result.said(FILES["fuzz"]))
         self.assert_measured_change(result, "fuzz", FILE_OF["src"])
 
-    def test_a_fifth_comparison_file_is_no_pin_and_its_line_is_refused(self):
-        # Review TD-4: check_compare.py takes any SHA-256 under its key, whatever the name.
-        source = REPO / FILES["compare"]
-        fifth = REPO / "results/compare/Linux-12302019-open-0000aaaa0000.json"
-        fifth.write_bytes(source.read_bytes() + b" ")
-        self.commit_with_proofs("a fifth comparison file")
-        pins = self.pins_for("compare")
+    def test_another_file_is_no_pin_and_its_line_is_refused(self):
+        # Review TD-4: a validator's key takes any SHA-256 under it, whatever the name, so only
+        # the exact paths PIN_NAMES holds may be pinned there.
+        source = REPO / FILES["fuzz"]
+        other = REPO / "results/fuzz-g3-0000aaaa0000.json"
+        other.write_bytes(source.read_bytes() + b" ")
+        self.commit_with_proofs("another fuzz file")
+        pins = self.pins_for("fuzz")
         document = json.loads(pins.read_text(encoding="utf-8"))
-        document["protocol_1_comparison_files"][fifth.name] = hashlib.sha256(
-            fifth.read_bytes()).hexdigest()
+        document["fuzz_g3_file_before_the_tie"][other.name] = hashlib.sha256(
+            other.read_bytes()).hexdigest()
         write_json(self.dir, "pins.json", document)
         result = run_check(REPO, "--pins", str(pins))
         self.assertEqual(result.code, check_ties.EXIT_REFUSED, result.out)
+        self.assertIn("check_ties: fuzz_g3_file_before_the_tie in the pins file pins "
+                      "fuzz-g3-0000aaaa0000.json, and check_ties.py lets only "
+                      "fuzz-g3-ea1dde4c02e4.json", result.err)
+        self.assertNotIn("pinned", result.said("results/" + other.name))
+        self.assertIn("pinned under", result.said(FILES["fuzz"]))
+
+    def test_no_file_may_be_pinned_as_protocol_1(self):
+        # The freeze replaced every protocol 1 comparison file, so a line under the comparison
+        # validator's key, even for a comparison file's own name and bytes, is refused and pins
+        # nothing.
+        result = run_check(REPO, "--pins", str(self.pins_for("compare")))
+        self.assertEqual(result.code, check_ties.EXIT_REFUSED, result.out)
         self.assertIn("check_ties: protocol_1_comparison_files in the pins file pins "
-                      "Linux-12302019-open-0000aaaa0000.json, and check_ties.py lets only "
-                      "Linux-12302019-full-67ae574f5666.json", result.err)
-        self.assertNotIn("pinned", result.said("results/compare/" + fifth.name))
-        self.assertIn("pinned under", result.said(FILES["compare"]))
+                      "Linux-12302019-full-67ae574f5666.json, and check_ties.py lets no file be "
+                      "pinned there", result.err)
+        self.assertNotIn("pinned", result.said(FILES["compare"]))
 
     def test_a_pin_names_its_file_by_its_path_under_results(self):
         # The same bytes under the same name in another folder are no pinned file.
-        copy = REPO / "results/compare/old" / Path(FILES["compare"]).name
+        copy = REPO / "results/old" / Path(FILES["fuzz"]).name
         copy.parent.mkdir()
-        copy.write_bytes((REPO / FILES["compare"]).read_bytes())
+        copy.write_bytes((REPO / FILES["fuzz"]).read_bytes())
         self.commit_with_proofs("a copy elsewhere")
-        result = run_check(REPO, "--pins", str(self.pins_for("compare")))
-        self.assertIn("pinned under", result.said(FILES["compare"]))
-        self.assertNotIn("pinned", result.said("results/compare/old/" + copy.name))
+        result = run_check(REPO, "--pins", str(self.pins_for("fuzz")))
+        self.assertIn("pinned under", result.said(FILES["fuzz"]))
+        self.assertNotIn("pinned under", result.said("results/old/" + copy.name))
 
     def test_the_names_that_may_be_pinned_are_fixed(self):
         self.assertEqual(check_ties.PIN_NAMES, PIN_NAMES)
@@ -575,7 +586,7 @@ class Pinned(TieTest):
 
     def test_a_pin_holds_only_for_its_own_kind(self):
         pins = self.dir / "pins.json"
-        write_json(self.dir, "pins.json", {"protocol_1_comparison_files": {
+        write_json(self.dir, "pins.json", {"fuzz_g3_file_before_the_tie": {
             "store-size-12302019.json": hashlib.sha256(
                 (REPO / FILES["store-size"]).read_bytes()).hexdigest()}})
         self.change(FILE_OF["src"])

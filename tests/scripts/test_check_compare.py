@@ -30,11 +30,12 @@ SCRATCH_ROOT = REPO_ROOT / "build" / "test_check_compare"
 # a file that states no protocol is valid only from those (review RF-1).
 COMMIT = "67ae574f566674b883e9199b375f88e12dbeeeca"
 OTHER_COMMIT = "0123456789abcdef0123456789abcdef01234567"
-# What check_compare.py says of a file that states no protocol and is not one of the committed
-# protocol 1 files, pinned by their SHA-256 (review RV-6).
-PROTOCOL_1_UNPINNED = ("header.protocol: none stated, and only the committed files measured "
-                       "before protocol 2, each pinned by its SHA-256 under "
-                       "protocol_1_comparison_files in scripts/data_pins.json, may state none")
+# What check_compare.py says of a file that states no protocol and whose name the pins file does
+# not pin to the SHA-256 of its bytes (reviews RV-6 and RF-1).
+PROTOCOL_1_UNPINNED = ("header.protocol: none stated, and a file may state none only if the "
+                       "pins file pins its name to the SHA-256 of its bytes under "
+                       "protocol_1_comparison_files, which scripts/data_pins.json does for no "
+                       "file")
 SHA = "ab" * 32
 MESSAGES = 1000
 BYTES = 20000
@@ -1937,6 +1938,35 @@ class Protocol2(Harness):
                                          str(path)],
                                         check=False, capture_output=True, text=True)
                 self.assertEqual(result.returncode, code, result.stderr)
+        self.assertIn(PROTOCOL_1_UNPINNED, result.stderr)
+
+    def test_a_protocol_1_pin_holds_only_under_its_own_name(self):
+        # The same bytes under another name are no pinned file: a pin is a name and the SHA-256
+        # of its bytes together, never the bytes alone.
+        committed = self.directory / f"macOS-{SLICE}-{COMMIT[:12]}.json"
+        committed.write_text(json.dumps(valid_document("macOS")), encoding="utf-8")
+        pin_protocol_1(self.pins, self.directory)
+        renamed = self.directory / "again" / f"macOS-{SLICE}-{OTHER_COMMIT[:12]}.json"
+        renamed.parent.mkdir()
+        renamed.write_bytes(committed.read_bytes())
+        for path, code in ((committed, 0), (renamed, 1)):
+            with self.subTest(path=path.name):
+                result = self.validated([sys.executable, "-I", str(SCRIPT), "--pins",
+                                         str(self.pins), "--capacity", str(self.capacity),
+                                         str(path)])
+                self.assertEqual(result.returncode, code, result.stderr)
+        self.assertIn(PROTOCOL_1_UNPINNED, result.stderr)
+
+    def test_the_pins_file_pins_no_protocol_1_file(self):
+        # The freeze replaced every committed protocol 1 file, so every file that states no
+        # protocol is refused here (docs/TASKS.md).
+        pins = json.loads((REPO_ROOT / "scripts" / "data_pins.json").read_text(encoding="utf-8"))
+        self.assertNotIn("protocol_1_comparison_files", pins)
+        kept = REPO_ROOT / "results" / "compare" / "replaced" / \
+            "Linux-12302019-full-67ae574f5666.json"
+        result = self.validated([sys.executable, "-I", str(SCRIPT), "--capacity",
+                                 str(self.capacity), str(kept)])
+        self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn(PROTOCOL_1_UNPINNED, result.stderr)
 
     def test_a_document_declaring_protocol_1(self):
