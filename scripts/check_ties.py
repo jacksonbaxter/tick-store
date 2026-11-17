@@ -16,10 +16,17 @@ git's tree content:
   - its MEASURED paths, what was built and run when the figure was taken, between that commit
     and the working tree: HEAD and anything not yet committed, new files included, as
     check_fuzz.py ties G-3's file, whose tie this shares (its TIED_PATHS are the fuzz kind's);
-  - its ASSEMBLED paths, what turned the run's raw output into the file afterwards, and the
-    committed results it copies, between the last commit that wrote the file and the tree:
-    an assembler may run after the commit the file names, as scripts/diag_summary.py, which
-    did not exist at the freeze commit, does for the diagnostic runs made there;
+  - its ASSEMBLED paths, what turned the run's raw output into the file afterwards, between
+    the last commit that wrote the file and the tree: an assembler may run after the commit
+    the file names, as scripts/diag_summary.py, which did not exist at the freeze commit, does
+    for the diagnostic runs made there;
+  - the committed results it copies figures from, READS, between the same two: not their
+    bytes but the fields its assembler reads of them, each a JSON path written out below
+    beside the assembler's lines, compared by value. A reassembly that reads the same values
+    writes the same bytes, which cannot be committed again, so a tie on the input's bytes
+    could never be met once the input changed in a field nothing reads. A file reads the
+    fields past the selecting one only where the input's selecting value is the file's own,
+    as a store-size file reads the capacity file's systems only on the capacity file's day;
   - the input pins of scripts/data_pins.json, its `days` and `slices`, which every run on real
     data verifies its input against, member by member, so the exemption pins beside them, which
     change nothing that runs, do not count.
@@ -110,12 +117,28 @@ COMMIT_IT_FIRST = "commit it first"
 
 
 @dataclass(frozen=True)
+class Reads:
+    """A committed results file an assembler copies figures from, and what it reads of it, each
+    a JSON path: `select`, the field every assembly reads to decide whether it reads more;
+    `own`, where the assembled file states the value that decides it ("*" for every item of a
+    list); and `fields`, the fields read where the input's `select` value is one of the file's
+    own. A path that names a table or a list stands for all of it."""
+    input: str
+    reason: str
+    select: tuple
+    own: tuple
+    fields: tuple
+
+
+@dataclass(frozen=True)
 class Kind:
     """One kind of results file: the files, by pattern relative to results/; the paths that
     were built and run when its figure was taken, compared with the commit it names, and those
     that assembled it, compared with the last commit that wrote it, as (pathspec, reason); the
-    data_pins.json members its runs read; what is excluded from the paths, and what is left out
-    of them, as (path, reason); and the pins file's key that may declare one."""
+    committed results it copies figures from, as Reads, compared by the fields read with that
+    same commit; the data_pins.json members its runs read; what is excluded from the paths,
+    and what is left out of them, as (path, reason); and the pins file's key that may declare
+    one."""
     name: str
     files: tuple
     measured: tuple
@@ -124,6 +147,7 @@ class Kind:
     excluded: tuple = ()
     left_out: tuple = ()
     pin: str = None
+    reads: tuple = ()
 
 
 PINS_FILE = "scripts/data_pins.json"
@@ -181,8 +205,32 @@ BUILD_PRESET = ("scripts/build_preset.py", "names the preset that configured the
                                            "the tools ran from")
 STORE_RESULTS = ("scripts/store_results.py", "assembles the round-trip and store-size files "
                                              "from the runs' raw output and exit statuses")
-CAPACITY = ("results/fullday-capacity-12302019.json", "a committed result this file copies "
-                                                      "figures from: CR-2's stored bytes")
+CAPACITY_FILE = "results/fullday-capacity-12302019.json"
+# What scripts/store_results.py reads of the capacity file, in assemble()'s CR-2 block
+# (store_results.py:303-314): `capacity.get("day") == day`, the day it assembles, which the
+# store-size file states as "day"; then, on that day only, for each of CR2_SYSTEMS,
+# capacity["systems"][name]'s "variant", "stored_bytes" and "outcome". On any other day it reads
+# nothing more, so the second day's file, CR-2 "no comparison", is tied to the day alone.
+STORE_RESULTS_READS = Reads(
+    CAPACITY_FILE, "store_results.py copies CR-2's stored bytes, with each system's variant and "
+                   "outcome, into the file of the capacity file's day",
+    select=("day",), own=("day",),
+    fields=(("systems", "parquet", "variant"), ("systems", "parquet", "stored_bytes"),
+            ("systems", "parquet", "outcome"),
+            ("systems", "arcticdb", "variant"), ("systems", "arcticdb", "stored_bytes"),
+            ("systems", "arcticdb", "outcome"),
+            ("systems", "questdb", "variant"), ("systems", "questdb", "stored_bytes"),
+            ("systems", "questdb", "outcome")))
+# What scripts/store_estimate.py reads of it, in judge() (store_estimate.py:215-218):
+# `capacity["day"] == day` for each day the estimate costs, which it states as "day" in each
+# item of "days"; then, on that day only, capacity["systems"][name]["stored_bytes"] for each of
+# CR2_SYSTEMS.
+STORE_ESTIMATE_READS = Reads(
+    CAPACITY_FILE, "store_estimate.py judges the estimate of the capacity file's day against "
+                   "each system's stored bytes",
+    select=("day",), own=("days", "*", "day"),
+    fields=(("systems", "parquet", "stored_bytes"), ("systems", "arcticdb", "stored_bytes"),
+            ("systems", "questdb", "stored_bytes")))
 # The input pins a run on real data verifies its input against, read by bench/CMakeLists.txt,
 # run_bench.py, compare/layout.py and fetch_data.py. The pins file's other keys exempt
 # committed files from validator rules, and change nothing that runs.
@@ -265,7 +313,8 @@ KINDS = (
                    VALIDATORS, RENDER, PROSE, TESTS_UNIT, OTHER_BUILDS, FETCH)),
     Kind("store-size", ("store-size-*.json",),
          measured=(*BUILT, TOOLS),
-         assembled=(STORE_RESULTS, BUILD_PRESET, CAPACITY),
+         assembled=(STORE_RESULTS, BUILD_PRESET),
+         reads=(STORE_RESULTS_READS,),
          pin_members=INPUT_PINS,
          excluded=PROSE_IN_PATHS,
          left_out=(("scripts/g2_plan.py", "G-2's planner, which the store-size figures do not "
@@ -276,8 +325,8 @@ KINDS = (
          assembled=(("scripts/store_estimate.py", "computes the estimate from the codec "
                                                   "evaluation files"),
                     ("results/codec-eval-*.json", "the committed results it costs, so a "
-                                                  "re-measured evaluation makes it stale"),
-                    CAPACITY[:1] + ("the stored bytes it judges the estimate against",)),
+                                                  "re-measured evaluation makes it stale")),
+         reads=(STORE_ESTIMATE_READS,),
          pin_members=INPUT_PINS,
          excluded=PROSE_IN_PATHS,
          left_out=(VALIDATORS, RENDER, PROSE, TESTS_UNIT, OTHER_BUILDS, FETCH)),
@@ -510,15 +559,93 @@ def written_at(repo, path):
     return commit, None
 
 
-def assembled_changes(repo, path, kind):
+# A key a document does not have, which equals only itself.
+MISSING = object()
+
+
+def field_of(document, path):
+    """The value at a JSON path of keys, or MISSING."""
+    for key in path:
+        if not isinstance(document, dict) or key not in document:
+            return MISSING
+        document = document[key]
+    return document
+
+
+def values_of(document, path):
+    """Every value at a JSON path in which "*" stands for each item of a list."""
+    found = [document]
+    for key in path:
+        found = [item for value in found for item in
+                 (value if key == "*" and isinstance(value, list) else
+                  [value[key]] if key != "*" and isinstance(value, dict) and key in value
+                  else [])]
+    return found
+
+
+def same_value(first, second):
+    """Equal as JSON, a number's type included; a missing key equals only a missing key."""
+    if first is MISSING or second is MISSING:
+        return first is second
+    return json.dumps(first, sort_keys=True) == json.dumps(second, sort_keys=True)
+
+
+def dotted(path):
+    return ".".join(path)
+
+
+def document_at(repo, commit, name):
+    """A committed results file as of a commit, or MISSING if that commit has none."""
+    if not run_git(repo, "ls-tree", "--name-only", commit, "--", name).stdout.strip():
+        return MISSING
+    shown = run_git(repo, "show", f"{commit}:{name}").stdout
+    try:
+        return json.loads(shown)
+    except json.JSONDecodeError as error:
+        raise Refusal(f"{name} at {commit[:12]} is not JSON: {error}") from None
+
+
+def read_changes(repo, base, document, kind):
+    """Each committed result the kind's assembler copies figures from, with the fields it reads
+    whose value differs between base, the commit that last wrote the file, and the tree."""
+    changed = []
+    for reads in kind.reads:
+        before = document_at(repo, base, reads.input)
+        try:
+            now = json.loads((Path(repo) / reads.input).read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            now = MISSING
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise Refusal(f"cannot read {reads.input}: {error}") from None
+        if before is MISSING or now is MISSING:
+            if before is not now:
+                changed.append(f"{reads.input} ({'added' if before is MISSING else 'removed'})")
+            continue
+        selected = field_of(before, reads.select)
+        if not same_value(selected, field_of(now, reads.select)):
+            moved = [dotted(reads.select)]
+        elif selected is not MISSING and any(same_value(selected, own) for own in
+                                             values_of(document, reads.own)):
+            moved = [dotted(path) for path in reads.fields
+                     if not same_value(field_of(before, path), field_of(now, path))]
+        else:
+            moved = []
+        if moved:
+            changed.append(f"{reads.input} ({', '.join(moved)})")
+    return changed
+
+
+def assembled_changes(repo, path, kind, document):
     """(base, changed, why): what assembled the file that differs since the commit that wrote
-    it, or why that cannot be compared."""
-    if not kind.assembled:
+    it, its assemblers' paths and the fields they read of the results it copies, or why that
+    cannot be compared."""
+    if not kind.assembled and not kind.reads:
         return None, [], None
     base, why = written_at(repo, path)
     if base is None:
         return None, [], why
-    return base, changed_paths(repo, base, pathspecs(kind.assembled, ())), None
+    return base, (changed_paths(repo, base, pathspecs(kind.assembled, ()))
+                  + read_changes(repo, base, document, kind)), None
 
 
 def pinned(kind, name, data, pins):
@@ -636,11 +763,12 @@ def judge(repo, path, name, pins, history):
                             f"{shown(changed)}. Measure it again at this code")
         else:
             same.append(commit[:12])
-    links = links_in(repo, specs) + links_in(repo, pathspecs(kind.assembled, ()))
+    links = links_in(repo, specs) + links_in(repo, pathspecs(
+        (*kind.assembled, *((reads.input, reads.reason) for reads in kind.reads)), ()))
     if links:
         refusals.append(f"{shown(links)}: a symbolic link git tracks in what it measures, "
                         "whose target's content the comparison does not see")
-    base, changed, why = assembled_changes(repo, path, kind)
+    base, changed, why = assembled_changes(repo, path, kind, document)
     if why:
         unjudged.append(f"not judged against what assembled it: {why}")
     elif changed:
@@ -652,7 +780,7 @@ def judge(repo, path, name, pins, history):
         return Verdict("differs", [f"{problem} ({kind.name})" for problem in problems])
     if unjudged:
         return Verdict("unjudged", [f"{line} ({kind.name})" for line in unjudged])
-    if not kind.measured and not kind.assembled:
+    if not kind.measured and not kind.assembled and not kind.reads:
         return Verdict("same", [f"ok, names {', '.join(same)}, which HEAD's history holds; "
                                 f"nothing tracked builds, runs or writes it ({kind.name})"])
     return Verdict("same", [f"ok, nothing it measures changed since {', '.join(same)} "
@@ -684,6 +812,10 @@ def table():
                          "pins its runs verify their input against")
         for path, why in kind.assembled:
             lines.append(f"  assembled  {path}: {why}")
+        for reads in kind.reads:
+            lines.append(f"  reads      {reads.input}: {dotted(reads.select)}; where it is the "
+                         f"file's {dotted(reads.own)}, {', '.join(map(dotted, reads.fields))}: "
+                         f"{reads.reason}")
         for path, why in kind.excluded:
             lines.append(f"  excluded   {path}: {why}")
         for path, why in kind.left_out:

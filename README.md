@@ -214,7 +214,14 @@ that fails, naming it: a missing object, a `.git` git cannot read, a folder insi
 given as the checkout, or a results folder outside it. A pin names its file by its exact path
 under `results/`, from a set fixed in the script, and a line in the pins file for any other name
 is refused. A results file not committed as it is is not judged against what assembled it, but
-told to be committed first, a skip, which `--no-skips` fails. What it does not check: what
+told to be committed first, a skip, which `--no-skips` fails. A committed result that another
+file copies figures from ties that file through the fields its assembler reads, compared by
+value, not through its bytes: the store-size files and the store estimate read the capacity
+file's day and, on that day only, each compared system's stored bytes (with the variant and
+outcome, for the store-size file). Each field is a JSON path written out in the script beside
+the assembler's lines, and a test runs each assembler on a probe that notes every key it reads.
+A moved field unties the file, a field nothing reads does not, and the second day's store-size
+file is tied to the day alone. What it does not check: what
 assembled a file is compared with the last commit that wrote the file, so any later commit of
 the file, by hand or not, resets that comparison, and nothing shows the bytes are what the
 assembler wrote; a new file this checkout's own excludes hide is not seen; and it compares the

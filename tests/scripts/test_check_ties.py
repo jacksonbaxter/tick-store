@@ -31,8 +31,11 @@ SCRIPT = REPO_ROOT / "scripts" / "check_ties.py"
 SCRATCH_ROOT = REPO_ROOT / "build" / "test_check_ties"
 
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
+sys.path.insert(0, str(REPO_ROOT / "tests" / "scripts"))
 import check_ties  # noqa: E402
 import render_results  # noqa: E402
+import store_estimate  # noqa: E402
+import test_store_results as store_fixture  # noqa: E402
 
 # One file for each path a kind measures or is assembled by, and some no kind does.
 FILE_OF = {
@@ -88,10 +91,8 @@ ASSEMBLED = {
     "codec-eval": {"scripts/codec_eval_results.py", "scripts/build_preset.py",
                    "scripts/store_results.py"},
     "roundtrip": {"scripts/store_results.py", "scripts/build_preset.py"},
-    "store-size": {"scripts/store_results.py", "scripts/build_preset.py",
-                   "results/fullday-capacity-12302019.json"},
-    "store-estimate": {"scripts/store_estimate.py", "results/codec-eval-12302019.json",
-                       "results/fullday-capacity-12302019.json"},
+    "store-size": {"scripts/store_results.py", "scripts/build_preset.py"},
+    "store-estimate": {"scripts/store_estimate.py", "results/codec-eval-12302019.json"},
     "diag": {"scripts/diag_summary.py"},
     "fuzz": {"scripts/fuzz_results.py", "scripts/fuzz_host.py", "scripts/build_preset.py",
              "scripts/check_fuzz.py"},
@@ -113,13 +114,18 @@ def results_of(commit):
                     {"header": {"commit": commit}, "variant_selection": {
                         "source_commit": commit}}),
         "capacity": ("fullday-capacity-12302019.json",
-                     {"systems": {"parquet": {"commit": commit},
-                                  "questdb": {"commit": commit}}}),
+                     {"label": "a capacity check", "day": "12302019", "systems": {
+                         name: {"commit": commit, "variant": f"{name}-v", "stored_bytes": size,
+                                "outcome": "finished", "wall_seconds": {"whole_run": 1}}
+                         for name, size in (("parquet", 3000), ("arcticdb", 6000),
+                                            ("questdb", 20000), ("questdb_class_a", 21000))}}),
         "census": ("census-12302019.json", {"commit": commit[:7]}),
         "codec-eval": ("codec-eval-12302019.json", {"commit": commit[:12]}),
         "roundtrip": ("roundtrip-10302019.json", {"commit": commit[:7]}),
-        "store-size": ("store-size-12302019.json", {"commit": commit[:7]}),
-        "store-estimate": ("store-estimate.json", {"days": [{"commit": commit[:12]}]}),
+        "store-size": ("store-size-12302019.json", {"commit": commit[:7], "day": "12302019"}),
+        "store-estimate": ("store-estimate.json", {"days": [
+            {"commit": commit[:12], "day": "12302019"},
+            {"commit": commit[:12], "day": "10302019"}]}),
         "coverage": ("coverage.json", {"commit": commit[:12]}),
         "diag": ("diag/writer-profile-12302019-x.json", {"commit": commit}),
         "fuzz": ("fuzz-g3-ea1dde4c02e4.json", {"header": {"commit": commit},
@@ -910,6 +916,201 @@ class Usage(TieTest):
         self.assertIn(f"what it measures changed since: {PINS} (slices)", said)
 
 
+CAPACITY = "results/fullday-capacity-12302019.json"
+SECOND_DAY = "results/store-size-10302019.json"
+
+
+class ReadFields(TieTest):
+    """The capacity file ties the store-size files and the store estimate through the fields
+    their assemblers read of it, compared by value, not through its bytes."""
+
+    def setUp(self):
+        super().setUp()
+        write_json(REPO, SECOND_DAY, {"commit": CODE[:7], "day": "10302019"})
+        self.commit_with_proofs("the second day's store-size file")
+        self.base = git(REPO, "rev-parse", "HEAD")
+
+    def move(self, *changes):
+        """Commits the capacity file with each (path, value) set, then runs the check."""
+        document = json.loads((REPO / CAPACITY).read_text(encoding="utf-8"))
+        for path, value in changes:
+            here = document
+            for key in path[:-1]:
+                here = here[key]
+            here[path[-1]] = value
+        write_json(REPO, CAPACITY, document)
+        self.commit_with_proofs("the capacity file measured again")
+        return run_check()
+
+    def assert_tied(self, result, *names):
+        for name in names:
+            self.assertIn("ok, nothing it measures changed since", result.said(name), name)
+
+    def assert_moved(self, result, name, field):
+        said = result.said(name)
+        self.assertIn(f"what assembled it changed since: {CAPACITY} (", said, name)
+        self.assertIn(field, said.split(f"{CAPACITY} (", 1)[1].split(")", 1)[0], name)
+
+    def test_fields_nothing_reads_may_move(self):
+        result = self.move((("label",), "measured again"),
+                           (("systems", "parquet", "wall_seconds"), {"whole_run": 2}),
+                           (("systems", "questdb_class_a", "stored_bytes"), 1))
+        self.assertEqual(result.code, check_ties.EXIT_OK, result.err)
+        self.assert_tied(result, FILES["store-size"], SECOND_DAY, FILES["store-estimate"],
+                         FILES["capacity"])
+
+    def test_each_read_field_that_moves_unties_the_files_that_read_it(self):
+        size, estimate = check_ties.STORE_RESULTS_READS, check_ties.STORE_ESTIMATE_READS
+        for path in dict.fromkeys(size.fields + estimate.fields):
+            with self.subTest(field=".".join(path)):
+                result = self.move((path, "moved"))
+                git(REPO, "reset", "-q", "--hard", self.base)
+                self.assertEqual(result.code, check_ties.EXIT_REFUSED, result.out)
+                self.assert_moved(result, FILES["store-size"], ".".join(path))
+                if path in estimate.fields:
+                    self.assert_moved(result, FILES["store-estimate"], ".".join(path))
+                else:
+                    self.assert_tied(result, FILES["store-estimate"])
+                # The second day's file reads no system: its day is not the capacity file's.
+                self.assert_tied(result, SECOND_DAY)
+
+    def test_a_moved_day_unties_every_file_that_compares_it(self):
+        result = self.move((("day",), "10302019"))
+        for name in (FILES["store-size"], SECOND_DAY, FILES["store-estimate"]):
+            self.assert_moved(result, name, "day")
+
+    def test_a_number_of_another_type_is_a_move(self):
+        result = self.move((("systems", "questdb", "stored_bytes"), 20000.0))
+        self.assert_moved(result, FILES["store-size"], "systems.questdb.stored_bytes")
+
+    def test_the_files_assembled_again_after_a_move_are_tied(self):
+        self.move((("systems", "parquet", "stored_bytes"), 3001))
+        for name in (FILES["store-size"], FILES["store-estimate"]):
+            document = json.loads((REPO / name).read_text(encoding="utf-8"))
+            document["assembled_again"] = True
+            write_json(REPO, name, document)
+        self.commit_with_proofs("assembled again")
+        result = run_check()
+        self.assertEqual(result.code, check_ties.EXIT_OK, result.err)
+        self.assert_tied(result, FILES["store-size"], SECOND_DAY, FILES["store-estimate"])
+
+    def test_a_removed_capacity_file_unties_them(self):
+        git(REPO, "rm", "-q", CAPACITY)
+        self.commit_with_proofs("the capacity file removed")
+        said = run_check().said(FILES["store-size"])
+        self.assertIn(f"{CAPACITY} (removed)", said)
+
+
+class Recording(dict):
+    """A probe document that notes each key path its reader takes; iterating a table notes
+    "*" under it, a read of all of it."""
+
+    def __init__(self, document, log, path=()):
+        super().__init__({key: Recording(value, log, path + (key,))
+                          if isinstance(value, dict) else value
+                          for key, value in document.items()})
+        self.log, self.path = log, path
+
+    def __getitem__(self, key):
+        self.log.add(self.path + (key,))
+        return super().__getitem__(key)
+
+    def get(self, key, default=None):
+        self.log.add(self.path + (key,))
+        return super().get(key, default)
+
+    def __contains__(self, key):
+        self.log.add(self.path + (key,))
+        return super().__contains__(key)
+
+    def every(self):
+        self.log.add(self.path + ("*",))
+
+    def __iter__(self):
+        self.every()
+        return super().__iter__()
+
+    def keys(self):
+        self.every()
+        return super().keys()
+
+    def values(self):
+        self.every()
+        return super().values()
+
+    def items(self):
+        self.every()
+        return super().items()
+
+
+def probe_capacity(log):
+    """A capacity file with every field the committed one has a kind of, and more systems than
+    CR-2 compares."""
+    return Recording({"measurement": "probe", "label": "probe", "day": "12302019",
+                      "host": {"cpu": "probe", "mem_total_bytes": 1},
+                      "method": {"guard": {"sample_seconds": 2}}, "export": {"records": 1},
+                      "questdb_heap_verdict": {"verdict": "adequate"},
+                      "systems": {name: {"variant": f"{name}-v", "stored_bytes": 10 ** 12,
+                                         "outcome": "finished", "commit": "0" * 40,
+                                         "rows": {"expected": 1}}
+                                  for name in ("parquet", "arcticdb", "questdb",
+                                               "questdb_class_a")}}, log)
+
+
+def read_paths(log):
+    """The paths read to their end: each path no other read path goes on from."""
+    return {path for path in log
+            if not any(len(other) > len(path) and other[:len(path)] == path for other in log)}
+
+
+class ReadsAreWhatTheAssemblersRead(unittest.TestCase):
+    """Each assembler's own reading runs on a probe capacity file that notes every key it
+    takes: store_results.assemble on the store-size tests' raw folder, store_estimate.judge
+    as estimate() calls it. What it reads must be exactly what check_ties.py lists, on the
+    capacity file's day and on another, so a field an assembler starts reading, or stops
+    reading, fails here."""
+
+    def expected(self, reads, its_day):
+        return {reads.select, *reads.fields} if its_day else {reads.select}
+
+    def test_store_results_reads_the_fields_the_store_size_kind_lists(self):
+        fixture = store_fixture.StoreResults("test_sizes_ratio_and_verdicts")
+        fixture.setUp()
+        self.addCleanup(fixture.tearDown)
+        reads = check_ties.STORE_RESULTS_READS
+        for day in ("12302019", "10302019"):
+            with self.subTest(day=day):
+                log = set()
+                _, size = store_fixture.results.assemble(fixture.dir, day, "abc1234", "macOS",
+                                                         probe_capacity(log), fixture.build)
+                self.assertEqual(read_paths(log), self.expected(reads, day == "12302019"))
+                self.assertEqual(check_ties.values_of(size, reads.own), [day])
+
+    def test_store_estimate_reads_the_fields_the_store_estimate_kind_lists(self):
+        reads = check_ties.STORE_ESTIMATE_READS
+        for day in ("12302019", "10302019"):
+            with self.subTest(day=day):
+                log = set()
+                store_estimate.judge(day, 1000, {"days": {}}, probe_capacity(log))
+                self.assertEqual(read_paths(log), self.expected(reads, day == "12302019"))
+
+    def test_the_committed_files_state_their_days_where_the_lists_say(self):
+        for name, reads in (("store-size-12302019.json", check_ties.STORE_RESULTS_READS),
+                            ("store-size-10302019.json", check_ties.STORE_RESULTS_READS),
+                            ("store-estimate.json", check_ties.STORE_ESTIMATE_READS)):
+            with self.subTest(name=name):
+                document = json.loads((REPO_ROOT / "results" / name).read_text(
+                    encoding="utf-8"))
+                self.assertTrue(check_ties.values_of(document, reads.own))
+
+    def test_the_capacity_file_ties_by_its_fields_and_never_by_its_bytes(self):
+        kinds = {kind.name: kind for kind in check_ties.KINDS}
+        self.assertEqual(kinds["store-size"].reads, (check_ties.STORE_RESULTS_READS,))
+        self.assertEqual(kinds["store-estimate"].reads, (check_ties.STORE_ESTIMATE_READS,))
+        for kind in check_ties.KINDS:
+            self.assertNotIn(CAPACITY, [path for path, _ in kind.assembled], kind.name)
+
+
 class Repository(unittest.TestCase):
     def test_every_committed_results_file_has_a_kind_and_names_a_commit(self):
         for path in sorted(p for p in (REPO_ROOT / "results").rglob("*") if p.is_file()):
@@ -934,6 +1135,9 @@ class Repository(unittest.TestCase):
             for path, why in (*kind.measured, *kind.assembled, *kind.excluded, *kind.left_out):
                 with self.subTest(kind=kind.name, path=path):
                     self.assertTrue(path and len(why) > 20)
+            for reads in kind.reads:
+                with self.subTest(kind=kind.name, path=reads.input):
+                    self.assertTrue(len(reads.reason) > 20 and reads.fields)
 
     def test_the_fuzz_kind_is_check_fuzz_s_tie(self):
         import check_fuzz
