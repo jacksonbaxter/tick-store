@@ -172,6 +172,37 @@ is not judged, naming how many tokens wait, which is a failure under `--no-skips
 exists, a missing file or a page that differs from a fresh render fails. What it does not check is
 that the prose is true beyond its figures and verdicts: a sentence can misread a right figure, and
 a number written in words is not seen.
+`render_writeup.py` holds the essay to `docs/writeup/figures.json`, its figure list; the
+template, the page and `scripts/targets.json` are fixed in the script, not chosen by the list. No
+digit stands in `docs/writeup/WRITEUP.template.md` outside a token of the list, a host's name or a
+text the list declares no result, with its reason and the places it may stand, and a declared text
+holding a number with a unit is refused. A token names its results file by kind and host, by a
+pattern under `results/` with one `*` where the commit goes, so a file measured again still
+resolves and two files of a kind stop the render. Every value reaches a results file, a count of
+the tree, a constant read from the code with its comments blanked, or a bar; a number written into
+the list must be one of its declared factors, such as bytes in a GB. A token may not read what its
+results file lists as not established, as a diagnostic summary lists what its run's raw output
+did not show. A verdict is
+`render_results.py`'s own; a bar is the target's value, shown exactly with its sign; a target's
+figure is the row's own part, printed on the same side of its bar as its verdict; and a gap is
+never printed as none. Every file a token reads names one measured commit, but for the exceptions
+the list declares with their reasons, which the essay names through a generated token; an
+exception's claim to differ from that commit only in some paths is put to `git diff`, and is not
+judged in a tree with no history. A file under a pin of `scripts/data_pins.json` is read only
+through a kind that declares the pin, and each paragraph showing its figures says so. A word that
+compares, ranks or judges, or a number in words, must sit inside a claim of the list whose
+condition reads the figures its sentence prints, or be carried by a token; the Missed targets and
+Not judged sections hold exactly the rows of those verdicts; a verdict the replaced run judged
+otherwise is shown with both outcomes and rests no claim. A figure read on one host must be
+described as that host's. The essay must run 2,500 to 4,000 words and open with one paragraph of
+three sentences, each holding a token. Until every file it reads is committed there is no
+`WRITEUP.md`, and the step is not judged, naming how many tokens and checks wait and on what, which
+is a failure under `--no-skips`; once the page exists, a missing file or a page that differs from
+a fresh render fails. What it does not check is that the prose is true beyond its figures, claims
+and verdicts: a sentence that misleads with no judging word, a verdict token set beside the wrong
+target, a line of the list that misdescribes what its entry reads, a number after a letter, as in
+a version, and the content of the profiler and counter summaries in `results/diag/`, which no
+separate validator re-reads, would all pass.
 
 `check_ties.py` examines every file under `results/`, and fails one of no kind. It refuses a
 commit not in HEAD's history, a symbolic link git tracks in a compared path, and any git command
