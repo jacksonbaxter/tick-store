@@ -9,6 +9,7 @@ hide: a failed step gives a non-zero exit and is named, the steps after it still
 skip is never counted as a pass.
 """
 
+import fnmatch
 import json
 import os
 import re
@@ -264,6 +265,57 @@ class CheckScript(unittest.TestCase):
         # A build is named by the steps that need it, and check.sh adds it.
         tests = {step for step in steps if not step.endswith("-build")}
         self.assertEqual(sorted(tests - named), [])
+
+    # The fixed grid's, the named seeds' and their scalar-capped tests re-run the fuzz oracles
+    # on fixed inputs: the unit and asan-ubsan steps run them all on each host, and the tsan
+    # step and scripts/coverage.sh leave them out, FuzzOracles and the rest still in.
+    RERUNS = ("Grid/OracleGrid.PassTheWholeCheck/ranked_pfor_none_scaled_1048576",
+              "FuzzRegression/BoundSeeds.PassTheWholeCheck/pfor",
+              "FuzzRegression/BoundSeeds.CountWhatTheTableGivesThem/run_length",
+              "simd_capped_to_scalar_bound_seed_pfor", "simd_capped_to_scalar_bound_seeds")
+    KEPT = ("FuzzOracles.PassEveryCutAndFlipOfAnItchStore", "simd_capped_to_scalar_fuzz_oracles",
+            "FuzzRegression.PforCrashersStayFixed", "simd_capped_to_scalar_store",
+            "simd_capped_to_scalar_partition", "ItchStoreCorrupt.StoreSectionFields")
+
+    def test_only_the_tsan_step_leaves_out_the_oracle_reruns(self):
+        # cmake and ctest stand-ins that record how each test step calls ctest.
+        tools = self.logs / "tools"
+        tools.mkdir()
+        calls = self.logs / "calls"
+        for tool, says in (("cmake", ""), ("ctest", "100% tests passed, 0 tests failed out of 1")):
+            (tools / tool).write_text(f'#!/bin/sh\nfor a in "$@"; do printf \'%s\\n\' "$a"; '
+                                      f'done >>"{calls}.{tool}"\necho >>"{calls}.{tool}"\n'
+                                      f'echo "{says}"\n')
+            (tools / tool).chmod(0o755)
+        env = dict(self.env, PATH=f"{tools}{os.pathsep}{self.env['PATH']}")
+        done = self.run_script("--only", "dev-test,asan-test,tsan-test", env=env)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        runs = {}
+        for run in Path(f"{calls}.ctest").read_text().split("\n\n"):
+            arguments = run.splitlines()
+            if not arguments:
+                continue
+            runs[arguments[arguments.index("--preset") + 1]] = arguments
+        self.assertEqual(sorted(runs), ["asan-ubsan", "dev", "tsan"])
+        for preset in ("dev", "asan-ubsan"):
+            self.assertNotIn("-E", runs[preset], preset)
+        left_out = runs["tsan"][runs["tsan"].index("-E") + 1]
+        for name in self.RERUNS:
+            self.assertRegex(name, left_out)
+        for name in self.KEPT:
+            self.assertNotRegex(name, left_out)
+
+    def test_coverage_leaves_out_the_oracle_reruns(self):
+        script = (REPO_ROOT / "scripts" / "coverage.sh").read_text()
+        self.assertIn('"$BINARY" --gtest_filter="$FILTER"', script)
+        gtest_filter = re.search(r"^FILTER='([^']*)'$", script, re.MULTILINE)[1]
+        self.assertTrue(gtest_filter.startswith("-"), gtest_filter)
+        patterns = gtest_filter[1:].split(":")
+        left_out = lambda name: any(fnmatch.fnmatchcase(name, p) for p in patterns)  # noqa: E731
+        for name in self.RERUNS[:3]:
+            self.assertTrue(left_out(name), name)
+        for name in self.KEPT:
+            self.assertFalse(left_out(name), name)
 
 
 if __name__ == "__main__":

@@ -1862,6 +1862,10 @@ FAULTS = (
           "when the essay could not be judged", CHECK_FAILED,
           "FAIL: test_check_sh_reports_not_judged_as_a_skip_and_a_failure_under_no_skips "
           "(__main__.NotJudged"),
+    Fault("check-sh-asan-leaves-out-the-oracle-reruns", "py-scripts", "check.sh's asan-ubsan "
+          "step leaves out the fixed grid and the named seeds' tests, as the tsan step does",
+          CHECK_FAILED, "FAIL: test_only_the_tsan_step_leaves_out_the_oracle_reruns "
+          "(__main__.CheckScript"),
     Fault("writeup-verdict-own-code", "py-scripts", "render_writeup.py words a verdict by its "
           "own rule, apart from render_results.py's verdict_class", CHECK_FAILED,
           "FAIL: test_the_verdict_is_render_results_own_code (__main__.Renders"),

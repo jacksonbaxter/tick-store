@@ -502,6 +502,19 @@ named seeds and on everything else it runs.
 - Query files past 450M of work in either measure are only opened; past the cap only asked and
   compared; past the budget, 365M, the repeat ask takes 2 of the 16 requests.
 
+**Which steps run the grid and the named seeds' tests.** The fixed grid (`Grid/OracleGrid.*`,
+144 tests), the named seeds' tests (`FuzzRegression/BoundSeeds.*`, 62) and the named seeds'
+scalar-capped parts (`simd_capped_to_scalar_bound_seed*`, 7) run in full in `check.sh`'s
+`dev-test` and `asan-test` steps, CI's unit and asan-ubsan jobs, on each host. The `tsan-test`
+step leaves all three out (`TSAN_LEAVES_OUT` in `check.sh`), and `scripts/coverage.sh`, which runs
+the unit binary once rather than through ctest, leaves out the first two; both still run
+`FuzzOracles.*`, the rest of `FuzzRegression` and every other test. These tests are
+single-threaded re-runs of the fuzz oracles on fixed inputs, each already run in full under the
+plain build and under AddressSanitizer and UBSan, and they are what took the Linux tsan and
+coverage jobs from 16 and 9 minutes to over 55. On the Mac dev build, one ctest entry at a time on
+a loaded machine, 137 of the grid's tests took 3,373 s and the 62 seed tests 757 s (the run was
+stopped before the grid's last 7 and the scalar-capped parts).
+
 **Every target.** What bounds one execution's time and memory at its `-max_len`, with
 `-rss_limit_mb=2048` and `-malloc_limit_mb=256` over all of them, and the slowest input of each
 target's saved corpus and seeds, each run once (`-detect_leaks=0`) on the Mac on the tree of the

@@ -1,0 +1,12 @@
+diff --git a/scripts/check.sh b/scripts/check.sh
+--- a/scripts/check.sh
++++ b/scripts/check.sh
+@@ -252,7 +252,7 @@
+ # LeakSanitizer comes with ASan and is off by default on macOS, where a leaking test passed.
+ step_asan_test() {
+     local -x ASAN_OPTIONS=detect_leaks=1${ASAN_OPTIONS:+:$ASAN_OPTIONS}
+-    test_preset asan-ubsan "$1"
++    test_preset asan-ubsan "$1" "$TSAN_LEAVES_OUT"
+ }
+ step_tsan_build() { build_preset tsan; }
+ # The tsan step leaves out the fixed grid (Grid/OracleGrid), the named seeds' tests

@@ -225,17 +225,20 @@ build_preset() {
 }
 
 # ctest exits 0 when it finds no tests at all, unless told otherwise, and a skipped test
-# counts as passed in its percentage. So nothing is ever taken from that line alone.
+# counts as passed in its percentage. So nothing is ever taken from that line alone. A third
+# argument is a ctest -E pattern of tests the step leaves out, which its summary names.
 test_preset() {
-    local preset=$1 log=$2 code skipped total
+    local preset=$1 log=$2 exclude=${3:-} code skipped total
     local args=(--preset "$preset" --no-tests=error --timeout "$TEST_TIMEOUT")
     [[ -z $TEST_REGEX ]] || args+=(-R "$TEST_REGEX")
+    [[ -z $exclude ]] || args+=(-E "$exclude")
     ctest "${args[@]}"
     code=$?
     total=$(sed -n 's/.*tests passed, [0-9]* tests failed out of \([0-9]*\).*/\1/p' "$log")
     [[ -n $total ]] || total=$(sed -n 's/.*tests passed out of \([0-9]*\).*/\1/p' "$log")
     skipped=$(grep -c '(Skipped)' "$log")
     NOTE="${total:-no} tests"
+    [[ -z $exclude ]] || NOTE="$NOTE, leaving out -E '$exclude'"
     if [[ $skipped -gt 0 ]]; then
         NOTE="$NOTE, $skipped SKIPPED: $(sed -n 's/.* - \(.*\) (Skipped).*/\1/p' "$log" |
             paste -sd, -)"
@@ -252,7 +255,13 @@ step_asan_test() {
     test_preset asan-ubsan "$1"
 }
 step_tsan_build() { build_preset tsan; }
-step_tsan_test() { test_preset tsan "$1"; }
+# The tsan step leaves out the fixed grid (Grid/OracleGrid), the named seeds' tests
+# (FuzzRegression/BoundSeeds) and their scalar-capped parts, and scripts/coverage.sh leaves out
+# the first two: they are single-threaded re-runs of the fuzz oracles on fixed inputs, run in
+# full by the unit and asan-ubsan steps on each host, and they took these two jobs from under
+# 20 minutes to over 55 (fuzz/README.md, "Bounds").
+TSAN_LEAVES_OUT='^(Grid/OracleGrid\.|FuzzRegression/BoundSeeds\.|simd_capped_to_scalar_bound_seed)'
+step_tsan_test() { test_preset tsan "$1" "$TSAN_LEAVES_OUT"; }
 
 step_oracle() {
     python3 -I scripts/check_oracle.py build/dev/tools/tick_roundtrip

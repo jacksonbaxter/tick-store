@@ -5,7 +5,11 @@
 #
 # llvm-profdata, llvm-cov and llvm-cxxfilt come from PATH, from the same LLVM as CXX. The tests
 # run as one process rather than through ctest, so there is one profile to merge. ItchRealDay
-# stays out, so that the report does not depend on whether the data is on this machine.
+# stays out, so that the report does not depend on whether the data is on this machine. The
+# fixed grid (Grid/OracleGrid) and the named seeds' tests (FuzzRegression/BoundSeeds) stay out
+# too: single-threaded re-runs of the fuzz oracles on fixed inputs, run in full by check.sh's
+# unit and asan-ubsan steps on each host, which took the coverage job from 9 minutes to over 55
+# (fuzz/README.md, "Bounds"). FuzzOracles and the rest of FuzzRegression still run here.
 #
 # Writes the curated summary to FILE, by default build/coverage/coverage.json. Pass
 # --output results/coverage.json to publish it. scripts/coverage_report.py holds the required
@@ -40,7 +44,9 @@ BINARY=build/coverage/tests/unit/tick_store_unit_tests
 PROFILES=build/coverage/profiles
 rm -rf "$PROFILES"
 mkdir -p "$PROFILES"
-LLVM_PROFILE_FILE=$PROFILES/unit-%p.profraw "$BINARY" --gtest_filter='-ItchRealDay.*' --gtest_brief=1
+# What the header says stays out. The scalar-capped parts are ctest's, which this does not run.
+FILTER='-ItchRealDay.*:Grid/OracleGrid.*:FuzzRegression/BoundSeeds.*'
+LLVM_PROFILE_FILE=$PROFILES/unit-%p.profraw "$BINARY" --gtest_filter="$FILTER" --gtest_brief=1
 llvm-profdata merge --sparse --output "$PROFILES/unit.profdata" "$PROFILES"/unit-*.profraw
 llvm-cov export --format=text --skip-expansions --skip-branches \
     --instr-profile "$PROFILES/unit.profdata" "$BINARY" >"$PROFILES/export.json"
