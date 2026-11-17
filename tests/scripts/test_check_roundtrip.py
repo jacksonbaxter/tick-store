@@ -117,7 +117,8 @@ class CheckRoundtrip(unittest.TestCase):
 
     def test_a_pinned_name_with_other_bytes_is_checked_in_full(self):
         # The reviewer's case: the committed file, its commit kept, G-2's data block verdict
-        # turned to a pass, under the pinned name.
+        # turned to a pass, under the pinned name. The freeze's file records every exit code,
+        # so checked in full it is refused for the edit itself.
         edited = json.loads((REPO_ROOT / "results" / "roundtrip-12302019.json").read_text())
         edited["g2"]["data_crc"]["verdict"] = "pass"
         path = self.scratch() / "roundtrip-12302019.json"
@@ -125,7 +126,8 @@ class CheckRoundtrip(unittest.TestCase):
         ran = subprocess.run([sys.executable, "-I", str(SCRIPT), str(path)],
                              capture_output=True, text=True, check=False)
         self.assertEqual(ran.returncode, 1, ran.stderr)
-        self.assertIn("roundtrip-12302019.json: g1.ingest: no exit_code observed", ran.stderr)
+        self.assertIn("roundtrip-12302019.json: g2.data_crc: exit_code 1 with the verdict 'pass', "
+                      "which verify exits 0 on", ran.stderr)
 
     def test_no_other_file_may_be_pinned(self):
         folder = self.scratch()
