@@ -5719,6 +5719,64 @@ moved lines, `render-pitch-claim-unchecked`, `render-pitch-word-limit-removed` a
 pitch: `readme-pitch-unchecked-figure`, `readme-first-screen-host-by-system` and
 `readme-pitch-claim-reworded`. The first proof run took 15 of them, the pitch's and the headline's that render-check proves among them, and 13 came out PROVEN; `readme-pitch-unchecked-figure` and `readme-first-screen-host-by-system` came out WRONG REASON, since each added a word to a pitch at its 100 and the word limit stopped the check first, so each now puts its word in another's place, the typed 42 for one and Linux for trading (`8a9cdfb`). The second run, at `8a9cdfb`, took those two and the 19 new faults, and all 21 came out PROVEN: 34 faults for the first screen, each failing for its own reason.
 
+### A comparison verdict beside the run it replaced, and what each write's clock holds
+
+2026-11-16. The freeze's comparison files replace the Linux day at `67ae574`, and on them one
+comparison verdict changes outcome: the class B write against ArcticDB goes from missed to met,
+since ArcticDB's write went from 123.6 s total and 42.6 s engine-only to 381.4 s and 291.8 s, on
+one repetition. The new day also records where each write's input was when its clock started:
+tick-store's ITCH file is made resident first, while the other systems' exported columns are
+taken as the cache holds them, 4,033 of 5,825,603 pages resident for most writes, with 18 to 46
+GB read from the device inside the clock. `render_results.py` now holds a verdict to both.
+
+- A comparison file a later run replaced stays, bytes unchanged, in `results/compare/replaced/`,
+  pinned by its SHA-256 under `replaced_comparison_files` in `scripts/data_pins.json`;
+  `check_compare.py` cannot judge it again away from its slice, so the pin holds it instead, and
+  an unpinned or changed file stops the render. Each comparison target, QL-4's ranking and every
+  part whose target is another system's figure, is judged on it as well. Where it lacks a
+  figure, the part is judged on the clock it keeps and the row says which.
+- Where the two outcomes differ, the Targets row gives both runs' figures in the measured cell
+  and both outcomes beside the verdict, says whether the change favours tick-store, and the part
+  is counted as the less favourable. The counts of the line under the headline's table, the
+  sentence under it and the pitch's claims take each part's less favourable outcome, worked out
+  from both runs apart from the writer's own verdict, so a writer that counts the favourable one
+  shows against the check.
+- A write verdict against other systems says, from each write's record and no typed word: whose
+  input is in memory before the clock starts and whose is read from disk inside it, the pages
+  resident at the start, the bytes read from the device inside the clock and how they are
+  counted, what each system's engine-only holds, and, where the inputs differ, that engine-only
+  does not take the reads out, with each other system's engine-only on the replaced run beside
+  this one's. A record from before the residency fields says it keeps none.
+- `results/disturbances-<commit>.json` records what else ran on the host during a campaign's
+  timed steps: each entry's UTC span, to the second or the minute, what it was in words, and the
+  document, system, variant and phase it fell in, with whether that phase is timed; the file
+  gives its commit, how the list was made and what it leaves out with why. `render_results.py`
+  refuses the file unless every entry is whole, falls in a document measured at its commit and
+  names a variant, class, repetition, query or case that document holds. A verdict that rests
+  on a timed phase an entry falls in says so beside it, with the replaced run's figure there
+  where there is one. `check_ties.py` gives the file a kind of its own that measures no code.
+- No generated page, the README's pitch and the essay included, may hold a sentence that says
+  tick-store writes faster than a system whose headline write read its input from disk inside
+  its clock: a word for a write, then a word for faster, then that system's name, refused.
+
+With no replaced file and no disturbance file, the pages are as before but for the write rows,
+which now say that the records of the committed day keep no residency figure but tick-store's.
+
+On a scratch tree of the committed results with the audit's 24 files in place of those they
+replace, the replaced day moved and a disturbance file of 16 entries, the render is current and
+every check passes: the class B write row gives ArcticDB on both runs, "met on this run's
+figures, a change that favours tick-store, and missed on the replaced run's, so counted
+missed", every part rests on tick-store's `v3-seg4Mi` class B write 1, which held a login, and
+the QuestDB part on QuestDB's `plain` class B write 1, which held the backup job, each with the
+replaced run's total. The first screen counts 4 met, 15 missed, 7 missed in part and 6 not
+judged, the audit's own, with DS-4 now missed. Each comparison target's outcome on the replaced
+day equals the committed RESULTS.md's. The essay on that tree runs to 4,077 words, over its
+4,000, because WT-4's quoted verdict now carries its marks; with the counted verdict alone it is
+3,992, so the essay must lose words or quote WT-4's class before it can be rendered on those
+files.
+
+Nineteen faults hold the new rules, from `compare-replaced-favourable-counted` to `ties-disturbances-no-kind`, and four were remade on their moved lines: `headline-left-out-writer-class-shared`, `render-ql4-p99-unexplained`, `headline-verdict-all-parts` and `writeup-verdict-own-code`. One proof run at `57215e2` took all 23, and all came out PROVEN.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from

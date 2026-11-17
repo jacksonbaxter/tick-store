@@ -133,6 +133,25 @@ for ranking words, so it can mislead without one, as can a number written in wor
 words beyond those its target lists, a plain name that misdescribes its target, or a bar whose
 words drift from its target in `BENCHMARKS.md` would all pass.
 
+`render_results.py --check` also holds a comparison verdict to the run it replaced. A comparison
+file a later run replaced stays, bytes unchanged and pinned by its SHA-256 under
+`replaced_comparison_files`, in `results/compare/replaced/`, and each comparison target is judged on
+it as well; where it lacks a figure, the part is judged on the clock it keeps and the row says
+so. Where the two outcomes differ, the row gives both runs' figures and outcomes and says beside
+the verdict whether the change favours tick-store, and every count, claim and line of the first
+screen takes the less favourable, which the checks work out from both runs apart from the code
+that writes the verdict. A write verdict against other systems says, from each write's record,
+whose input was in memory before the clock started and whose was read from disk inside it, the
+bytes read from the device inside the clock, what engine-only holds, and that engine-only does
+not take the reads out. A verdict that rests on a timed phase in which
+`results/disturbances-<commit>.json` records something else running, such as a login or the
+host's backup job, says so beside it, with the replaced run's figure there; the file's shape,
+spans and places in the documents are checked. No page, the essay included, may hold a sentence
+saying tick-store writes faster than a system whose write read its input from disk inside its
+clock. With no replaced file and no disturbance file, nothing is marked. What it does not check
+is the disturbance list itself, made by hand from the host's logs: an event left out of it marks
+nothing, and a faster write said in other words than the rule's passes.
+
 `render_writeup.py` holds the essay to `docs/writeup/figures.json`, its figure list. Every figure,
 verdict and results link in `docs/writeup/WRITEUP.template.md` is a token the list defines: the
 results file by kind and host, never by a name with a commit in it, so a file measured again still
