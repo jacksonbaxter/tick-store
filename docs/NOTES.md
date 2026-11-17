@@ -5830,17 +5830,24 @@ these keys for any other name is refused, so on that copy the run says `check_ti
 protocol_1_comparison_files in the pins file pins Linux-12302019-open-0000aaaa0000.json, and
 check_ties.py lets only ... be pinned there`, judges the file, `16 differs`, and exits 1.
 `check_compare.py` still takes any SHA-256 under its key; its rules are final for the freeze, so
-the restriction is in `check_ties.py`. For a file the freeze replaces but keeps, the reason
-"replaced, kept for the record": key `replaced_kept_for_the_record` in the pins file, keyed by
-path, and `REPLACED_KEPT` in the script, each entry a path and a SHA-256; such a file is pinned
-only under a `replaced/` folder, and only when its bytes' SHA-256 is the one in both places.
-`REPLACED_KEPT` is empty, and its test requires it to be until the results commit adds the file.
+the restriction is in `check_ties.py`. For a comparison file the freeze replaces but keeps,
+one rule, shared with `render_results.py`, which judges a verdict on the replaced run too: the
+file lives in `compare/replaced/`, the pins file gives its name its SHA-256 under
+`replaced_comparison_files`, the key `render_results.py` reads, and `REPLACED_KEPT` in
+`check_ties.py` fixes its exact path and the same SHA-256 in code. Only then is it pinned; a
+line under that key for any other name is refused. This first had a key of its own,
+`replaced_kept_for_the_record`, and a `replaced/` folder anywhere, written apart from the
+renderer's; on the rebase onto `81cec1f` the two became one, the renderer's key and the
+stricter of each rule, and a test holds the key and the folder to `render_results.py`'s.
+`REPLACED_KEPT` holds the Linux full day measured at `67ae574`, which nothing pins until the
+results commit moves it there.
 
 **The disturbances file.** `results/disturbances-ede0176b10bb.json`, which the freeze's runners
-assembled by hand, measures nothing and names its commit. The table now has its kind,
-`disturbances-*.json`, with no measured or assembled path and the reason why, so such a file
-passes if it names a commit in HEAD's history and fails if it names none or one outside it. The
-file itself is not added here.
+assembled by hand, measures nothing and names its commit. There is one kind for it,
+`disturbances-*.json`, with no measured or assembled path and both reasons, since `57215e2` had
+added the same kind: such a file passes if it names a commit in HEAD's history and fails if it
+names none or one outside it, and `render_results.py` checks its shape. The file itself is not
+added here; both sides' tests stay, and `ties-disturbances-no-kind` is remade on the merged lines.
 
 **Ancestry and links** (TD-5, TD-6). A commit this clone still held after a rebase, or one on
 another branch, was judged, and passed locally (exit 0), though a fresh clone refused the first.
