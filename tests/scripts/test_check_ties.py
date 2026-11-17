@@ -153,6 +153,15 @@ def write_json(root, name, document):
     write(root, name, json.dumps(document, indent=1) + "\n")
 
 
+def hold_objects_still(root):
+    """No automatic repack in a repository the tests make: a commit can start a detached `git
+    maintenance run --auto`, which may pack and prune loose objects while a test copies the
+    repository or removes one of them, so whether a test passed would turn on that race. A copy
+    takes these settings with the rest of .git."""
+    git(root, "config", "gc.auto", "0")
+    git(root, "config", "maintenance.auto", "false")
+
+
 def make_repo(root):
     """The code at CODE; the results naming it at RESULTS; the proofs naming RESULTS, the last
     commit that changed code as prove_checks.py keys it, committed last."""
@@ -160,6 +169,7 @@ def make_repo(root):
         shutil.rmtree(root)
     root.mkdir(parents=True)
     git(root, "init", "-q")
+    hold_objects_still(root)
     for name in (*FILE_OF.values(), *PROSE, *PROVER_ONLY):
         write(root, name, "first\n")
     write_json(root, PINS, INPUT_PINS)
@@ -814,6 +824,7 @@ class GitErrors(TieTest):
     def copy(self):
         copy = self.dir / "copy"
         shutil.copytree(REPO, copy, symlinks=True)
+        hold_objects_still(copy)
         return copy
 
     def test_a_missing_object_is_a_refusal_naming_the_command(self):
@@ -827,7 +838,13 @@ class GitErrors(TieTest):
         git(copy, "commit", "-q", "-am", "later")
         self.assertIn("what assembled it changed since",
                       run_check(copy).said(FILES["roundtrip"]))
-        (copy / ".git" / "objects" / lost[:2] / lost[2:]).unlink()
+        loose = copy / ".git" / "objects" / lost[:2] / lost[2:]
+        if not loose.is_file():
+            self.fail(f"the commit {lost} is not a loose object at {loose}, so this test cannot "
+                      "remove it: git packed it, though the copy's gc.auto is 0 and its "
+                      "maintenance.auto false (git count-objects -v: "
+                      f"{' '.join(git(copy, 'count-objects', '-v').split())})")
+        loose.unlink()
         result = run_check(copy)
         self.assertEqual(result.code, check_ties.EXIT_REFUSED, result.out)
         said = result.said(FILES["roundtrip"])
