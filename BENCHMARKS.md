@@ -1,10 +1,10 @@
 # tick-store benchmarks and targets
 
-Status: the final review, Phase 4 of [docs/TASKS.md](docs/TASKS.md#phase-4-final-review-and-done-criteria). The measured code is `ede0176`, and the fuzz harness is judged at `8616263`, where the library code measured at `ede0176` is identical: only `fuzz/`, two unit-test files and `scripts/coverage.sh` differ. Every verdict is in [RESULTS.md](RESULTS.md#targets).
+Status: the final review, Phase 4 of [docs/TASKS.md](docs/TASKS.md#phase-4-final-review-and-done-criteria). The measured code is `ede0176`, the freeze: none of the code the benchmarks and the comparison build and run changed after that commit. The fuzz harness is judged at `8616263`, where the library code measured at `ede0176` is identical: only `fuzz/`, two unit-test files and `scripts/coverage.sh` differ. Every verdict is in [RESULTS.md](RESULTS.md#targets).
 
 Every source figure below is a published figure, or
 arithmetic on one, used as a target or as context. The exceptions are the file facts in CR-1 and Data, which come from the downloaded
-files. A research subagent opened each source, and the `Checked` column records that the project session then opened it too and
+files. A research subagent opened each source, and the `Checked` column records that I then opened it too and
 recomputed any derived figure from the raw values.
 
 Full evidence, with quotes and locations, is in `research/evidence/`.
@@ -46,7 +46,7 @@ Results from the two hosts are kept apart and never mixed.
 
 ## Correctness gates
 
-These come from the project brief, so they need no published source. Each one must pass before any speed number counts.
+These come from the project's brief, written before any measurement, so they need no published source. Each one must pass before any speed number counts.
 
 | ID | Gate | Check |
 |---|---|---|
@@ -209,7 +209,7 @@ measured at `ede0176` is identical.
 ## Reference numbers
 
 These are context only. They are recorded so the write-up can cite them, and are not targets. A research subagent opened each
-source. The project session also opened the TritanDB, KX, ALP, VIREL and datafusion rows, but not Gorilla, Lemire, Stream VByte,
+source. I also opened the TritanDB, KX, ALP, VIREL and datafusion rows, but not Gorilla, Lemire, Stream VByte,
 Agner Fog or TSM-Bench, since no target rests on them.
 
 | Value | Counted | Source | Measured on |

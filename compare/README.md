@@ -580,7 +580,7 @@ benchmark. `compare/fullday.py` needs the day's export at `<data>/export/<day>-f
   a work folder under any `results` folder, and `scripts/check_compare.py` refuses the file.
   `results/fullday-capacity-12302019.json` is the curated summary, and sits outside `results/compare/`.
 
-**QuestDB's heap on Linux is `-Xms1g -Xmx1g`, the Phase 3 setting.** It held for a full day in class
+**QuestDB's heap on Linux is `-Xms1g -Xmx1g`, the [Phase 3](../docs/TASKS.md#phase-3-implementation) setting.** It held for a full day in class
 A and in class B, with no collection after start-up and at most 300 MiB of 982 MiB in use when ingest
 ended. QuestDB's default heap was not tested, because nothing pointed to it. The evidence is in
 `results/fullday-capacity-12302019.json`. Each Linux results file states its heap and cites that
@@ -729,7 +729,8 @@ ArcticDB `rows10M-cols127` and per security, QuestDB `locate-index`, and tick-st
 `snappy-rg1Mi` won Q2 cold, and no other Parquet variant beat the rest on Q5 cold, so
 `zstd9-rg1Mi` dropped out. That full day was lost to the host's backup reading QuestDB's store.
 
-At `67ae574`, the commit of the full-day results the freeze replaced, kept in
+At `67ae574`, the commit of the full-day results the freeze replaced (the freeze is `ede0176`:
+none of the code the comparison builds and runs changed after that commit), kept in
 `results/compare/replaced/`, the list changed before the run: Parquet
 `zstd1-rg128k` and `none-rg1Mi`, ArcticDB `rows100k-cols1` and per security, QuestDB
 `locate-index`, and tick-store `v3-seg1Mi`. Against `7a2e092`, Parquet lost `snappy-rg1Mi`, and
