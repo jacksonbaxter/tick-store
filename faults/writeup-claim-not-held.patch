@@ -1,7 +1,7 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -1637,7 +1637,7 @@
+@@ -1643,7 +1643,7 @@
              waits.append(wait)
              covered.append(text)
              continue

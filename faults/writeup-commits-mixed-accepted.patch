@@ -1,7 +1,7 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -1429,7 +1429,7 @@
+@@ -1435,7 +1435,7 @@
              exceptions.setdefault(kind, set()).add(commit)
          else:
              measured.setdefault(commit, []).append(path.relative_to(resolver.root).as_posix())

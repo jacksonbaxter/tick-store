@@ -1,7 +1,7 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -414,7 +414,7 @@
+@@ -420,7 +420,7 @@
          say so."""
          pin = pin_of(self.root, path, self.pins)
          declared = (self.kinds[kind].get("pin") or {}).get("name")

@@ -1,7 +1,7 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -401,7 +401,7 @@
+@@ -407,7 +407,7 @@
          """The one results file of a kind on a host, or Waiting if there is none yet."""
          pattern = self.pattern_of(kind, host, name)
          try:

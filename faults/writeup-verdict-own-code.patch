@@ -1,7 +1,7 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -1214,7 +1214,7 @@
+@@ -1220,7 +1220,7 @@
              raise Refused(f"{show(name)}: no part {unknown} in {labels}")
          parts = [part for part in parts if part[0] in spec["parts"]]
      try:

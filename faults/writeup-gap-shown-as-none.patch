@@ -1,7 +1,7 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -730,7 +730,7 @@
+@@ -736,7 +736,7 @@
      if gap not in ("ratio", "difference"):
          raise Refused(f"{show(name)}: gap is ratio or difference, not {gap!r}")
      printed = printed_number(text)

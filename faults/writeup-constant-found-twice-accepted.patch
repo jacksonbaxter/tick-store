@@ -1,7 +1,7 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -879,7 +879,7 @@
+@@ -885,7 +885,7 @@
      if until:
          raise Refused(f"{show(context.name)}: {spec['pattern']!r} now matches in "
                        f"{spec['source']}, and its entry still waits {until}: drop until")

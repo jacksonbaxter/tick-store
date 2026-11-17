@@ -1,7 +1,7 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -647,7 +647,7 @@
+@@ -653,7 +653,7 @@
      the path it covers. A token that reads such a path would state as fact what the run does
      not establish: it is refused, with the file's reason."""
      document = context.document

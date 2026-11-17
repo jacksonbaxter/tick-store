@@ -1,7 +1,7 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -756,7 +756,7 @@
+@@ -762,7 +762,7 @@
      if isinstance(expression, bool):
          raise Refused(f"{show(name)}: the literal {expression!r} is no expression")
      if isinstance(expression, (int, float)):

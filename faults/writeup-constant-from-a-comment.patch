@@ -1,7 +1,7 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -872,7 +872,7 @@
+@@ -878,7 +878,7 @@
      path = context.resolver.root / spec["source"]
      if until and not path.exists():
          raise Waiting("code", "a merge", until)

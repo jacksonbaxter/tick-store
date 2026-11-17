@@ -63,6 +63,7 @@ import hashlib
 import json
 import math
 import re
+import unicodedata
 import statistics
 import subprocess
 import sys
@@ -94,6 +95,8 @@ COMMENT = re.compile(r"[ \t]*<!--.*?-->[ \t]*\n?", re.DOTALL)
 # A number as prose writes it, render_results.py's NUMBER, not part of a name: digits that follow
 # a letter, as in AVX2, M4, L3 or Q1, name something.
 TYPED = re.compile(r"(?<![A-Za-z0-9])" + render_results.NUMBER.pattern)
+# A multiplier glued to its number, "x3", which TYPED's start passes over as a name.
+MULTIPLIER = re.compile(r"(?<![A-Za-z0-9])x[0-9]+")
 # A number written in words. "One" names a unit far more often than it counts, so it is a number
 # word like the rest: each use is a declared non-result or sits in a claim. "Double" is left out:
 # here it names a floating-point type.
@@ -101,7 +104,7 @@ NUMBER_WORDS = re.compile(
     r"\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|"
     r"fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|"
     r"eighty|ninety|hundreds?|thousands?|millions?|billions?|dozens?|half|halved|halves|twice|"
-    r"thrice|doubled|tripled?|quarters?|once)\b", re.IGNORECASE)
+    r"thrice|doubled|tripled?|quarters?|once|orders? of magnitude)\b", re.IGNORECASE)
 # Words that rank, compare or state an outcome: render_results.py's RANKING, and more.
 JUDGING = re.compile(
     r"\b(?:faster|fastest|fast|slower|slowest|slows?|slowed|quicker|quickest|least|most|more|"
@@ -266,7 +269,10 @@ def typed_numbers(body, not_results):
     # A host's name is the script's own, never a result.
     for word in HOST_WORDS.values():
         text = re.sub(rf"\b{re.escape(word)}\b", " ", text)
-    return TYPED.findall(text)
+    # A numeral other than an ASCII digit, "½", "²" or "Ⅻ", is a number too.
+    numerals = [char for char in text if not char.isascii()
+                and unicodedata.numeric(char, None) is not None]
+    return TYPED.findall(text) + MULTIPLIER.findall(text) + numerals
 
 
 def word_count(text):

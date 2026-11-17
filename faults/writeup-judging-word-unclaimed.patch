@@ -1,7 +1,7 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -1647,7 +1647,7 @@
+@@ -1653,7 +1653,7 @@
              continue
          for sentence in sentences_of(block):
              masked = masked_sentence(resolver, sentence, covered, headers)

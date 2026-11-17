@@ -1,7 +1,7 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -694,7 +694,7 @@
+@@ -700,7 +700,7 @@
                        6)
          entry = dict(entry, format=f"{{:,.{digits}f}}")
      text = number_text(scaled, entry, name)

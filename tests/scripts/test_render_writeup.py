@@ -392,11 +392,22 @@ class Refuses(Tree):
     def test_a_number_in_words(self):
         # Review WD-3: a result written in words is a typed number.
         for words in ("It ran four times as long.", "It took half the time.",
-                      "It ran twice.", "It read a million values.", "It ran one pass."):
+                      "It ran twice.", "It read a million values.", "It ran one pass.",
+                      "It ran an order of magnitude longer."):
             with self.subTest(words=words):
                 self.setUp()
                 self.insert(words)
                 self.refused("counts with")
+
+    def test_a_multiplier_or_a_numeral_that_is_not_a_digit(self):
+        # Review WD-17: "x3" passed as a name, and "½", "²" and "Ⅻ" as letters.
+        for text, number in (("It ran x3 longer.", "x3"), ("It ran ×3 longer.", "3"),
+                             ("It took ½ the time.", "½"), ("It grew as n².", "²"),
+                             ("It ran Ⅻ times.", "Ⅻ")):
+            with self.subTest(text=text):
+                self.setUp()
+                self.insert(text)
+                self.refused(f"the template types the number {number!r} by hand")
 
     def test_digits_in_a_name_are_no_number(self):
         self.insert("On the M4 with AVX2 off, Q1 ran.")

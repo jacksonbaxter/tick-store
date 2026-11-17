@@ -2050,6 +2050,9 @@ FAULTS = (
     Fault("writeup-tokens-glued-accepted", "py-scripts", "render_writeup.py takes tokens side by "
           "side or against a digit", CHECK_FAILED,
           "FAIL: test_tokens_side_by_side_or_against_a_digit (__main__.Refuses"),
+    Fault("writeup-numeral-forms-accepted", "py-scripts", "render_writeup.py takes a multiplier "
+          "glued to its number, or a numeral other than an ASCII digit", CHECK_FAILED,
+          "FAIL: test_a_multiplier_or_a_numeral_that_is_not_a_digit (__main__.Refuses"),
     # The step itself on the committed page. Its baseline passes only once WRITEUP.md is
     # rendered, when every results file it reads is committed (docs/TASKS.md).
     Fault("writeup-template-not-rendered", "writeup-check", "the essay's template reworded "

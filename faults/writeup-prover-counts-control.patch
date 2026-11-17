@@ -1,7 +1,7 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -912,7 +912,9 @@
+@@ -918,7 +918,9 @@
                  control = any(keyword.arg == "control" and
                                getattr(keyword.value, "value", False) is True
                                for keyword in call.keywords)
