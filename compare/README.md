@@ -375,12 +375,16 @@ machine-wide, over the whole ingest call:
 `tick_roundtrip`'s own wall time, the process's start and exit taken out; for the others it takes
 out the reading of each chunk and putting it in the form the system's call takes, as the table
 above says. Engine-only does not remove the difference in where the inputs are: the device bytes
-are counted over the whole clock, so engine-only may hold them as well. ArcticDB's headline class B
-write shows how far it can move: its engine-only time was 42.6 s on the replaced run (the total less
-`python_seconds` in `results/compare/replaced/Linux-12302019-full-67ae574f5666.json`, whose records
-keep no residency or device-read figure for the other systems) and 291.8 s on this one, with
-`python_seconds` at 80.9 s and 89.6 s. So the two-clock rule below does not take the asymmetry
-out. Each of these figures is from one host, with 15 GB of memory, less than the export's
+are counted over the whole clock, so engine-only may hold them as well. This run's records show
+device reads inside every other system's clock, the table above, so the two-clock rule below does
+not take the asymmetry out. ArcticDB's headline class B engine-only time was 42.6 s on the replaced
+run (the total less `python_seconds` in
+`results/compare/replaced/Linux-12302019-full-67ae574f5666.json`) and 291.8 s on this one, with
+`python_seconds` at 80.9 s and 89.6 s, and the cause of that move is not known. This run's record
+shows the write starting with 4,033 of its input's 5,825,603 pages resident and 23,850,713,088 B
+read from the device inside its clock. The replaced run's record keeps no residency or device-read
+figure for any system but tick-store, so it cannot show what the cache held then or how much was
+read, and the two records cannot say whether the cache made the difference. Each of these figures is from one host, with 15 GB of memory, less than the export's
 23,861,669,888 bytes, and from one write per class, a single repetition, with nothing to show its
 spread.
 

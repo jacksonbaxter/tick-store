@@ -19,7 +19,7 @@
     "values": {"tickstore": {"value": {"path": ["systems", "tickstore", "variants", "@headline", "classes", "B", "stored", "allocated_bytes"]}, "scale": 1e-9, "format": "{:.2f}"},
                "parquet": {"value": {"min_variant": ["parquet", "classes", "B", "stored", "allocated_bytes"]}, "scale": 1e-9, "format": "{:.2f}"}}},
    {"id": "QL-4", "host": "Linux", "parts": ["Q2 warm"], "what": "One hour of one stock, warm", "bar": "fastest of the four, each in the setup the comparison fixed for it, by median and tail", "source": "the project's own bar",
-    "measured": "median {tickstore} ms vs {best_system} {best} ms; ArcticDB with a table per stock {per_stock} ms",
+    "measured": "median {tickstore} ms vs {best_system} {best} ms; ArcticDB with a table per stock {per_stock} ms, {per_stock_mark}",
     "values": {"tickstore": {"value": {"path": ["systems", "tickstore", "variants", "@headline", "queries", "Q2", "warm", "median_us"]}, "scale": 0.001, "format": "{:,.2f}"},
                "best_system": {"value": {"lowest_system": {"systems": ["parquet", "arcticdb", "questdb"], "path": ["queries", "Q2", "warm", "median_us"]}}, "label": "system"},
                "best": {"value": {"lowest_value": {"systems": ["parquet", "arcticdb", "questdb"], "path": ["queries", "Q2", "warm", "median_us"]}}, "scale": 0.001, "format": "{:,.2f}"},
@@ -101,7 +101,7 @@
    {"text": "It gives every message back bit-exact.", "target": {"id": "G-1", "host": "any", "verdict": "met"}},
    {"text": "Beside Parquet, ArcticDB and QuestDB on a 2018 four-core AMD Ryzen running Linux, it takes the least disk of the four.", "target": {"id": "CR-2", "host": "Linux", "verdict": "met"}},
    {"text": "On the Ryzen it answers queries about one stock fastest of the four, each in the setup [the comparison fixed for it](compare/README.md#tuning-variants-and-their-sources), but on short windows across every stock ArcticDB or QuestDB is fastest.", "all": [{"target": {"id": "QL-4", "host": "Linux", "parts": ["Q2 warm", "Q2 cold", "Q3 warm", "Q3 cold"], "verdict": "met"}}, {"file": "results/compare/Linux-12302019-full-*.json", "fastest": {"systems": ["parquet", "arcticdb", "questdb", "tickstore"], "queries": ["Q1", "Q4"], "kinds": ["warm", "cold"], "fields": ["median_us", "p99_us"], "one_of": ["arcticdb", "questdb"]}}]},
-   {"text": "One thread on the Ryzen ingests below Nasdaq's peak message rate.", "target": {"id": "WT-2", "host": "Linux", "verdict": "missed"}}
+   {"text": "One thread on the Ryzen ingests below Nasdaq's peak message rate.", "target": {"id": "WT-2", "host": "Linux", "parts": ["class A"], "verdict": "missed"}}
   ]
  },
  "rows": [
@@ -306,7 +306,7 @@
   {"id": "WT-1", "host": "macOS", "target": {"at_least": 8590000}, "target_text": "at least 8.59 M records/s", "digits": 3, "scale": 1e-6, "unit": " M records/s",
    "parts": [{"label": "class A, one thread", "file": "results/compare/macOS-12302019-full-tickstore-*.json",
               "value": {"path": ["systems", "tickstore", "variants", "@headline", "classes", "A", "write", "records_per_second_median"]}}]},
-  {"id": "WT-2", "host": "Linux", "pitch": [{"words": "ingests below Nasdaq's peak message rate"}],
+  {"id": "WT-2", "host": "Linux", "pitch": [{"words": "ingests below Nasdaq's peak message rate", "parts": ["class A"]}],
    "target": {"above": 2732762}, "target_text": "above 2,732,762 messages/s", "digits": 3, "scale": 1e-6, "unit": " M messages/s",
    "parts": [
     {"label": "class A", "file": "results/compare/Linux-12302019-full-*.json",

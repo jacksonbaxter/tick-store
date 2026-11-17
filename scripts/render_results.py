@@ -146,6 +146,8 @@ SWAP_PHASES = (("write", "Write"), ("read_back", "Read-back"), ("warm_queries", 
 SWAP_COLUMNS = ("System", *(f"{label}, in / out MiB" for _, label in SWAP_PHASES),
                 "Timed queries with swap-in")
 SWAP_MARK = " (swap-in)"
+# The mark of a figure from a timed phase in which the disturbance file lists a disturbance.
+DISTURBED_MARK = " (disturbed)"
 
 EXIT_STALE = 1
 EXIT_USAGE = 2
@@ -380,17 +382,33 @@ def lowest_mark(values, name):
     return ", ".join(marks) or "no"
 
 
-def timed_cell(entry, kind, field):
-    """A warm or cold number, marked when a page was swapped in while it was timed."""
+def timed_cell(entry, kind, field, disturbed=False):
+    """A warm or cold number, marked when a page was swapped in while it was timed, and when
+    the disturbance file lists a disturbance in its phase."""
     flagged = (entry[kind].get("swap_timed") or {}).get("flagged")
-    return milliseconds(entry[kind][field]) + (SWAP_MARK if flagged else "")
+    return milliseconds(entry[kind][field]) + (SWAP_MARK if flagged else "") + \
+        (DISTURBED_MARK if disturbed else "")
+
+
+def phase_disturbed(entries, system, variant, phase, which):
+    """Whether entries, a document's own, list a timed disturbance in a phase: a write of a
+    class, or the warm or cold queries, whole or of the query named."""
+    for entry in entries:
+        if not entry["timed"] or (entry.get("system"), entry.get("variant")) != (system, variant):
+            continue
+        if phase == "write" and entry["phase"] == "write" and entry["class"] == which:
+            return True
+        if phase != "write" and entry["phase"] == f"{phase} queries" and \
+                entry["query"] in (None, which):
+            return True
+    return False
 
 
 def is_alone(document):
     return document.get("scope") == "tickstore-only"
 
 
-def query_table(document):
+def query_table(document, entries=()):
     names = ordered_systems(document)
     alone = is_alone(document)
     (_, warm), (_, cold) = query_tails(document)
@@ -402,9 +420,13 @@ def query_table(document):
         for name in names:
             variant, _ = headline(document, name)
             entry = values[name]
+            warm, cold = (phase_disturbed(entries, name, variant, kind, query)
+                          for kind in ("warm", "cold"))
             cells = (query, SYSTEM_LABEL[name], f"`{variant}`", f"{entry['digest']['rows']:,}",
-                     timed_cell(entry, "warm", "median_us"), timed_cell(entry, "warm", "p99_us"),
-                     timed_cell(entry, "cold", "median_us"), timed_cell(entry, "cold", "p99_us"),
+                     timed_cell(entry, "warm", "median_us", warm),
+                     timed_cell(entry, "warm", "p99_us", warm),
+                     timed_cell(entry, "cold", "median_us", cold),
+                     timed_cell(entry, "cold", "p99_us", cold),
                      "not ranked: alone" if alone else lowest_mark(values, name))
             lines.append("| " + " | ".join(cells) + " |")
     return lines
@@ -447,7 +469,7 @@ def engine_only_cell(write):
         return "not recorded"
 
 
-def ingest_table(document, class_name):
+def ingest_table(document, class_name, entries=()):
     lines = ["| " + " | ".join(INGEST_COLUMNS) + " |", "|" + "---|" * len(INGEST_COLUMNS)]
     source_bytes = document["input"]["bytes"]
     for name in ordered_systems(document):
@@ -457,9 +479,11 @@ def ingest_table(document, class_name):
         stored = result["stored"]["allocated_bytes"]
         durability = result["durability"]
         label = SYSTEM_LABEL[name] + (" (parses ITCH)" if name == "tickstore" else "")
-        cells = (label, f"`{variant}`", f"{write['seconds_median']:.3f}",
-                 engine_only_cell(write),
-                 f"{write['records_per_second_median'] / 1e6:.2f}", f"{stored:,}",
+        mark = DISTURBED_MARK if phase_disturbed(entries, name, variant, "write", class_name) \
+            else ""
+        cells = (label, f"`{variant}`", f"{write['seconds_median']:.3f}{mark}",
+                 engine_only_cell(write) + mark,
+                 f"{write['records_per_second_median'] / 1e6:.2f}{mark}", f"{stored:,}",
                  f"{source_bytes / stored:.3f}", durability["status"],
                  "yes" if durability["like_for_like"] else "no")
         lines.append("| " + " | ".join(cells) + " |")
@@ -474,7 +498,7 @@ def gib(value):
     return f"{value / (1 << 30):,.2f} GiB"
 
 
-def variant_table(document):
+def variant_table(document, entries=()):
     """Every variant each system ran, so a tuning variant's trade-off shows beside its
     headline. Queries are medians on the class B store."""
     lines = ["| " + " | ".join(VARIANT_COLUMNS) + " |", "|" + "---|" * len(VARIANT_COLUMNS)]
@@ -485,12 +509,17 @@ def variant_table(document):
             classes = entry["classes"]
             stored = classes["B"]["stored"]["allocated_bytes"]
             mark = " (headline)" if variant == system["headline_variant"] else ""
+            def held(phase, which, name=name, variant=variant):
+                return DISTURBED_MARK if phase_disturbed(entries, name, variant, phase, which) \
+                    else ""
             cells = [SYSTEM_LABEL[name], f"`{variant}`{mark}", f"{stored:,}",
                      f"{source_bytes / stored:.3f}",
-                     f"{classes['A']['write']['seconds_median']:.1f} / "
-                     f"{classes['B']['write']['seconds_median']:.1f}"]
-            cells += [f"{milliseconds(entry['queries'][query]['warm']['median_us'])} / "
+                     f"{classes['A']['write']['seconds_median']:.1f}{held('write', 'A')} / "
+                     f"{classes['B']['write']['seconds_median']:.1f}{held('write', 'B')}"]
+            cells += [f"{milliseconds(entry['queries'][query]['warm']['median_us'])}"
+                      f"{held('warm', query)} / "
                       f"{milliseconds(entry['queries'][query]['cold']['median_us'])}"
+                      f"{held('cold', query)}"
                       for query in QUERY_NAMES]
             lines.append("| " + " | ".join(cells) + " |")
     return lines
@@ -555,7 +584,9 @@ def time_memory_lines(document):
     return lines
 
 
-def compare_for(document):
+def compare_for(document, entries=()):
+    """One comparison file's block. entries are the disturbances the tree lists in its timed
+    phases, each figure from one marked."""
     header = document["header"]
     host = header["host"]
     day = full_day_of(document)
@@ -565,27 +596,32 @@ def compare_for(document):
     ranking = ("No other system ran, so nothing is ranked." if alone else
                "\"Lowest\" names the measures, warm or cold, on which a system had both the "
                "lowest median and the lowest tail figure of the four.")
+    note = method_input_note(document)
     lines = [f"**{host}, {scope}.** {header['cpu_model']}, commit `{header['commit'][:12]}`. "
-             f"{header['statement']} {document['label']}", "",
+             f"{header['statement']} {document['label']}" + (f" {note}" if note else ""),
+             "",
              "Queries, on each system's class B store, in milliseconds. Each latency is the "
              "median of its runs and its tail figure, the 99th percentile by nearest rank, which "
              f"is {measured_as(query_tails(document))}. {ranking}", ""]
-    lines += query_table(document)
+    lines += query_table(document, entries)
     for class_name, meaning in (("A", "returns once data is in the OS page cache"),
                                 ("B", "returns after a flush to the device")):
         unit = "day" if day else "slice"
+        clause = input_clause(document, class_name)
         lines += ["", f"Ingest and size, class {class_name}: {meaning}. Stored bytes are "
                       f"allocated at rest, and the ratio is the {unit}'s source bytes over them. "
                       + (f"{MACOS_ALLOCATION} " if host == "macOS" else "")
-                      + f"{WRITE_TIMES}", ""]
-        lines += ingest_table(document, class_name)
+                      + f"{WRITE_TIMES}"
+                      + (f" The rates below are not like for like: {clause}." if clause else ""),
+                  ""]
+        lines += ingest_table(document, class_name, entries)
     lines += ["", document["input"]["ingest_input"]]
     if day:
         rule = ("every variant tick-store has, since it ran alone" if alone
                 else "by the rule in compare/README.md")
         lines += ["", f"Every variant run on the full day, {rule}. "
                       "Queries are medians on the class B store.", ""]
-        lines += variant_table(document)
+        lines += variant_table(document, entries)
         if host == "Linux":
             lines += ["", "Peak memory per system, from compare/guard.py across the system's "
                           "whole run.", ""]
@@ -598,20 +634,29 @@ def compare_for(document):
                       f"{guard}A timed query with any page swapped in is kept and "
                       f"marked{SWAP_MARK}. See \"The guard's swap rule\" in docs/NOTES.md.", ""]
         lines += swap_table(document)
+    if any(DISTURBED_MARK in line for line in lines):
+        lines[0] += (f" A figure from a timed phase in which the disturbance file lists a "
+                     f"disturbance is marked{DISTURBED_MARK}; a verdict in Targets that rests on "
+                     "one says what it was beside its word.")
     return lines
 
 
-def render_compare(compare_dir):
+def render_compare(compare_dir, root=None):
+    """Every comparison file's block; with root, each figure from a timed phase in which the
+    tree's disturbance files list a disturbance is marked."""
     paths = sorted(compare_dir.glob("*.json"))
     documents = [json.loads(path.read_text(encoding="utf-8")) for path in paths]
     if not documents:
         return ["No reported comparison yet."]
+    entries = disturbance_entries(root) if root is not None else []
     lines = []
     for full_day in (True, False):
         for host in HOSTS:
-            for document in documents:
+            for path, document in zip(paths, documents):
                 if document["header"]["host"] == host and bool(full_day_of(document)) == full_day:
-                    lines += compare_for(document) + [""]
+                    own = [entry for entry in entries if entry["document"] ==
+                           f"compare/{path.name}" and entry["timed"]]
+                    lines += compare_for(document, own) + [""]
     return lines[:-1]
 
 
@@ -818,8 +863,9 @@ def judge(item, row, document):
     return text, met
 
 
-def lowest_parts(row, document):
-    """QL-4's parts: each query and kind, ours lowest of every system on each field."""
+def lowest_parts(row, document, mark=None):
+    """QL-4's parts: each query and kind, ours lowest of every system on each field. mark,
+    given a phase read, gives what stands beside a figure shown from it, as a disturbance."""
     spec = row["lowest_of"]
     parts = []
     for query in spec["queries"]:
@@ -848,7 +894,7 @@ def lowest_parts(row, document):
             names = " / ".join("median" if field == "median_us" else
                                tail if field in TAIL_FIELDS else field
                                for field in spec["fields"])
-            note = faster_variants(spec, document, query, kind, ours, row) if met else ""
+            note = faster_variants(spec, document, query, kind, ours, row, mark) if met else ""
             parts.append((f"{query} {kind}", f"{values} against {others} ({names}){note}", met))
     return parts
 
@@ -856,9 +902,10 @@ def lowest_parts(row, document):
 COUNT_WORDS = {2: "two", 3: "three", 4: "four"}
 
 
-def faster_variants(spec, document, query, kind, ours, row):
+def faster_variants(spec, document, query, kind, ours, row, mark=None):
     """For a part met under QL-4: that it compares headline variants, and each other system's
-    variant that is not its headline and has a lower median on that query, with its figures."""
+    variant that is not its headline and has a lower median on that query, with its figures
+    and, beside them, what mark gives for the phase they were timed in (review C1, 4d)."""
     count = 1 + len(spec["others"])
     note = f", met among the {COUNT_WORDS.get(count, str(count))} headline variants"
     first = spec["fields"][0]
@@ -869,7 +916,8 @@ def faster_variants(spec, document, query, kind, ours, row):
             block = walk(variant, ["queries", query, kind])
             if name != headline_name and block[first] < ours[first]:
                 figures = " / ".join(shown(block[field], row) for field in spec["fields"])
-                faster.append(f"{SYSTEM_LABEL[system]}'s `{name}` is faster, {figures}")
+                beside = mark(("queries", system, name, kind, query)) if mark else ""
+                faster.append(f"{SYSTEM_LABEL[system]}'s `{name}` is faster, {figures}{beside}")
     return note + (", though " + " and ".join(faster) if faster else "")
 
 
@@ -987,6 +1035,108 @@ def write_inputs(row, parts):
     return text
 
 
+def input_reads(document, class_name):
+    """Per system with a record of it, from its headline write of a class: (whether its input
+    was wholly resident when the clock started, the bytes read from the device inside the
+    clock or None)."""
+    found = {}
+    if not isinstance(document.get("systems"), dict):
+        return found
+    for system in ordered_systems(document):
+        try:
+            write = walk(document, ["systems", system, "variants", "@headline", "classes",
+                                    class_name, "write"])
+        except TargetError:
+            continue
+        detail = (write.get("detail") if isinstance(write, dict) else None) or {}
+        start = detail.get("input_at_clock_start")
+        if not isinstance(start, dict) or "pages" not in start:
+            continue
+        found[system] = (start["resident_pages"] == start["pages"],
+                         (detail.get("device_read") or {}).get("bytes"))
+    return found
+
+
+def byte_range(values):
+    low, high = min(values), max(values)
+    return f"{low:,} B" if low == high else f"{low:,} to {high:,} B"
+
+
+def input_sides(reads):
+    """(the systems whose input was resident, those whose was read from disk, the bytes read
+    inside each side's clocks), or None where the inputs are alike or tick-store's is unknown."""
+    if "tickstore" not in reads or len({resident for resident, _ in reads.values()}) < 2:
+        return None
+    resident = [system for system, (whole, _) in reads.items() if whole]
+    disk = [system for system, (whole, _) in reads.items() if not whole]
+    return resident, disk
+
+
+def possessive(systems):
+    return and_list([f"{SYSTEM_LABEL[system]}'s" for system in systems])
+
+
+# What engine-only holds and why the two clocks leave the difference in the inputs, as every
+# input note says it.
+ENGINE_ONLY_READS = ("engine-only, the clock less reading the input and putting it in the form "
+                     "the system's call takes, may still hold those reads, which are counted over "
+                     "the whole clock, so the two-clock rule does not take the difference out")
+
+
+def input_clause(document, class_name):
+    """For a comparison whose headline writes of a class did not start alike, by their records,
+    the one clause every page that quotes a write verdict against another system carries beside
+    it, and RESULTS.md beside the ingest table: whose input was in memory before the clock
+    started and whose was read from disk inside it, the bytes each side's records show read
+    from the device inside the clock, and what engine-only holds (review C1, conditions 2 and
+    3). None where they started alike."""
+    reads = input_reads(document, class_name)
+    sides = input_sides(reads)
+    if sides is None:
+        return None
+    resident, disk = sides
+    def side(systems):
+        found = [reads[system][1] for system in systems if reads[system][1] is not None]
+        return f", with {byte_range(found)} read from the device inside the clock" if found \
+            else ", with no device-read figure"
+    return (f"inputs not alike, by each write's record: {possessive(resident)} "
+            f"{'input is' if len(resident) == 1 else 'inputs are'} in memory before the clock "
+            f"starts{side(resident)}; {possessive(disk)} "
+            f"{'is' if len(disk) == 1 else 'are'} read from disk inside it{side(disk)}; "
+            f"{ENGINE_ONLY_READS}")
+
+
+def method_input_note(document):
+    """The sentence the comparison's method, wherever it is described, gives for a comparison
+    whose headline writes did not start alike: whose input is in memory before the clock and
+    whose is read from disk inside it, the bytes read from the device inside each side's
+    clocks over both classes, by the records, and what engine-only holds. None where alike."""
+    sides, by_class = {}, {}
+    for class_name in ("A", "B"):
+        reads = input_reads(document, class_name)
+        found = input_sides(reads)
+        if found is None:
+            continue
+        by_class[class_name] = reads
+        for side, systems in zip(("resident", "disk"), found):
+            sides.setdefault(side, [])
+            sides[side] += [system for system in systems if system not in sides[side]]
+    if not by_class:
+        return None
+    def read_bytes(side):
+        found = [reads[system][1] for reads in by_class.values() for system in sides[side]
+                 if system in reads and reads[system][1] is not None]
+        return byte_range(found) if found else "no device-read figure"
+    return (f"Write inputs are not alike on this day, by each write's record: "
+            f"{possessive(sides['resident'])} "
+            f"{'input is' if len(sides['resident']) == 1 else 'inputs are'} in memory before "
+            f"the clock starts, and {possessive(sides['disk'])} "
+            f"{'is' if len(sides['disk']) == 1 else 'are'} read from disk inside it, with "
+            f"{read_bytes('disk')} read from the device inside those headline write clocks of "
+            f"class {' and '.join(by_class)} against {read_bytes('resident')} inside "
+            f"{possessive(sides['resident'])}; {ENGINE_ONLY_READS}.")
+
+
 def target_text_of(row):
     return row.get("target_text") or " ".join(
         f"{COMPARATORS[name][1]} {shown(value, row)}" for name, value in row["target"].items())
@@ -1016,7 +1166,8 @@ def judged_parts(row, root):
                               "the four-system day")
     if "lowest_of" in row:
         document = documents[files[0]]
-        parts = [(*part, files[0], document) for part in lowest_parts(row, document)]
+        mark = figure_marker(root, files[0], document, row["lowest_of"]["file"], row)
+        parts = [(*part, files[0], document) for part in lowest_parts(row, document, mark)]
         return finished(row, root, [row["lowest_of"]] * len(parts), parts), None
     parts = []
     for spec, path in zip(row["parts"], files):
@@ -1093,6 +1244,44 @@ def replaced_pattern(pattern):
     return (found.parent / REPLACED / found.name).as_posix()
 
 
+def figure_marks(entries, root, path, document, read, replaced, row):
+    """What stands beside a figure shown from one timed phase, on any page: each disturbance
+    recorded in that phase, with the replaced run's figure there, and the record's flag of a
+    page swapped in while it was timed."""
+    marks = [f"measured in {disturbance_text(entry, found, replaced, row)}"
+             for entry, found in disturbed(entries, root, path, [read])]
+    if swapped_reads([read], document):
+        marks.append("which the record flags as timed while pages were swapped in")
+    return marks
+
+
+def figure_marker(root, path, document, pattern, row):
+    """mark for lowest_parts: given a phase read, ", " and each of figure_marks, or nothing."""
+    entries = disturbance_entries(root)
+    replaced = replaced_document(root, pattern)
+
+    def mark(read):
+        return "".join(f", {text}" for text in figure_marks(entries, root, path, document, read,
+                                                            replaced, row))
+    return mark
+
+
+def replaced_document(root, pattern):
+    """(path, document) of the replaced run's file for a results pattern, its bytes held to
+    their pin, or None where no file was replaced."""
+    path = target_file(Path(root), replaced_pattern(pattern))
+    if path is None:
+        return None
+    data = path.read_bytes()
+    pins_path = Path(root) / "scripts" / "data_pins.json"
+    pins = json.loads(pins_path.read_text(encoding="utf-8")) if pins_path.exists() else {}
+    if (pins.get(REPLACED_PINS) or {}).get(path.name) != hashlib.sha256(data).hexdigest():
+        raise TargetError(f"{path.relative_to(root)} is not pinned by its SHA-256 under "
+                          f"{REPLACED_PINS} in scripts/data_pins.json, so its bytes could "
+                          "have changed since it was the reported file")
+    return path, json.loads(data.decode("utf-8"))
+
+
 def judged_on_what_it_has(conditions, row, document):
     """A part judged on a replaced run's file: (met, text, the labels judged, what it lacks).
     A condition whose figure the older file does not keep is left out, and the rest decide."""
@@ -1118,17 +1307,10 @@ def replaced_parts(row, root, specs):
     old = {}
     for spec in dict.fromkeys(json.dumps(spec, sort_keys=True) for spec in specs):
         spec = json.loads(spec)
-        path = target_file(root, replaced_pattern(spec["file"]))
-        if path is None:
+        found = replaced_document(root, spec["file"])
+        if found is None:
             return None
-        data = path.read_bytes()
-        pins_path = root / "scripts" / "data_pins.json"
-        pins = json.loads(pins_path.read_text(encoding="utf-8")) if pins_path.exists() else {}
-        if (pins.get(REPLACED_PINS) or {}).get(path.name) != hashlib.sha256(data).hexdigest():
-            raise TargetError(f"{path.relative_to(root)} is not pinned by its SHA-256 under "
-                              f"{REPLACED_PINS} in scripts/data_pins.json, so its bytes could "
-                              "have changed since it was the reported file")
-        document = json.loads(data.decode("utf-8"))
+        path, document = found
         if "lowest_of" in row:
             for label, text, met in lowest_parts(row, document):
                 old[label] = (met, text, None, [], path, document)
@@ -1152,6 +1334,11 @@ def finished(row, root, specs, parts):
     done = []
     for spec, (label, text, met, path, document) in zip(specs, parts):
         notes = {}
+        # A row judged on no other system has no outcome of the replaced run to show, but a
+        # disturbed phase it rests on still gives the replaced run's figure there (review C1).
+        found = replaced_document(root, spec["file"])
+        if found is not None:
+            notes["replaced"] = found
         if old is not None and label in old:
             old_met, old_text, labels, missing, old_path, old_document = old[label]
             notes["replaced"] = (old_path, old_document)
@@ -1166,6 +1353,14 @@ def finished(row, root, specs, parts):
         found = disturbed(entries, root, path, reads)
         if found:
             notes["disturbed"] = found
+        # Each figure the part rests on that the record flags as timed with a page swapped in,
+        # and, where the replaced run's outcome is counted with this run's, the replaced run's.
+        swapped = [(*read[:2], False) for read in swapped_reads(reads, document)]
+        if notes.get("change"):
+            swapped += [(*read[:2], True) for read in
+                        swapped_reads(reads, notes["replaced"][1])]
+        if swapped:
+            notes["swapped"] = list(dict.fromkeys(swapped))
         writes = [read for read in reads if read[0] == "write"]
         if writes and is_comparison(row):
             notes["write"] = writes[0][3]
@@ -1174,8 +1369,8 @@ def finished(row, root, specs, parts):
 
 
 def phase_of_path(path, document):
-    """The timed phase a path into a comparison file reads, or None: a write of a class, or a
-    query of a kind, of a system's variant."""
+    """The timed phase a path into a comparison file reads, or None: a write of a class, with
+    the field read from it, or a query of a kind, of a system's variant."""
     if len(path) < 7 or path[0] != "systems" or path[2] != "variants":
         return None
     system = path[1]
@@ -1183,7 +1378,7 @@ def phase_of_path(path, document):
     if variant == "@headline":
         variant = walk(document, ["systems", system, "headline_variant"])
     if path[4] == "classes" and path[6] == "write":
-        return ("write", system, variant, path[5])
+        return ("write", system, variant, path[5], path[7] if len(path) > 7 else None)
     if path[4] == "queries":
         return ("queries", system, variant, path[6], path[5])
     return None
@@ -1398,61 +1593,138 @@ def utc_span(entry):
 
 
 def phase_words(entry, read):
+    """The phase an entry fell in, in words: a query phase the entry names whole is its kind's
+    queries, so the words hold no query's name the README's first screen refuses."""
     if read[0] == "case":
         return f"the case `{entry['case']}`"
     system = SYSTEM_LABEL.get(entry["system"], entry["system"])
     if read[0] == "write":
         return f"{system}'s `{entry['variant']}` class {entry['class']} write {entry['repetition']}"
-    return f"{system}'s `{entry['variant']}` {read[3]} {read[4]}"
+    if entry.get("query") is None:
+        return f"{system}'s `{entry['variant']}` {read[3]} queries"
+    return f"{system}'s `{entry['variant']}` {read[3]} {entry['query']}"
 
 
 def replaced_figure(read, replaced, row):
-    """The replaced run's figure of a phase: a write's total seconds, or a query's median."""
+    """The replaced run's figure of a phase: a write's rate where the part reads its rate, else
+    its total seconds, or a query's median."""
     if read[0] == "case" or replaced is None:
         return None
     try:
         variant = walk(replaced[1], ["systems", read[1], "variants", read[2]])
         if read[0] == "write":
+            if len(read) > 4 and read[4] == "records_per_second_median":
+                return "rate", walk(variant, ["classes", read[3], "write", read[4]])
             return "total", walk(variant, ["classes", read[3], "write", "seconds_median"])
         return "median", walk(variant, ["queries", read[4], read[3], "median_us"])
     except TargetError:
         return None
 
 
-def verdict_marks(parts, row=None):
-    """What stands beside a verdict: each part whose outcome the replaced run's figures
-    change, with both outcomes, whether the change favours tick-store and the one counts take;
-    and each disturbance recorded in a phase a part rests on, with the replaced run's figure
-    there where there is one."""
-    marks = []
-    for part in parts:
-        change = notes_of(part).get("change")
-        if change:
-            favours = ", a change that favours tick-store," if \
-                standing(change["new"]) > standing(change["old"]) else ""
-            marks.append(f"({part[0]}) {verdict_word(change['new'])} on this run's figures"
-                         f"{favours} and {verdict_word(change['old'])} on the replaced run's, "
-                         f"so counted {verdict_word(counted(part))}")
+def disturbance_text(entry, read, replaced, row):
+    """One disturbance in a phase, its span, and the replaced run's figure there if any."""
+    text = f"{phase_words(entry, read)}, which held {entry['what']}, {utc_span(entry)}"
+    figure = replaced_figure(read, replaced, row or {})
+    if figure is not None:
+        text += f", where the replaced run's {figure[0]} is {shown(figure[1], row or {})}"
+    return text
+
+
+# What a mark says of a figure timed while a page was swapped in, as the record's own
+# timed_policy has it: the number is kept and marked, and a verdict that rests on it says so.
+# The systems follow a semicolon, so a sentence read for a faster write ends before them.
+SWAPPED = "rests on figures timed while pages were swapped in; the record flags "
+
+
+def swapped_reads(reads, document):
+    """The query phases among reads whose record flags a page swapped in while they were
+    timed: (system, variant, kind, query)."""
+    found = []
+    for read in reads:
+        if read[0] != "queries":
+            continue
+        try:
+            block = walk(document, ["systems", read[1], "variants", read[2], "queries", read[4],
+                                    read[3]])
+        except TargetError:
+            continue
+        if isinstance(block, dict) and (block.get("swap_timed") or {}).get("flagged"):
+            found.append(read[1:])
+    return found
+
+
+def change_text(part, labelled=True):
+    """A part whose outcome the replaced run's figures change: its outcome on this run first,
+    the verdict word the rule gives it, then the replaced run's, whether the change favours
+    tick-store, and the one every count, ranking and first screen takes."""
+    change = notes_of(part)["change"]
+    favours = ", a change that favours tick-store," if \
+        standing(change["new"]) > standing(change["old"]) else ""
+    return ((f"({part[0]}) " if labelled else "") +
+            f"{verdict_word(change['new'])} on this run's figures{favours} and "
+            f"{verdict_word(change['old'])} on the replaced run's, so counted as "
+            f"{verdict_word(counted(part))} in every count, ranking and first screen on these pages")
+
+
+def change_marks(parts):
+    return [change_text(part) for part in parts if notes_of(part).get("change")]
+
+
+def phase_marks(parts, row=None, labelled=True):
+    """What stands beside a verdict for the phases its parts rest on: each disturbance recorded
+    in one, with the replaced run's figure there where there is one; and each figure the record
+    flags as timed while a page was swapped in. Unlabelled, as on the README's first screen,
+    the marks name no part."""
     held = {}
     for part in parts:
         for entry, read in notes_of(part).get("disturbed", []):
-            text = (f"rests on {phase_words(entry, read)}, which held {entry['what']}, "
-                    f"{utc_span(entry)}")
-            figure = replaced_figure(read, notes_of(part).get("replaced"), row or {})
-            if figure is not None:
-                text += f", where the replaced run's {figure[0]} is {shown(figure[1], row or {})}"
+            text = "rests on " + disturbance_text(entry, read, notes_of(part).get("replaced"), row)
             held.setdefault(text, []).append(part[0])
+    for part in parts:
+        swapped = notes_of(part).get("swapped") or []
+        if swapped:
+            text = SWAPPED + and_list([f"{SYSTEM_LABEL.get(system, system)}'s `{variant}`" + (
+                " on the replaced run" if old else "") for system, variant, old in swapped])
+            held.setdefault(text, []).append(part[0])
+    marks = []
     for text, labels in held.items():
-        who = "every part" if len(labels) == len(parts) > 1 else \
-            ", ".join(f"({label})" for label in labels)
-        marks.append(f"{who} {text}")
+        who = "" if not labelled else "every part " if len(labels) == len(parts) > 1 else \
+            ", ".join(f"({label})" for label in labels) + " "
+        marks.append(f"{who}{text}")
     return marks
 
 
-def verdict_of(parts, row=None):
-    """The verdict on the parts' counted outcomes, with its marks beside it."""
-    marks = verdict_marks(parts, row)
-    return core_verdict(parts) + "".join(f"; {mark}" for mark in marks)
+def verdict_marks(parts, row=None):
+    """Every mark that stands beside a verdict, as the essay quotes them: each part whose
+    outcome the replaced run's figures change, with both outcomes, whether the change favours
+    tick-store and the one counts take; and each mark of the phases its parts rest on."""
+    return change_marks(parts) + phase_marks(parts, row)
+
+
+def verdict_of(parts, row=None, labelled=True):
+    """The verdict as the rule gives it, each changed part under its own outcome with its mark
+    beside the word, and the marks of the phases it rests on."""
+    marks = phase_marks(parts, row, labelled)
+    return shown_verdict(parts) + "".join(f"; {mark}" for mark in marks)
+
+
+def shown_verdict(parts):
+    """The verdict words: a part the replaced run's figures change stands apart, under the
+    outcome the rule gives it on this run, with both outcomes and the counted one beside that
+    word, and the others' counted outcomes as core_verdict gives them (review C1, E)."""
+    changed = [part for part in parts if notes_of(part).get("change")]
+    if not changed:
+        return core_verdict(parts)
+    pieces = [change_text(part) + ", both runs' figures under Measured" for part in changed]
+    rest = [part for part in parts if not notes_of(part).get("change")]
+    if not rest:
+        return "; ".join(pieces)
+    words = core_verdict(rest)
+    if words in ("met", "missed"):
+        words = f"{words} on " + ", ".join(f"({part[0]})" for part in rest)
+    met = [piece for piece in words.split("; ") if piece.startswith("met on ")]
+    others = [piece for piece in words.split("; ") if not piece.startswith("met on ")]
+    return "; ".join(met + pieces + others)
 
 
 def core_verdict(parts):
@@ -1748,8 +2020,16 @@ def left_out_items(definitions, root, shown, names):
             if kind == "met":
                 met_parts += 1
             else:
-                items[kind].append((row["host"], name))
+                items[kind].append((row["host"], marked_name(name, part, row)))
     return items, met_parts, counts, named
+
+
+def marked_name(name, part, row):
+    """A left-out part's plain name on the line under the table, with each mark its verdict
+    carries beside it in brackets, unlabelled, as the first screen names no part (review C1)."""
+    marks = ([change_text(part, labelled=False)] if notes_of(part).get("change") else []) + \
+        phase_marks([part], row, labelled=False)
+    return name + "".join(f" ({mark})" for mark in marks)
 
 
 def host_groups(found, hosts):
@@ -1843,7 +2123,24 @@ def check_left_out(line, definitions, root, shown, names, hosts):
     the targets' own, with each target asked for named among its own class's count and no
     other; and what the screen shows, names and counts adds up to every row of the targets and
     every part of the targets it shows, so nothing drops out unseen. A headline never hides a
-    miss."""
+    miss. A part whose verdict carries a mark is named with it, as marked_name gives it: each
+    such name is read whole before the line is split, and a name without its mark is not the
+    part's name (review C1)."""
+    tokens = {}
+    for row in definitions["rows"]:
+        key = (row["id"], row["host"])
+        if key not in shown:
+            continue
+        for part in judged_parts(row, root)[0]:
+            name = names[key].get("parts", {}).get(part[0])
+            if part[0] in shown[key] or not name or class_of([counted(part)]) == "met":
+                continue
+            token = marked_name(name, part, row)
+            if token != name:
+                tokens.setdefault(token, f"\x00{len(tokens)}\x00")
+    for token in sorted(tokens, key=len, reverse=True):
+        line = line.replace(token, tokens[token])
+    whole = {shield: token for token, shield in tokens.items()}
     sentences = {}
     clause = COUNT_CLAUSE.search(line)
     if clause is None:
@@ -1897,7 +2194,7 @@ def check_left_out(line, definitions, root, shown, names, hosts):
             if kind == "met":
                 met_parts += 1
                 continue
-            name = names[key].get("parts", {}).get(part[0])
+            name = marked_name(names[key].get("parts", {}).get(part[0]), part, row)
             found_items[kind].setdefault(name, {})[row["host"]] = key
             named_parts += 1
     for kind, head in LEFT_OUT_HEADS.items():
@@ -1909,6 +2206,8 @@ def check_left_out(line, definitions, root, shown, names, hosts):
             wanted[(where, name)] = next(iter(by_host.values()))
         sentence = sentences.get(head)
         given = stated_items(sentence[len(head) + 2:], hosts, kind) if sentence else set()
+        given = {(where, re.sub("\x00\\d+\x00", lambda found: whole[found.group(0)], name))
+                 for where, name in given}
         for (where, name), key in wanted.items():
             if (where, name) in given:
                 continue
@@ -1944,28 +2243,52 @@ def check_left_out(line, definitions, root, shown, names, hosts):
                           f"{named_parts} and counts {stated_met} met, of their {total_parts}")
 
 
-def under_sentence(under, row, parts, hosts):
+def under_sentence(under, row, parts, hosts, root):
     """The sentence under the table, with its row's figure and verdict."""
     return filled([under["text"]], under, row, parts, hosts, "the sentence under the table",
-                  {"verdict": verdict_of(parts, row)})[0]
+                  {"verdict": verdict_of(parts, row, labelled=False),
+                   **value_marks(under, parts, root, row)})[0]
 
 
-def check_under(sentence, under, row, parts, hosts):
+def check_under(sentence, under, row, parts, hosts, root):
     """The sentence under the table, checked apart from the code that writes it: a row met or
     missed in whole says that word, and any other says neither (review DX-4)."""
     kind = class_of([counted(part) for part in parts])
-    marks = "".join(f"; {mark}" for mark in verdict_marks(parts, row))
+    marks = "".join(f"; {mark}" for mark in phase_marks(parts, row, labelled=False))
+    beside = value_marks(under, parts, root, row)
     if kind in ("met", "missed"):
         expected = filled([under["text"]], under, row, parts, hosts,
-                          "the sentence under the table", {"verdict": kind + marks})[0]
+                          "the sentence under the table", {"verdict": kind + marks, **beside})[0]
         if sentence != expected:
             raise TargetError(f"the sentence under the table reads {sentence!r}, and its row is "
                               f"{kind}: {expected!r}")
         return
     for word in ("met", "missed"):
         if sentence == filled([under["text"]], under, row, parts, hosts,
-                              "the sentence under the table", {"verdict": word + marks})[0]:
+                              "the sentence under the table", {"verdict": word + marks,
+                                                               **beside})[0]:
             raise TargetError(f"the sentence under the table says {word}, and its row is {kind}")
+
+
+def value_marks(spec, parts, root, row):
+    """For each named value of a headline text read from a timed phase that holds a recorded
+    disturbance, or that the record flags as timed with a page swapped in, the value
+    "<name>_mark" with what figure_marks says of it. filled() refuses a value no text names, so
+    a text that shows such a figure and not its mark is refused (review C1, 4d)."""
+    marks = {}
+    entries = disturbance_entries(root)
+    for name, value in (spec.get("values") or {}).items():
+        expression = value.get("value") if isinstance(value, dict) else None
+        if not isinstance(expression, dict):
+            continue
+        found = []
+        for path, document in {part[3]: part[4] for part in parts}.items():
+            replaced = notes_of(next(part for part in parts if part[3] == path)).get("replaced")
+            for read in reads_of(expression, document):
+                found += figure_marks(entries, root, path, document, read, replaced, row)
+        if found:
+            marks[f"{name}_mark"] = ", ".join(dict.fromkeys(found))
+    return marks
 
 
 def headline_cells(entry, rows, root, hosts):
@@ -1981,8 +2304,9 @@ def headline_cells(entry, rows, root, hosts):
         no_typed_figure(entry[key], hosts, f"its {key} {entry[key]!r}")
     _, parts = shown_parts(entry, row, root)
     bar, measured = filled([entry["bar"], entry["measured"]], entry, row, parts, hosts,
-                           "its bar and measured")
-    return (entry["what"], f"{bar} ({entry['source']})", measured, verdict_of(parts, row)), parts
+                           "its bar and measured", value_marks(entry, parts, root, row))
+    return (entry["what"], f"{bar} ({entry['source']})", measured,
+            verdict_of(parts, row, labelled=False)), parts
 
 
 def render_headline(definitions_path, root):
@@ -2018,8 +2342,8 @@ def render_headline(definitions_path, root):
                                   "under the table")
             _, parts = shown_parts(under, row, root)
             shown.setdefault((under["id"], under["host"]), set()).update(p[0] for p in parts)
-            sentence = under_sentence(under, row, parts, hosts)
-            check_under(sentence, under, row, parts, hosts)
+            sentence = under_sentence(under, row, parts, hosts, root)
+            check_under(sentence, under, row, parts, hosts, root)
             lines += ["", sentence]
         names = plain_names(definitions, hosts)
         items, met_parts, counts, named = left_out_items(definitions, root, shown, names)
@@ -2458,6 +2782,126 @@ def page_problem(pages, writers):
     return None
 
 
+# A target's id as a page writes it, or a run of them, "QL-1 to QL-3"; a word that gives a
+# verdict; and the words that name each host on the pages.
+TARGET_ID = re.compile(r"(?<![\w-])([A-Z]{1,3})-(\d+)(?: to (?:\1-)?(\d+))?(?![\w-])")
+VERDICT_WORDS = re.compile(r"\b(?:met|missed|meets?|misses|not judged)\b", re.IGNORECASE)
+HOST_WORDS = {"Linux": ("Linux", "the Ryzen"), "macOS": ("macOS", "the laptop", "the Mac")}
+HOST_CELLS = {"any": ("any",), "linux": ("Linux",), "macos": ("macOS",),
+              "both": ("Linux", "macOS", "any")}
+# The pages whose hand-written text a reader takes a verdict from: every one the faster-write
+# rule reads, the generated blocks left out, which carry the marks by construction.
+GENERATED_BLOCKS = ((TARGETS_BEGIN, TARGETS_END), (BEGIN, END), (COMPARE_BEGIN, COMPARE_END),
+                    (HEADLINE_BEGIN, HEADLINE_END))
+
+
+def without_blocks(text):
+    """A page with its generated blocks blanked, their lines kept, so line numbers hold."""
+    for begin, end in GENERATED_BLOCKS:
+        found = block_of(text, begin, end)
+        if found is not None:
+            before, block, after = found
+            text = before + "\n" * block.count("\n") + after
+    return text
+
+
+def row_marks(row, root):
+    """Every mark a quote of a row's verdict carries: each mark RESULTS.md sets beside it, word
+    for word, a changed part's own included, and for a write against other systems the input
+    clause input_clause gives (review C1, item 8)."""
+    parts, _ = judged_parts(row, root)
+    if parts is None:
+        return []
+    marks = change_marks(parts) + phase_marks(parts, row)
+    classes = [notes_of(part)["write"] for part in parts if notes_of(part).get("write")]
+    clause = input_clause(parts[0][4], classes[0]) if classes else None
+    return marks + ([clause] if clause else [])
+
+
+def quoted_rows(unit, rows):
+    """(text, the (id, host) rows whose verdict it quotes) for a unit of a page: a table row
+    whose first cell is a target's id and second its host, whole; or each sentence that names
+    a target's id and a verdict word, on the host it names where the target has a row there."""
+    if unit.startswith("|"):
+        cells = [cell.strip() for cell in unit.strip().strip("|").split("|")]
+        hosts = HOST_CELLS.get(cells[1].lower()) if len(cells) > 2 else None
+        if not hosts or not any(key[0] == cells[0] for key in rows):
+            return []
+        return [(unit, {key for key in rows if key[0] == cells[0] and key[1] in hosts})]
+    found = []
+    for sentence in sentences_of(unit):
+        if not VERDICT_WORDS.search(sentence):
+            continue
+        named = set()
+        for match in TARGET_ID.finditer(sentence):
+            last = int(match.group(3) or match.group(2))
+            named.update(f"{match.group(1)}-{number}"
+                         for number in range(int(match.group(2)), last + 1))
+        hosts = [host for host, words in HOST_WORDS.items()
+                 if any(re.search(rf"(?<![\w-]){re.escape(word)}(?![\w-])", sentence)
+                        for word in words)]
+        keys = set()
+        for ident in named:
+            own = {key for key in rows if key[0] == ident}
+            there = {key for key in own if len(hosts) == 1 and key[1] in (hosts[0], "any")}
+            keys |= there or own
+        if keys:
+            found.append((sentence, keys))
+    return found
+
+
+def quote_problem(pages, definitions, root):
+    """Where and why a hand-written row or sentence quotes the verdict of a target-and-machine
+    row without a mark RESULTS.md sets beside that verdict, or None. pages is (name, text)."""
+    rows = {(row["id"], row["host"]): row for row in definitions["rows"]}
+    marks = {}
+    for name, text in pages:
+        for number, unit in prose_units(without_blocks(text)):
+            for quote, keys in quoted_rows(unit, rows):
+                said = " ".join(quote.split())
+                for key in sorted(keys):
+                    if key not in marks:
+                        marks[key] = row_marks(rows[key], root)
+                    missing = [mark for mark in marks[key] if mark not in said]
+                    if missing:
+                        return (f"{name}:{number}: {quote[:80]!r} quotes the verdict of {key[0]} "
+                                f"on {key[1]} without a mark RESULTS.md sets beside it: "
+                                f"{missing[0]!r}")
+    return None
+
+
+# The sections that describe the comparison's method by hand, each of which gives the input
+# note of every comparison whose writes did not start alike (review C1, condition 2).
+METHOD_SECTIONS = (("README.md", "## Comparison"), ("RESULTS.md", "## Comparison"))
+
+
+def method_problem(pages, root):
+    """Where a section describing the comparison's method lacks method_input_note's sentence for
+    a comparison file of the tree, or None. pages is (name, text); its generated blocks do not
+    count, so the hand-written method says it."""
+    notes = []
+    for path in sorted((Path(root) / "results" / "compare").glob("*.json")):
+        note = method_input_note(json.loads(path.read_text(encoding="utf-8")))
+        if note:
+            notes.append((path.name, note))
+    texts = dict(pages)
+    for name, heading in METHOD_SECTIONS:
+        if name not in texts or not notes:
+            continue
+        lines = without_blocks(texts[name]).split("\n")
+        if heading not in lines:
+            return f"{name} has no {heading!r} section to describe the comparison's method"
+        start = lines.index(heading) + 1
+        end = next((index for index in range(start, len(lines))
+                    if re.match(r"#{1,2} ", lines[index])), len(lines))
+        section = " ".join(" ".join(lines[start:end]).split())
+        for file_name, note in notes:
+            if note not in section:
+                return (f"{name}'s {heading!r} does not say where the writes' inputs were in "
+                        f"{file_name}: {note!r}")
+    return None
+
+
 def block_of(text, begin=BEGIN, end=END):
     """(before, block, after) around the markers, or None if they are not both there."""
     first = text.find(begin)
@@ -2537,7 +2981,8 @@ def main(argv=None):
     blocks = [(BEGIN, END, render(args.results))]
     if block_of(text, COMPARE_BEGIN, COMPARE_END) is not None:
         try:
-            blocks.append((COMPARE_BEGIN, COMPARE_END, render_compare(args.compare_results)))
+            blocks.append((COMPARE_BEGIN, COMPARE_END, render_compare(args.compare_results,
+                                                                      args.targets_root)))
         except TargetError as error:
             print(f"render_results: comparison: {error}", file=sys.stderr)
             return EXIT_USAGE
@@ -2593,6 +3038,12 @@ def main(argv=None):
         problem = page_problem(pages, writers)
         if problem:
             raise TargetError(problem)
+        if has_targets:
+            problem = quote_problem(pages, json.loads(args.targets.read_text(
+                encoding="utf-8")), args.targets_root) or method_problem(pages,
+                                                                         args.targets_root)
+            if problem:
+                raise TargetError(problem)
     except (OSError, json.JSONDecodeError, TargetError) as error:
         print(f"render_results: targets: {error}", file=sys.stderr)
         return EXIT_USAGE

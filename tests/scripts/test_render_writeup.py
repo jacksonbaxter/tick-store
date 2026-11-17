@@ -1016,7 +1016,8 @@ class Marks(Tree):
         page = self.renders()
         self.assertIn("The day write is missed; (against ArcticDB) met on this run's figures, a "
                       "change that favours tick-store, and missed on the replaced run's, so "
-                      "counted missed; inputs of the class B writes, from each write's record: "
+                      "counted as missed in every count, ranking and first screen on these "
+                      "pages; inputs of the class B writes, from each write's record: "
                       "tick-store's input, `input`, is in memory before the clock starts", page)
         self.assertIn("ArcticDB's input, `input`, is read from disk inside the clock", page)
 

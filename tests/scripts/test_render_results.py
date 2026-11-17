@@ -1754,7 +1754,7 @@ class LeftOutLineTest(Scratch):
 
     def test_a_sentence_under_the_table_that_always_says_met_is_refused(self):
         def always_met(_):
-            def write(under, row, parts, hosts):
+            def write(under, row, parts, hosts, *_):
                 return RENDER.filled([under["text"]], under, row, parts, hosts, "under",
                                      {"verdict": "met"})[0]
             return write
@@ -1772,7 +1772,7 @@ class LeftOutLineTest(Scratch):
                       RENDER.render_headline(self.targets, self.tree))
 
         def always_met(_):
-            def write(under, row, parts, hosts):
+            def write(under, row, parts, hosts, *_):
                 return RENDER.filled([under["text"]], under, row, parts, hosts, "under",
                                      {"verdict": "met"})[0]
             return write
@@ -2128,9 +2128,14 @@ class ReplacedRunTest(Scratch):
                       "total 189.0 s against 124.0 s, engine-only 188.6 s against 43.0 s",
                       parts[0][1])
         verdict = RENDER.verdict_of(parts, CHANGE_ROW)
-        self.assertTrue(verdict.startswith("missed; (against ArcticDB) met on this run's figures, "
-                                           "a change that favours tick-store, and missed on the "
-                                           "replaced run's, so counted missed"), verdict)
+        # The verdict word the rule gives on this run's figures, with the mark beside it: both
+        # outcomes, that the change favours tick-store, and the one every count takes (C1).
+        self.assertTrue(verdict.startswith("(against ArcticDB) met on this run's figures, a "
+                                           "change that favours tick-store, and missed on the "
+                                           "replaced run's, so counted as missed in every count, "
+                                           "ranking and first screen on these pages, both runs' "
+                                           "figures under Measured"), verdict)
+        self.assertNotIn("missed on (against ArcticDB)", verdict)
         self.assertEqual(RENDER.verdict_class(parts), "missed")
         self.assertIn("replaced/Linux-day-67ae574f5666.json", RENDER.files_of(parts, self.tree))
 
@@ -2141,7 +2146,7 @@ class ReplacedRunTest(Scratch):
         parts = self.parts()
         verdict = RENDER.verdict_of(parts, CHANGE_ROW)
         self.assertIn("(against ArcticDB) missed on this run's figures and met on the replaced "
-                      "run's, so counted missed", verdict)
+                      "run's, so counted as missed in every count", verdict)
         self.assertNotIn("favours", verdict)
 
     def test_an_older_file_is_judged_on_the_clock_it_keeps_and_says_so(self):
@@ -2305,6 +2310,249 @@ class ReplacedRunTest(Scratch):
         for name in sorted(set(RESULTS_PAGES) | set(RENDER.RESULTS_PAGES)):
             with self.subTest(page=name):
                 self.assertTrue((REPO_ROOT / name).is_file(), name)
+
+
+# A row judged against a constant, on a rate read from a write, as WT-2.
+RATE_ROW = {"id": "T-12", "host": "Linux", "target": {"above": 5}, "digits": 1, "unit": " r/s",
+            "parts": [{"label": "class B", "file": "results/compare/Linux-day-*.json",
+                       "value": {"path": [*b_write("tickstore"), "records_per_second_median"]}}]}
+# A query of tick-store's against ArcticDB's, as one of QL-4's parts.
+SWAP_ROW = {"id": "T-13", "host": "Linux", "digits": 2, "scale": 0.001, "unit": " ms",
+            "parts": [{"label": "Q2 warm", "file": "results/compare/Linux-day-*.json",
+                       "value": {"path": ["systems", "tickstore", "variants", "@headline",
+                                          "queries", "Q2", "warm", "median_us"]},
+                       "at_most": {"path": ["systems", "arcticdb", "variants", "@headline",
+                                            "queries", "Q2", "warm", "median_us"]}}]}
+SCREEN_HOSTS = {"Linux": {"introduced": "a Linux box", "then": "the box"},
+                "macOS": {"introduced": "a laptop", "then": "the laptop"}, "both": "both"}
+
+
+def with_queries(document, flagged=()):
+    """A change_document with a warm Q2 for each system, the ones named flagged as timed with
+    a page swapped in."""
+    for system, entry in document["systems"].items():
+        block = {"median_us": 1000.0 if system == "tickstore" else 2000.0, "p99_us": 3000.0}
+        if system in flagged:
+            block["swap_timed"] = {"pages_in": 3, "pages_out": 0, "flagged": True}
+        entry["variants"]["h"]["queries"] = {"Q2": {"warm": block}}
+    return document
+
+
+class ConditionsTest(Scratch):
+    """Review C1: the four conditions on publishing a verdict. A changed verdict stands under
+    the word the rule gives with its mark beside it; a write verdict quoted anywhere carries
+    where the inputs were; a disturbed phase gives the replaced run's figure on every row and is
+    marked in the tables; a figure timed with a page swapped in is said beside the verdict; and
+    no hand-written page quotes a marked verdict without its marks."""
+
+    def setUp(self):
+        super().setUp()
+        self.compare_dir = self.tree / "results" / "compare"
+        (self.compare_dir / "replaced").mkdir(parents=True)
+        (self.tree / "scripts").mkdir()
+        self.new = self.compare_dir / f"Linux-day-{FREEZE[:12]}.json"
+        self.old = self.compare_dir / "replaced" / "Linux-day-67ae574f5666.json"
+
+    write = ReplacedRunTest.write
+    parts = ReplacedRunTest.parts
+    favourable_change = ReplacedRunTest.favourable_change
+
+    def disturb(self, *entries):
+        (self.tree / "results" / f"disturbances-{FREEZE[:12]}.json").write_text(
+            json.dumps(disturbances(*entries)), encoding="utf-8")
+
+    def test_a_disturbed_phase_of_a_row_against_no_system_gives_the_replaced_figure(self):
+        new = change_document(dict(recorded_write(190.0, 0.4), records_per_second_median=2.0),
+                              recorded_write(381.0, 90.0))
+        old = change_document(dict(recorded_write(189.0, 0.4), records_per_second_median=3.0),
+                              recorded_write(124.0, 81.0), commit="67ae574f5666")
+        self.write(new, old)
+        self.disturb()
+        verdict = RENDER.verdict_of(self.parts(RATE_ROW), RATE_ROW)
+        self.assertEqual(verdict, "missed; (class B) rests on tick-store's `h` class B write 1, "
+                                  "which held a remote login by this project, 2026-11-15 03:22 "
+                                  "UTC, to the minute, where the replaced run's rate is 3.0 r/s")
+
+    def test_a_verdict_on_a_figure_timed_with_a_page_swapped_in_says_so(self):
+        document = with_queries(change_document(recorded_write(1.0, 0.1),
+                                                recorded_write(2.0, 0.1)), flagged=["arcticdb"])
+        self.write(document)
+        parts = self.parts(SWAP_ROW)
+        self.assertEqual(RENDER.verdict_of(parts, SWAP_ROW),
+                         "met; (Q2 warm) rests on figures timed while pages were swapped in; the "
+                         "record flags ArcticDB's `h`")
+        # On the first screen, which names no query, the mark names no part.
+        self.assertEqual(RENDER.verdict_of(parts, SWAP_ROW, labelled=False),
+                         "met; rests on figures timed while pages were swapped in; the record "
+                         "flags ArcticDB's `h`")
+        self.write(with_queries(change_document(recorded_write(1.0, 0.1),
+                                                recorded_write(2.0, 0.1))))
+        self.assertEqual(RENDER.verdict_of(self.parts(SWAP_ROW), SWAP_ROW), "met")
+
+    def test_a_headline_figure_from_a_disturbed_phase_must_show_its_mark(self):
+        self.write(with_queries(change_document(recorded_write(1.0, 0.1),
+                                                recorded_write(2.0, 0.1))))
+        self.disturb(dict(LOGIN, phase="warm queries", system="arcticdb", query=None,
+                          **{"class": None, "repetition": None}))
+        path = self.tree / "results" / f"disturbances-{FREEZE[:12]}.json"
+        document = json.loads(path.read_text())
+        for entry in document["entries"]:
+            del entry["class"], entry["repetition"]
+        path.write_text(json.dumps(document), encoding="utf-8")
+        spec = {"values": {"theirs": {"value": SWAP_ROW["parts"][0]["at_most"], "scale": 0.001,
+                                      "format": "{:.2f}"}}}
+        parts = self.parts(SWAP_ROW)
+        marks = RENDER.value_marks(spec, parts, self.tree, SWAP_ROW)
+        self.assertEqual(marks, {"theirs_mark": "measured in ArcticDB's `h` warm queries, which "
+                                                "held a remote login by this project, 2026-11-15 "
+                                                "03:22 UTC, to the minute"})
+        with self.assertRaisesRegex(RENDER.TargetError, "takes the value 'theirs_mark' and names "
+                                                        "it nowhere"):
+            RENDER.filled(["ArcticDB {theirs} ms"], spec, SWAP_ROW, parts, SCREEN_HOSTS, "it",
+                          marks)
+        self.assertEqual(RENDER.filled(["ArcticDB {theirs} ms, {theirs_mark}"], spec, SWAP_ROW,
+                                       parts, SCREEN_HOSTS, "it", marks),
+                         ["ArcticDB 2.00 ms, " + marks["theirs_mark"]])
+
+    def test_a_faster_variant_shown_beside_a_ranking_carries_its_phases_mark(self):
+        document = dict(lowest_document(), header={"host": "Linux", "commit": FREEZE})
+        parquet = document["systems"]["parquet"]["variants"]
+        parquet["fast"] = json.loads(json.dumps(parquet["h"]))
+        parquet["fast"]["queries"]["Q1"]["warm"] = latency(500.0, 900.0, 30)
+        (self.tree / "results" / "day-0123.json").write_text(json.dumps(document),
+                                                            encoding="utf-8")
+        self.write(change_document(recorded_write(1.0, 0.1), recorded_write(2.0, 0.1)))
+        entry = {key: value for key, value in LOGIN.items() if key not in ("class", "repetition")}
+        self.disturb(dict(entry, document="day-0123.json", phase="warm queries",
+                          system="parquet", variant="fast", query=None))
+        parts, _ = RENDER.judged_parts(LOWEST_ROW, self.tree)
+        self.assertIn("though Parquet's `fast` is faster, 0.50 ms / 0.90 ms, measured in "
+                      "Parquet's `fast` warm queries, which held a remote login by this project, "
+                      "2026-11-15 03:22 UTC, to the minute", parts[0][1])
+
+    def test_the_tables_mark_a_disturbed_phase_and_say_the_rates_are_not_alike(self):
+        document, _ = COMPARE.full_day_document()
+        for system in document["systems"].values():
+            system["peak_memory"].setdefault("vmhwm_bytes_by_process", {"python3": 10})
+            write = system["variants"]["v"]["classes"]["B"]["write"]
+            whole = system is document["systems"]["tickstore"]
+            write.setdefault("detail", {})["input_at_clock_start"] = {"files": ["x"], "pages": 10,
+                                                       "resident_pages": 10 if whole else 1}
+            write["detail"]["device_read"] = {"bytes": 5 if whole else 900, "counter": "dev"}
+        entries = [{"phase": "write", "system": "tickstore", "variant": "v", "class": "B",
+                    "repetition": 1, "timed": True}]
+        lines = RENDER.compare_for(document, entries)
+        row = next(line for line in lines if line.startswith("| tick-store (parses ITCH) |")
+                   and "(disturbed)" in line)
+        self.assertEqual(row.count("(disturbed)"), 3)
+        self.assertIn("marked (disturbed); a verdict in Targets that rests on one says what it "
+                      "was beside its word.", lines[0])
+        self.assertIn("The rates below are not like for like: inputs not alike, by each write's "
+                      "record: tick-store's input is in memory before the clock starts, with 5 B "
+                      "read from the device inside the clock; Parquet's, ArcticDB's and QuestDB's "
+                      "are read from disk inside it, with 900 B read from the device inside the "
+                      "clock; engine-only", "\n".join(lines))
+        self.assertIn("Write inputs are not alike on this day", lines[0])
+        clean = RENDER.compare_for(document)
+        self.assertFalse(any("(disturbed)" in line for line in clean))
+
+    def test_the_line_under_the_table_names_a_marked_part_with_its_mark(self):
+        self.favourable_change()
+        self.disturb()
+        parts = self.parts()
+        token = RENDER.marked_name("flushed write", parts[0], CHANGE_ROW)
+        self.assertTrue(token.startswith("flushed write (missed on this run's figures"[:14]))
+        self.assertIn("(rests on tick-store's `h` class B write 1, which held a remote login",
+                      token)
+        definitions = {"rows": [CHANGE_ROW, {"id": "T-99", "host": "any", "no_figure": "none"}],
+                       "headline": {"names": [
+                           {"id": "T-11", "host": "Linux", "name": "flushed write",
+                            "parts": {"against ArcticDB": "flushed write"}},
+                           {"id": "T-99", "host": "any", "name": "another"}]}}
+        names = RENDER.plain_names(definitions, SCREEN_HOSTS)
+        shown = {("T-11", "Linux"): set()}
+        items, met, counts, named = RENDER.left_out_items(definitions, self.tree, shown, names)
+        line = RENDER.left_out_line(items, met, counts, named, SCREEN_HOSTS)
+        self.assertIn(token, line)
+        RENDER.check_left_out(line, definitions, self.tree, shown, names, SCREEN_HOSTS)
+        bare = line.replace(token, "flushed write")
+        with self.assertRaisesRegex(RENDER.TargetError, "does not name"):
+            RENDER.check_left_out(bare, definitions, self.tree, shown, names, SCREEN_HOSTS)
+
+    def quoted(self, page, rows=(CHANGE_ROW,)):
+        return RENDER.quote_problem([("BENCHMARKS.md", page)], {"rows": list(rows)}, self.tree)
+
+    def test_a_hand_written_quote_of_a_marked_verdict_is_refused_without_its_marks(self):
+        self.favourable_change()
+        self.disturb()
+        marks = RENDER.row_marks(CHANGE_ROW, self.tree)
+        change, login, clause = marks
+        self.assertTrue(change.startswith("(against ArcticDB) met on this run's figures, a change "
+                                          "that favours tick-store"))
+        self.assertTrue(login.startswith("(against ArcticDB) rests on tick-store's `h`"))
+        self.assertTrue(clause.startswith("inputs not alike, by each write's record: "
+                                          "tick-store's input is in memory before the clock "
+                                          "starts, with 2 B read"))
+        for kind, dropped in (("change", change), ("disturbance", login),
+                              ("write input", clause)):
+            kept = "; ".join(mark for mark in marks if mark != dropped)
+            for page in (f"| T-11 | Linux | 190 s | Missed; {kept} |\n",
+                         f"Before.\n\nT-11 is missed on Linux; {kept}.\n"):
+                with self.subTest(kind=kind, page=page[:12]):
+                    problem = self.quoted(page) or ""
+                    self.assertIn("quotes the verdict of T-11 on Linux without a mark "
+                                  "RESULTS.md sets beside it: ", problem)
+                    self.assertIn(dropped[:60], problem)
+        whole = "; ".join(marks)
+        self.assertIsNone(self.quoted(f"| T-11 | Linux | 190 s | Missed; {whole} |\n"))
+        self.assertIsNone(self.quoted(f"T-11 is missed on Linux; {whole}.\n"))
+        # A sentence that names the target and gives no verdict quotes none, and a wrapped
+        # sentence is read whole.
+        self.assertIsNone(self.quoted("T-11 is judged on two clocks.\n"))
+        self.assertIn("BENCHMARKS.md:3:", self.quoted("Intro.\n\nT-11 is\nmet.\n") or "")
+        # A run of ids holds the ones between, and the generated blocks are not read.
+        self.assertIn("T-11 on Linux", self.quoted("T-10 to T-12 are met.\n") or "")
+        self.assertIsNone(self.quoted(f"{TARGETS_BEGIN}\n| T-11 | Linux | x | met |\n"
+                                      f"{TARGETS_END}\n"))
+
+    def test_a_hand_written_quote_of_a_swapped_in_verdict_is_refused_without_it(self):
+        self.write(with_queries(change_document(recorded_write(1.0, 0.1),
+                                                recorded_write(2.0, 0.1)), flagged=["tickstore"]))
+        mark = RENDER.row_marks(SWAP_ROW, self.tree)
+        self.assertEqual(mark, ["(Q2 warm) rests on figures timed while pages were swapped in; "
+                                "the record flags tick-store's `h`"])
+        self.assertIn("without a mark", self.quoted("| T-13 | Linux | 1 ms | Met |\n",
+                                                    [SWAP_ROW]) or "")
+        self.assertIsNone(self.quoted(f"| T-13 | Linux | 1 ms | Met; {mark[0]} |\n",
+                                      [SWAP_ROW]))
+
+    def test_the_render_refuses_a_page_quoting_a_marked_verdict_bare(self):
+        self.favourable_change()
+        self.results_md.write_text(WITH_TARGETS, encoding="utf-8")
+        self.targets.write_text(json.dumps({"schema": "t", "rows": [CHANGE_ROW]}),
+                                encoding="utf-8")
+        (self.tree / "BENCHMARKS.md").write_text("| T-11 | Linux | 190 s | Missed |\n",
+                                                 encoding="utf-8")
+        result = self.render()
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("BENCHMARKS.md:1: '| T-11 | Linux | 190 s | Missed |' quotes the verdict "
+                      "of T-11 on Linux without a mark", result.stderr)
+
+    def test_the_methods_sections_say_where_the_write_inputs_were(self):
+        self.favourable_change()
+        note = RENDER.method_input_note(json.loads(self.new.read_text()))
+        self.assertEqual(note, "Write inputs are not alike on this day, by each write's record: "
+                               "tick-store's input is in memory before the clock starts, and "
+                               "ArcticDB's is read from disk inside it, with 9 B read from the "
+                               "device inside those headline write clocks of class B against 2 B "
+                               "inside tick-store's; " + RENDER.ENGINE_ONLY_READS + ".")
+        bare = "# T\n\n## Comparison\n\nThe method.\n\n## Next\n\n" + note + "\n"
+        for name in ("README.md", "RESULTS.md"):
+            with self.subTest(page=name):
+                self.assertIn(f"{name}'s '## Comparison' does not say where the writes' inputs "
+                              "were", RENDER.method_problem([(name, bare)], self.tree) or "")
+                said = bare.replace("The method.", "The method.\n" + note)
+                self.assertIsNone(RENDER.method_problem([(name, said)], self.tree))
 
 
 if __name__ == "__main__":
