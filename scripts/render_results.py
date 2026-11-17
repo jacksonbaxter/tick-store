@@ -2419,6 +2419,45 @@ def faster_write_problem(texts, writers):
     return None
 
 
+# The pages that present results, beside the README and RESULTS.md, which --readme and
+# --results-md name: paths under --targets-root, whose whole prose the faster-write rule reads,
+# as it reads the README's and RESULTS.md's. A page the tree lacks is not read, and the tests
+# hold this list to the repository's pages. Left out: docs/NOTES.md, docs/TASKS.md and
+# docs/REVIEW.md, and the research folder, are the working record, which quotes each run's
+# verdicts and the reviews' findings as they stood, not pages that present results; docs/format.md
+# and docs/store.md describe the store and state no comparison; tests/unit/crashers/README.md
+# says where a crash input goes; and the essay is held to the rule by render_writeup.py.
+RESULTS_PAGES = ("BENCHMARKS.md", "compare/README.md", "fuzz/README.md")
+# A line that starts a unit of prose of its own rather than carrying on a wrapped paragraph.
+UNIT_START = re.compile(r"\s*(?:$|[|#>]|```|<!--|(?:[-*+]|\d+[.)])\s)")
+NOT_CARRIED_ON = re.compile(r"\s*(?:$|[|#]|```|<!--)")
+
+
+def prose_units(text):
+    """(line, text) of each paragraph, list item, table row and heading of a page, a wrapped
+    paragraph or item joined into one, so a sentence is read whole across its line breaks."""
+    units = []
+    carry = False
+    for number, line in enumerate(text.split("\n"), 1):
+        if carry and not UNIT_START.match(line):
+            units[-1] = (units[-1][0], units[-1][1] + " " + line.strip())
+        elif line.strip():
+            units.append((number, line.strip()))
+        carry = not NOT_CARRIED_ON.match(line)
+    return units
+
+
+def page_problem(pages, writers):
+    """Where and why a page's prose says tick-store writes faster than a system on a clock
+    that holds that system's disk reads, or None. pages is (name, text) pairs."""
+    for name, text in pages:
+        for number, unit in prose_units(text):
+            problem = faster_write_problem([unit], writers)
+            if problem:
+                return f"{name}:{number}: {problem}"
+    return None
+
+
 def block_of(text, begin=BEGIN, end=END):
     """(before, block, after) around the markers, or None if they are not both there."""
     first = text.find(begin)
@@ -2541,10 +2580,17 @@ def main(argv=None):
         if headline:
             check_screen(args.targets, readme, headline[0][2])
         disturbance_entries(args.targets_root)
-        pages = [line for _, _, lines in blocks + headline for line in lines]
+        writers = disk_read_writers(args.targets_root)
+        generated = [line for _, _, lines in blocks + headline for line in lines]
+        problem = faster_write_problem(generated, writers)
+        if problem:
+            raise TargetError(problem)
+        pages = [(md_name, text)]
         if readme is not None:
-            pages.append(readme.split(HEADLINE_BEGIN)[0])
-        problem = faster_write_problem(pages, disk_read_writers(args.targets_root))
+            pages.append((args.readme.name, readme))
+        pages += [(name, (args.targets_root / name).read_text(encoding="utf-8"))
+                  for name in RESULTS_PAGES if (args.targets_root / name).is_file()]
+        problem = page_problem(pages, writers)
         if problem:
             raise TargetError(problem)
     except (OSError, json.JSONDecodeError, TargetError) as error:

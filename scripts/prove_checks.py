@@ -1668,9 +1668,14 @@ FAULTS = (
           "say tick-store writes faster than a system whose clock holds its disk reads", CHECK_FAILED,
           "FAIL: test_a_sentence_saying_a_write_is_faster_than_a_disk_read_clock_is_refused "
           "(__main__.ReplacedRunTest"),
-    Fault("compare-faster-write-readme-unread", "py-scripts", "render_results.py reading every "
-          "generated page for a faster write and not the README's pitch", CHECK_FAILED,
-          "FAIL: test_the_render_refuses_a_page_saying_so "
+    Fault("compare-faster-write-readme-unread", "py-scripts", "render_results.py reading the "
+          "generated blocks and the other results pages for a faster write and not the README",
+          CHECK_FAILED, "FAIL: test_the_render_refuses_a_page_saying_so "
+          "(__main__.ReplacedRunTest"),
+    Fault("compare-faster-write-pages-unread", "py-scripts", "render_results.py reading only the "
+          "generated blocks for a faster write and not the whole prose of the README, RESULTS.md, "
+          "BENCHMARKS.md, compare/README.md and fuzz/README.md", CHECK_FAILED,
+          "FAIL: test_every_results_page_is_read_whole_and_named_with_its_line "
           "(__main__.ReplacedRunTest"),
     Fault("compare-disk-reads-unseen", "py-scripts", "render_results.py finding no system whose "
           "write read its input from disk inside the clock", CHECK_FAILED,

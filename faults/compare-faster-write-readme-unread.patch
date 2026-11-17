@@ -1,12 +1,12 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -2543,7 +2543,7 @@
-         disturbance_entries(args.targets_root)
-         pages = [line for _, _, lines in blocks + headline for line in lines]
-         if readme is not None:
--            pages.append(readme.split(HEADLINE_BEGIN)[0])
-+            pass
-         problem = faster_write_problem(pages, disk_read_writers(args.targets_root))
-         if problem:
+@@ -2587,7 +2587,7 @@
              raise TargetError(problem)
+         pages = [(md_name, text)]
+         if readme is not None:
+-            pages.append((args.readme.name, readme))
++            pass
+         pages += [(name, (args.targets_root / name).read_text(encoding="utf-8"))
+                   for name in RESULTS_PAGES if (args.targets_root / name).is_file()]
+         problem = page_problem(pages, writers)

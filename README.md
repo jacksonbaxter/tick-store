@@ -146,11 +146,15 @@ bytes read from the device inside the clock, what engine-only holds, and that en
 not take the reads out. A verdict that rests on a timed phase in which
 `results/disturbances-<commit>.json` records something else running, such as a login or the
 host's backup job, says so beside it, with the replaced run's figure there; the file's shape,
-spans and places in the documents are checked. No page, the essay included, may hold a sentence
-saying tick-store writes faster than a system whose write read its input from disk inside its
-clock. With no replaced file and no disturbance file, nothing is marked. What it does not check
+spans and places in the documents are checked. No results page, the essay included, may hold a
+sentence saying tick-store writes faster than a system whose write read its input from disk inside
+its clock: the rule reads the whole prose of `README.md`, `RESULTS.md`, `BENCHMARKS.md`,
+`compare/README.md` and `fuzz/README.md`, a wrapped sentence whole, and names the page and line.
+With no replaced file and no disturbance file, nothing is marked. What it does not check
 is the disturbance list itself, made by hand from the host's logs: an event left out of it marks
-nothing, and a faster write said in other words than the rule's passes.
+nothing, and a faster write said in other words than the rule's passes. Nor does it read
+`docs/NOTES.md`, `docs/TASKS.md`, `docs/REVIEW.md` or `research/`, the working record, which quotes
+each run's verdicts as they stood.
 
 `render_writeup.py` holds the essay to `docs/writeup/figures.json`, its figure list. Every figure,
 verdict and results link in `docs/writeup/WRITEUP.template.md` is a token the list defines: the
