@@ -6833,6 +6833,163 @@ faults (`acc3539`); REVIEW rows R-A1 to R-A7 and R-B1 to R-B3 give each.
   shown the same way, outputs in `conditions-check/fix4/proofs-render`. The full re-proof owes
   all nineteen.
 
+### The second collection's Linux half
+
+2026-11-17. The Linux host's run at `8616263` held the host's window from 15:02:02 to 17:34:30
+UTC and was copied in one connection after it ended. Every step ended with exit 0: the preflight,
+the fuzz build, the seed diagnostic (L19), the named seeds' gate (L20), the 30-minute fuzz runs
+(L09), the host file, the capacity day at `ede0176` (L21) and the runner's own validation. Its
+staging manifest checks 122 of 122 entries, and the Mac's copy from part a still checks 80 of
+80. I read every raw record before using it.
+
+**G-3 (`8e38280`).** All seven Linux runs name `8616263`. Each timed run says "Done N runs in
+1801 second(s)", `fuzz_run_length` 1808, and no log holds a sanitizer report, a libFuzzer error,
+a crash, timeout, leak or slow-unit artifact; each replay was clean and each merge took one
+attempt. `scripts/fuzz_results.py` assembled the two hosts into
+`results/fuzz-g3-8616263b7561.json`, with the host's project folder stripped from the Linux
+commands on the command line alone, and `check_fuzz.py` says "ok, tied: nothing fuzzed changed
+since 8616263b7561". G-3 is met: 13 of 13 targets on macOS and 7 of 7 on Linux at AVX2, the
+shortest 1,801 s on each. The library code measured at `ede0176` is identical at `8616263`; the
+measured paths that differ are `fuzz/`, `tests/unit/CMakeLists.txt`,
+`tests/unit/fuzz_regression_test.cpp` and `scripts/coverage.sh`.
+
+In the same commit the file from `ea1dde4` goes, with everything that let it through:
+- its pin, `fuzz_g3_file_before_the_tie`, in `scripts/data_pins.json`;
+- `check_fuzz.py`'s `PRE_TIE_FILE`, `PRE_TIE_PINS`, `PRE_TIE_SCHEMA` and
+  `pinned_before_the_tie`. The schema from before the launcher is now refused in any file. No
+  rule of `check_fuzz.py` reads the pins file any more, so its `--pins` option went too, and
+  `render_results.py` no longer passes it;
+- `render_results.py`'s rule that showed G-3 as not judged on that file, and its test class;
+- `check_ties.py`'s entry for the key in `PIN_NAMES` and the fuzz kind's pin. No kind declares
+  a validator's pin now, so the tests of that rule declare one on a stand-in key, and a new test
+  holds that a line under the old key pins nothing;
+- `test_check_sh.py`'s `untie()`, which made the old file look tied.
+
+**The named seeds' gate on Linux.** It ran at `8616263` as on the Mac, at AVX2, each run on cpu6
+with its sibling cpu7 kept busy for the whole of every run (155 of 155 runs "spinner running"
+before and after, cpu7 100.0% busy). All 31 seeds passed against 5,000 ms an execution. The
+worst was `run_length/bound-small-blocks` at 4,668.5 ms (median 3,908.0). fuzz/README.md's Bounds
+section now gives this, and how far the medians fell from its predicted column: from 21.0% below
+to 10.4% above.
+
+**The seed diagnostic (L19).** A diagnostic at `ede0176`, not a G-3 run, and it judges nothing.
+The 31-byte `fuzz_dictionary` seed that part A's replay timed out on, at `-timeout=120` on cpu6,
+took 8,392.0 ms an execution with cpu7 idle and 13,186.0 ms with cpu7 kept busy, two executions
+each, exit 0.
+
+**The capacity file (`9e05af1`).** The capacity day ran at `ede0176`, all four parts finished,
+the guard never fired, and each part began with no store at its root. The runner's assembler
+filled every derived field and left 17 for the collection. I filled each from its source:
+- `measurement`, `label`: the run's own statement (CAPACITY.txt) and its parts, all four
+  finished, QuestDB once more in class A. The wording is the old file's, which still holds.
+- `host.cpu`: cpuinfo, "AMD Ryzen Embedded V1605B", 4 cores, 8 siblings.
+- `host.swap_note`: meminfo before and after. Swap held 137,887,744 of 1,023,406,080 bytes before
+  the first part and 255,541,248 after the last. It was not full, as it was in the old run.
+- `method.ingest`, `queries`, `stored_settings`, `not_done`, `sigill_scope`: `compare/fullday.py`
+  and the systems' chunk sizes at `ede0176` (4 Mi rows for Parquet and QuestDB, 4,000,000 for
+  ArcticDB, write then appends), and each report's steps, every one exit 0, `stored_settings`
+  included. The old wording holds.
+- `method.peak_memory`: reworded for how the assembler reads it. A library system's workers'
+  figures are wait4's, each above the runner's own VmHWM. The runner's, the client's and every
+  RssAnon and RssFile come from the guard's 2 s samples. The QuestDB server's VmHWM is read from
+  /proc as its service stops.
+- `method.guard`: `stop_over_swap_bytes_per_second` is dropped. In its place are the guard's
+  `limits` as it named them, copied: `max_swap_in_bytes_per_second` 10,485,760,
+  `swap_in_strikes` 3, `swap_exhausted_fraction` 0.02, `swap_exhausted_floor` and `swap_out`.
+  All five parts' guards had the same limits. No validator, renderer or essay token read the old
+  key.
+- `export.stored_bytes`: 23,861,739,520, the allocated bytes (st_blocks × 512) of
+  `export-sizes.json`. That is the definition each system's `stored_bytes` uses, through
+  `coldcache.allocated_bytes`. A new `stored_bytes_note` names it. The old file's 23,861,605,383
+  is this run's apparent size to the byte, so the old figure was apparent bytes.
+- `systems.questdb` and `questdb_class_a` `heap.through` and `heap.in_force_read_from`:
+  `questdb_system.py`'s launched server at `ede0176` passes the heap through bin/questdb.sh's
+  `JVM_PREPEND`. Each report's settings read `-Xmx1g` and `-Xms1g` in force from the running
+  command.
+- `questdb_heap_verdict`: below.
+
+**The heap verdict, by the coordinator's rule.** The rule was written before the Linux copy was
+read. "Adequate" only if the nine conditions hold and the four figures stay at or under the old
+run's. The old record gave those four figures as observations and stated no bound; they are read
+here as bounds by the coordinator's rule. The criteria's sources are the old verdict's `why`,
+this file's "QuestDB's `-Xmx1g` is adequate" and "Phase 2's capacity check" entries, and
+compare/README.md's heap paragraph. Values are class B, then class A, from each system's `heap`
+in the new file, checked against the raw GC and server logs:
+
+| Criterion | Field | New run |
+|---|---|---|
+| WAL fully applied | `wal.writer_txn_equals_sequencer_txn`, `outcome` | true, finished; true, finished |
+| no collection after start-up | `gc_log_per_server_start[*].young_pauses`, last pause's uptime | 0 in all six starts; last pause at 3.1 to 6.1 s |
+| only the three full collections of each start, 2 metadata and 1 System.gc() | `pauses`, `full_pauses`, `causes` | 3, 3, both causes, every start (the GC logs: 2 and 1) |
+| eden never filled | no young pause | none |
+| no OutOfMemoryError | `out_of_memory_error` | false, every start |
+| no memory pressure | `wal.largest_memory_pressure` | 0; 0 |
+| no suspension | `wal.suspended`, `server_log.lines_naming_oom_backpressure_or_suspension` | false, 0; false, 0 |
+| no error line | `server_log.lines_error_or_critical` | 0; 0 |
+| tested at the chosen heap | `heap.requested`, the running command | `-Xms1g -Xmx1g`; the same |
+| pauses under 0.25 s in total per start (bound) | `pause_total_ms` | 181.8 to 204.2 ms; 190.5 to 195.5 ms |
+| at most 116 MiB used after a collection (bound) | `peak_heap_after_gc_mib` | 116; 116 |
+| at most 300 of 982 MiB in use at the end of ingest (bound) | ingest start's `heap_used_at_exit_mib`, `heap_capacity_mib` | 242 of 982; 264 of 982 |
+| WAL lag of 3 or fewer (bound) | `wal.largest_sequencer_minus_writer_txn` | 1; 3 |
+
+All nine conditions hold and the four figures are at or under the bounds, so the verdict is
+"adequate" for `-Xms1g -Xmx1g`, tested at that value. The verdict's `why` gives these figures.
+Its `criteria` field says the figures are read as bounds by that rule. The old verdict's `risk`
+and `client` paragraphs judged mapped pages and the client's memory. They are not carried over:
+the rule allows no other judgement.
+
+**What moved.** The leaf diff against the old file, apart from times, memory, swap and GC
+figures, has these changes:
+- every part's commit is now `ede0176`;
+- `host.mem_total_bytes` is 8,192 bytes lower;
+- the export's stored bytes are the allocated figure;
+- the guard's limits;
+- `peak_heap_after_gc_mib` is 115 or 116 in place of 114 to 116;
+- class A gets a disk figure, where the old run had none;
+- ArcticDB's `stored_bytes` is 6,352,654,336, 12,288 bytes under the old 6,352,666,624.
+
+Parquet's and QuestDB's stored bytes, every variant and every outcome are unchanged.
+
+ArcticDB's move unties the two files that read it under the read-field tie (`b54259b`). I
+remade both:
+- `store-size-12302019.json`, with `store_results.py` on the Mac freeze run's raw folder;
+- `store-estimate.json`, with `store_estimate.py` on the two codec evaluation files.
+
+Both scripts first gave the committed bytes exactly when run on the old capacity file. On the new
+one the size file differs in `cr2.systems.arcticdb` alone, and the estimate in ArcticDB's six
+CR-2 entries; the round-trip file is unchanged. No page shows these figures. RESULTS.md's
+6,352,666,624 is the full-day comparison's own measurement, not the capacity file's, so the pages
+did not change. CR-2 stays met.
+
+**Checks.** At `9e05af1`:
+- `render_results.py` changed nothing after the G-3 commit, and `--check` exits 0;
+- `check_hygiene.py` is clean;
+- `check_compare.py` passes every comparison file against the new capacity file;
+- `check_ties.py` says `30 files: 28 same, 1 pinned, 1 differs`, the one differing being
+  `check-proofs.json` and the pinned one the replaced Linux day;
+- `render_writeup.py --check` exits 3, waiting on the capacity kind alone, which figures.json
+  still lists as pending; that edit belongs to the essay's last steps;
+- all 22 test files pass.
+
+**Logins during the run.** Another project's watcher logged in to the host about every 1,800 s
+during this run, as during the freeze's Linux runs. Today's fell at 15:12:32, 15:12:58 and about
+15:42:58, 16:12:58, 16:42:59 and 17:13:00 UTC, inside L20, L09 and L21. They are being mapped
+onto the timed phases, with each phase's per-CPU record and load. The disturbance entries and any
+marks they bring follow.
+
+**Proofs.** I ran no `prove_checks.py`. Each fault below was shown by hand in a clone under the
+worktree's `build/` at `8e38280`. The control run of its test file passed, and the fault failed
+with the string its entry expects. The outputs are under the phase's `collect2/partb/proofs-s1`
+folder. Each is shown by hand, proof owed to the full re-proof.
+- Remade on the lines that moved: `fuzz-g3-old-schema-accepted`, now refused in any file;
+  `fuzz-g3-missing-commit-unjudged`; `ties-protocol-1-pin-allowed`; `ties-disturbances-no-kind`.
+- Shown again because the test helper they run through changed: the other ten
+  `check_fuzz.py` faults of `CheckFuzzTest` and `TieTest`; `check-sh-untied-g3-passes`; and
+  `ties-pin-by-name`, `ties-pin-any-listed-name`, `ties-stray-pin-accepted` and
+  `ties-replaced-pin-outside-folder`, now on the stand-in key.
+- Removed with the pin they tested: `fuzz-g3-pin-any-content`, `fuzz-g3-pin-other-file` and
+  `render-g3-before-the-tie-judged`.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
