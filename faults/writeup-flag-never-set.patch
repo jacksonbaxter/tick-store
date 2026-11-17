@@ -1,0 +1,12 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -980,7 +980,7 @@
+         else:
+             phases.append(("queries", system, variant, read["kind"], read["query"]))
+     root = context.resolver.root
+-    return bool(render_results.disturbed(render_results.disturbance_entries(root), root, path,
++    return False and bool(render_results.disturbed(render_results.disturbance_entries(root), root, path,
+                                          phases) or
+                 render_results.swapped_reads(phases, document))
+ 

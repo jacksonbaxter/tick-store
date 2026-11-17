@@ -758,7 +758,7 @@ SHARED_FORMS = ("path", "case", "cases_median", "best", "codec", "store_bits", "
                 "lowest_system", "lowest_value", "engine_only")
 # The figure list's own forms that read the entry's results file.
 DOCUMENT_FORMS = ("codec_columns", "codec_column", "least", "items", "where", "count",
-                  "count_cases", "flagged_queries", "target_values")
+                  "count_cases", "flagged_queries", "target_values", "flagged")
 # Forms that read the tree, the code or the targets, not a results file.
 TREE_FORMS = ("bar", "constant", "lines", "count_matches", "prover", "verdict_is")
 OPERATORS = ("sub", "add", "mul", "div", "same", "log2", "pow2", "min", "max", "median",
@@ -961,6 +961,30 @@ def prover(spec, context):
                   "controls_passed, not {wanted!r}")
 
 
+def flagged(reads, context):
+    """Whether any of the timed phases named is one render_results.py marks: a disturbance the
+    tree's disturbance records place in it, or a query block its record flags as timed while a
+    page was swapped in. Each read names a system, or a figure whose value is one, and its
+    headline variant's class B write or a query and kind."""
+    document = context.need_document("flagged")
+    entry = context.entry
+    path, _ = context.resolver.file_of(entry["kind"], entry["host"], context.name)
+    phases = []
+    for read in reads:
+        system = read["system"]
+        if isinstance(system, dict):
+            system = evaluate(system, context)
+        variant = walk(document, ["systems", system, "headline_variant"])
+        if "write" in read:
+            phases.append(("write", system, variant, read["write"]))
+        else:
+            phases.append(("queries", system, variant, read["kind"], read["query"]))
+    root = context.resolver.root
+    return bool(render_results.disturbed(render_results.disturbance_entries(root), root, path,
+                                         phases) or
+                render_results.swapped_reads(phases, document))
+
+
 def evaluate(expression, context):
     """A value by the figure list's expressions; scripts/targets.json's own forms go to
     render_results.evaluate on the entry's document."""
@@ -1138,6 +1162,8 @@ def evaluate(expression, context):
             floor = evaluate(expression["at_least"], context)
             cases = [case for case in cases if walk(case, expression["field"]) >= floor]
         return len(cases)
+    if "flagged" in expression:
+        return flagged(expression["flagged"], context)
     if "flagged_queries" in expression:
         variant = walk(document, expression["flagged_queries"])
         return [f"{query} {kind}" for query in render_results.QUERY_NAMES
@@ -1536,7 +1562,7 @@ def commits(resolver):
     if None in measured:
         raise Refused("a results file the essay reads names no commit")
     commit = next(iter(measured), None)
-    phrases = []
+    phrases, at = [], {}
     for kind in sorted(exceptions, key=lambda item: resolver.kinds[item]["exception"]["says"]):
         spec = resolver.kinds[kind]["exception"]
         if not spec.get("why") or not spec.get("says"):
@@ -1562,13 +1588,20 @@ def commits(resolver):
                           f"figures read at {commit[:COMMIT_SHOWN]} measure differs there: "
                           f"{changed[:5]}{' and more' if len(changed) > 5 else ''}; measure "
                           "them at one commit")
-        phrases.append(f"{spec['says']}, at `{own[:COMMIT_SHOWN]}`, where the code every other "
-                       "figure measures is unchanged")
+        at.setdefault(own, []).append(spec["says"])
+    # The kinds at one other commit are named together, so the commit and what holds there are
+    # said once: "the fuzz result and its record, at `8616263b7561`, where ...".
+    phrases = [f"{and_words(says)}, at `{own[:COMMIT_SHOWN]}`, where the code every other figure "
+               "measures is unchanged" for own, says in at.items()] + phrases
     if not phrases:
         return commit, ""
     joined = phrases[0] if len(phrases) == 1 else \
         "; ".join(phrases[:-1]) + "; and " + phrases[-1]
     return commit, f", except {joined}"
+
+
+def and_words(items):
+    return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
 
 
 # The forms whose value ranks what it reads, so a token computed by one may carry the ranking word

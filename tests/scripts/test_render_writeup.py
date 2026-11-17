@@ -1111,6 +1111,29 @@ class Marks(Tree):
                                                     r".every part rests on tick-store's write"):
             RENDER.render(self.root)
 
+    def flag(self, reads):
+        """A dagger token on the day's phases, and the ArcticDB warm Q1 flagged as timed while a
+        page was swapped in."""
+        path = self.root / f"results/compare/Linux-day-{COMMIT[:12]}.json"
+        document = json.loads(path.read_text())
+        document["systems"]["arcticdb"]["variants"]["h"]["queries"] = {
+            "Q1": {"warm": {"swap_timed": {"flagged": True}}}}
+        path.write_text(json.dumps(document))
+        self.figures["figures"]["flag_x"] = {
+            "what": "whether a phase is disturbed or swapped in, on the Zen 1", "kind": "day", "host": "Linux",
+            "value": {"flagged": reads}, "words": {"true": "flagged", "false": "clean"}}
+        self.save()
+        self.insert("The phase is {{flag_x}}.")
+        return RENDER.render(self.root).text
+
+    def test_a_swapped_in_phase_is_flagged(self):
+        self.assertIn("The phase is flagged.", self.flag(
+            [{"system": "tickstore", "write": "B"},
+             {"system": "arcticdb", "query": "Q1", "kind": "warm"}]))
+
+    def test_a_phase_with_nothing_recorded_is_clean(self):
+        self.assertIn("The phase is clean.", self.flag([{"system": "tickstore", "write": "B"}]))
+
     def test_a_move_between_the_runs_with_no_unknown_cause(self):
         self.insert("Between the replaced run and the current run ArcticDB's write rose.")
         self.refused("states a move between the replaced run and this one and does not say its "

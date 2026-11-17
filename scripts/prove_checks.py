@@ -2301,6 +2301,9 @@ FAULTS = (
           "between the replaced run and this one without saying its cause was not measured and "
           "is not known", CHECK_FAILED,
           "FAIL: test_a_move_between_the_runs_with_no_unknown_cause (__main__.Marks"),
+    Fault("writeup-flag-never-set", "py-scripts", "render_writeup.py never sets the dagger "
+          "of a figure from a disturbed or swapped-in phase", CHECK_FAILED,
+          "FAIL: test_a_swapped_in_phase_is_flagged (__main__.Marks"),
     Fault("writeup-keeps-unchecked", "py-scripts", "render_writeup.py lets the essay say what the "
           "replaced run's record keeps other than as its fields give it", CHECK_FAILED,
           "FAIL: test_what_the_replaced_record_keeps_said_otherwise (__main__.Marks"),
