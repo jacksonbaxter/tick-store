@@ -4,10 +4,10 @@ tick-store keeps a trading day of Nasdaq TotalView-ITCH 5.0, 268,744,780 message
 8.25 GB, in a store 4.69 times smaller than the feed, 1.76 GB
 on disk against 3.19 GB for Parquet, and rebuilds the feed from it.
 On the Zen 1, a Linux machine from 2018, it answers an hour of a stock in 74.04 ms
-warm against 283.77 ms † for the fastest other system in its fixed
-setup, though ArcticDB with a table per stock takes 44.58
-ms, while a millisecond across every stock takes it 167 times as long as
-QuestDB and the whole-day sum of a column 16.8 times as long as
+warm, QuestDB in its fixed setup in 283.77 ms † and ArcticDB with a
+table per stock in 44.58 ms †, while a second and a millisecond across every
+stock take it 8.7 and 167 times as long as ArcticDB and
+QuestDB, and the whole-day sum of a column 16.8 times as long as
 QuestDB †.
 A single writer thread there ingests 1.270 M messages/s before a flush, 2.15 times
 short of Nasdaq's published peak message rate.
@@ -18,20 +18,19 @@ their bits on timestamps and 3.554x on prices as dollar doubles.
 
 ## At a glance
 
-The Zen 1, each system in its fixed setup; queries are warm medians, and the other system is
-the system first on the row.
+The Zen 1, each system in its fixed setup; queries are warm medians.
 
-| | tick-store | The other system first on the row | tick-store over it |
+| | tick-store | The other system first on the row | tick-store over it, or another setup |
 |---|---|---|---|
 | Disk, GB | 1.76 | 3.19, Parquet | 0.55 |
 | Day write with flush, s | 190.7 † | 211.9, Parquet  | inputs not alike |
 | A second of every stock (Q1), ms | 296.78  | 34.16, ArcticDB  | 8.7 |
-| An hour of a stock (Q2), ms | 74.04 ms  | 283.77, QuestDB † | 0.26 |
-| Its per-minute aggregate (Q3), ms | 36.07 ms  | 64.95, QuestDB  | 0.56 |
+| An hour of a stock (Q2), ms | 74.04 ms  | 283.77, QuestDB † | ArcticDB, a table per stock: 44.58 † |
+| Its per-minute aggregate (Q3), ms | 36.07 ms  | 64.95, QuestDB  | ArcticDB, a table per stock: 25.00 † |
 | A millisecond of every stock (Q4), ms | 207.95  | 1.24, QuestDB  | 167 |
 | The day's sum of a shares column (Q5), ms | 912.75  | 54.46, QuestDB † | 16.8 |
 
-† In this table and the opening, timed while the host's logs record a login or a backup job, or
+† Here, in the opening and under Queries, timed while the host's logs record a login or a backup job, or
 while the host was swapping memory; the [targets table](RESULTS.md#targets) names each. The write row is not like-for-like:
 tick-store's input was in memory before its clock, and the others read theirs from disk inside it.
 
@@ -90,8 +89,7 @@ orders, and 6.1 to 9.2, by message
 type, as a distance back in the stock's own list, so I chose the last ([codec evaluation](results/codec-eval-12302019.json)).
 As built, with block metadata, those distances cost 7.563 bits. A distance of 0
 is an import: the full reference of an order created before the segment, since no state crosses a
-segment; the day holds 10,498,192, at 25.943 bits each. A new order's own reference
-costs 7.797 bits by the best codec and 11.363 bits as built.
+segment; the day holds 10,498,192, at 25.943 bits each.
 
 **Prices as integers, per stock.** ITCH prices are integers in units of 10^-4 dollars. The store
 groups add prices by stock and side and codes them with PFOR delta (patched frame of reference on
@@ -158,10 +156,7 @@ pieces, so the PFOR blocks leave redundancy across values that a block-local cod
 
 **The vector layout.** A full PFOR vector is 1,024 values at a bit width in
 16 lanes of 64-bit words, value i in lane i mod 16, so
-a row of 16 values unpacks from 16 consecutive words with a shift. At width
-w the packed values take 128 × w bytes, after a
-3-byte header and the base, then a
-2-byte exception count ([pfor.cpp](src/codec/pfor.cpp)). Deltas
+a row of 16 values unpacks from 16 consecutive words with a shift. Deltas
 stay in value order, so the inverse delta is a prefix sum across each row's lanes.
 
 **Which kernels the store calls.** On every instruction set the decoder calls the interleaved and
@@ -190,9 +185,8 @@ median, so on whole queries SIMD's effect is inside or near the run-to-run sprea
 **The store's price column.** Per piece, the reader inflates any zstd frame, allocates, decodes
 PFOR with scale and patches, range-checks every value and appends. On the Zen 1 those steps take
 11.6%, 20.4% (unpack), 25.3% (patches),
-4.6% (scale and range check) and 0.6% (allocation and copy,
-as the profile's memory and container groups count them; copies resolved only to the C library,
-19.4%, are not counted) of
+4.6% (scale and range check) and 0.6% (allocation and copy;
+copies resolved only to the C library, 19.4%, are not counted there) of
 the decode's user cycles ([price-decode profile](results/diag/price-decode-profile-12302019-ede0176b10bb.json): a diagnostic summary no separate validator re-reads).
 
 ## Branch prediction and instruction counts
@@ -202,8 +196,7 @@ instructions and 0.403 mispredicts per price, the store's price column
 21.99, 47.00 and 0.051 at
 2.14 IPC. Over prices and timestamps, Gorilla's mispredicts are
 7.9 to 20.3 times the store's codecs' and its instructions
-4.6 to 22.7 times. PFOR delta on timestamps runs at
-1.17 IPC; with no memory counters, nothing here says what limits it
+4.6 to 22.7 times.
 ([Zen 1 column decodes](results/bench/Linux-column_decode-ede0176b10bb.json)).
 
 ## Memory
@@ -237,10 +230,10 @@ dictionary encoding 6.8%, sorting 4.8%, parsing 2.7%
 and zstd 1.2% ([writer profile](results/diag/writer-profile-12302019-ede0176b10bb.json): a diagnostic summary no separate validator re-reads). The others' engine-only times may still hold reading their input from disk, so
 the clocks are not alike and the gap is not all tick-store's writer.
 
-**Queries.** On Q2 tick-store takes 74.04 ms warm against
-283.77 for the next system in its fixed setup, and on Q3
-36.07 ms against 64.95 ms; ArcticDB with a table per stock takes
-44.58 and 25.00 ms on them, and
+**Queries.** On Q2 tick-store takes 74.04 ms warm and
+QuestDB 283.77 ms † in its fixed setup, and on Q3
+36.07 ms and QuestDB 64.95 ms; ArcticDB with a table per stock takes
+44.58 † and 25.00 ms † on them, and
 10.2 s on Q1. Q5, the day's sum of a shares column, decodes 152,004,760 values at
 6.0 ns each; of its sampled cycles, dictionary decoding takes 30.5%,
 the C library 20.6% and the unpack kernels 13.7%
@@ -311,11 +304,16 @@ figures; the cause of ArcticDB's move between them was not measured and is not k
 ## Fuzzing and checks
 
 Every parser and decoder ran 30 minutes of fuzzing under
-AddressSanitizer and UndefinedBehaviorSanitizer at the second commit: 13 of
+AddressSanitizer and UndefinedBehaviorSanitizer: 13 of
 13 targets ran clean on the M4 and 7 of 7 on the
-Zen 1, the shortest run 1,801 s ([fuzz results](results/fuzz-g3-8616263b7561.json)). The checks and the faults
-that prove them are in the README; the prover's
-record covers 99 of its 463 listed faults.
+Zen 1, the shortest run 1,801 s ([fuzz results](results/fuzz-g3-8616263b7561.json)). The fuzzing target is
+met; a backup run and two remote logins during its bound-seed gate, which could only have slowed them; three remote logins during its timed fuzzing runs, which could only have slowed them.
+
+A login or a backup run can take executions from a fuzzing run, not hide a finding; the
+[targets section](RESULTS.md#targets) gives each target's executions.
+
+The checks and the faults that prove them are in the README; the prover's
+record covers 99 of its 464 listed faults.
 
 ## Limits
 
@@ -324,15 +322,16 @@ is smaller than the other systems' 23.86 GB of input, with each day write run
 1 time. A fair protocol would give every system its input resident before its
 clock, or none, and repeat every write. The disturbance records hold 31 entries
 inside the campaign's timed phases and 10 inside the fuzz run's, an event
-entered for each phase it fell in, from the host's logs and another project's status file. The host's own scheduled jobs ran through every timed window
+entered for each phase it fell in. The host's own scheduled jobs ran through every timed window
 on the Zen 1 and were not stopped: a repository backup every 15 minutes, a health collector and
 2 small watchers every 5, 2 sync jobs every 10, a file backup about hourly, and daily maintenance;
 only the runs the logs place inside a phase are listed. The Zen 1's day was measured
 again: the earlier run, "the replaced run", is kept, and its figure stands beside this run's
 wherever a mark names it. In the targets sections a verdict marked "swap-in" rests on figures timed
-while the host was swapping memory, which may flatter tick-store where they are another system's
-and understate it where they are its own, and a verdict marked with a login or a backup run on a phase that held it.
-Sizes on the M4 are file-system allocation, so sizes come from the Zen 1. Not measured and not
+while the host was swapping memory, and a verdict marked with a login or a backup run on a phase
+that held it. Where this run and the replaced run both carry the swap on a rival's side, neither
+confirms the other, and such a verdict keeps its word and is not counted.
+Not measured and not
 estimated: the cycles a mispredict costs and any memory-level counter.
 
 <!-- generated by scripts/render_writeup.py from docs/writeup/WRITEUP.template.md and docs/writeup/figures.json: edit those, never this file -->
