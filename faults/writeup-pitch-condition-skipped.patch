@@ -1,0 +1,12 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1586,7 +1586,7 @@
+             conditions = render_results.conditions_of(spec)
+         except render_results.TargetError as error:
+             raise Refused(f"{name}: {error}") from error
+-        for condition in conditions:
++        for condition in conditions[:1]:
+             if "target" in condition:
+                 row = resolver.target_row(condition["target"], name)
+                 resolver.judged(row, name)

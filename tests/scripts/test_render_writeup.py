@@ -839,6 +839,27 @@ class Claims(Tree):
         self.save()
         self.insert(sentence)
 
+    def test_a_pitch_sentence_reused_on_every_condition(self):
+        # The README's pitch ties whole sentences to the results; an essay claim names words of
+        # one of them, and every condition of that sentence must hold.
+        demo = "results/bench/macOS-demo-*.json"
+        self.targets["pitch"] = {"claims": [{"text": "The demo is quick, and it ran.", "all": [
+            {"target": {"id": "T-1", "host": "macOS", "verdict": "met"}},
+            {"file": demo, "below": [[{"path": ["runs"]}, {"path": ["median_us"]}]]}]}]}
+        self.figures.setdefault("claims", []).append(
+            {"text": "is quicker than its bar", "pitch_claim": "demo is quick"})
+        self.save()
+        self.insert("The demo is quicker than its bar.")
+        self.renders()
+        self.targets["pitch"]["claims"][0]["all"][1]["below"] = [
+            [{"path": ["median_us"]}, {"path": ["runs"]}]]
+        self.save()
+        self.refused("the template says 'is quicker than its bar'")
+        self.targets["pitch"]["claims"].append({"text": "The demo is quick again.", "target": {
+            "id": "T-1", "host": "macOS", "verdict": "met"}})
+        self.save()
+        self.refused("2 claims of the pitch of scripts/targets.json hold the words 'demo is quick'")
+
     def test_a_claim_that_holds(self):
         self.claim("fewer runs than its median", {"below": [{"figure": "count"},
                                                             {"figure": "median"}]},

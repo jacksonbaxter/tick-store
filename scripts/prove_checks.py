@@ -2053,6 +2053,9 @@ FAULTS = (
     Fault("writeup-numeral-forms-accepted", "py-scripts", "render_writeup.py takes a multiplier "
           "glued to its number, or a numeral other than an ASCII digit", CHECK_FAILED,
           "FAIL: test_a_multiplier_or_a_numeral_that_is_not_a_digit (__main__.Refuses"),
+    Fault("writeup-pitch-condition-skipped", "py-scripts", "render_writeup.py judges an essay "
+          "claim on the first condition of its pitch sentence alone", CHECK_FAILED,
+          "FAIL: test_a_pitch_sentence_reused_on_every_condition (__main__.Claims"),
     # The step itself on the committed page. Its baseline passes only once WRITEUP.md is
     # rendered, when every results file it reads is committed (docs/TASKS.md).
     Fault("writeup-template-not-rendered", "writeup-check", "the essay's template reworded "

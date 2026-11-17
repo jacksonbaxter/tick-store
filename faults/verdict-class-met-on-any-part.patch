@@ -1,7 +1,7 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -1167,7 +1167,7 @@
+@@ -1201,7 +1201,7 @@
          return "not judged"
      verdict_of(parts)
      verdicts = [part[2] for part in parts]

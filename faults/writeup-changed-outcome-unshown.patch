@@ -1,7 +1,7 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -1819,7 +1819,7 @@
+@@ -1834,7 +1834,7 @@
              spec = entry["changed"]
              tokens[(spec.get("id"), spec.get("host"), spec.get("part"))] = name
      for key in changes:
