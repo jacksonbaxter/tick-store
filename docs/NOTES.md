@@ -6990,6 +6990,55 @@ folder. Each is shown by hand, proof owed to the full re-proof.
 - Removed with the pin they tested: `fuzz-g3-pin-any-content`, `fuzz-g3-pin-other-file` and
   `render-g3-before-the-tie-judged`.
 
+### Another project's logins, the journal's backup run and the host's own jobs
+
+Another project's watcher logged in to the Linux host about every half hour from 14 Nov
+15:22:16Z, through the freeze's Linux runs and the G-3 run at `8616263`. Each pass is one remote
+login that reads the host's window state and a few files, then sleeps. The audit in the phase's
+`watch-logins` folder mapped every login onto the timed phases by the run records' own times:
+- a login the watcher's status file records ends at that line's time, and is placed by it;
+- a login between two recorded lines is computed from the period, and is given with its bounds,
+  the earliest and latest it could have run, as the entry's start and end.
+
+43 logins fell inside this project's windows on the host, 31 of them in a measured phase. No
+phase with a login inside fails its own rule on its record: the sibling share and load rule for
+the comparison's phases and the kernel cases, the gate's bar with the sibling busy, and exit 0
+for the fuzz and capacity parts. I ruled: no rerun; the entries and the marks go in as proposed.
+
+- **The records (`6f94fdc`).** The freeze's record takes the 31 entries and the capacity check's
+  ArcticDB part, which falls in a file measured at `ede0176`. A new record,
+  `results/disturbances-8616263b7561.json`, holds G-3's Linux run: two logins in the bound-seed
+  gate, seven fuzz entries for three logins that each fell in three targets running at once, and
+  the host's scheduled repository backup from 15:12:26Z to 15:12:29Z. The host's journal, read on
+  17 Nov after the run, shows it; the run's own records do not. The validator takes fuzz, gate
+  and capacity phases. check_ties counts the new record as one more file the same.
+- **The gate's worst run.** It is 4,668.5 ms against 5,000, from 15:12:42Z to 15:12:51Z. It holds
+  no login, and shows the highest load of its seed's five runs and about 205 more processes
+  started than usual. Nothing on record explains that.
+- **The marks.** A phase of several events is said by kind and count: two remote logins in
+  tick-store's flushed write, a backup run and a remote login in QuestDB's. DS-4 Linux is marked
+  for one of the 65 cases its median takes. G-3 Linux is marked for its gate and its timed runs,
+  which the events could only have slowed. The per-stock figure's note now says two remote logins.
+- **The host's own jobs.** The host runs its owner's scheduled jobs through every window:
+  - a repository backup every fifteen minutes;
+  - a health collector and two small watchers every five minutes;
+  - two sync jobs every ten minutes;
+  - a file backup about hourly;
+  - daily maintenance.
+
+  None was stopped: nothing on the host is changed for a measurement beyond the governor. The
+  run records list none of them by phase beyond the events recorded. What guards each timed
+  figure is the per-CPU record and the load rule. Both records' `not_listed` say so, RESULTS.md
+  says it once under the targets table, and the essay's limits paragraph says it.
+- **The essay (`4fb405f`, `b8db07c`).** Each disturbance kind reads one record a run: `record_of`
+  names the kind whose run it records, so no commit is named. The fuzz run's record is a commit
+  exception beside the fuzz result. The final render resolves 341 tokens to 3,803 words, and
+  `--check` passes.
+- **Faults (`3b6dee7`).** Five new and eight remade, shown by hand in a clone under `build/`,
+  outputs in the phase's `conditions-check/fix5` folder. The full re-proof owes them.
+- **A count corrected.** My last report gave 23 faults owed from the pass before. This entry's
+  "all nineteen" is right: seven new, nine remade and three render-check mutations.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
