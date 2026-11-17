@@ -285,8 +285,8 @@ What each block gets, read in order from the input's start:
 - **Past the cap, up to the compare limit:** the block is decoded by the scalar set in place and
   by the chosen set from an exact copy, the two must agree, refusal or values, and a refused
   block must leave the output alone. Nothing else.
-- **Past that, up to the decode limit (PFOR only):** decoded once by the chosen set, so the
-  sanitizers still see it. **Past the decode limit:** not examined.
+- **Past that, up to the decode limit (PFOR only):** decoded once, in place, with the chosen
+  kernel set. **Past the decode limit:** not examined.
 - Part 2, the input's bytes as values (2,048 words at -max_len), is unchanged and unbounded.
 
 The store target (`kStoreFuzzBounds`): a file whose segments state at most 1,048,576 values in all
@@ -303,11 +303,16 @@ compare limit (`compared_work`), the indexed path is asked every request by both
 the answers compared; past that the file is opened and not queried. The value counts below are a
 ceiling derived from the measure, every value taken at the cheapest weight, not a bound of their own.
 
-On the public page this reads: **fuzzing compares the SIMD kernels against the scalar ones on
-codec blocks of up to 1,048,576 values, the format's largest: every check runs on the blocks
-within an input's first 262,144 values (dictionary) or 1,048,576 (run-length, PFOR), and one
-maximal block after them gets the kernel comparison and the sanitizers alone; the store writes
-blocks of 4,096 values, inside every cap.**
+On the public page this reads: **fuzzing compares the SIMD kernels with the scalar ones on every
+codec block that ends within an input's compare limit, 1,310,720 values from its start for the
+dictionary and 2,097,152 for run-length and PFOR, in blocks of up to 1,048,576 values, the
+format's largest. The blocks within the cap, where twice the values before a block plus its own
+count stay within 262,144 values (dictionary) or 1,048,576 (run-length, PFOR), also get the
+refusal, cut, block and column checks; the re-encode checks take the first 5,123 values
+(dictionary) or 17,410 (run-length, PFOR) and the first 64 values of each of the next 64 blocks.
+Past the compare limit PFOR decodes each block that ends within 3,145,728 values once, in place,
+with the chosen kernel set, and nothing more is examined. The store writes codec blocks of 4,096 values, which every
+codec target takes whole as an input's first block.**
 
 **The count table.** For each bounded target, every loop the oracle runs, or runs in what it
 calls, whose trip count depends on the input, with the constant that limits it; then the most
@@ -328,18 +333,19 @@ they work, and `FuzzOracles.TheCountTableHoldsTheConstants` holds each most belo
 prefix blocks, P = 64 prefix values, E encoders (dictionary 2, run-length 1, PFOR 16), Eb the
 encoders a block is re-encoded with (2, 1, 4: a PFOR block's own transform), X the encoder-side
 check's encodes (2, 1, 0), K = 3 oracle block sizes, W = 2,048 part 2 words (16,384 bytes / 8),
-M = 16,384 bytes (-max_len), m the decoders' least block (the 8-byte header and the least payload
-each accepts: dictionary 29 bytes, run-length 44, PFOR 16).
+M = 16,384 bytes (-max_len), m the least valid block (the 8-byte header and the least payload
+a valid block has: dictionary 30 bytes, where its header checks pass at 29 but a valid block needs
+the Huffman stream's 8-bit longest-code field; run-length 44; PFOR 16).
 
 | Loop | Limited by |
 |---|---|
-| part 1's walk over blocks, within the cap and past it | each block it takes but a refused one, which ends the walk, holds m bytes or more, so at most ceil(M / m) blocks: 565, 373, 1,024; the walk also stops past S (L where there is no decode-once tier) |
+| part 1's walk over blocks, within the cap and past it | each block it takes but a refused one, which ends the walk, holds m bytes or more, so at most ceil(M / m) blocks: 547, 373, 1,024; the walk also stops past S (L where there is no decode-once tier) |
 | each block's decodes, re-encodes and checks | the block's stated count, at most kMaxBlockValues = 2^20, and the tiers above: within the cap 2 x before + count <= C; past it before + count <= L or S |
 | the re-encodes' values | B in all, then P values in each of at most N blocks |
 | the encoders a block is re-encoded with; the column re-encodes | Eb; E x K, each on at most B values |
 | distinct_count's sort, maximal_runs (decoder-side checks) | the block's values |
 | part 2's words and its encoders | W; E |
-| inside every block decoder and encoder (`block.cpp`, `pfor.cpp`, `dictionary.cpp`, `run_length.cpp`, `patch_list.cpp`, `lane_pack.cpp`, `int_transform.hpp`, `bit_stream.hpp`, `byte_cursor.hpp`, `simd/`) | a block's values, entries, runs, patches or bytes, each at most its stated count (entries and runs are at most the count: `block.hpp`) or its bytes; fixed widths otherwise (8 lanes, 8 bytes, 64 bits, 256 table entries, the 4 head-delta heads, the PFOR widths and at most `kCommonDivisors` scale candidates, the dictionary's 3 modes); the move-to-front decode moves at most `kDictMtfMaxEntries` - 1 = 2,047 entries a value; the dictionary's repeat scan stops at `kRepeatStepsPerEntry` x entries + 16 probes; a Huffman code read takes at most the 64 bits of one word |
+| inside every block decoder and encoder (`block.cpp`, `pfor.cpp`, `dictionary.cpp`, `run_length.cpp`, `patch_list.cpp`, `lane_pack.cpp`, `int_transform.hpp`, `bit_stream.hpp`, `byte_cursor.hpp`, `simd/`) | a block's values, entries, runs, patches or bytes, each at most its stated count (a dictionary's entries and a run-length block's runs are refused past its count: `dictionary.cpp`, "dict entries"; `run_length.cpp`, "rle runs") or its bytes; fixed widths otherwise (8 lanes, 8 bytes, 64 bits, 256 table entries, the 4 head-delta heads, the PFOR widths and at most `kCommonDivisors` scale candidates, the dictionary's 3 modes); the move-to-front decode moves at most `kDictMtfMaxEntries` - 1 = 2,047 entries a value; the dictionary's repeat scan stops at `kRepeatStepsPerEntry` x entries + 16 probes; a Huffman code read takes at most the 64 bits of one word |
 | `decode_column`'s walk | refuses a block that would pass the count before decoding it, so at most the count's values |
 
 *The block term.* Part of a block's cost does not grow with its values, so an input of many small
@@ -375,7 +381,7 @@ segment is one one-byte raw record in 317 bytes, so the most a written file hold
 the requests, at most 16 (4 windows x 4 locates); for each, one call for rows and one for the
 minute aggregate or the locate counts, and one share-sum call an ask; each call decodes each
 segment at most once (the time before a segment is kept, `engine.last_ts`), so at most the file's
-values T; the minute aggregate's bucket moves, at most min(typed records, `kMostMinutes` = 4,691)
+values T; the minute aggregate's bucket moves, at most min(typed records, `kMostMinutes` = 4,692)
 squared a call, counted in the work measure; the column form's 65,536 locate counters a request.
 Every one of these is a term of the work measure, so the measure, not T, is the query's bound. T is
 held by it: every value costs at least the plain segment's weight, so T is at most (work limit -
@@ -385,7 +391,7 @@ one plain segment's weight) / that weight.
 
 | Target | Decoded | Encoded | Compared | Parts |
 |---|---|---|---|---|
-| dictionary | 5C + 2(L - C) + (S - L) + (Eb + E K) B + 2 E W = **3,457,048** | (2 Eb + X)(B + N P) + E K B + E W = **90,148** | L + E W = **1,314,816** | ceil(M / m) = **565** blocks |
+| dictionary | 5C + 2(L - C) + (S - L) + (Eb + E K) B + 2 E W = **3,457,048** | (2 Eb + X)(B + N P) + E K B + E W = **90,148** | L + E W = **1,314,816** | ceil(M / m) = **547** blocks |
 | run-length | the same = **7,413,768** | the same = **118,796** | the same = **2,099,200** | **373** blocks |
 | PFOR | the same = **9,359,464** | the same = **1,040,496** | the same = **2,129,920** | **1,024** blocks |
 | store | max(5 Cs, 2 Ls) = 8 x 2^20 = **8,388,608** | 2 Cs = **2,097,152** | Ls = **4,194,304** | 5 G = **1,910** segment reads, 2 G = 764 written |
@@ -413,7 +419,7 @@ past the cap two asks (66 T); the query writes nothing.
 |---|---|---|
 | `dictionary/bound-costliest` | 3,457,048 / 65,572 / 1,314,816, 3 blocks | decoded and compared all; encoded short by 24,576, its one block within the cap leaving the prefix unreached |
 | `dictionary/bound-prefix` | 816,143 / 90,148 / 257,021, 67 blocks | encoded all |
-| `dictionary/bound-most-blocks` | 14,187 / 10,636 / 4,641, 546 blocks | 97% of the blocks: the encoders' smallest block is 30 bytes, one more than the decoder's least, so 545 blocks and the tail's header fit where a hand-made input of 29-byte blocks would hold 565 |
+| `dictionary/bound-most-blocks` | 14,187 / 10,636 / 4,641, 546 blocks | 99.8% of the blocks: 545 blocks of the least, 30 bytes, and the tail's header, where the most is 546 valid blocks and a refused one in the 4 bytes they leave |
 | `run_length/bound-costliest` | 7,413,768 / 106,508 / 2,099,200, 3 blocks | decoded and compared all; encoded short by 12,288 (the prefix) |
 | `run_length/bound-prefix` | 3,159,042 / 118,796 / 1,029,118, 67 blocks | encoded all |
 | `run_length/bound-most-blocks` | 6,700 / 4,280 / 2,420, 373 blocks | all the blocks |
@@ -479,8 +485,9 @@ named seeds and on everything else it runs.
 
 - A codec input past its compare limit, 1,310,720 values from its start for the dictionary and
   2,097,152 for run-length, and past PFOR's decode limit, 3,145,728: not examined. Between PFOR's
-  compare and decode limits: decoded once, not compared. Past each cap (262,144; 1,048,576;
-  1,048,576 values) up to those limits: only the kernel comparison and the sanitizers; the unit
+  compare and decode limits: decoded once, in place, with the chosen kernel set, not compared.
+  Past each cap (262,144; 1,048,576; 1,048,576 values) up to the compare limits: only the kernel
+  comparison, under the sanitizers as every decode is; the unit
   suite's fixed grid (`Grid/OracleGrid.PassTheWholeCheck`) runs every check on one dictionary
   block of each size from just past the cap to the largest, in every mode. -max_len
   holds at most three maximal PFOR blocks and two maximal dictionary blocks beside the cap's, so
@@ -497,9 +504,28 @@ named seeds and on everything else it runs.
 
 **Every target.** What bounds one execution's time and memory at its `-max_len`, with
 `-rss_limit_mb=2048` and `-malloc_limit_mb=256` over all of them, and the slowest input of each
-target's saved corpus and seeds, each run once (`-detect_leaks=0`) on the Mac:
+target's saved corpus and seeds, each run once (`-detect_leaks=0`) on the Mac on the tree of the
+named seeds' times above:
 
-TABLE_HERE
+| Target | -max_len | What bounds one execution | Inputs run | Slowest, ms (input) |
+|---|---|---|---|---|
+| `fuzz_columns` | 70,000 | the input's bytes | 445 | 1 (`columns/seed-00000`) |
+| `fuzz_container` | 70,000 | the input's bytes | 779 | 0 (a corpus file) |
+| `fuzz_dictionary` | 16,384 | the bounds above | 3,156 | 695 (`dictionary/bound-one-value-blocks`) |
+| `fuzz_gorilla_timestamps` | 70,000 | the input's bytes: the largest block of the cheapest value | 1,411 | 347 (`gorilla_timestamps/bound-costliest`) |
+| `fuzz_gorilla_xor` | 70,000 | the same | 2,085 | 384 (`gorilla_xor/bound-costliest`) |
+| `fuzz_itch_frame` | 70,000 | the input's bytes | 5,409 | 1 (a corpus file) |
+| `fuzz_itch_message` | 256 | the input's bytes | 1,140 | 0 (a corpus file) |
+| `fuzz_itch_query` | 131,072 | the bounds above | 2,510 | 428 (`itch_query/bound-costliest-within-budget`) |
+| `fuzz_itch_store` | 70,000 | the bounds above | 2,431 | 521 (`itch_store/bound-costliest`) |
+| `fuzz_pfor` | 16,384 | the bounds above | 5,569 | 566 (`pfor/bound-costliest`) |
+| `fuzz_run_length` | 16,384 | the bounds above | 2,532 | 635 (`run_length/bound-small-blocks`) |
+| `fuzz_stream_vbyte` | 70,000 | the input's bytes: the largest block of the cheapest value | 1,951 | 113 (`stream_vbyte/bound-costliest`) |
+| `fuzz_stub_store` | 70,000 | the input's bytes | 933 | 1 (a corpus file) |
+
+Every input exited 0. Each bounded target's slowest input is one of its named seeds; a single
+run is noisier than the medians above (`run_length/bound-small-blocks` took 635 ms here against
+its median of 612).
 
 ## Reach
 

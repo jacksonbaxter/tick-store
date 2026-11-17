@@ -340,8 +340,10 @@ oracle_counts::Counts codec_table(const codec::oracle::OracleBounds& b, std::siz
             .blocks = (bound_seeds::kSmallMaxLen + least_block_bytes - 1) / least_block_bytes};
 }
 
-// The decoders' least block: the header and the least payload each accepts.
-constexpr std::size_t kDictLeastBlock = codec::kBlockHeaderSize + 21;
+// The decoders' least valid block: the header and the least payload each accepts. The
+// dictionary's header checks pass at 21 payload bytes, but a valid block needs a byte more, the
+// Huffman stream's 8-bit longest-code field (dictionary.cpp, read_huffman).
+constexpr std::size_t kDictLeastBlock = codec::kBlockHeaderSize + 22;
 constexpr std::size_t kRleLeastBlock = codec::kBlockHeaderSize + 36;
 constexpr std::size_t kPforLeastBlock = codec::kBlockHeaderSize + 8;
 
@@ -390,7 +392,7 @@ oracle_counts::Counts query_table() {
 TEST(FuzzOracles, TheCountTableHoldsTheConstants) {
     using C = oracle_counts::Counts;
     EXPECT_EQ(codec_table(codec::oracle::kDictFuzzBounds, 2, 2, 2, kDictLeastBlock),
-              (C{.decoded = 3'457'048, .encoded = 90'148, .compared = 1'314'816, .blocks = 565}));
+              (C{.decoded = 3'457'048, .encoded = 90'148, .compared = 1'314'816, .blocks = 547}));
     EXPECT_EQ(codec_table(codec::oracle::kRleFuzzBounds, 1, 1, 1, kRleLeastBlock),
               (C{.decoded = 7'413'768, .encoded = 118'796, .compared = 2'099'200, .blocks = 373}));
     EXPECT_EQ(codec_table(codec::oracle::kPforFuzzBounds, 16, 4, 0, kPforLeastBlock),

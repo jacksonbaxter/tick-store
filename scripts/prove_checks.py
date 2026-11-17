@@ -612,8 +612,8 @@ FAULTS = (
           arguments=("--test-regex", "BoundSeeds.CountWhatTheTableGivesThem/itch_query$")),
     Fault("codec-count-the-cut-as-decoded", "dev-test", "the codec oracle's count takes a cut "
           "block at the values its header states, which the decoder never decodes", EXIT_CTEST,
-          "BoundSeeds.CountWhatTheTableGivesThem/dictionary (Failed)",
-          arguments=("--test-regex", "BoundSeeds.CountWhatTheTableGivesThem/dictionary$")),
+          "BoundSeeds.CountWhatTheTableGivesThem/run_length (Failed)",
+          arguments=("--test-regex", "BoundSeeds.CountWhatTheTableGivesThem/run_length$")),
     Fault("codec-block-examined-twice", "dev-test", "the codec oracle decodes every block in a "
           "first pass before part 1 examines it", EXIT_CTEST,
           "BoundSeeds.CountWhatTheTableGivesThem/pfor_most_blocks (Failed)",

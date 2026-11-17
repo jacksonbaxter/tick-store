@@ -1234,10 +1234,10 @@ template <class Block>
 // the codec's encoders write, of one value: every one within the cap and the budget, so each
 // takes the whole of part 1, the re-encodes with every block encoder included, for one value.
 // They reach the count table's block term (fuzz/README.md, "Bounds"): what a block costs
-// whatever its values. The decoders' least block (kBlockHeaderSize and the codec's least
-// payload) is what the table's most blocks is taken from; the encoders' least is a byte more
-// for the dictionary and the same for the others, so these seeds hold 545 of the dictionary's
-// 565, all 1,024 of PFOR's and all 373 of run-length's, the tail's header counted as a block.
+// whatever its values. The decoders' least valid block (kBlockHeaderSize and the codec's least
+// payload) is what the table's most blocks is taken from, and the encoders write it. Counting
+// the tail's header as a block, these seeds hold 546 of the dictionary's 547 (546 valid blocks
+// and a refused one in the 4 bytes they leave), all 1,024 of PFOR's and all 373 of run-length's.
 inline constexpr std::size_t kPforMostBlocks = 1'023;
 inline constexpr std::size_t kDictMostBlocks = 545;
 inline constexpr std::size_t kRleMostBlocks = 372;
