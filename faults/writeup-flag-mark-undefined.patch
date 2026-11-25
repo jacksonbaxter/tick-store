@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 77da66d..4878a45 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1756,7 +1756,7 @@ def marks_hold(resolver, body, blocks, values):
+         return None
+     for name, entry in resolver.entries.items():
+         word = flag_word(entry) if isinstance(entry, dict) else None
+-        if word and word not in definitions.values():
++        if False:
+             raise Refused(f"{show(name)} flags with {word!r}, which no flag_mark entry defines")
+     typed = TOKEN.sub(" ", body)
+     for mark in sorted(marks):

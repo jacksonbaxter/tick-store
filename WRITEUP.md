@@ -7,8 +7,7 @@ On a 2018 four-core AMD Ryzen running Linux (the Ryzen), it answers an hour of a
 74.04 ms warm, against 44.58 ms † for ArcticDB with a table per stock, while a
 second and a millisecond across every stock take it 8.7 and 167 times as long as
 ArcticDB and QuestDB, and the whole-day sum of a column 16.8 times as long as
-QuestDB † († marks a figure timed during a login, a backup job or, for a query,
-swapping on the host).
+QuestDB † († marks a figure timed during a login, a backup job or, for a query, swapping on the host).
 A single writer thread there ingests 1.270 M messages/s before a flush, 2.15 times
 short of Nasdaq's published peak message rate.
 
@@ -28,8 +27,8 @@ The Ryzen, each system in its fixed setup; queries are warm medians.
 
 The write row is not like-for-like: tick-store's input was in memory before its clock, with 250,916,864 B read from the
 device inside it, and the others read theirs from disk inside theirs, 18,411,094,016 to
-21,521,625,088 B. Both runs: this run and the replaced run, an earlier measurement of the
-day; neither confirms the other, so neither part counts. ArcticDB with a table per stock is faster:
+21,521,625,088 B. Both runs: this run and the replaced run, an earlier measurement, on older
+code; neither confirms the other, so neither part counts. ArcticDB with a table per stock is faster:
 44.58 ms † on Q2 and 25.00 ms † on Q3.
 
 ## How it was measured
@@ -305,7 +304,7 @@ A login or a backup can take executions from a fuzzing run, not hide a finding: 
 [runs by target](RESULTS.md#g-3-runs-by-target) give each target's.
 
 The checks and the faults that prove them are in the README; the prover's
-record covers 99 of its 493 listed faults.
+record covers 99 of its 508 listed faults.
 
 ## Limits
 

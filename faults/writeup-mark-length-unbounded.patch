@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 77da66d..e3cb277 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1514,7 +1514,7 @@ def check_list(figures):
+ 
+ 
+ # The longest a mark may be, in characters: a mark is a symbol, never a word.
+-MARK_MOST = 2
++MARK_MOST = 9
+ 
+ 
+ def is_mark(mark):

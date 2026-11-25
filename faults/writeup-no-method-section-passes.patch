@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 77da66d..f602d07 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1053,7 +1053,7 @@ def method_problem(root, text, body=None, resolver=None, values=None):
+                 "described in one")
+     section = section_of(text, METHOD_SECTION)
+     if section is None:
+-        return f"the essay has no {METHOD_SECTION!r} section to describe the comparison's method"
++        return None
+     section = " ".join(section.split())
+     for name, note in notes:
+         if note not in section:

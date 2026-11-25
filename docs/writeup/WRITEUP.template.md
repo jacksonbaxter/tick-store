@@ -7,8 +7,7 @@ On a 2018 four-core AMD Ryzen running Linux (the Ryzen), it answers an hour of a
 {{cmpL_ts_q2_warm_med_ms}} warm, against {{cmpL_arcps_q2_warm_med_ms}} ms {{glance_arcps_q2_flag}} for ArcticDB with a table per stock, while a
 second and a millisecond across every stock take it {{gap_ql4_q1_x}} and {{gap_ql4_q4_x}} times as long as
 {{cmpL_q1_warm_best_system}} and {{cmpL_q4_warm_best_system}}, and the whole-day sum of a column {{gap_ql4_q5_x}} times as long as
-{{cmpL_q5_warm_best_system}} {{glance_q5_other_flag}} († marks a figure timed during a login, a backup job or, for a query,
-swapping on the host).
+{{cmpL_q5_warm_best_system}} {{glance_q5_other_flag}} ({{mark:flags}}).
 A single writer thread there ingests {{cmpL_ts_A_msg_rate_m}} before a flush, {{gap_wt2_linux_x}} times
 short of Nasdaq's published peak message rate.
 
@@ -28,8 +27,8 @@ The Ryzen, each system in its fixed setup; queries are warm medians.
 
 The write row is not like-for-like: tick-store's input was in memory before its clock, with {{cmpL_ts_A_device_b}} B read from the
 device inside it, and the others read theirs from disk inside theirs, {{cmpL_others_A_device_min_b}} to
-{{cmpL_others_A_device_max_b}} B. Both runs: this run and the replaced run, an earlier measurement of the
-day; neither confirms the other, so neither part counts. ArcticDB with a table per stock is faster:
+{{cmpL_others_A_device_max_b}} B. Both runs: this run and the replaced run, an earlier measurement, on older
+code; neither confirms the other, so neither part counts. ArcticDB with a table per stock is faster:
 {{glance_arcps_q2_ms}} ms {{glance_arcps_q2_flag}} on Q2 and {{glance_arcps_q3_ms}} ms {{glance_arcps_q3_flag}} on Q3.
 
 ## How it was measured

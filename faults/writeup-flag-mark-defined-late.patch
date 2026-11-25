@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 77da66d..2c4a134 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1788,7 +1788,7 @@ def marks_hold(resolver, body, blocks, values):
+         if len(defined) != 1:
+             raise Refused(f"the mark {mark!r} is defined {len(defined)} times: a mark is "
+                           "defined once, by its token, in the first block it stands in")
+-        if stands and min(stands) != defined[0]:
++        if False:
+             raise Refused(f"the mark {mark!r} is not defined in the first block it stands in, "
+                           f"{blocks[min(stands)][:80]!r}")
+     for block in blocks:

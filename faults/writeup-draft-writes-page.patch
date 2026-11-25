@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 77da66d..28a4ef4 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -2401,7 +2401,7 @@ def main(argv=None):
+         print(f"render_writeup: {page_name} is current: {rendered.total} tokens, "
+               f"{rendered.words:,} words")
+         return EXIT_OK
+-    if args.draft:
++    if False:
+         # A draft is never the page: with every token resolved, the page is left as it was.
+         print(f"render_writeup: wrote the draft {args.draft}: {rendered.total} tokens, "
+               f"{rendered.words:,} words; {page_name} left as it was")

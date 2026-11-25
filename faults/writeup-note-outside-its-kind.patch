@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 77da66d..3a90d3b 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1796,7 +1796,7 @@ def marks_hold(resolver, body, blocks, values):
+         kinds = {kind for name in names for _, kind, _ in resolver.deps.get(name, set())}
+         for name in names:
+             head, _, kind = name.partition(":")
+-            if head in ("note", "mark") and kind in resolver.kinds and kind not in kinds:
++            if False:
+                 raise Refused(f"{show(name)} stands in a block that shows no figure of the kind "
+                               f"{kind!r}: {block[:80]!r}")
+         for unit in units_of(block):

@@ -3171,7 +3171,8 @@ FAULTS = (
           "FAIL: test_a_mark_with_no_definition_before_it (__main__.Pins"),
     # Review R4-D: the essay's bound is held on wc -w's count of the rendered page.
     Fault("writeup-words-not-as-wc", "py-scripts", "render_writeup.py counts the essay's words "
-          "leaving out its tables' pipes and rules and every mark, not as wc -w counts the page",
+          "leaving out its tables' pipes and rules and every mark, not as LC_ALL=C wc -w counts the "
+          "page",
           CHECK_FAILED, "FAIL: test_the_word_count_is_wc_s_count_of_the_page (__main__.Refuses"),
     # Review R4-A: the method section gives each comparison's input note.
     Fault("writeup-method-note-unchecked", "py-scripts", "render_writeup.py takes an essay whose "
@@ -3183,8 +3184,45 @@ FAULTS = (
           "FAIL: test_a_kind_at_its_own_commit_read_under_no_pin (__main__.Commits"),
     # Review R4-B: a not-counted mark stands only beside a part that is not counted.
     Fault("writeup-not-counted-of-a-counted-part", "py-scripts", "render_writeup.py gives a "
-          "counted part a not-counted mark's place", CHECK_FAILED,
+          "counted part an empty not-counted cell: its counted test removed, and the count of "
+          "its not-counted marks allowed to be none", CHECK_FAILED,
           "FAIL: test_a_not_counted_mark_of_a_counted_part (__main__.NotCountedMark"),
+    # Review C2-5: each mark is defined once, by its token, in the first block it stands in, never typed, printed only by its own tokens, a note only where its kind is shown and a flag straight after its figure.
+    Fault("writeup-typed-mark", "py-scripts", "render_writeup.py takes a mark typed in the template, not printed by a token whose own it is", CHECK_FAILED,
+          "FAIL: test_a_flag_mark_typed_undefined_or_printed_by_another_token (__main__.Marks"),
+    Fault("writeup-flag-mark-undefined", "py-scripts", "render_writeup.py takes a flag that prints a mark no flag_mark entry defines", CHECK_FAILED,
+          "FAIL: test_a_flag_mark_typed_undefined_or_printed_by_another_token (__main__.Marks"),
+    Fault("writeup-mark-in-foreign-token", "py-scripts", "render_writeup.py takes a token that prints a mark not its own", CHECK_FAILED,
+          "FAIL: test_a_flag_mark_typed_undefined_or_printed_by_another_token (__main__.Marks"),
+    Fault("writeup-flag-mark-defined-late", "py-scripts", "render_writeup.py takes a flag mark defined in a block other than the first it stands in", CHECK_FAILED,
+          "FAIL: test_a_flag_mark_defined_once_where_it_first_stands (__main__.Marks"),
+    Fault("writeup-flag-mark-defined-twice", "py-scripts", "render_writeup.py takes a flag mark defined twice", CHECK_FAILED,
+          "FAIL: test_a_flag_mark_defined_once_where_it_first_stands (__main__.Marks"),
+    Fault("writeup-note-outside-its-kind", "py-scripts", "render_writeup.py takes a note or mark token in a block that shows none of its kind's figures", CHECK_FAILED,
+          "FAIL: test_a_mark_typed_or_a_note_where_its_kind_is_not_shown (__main__.Pins"),
+    Fault("writeup-flag-not-beside", "py-scripts", "render_writeup.py takes a flag token that does not stand straight after a figure of the phase it flags", CHECK_FAILED,
+          "FAIL: test_a_flag_not_straight_after_a_figure_of_its_phase (__main__.Marks"),
+    # Review C2-4: a not-counted token stands beside a figure of its own part.
+    Fault("writeup-not-counted-untied", "py-scripts", "render_writeup.py takes a not-counted token in a row or sentence that reads nothing of the part it names", CHECK_FAILED,
+          "FAIL: test_a_not_counted_token_beside_its_part (__main__.NotCountedTie"),
+    # Review C2-6 and C2: the method section is one, and its input note stands whole, from a token giving it alone.
+    Fault("writeup-no-method-section-passes", "py-scripts", "render_writeup.py takes an essay with no method section while a comparison's writes did not start alike", CHECK_FAILED,
+          "FAIL: test_an_essay_with_no_method_section (__main__.Marks"),
+    Fault("writeup-method-heading-twice", "py-scripts", "render_writeup.py takes a second method section", CHECK_FAILED,
+          "FAIL: test_a_second_method_section (__main__.Marks"),
+    Fault("writeup-method-note-joined", "py-scripts", "render_writeup.py takes the input note with other words joined to its sentences", CHECK_FAILED,
+          "FAIL: test_an_input_note_joined_to_other_words_or_changed_by_its_token (__main__.Marks"),
+    Fault("writeup-method-note-token-unchecked", "py-scripts", "render_writeup.py takes the input note from a token whose value adds to it", CHECK_FAILED,
+          "FAIL: test_an_input_note_joined_to_other_words_or_changed_by_its_token (__main__.Marks"),
+    # Review C2-6: a mark is at most two characters.
+    Fault("writeup-mark-length-unbounded", "py-scripts", "render_writeup.py takes a kind's mark of more than two characters", CHECK_FAILED,
+          "FAIL: test_a_mark_that_is_no_symbol_or_stands_for_two_notes (__main__.Pins"),
+    # Review C2: the page counts alike under both locales.
+    Fault("writeup-words-utf8-unchecked", "py-scripts", "render_writeup.py takes a page that macOS's wc -w in a UTF-8 locale counts otherwise than LC_ALL=C wc -w", CHECK_FAILED,
+          "FAIL: test_a_page_macos_wc_counts_otherwise_in_a_utf8_locale (__main__.Refuses"),
+    # Review C2: a draft never writes the page.
+    Fault("writeup-draft-writes-page", "py-scripts", "render_writeup.py --draft also rewrites WRITEUP.md when every token resolves", CHECK_FAILED,
+          "FAIL: test_a_draft_never_writes_the_page (__main__.Renders"),
     # The step itself on the committed page. Its baseline passes only once WRITEUP.md is
     # rendered, when every results file it reads is committed (docs/TASKS.md).
     Fault("writeup-template-not-rendered", "writeup-check", "the essay's template reworded "

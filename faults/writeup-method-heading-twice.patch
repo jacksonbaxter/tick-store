@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 77da66d..7e7afc9 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1048,7 +1048,7 @@ def method_problem(root, text, body=None, resolver=None, values=None):
+     if not notes:
+         return None
+     headings = re.findall(rf"^{re.escape(METHOD_SECTION)}\s*$", text, re.M)
+-    if len(headings) > 1:
++    if False:
+         return (f"the essay has {len(headings)} {METHOD_SECTION!r} sections: the method is "
+                 "described in one")
+     section = section_of(text, METHOD_SECTION)

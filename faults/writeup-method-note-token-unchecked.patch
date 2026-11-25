@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 77da66d..091ede4 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1068,7 +1068,7 @@ def method_problem(root, text, body=None, resolver=None, values=None):
+             own = [token for token in TOKEN.findall(section_of(body, METHOD_SECTION) or "")
+                    if ((resolver.entries.get(token) or {}).get("value") ==
+                        {"method_input_note": True}) and values.get(token) == note]
+-            if not own:
++            if False:
+                 return (f"the essay's {METHOD_SECTION!r} gives the input note of {name} through "
+                         "no token whose value is the note alone")
+     return None

@@ -156,6 +156,21 @@ class Tree(unittest.TestCase):
 
 
 class Renders(Tree):
+    def test_a_draft_never_writes_the_page(self):
+        # Review C2: --draft writes the draft and leaves the page as it was, also when every
+        # token resolves.
+        draft = self.root / "draft.md"
+        done = self.run_script("--draft", str(draft))
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("The demo decodes at 1.23 ms", draft.read_text(encoding="utf-8"))
+        self.assertFalse((self.root / "WRITEUP.md").exists())
+        self.renders()
+        before = self.page()
+        self.edit("docs/writeup/WRITEUP.template.md", "## Method", "Drafted.\n\n## Method")
+        self.assertEqual(self.run_script("--draft", str(draft)).returncode, 0)
+        self.assertIn("Drafted.", draft.read_text(encoding="utf-8"))
+        self.assertEqual(self.page(), before)
+
     def test_a_tree_whose_tokens_resolve_renders_a_page_check_calls_current(self):
         page = self.renders()
         self.assertIn("The demo decodes at 1.23 ms on the M4, against a bar of ≤ 2.5 ms, and "
@@ -568,6 +583,21 @@ class Refuses(Tree):
         self.assertEqual(RENDER.word_count(page), int(done.stdout.split()[0]))
         self.assertIn(f"{RENDER.word_count(page):,} words", self.run_script("--check").stdout)
 
+    def test_a_page_macos_wc_counts_otherwise_in_a_utf8_locale(self):
+        # Review C2: macOS's wc -w in a UTF-8 locale ends a word at a byte 0xA0, the last byte
+        # of a no-break space and of a dagger, so the page holds neither before a non-space.
+        for text, posix, utf8 in (("a\u00a0b", 1, 2), ("a \u2020; b", 3, 4), ("a \u2020 b", 3, 3),
+                                  ("a \u2021; b", 3, 3), ("\u0800", 1, 2)):
+            self.assertEqual((RENDER.word_count(text), RENDER.utf8_wc_count(text)),
+                             (posix, utf8), text)
+            if sys.platform == "darwin":
+                done = subprocess.run(["wc", "-w"], input=text.encode("utf-8"),
+                                      capture_output=True, env=dict(os.environ,
+                                                                    LC_ALL="en_US.UTF-8"))
+                self.assertEqual(int(done.stdout.split()[0]), utf8, text)
+        self.insert("The store keeps each\u00a0stock together.")
+        self.refused("under LC_ALL=C wc -w and", "under macOS's wc -w in a UTF-8 locale")
+
     def test_an_essay_with_no_title(self):
         self.edit("docs/writeup/WRITEUP.template.md", "# A demo essay\n\n", "")
         self.refused("the page does not open with its title")
@@ -833,11 +863,29 @@ class Pins(Tree):
                   "([results]({{path:demo}}) {{mark:demo}}).")
         self.refused("the mark '\u2021' is defined twice")
 
+    def test_a_mark_typed_or_a_note_where_its_kind_is_not_shown(self):
+        # Review C2-5: a mark stands only through its token, and a note's token only in a
+        # block showing its kind's figures.
+        self.marked()
+        self.renders()
+        self.insert("Typed \u2021 here.")
+        self.refused("the template types the mark '\u2021'")
+        self.edit("docs/writeup/WRITEUP.template.md", "Typed \u2021 here.",
+                  "Here is {{note:demo}}.")
+        self.refused("{{note:demo}} stands in a block that shows no figure of the kind 'demo'")
+
     def test_a_mark_that_is_no_symbol_or_stands_for_two_notes(self):
         self.marked()
         self.figures["kinds"]["demo"]["mark"] = "n1"
         self.save()
         self.refused("its mark 'n1' is no short symbol")
+        # Review C2-6: a mark is at most two characters.
+        self.figures["kinds"]["demo"]["mark"] = "\u2021\u2021"
+        self.save()
+        self.renders()
+        self.figures["kinds"]["demo"]["mark"] = "\u2021\u2021\u2021"
+        self.save()
+        self.refused("its mark '\u2021\u2021\u2021' is no short symbol")
         self.figures["kinds"]["demo"]["mark"] = "\u2021"
         self.figures["kinds"]["other"] = {"what": "another", "note": "another note",
                                           "mark": "\u2021",
@@ -1157,6 +1205,96 @@ class Marks(Tree):
         self.refused(f"the essay's {RENDER.METHOD_SECTION!r} does not say where the writes' "
                      "inputs were in Linux-day-")
 
+    def test_an_essay_with_no_method_section(self):
+        # Review C2-6.
+        self.edit("docs/writeup/WRITEUP.template.md", RENDER.METHOD_SECTION, "## Measures")
+        self.refused(f"the essay has no {RENDER.METHOD_SECTION!r} section to describe the "
+                     "comparison's method")
+
+    def test_a_second_method_section(self):
+        self.insert(f"{RENDER.METHOD_SECTION}\n\nEach system wrote the day again.")
+        self.refused(f"the essay has 2 {RENDER.METHOD_SECTION!r} sections")
+
+    def test_an_input_note_joined_to_other_words_or_changed_by_its_token(self):
+        # Review C2: the note stands as whole sentences, from a token that gives it alone.
+        self.edit("docs/writeup/WRITEUP.template.md", "{{method_note}}", "So: {{method_note}}")
+        self.refused(f"the essay's {RENDER.METHOD_SECTION!r} changes the input note of "
+                     "Linux-day-")
+        self.edit("docs/writeup/WRITEUP.template.md", "So: {{method_note}}", "{{method_note}}")
+        self.figures["figures"]["method_note"]["value"] = {"concat": [
+            {"method_input_note": True}, " Or so."]}
+        self.save()
+        self.refused("gives the input note of Linux-day-", "through no token whose value is the "
+                     "note alone")
+
+    def dagger(self):
+        """ArcticDB's Q1 warm, swapped in, with its dagger beside it and the dagger's
+        definition after it in the same sentence."""
+        path = self.root / f"results/compare/Linux-day-{COMMIT[:12]}.json"
+        document = json.loads(path.read_text())
+        document["systems"]["arcticdb"]["variants"]["h"]["queries"] = {
+            "Q1": {"warm": {"median_us": 5000, "swap_timed": {"flagged": True}}}}
+        path.write_text(json.dumps(document))
+        self.figures["figures"]["q1_ms"] = {
+            "what": "ArcticDB's warm Q1 median, ms, on the Ryzen", "kind": "day", "host": "Linux",
+            "value": {"path": ["systems", "arcticdb", "variants", "@headline", "queries", "Q1",
+                               "warm", "median_us"]}, "format": "{:,.1f}", "scale": 0.001}
+        self.figures["factors"].append({"value": 0.001, "why": "to milliseconds"}) \
+            if not any(item["value"] == 0.001 for item in self.figures["factors"]) else None
+        self.figures["figures"]["q1_flag"] = {
+            "what": "a dagger if ArcticDB's warm Q1 is swapped in, on the Ryzen", "kind": "day",
+            "host": "Linux", "value": {"flagged": [{"system": "arcticdb", "query": "Q1",
+                                                   "kind": "warm"}]},
+            "words": {"true": "\u2020", "false": ""}}
+        self.figures["figures"]["mark:flags"] = {
+            "what": "the dagger's definition", "flag_mark": {
+                "mark": "\u2020", "says": "marks a figure timed while pages were swapped in"}}
+        self.save()
+        self.insert("ArcticDB took {{q1_ms}} ms {{q1_flag}} on Q1 ({{mark:flags}}).")
+
+    def test_a_flag_mark_defined_once_where_it_first_stands(self):
+        # Review C2-5: the dagger is defined once, by its token, in the first block it stands
+        # in, never typed, and printed only by a flag.
+        self.dagger()
+        self.assertIn("ArcticDB took 5.0 ms \u2020 on Q1 (\u2020 marks a figure timed while "
+                      "pages were swapped in).", self.renders())
+        self.edit("docs/writeup/WRITEUP.template.md", " on Q1 ({{mark:flags}}).",
+                  " on Q1.\n\nThe mark: {{mark:flags}}.")
+        self.refused("the mark '\u2020' is not defined in the first block it stands in")
+        self.edit("docs/writeup/WRITEUP.template.md", "\n\nThe mark: {{mark:flags}}.", "")
+        self.edit("docs/writeup/WRITEUP.template.md", "ArcticDB took",
+                  "The mark: {{mark:flags}}.\n\nArcticDB took")
+        self.refused("the mark '\u2020' is not defined in the first block it stands in")
+        self.edit("docs/writeup/WRITEUP.template.md", "The mark: {{mark:flags}}.\n\n", "")
+        self.edit("docs/writeup/WRITEUP.template.md", " on Q1.", " on Q1 ({{mark:flags}}).")
+        self.insert("Again: {{mark:flags}}.")
+        self.refused("the mark '\u2020' is defined 2 times")
+
+    def test_a_flag_mark_typed_undefined_or_printed_by_another_token(self):
+        self.dagger()
+        self.insert("Typed \u2020 here.")
+        self.refused("the template types the mark '\u2020'")
+        self.edit("docs/writeup/WRITEUP.template.md", "Typed \u2020 here.\n\n", "")
+        del self.figures["figures"]["mark:flags"]
+        self.save()
+        self.edit("docs/writeup/WRITEUP.template.md", " ({{mark:flags}})", "")
+        self.refused("{{q1_flag}} flags with '\u2020', which no flag_mark entry defines")
+        self.dagger()
+        self.figures["figures"]["odd"] = {
+            "what": "a dagger unless tick-store's write is disturbed, on the Ryzen", "kind": "day",
+            "host": "Linux", "value": {"not": {"flagged": [{"system": "tickstore",
+                                                            "write": "B"}]}},
+            "words": {"true": "\u2020", "false": ""}}
+        self.save()
+        self.edit("docs/writeup/WRITEUP.template.md", "ms {{q1_flag}}", "ms {{q1_flag}} {{odd}}")
+        self.refused("{{odd}} prints the mark '\u2020', which is not its own")
+
+    def test_a_flag_not_straight_after_a_figure_of_its_phase(self):
+        self.dagger()
+        self.edit("docs/writeup/WRITEUP.template.md", "ArcticDB took {{q1_ms}} ms {{q1_flag}}",
+                  "ArcticDB {{q1_flag}} took {{q1_ms}} ms")
+        self.refused("{{q1_flag}} does not stand straight after a figure of the phase it flags")
+
     def test_an_input_note_where_the_writes_started_alike(self):
         self.write(f"results/compare/Linux-day-{COMMIT[:12]}.json",
                    json.dumps(day(write_record(190.0, 10), write_record(381.0, 10))))
@@ -1321,6 +1459,37 @@ class NotCountedMark(unittest.TestCase):
         with self.assertRaisesRegex(RENDER.Refused, r"no one part 'Q3 warm'"):
             RENDER.not_counted({"id": "T-9", "host": "Linux", "part": "Q3 warm"},
                                self.context())
+
+
+class NotCountedTie(unittest.TestCase):
+    """Review C2-4: a not-counted token stands in the row or sentence of the part it names."""
+
+    def resolver(self, part):
+        lowest = {"id": "QL-4", "host": "Linux", "lowest_of": {}}
+        write = {"id": "WT-4", "host": "Linux", "parts": [{"label": "against QuestDB", "value": {
+            "path": ["systems", "tickstore", "variants", "@headline", "classes", "B", "write",
+                     "seconds_median"]}}]}
+        def query(name):
+            return {"value": {"path": ["systems", "tickstore", "variants", "@headline",
+                                       "queries", name, "warm", "median_us"]}}
+        entries = {"q2": query("Q2"), "q3": query("Q3"),
+                   "nc": {"value": {"not_counted": part}}}
+        return types.SimpleNamespace(
+            entries=entries,
+            target_row=lambda spec, name: lowest if spec["id"] == "QL-4" else write)
+
+    def test_a_not_counted_token_beside_its_part(self):
+        resolver = self.resolver({"id": "QL-4", "host": "Linux", "part": "Q2 warm"})
+        RENDER.not_counted_ties(resolver, ["| Q2 | {{q2}} | {{nc}} |"])
+        RENDER.not_counted_ties(resolver, ["Q2 takes {{q2}}, {{nc}}."])
+        with self.assertRaisesRegex(RENDER.Refused, r"\{\{nc\}\} gives QL-4's part 'Q2 warm', "
+                                                    r"and nothing beside it reads that part"):
+            RENDER.not_counted_ties(resolver, ["| Q3 | {{q3}} | {{nc}} |"])
+
+    def test_a_not_counted_token_of_another_row_s_part(self):
+        resolver = self.resolver({"id": "WT-4", "host": "Linux", "part": "against QuestDB"})
+        with self.assertRaisesRegex(RENDER.Refused, r"gives WT-4's part 'against QuestDB'"):
+            RENDER.not_counted_ties(resolver, ["| Q2 | {{q2}} | {{nc}} |"])
 
 
 class SetupMark(unittest.TestCase):

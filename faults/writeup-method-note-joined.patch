@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 77da66d..511710f 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1061,7 +1061,7 @@ def method_problem(root, text, body=None, resolver=None, values=None):
+                     f"in {name}: {note!r}")
+         at = section.index(note)
+         before, after = section[:at], section[at + len(note):]
+-        if (before and not re.search(r"[.!?]\s$", before)) or (after and not after[0].isspace()):
++        if False:
+             return (f"the essay's {METHOD_SECTION!r} changes the input note of {name}: it stands "
+                     "as whole sentences, nothing joined to it")
+         if body is not None:

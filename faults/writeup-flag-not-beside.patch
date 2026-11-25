@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 77da66d..63676b8 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1808,7 +1808,7 @@ def marks_hold(resolver, body, blocks, values):
+                 before = unit_names[index - 1] if index else None
+                 paths = paths_read(resolver, before) if before else []
+                 reads = entry["value"]["flagged"]
+-                if not before or not all(any(beside_flag(path, read) for path in paths)
++                if False and not all(any(beside_flag(path, read) for path in paths)
+                                          for read in reads):
+                     raise Refused(f"{show(name)} does not stand straight after a figure of the "
+                                   f"phase it flags: {unit.strip()[:80]!r}")

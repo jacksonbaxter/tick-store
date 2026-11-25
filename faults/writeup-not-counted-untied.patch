@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 77da66d..6b4aeea 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1703,7 +1703,7 @@ def not_counted_ties(resolver, blocks):
+                 spec = spec["not_counted"]
+                 row = resolver.target_row(spec, name)
+                 wanted = part_paths(row, spec.get("part"))
+-                if not wanted or not any(holds_path(path, want) for other in names
++                if False and not any(holds_path(path, want) for other in names
+                                          if other != name
+                                          for path in paths_read(resolver, other)
+                                          for want in wanted):
