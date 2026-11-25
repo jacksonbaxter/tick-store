@@ -1,19 +1,18 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -2348,13 +2348,8 @@
- # What guards a timed figure against them, step by step, as the last not_listed items of both
+@@ -2350,13 +2350,7 @@
  # disturbance records give it (reviews R3-2, R1-9).
- GUARDS = ("What guards a timed figure differs by step. In the kernel benchmark's file and the two "
--          "comparison files it is the per-CPU record and the load rule. Each run of the "
+ GUARDS = ("What guards a timed figure differs by step. In the three Linux benchmark files, the "
+           "kernel, column decode and ITCH codec benchmarks', and the two comparison files it is "
+-          "the per-CPU record and the load rule. Each run of the "
 -          "bound-seed gate keeps per-CPU counters from before and after it, the load at its start "
 -          "and whether the process keeping the sibling core busy ran at both ends; the gate held "
 -          "a run to a clean exit, that process and the bar alone, and its counters and load to no "
 -          "rule. The timed fuzzing runs and the capacity check's parts keep no per-CPU record and "
 -          "no load: each fuzzing run passes or fails by its own log, and the capacity check's "
 -          "guard watches memory, swap and disk alone.")
-+          "comparison files it is the per-CPU record and the load rule, and so it is for every "
-+          "other timed figure.")
++          "the per-CPU record and the load rule, and so it is for every other timed figure.")
  SCHEDULED_JOBS = ("The marks name only what the disturbance records list. The host's own "
                    "scheduled jobs, a repository backup every fifteen minutes, a health collector "
                    "and two small watchers every five, two sync jobs every ten, a file backup "

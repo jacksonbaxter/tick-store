@@ -3597,11 +3597,15 @@ class GuardsTest(unittest.TestCase):
                           if "bound-seed gate keeps" in item["why"])
         # Each step's guard, the record's words beside the sentence's.
         for record, said in (
-                (("ede0176b10bb", "In the kernel benchmark's file and the two comparison files, "
-                                  "what guards each timed figure is the per-CPU record and the "
-                                  "load rule"),
-                 "In the kernel benchmark's file and the two comparison files it is the per-CPU "
-                 "record and the load rule."),
+                (("ede0176b10bb", "In the three Linux benchmark files, "
+                                  "Linux-simd_kernel-ede0176b10bb.json, "
+                                  "Linux-column_decode-ede0176b10bb.json and "
+                                  "Linux-itch_codec-ede0176b10bb.json under results/bench, and the "
+                                  "two comparison files, what guards each timed figure is the "
+                                  "per-CPU record and the load rule"),
+                 "In the three Linux benchmark files, the kernel, column decode and ITCH codec "
+                 "benchmarks', and the two comparison files it is the per-CPU record and the "
+                 "load rule."),
                 (("8616263b7561", "Each run of the bound-seed gate keeps the kernel's per-CPU "
                                   "counters copied before and after it"),
                  "Each run of the bound-seed gate keeps per-CPU counters from before and after it"),

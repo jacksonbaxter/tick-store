@@ -2348,8 +2348,9 @@ def short_forms_explained():
 # scheduled jobs, named by kind only, ran through every window.
 # What guards a timed figure against them, step by step, as the last not_listed items of both
 # disturbance records give it (reviews R3-2, R1-9).
-GUARDS = ("What guards a timed figure differs by step. In the kernel benchmark's file and the two "
-          "comparison files it is the per-CPU record and the load rule. Each run of the "
+GUARDS = ("What guards a timed figure differs by step. In the three Linux benchmark files, the "
+          "kernel, column decode and ITCH codec benchmarks', and the two comparison files it is "
+          "the per-CPU record and the load rule. Each run of the "
           "bound-seed gate keeps per-CPU counters from before and after it, the load at its start "
           "and whether the process keeping the sibling core busy ran at both ends; the gate held "
           "a run to a clean exit, that process and the bar alone, and its counters and load to no "
