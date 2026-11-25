@@ -1,0 +1,12 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 64c8cfb..6759b8a 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1028,7 +1028,6 @@ def flag_reads(reads, document, system_of):
+     phases = []
+     for read in reads:
+         if "case" in read:
+-            phases.append(("case", read["case"]))
+             continue
+         system = read["system"]
+         if isinstance(system, dict):

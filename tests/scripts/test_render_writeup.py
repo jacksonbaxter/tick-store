@@ -1380,11 +1380,165 @@ class Marks(Tree):
                      "and variant it flags")
 
     def test_a_flag_beside_a_figure_whose_system_is_not_fixed(self):
+        # Review C3-8: a figure of the flag's phase whose expression fixes no system is not
+        # beside it, and the page is refused as for any other figure; a ratio resting on the
+        # flag's own figure is.
         self.other_figures()
+        path = self.root / f"results/compare/Linux-day-{COMMIT[:12]}.json"
+        document = json.loads(path.read_text())
+        document["queries"] = {"Q1": {"warm": {"median_us": 5000}}}
+        path.write_text(json.dumps(document))
+        self.figure("bare_q1_ms", {
+            "what": "a warm Q1 median the day's record gives for no system, ms, on the Ryzen",
+            "kind": "day", "host": "Linux", "format": "{:,.1f}", "scale": 0.001,
+            "value": {"path": ["queries", "Q1", "warm", "median_us"]}})
+        self.insert("Bare, {{bare_q1_ms}} ms {{q1_flag}} on Q1.")
+        self.refused("{{q1_flag}} does not stand straight after a figure of the phase, system "
+                     "and variant it flags")
+        self.edit("docs/writeup/WRITEUP.template.md", "Bare, {{bare_q1_ms}} ms {{q1_flag}}",
+                  "Bare, {{bare_q1_ms}} ms")
         self.edit("docs/writeup/WRITEUP.template.md", "a ratio {{ratio_q1}}.",
-                  "a ratio {{ratio_q1}} {{q1_flag}}.")
-        self.refused("{{q1_flag}} stands after {{ratio_q1}}, whose figure's system its "
-                     "expression does not fix")
+                  "a ratio {{ratio_q1}} {{q1_flag}} too.")
+        self.assertIn("a ratio 5.0000 \u2020 too.", self.renders())
+
+    def test_a_flag_beside_a_min_max_same_or_lowest_holds_to_the_item_it_shows(self):
+        # A min or max of figures is read by the item it takes, a same by its first item, and a
+        # lowest_value in its system's headline setup.
+        self.other_figures()
+        path = self.root / f"results/compare/Linux-day-{COMMIT[:12]}.json"
+        document = json.loads(path.read_text())
+        document["systems"]["tickstore"]["variants"]["h"]["queries"]["Q1"]["cold"] = {
+            "median_us": 5000, "swap_timed": {"flagged": False}}
+        path.write_text(json.dumps(document))
+        def of(key, items):
+            return {"what": f"the {key} of {', '.join(items)}, ms, on the Ryzen",
+                    "format": "{:,.1f}", "scale": 0.001,
+                    "value": {key: [{"figure": item} for item in items]}}
+        self.figures["figures"]["min_q1_ms"] = of("min", ["ts_q1_ms", "q1_ms"])
+        self.figures["figures"]["ts_q1_cold_ms"] = {
+            "what": "tick-store's cold Q1 median, ms, on the Ryzen", "kind": "day",
+            "host": "Linux", "format": "{:,.1f}", "scale": 0.001, "helper": True,
+            "value": {"path": ["systems", "tickstore", "variants", "@headline", "queries", "Q1",
+                               "cold", "median_us"]}}
+        self.figures["figures"]["same_q1_ms"] = of("same", ["q1_ms", "ts_q1_cold_ms"])
+        self.save()
+        self.insert("Taken {{min_q1_ms}} ms {{q1_flag}} and the same {{same_q1_ms}} ms "
+                    "{{q1_flag}} on Q1.")
+        page = self.renders()
+        self.assertIn("Taken 5.0 ms \u2020 and the same 5.0 ms \u2020 on Q1.", page)
+        # A max taking the other item, and the lowest system's figure in another setup.
+        self.figures["figures"]["max_q1_ms"] = of("max", ["q1_ms", "ts_q1_ms"])
+        del self.figures["figures"]["min_q1_ms"]
+        self.save()
+        wrong = [("{{min_q1_ms}} ms {{q1_flag}}", "{{max_q1_ms}} ms {{q1_flag}}", "{{q1_flag}}"),
+                 ("{{min_q1_ms}} ms {{q1_flag}}", "{{max_q1_ms}} ms, {{low_q1_ms}} ms "
+                  "{{p_q1_flag}}", "{{p_q1_flag}}")]
+        for old, new, flag in wrong:
+            with self.subTest(new=new):
+                self.edit("docs/writeup/WRITEUP.template.md", old, new)
+                self.refused(f"{flag} does not stand straight after a figure of the phase, "
+                             "system and variant it flags")
+                self.edit("docs/writeup/WRITEUP.template.md", new, old)
+
+    def test_a_figure_of_a_flagged_phase_carries_its_flag(self):
+        # Review C3-5: every figure from a phase the record flags has its flag in its sentence
+        # or table row, also through a ratio of it.
+        self.other_figures()
+        self.insert("Again ArcticDB took {{q1_ms}} ms on Q1.")
+        self.refused("{{q1_ms}} shows a figure of Linux-day-", "queries arcticdb h warm Q1, which "
+                     "the records flag, and nothing in its table row or sentence carries the "
+                     "flag: 'Again ArcticDB took")
+        self.edit("docs/writeup/WRITEUP.template.md", "took {{q1_ms}} ms on Q1.",
+                  "took {{q1_ms}} ms {{q1_flag}} on Q1.")
+        self.assertIn("Again ArcticDB took 5.0 ms \u2020 on Q1.", self.renders())
+
+    def test_a_ratio_of_a_flagged_figure_carries_its_flag(self):
+        # Review C3-5: a ratio rests on each figure it divides, so it carries their flag in its
+        # sentence, or in its table row beside another cell's.
+        self.other_figures()
+        self.insert("Its ratio is {{ratio_q1}}.")
+        self.refused("{{ratio_q1}} shows a figure of Linux-day-", "queries arcticdb h warm Q1")
+        self.edit("docs/writeup/WRITEUP.template.md", "Its ratio is {{ratio_q1}}.",
+                  "| Ratio | Q1, ms |\n|---|---|\n| {{ratio_q1}} | {{q1_ms}} {{q1_flag}} |")
+        self.assertIn("| 5.0000 | 5.0 \u2020 |", self.renders())
+
+    def disturbed_write(self):
+        """A remote login during tick-store's flushed write, entered in the day's record."""
+        entry = {"start": "2026-11-15T03:22:17Z", "end": "2026-11-15T03:22:51Z",
+                 "precision": "second", "what": "a remote login by this project",
+                 "document": f"compare/Linux-day-{COMMIT[:12]}.json", "phase": "write",
+                 "timed": True, "system": "tickstore", "variant": "h", "class": "B",
+                 "repetition": 1}
+        self.write(f"results/disturbances-{COMMIT[:12]}.json", json.dumps({
+            "schema": RESULTS_CODE.DISTURBANCE_SCHEMA, "commit": COMMIT, "how": "by hand",
+            "entries": [entry]}))
+
+    def test_a_disturbed_figure_carried_by_its_flag_or_its_verdict(self):
+        # Review C3-5: a figure of a disturbed write stands with its flag or beside the verdict
+        # whose marks name the disturbance.
+        self.dagger()
+        self.disturbed_write()
+        self.figures["figures"]["ts_B_s"] = {
+            "what": "tick-store's flushed write, s, on the Ryzen", "kind": "day",
+            "host": "Linux", "format": "{:,.1f}", "value": {"path": [
+                "systems", "tickstore", "variants", "@headline", *B_WRITE, "seconds_median"]}}
+        self.save()
+        self.insert("Tick-store wrote the day in {{ts_B_s}} s.")
+        self.refused("{{ts_B_s}} shows a figure of Linux-day-", "write tickstore h B, which the "
+                     "records flag")
+        self.figure("ts_B_flag", {
+            "what": "a dagger if tick-store's flushed write is disturbed, on the Ryzen",
+            "kind": "day", "host": "Linux", "words": {"true": "\u2020", "false": ""},
+            "value": {"flagged": [{"system": "tickstore", "write": "B"}]}})
+        self.edit("docs/writeup/WRITEUP.template.md", "in {{ts_B_s}} s.",
+                  "in {{ts_B_s}} s {{ts_B_flag}} here.")
+        self.assertIn("Tick-store wrote the day in 190.0 s \u2020 here.", self.renders())
+        self.edit("docs/writeup/WRITEUP.template.md",
+                  "Tick-store wrote the day in {{ts_B_s}} s {{ts_B_flag}} here.", "")
+        del self.figures["figures"]["ts_B_flag"]
+        self.save()
+        self.edit("docs/writeup/WRITEUP.template.md", "The day write is {{verdict:t11}}.",
+                  "The day write, {{ts_B_s}} s, is {{verdict:t11}}.")
+        page = self.renders()
+        self.assertIn("The day write, 190.0 s, is missed;", page)
+        self.assertIn("a remote login during tick-store's write", page)
+
+    def test_a_kernel_figure_of_a_disturbed_case_carries_its_flag(self):
+        # Review C3-5: a bench case the record places a disturbance in flags the figures that
+        # rest on it, a ratio of medians over cases among them.
+        self.dagger()
+        name = f"results/bench/Linux-simd_kernel-{COMMIT[:12]}.json"
+        def case(name, rate):
+            return {"case": name, "throughput": {"values_per_second": {"median": rate}}}
+        self.write(name, json.dumps({"header": {"host": "Linux", "commit": COMMIT}, "results": [
+            case("k/w=1/avx2", 2e9), case("k/w=2/avx2", 2e9), case("k/w=1/scalar", 1e9),
+            case("k/w=2/scalar", 1e9)]}))
+        self.write(f"results/disturbances-{COMMIT[:12]}.json", json.dumps({
+            "schema": RESULTS_CODE.DISTURBANCE_SCHEMA, "commit": COMMIT, "how": "by hand",
+            "entries": [{"start": "2026-11-15T03:22:17Z", "end": "2026-11-15T03:22:51Z",
+                         "precision": "second", "what": "a remote login by this project",
+                         "document": name[len("results/"):], "phase": "case",
+                         "case": "k/w=2/avx2", "timed": True}]}))
+        self.figures["kinds"]["kernels"] = {"what": "the demo kernels", "files": {
+            "Linux": "results/bench/Linux-simd_kernel-*.json"}}
+        def median(pattern):
+            return {"cases_median": pattern, "field": ["throughput", "values_per_second",
+                                                       "median"]}
+        self.figures["figures"]["k_speedup"] = {
+            "what": "AVX2 over scalar, the kernel's median over its cases of each set, on the "
+            "Ryzen", "kind": "kernels", "host": "Linux", "format": "{:.2f}",
+            "value": {"div": [median("k/*avx2"), median("k/*scalar")]}}
+        self.save()
+        self.insert("AVX2 over scalar: {{k_speedup}}x on the kernel.")
+        self.refused("{{k_speedup}} shows a figure of Linux-simd_kernel-", "case k/*avx2, which "
+                     "the records flag")
+        self.figure("k_flag", {
+            "what": "a dagger if a case of either set of the kernel is disturbed, on the Ryzen",
+            "kind": "kernels", "host": "Linux", "words": {"true": "\u2020", "false": ""},
+            "value": {"flagged": [{"case": "k/*avx2"}, {"case": "k/*scalar"}]}})
+        self.edit("docs/writeup/WRITEUP.template.md", "{{k_speedup}}x on",
+                  "{{k_speedup}}x {{k_flag}} on")
+        self.assertIn("AVX2 over scalar: 2.00x \u2020 on the kernel.", self.renders())
 
     def test_an_input_note_where_the_writes_started_alike(self):
         self.write(f"results/compare/Linux-day-{COMMIT[:12]}.json",

@@ -9,7 +9,7 @@ second and a millisecond across every stock take it {{gap_ql4_q1_x}} and {{gap_q
 {{cmpL_q1_warm_best_system}} and {{cmpL_q4_warm_best_system}}, and the whole-day sum of a column {{gap_ql4_q5_x}} times as long as
 {{cmpL_q5_warm_best_system}} {{glance_q5_other_flag}} does.
 A single writer thread there ingests {{cmpL_ts_A_msg_rate_m}} before a flush, {{gap_wt2_linux_x}} times
-short of Nasdaq's published peak message rate.
+short of Nasdaq's published peak rate.
 
 ## At a glance
 
@@ -120,7 +120,7 @@ whole store in file order, so the store's net was not measured.
 {{ss_stored_bytes}} bytes against {{cmpL_seg1_apparent_bytes}}. But a window across every stock
 decodes its segment's whole permutation; Q4's {{cmpL_q4_rows}} rows decode
 {{cmpL_ts_q4_values}} values over every column read at the default against {{cmpL_seg1_q4_values}}, so Q4 takes {{cmpL_ts_q4_warm_med_ms}} ms
-against {{cmpL_seg1_q4_warm_med_ms}} and Q1 {{cmpL_ts_q1_warm_med_ms}} against
+against {{cmpL_seg1_q4_warm_med_ms}} {{seg1_q4_flag}} and Q1 {{cmpL_ts_q1_warm_med_ms}} against
 {{cmpL_seg1_q1_warm_med_ms}}: on the Ryzen the default loses both to the smaller segments. The default
 was picked by a rule I wrote before any layout was timed: each layout small enough on disk scores
 a point on each of Q1 to Q5, warm and cold, on the M4, where it is within a few percent of the
@@ -164,14 +164,14 @@ stay in value order, so the inverse delta is a prefix sum across each row's lane
 **Which kernels the store calls.** On every instruction set the decoder calls the interleaved and
 linear unpacks, the frame-of-reference add and the two-pass delta. On AVX2 it also fuses unpack,
 base and prefix sum for a full delta vector with no exceptions; on NEON and scalar that fused
-kernel is benchmarked and never called. The narrow fused unpack, Stream VByte and the
-delta-of-delta reconstruct are benchmark-only as well.
+kernel is benchmarked, never called. The narrow fused unpack, Stream VByte and the
+delta-of-delta reconstruct are benchmark-only too.
 
 **What SIMD bought.** On the M4, NEON over scalar, medians over widths: linear unpack
 {{skM_linear_speedup}}x, two-pass delta {{skM_two_pass_speedup}}x, fused delta
 {{skM_fused_speedup}}x and interleaved unpack {{skM_unpack_speedup}}x
-([M4 kernels]({{path:skM}})). On the Ryzen, AVX2 over scalar: linear unpack {{skL_linear_speedup}}x, interleaved unpack
-{{skL_unpack_speedup}}x, two-pass delta {{skL_two_pass_speedup}}x, fused {{skL_fused_speedup}}x.
+([M4 kernels]({{path:skM}})). AVX2 over scalar: linear unpack {{skL_linear_speedup}}x, interleaved unpack
+{{skL_unpack_speedup}}x, two-pass delta {{skL_two_pass_speedup}}x {{skL_two_pass_flag}} and fused {{skL_fused_speedup}}x {{skL_fused_flag}} on the Ryzen.
 
 **What SIMD changes end to end.** The same binary at AVX2 on the Ryzen, against itself capped to scalar,
 changes the warm engine median by {{d3_simd_q1_pct}}%, {{d3_simd_q2_pct}}%, {{d3_simd_q3_pct}}%,
@@ -232,7 +232,7 @@ dictionary encoding {{d1_dict_encode_pct}}%, sorting {{d1_sort_pct}}%, parsing {
 and zstd {{d1_zstd_pct}}% ([writer profile]({{path:d1}}) {{note:diag-writer}}). If the others' engine-only clocks hold disk reads, they
 overstate their engines' work.
 
-**Queries.** ArcticDB with a table per stock takes {{cmpL_arcps_q1_warm_med_s}} s on Q1. Q5, the day's sum of a shares column, decodes {{cmpL_ts_q5_values}} values at
+**Queries.** ArcticDB with a table per stock takes {{cmpL_arcps_q1_warm_med_s}} s {{arcps_q1_flag}} on Q1. Q5, the day's sum of a shares column, decodes {{cmpL_ts_q5_values}} values at
 {{q5_ns_per_value}} ns each; of its sampled cycles, dictionary decoding takes {{d2_q5_dict_pct}}%,
 the C library {{d2_q5_libc_pct}}% and the unpack kernels {{d2_q5_unpack_pct}}%
 ([query profile]({{path:d2}}) {{note:diag-query}}).
@@ -251,7 +251,7 @@ and captures no live feed.
 ## Targets that held
 
 On both days the store gives every message back bit-exact ({{verdict:g1}}), a flipped bit is caught
-in a data block and in the footer ({{verdict:g2}}), Gorilla is built and is exact on the whole day
+in a data block and the footer ({{verdict:g2}}), Gorilla is built and exact on the whole day
 ({{verdict:g4}}), and the store takes the least disk of the systems compared, each in its smallest setup ({{verdict:cr2}}).
 
 ## Missed targets

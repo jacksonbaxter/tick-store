@@ -1,0 +1,12 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 64c8cfb..d69ce47 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -2032,7 +2032,6 @@ def flags_carried(resolver, blocks, values):
+                     _, parts, _ = verdict_parts(resolver, name, entry)
+                     for part in parts or []:
+                         notes = render_results.notes_of(part)
+-                        carried.update(phase_key(read) for _, read in notes.get("disturbed", []))
+                         # A swap mark names the system and setup; the part, a query and kind.
+                         query, _, kind = str(part[0]).partition(" ")
+                         if kind in ("warm", "cold"):

@@ -1,0 +1,12 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 64c8cfb..349fad6 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -2501,7 +2501,6 @@ def render(root):
+     check_marks(resolver, values)
+     paragraph_rules(resolver, blocks)
+     marks_hold(resolver, body, blocks, values)
+-    flags_carried(resolver, blocks, values)
+     not_counted_ties(resolver, blocks)
+     for wait in pending:
+         waiting[f"({wait.label})"] = wait.label

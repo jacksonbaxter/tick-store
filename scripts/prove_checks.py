@@ -3228,8 +3228,18 @@ FAULTS = (
           "FAIL: test_a_flag_beside_another_system_s_figure (__main__.Marks"),
     Fault("writeup-flag-variant-unchecked", "py-scripts", "render_writeup.py takes a flag token straight after its system's figure in another setup", CHECK_FAILED,
           "FAIL: test_a_flag_beside_its_system_s_figure_in_another_setup (__main__.Marks"),
-    Fault("writeup-flag-unfixed-system-passes", "py-scripts", "render_writeup.py does not say a flag token stands after a figure whose system its expression does not fix", CHECK_FAILED,
+    # Review C3-8: the fault turns a wrong page into an accepted one.
+    Fault("writeup-flag-unfixed-system-passes", "py-scripts", "render_writeup.py takes a flag token straight after a figure whose expression fixes no system of the phase it flags", CHECK_FAILED,
           "FAIL: test_a_flag_beside_a_figure_whose_system_is_not_fixed (__main__.Marks"),
+    # Review C3-5: every figure from a flagged phase carries its flag.
+    Fault("writeup-flag-uncarried", "py-scripts", "render_writeup.py takes a figure of a phase the records flag with no flag of that phase in its sentence or table row", CHECK_FAILED,
+          "FAIL: test_a_figure_of_a_flagged_phase_carries_its_flag (__main__.Marks"),
+    Fault("writeup-flag-ratio-unread", "py-scripts", "render_writeup.py does not read a ratio's items for the phases its figure rests on, so a ratio of a flagged figure stands unmarked", CHECK_FAILED,
+          "FAIL: test_a_ratio_of_a_flagged_figure_carries_its_flag (__main__.Marks"),
+    Fault("writeup-flag-verdict-carry-ignored", "py-scripts", "render_writeup.py refuses a disturbed figure beside the verdict whose marks name the disturbance", CHECK_FAILED,
+          "FAIL: test_a_disturbed_figure_carried_by_its_flag_or_its_verdict (__main__.Marks"),
+    Fault("writeup-flag-case-unread", "py-scripts", "render_writeup.py's flag ignores the bench cases it reads, so a kernel figure resting on a disturbed case gets no dagger", CHECK_FAILED,
+          "FAIL: test_a_kernel_figure_of_a_disturbed_case_carries_its_flag (__main__.Marks"),
     # Review C2-9: a verdict judged on the replaced run names that run in the commit sentence.
     Fault("writeup-replaced-run-unnamed", "py-scripts", "render_writeup.py leaves the replaced run out of the commit sentence when only a verdict's marks give its figures", CHECK_FAILED,
           "FAIL: test_a_verdict_judged_on_the_replaced_run_names_it_in_the_commit_sentence (__main__.Marks"),

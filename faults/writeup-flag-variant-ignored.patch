@@ -1,10 +1,11 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 64c8cfb..3244f94 100644
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -975,7 +975,7 @@
+@@ -1033,7 +1033,7 @@ def flag_reads(reads, document, system_of):
+         system = read["system"]
          if isinstance(system, dict):
-             system = evaluate(system, context)
-         # A read names its variant, or takes the system's headline one.
+             system = system_of(system)
 -        variant = read.get("variant") or walk(document, ["systems", system, "headline_variant"])
 +        variant = walk(document, ["systems", system, "headline_variant"])
          if "write" in read:

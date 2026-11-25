@@ -1009,26 +1009,36 @@ def prover(spec, context):
 def flagged(reads, context):
     """Whether any of the timed phases named is one render_results.py marks: a disturbance the
     tree's disturbance records place in it, or a query block its record flags as timed while a
-    page was swapped in. Each read names a system, or a figure whose value is one, and its
-    headline variant's class B write or a query and kind."""
+    page was swapped in. Each read names a system, or a figure whose value is one, its variant
+    or the headline, and its class's write or a query and kind; or a bench case's pattern."""
     document = context.need_document("flagged")
     entry = context.entry
     path, _ = context.resolver.file_of(entry["kind"], entry["host"], context.name)
+    phases = flag_reads(reads, document, lambda system: evaluate(system, context))
+    root = context.resolver.root
+    return bool(render_results.disturbed(render_results.disturbance_entries(root), root, path,
+                                         phases) or
+                render_results.swapped_reads(phases, document))
+
+
+def flag_reads(reads, document, system_of):
+    """A flag's reads as render_results.disturbed takes them: a bench case's pattern, or a
+    system, named or given by a figure (system_of), and its variant, named or the headline, with
+    its class's write or a query and kind."""
     phases = []
     for read in reads:
+        if "case" in read:
+            phases.append(("case", read["case"]))
+            continue
         system = read["system"]
         if isinstance(system, dict):
-            system = evaluate(system, context)
-        # A read names its variant, or takes the system's headline one.
+            system = system_of(system)
         variant = read.get("variant") or walk(document, ["systems", system, "headline_variant"])
         if "write" in read:
             phases.append(("write", system, variant, read["write"]))
         else:
             phases.append(("queries", system, variant, read["kind"], read["query"]))
-    root = context.resolver.root
-    return bool(render_results.disturbed(render_results.disturbance_entries(root), root, path,
-                                         phases) or
-                render_results.swapped_reads(phases, document))
+    return phases
 
 
 def not_counted(spec, context):
@@ -1786,17 +1796,21 @@ def not_counted_ties(resolver, blocks):
 
 def flag_phase(read):
     """The names a flag's read must find in the figure it stands beside."""
+    if "case" in read:
+        return ["case", read["case"]]
     if "write" in read:
         return ["classes", read["write"], "write"]
     return ["queries", read.get("query"), read.get("kind")]
 
 
 def shown_reads(resolver, name, seen=()):
-    """What the value a token prints was read from: (path, system, variant) for each phase it
+    """What the value a token prints rests on: (path, system, variant) for each phase it
     takes, the system and variant None where the expression does not fix them. A path through
     systems names both; a lowest_value or lowest_system, the system it finds, in its headline
     variant; a min_variant, its system; a figure, that entry's; a same, its first item's, the
-    value it prints; a min or max, the item it takes; a target's figure, its part's paths."""
+    value it prints; a min or max, the item it takes; a bench case or a median over cases, the
+    path ["case", its pattern]; a ratio, product, sum or difference, every item's; a target's
+    figure, its part's paths and cases (review C3-5)."""
     entry = resolver.entries.get(name) or {}
     found = []
     def system_of(path):
@@ -1838,20 +1852,29 @@ def shown_reads(resolver, name, seen=()):
                 values = {item["figure"]: resolver.raw(item["figure"]) for item in items}
                 taken = (min if key == "min" else max)(values, key=values.get)
                 return walk_reads({"figure": taken})
-        return []
+        for key in ("case", "cases_median"):
+            if isinstance(expression.get(key), str):
+                return [(["case", expression[key]], None, None)]
+        return [read for key in ("div", "mul", "sub", "add", "sum") if key in expression
+                for read in walk_reads(expression[key])]
     found += walk_reads(entry.get("value"))
     if "target" in entry:
         spec = entry["target"]
         row = resolver.target_row(spec, name)
         found += [(path, *system_of(path)) for path in part_paths(row, spec.get("part"))]
+        found += [read for part in row.get("parts", []) if part.get("label") == spec.get("part")
+                  for read in walk_reads([part.get("value"), part.get("all")])]
     return found
 
 
 def beside_flag(resolver, flag, figure, read):
-    """Whether the token figure prints a figure of the phase the flag's read names: its phase,
-    its system, and its variant where both name one (review C2-10). None where the token's
-    expression names no read, as a ratio's, or fixes the system of none it reads of that
-    phase."""
+    """Whether the token figure prints a figure resting on the phase the flag's read names: a
+    bench case's pattern, or its phase, its system, and its variant where both name one
+    (review C2-10). A figure whose expression fixes the system of no read of that phase, or
+    reads none, cannot be held to the flag, and is not beside it (review C3-8)."""
+    reads = shown_reads(resolver, figure)
+    if "case" in read:
+        return any(path == flag_phase(read) for path, _, _ in reads)
     system = read.get("system")
     if isinstance(system, dict) and isinstance(system.get("figure"), str):
         system = resolver.raw(system["figure"])
@@ -1860,13 +1883,8 @@ def beside_flag(resolver, flag, figure, read):
         if variant in (None, "@headline"):
             return walk(document, ["systems", name, "headline_variant"])
         return variant
-    reads = shown_reads(resolver, figure)
-    phase = [(its_system, variant) for path, its_system, variant in reads
-             if holds_path(path, flag_phase(read))]
-    if not reads or (phase and all(its_system is None for its_system, _ in phase)):
-        return None
-    for its_system, variant in phase:
-        if its_system != system:
+    for path, its_system, variant in reads:
+        if not holds_path(path, flag_phase(read)) or its_system is None or its_system != system:
             continue
         if variant is None or headline(its_system, variant) == headline(system,
                                                                       read.get("variant")):
@@ -1945,15 +1963,98 @@ def marks_hold(resolver, body, blocks, values):
                     continue
                 before = unit_names[index - 1] if index else None
                 reads = entry["value"]["flagged"]
-                found = [beside_flag(resolver, name, before, read) for read in reads] \
-                    if before else [False]
-                if None in found:
-                    raise Refused(f"{show(name)} stands after {show(before)}, whose figure's "
-                                  "system its expression does not fix, so the flag cannot be "
-                                  f"held to it: {unit.strip()[:80]!r}")
-                if not all(found):
+                if not before or not all(beside_flag(resolver, name, before, read)
+                                         for read in reads):
                     raise Refused(f"{show(name)} does not stand straight after a figure of the "
                                   f"phase, system and variant it flags: {unit.strip()[:80]!r}")
+
+
+def rested_phases(resolver, name):
+    """The timed phases a token's figure rests on, each with a file it reads, as
+    render_results.disturbed and swapped_reads take them: each bench case shown_reads gives,
+    and each query or class write through a system it fixes, in the variant it names or the
+    file's headline."""
+    found = []
+    files = sorted(path for path, _, _ in resolver.deps.get(name, set()))
+    for path, system, variant in shown_reads(resolver, name):
+        if path[:1] == ["case"]:
+            found += [(file, ("case", path[1])) for file in files]
+            continue
+        if system is None:
+            continue
+        for file in files:
+            document = resolver.document_of(file)
+            systems = document.get("systems") if isinstance(document, dict) else None
+            if not isinstance(systems, dict) or system not in systems:
+                continue
+            its = systems[system].get("headline_variant") if variant in (None, "@headline") \
+                else variant
+            if "queries" in path and path.index("queries") + 2 < len(path):
+                at = path.index("queries")
+                if path[at + 2] in ("warm", "cold"):
+                    found.append((file, ("queries", system, its, path[at + 2], path[at + 1])))
+            if "classes" in path and "write" in path and path.index("classes") + 1 < len(path):
+                found.append((file, ("write", system, its, path[path.index("classes") + 1])))
+    return found
+
+
+def phase_key(read):
+    """A phase read as disturbed takes it, less what a verdict's own reads add after it: a
+    write's field."""
+    return tuple(read[:4] if read[0] == "write" else read[:5] if read[0] == "queries" else
+                 read[:2])
+
+
+def flags_carried(resolver, blocks, values):
+    """Every figure the page shows from a phase the records flag carries its flag (review
+    C3-5): a disturbance the tree's disturbance records place in a timed phase it rests on, or a
+    query block its record flags as timed while a page was swapped in, as render_results.py
+    marks them. Its table row or sentence holds a flag token that reads that phase and prints
+    its mark, or the verdict of a target whose marks name a disturbance in it, or a swap in the
+    query and kind its part names; else the page is refused. A figure is a token printing a
+    digit that is no verdict."""
+    root = resolver.root
+    entries = render_results.disturbance_entries(root)
+    for block in blocks:
+        units = [block] if block.lstrip().startswith("|") else sentences_of(block)
+        for unit in units:
+            # A token not yet resolved, waiting on its file, is held once it resolves.
+            names = [name for name in dict.fromkeys(TOKEN.findall(unit)) if name in values]
+            carried = set()
+            for name in names:
+                entry = resolver.entries.get(name) or {}
+                value = entry.get("value")
+                if isinstance(value, dict) and "flagged" in value and values.get(name):
+                    document = resolver.context(name, entry).document
+                    carried.update(phase_key(read) for read in flag_reads(
+                        value["flagged"], document, lambda system: resolver.raw(system["figure"])))
+                if "verdict" in entry:
+                    _, parts, _ = verdict_parts(resolver, name, entry)
+                    for part in parts or []:
+                        notes = render_results.notes_of(part)
+                        carried.update(phase_key(read) for _, read in notes.get("disturbed", []))
+                        # A swap mark names the system and setup; the part, a query and kind.
+                        query, _, kind = str(part[0]).partition(" ")
+                        if kind in ("warm", "cold"):
+                            carried.update(("queries", system, variant, kind, query)
+                                           for system, variant, earlier in
+                                           notes.get("swapped") or [] if not earlier)
+            for name in names:
+                entry = resolver.entries.get(name) or {}
+                value = values.get(name)
+                if "verdict" in entry or not isinstance(value, str) or \
+                        not re.search(r"\d", value):
+                    continue
+                for path, phase in rested_phases(resolver, name):
+                    document = resolver.document_of(path)
+                    if phase_key(phase) in carried or not (
+                            render_results.disturbed(entries, root, path, [phase]) or
+                            render_results.swapped_reads([phase], document)):
+                        continue
+                    raise Refused(f"{show(name)} shows a figure of {path.name}'s "
+                                  f"{' '.join(map(str, phase))}, which the records flag, and "
+                                  "nothing in its table row or sentence carries the flag: "
+                                  f"{unit.strip()[:80]!r}")
 
 
 def commit_of(resolver, path, kind):
@@ -2400,6 +2501,7 @@ def render(root):
     check_marks(resolver, values)
     paragraph_rules(resolver, blocks)
     marks_hold(resolver, body, blocks, values)
+    flags_carried(resolver, blocks, values)
     not_counted_ties(resolver, blocks)
     for wait in pending:
         waiting[f"({wait.label})"] = wait.label

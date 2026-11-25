@@ -1,9 +1,10 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 64c8cfb..a66b28b 100644
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -980,7 +980,7 @@
-         else:
-             phases.append(("queries", system, variant, read["kind"], read["query"]))
+@@ -1016,7 +1016,7 @@ def flagged(reads, context):
+     path, _ = context.resolver.file_of(entry["kind"], entry["host"], context.name)
+     phases = flag_reads(reads, document, lambda system: evaluate(system, context))
      root = context.resolver.root
 -    return bool(render_results.disturbed(render_results.disturbance_entries(root), root, path,
 +    return False and bool(render_results.disturbed(render_results.disturbance_entries(root), root, path,

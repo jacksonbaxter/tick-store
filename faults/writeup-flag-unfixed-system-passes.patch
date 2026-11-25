@@ -1,13 +1,17 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
-index 219078d..5e3cf80 100644
+index 64c8cfb..2d8e47f 100644
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -1945,7 +1945,7 @@ def marks_hold(resolver, body, blocks, values):
-                 reads = entry["value"]["flagged"]
-                 found = [beside_flag(resolver, name, before, read) for read in reads] \
-                     if before else [False]
--                if None in found:
-+                if False:
-                     raise Refused(f"{show(name)} stands after {show(before)}, whose figure's "
-                                   "system its expression does not fix, so the flag cannot be "
-                                   f"held to it: {unit.strip()[:80]!r}")
+@@ -1884,9 +1884,10 @@ def beside_flag(resolver, flag, figure, read):
+             return walk(document, ["systems", name, "headline_variant"])
+         return variant
+     for path, its_system, variant in reads:
+-        if not holds_path(path, flag_phase(read)) or its_system is None or its_system != system:
++        if not holds_path(path, flag_phase(read)) or (its_system is not None and
++                                                      its_system != system):
+             continue
+-        if variant is None or headline(its_system, variant) == headline(system,
++        if its_system is None or variant is None or headline(its_system, variant) == headline(system,
+                                                                       read.get("variant")):
+             return True
+     return False

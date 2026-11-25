@@ -1,13 +1,13 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
-index 219078d..0fe7f54 100644
+index 64c8cfb..617a4da 100644
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -1864,7 +1864,7 @@ def beside_flag(resolver, flag, figure, read):
-     if not reads or (phase and all(its_system is None for its_system, _ in phase)):
-         return None
-     for its_system, variant in phase:
--        if its_system != system:
-+        if False:
+@@ -1884,7 +1884,7 @@ def beside_flag(resolver, flag, figure, read):
+             return walk(document, ["systems", name, "headline_variant"])
+         return variant
+     for path, its_system, variant in reads:
+-        if not holds_path(path, flag_phase(read)) or its_system is None or its_system != system:
++        if not holds_path(path, flag_phase(read)) or its_system is None:
              continue
          if variant is None or headline(its_system, variant) == headline(system,
                                                                        read.get("variant")):

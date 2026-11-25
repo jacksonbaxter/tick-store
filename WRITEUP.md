@@ -9,7 +9,7 @@ second and a millisecond across every stock take it 8.7 and 167 times as long as
 ArcticDB and QuestDB, and the whole-day sum of a column 16.8 times as long as
 QuestDB † does.
 A single writer thread there ingests 1.270 M messages/s before a flush, 2.15 times
-short of Nasdaq's published peak message rate.
+short of Nasdaq's published peak rate.
 
 ## At a glance
 
@@ -120,7 +120,7 @@ whole store in file order, so the store's net was not measured.
 1,758,234,758 bytes against 1,808,255,218. But a window across every stock
 decodes its segment's whole permutation; Q4's 338 rows decode
 25,558,344 values over every column read at the default against 7,104,138, so Q4 takes 207.95 ms
-against 55.81 and Q1 296.78 against
+against 55.81 † and Q1 296.78 against
 115.78: on the Ryzen the default loses both to the smaller segments. The default
 was picked by a rule I wrote before any layout was timed: each layout small enough on disk scores
 a point on each of Q1 to Q5, warm and cold, on the M4, where it is within a few percent of the
@@ -164,14 +164,14 @@ stay in value order, so the inverse delta is a prefix sum across each row's lane
 **Which kernels the store calls.** On every instruction set the decoder calls the interleaved and
 linear unpacks, the frame-of-reference add and the two-pass delta. On AVX2 it also fuses unpack,
 base and prefix sum for a full delta vector with no exceptions; on NEON and scalar that fused
-kernel is benchmarked and never called. The narrow fused unpack, Stream VByte and the
-delta-of-delta reconstruct are benchmark-only as well.
+kernel is benchmarked, never called. The narrow fused unpack, Stream VByte and the
+delta-of-delta reconstruct are benchmark-only too.
 
 **What SIMD bought.** On the M4, NEON over scalar, medians over widths: linear unpack
 5.68x, two-pass delta 1.80x, fused delta
 2.09x and interleaved unpack 1.02x
-([M4 kernels](results/bench/macOS-simd_kernel-ede0176b10bb.json)). On the Ryzen, AVX2 over scalar: linear unpack 3.80x, interleaved unpack
-1.24x, two-pass delta 1.25x, fused 1.35x.
+([M4 kernels](results/bench/macOS-simd_kernel-ede0176b10bb.json)). AVX2 over scalar: linear unpack 3.80x, interleaved unpack
+1.24x, two-pass delta 1.25x † and fused 1.35x † on the Ryzen.
 
 **What SIMD changes end to end.** The same binary at AVX2 on the Ryzen, against itself capped to scalar,
 changes the warm engine median by -2.3%, -3.6%, -4.3%,
@@ -232,7 +232,7 @@ dictionary encoding 6.8%, sorting 4.8%, parsing 2.7%
 and zstd 1.2% ([writer profile](results/diag/writer-profile-12302019-ede0176b10bb.json) ‡). If the others' engine-only clocks hold disk reads, they
 overstate their engines' work.
 
-**Queries.** ArcticDB with a table per stock takes 10.2 s on Q1. Q5, the day's sum of a shares column, decodes 152,004,760 values at
+**Queries.** ArcticDB with a table per stock takes 10.2 s † on Q1. Q5, the day's sum of a shares column, decodes 152,004,760 values at
 6.0 ns each; of its sampled cycles, dictionary decoding takes 30.5%,
 the C library 20.6% and the unpack kernels 13.7%
 ([query profile](results/diag/query-profile-12302019-ede0176b10bb.json) ‡).
@@ -251,7 +251,7 @@ and captures no live feed.
 ## Targets that held
 
 On both days the store gives every message back bit-exact (met), a flipped bit is caught
-in a data block and in the footer (met), Gorilla is built and is exact on the whole day
+in a data block and the footer (met), Gorilla is built and exact on the whole day
 (met), and the store takes the least disk of the systems compared, each in its smallest setup (met).
 
 ## Missed targets
@@ -307,7 +307,7 @@ executions from a fuzzing run, not hide a finding: the
 [runs by target](RESULTS.md#g-3-runs-by-target) give each target's executions.
 
 The checks and the faults that prove them are in the README; the prover's
-record covers 99 of its 693 listed faults.
+record covers 99 of its 697 listed faults.
 
 ## Limits
 
