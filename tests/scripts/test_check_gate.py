@@ -289,6 +289,14 @@ class FormTest(Tree):
         self.assert_field_refused("load1", -3.0,
                                   "its load1 -3.0 is not a finite number of at least 0")
 
+    def test_a_load_of_negative_zero_is_refused(self):
+        self.assert_field_refused("load1", -0.0,
+                                  "its load1 -0.0 is not a finite number of at least 0")
+
+    def test_a_busy_share_of_negative_zero_is_refused(self):
+        self.assert_field_refused("cpu_busy_percent", {"cpu2": -0.0, "cpu7": 100.0},
+                                  "its cpu_busy_percent {'cpu2': -0.0, 'cpu7': 100.0} is not")
+
     def test_a_load_as_a_string_is_refused(self):
         self.assert_field_refused("load1", "2.40",
                                   "its load1 '2.40' is not a finite number of at least 0")

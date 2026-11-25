@@ -1749,6 +1749,9 @@ FAULTS = (
     Fault("gate-infinite-number-accepted", "py-scripts",
           "check_gate.py takes an infinite load or time an execution", CHECK_FAILED,
           "FAIL: test_an_infinite_load_is_refused (__main__.FormTest"),
+    Fault("gate-negative-zero-accepted", "py-scripts",
+          "check_gate.py takes a load of -0.0, which the page prints as -0.00", CHECK_FAILED,
+          "FAIL: test_a_load_of_negative_zero_is_refused (__main__.FormTest"),
     Fault("gate-share-past-a-hundred-accepted", "py-scripts", "check_gate.py takes a busy share "
           "over 100", CHECK_FAILED, "FAIL: test_a_busy_share_over_a_hundred_is_refused "
           "(__main__.FormTest"),

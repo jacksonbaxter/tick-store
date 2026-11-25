@@ -140,8 +140,9 @@ def is_count(value, least=0):
 
 def is_real(value, least=0.0, most=math.inf):
     """A float, as the assembler writes a time an execution, a load or a share: finite and
-    from least to most."""
-    return isinstance(value, float) and math.isfinite(value) and least <= value <= most
+    from least to most, and not -0.0, which compares equal to 0 and prints as -0.00."""
+    return isinstance(value, float) and math.isfinite(value) and least <= value <= most and \
+        not (value == 0.0 and math.copysign(1.0, value) < 0)
 
 
 def is_utc(value):
