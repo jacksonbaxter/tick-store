@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1699,7 +1699,7 @@
+         if read[0] != "queries" or label in given:
+             continue
+         flags = [bool(swapped_reads([read], found_document))
+-                 for found_document in (document, old_document)]
++                 for found_document in (document, document)]
+         if not any(flags):
+             continue
+         pages = []

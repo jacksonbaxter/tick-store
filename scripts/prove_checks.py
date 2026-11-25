@@ -2134,6 +2134,12 @@ FAULTS = (
           "the table classes a row of missed parts and one met and not counted missed in part, "
           "apart from the writer, which does not", EXIT_RENDER_REFUSED,
           "the line under the table counts the other rows as"),
+    # Review R1-2: the not-counted mark names every side either run flags, with its pages in
+    # each run, read from both records.
+    Fault("sides-also-flagged-this-run-only", "py-scripts", "render_results.py's not-counted "
+          "mark names only the sides this run flags, and leaves out a side the replaced run "
+          "alone flags", CHECK_FAILED,
+          "FAIL: test_the_not_counted_mark_names_every_side_either_run_flags (__main__.SidesTest"),
     Fault("sides-left-out-counts-uncounted", "py-scripts", "render_results.py counts a part no run confirms among the first screen's met parts", CHECK_FAILED,
           "FAIL: test_no_count_takes_a_part_not_counted (__main__.SidesTest"),
     # The ruling on review P1-5: G-3's runs beside its verdict, from its file.

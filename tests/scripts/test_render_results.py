@@ -2910,6 +2910,37 @@ class SidesTest(Scratch):
         self.assertIn("met by the rule and not counted: a disturbance the replaced run has no "
                       "record to rule out on ArcticDB's side", RENDER.verdict_of([part], SWAP_ROW))
 
+    def test_the_not_counted_mark_names_every_side_either_run_flags(self):
+        # Review R1-2: a side one run alone flags, here tick-store's on the replaced run, is
+        # named with its pages in each run, read from both records; the class does not move.
+        part = self.runs(["arcticdb"], ["arcticdb", "tickstore"])
+        old = json.loads(self.old.read_text(encoding="utf-8"))
+        old["systems"]["tickstore"]["variants"]["h"]["queries"]["Q2"]["warm"]["swap_timed"][
+            "pages_in"] = 7
+        self.write(json.loads(self.new.read_text(encoding="utf-8")), old)
+        part = self.parts(SWAP_ROW)[0]
+        self.assertIsInstance(RENDER.counted(part), RENDER.NotCounted)
+        # This run's record keeps no swap count for tick-store's query, and says so.
+        self.assertEqual(RENDER.notes_of(part)["also_flagged"],
+                         [("tick-store", None, 7, False)])
+        self.assertIn("swapping memory in both runs, on ArcticDB's side 3 pages in this run and "
+                      "3 in the replaced one, and in one run only, on tick-store's side no count "
+                      "in this run and 7 in the replaced one, so neither run confirms the other",
+                      RENDER.verdict_of([part], SWAP_ROW))
+        new = json.loads(self.new.read_text(encoding="utf-8"))
+        new["systems"]["tickstore"]["variants"]["h"]["queries"]["Q2"]["warm"]["swap_timed"] = {
+            "pages_in": 1, "pages_out": 0, "flagged": False}
+        self.write(new, old)
+        self.assertIn("and in one run only, on tick-store's side 1 page in this run and 7 in the "
+                      "replaced one, so", RENDER.verdict_of(self.parts(SWAP_ROW), SWAP_ROW))
+        # The short form names the reason and its systems alone, as before.
+        self.assertIn("met, not counted: swapping memory in both runs (ArcticDB)",
+                      RENDER.short_marks([part], SWAP_ROW))
+        # A side no run flags is not named.
+        part = self.runs(["arcticdb"], ["arcticdb"])
+        self.assertEqual(RENDER.notes_of(part)["also_flagged"], [])
+        self.assertNotIn("in one run only", RENDER.verdict_of([part], SWAP_ROW))
+
     def test_a_part_not_like_for_like_is_never_counted(self):
         part = ("against QuestDB, not like-for-like", "1 s against 2 s", True, None, {}, {})
         self.assertIsInstance(RENDER.counted(part), RENDER.NotCounted)

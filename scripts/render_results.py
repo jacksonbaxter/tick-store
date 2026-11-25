@@ -1585,6 +1585,9 @@ def finished(row, root, specs, parts):
                 notes["unconfirmed" if any(side[1] for side in sides) else "confirmed"] = sides
                 if old is not None and label in old:
                     notes["replaced_text"] = old[label][1]
+                    # Every other side either run flags, with its pages in each (review R1-2).
+                    notes["also_flagged"] = also_flagged(deciding, document,
+                                                         notes["replaced"][1], sides)
         # A part met among the headline setups that another system's other setup beats carries
         # that setup beside its verdict, so the win is never quoted bare (review R-A1).
         if "lowest_of" in row and met is True:
@@ -1655,6 +1658,31 @@ def pages_in(document, read):
     """The pages the whole host swapped in while a query phase was timed, by its record."""
     return walk(document, ["systems", read[1], "variants", read[2], "queries", read[4],
                            read[3], "swap_timed", "pages_in"])
+
+
+def also_flagged(deciding, document, old_document, sides):
+    """Each side of a part's deciding query phases that this run or the replaced one flags as
+    timed while pages were swapped in, beyond the sides the not-counted mark gives with both
+    runs' pages: (its label, its pages in this run, in the replaced one, both runs flag it),
+    so the mark names every side either run flags (review R1-2)."""
+    given = {side[0] for side in sides if side[1] == "swapped"}
+    found = []
+    for read in deciding:
+        label = SYSTEM_LABEL.get(read[1], read[1])
+        if read[0] != "queries" or label in given:
+            continue
+        flags = [bool(swapped_reads([read], found_document))
+                 for found_document in (document, old_document)]
+        if not any(flags):
+            continue
+        pages = []
+        for found_document in (document, old_document):
+            try:
+                pages.append(pages_in(found_document, read))
+            except TargetError:
+                pages.append(None)
+        found.append((label, pages[0], pages[1], all(flags)))
+    return list(dict.fromkeys(found))
 
 
 def results_name(root, path):
@@ -2362,7 +2390,8 @@ def phase_mark_triples(parts, row=None, labelled=True):
     for part in parts:
         sides = notes_of(part).get("unconfirmed")
         if sides:
-            full, _ = unconfirmed_forms(sides, notes_of(part).get("replaced_text"))
+            full, _ = unconfirmed_forms(sides, notes_of(part).get("replaced_text"), part[0],
+                                        notes_of(part).get("also_flagged") or ())
             short = unconfirmed_forms(every_side)[1]
             held.setdefault(full, (short, short, []))[2].append(part[0])
         sides = notes_of(part).get("confirmed")
@@ -2398,19 +2427,33 @@ def label_of(label):
     return f"{label}'s"
 
 
-def unconfirmed_forms(sides, replaced_text=None):
+def side_pages(label, new, old):
+    """A side's pages swapped in, by each run's record, or that a record keeps no count."""
+    this = "no count" if new is None else counted_with(new, "page")
+    then = "no count" if old is None else f"{old:,}"
+    return f"on {label_of(label)} side {this} in this run and {then} in the replaced one"
+
+
+def unconfirmed_forms(sides, replaced_text=None, label="", also=()):
     """A not-counted part's mark in full and short: each reason with the systems it holds for
-    and, for swapping, the pages each run's record gives; that neither run confirms the other,
-    so nothing counts it; and the replaced run's figures where it has them."""
+    and, for swapping, the pages each run's record gives, with every other side either run
+    flags (review R1-2); that neither run confirms the other, so nothing counts it; and the
+    replaced run's figures where it has them."""
     by_why = {}
-    for label, why, detail in sides:
-        if why and (label, detail) not in by_why.get(why, []):
-            by_why.setdefault(why, []).append((label, detail))
+    for side, why, detail in sides:
+        if why and (side, detail) not in by_why.get(why, []):
+            by_why.setdefault(why, []).append((side, detail))
     pieces = []
+    # The sides the reasons do not give with both runs' pages, which either run flags.
+    others = "".join(f", and {words}, " + " and ".join(found) for words, found in (
+        (words, [side_pages(side, new, old) for side, new, old, flags in also if flags is both])
+        for both, words in ((False, "in one run only"), (True, "in both"))) if found)
+    if others and "swapped" not in by_why:
+        pieces.append("swapping memory" + others[len(", and"):])
     for why, items in by_why.items():
         if why == "swapped":
             pieces.append(f"{UNCONFIRMED_WHY[why]}, on " + " and on ".join(
-                f"{label_of(label)} side {detail}" for label, detail in items))
+                f"{label_of(side)} side {detail}" for side, detail in items) + others)
         else:
             pieces.append(f"{UNCONFIRMED_WHY[why]} on "
                           f"{and_list([label_of(label) for label, _ in items])} side")
