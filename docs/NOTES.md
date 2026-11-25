@@ -7122,8 +7122,8 @@ for the fuzz and capacity parts. I ruled: no rerun; the entries and the marks go
   *Corrected 2026-11-25:* that holds for the gate's runs, the kernel benchmark's file and the
   comparison files, not for every figure. The timed fuzzing runs and the capacity check's parts
   keep no per-CPU record and no load. Both records' `not_listed` now say what guards each step
-  (`1c0726c`); RESULTS.md's sentence under the targets table and the essay's still say it of
-  every figure.
+  (`1c0726c`). RESULTS.md's sentence under the targets table still says it of every figure; the
+  essay's limits paragraph names the jobs and makes no claim of what guards a figure.
 - **The essay (`4fb405f`, `b8db07c`).** Each disturbance kind reads one record a run: `record_of`
   names the kind whose run it records, so no commit is named. The fuzz run's record is a commit
   exception beside the fuzz result. The final render resolves 341 tokens to 3,803 words, and
