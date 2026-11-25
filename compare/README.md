@@ -686,13 +686,17 @@ system. On the day that does not fit: estimated from `results/fullday-capacity-1
 the Linux slice timings at `25a462b` (`git show
 25a462b:results/compare/Linux-12302019-open-67621b061000.json`, a file deleted in `bf130cc`), counting both classes, one write each, both classes' read-
 backs and the oracle, and the queries, every variant would take about 13.5 hours of measurement
-on the Linux host, and about 20 with three writes per class, against a guide of about 10.
+on the Linux host, and about 20 with three writes per class, against a guide of about 10. The plan
+was made with the capacity run that the committed file later replaced (`git show
+9e05af1^:results/fullday-capacity-12302019.json`); where a figure in the table came from that run,
+the row gives the committed file's beside it, and the minutes and totals are the plan's as made, not
+made again.
 
 | System | Variants and minutes, each with both classes |
 |---|---|
-| Parquet | 7 streamable variants at 34 to 41 each (write 3.1 min a class, read-back and oracle 10, queries 7), about 250. `zstd1-rgall`, one row group for the whole input, cannot stream a day |
+| Parquet | 7 streamable variants at 34 to 41 each (write 3.1 min a class, the earlier capacity run's Parquet ingest of 187.5 s; the committed file gives 178.5 s, 3.0 min; read-back and oracle 10, queries 7), about 250. `zstd1-rgall`, one row group for the whole input, cannot stream a day |
 | ArcticDB | headline 43, `rows10M-cols127` 52, `rows100k-cols1` 72 (class B writes 5.3 times the headline's on the slice), per security 98 (partition and writes 33, read-back over 8,907 symbols 28, Q1, Q4 and Q5 over every symbol 37), about 265 |
-| QuestDB | `plain` 87 (writes 10.5 and 16 min from the capacity check, settle, read-back 38, cold restarts 8), `locate-index` 95, about 182 |
+| QuestDB | `plain` 87 (writes 10.5 min for class A and 16 min for class B from the earlier capacity run, 632.3 s and 959.0 s; the committed file gives 10.9 min for class A and 7.4 min for class B, `wall_seconds.ingest` 652.8 s and 444.8 s; settle, read-back 38, cold restarts 8), `locate-index` 95, about 182 |
 | tick-store | 43 each (write about 4 min a class, `tick_export --store`, the oracle and G-1 15 min a class), 86 |
 | Every system | the source's SHA-256 and the export's oracle before it starts, 6 each, 24 |
 
@@ -747,8 +751,10 @@ security, QuestDB `locate-index`, and tick-store `v3-seg1Mi`. Against `67ae574`,
 At `dd5de38` the full day did not finish. The guard stopped QuestDB `plain` twice on swap
 traffic: in its class A write, and on a freshly booted host in its read-back. Both times the kernel
 paged out QuestDB's own idle heap, 0.65 to 0.93 GB, to keep the store's mapped pages. The free swap
-filled in about 6 s, at up to 81 MB/s, with 11.6 GB or more still available. The capacity check met
-none of this, because swap was already full when it started. See "Full-day comparison" in
+filled in about 6 s, at up to 81 MB/s, with 11.6 GB or more still available. The capacity check of
+that time, the run the committed file replaced, met none of this, because swap was already full when
+it started; in the committed capacity run swap held 137,887,744 of its 1,023,406,080 bytes before
+the first part (`host.swap_note`). See "Full-day comparison" in
 `docs/NOTES.md`. The guard's swap rule then changed, as registered in "The guard's swap rule" in
 `docs/NOTES.md` before the rerun: swap-out alone no longer stops a run, and QuestDB's heap stays
 `-Xms1g -Xmx1g`. The full day ran to its end at `ede0176`:
