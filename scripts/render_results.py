@@ -2793,7 +2793,7 @@ def gate_block_files(root):
     begin, end = gate_markers()
     has_block = block_of(text, begin, end) is not None
     try:
-        found, entries, documents = check_gate.check(root, paths)
+        found, entries, _ = check_gate.check(root, paths)
         problems = [f"{name}: {problem}" for name, problems in found.items()
                     for problem in problems] + entries
         if problems:
@@ -2805,7 +2805,7 @@ def gate_block_files(root):
                               "fuzz-gate-*.json, or the reverse: both or neither")
         if not paths:
             return []
-        lines = gate_block(root, paths[0], next(iter(documents.values())))
+        lines = gate_block(root, paths[0], json.loads(paths[0].read_text(encoding="utf-8")))
     except (OSError, json.JSONDecodeError, KeyError, TargetError) as error:
         print(f"render_results: gate: {error}", file=sys.stderr)
         raise SystemExit(EXIT_USAGE) from error
