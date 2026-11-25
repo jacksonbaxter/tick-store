@@ -35,7 +35,7 @@ Every target in BENCHMARKS.md, on each host it states. Each value is read from t
 | DS-1 | macOS | at most 2.120 ns | 8.897 ns | missed | `results/bench/macOS-column_decode-ede0176b10bb.json` |
 | DS-2 | Linux | at most 21.30 cycles | 60.66 cycles | missed | `results/bench/Linux-column_decode-ede0176b10bb.json` |
 | DS-3 | macOS | at least 3.60 G values/s | 3.40 G values/s | missed | `results/bench/macOS-simd_kernel-ede0176b10bb.json` |
-| DS-4 | Linux | at most 0.377 cycles | 2.709 cycles | missed; (fused, median of the widths) rests on the case `pfor_delta_fused/w=52/avx2`, one of the 65 its median takes, which held a remote login by another project's watcher, computed from its period between two recorded lines, 2026-11-15 07:22:49 to 07:22:53 UTC | `results/bench/Linux-simd_kernel-ede0176b10bb.json` |
+| DS-4 | Linux | at most 0.377 cycles | 2.709 cycles | missed; (fused, median of the widths) rests on the case `pfor_delta_fused/w=52/avx2`, one of the 65 behind its median, which held a remote login by another project's watcher, computed from its period between two recorded lines, 2026-11-15 07:22:49 to 07:22:53 UTC | `results/bench/Linux-simd_kernel-ede0176b10bb.json` |
 | DS-5 | macOS | at least 4,605 MB/s | 3,367 MB/s | missed | `results/bench/macOS-column_decode-ede0176b10bb.json` |
 | DS-5 | Linux | at least 4,605 MB/s | 1,301 MB/s | missed | `results/bench/Linux-column_decode-ede0176b10bb.json` |
 | DS-6 | macOS | at least 14.00x; judged on Gorilla's ns a value over the layout's, the same values, one results file | timestamps: 15.44x; prices: 3.74x | met on (timestamps); missed on (prices) | `results/bench/macOS-column_decode-ede0176b10bb.json` |

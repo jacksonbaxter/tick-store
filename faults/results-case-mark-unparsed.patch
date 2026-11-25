@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -2232,7 +2232,7 @@
+     if read[0] == "case":
+         count = case_count(read, document)
+         # Said as a reader takes it, no word longer (review R1-14).
+-        return f"one of the {count:,} cases behind its median" if count and count > 1 else \
++        return f"one of the {count:,} cases its median takes" if count and count > 1 else \
+             "the case"
+     if read[0] == "fuzz":
+         return "its bound-seed gate" if entry and entry["phase"] == "gate run" else \

@@ -2051,7 +2051,7 @@ def phase_words(entry, read, document=None):
     if read[0] == "case":
         count = case_count(read, document)
         return f"the case `{entry['case']}`" + (
-            f", one of the {count:,} its median takes" if count and count > 1 else "")
+            f", one of the {count:,} behind its median" if count and count > 1 else "")
     if read[0] == "fuzz":
         return short_phase(read, entry)
     system = SYSTEM_LABEL.get(entry["system"], entry["system"])
@@ -2231,7 +2231,8 @@ def short_phase(read, entry=None, document=None):
     one case of the cases a median takes; or a fuzz pass's gate or timed runs."""
     if read[0] == "case":
         count = case_count(read, document)
-        return f"one of the {count:,} cases its median takes" if count and count > 1 else \
+        # Said as a reader takes it, no word longer (review R1-14).
+        return f"one of the {count:,} cases behind its median" if count and count > 1 else \
             "the case"
     if read[0] == "fuzz":
         return "its bound-seed gate" if entry and entry["phase"] == "gate run" else \

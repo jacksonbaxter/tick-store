@@ -2220,6 +2220,11 @@ FAULTS = (
           "the targets table says the per-CPU record and the load rule guard every timed "
           "figure, the gate's, the fuzzing's and the capacity check's included", CHECK_FAILED,
           "FAIL: test_the_guards_are_said_by_step_as_the_records_give_them (__main__.GuardsTest"),
+    # Review R1-14: a case's mark in words a reader can parse.
+    Fault("results-case-mark-unparsed", "py-scripts", "render_results.py gives a case's mark as "
+          "\"one of the 65 cases its median takes\" again", CHECK_FAILED,
+          "FAIL: test_a_case_of_a_median_says_how_many_cases_the_median_takes "
+          "(__main__.FuzzDisturbanceTest"),
     # Review R1-10: the check names each page by its path.
     Fault("render-check-pages-by-name", "py-scripts", "render_results.py names the pages it "
           "checked by their file names alone, so README.md and fuzz/README.md read the same",

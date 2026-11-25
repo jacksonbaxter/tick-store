@@ -3726,8 +3726,8 @@ class FuzzDisturbanceTest(unittest.TestCase):
         read = ("case", "k/w=*/avx2")
         entry = dict(self.entry("case", "k/w=52/avx2"))
         self.assertEqual(RENDER.short_phase(read, entry, document),
-                         "one of the 65 cases its median takes")
-        self.assertIn("the case `k/w=52/avx2`, one of the 65 its median takes",
+                         "one of the 65 cases behind its median")
+        self.assertIn("the case `k/w=52/avx2`, one of the 65 behind its median",
                       RENDER.group_text(read, [entry], None, {}, document))
 
 
