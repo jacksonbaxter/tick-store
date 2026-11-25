@@ -743,7 +743,10 @@ FAULTS = (
     # fuzzer is reached and refuses the mode by name.
     Fault("fuzz-dictionary-mode-set-ignored", "fuzz-dictionary", "the dictionary encoder tries "
           "Huffman whatever its mode set allows, so a column held to ranked PFOR can take "
-          "Huffman", EXIT_LIBFUZZER,
+          "Huffman; the patch also moves the seed table's kStoreWriterMostSegments from 219 to "
+          "the faulted writer's 230, as a change that updated the table with the encoder would, "
+          "so the seed generator does not stop fuzz-build and the fuzzer is reached",
+          EXIT_LIBFUZZER,
           "check_dict_column: the encoder held to ranked PFOR took another mode",
           arguments=FUZZ_ARGUMENTS),
     Fault("fuzz-dictionary-mode-set-larger-block", "fuzz-dictionary", "the dictionary encoder "
