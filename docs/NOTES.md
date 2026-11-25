@@ -7825,6 +7825,12 @@ R4-A to R4-D).
   the sort does not buy them; the essay now says so. The sort's cost is given as labelled
   arithmetic on the codec evaluation's bits and each column's count, and new orders' references
   cost the sort too, 7.797 bits in file order against 11.363 as built.
+- Correction, 2026-11-25 (docs/REVIEW.md, R4-C9 and R4-E1): the distances within the stock are
+  coded in file order given every message's stock, which a file-order store must then keep:
+  311.9 MB at the best codec measured (`stock_locate`, dict, 9.284232 bits × 268,744,780
+  values), against the permutation's 315.4 MB. Only on that condition does the sort not buy them;
+  a file-order store that keeps less, 176.3 MB for the messages that name no order, must code
+  day-wide distances at 15.6 to 20.7 bits. The bullet above stands as written.
 - The bound is held on the count `wc -w` makes of the rendered page: runs of characters between
   ASCII whitespace, with comments, table pipes and rules and marks counted. macOS's `wc -w` in a
   UTF-8 locale ends a word at a dagger, so "†;" counts as two words there and one under
