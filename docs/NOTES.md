@@ -7634,12 +7634,12 @@ another fixer. docs/REVIEW.md gives each as R3-6 to R3-14.
 gate file's validator and assembler, and of their tests and faults, found the gaps below; a second
 pass found five more. It reassembled `results/fuzz-gate-8616263b7561.json` from the raw logs byte
 for byte, so the file was right; the gaps were in what the validator would let through and in what
-was tested and proven. docs/REVIEW.md gives each as [R4-1 to
-R4-12](REVIEW.md#the-final-reviews-code-review-of-the-gates-checks-r4). The committed file passes
+was tested and proven. docs/REVIEW.md gives each as [R5-1 to
+R5-12](REVIEW.md#the-final-reviews-code-review-of-the-gates-checks-r5). The committed file passes
 every new refusal: `check_gate.py` still prints "fuzz-gate-8616263b7561.json: ok, 310 runs on 2
 hosts". No bar moved: `REQUIRED_RUNS` is 5 and the bar half the 10 s timeout.
 
-- **Run fields (R4-1, code review F-1, `a8e03fa`).** Only some fields were type-checked. A NaN,
+- **Run fields (R5-1, code review F-1, `a8e03fa`).** Only some fields were type-checked. A NaN,
   negative or string `load1`, a negative or string `processes_started`, a NaN or negative `wall_ms`,
   a busy share of "lots", a `fuzz_pfor` target on a run-length seed and a start of 25:61:99 were all
   accepted, and the gate block then printed "nan", "-258 processes" and "25:61:99"; a string load
@@ -7647,20 +7647,20 @@ hosts". No bar moved: `REQUIRED_RUNS` is 5 and the bar half the 10 s timeout.
   now has the form the assembler writes: whole numbers, finite floats of at least 0, real UTC times
   with the end not before the start, busy shares of named cpus in order, cpu2 and cpu7 among them,
   to one decimal from 0 to 100, and the target its seed's own in `fuzz/bound_seeds.txt`.
-- **The header and the runs a seed (R4-2, code review F-2, `1e8ea7d`).** Another `seeds_file`, a
+- **The header and the runs a seed (R5-2, code review F-2, `1e8ea7d`).** Another `seeds_file`, a
   SHA-256 of zeros, another bar text or statement and no hosts were accepted, and six runs a seed
   passed where the gate requires five. Each header field is now the assembler's, the list's SHA-256
   is the tree's `fuzz/bound_seeds.txt`'s, and the runs a seed are exactly five.
-- **The summary by type (R4-3, code review F-3, `3bcdf05`).** It was compared with `==`, so
+- **The summary by type (R5-3, code review F-3, `3bcdf05`).** It was compared with `==`, so
   `all_pass: 1` and `seeds: 31.0` passed and the page read "31 of 31.0 seeds". It is now compared in
   type and value at every level.
-- **Refusals with no test (R4-4, code review F-4, `0642397`).** I took out each refusal of both
+- **Refusals with no test (R5-4, code review F-4, `0642397`).** I took out each refusal of both
   scripts in a throwaway clone and ran its test file: 61 of 92 such edits failed no test. Tests were
   added until each fails one, but `len(runs) != 1` in `gate_run_of`, which cannot change a result:
   only a file whose runs are numbered 1 to 5 once each reaches it.
-- **Refusals with no fault (R4-5, code review F-5, `b88b912`).** `gate_results.py` had no fault, and
+- **Refusals with no fault (R5-5, code review F-5, `b88b912`).** `gate_results.py` had no fault, and
   several refusals of `check_gate.py` had none. Each refusal of both now has one.
-- **Repeated lines in the raw logs (R4-6, code review F-6): a known gap.** `gate_results.py` reads
+- **Repeated lines in the raw logs (R5-6, code review F-6): a known gap.** `gate_results.py` reads
   the step log's start, end and figures lines into maps, so a repeated line silently replaces the
   one before, and lines for runs past the runs a seed are ignored. I did not change it.
   `check_ties.py` ties the gate file to the assembler as it stood at the commit that wrote the file,
@@ -7674,26 +7674,26 @@ hosts". No bar moved: `REQUIRED_RUNS` is 5 and the bar half the 10 s timeout.
   runs, none for a run past five. Assembled again on a later day, the file's `assembled` field would
   change, so the changed assembler and the file could be committed and tied again; docs/TASKS.md
   keeps it open.
-- **Entry spans run alone (R4-7, code review F-7, `8202026`).** Run alone, the check took a "gate
+- **Entry spans run alone (R5-7, code review F-7, `8202026`).** Run alone, the check took a "gate
   run" entry whose span was "" to "Z", or whose end was null; the renderer's own check of the
   disturbance files refused both. The check now wants two real UTC times, start first.
-- **The day of assembly (R4-8, second pass G-1, `2c51167`).** It was only checked to be a real day,
+- **The day of assembly (R5-8, second pass G-1, `2c51167`).** It was only checked to be a real day,
   so "2026-11-01", before the runs of 2026-11-17, and "2099-01-01" passed, and the page printed
   them. A day before the last run's day is refused. A day after today is not: the only way to know
   today is the clock, and the check's result would then depend on the day it runs.
-- **Two faults that showed only a crash (R4-9, second pass G-2, `5494e66`).**
+- **Two faults that showed only a crash (R5-9, second pass G-2, `5494e66`).**
   `gate-run-fields-unchecked` expected a test that, with the refusal gone, raised a KeyError, and
   with it gone a run with an extra field, or a macOS run with `processes_started`, passed no test.
   `gate-run-units-form-unchecked` expected a division by zero, and a unit count of 2.0 with its
   summary to match passed. Each now has a test of that case and expects it.
   `gate-pass-rule-unchecked`, which took out the whole pass check that its parts' faults now take
   out one by one, takes out the findings.
-- **The summary's host order (R4-10, second pass G-3, `546d771`).** Dicts were compared as sets, so
+- **The summary's host order (R5-10, second pass G-3, `546d771`).** Dicts were compared as sets, so
   a summary with Linux before macOS passed, and the block would swap the host paragraphs and the
   table's columns. Keys are now compared in order too.
-- **Negative zero (R4-11, second pass G-4, `e280180`).** -0.0 passed as a number of at least 0, and
+- **Negative zero (R5-11, second pass G-4, `e280180`).** -0.0 passed as a number of at least 0, and
   the page would print "-0.00". It is refused as a load, a time an execution or a busy share.
-- **What the check does not hold (R4-12, second pass G-5): a stated limit.** It does not hold a
+- **What the check does not hold (R5-12, second pass G-5): a stated limit.** It does not hold a
   run's fields against each other: a wall time of 1 ms against 9,337 ms of libFuzzer time, a span of
   0 s or of two hours, runs that overlap in time, an extra cpu in the busy shares, or a load of
   1e308 all pass. The gate set no rule on these; in the committed file every wall time is at least
