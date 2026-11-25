@@ -1,8 +1,8 @@
 diff --git a/scripts/check_ties.py b/scripts/check_ties.py
 --- a/scripts/check_ties.py
 +++ b/scripts/check_ties.py
-@@ -374,7 +374,7 @@
-                     "check_oracle.py", VALIDATORS[1]), RENDER, PROSE)),
+@@ -394,7 +394,7 @@ KINDS = (
+                    RENDER, PROSE)),
      # The record of what else ran on the host during a campaign's timed steps: made by hand
      # from the host's logs and the project's session records, so no code makes its entries.
 -    Kind("disturbances", ("disturbances-*.json",),
