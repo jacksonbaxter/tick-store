@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -2960,7 +2960,7 @@ def gate_block_files(root):
+                     for problem in problems] + entries
+         if problems:
+             raise TargetError("; ".join(problems))
+-        if len(paths) > 1:
++        if len(paths) > 2:
+             raise TargetError("more than one fuzz-gate-*.json, and fuzz/README.md shows one")
+         if has_block != bool(paths):
+             raise TargetError("fuzz/README.md has the gate's markers and there is no "

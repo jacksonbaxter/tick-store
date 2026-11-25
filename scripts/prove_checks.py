@@ -1565,6 +1565,12 @@ FAULTS = (
           "host's journal shows as ending at its last line, which the journal does not show",
           CHECK_FAILED, "FAIL: test_a_journal_event_is_given_by_its_last_line_in_the_journal "
           "(__main__.EventEndTest"),
+    Fault("gate-block-several-files-taken", "py-scripts", "render_results.py renders the gate's "
+          "block from the first of two gate files", CHECK_FAILED,
+          "FAIL: test_more_than_one_gate_file_is_refused (__main__.PageTest"),
+    Fault("gate-block-markers-optional", "py-scripts", "render_results.py takes fuzz/README.md "
+          "with no gate markers beside a gate file, or the markers with no gate file",
+          CHECK_FAILED, "FAIL: test_a_gate_file_with_no_markers_is_refused (__main__.PageTest"),
     Fault("gate-block-hand-edit", "render-check", "a hand edit of the Linux worst run's time "
           "in fuzz/README.md's gate block", CHECK_FAILED,
           "the table in fuzz/README.md is stale or was edited by hand"),

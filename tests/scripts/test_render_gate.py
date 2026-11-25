@@ -98,5 +98,27 @@ class EventEndTest(Tree):
         self.assertIn("It began 17 s after the end of a remote login", self.block([login]))
 
 
+class PageTest(Tree):
+    def test_the_markers_with_no_gate_file_are_refused(self):
+        self.write([], gate=False)
+        self.assertIn("has the gate's markers and there is no fuzz-gate-*.json", self.refused())
+
+    def test_a_gate_file_with_no_markers_is_refused(self):
+        self.write([], page="# Fuzzing\n")
+        self.assertIn("has the gate's markers and there is no fuzz-gate-*.json, or the reverse",
+                      self.refused())
+
+    def test_more_than_one_gate_file_is_refused(self):
+        self.write([])
+        other = copy.deepcopy(self.document)
+        other["header"]["commit"] = "a" * 40
+        (self.root / "results" / f"fuzz-gate-{'a' * 12}.json").write_text(
+            json.dumps(other), encoding="utf-8")
+        self.assertIn("more than one fuzz-gate-*.json", self.refused())
+
+    def test_one_gate_file_and_its_markers_render(self):
+        self.assertIn("holds the gate's 20 runs", self.block())
+
+
 if __name__ == "__main__":
     unittest.main()
