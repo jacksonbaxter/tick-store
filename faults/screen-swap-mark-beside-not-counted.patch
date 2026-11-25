@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -2434,7 +2434,7 @@
+     every = [item for part in parts for item in notes_of(part).get("swapped") or []]
+     # On the first screen the not-counted mark, which says the host swapped during those
+     # systems' runs in both runs, stands in for the swap mark of the same systems (review R1-5).
+-    standing_in = {side[0] for side in every_side if side[1] == "swapped"}
++    standing_in = set()
+     screened = [item for item in every if SYSTEM_LABEL.get(item[0], item[0]) not in standing_in]
+     for part in parts:
+         swapped = notes_of(part).get("swapped") or []

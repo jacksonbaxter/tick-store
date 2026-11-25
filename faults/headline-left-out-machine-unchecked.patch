@@ -1,12 +1,12 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -2209,7 +2209,7 @@ def check_left_out(line, definitions, root, shown, names, hosts):
-         given = {(where, re.sub("\x00\\d+\x00", lambda found: whole[found.group(0)], name))
-                  for where, name in given}
-         for (where, name), key in wanted.items():
--            if (where, name) in given:
-+            if name in {item for _, item in given}:
+@@ -3249,7 +3249,7 @@
+         sentence = sentences.get(head)
+         given = stated_items(sentence[len(head) + 2:], hosts, kind, leads) if sentence else set()
+         for (where, name, lead, marks), key in wanted.items():
+-            if (where, name, lead, marks) in given:
++            if (name, lead, marks) in {item[1:] for item in given}:
                  continue
-             elsewhere = [other for other, item in given if item == name]
+             elsewhere = [other for other, item, *_ in given if item == name and other != where]
              if elsewhere:

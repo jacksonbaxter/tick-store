@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -3025,7 +3025,7 @@
+             by_marks = {}
+             for name, own, marks in keys:
+                 if own == lead:
+-                    by_marks.setdefault(marks, []).append(name)
++                    by_marks.setdefault(next(iter(by_marks), marks), []).append(name)
+             for index, (marks, names) in enumerate(by_marks.items()):
+                 chunk = ", ".join(names) + (f" ({'; '.join(marks)})" if marks else "")
+                 chunks.append(f"{lead}: {chunk}" if lead is not None and index == 0 else chunk)

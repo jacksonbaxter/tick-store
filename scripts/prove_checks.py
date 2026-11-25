@@ -315,10 +315,10 @@ def hand_edit_headline_value():
 
 
 def hand_edit_pitch_figure():
-    """The README's pitch, its compression ratio raised by hand (review E-9)."""
+    """The README's pitch, its store's size raised by hand (review E-9)."""
     document = json.loads((TREE / "results" / "store-size-12302019.json").read_text())
-    ratio = document["ratio"]
-    edit_text("README.md", f"{ratio:.2f} times smaller", f"{ratio + 1:.2f} times smaller")
+    stored = document["stored_bytes"] * 1e-9
+    edit_text("README.md", f"in {stored:.2f} GB, down from", f"in {stored + 1:.2f} GB, down from")
 
 
 def reword_the_writeup_template():
@@ -348,7 +348,7 @@ def swap_pitch_store_sizes():
     document = json.loads((TREE / "results" / "store-size-12302019.json").read_text())
     source, stored = (f"{document[key] * 1e-9:.2f} GB" for key in ("source_bytes",
                                                                    "stored_bytes"))
-    edit_text("README.md", f"{source}, in {stored}", f"{stored}, in {source}")
+    edit_text("README.md", f"in {stored}, down from {source}", f"in {source}, down from {stored}")
 
 
 def reword_a_pitch_claim():
@@ -360,7 +360,26 @@ def reword_a_pitch_claim():
 def type_an_unchecked_pitch_figure():
     """A figure typed into the README's pitch that no row of its check covers (review E-9)."""
     # The pitch sits at its word limit, so the figure takes a word's place.
-    edit_text("README.md", "keeps one day,", "keeps 42 days,")
+    edit_text("README.md", "It gives every message back", "It gives 42 messages back")
+
+
+def give_a_pitch_figure_without_its_mark():
+    """The pitch quoting ArcticDB's warm hour with a table per stock again, a figure from a
+    timed phase in which the records list two remote logins, bare, its claim and its figure's
+    format reworded to match, as the pitch read before review R1-4."""
+    def change(document):
+        figure = document["pitch"]["figures"][1]
+        figure["values"].append({"mul": [{"path": [
+            "systems", "arcticdb", "variants", "rows100k-cols127-per-security", "queries", "Q2",
+            "warm", "median_us"]}, 0.001]})
+        figure["format"] += ", ArcticDB with a table per stock in {:.2f} ms"
+        for claim in document["pitch"]["claims"]:
+            claim["text"] = claim["text"].replace(
+                "though ArcticDB with a table per stock is faster",
+                "ArcticDB with a table per stock in 44.58 ms")
+    edit_json("scripts/targets.json", change)
+    edit_text("README.md", "though ArcticDB with a table per\nstock is faster",
+              "ArcticDB with a table per\nstock in 44.58 ms")
 
 
 def drop_a_pitch_claims_tie():
@@ -389,7 +408,7 @@ def call_a_host_by_its_system():
     """The pitch calling the Linux host "Linux" again, in its figure sentence, which no claim
     ties, so the screen's own rule is the one that stops it; the word takes another's place,
     since the pitch sits at its word limit."""
-    edit_text("README.md", "C++23 columnar store", "C++23 Linux store")
+    edit_text("README.md", "It stores a day's", "Linux stores a day's")
 
 
 def drop_the_moves_unknown_cause():
@@ -1626,8 +1645,9 @@ FAULTS = (
           "(__main__.RenderLowestTest"),
     # Review E-9: the README's pitch figures are checked against the results.
     Fault("readme-pitch-figure-edited", "render-check", "a hand edit of a figure in the "
-          "README's pitch: the compression ratio raised by one", EXIT_RENDER_REFUSED,
-          "the README's pitch does not state '268,744,780 messages and", hand_edit_pitch_figure),
+          "README's pitch: the store's size raised by one GB", EXIT_RENDER_REFUSED,
+          "the README's pitch does not state \"a day's 268,744,780 messages in",
+          hand_edit_pitch_figure),
     Fault("readme-pitch-unchecked-figure", "render-check", "a figure typed into the README's "
           "pitch that nothing checks", EXIT_RENDER_REFUSED,
           "a figure in the README's pitch that nothing checks: '42'",
@@ -1635,7 +1655,7 @@ FAULTS = (
     # Reviews RG-4 and RG-13: a pitch figure is bound to its words, and a ranking to the results.
     Fault("readme-pitch-store-figures-swapped", "render-check", "the README's pitch with the "
           "source's size and the store's traded, both still figures the results give",
-          EXIT_RENDER_REFUSED, "the README's pitch does not state '268,744,780 messages and",
+          EXIT_RENDER_REFUSED, "the README's pitch does not state \"a day's 268,744,780 messages in",
           swap_pitch_store_sizes),
     Fault("render-pitch-shared-format-accepted", "py-scripts", "render_results.py takes two "
           "pitch figures of one format, which could trade places in the text unseen",
@@ -2144,6 +2164,33 @@ FAULTS = (
     Fault("sides-write-swap-misread", "py-scripts", "render_results.py gives a write side's "
           "pages swapped out over its write phase as the pages swapped in", CHECK_FAILED,
           "FAIL: test_a_write_side_gives_both_runs_write_phase_swap_from_the_records "
+          "(__main__.SidesTest"),
+    # Review R1-4: a pitch figure from a marked timed phase stands with its mark, and a claim
+    # held on both runs is judged on the replaced run's file too.
+    Fault("pitch-figure-without-its-mark", "render-check", "the pitch quoting ArcticDB's warm "
+          "hour with a table per stock bare, a figure from a phase in which the records list "
+          "two remote logins", EXIT_RENDER_REFUSED,
+          "a figure from a timed phase the records mark, without its mark",
+          give_a_pitch_figure_without_its_mark),
+    Fault("pitch-claim-judged-on-this-run-only", "py-scripts", "render_results.py judges a "
+          "pitch claim held on both runs on this run's file alone", CHECK_FAILED,
+          "FAIL: test_a_pitch_claim_held_on_both_runs_is_judged_on_the_replaced_file_too "
+          "(__main__.ConditionsTest"),
+    # Review R1-5: the line under the table groups parts of the same marks, its not-counted
+    # class glossed for its parts' reasons, and the not-counted mark stands in for the swap
+    # mark of the same systems on the first screen.
+    Fault("left-out-groups-merged", "render-check", "render_results.py's line under the table "
+          "puts each setup's parts in one group under the first group's marks",
+          EXIT_RENDER_REFUSED, "the line under the table does not name"),
+    Fault("left-out-gloss-not-its-parts", "py-scripts", "render_results.py glosses the "
+          "not-counted class as swapping alone when some of its parts are not counted for "
+          "another reason", CHECK_FAILED,
+          "FAIL: test_the_line_groups_parts_of_the_same_marks_and_glosses_the_class "
+          "(__main__.SidesTest"),
+    Fault("screen-swap-mark-beside-not-counted", "py-scripts", "render_results.py gives the "
+          "first screen's swap mark of the systems its not-counted mark already names",
+          CHECK_FAILED,
+          "FAIL: test_the_not_counted_mark_stands_in_for_the_swap_mark_of_the_same_systems "
           "(__main__.SidesTest"),
     Fault("sides-left-out-counts-uncounted", "py-scripts", "render_results.py counts a part no run confirms among the first screen's met parts", CHECK_FAILED,
           "FAIL: test_no_count_takes_a_part_not_counted (__main__.SidesTest"),

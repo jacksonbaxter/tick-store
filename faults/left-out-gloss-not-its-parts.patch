@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -2755,7 +2755,7 @@
+ 
+ def not_counted_head(reasons):
+     """The not-counted class's opening words with their gloss, for the reasons of its parts."""
+-    gloss = NOT_COUNTED_GLOSS if reasons and all(why == "swapped" for why in reasons) else \
++    gloss = NOT_COUNTED_GLOSS if reasons else \
+         NOT_COUNTED_GLOSS_ANY
+     return f"{LEFT_OUT_HEADS['met, not counted']} ({gloss})"
+ 

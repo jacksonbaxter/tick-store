@@ -1830,6 +1830,47 @@ class LeftOutLineTest(Scratch):
                 self.assertEqual(RENDER.class_of(mets), kind)
 
 
+class GroupedLineTest(unittest.TestCase):
+    """Review R1-5: the line under the table names the parts of one class by machine, the parts
+    with no setup mark first, each setup mark once before the parts it covers, and the parts
+    of the same marks in one group; stated_items reads every name back with its machine, its
+    setup mark and its marks."""
+
+    FOUND = [("Linux", "a", None, ("m1",), ()),
+             ("Linux", "b", "S, while X is faster", ("m2; with a semicolon", "m3 (Q, R)"), ()),
+             ("Linux", "c", "S, while X is faster", ("m2; with a semicolon", "m3 (Q, R)"), ()),
+             ("Linux", "d", "S, while X is faster", ("m4",), ()),
+             ("Linux", "e", None, (), ()), ("macOS", "e", None, (), ()),
+             ("Linux", "f", None, ("m1",), ())]
+
+    def test_groups_are_written_and_read_back(self):
+        line = RENDER.host_groups(self.FOUND, SCREEN_HOSTS)
+        self.assertEqual(line, "on both, e; on the box, a, f (m1); S, while X is faster: b, c "
+                               "(m2; with a semicolon; m3 (Q, R)); d (m4)")
+        stated = RENDER.stated_items(line, SCREEN_HOSTS, "missed", {"S, while X is faster"})
+        self.assertEqual(stated, {
+            ("both", "e", None, None), ("Linux", "a", None, "m1"), ("Linux", "f", None, "m1"),
+            ("Linux", "b", "S, while X is faster", "m2; with a semicolon; m3 (Q, R)"),
+            ("Linux", "c", "S, while X is faster", "m2; with a semicolon; m3 (Q, R)"),
+            ("Linux", "d", "S, while X is faster", "m4")})
+
+    def test_a_name_read_under_no_setup_mark_it_carries_is_another_item(self):
+        # A group with no setup mark written after one that has it would be read under it.
+        line = "on the box, S, while X is faster: b (m4); a (m1)"
+        stated = RENDER.stated_items(line, SCREEN_HOSTS, "missed", {"S, while X is faster"})
+        self.assertIn(("Linux", "a", "S, while X is faster", "m1"), stated)
+        with self.assertRaisesRegex(RENDER.TargetError, "names 'a' twice or empty"):
+            RENDER.stated_items("on the box, a; a (m1)", SCREEN_HOSTS, "missed")
+
+    def test_a_plain_name_with_a_bracket_or_a_colon_is_refused(self):
+        for text in ("a (b)", "a: b"):
+            definitions = {"rows": [{"id": "T-1", "host": "Linux"}],
+                           "headline": {"names": [{"id": "T-1", "host": "Linux", "name": text}]}}
+            with self.subTest(text=text):
+                with self.assertRaisesRegex(RENDER.TargetError, "holds a list's or a machine's"):
+                    RENDER.plain_names(definitions, SCREEN_HOSTS)
+
+
 class RenderCompareTest(Scratch):
     """The comparison block: its own markers, one section per host, one table per class."""
 
@@ -2495,11 +2536,13 @@ class ConditionsTest(Scratch):
         self.favourable_change()
         self.disturb()
         parts = self.parts()
-        token = RENDER.marked_name("flushed write", parts[0], CHANGE_ROW)
-        self.assertTrue(token.startswith("flushed write (missed on this run's figures"[:14]))
-        self.assertIn("(a remote login on the test machine fell inside the timing of "
+        name, lead, marks = RENDER.marked_name("flushed write", parts[0], CHANGE_ROW)
+        self.assertEqual((name, lead), ("flushed write", None))
+        self.assertTrue(marks[0].startswith("met on this run's figures"), marks)
+        self.assertIn("a remote login on the test machine fell inside the timing of "
                       "tick-store's write; an earlier full run, which this one replaces, gave "
-                      "189.0 s)", token)
+                      "189.0 s", marks)
+        token = f"flushed write ({'; '.join(marks)})"
         definitions = {"rows": [CHANGE_ROW, {"id": "T-99", "host": "any", "no_figure": "none"}],
                        "headline": {"names": [
                            {"id": "T-11", "host": "Linux", "name": "flushed write",
@@ -2616,6 +2659,80 @@ class ConditionsTest(Scratch):
         self.write(with_queries(change_document(recorded_write(1.0, 0.1),
                                                 recorded_write(2.0, 0.1))))
         self.pitch_check(bare)
+
+    def figure_pitch(self, sentence, figure, claims=()):
+        """check_pitch on a pitch of one figure, a no-result title and the claims given."""
+        pitch = {"max_words": 100, "figures": [figure], "claims": list(claims),
+                 "no_result_sentences": [{"text": "Title", "why": "the page's heading"}]}
+        self.targets.write_text(json.dumps({"schema": "t", "rows": [SWAP_ROW], "pitch": pitch,
+                                            "headline": {"hosts": SCREEN_HOSTS}}),
+                                encoding="utf-8")
+        RENDER.check_pitch(self.targets, self.tree,
+                           f"# Title\n\n{sentence}\n\n{RENDER.HEADLINE_BEGIN}\n")
+
+    def test_a_pitch_figure_from_a_disturbed_phase_stands_with_its_mark(self):
+        # Review R1-4: the pitch quoted ArcticDB's figure from a phase that held two remote
+        # logins with no mark; a figure from a marked phase carries the first screen's mark.
+        self.write(with_queries(change_document(recorded_write(1.0, 0.1),
+                                                recorded_write(2.0, 0.1))),
+                   with_queries(change_document(recorded_write(1.0, 0.1),
+                                                recorded_write(2.0, 0.1), commit="67ae574f5666")))
+        entry = dict(LOGIN, phase="warm queries", system="arcticdb", query=None)
+        del entry["class"], entry["repetition"]
+        self.disturb(entry)
+        figure = {"file": "results/compare/Linux-day-*.json",
+                  "values": [{"mul": [SWAP_ROW["parts"][0]["at_most"], 0.001]}],
+                  "format": "ArcticDB answers in {:.2f} ms",
+                  "display": {"digits": 2, "scale": 0.001, "unit": " ms"}}
+        with self.assertRaises(RENDER.TargetError) as refused:
+            self.figure_pitch("On the box ArcticDB answers in 2.00 ms.", figure)
+        self.assertIn("a figure from a timed phase the records mark, without its mark: say "
+                      "\"ArcticDB answers in 2.00 ms (a remote login on the test machine fell "
+                      "inside the timing of ArcticDB's warm queries; an earlier full run, which "
+                      "this one replaces, gave 2.00 ms)\"", str(refused.exception))
+        self.figure_pitch("On the box ArcticDB answers in 2.00 ms (a remote login on the test "
+                          "machine fell inside the timing of ArcticDB's warm queries; an earlier "
+                          "full run, which this one replaces, gave 2.00 ms).", figure)
+        # Its replaced run's figure is shown as the figure's display gives it, which it must give.
+        with self.assertRaisesRegex(RENDER.TargetError, "give the figure a display"):
+            self.figure_pitch("On the box ArcticDB answers in 2.00 ms.",
+                              {key: value for key, value in figure.items() if key != "display"})
+        # tick-store's own figure, from an undisturbed phase, needs no mark.
+        own = dict(figure, values=[{"mul": [SWAP_ROW["parts"][0]["value"], 0.001]}],
+                   format="tick-store answers in {:.2f} ms")
+        self.figure_pitch("On the box tick-store answers in 1.00 ms.", own)
+
+    def test_a_pitch_claim_held_on_both_runs_is_judged_on_the_replaced_file_too(self):
+        # Review R1-4: "ArcticDB with a table per stock is faster", a pair of figures below each
+        # other on this run and on the replaced one; a flag on either run's figure asks for the
+        # pitch's swap words.
+        new = with_queries(change_document(recorded_write(1.0, 0.1), recorded_write(2.0, 0.1)))
+        old = with_queries(change_document(recorded_write(1.0, 0.1), recorded_write(2.0, 0.1),
+                                           commit="67ae574f5666"), flagged=["arcticdb"])
+        for document in (new, old):
+            document["systems"]["arcticdb"]["variants"]["h"]["queries"]["Q2"]["warm"][
+                "median_us"] = 500.0
+        self.write(new, old)
+        claim = {"text": None, "file": "results/compare/Linux-day-*.json", "on_replaced": True,
+                 "below": [[SWAP_ROW["parts"][0]["at_most"], SWAP_ROW["parts"][0]["value"]]]}
+        figure = {"file": "results/compare/Linux-day-*.json",
+                  "values": [{"mul": [SWAP_ROW["parts"][0]["value"], 0.001]}],
+                  "format": "it answers in {:.2f} ms"}
+        bare = "On the box it answers in 1.00 ms, though ArcticDB is faster."
+        marked = f"On the box it answers in 1.00 ms, though ArcticDB is faster; {RENDER.PITCH_SWAPPED}."
+        with self.assertRaises(RENDER.TargetError) as refused:
+            self.figure_pitch(bare, figure, [dict(claim, text=bare)])
+        self.assertIn(f"does not say {RENDER.PITCH_SWAPPED!r}", str(refused.exception))
+        self.figure_pitch(marked, figure, [dict(claim, text=marked)])
+        # The replaced run reversing the pair refuses the claim.
+        old["systems"]["arcticdb"]["variants"]["h"]["queries"]["Q2"]["warm"]["median_us"] = 1500.0
+        self.write(new, old)
+        with self.assertRaisesRegex(RENDER.TargetError, "is not below 1000.0 on the replaced run"):
+            self.figure_pitch(marked, figure, [dict(claim, text=marked)])
+        # And with no replaced file there is nothing to judge it on as well.
+        self.old.unlink()
+        with self.assertRaisesRegex(RENDER.TargetError, "no replaced run of"):
+            self.figure_pitch(marked, figure, [dict(claim, text=marked)])
 
     def test_the_pitchs_short_form_speaks_of_rivals_and_stands_nowhere_else(self):
         self.write(with_queries(change_document(recorded_write(1.0, 0.1),
@@ -2767,9 +2884,11 @@ class ConditionsTest(Scratch):
         self.write(with_queries(change_document(recorded_write(1.0, 0.1),
                                                 recorded_write(2.0, 0.1)), flagged=["arcticdb"]))
         parts = self.parts(SWAP_ROW)
-        self.assertEqual(RENDER.screen_verdict(parts, SWAP_ROW), "met (met, not counted: no "
-                         "replaced run (ArcticDB); the host was swapping memory during "
-                         "ArcticDB's runs, which may flatter this)")
+        # The not-counted mark's screen form stands under its class, which glosses it, so it
+        # gives its reason and systems alone (review R1-5).
+        self.assertEqual(RENDER.screen_verdict(parts, SWAP_ROW), "met (no replaced run "
+                         "(ArcticDB); the host was swapping memory during ArcticDB's runs, which "
+                         "may flatter this)")
         self.assertEqual(RENDER.short_marks(parts, SWAP_ROW),
                          ["met, not counted: no replaced run (ArcticDB)",
                           RENDER.SHORT_SWAPPED + "ArcticDB"])
@@ -3009,11 +3128,70 @@ class SidesTest(Scratch):
         self.runs(["arcticdb"], ["arcticdb"])
         items, met_parts, _, _ = RENDER.left_out_items(definitions, self.tree, shown, names)
         self.assertEqual(met_parts, 0)
-        self.assertEqual([name.split(" (")[0] for _, name in items["met, not counted"]],
-                         ["a fast hour"])
+        self.assertEqual([item[1] for item in items["met, not counted"]], ["a fast hour"])
         self.runs(["arcticdb"], [])
         items, met_parts, _, _ = RENDER.left_out_items(definitions, self.tree, shown, names)
         self.assertEqual((met_parts, items["met, not counted"]), (1, []))
+
+    def test_the_not_counted_mark_stands_in_for_the_swap_mark_of_the_same_systems(self):
+        # Review R1-5: under its glossed class, a part not counted for swapping in both runs
+        # gives whose runs, and the swap mark of the same systems goes; a system the
+        # not-counted mark does not name keeps its swap mark.
+        part = self.runs(["arcticdb"], ["arcticdb"])
+        self.assertEqual(RENDER.screen_marks([part], SWAP_ROW),
+                         ([], ["swapping during ArcticDB's runs"]))
+        part = self.runs(["arcticdb", "tickstore"], ["arcticdb"])
+        self.assertEqual(RENDER.screen_marks([part], SWAP_ROW)[1],
+                         ["swapping during ArcticDB's runs", "the host was swapping memory "
+                          "during tick-store's runs, which may understate this"])
+        # The full and short forms, which RESULTS.md and a quote give, keep both marks.
+        self.assertIn(RENDER.SHORT_SWAPPED + "tick-store, ArcticDB",
+                      RENDER.short_marks([part], SWAP_ROW))
+
+    def test_the_line_groups_parts_of_the_same_marks_and_glosses_the_class(self):
+        # Review R1-5: two parts not counted for the same reason on the same systems are named
+        # in one group, the marks once; the class opens with its gloss; and the check reads the
+        # groups back, refusing a group's marks dropped and a gloss that is not its parts'.
+        row = {**SWAP_ROW, "parts": [SWAP_ROW["parts"][0], {**SWAP_ROW["parts"][0],
+                                                            "label": "Q2 warm again"}]}
+        names = {("T-13", "Linux"): {"name": "T", "parts": {"Q2 warm": "a fast hour",
+                                                            "Q2 warm again": "a fast hour again"}},
+                 ("T-99", "any"): {"name": "another"}}
+        definitions = {"rows": [row, {"id": "T-99", "host": "any", "no_figure": "none"}],
+                       "headline": {}}
+        shown = {("T-13", "Linux"): set()}
+        self.runs(["arcticdb"], ["arcticdb"])
+        items, met, counts, named = RENDER.left_out_items(definitions, self.tree, shown, names)
+        count, line = RENDER.left_out_line(items, met, counts, named, SCREEN_HOSTS)
+        self.assertEqual(line, f"Not shown in the table above. Met by the rule and not counted "
+                               f"({RENDER.NOT_COUNTED_GLOSS}): on the box, a fast hour, a fast "
+                               "hour again (swapping during ArcticDB's runs).")
+        text = "\n".join(["", count, "", RENDER.OTHERS_HEADING, "", line])
+        RENDER.check_left_out(text, definitions, self.tree, shown, names, SCREEN_HOSTS)
+        for broken, expected in (
+                (text.replace(" (swapping during ArcticDB's runs)", ""),
+                 "does not name \"a fast hour (swapping during ArcticDB's runs)\""),
+                (text.replace(", a fast hour again (", " (swapping during ArcticDB's runs); a "
+                                                       "fast hour again (QuestDB; "),
+                 "does not name \"a fast hour again (swapping during ArcticDB's runs)\""),
+                (text.replace(RENDER.NOT_COUNTED_GLOSS, RENDER.NOT_COUNTED_GLOSS_ANY),
+                 "which is no class of its own")):
+            with self.subTest(broken=broken):
+                with self.assertRaises(RENDER.TargetError) as refused:
+                    RENDER.check_left_out(broken, definitions, self.tree, shown, names,
+                                          SCREEN_HOSTS)
+                self.assertIn(expected, str(refused.exception))
+        # A part not like-for-like, with no side, takes the gloss that covers every reason.
+        self.assertEqual(RENDER.not_counted_head([]), f"Met by the rule and not counted "
+                                                     f"({RENDER.NOT_COUNTED_GLOSS_ANY})")
+        # So does a list whose parts are not all not counted for swapping alone.
+        for reasons in (["swapped", "no record"], ["swapped", "not alike"]):
+            with self.subTest(reasons=reasons):
+                self.assertEqual(RENDER.not_counted_head(reasons),
+                                 f"Met by the rule and not counted "
+                                 f"({RENDER.NOT_COUNTED_GLOSS_ANY})")
+        self.assertEqual(RENDER.not_counted_head(["swapped", "swapped"]),
+                         f"Met by the rule and not counted ({RENDER.NOT_COUNTED_GLOSS})")
 
     def test_no_first_screen_shows_a_part_not_counted(self):
         self.runs(["arcticdb"], ["arcticdb"])

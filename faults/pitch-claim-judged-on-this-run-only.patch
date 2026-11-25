@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -3846,7 +3846,7 @@
+         documents = [("", document)]
+         # A pair the claim holds on both runs is judged on the replaced run's file too, which
+         # must be there (review R1-4).
+-        if claim.get("on_replaced"):
++        if False:
+             found = replaced_document(root, claim["file"])
+             if found is None:
+                 return f"no replaced run of {claim['file']} to judge it on as well"

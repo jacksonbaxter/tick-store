@@ -1,21 +1,15 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -2194,7 +2194,7 @@ def check_left_out(line, definitions, root, shown, names, hosts):
-             if kind == "met":
-                 met_parts += 1
-                 continue
--            name = marked_name(names[key].get("parts", {}).get(part[0]), part, row)
-+            name = names[key].get("parts", {}).get(part[0])
-             found_items[kind].setdefault(name, {})[row["host"]] = key
-             named_parts += 1
-     for kind, head in LEFT_OUT_HEADS.items():
-@@ -2206,7 +2206,7 @@ def check_left_out(line, definitions, root, shown, names, hosts):
-             wanted[(where, name)] = next(iter(by_host.values()))
+@@ -3245,9 +3245,9 @@
+             machines = set(by_host)
+             where = "any" if "any" in machines else "both" if machines >= set(HOSTS) else \
+                 next(iter(machines))
+-            wanted[(where, name, lead, marks)] = next(iter(by_host.values()))
++            wanted[(where, name, None, None)] = next(iter(by_host.values()))
          sentence = sentences.get(head)
-         given = stated_items(sentence[len(head) + 2:], hosts, kind) if sentence else set()
--        given = {(where, re.sub("\x00\\d+\x00", lambda found: whole[found.group(0)], name))
-+        given = {(where, re.sub("\x00\\d+\x00", lambda found: whole[found.group(0)].split(" (")[0], name))
-                  for where, name in given}
-         for (where, name), key in wanted.items():
-             if (where, name) in given:
+-        given = stated_items(sentence[len(head) + 2:], hosts, kind, leads) if sentence else set()
++        given = {(where, name, None, None) for where, name, *_ in stated_items(sentence[len(head) + 2:], hosts, kind, leads)} if sentence else set()
+         for (where, name, lead, marks), key in wanted.items():
+             if (where, name, lead, marks) in given:
+                 continue

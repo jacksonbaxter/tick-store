@@ -2423,7 +2423,8 @@ def phase_mark_triples(parts, row=None, labelled=True):
             full, _ = unconfirmed_forms(sides, notes_of(part).get("replaced_text"), part[0],
                                         notes_of(part).get("also_flagged") or ())
             short = unconfirmed_forms(every_side)[1]
-            held.setdefault(full, (short, short, []))[2].append(part[0])
+            held.setdefault(full, (short, screen_unconfirmed(every_side), []))[2].append(
+                part[0])
         sides = notes_of(part).get("confirmed")
         if sides:
             full = (f"confirmed by the replaced run, which gives the same outcome with no such "
@@ -2431,13 +2432,18 @@ def phase_mark_triples(parts, row=None, labelled=True):
                     f"{notes_of(part)['replaced_text']}")
             held.setdefault(full, (CONFIRMED_SHORT, CONFIRMED_SHORT, []))[2].append(part[0])
     every = [item for part in parts for item in notes_of(part).get("swapped") or []]
+    # On the first screen the not-counted mark, which says the host swapped during those
+    # systems' runs in both runs, stands in for the swap mark of the same systems (review R1-5).
+    standing_in = {side[0] for side in every_side if side[1] == "swapped"}
+    screened = [item for item in every if SYSTEM_LABEL.get(item[0], item[0]) not in standing_in]
     for part in parts:
         swapped = notes_of(part).get("swapped") or []
         if swapped:
             text = SWAPPED + and_list([f"{SYSTEM_LABEL.get(system, system)}'s `{variant}`" + (
                 " on the replaced run" if old else "") for system, variant, old in swapped])
-            held.setdefault(text, (short_swapped(every), screen_swapped(every), []))[2].append(
-                part[0])
+            held.setdefault(text, (short_swapped(every),
+                                   screen_swapped(screened) if screened else None,
+                                   []))[2].append(part[0])
     triples = []
     for text, (short, screen, labels) in held.items():
         who = "" if not labelled else "every part " if len(labels) == len(parts) > 1 else \
@@ -2505,6 +2511,18 @@ def unconfirmed_forms(sides, replaced_text=None, label="", also=()):
             f"count, ranking or first screen takes it{then}", f"{NOT_COUNTED_SHORT}: {short}")
 
 
+def screen_unconfirmed(sides):
+    """The not-counted mark as the README gives it, under the class whose heading glosses it:
+    whose runs the host swapped during in both runs, or each other reason with its systems."""
+    by_why = {}
+    for label, why, _ in sides:
+        if why and label not in by_why.setdefault(why, []):
+            by_why[why].append(label)
+    return "; ".join(f"swapping during {and_list([label_of(label) for label in labels])} runs"
+                     if why == "swapped" else f"{UNCONFIRMED_WHY[why]} ({', '.join(labels)})"
+                     for why, labels in by_why.items())
+
+
 def phase_mark_pairs(parts, row=None, labelled=True):
     """(the mark, its short form) for each mark phase_marks gives, in its order."""
     return [(full, short) for full, short, _ in phase_mark_triples(parts, row, labelled)]
@@ -2527,7 +2545,8 @@ def short_marks(parts, row=None):
 def screen_marks(parts, row=None):
     """The marks as the README's first screen gives them, each once: the setup mark beside the
     verdict word, the others in brackets after it (review R-A1, R-A3, R-A4)."""
-    marks = list(dict.fromkeys(screen for _, _, screen in phase_mark_triples(parts, row, False)))
+    marks = list(dict.fromkeys(screen for _, _, screen in phase_mark_triples(parts, row, False)
+                               if screen))
     beside = [mark for mark in marks if mark.startswith(SHORT_SETUP)]
     return beside, [mark for mark in marks if mark not in beside]
 
@@ -2913,6 +2932,24 @@ LEFT_OUT_HEADS = {"missed": "Missed", "missed in part": "Missed in part",
                   "met, not counted": "Met by the rule and not counted"}
 
 
+# The not-counted class glossed where the README first names it (review R1-5): in the words of
+# the swapping both runs record when every part listed is not counted for that, else in words
+# that cover every reason.
+NOT_COUNTED_GLOSS = ("met by the target's own rule, but the host was swapping memory during a "
+                     "rival's runs in both this run and the earlier one, so neither confirms it "
+                     "and I count it nowhere")
+NOT_COUNTED_GLOSS_ANY = ("met by the target's own rule, but not like-for-like, or on a rival's "
+                         "side that neither this run nor the earlier one confirms, so I count it "
+                         "nowhere")
+
+
+def not_counted_head(reasons):
+    """The not-counted class's opening words with their gloss, for the reasons of its parts."""
+    gloss = NOT_COUNTED_GLOSS if reasons and all(why == "swapped" for why in reasons) else \
+        NOT_COUNTED_GLOSS_ANY
+    return f"{LEFT_OUT_HEADS['met, not counted']} ({gloss})"
+
+
 def headline_hosts(headline):
     """Each host's introduction on the first screen, by what it is, and the short name the
     screen calls it after, with the words for both hosts at once."""
@@ -3082,7 +3119,8 @@ def plain_names(definitions, hosts):
             # The line under the table is read back name by name, under its machine, so a name
             # is whole, and on one machine it is one target's, and one part's within it: a name
             # inside a list, or shared by two parts, could stand in for another (review DX-13).
-            if ", " in text or "; " in text or text.startswith("on ") or not text.strip():
+            if ", " in text or "; " in text or ": " in text or "(" in text or ")" in text \
+                    or text.startswith("on ") or not text.strip():
                 raise TargetError(f"the plain name {text!r} is empty or holds a list's or a "
                                   "machine's words, so the line under the table could not be "
                                   "read back")
@@ -3133,36 +3171,57 @@ def left_out_items(definitions, root, shown, names):
             if kind == "met":
                 met_parts += 1
             else:
-                items[kind].append((row["host"], marked_name(name, part, row)))
+                reasons = tuple(side[1] for side in notes_of(part).get("unconfirmed") or []) + \
+                    (("not alike",) if NOT_ALIKE in part[0] else ())
+                items[kind].append((row["host"], *marked_name(name, part, row), reasons))
     return items, met_parts, counts, named
 
 
 def marked_name(name, part, row):
-    """A left-out part's plain name on the line under the table, with each mark its verdict
-    carries beside it in brackets, unlabelled, as the first screen names no part (review C1)."""
+    """A left-out part on the line under the table: (its plain name, the setup mark its verdict
+    carries, which leads the names it covers, or None, and every other mark, unlabelled, as the
+    first screen names no part), each in its screen form (reviews C1, R1-5)."""
     beside, marks = screen_marks([part], row)
     marks = ([change_text(part, labelled=False)] if notes_of(part).get("change") else []) + \
-        beside + marks
-    return name + "".join(f" ({mark})" for mark in marks)
+        beside[1:] + marks
+    return name, beside[0] if beside else None, tuple(marks)
 
 
 def host_groups(found, hosts):
-    """"a, b; on both machines, c; on the Ryzen, d", from (host, name) pairs in their order."""
-    by_host = {}
-    for host, name in found:
+    """One class's parts grouped (review R1-5): by machine, "on the Ryzen, " once, with "any"
+    first and both machines next; within a machine, the parts with no setup mark first, then
+    each setup mark once, "<setup>: ", before the parts it covers; and the parts that carry the
+    same other marks together, "a, b (m1; m2)", groups apart by "; ". found is (host, name,
+    lead, marks) in order."""
+    machines = {}
+    for host, name, lead, marks, *_ in found:
         if host not in ("any", *HOSTS):
             raise TargetError(f"no words for the host {host!r}")
-        names = by_host.setdefault(host, [])
-        if name not in names:
-            names.append(name)
-    both = [name for name in by_host.get(HOSTS[0], []) if name in by_host.get(HOSTS[1], [])]
-    groups = [", ".join(by_host["any"])] if by_host.get("any") else []
-    if both:
-        groups.append(f"on {hosts['both']}, " + ", ".join(both))
-    for host in HOSTS:
-        alone = [name for name in by_host.get(host, []) if name not in both]
-        if alone:
-            groups.append(f"on {hosts[host]['then']}, " + ", ".join(alone))
+        hosts_of = machines.setdefault((name, lead, marks), [])
+        if host not in hosts_of:
+            hosts_of.append(host)
+    blocks = {where: [] for where in ("any", "both", *HOSTS)}
+    for key, hosts_of in machines.items():
+        where = "any" if "any" in hosts_of else "both" if set(hosts_of) >= set(HOSTS) else \
+            hosts_of[0]
+        blocks[where].append(key)
+    groups = []
+    for where, keys in blocks.items():
+        if not keys:
+            continue
+        chunks = []
+        leads = sorted(dict.fromkeys(lead for _, lead, _ in keys), key=lambda lead: lead is not None)
+        for lead in leads:
+            by_marks = {}
+            for name, own, marks in keys:
+                if own == lead:
+                    by_marks.setdefault(marks, []).append(name)
+            for index, (marks, names) in enumerate(by_marks.items()):
+                chunk = ", ".join(names) + (f" ({'; '.join(marks)})" if marks else "")
+                chunks.append(f"{lead}: {chunk}" if lead is not None and index == 0 else chunk)
+        phrase = "" if where == "any" else \
+            f"on {hosts['both'] if where == 'both' else hosts[where]['then']}, "
+        groups.append(phrase + "; ".join(chunks))
     return "; ".join(groups)
 
 
@@ -3184,7 +3243,8 @@ AMONG = "Among the other rows "
 
 def left_out_line(items, met_parts, counts, named, hosts):
     """The first screen's count sentence, and the list under OTHERS_HEADING."""
-    sentences = [f"{LEFT_OUT_HEADS[kind]}: {host_groups(found, hosts)}."
+    sentences = [f"{not_counted_head([why for item in found for why in item[4]]) if kind == 'met, not counted' else LEFT_OUT_HEADS[kind]}: "
+                 f"{host_groups(found, hosts)}."
                  for kind, found in items.items() if found]
     if met_parts:
         sentences.append(f"Met: {met_parts} more of their parts.")
@@ -3218,23 +3278,58 @@ def class_of(mets):
     return "missed in part" if missed else "not judged in part"
 
 
-def stated_items(sentence, hosts, kind):
-    """The (where, name) pairs one class sentence of the line states: where is "any", "both"
-    or a host, from the group's opening words, and each name is whole, split at ", "."""
+def top_level(text, separator):
+    """text split at each separator outside brackets, as a mark in brackets may hold it."""
+    pieces, depth, start, index = [], 0, 0, 0
+    while index < len(text):
+        if text[index] == "(":
+            depth += 1
+        elif text[index] == ")":
+            depth -= 1
+        elif depth == 0 and text.startswith(separator, index):
+            pieces.append(text[start:index])
+            index += len(separator)
+            start = index
+            continue
+        index += 1
+    return pieces + [text[start:]]
+
+
+def stated_items(sentence, hosts, kind, leads=()):
+    """The (where, name, lead, marks) of each name one class sentence of the line states, read
+    back group by group: groups part at "; " outside brackets; a group that opens with a
+    machine's words, "on the Ryzen, ", puts it and the groups after it on that machine, and
+    the first group with none is on any; one that opens with a setup mark of leads and ": "
+    puts it and the groups after it on that machine under that mark; a group's names part at
+    ", ", and the brackets that close it are the marks of each, as given, or None."""
     pairs = []
     heads = [("both", f"on {hosts['both']}, "),
              *((host, f"on {hosts[host]['then']}, ") for host in HOSTS)]
-    for group in sentence.split("; "):
-        where = "any"
+    where, lead = "any", None
+    for group in top_level(sentence, "; "):
         for key, words in heads:
             if group.startswith(words):
-                where, group = key, group[len(words):]
+                where, lead, group = key, None, group[len(words):]
                 break
-        for name in group.split(", "):
-            if not name or (where, name) in pairs:
+        for words in leads:
+            if group.startswith(f"{words}: "):
+                lead, group = words, group[len(words) + 2:]
+                break
+        marks = None
+        if group.endswith(")"):
+            depth, index = 0, len(group) - 1
+            while index >= 0:
+                depth += {")": 1, "(": -1}.get(group[index], 0)
+                if depth == 0:
+                    break
+                index -= 1
+            if index > 0 and group[index - 1] == " ":
+                marks, group = group[index + 1:-1], group[:index - 1]
+        for name in top_level(group, ", "):
+            if not name or any(item[1] == name and item[0] == where for item in pairs):
                 raise TargetError(f"the line under the table names {name!r} twice or empty "
                                   f"under {kind}")
-            pairs.append((where, name))
+            pairs.append((where, name, lead, marks))
     return set(pairs)
 
 
@@ -3251,9 +3346,11 @@ def check_left_out(text, definitions, root, shown, names, hosts):
     the targets' own, with each target asked for named among its own class's count and no
     other; and what the screen shows, names and counts adds up to every row of the targets and
     every part of the targets it shows, so nothing drops out unseen. A headline never hides a
-    miss. A part whose verdict carries a mark is named with it, as marked_name gives it: each
-    such name is read whole before the line is split, and a name without its mark is not the
-    part's name (review C1). text is the block's lines after the sentence under the table: the
+    miss. A part whose verdict carries a mark is named with it, as marked_name gives it: the
+    line is read back group by group, as stated_items reads it, and a name under another setup
+    mark or with other marks than its own is not the part's name (reviews C1, R1-5). The
+    not-counted class opens with its gloss, for its parts' own reasons, as not_counted_head
+    gives it. text is the block's lines after the sentence under the table: the
     count sentence ends the first screen, and OTHERS_HEADING follows it directly with the list
     under it, so a list dropped or moved above the heading, or a count dropped, is refused
     (review R-A5)."""
@@ -3266,35 +3363,31 @@ def check_left_out(text, definitions, root, shown, names, hosts):
                           f"followed directly by {OTHERS_HEADING!r} and the list of what the "
                           "table's targets leave out under it")
     count_line, line = tail[1], tail[5]
-    tokens = {}
+    # The not-counted class's opening, glossed for the reasons its parts carry, worked out here.
+    reasons = []
     for row in definitions["rows"]:
         key = (row["id"], row["host"])
         if key not in shown:
             continue
         for part in judged_parts(row, root)[0]:
-            name = names[key].get("parts", {}).get(part[0])
-            if part[0] in shown[key] or not name or class_of([counted(part)]) == "met":
-                continue
-            token = marked_name(name, part, row)
-            if token != name:
-                tokens.setdefault(token, f"\x00{len(tokens)}\x00")
-    for token in sorted(tokens, key=len, reverse=True):
-        line = line.replace(token, tokens[token])
-    whole = {shield: token for token, shield in tokens.items()}
+            if part[0] not in shown[key] and isinstance(counted(part), NotCounted):
+                reasons += [side[1] for side in counted(part).sides]
+                reasons += ["not alike"] if NOT_ALIKE in part[0] else []
+    heads = {**LEFT_OUT_HEADS, "met, not counted": not_counted_head(reasons)}
     sentences = {}
     clause = COUNT_CLAUSE.search(count_line)
     if clause is None:
         raise TargetError("the first screen gives no count of the other rows")
     body = line.strip()
     stated_named = {}
-    for sentence in [piece for piece in body[len(OTHERS_OPENING):].strip().split(". ")
+    for sentence in [piece for piece in top_level(body[len(OTHERS_OPENING):].strip(), ". ")
                      if piece]:
         head = sentence.split(":", 1)[0]
         if head.startswith(AMONG) and head[len(AMONG):] in COUNT_ORDER and \
                 head[len(AMONG):] not in stated_named:
             stated_named[head[len(AMONG):]] = sentence[len(head) + 2:].rstrip(".")
             continue
-        if head not in [*LEFT_OUT_HEADS.values(), "Met"] or head in sentences:
+        if head not in [*heads.values(), "Met"] or head in sentences:
             raise TargetError(f"the line under the table says {sentence!r}, which is no class "
                               "of its own or a second of one")
         sentences[head] = sentence.rstrip(".")
@@ -3331,31 +3424,32 @@ def check_left_out(text, definitions, root, shown, names, hosts):
             if kind == "met":
                 met_parts += 1
                 continue
-            name = marked_name(names[key].get("parts", {}).get(part[0]), part, row)
-            found_items[kind].setdefault(name, {})[row["host"]] = key
+            name, lead, marks = marked_name(names[key].get("parts", {}).get(part[0]), part, row)
+            found_items[kind].setdefault((name, lead, "; ".join(marks) or None),
+                                         {})[row["host"]] = key
             named_parts += 1
-    for kind, head in LEFT_OUT_HEADS.items():
+    leads = {item[1] for found in found_items.values() for item in found if item[1]}
+    for kind, head in heads.items():
         wanted = {}
-        for name, by_host in found_items[kind].items():
+        for (name, lead, marks), by_host in found_items[kind].items():
             machines = set(by_host)
             where = "any" if "any" in machines else "both" if machines >= set(HOSTS) else \
                 next(iter(machines))
-            wanted[(where, name)] = next(iter(by_host.values()))
+            wanted[(where, name, lead, marks)] = next(iter(by_host.values()))
         sentence = sentences.get(head)
-        given = stated_items(sentence[len(head) + 2:], hosts, kind) if sentence else set()
-        given = {(where, re.sub("\x00\\d+\x00", lambda found: whole[found.group(0)], name))
-                 for where, name in given}
-        for (where, name), key in wanted.items():
-            if (where, name) in given:
+        given = stated_items(sentence[len(head) + 2:], hosts, kind, leads) if sentence else set()
+        for (where, name, lead, marks), key in wanted.items():
+            if (where, name, lead, marks) in given:
                 continue
-            elsewhere = [other for other, item in given if item == name]
+            elsewhere = [other for other, item, *_ in given if item == name and other != where]
             if elsewhere:
                 raise TargetError(f"the line under the table names {name!r} "
                                   f"{where_words(elsewhere[0], hosts)}, and it is {kind} "
                                   f"{where_words(where, hosts)} ({key[0]} on {key[1]})")
-            raise TargetError(f"the line under the table does not name {name!r}, which is "
+            whole = (f"{lead}: " if lead else "") + name + (f" ({marks})" if marks else "")
+            raise TargetError(f"the line under the table does not name {whole!r}, which is "
                               f"{kind} ({key[0]} on {key[1]}), and a headline never hides a miss")
-        extra = sorted(given - set(wanted))
+        extra = sorted(given - set(wanted), key=repr)
         if extra:
             raise TargetError(f"the line under the table names {extra[0][1]!r} "
                               f"{where_words(extra[0][0], hosts)} as {kind}, and the targets give "
@@ -3666,6 +3760,16 @@ def pitch_swapped(condition, definitions, root):
             parts = [part for part in parts if part[0] in spec["parts"]]
         return [system for part in parts
                 for system, _, _ in notes_of(part).get("swapped") or []]
+    if "below" in condition:
+        path = target_file(root, condition["file"])
+        if path is None:
+            return []
+        documents = [json.loads(path.read_text(encoding="utf-8"))]
+        found = replaced_document(root, condition["file"]) if condition.get("on_replaced") \
+            else None
+        documents += [found[1]] if found else []
+        return [read[0] for document in documents for pair in condition["below"]
+                for item in pair for read in swapped_reads(reads_of(item, document), document)]
     if "fastest" in condition:
         path = target_file(root, condition["file"])
         if path is None:
@@ -3706,6 +3810,25 @@ def pitch_faster(condition, definitions, root):
     return setup_forms(faster)[1].split(", while ", 1)[1]
 
 
+def pitch_figure_marks(figure, path, document, root):
+    """What figure_short_marks gives beside each value of a pitch figure read from a timed
+    phase: a recorded disturbance there, with the replaced run's figure shown as the figure's
+    display gives it, and a page swapped in while it was timed."""
+    entries = disturbance_entries(root)
+    replaced = replaced_document(root, figure["file"])
+    display = figure.get("display") or {}
+    marks = []
+    for value in figure["values"]:
+        for read in reads_of(value, document):
+            found = figure_short_marks(entries, root, path, document, read, replaced, display)
+            if found and not display and replaced_figure(read, replaced, display) is not None:
+                raise TargetError(f"pitch: {figure['format']!r} reads a figure from a marked "
+                                  "phase, whose mark gives the replaced run's figure there; give "
+                                  "the figure a display, its digits, scale and unit")
+            marks += found
+    return list(dict.fromkeys(marks))
+
+
 def check_pitch(definitions_path, root, readme):
     """The README's pitch, the prose above its headline with its headings, states figures by
     hand. Each one scripts/targets.json lists under "pitch" must appear in it as the results
@@ -3721,7 +3844,10 @@ def check_pitch(definitions_path, root, readme):
     or a figure's words, headings included (review DX-3). The pitch, headings included, runs to
     at most "max_words" words, and holds no character a reader cannot see. A claim resting on a figure the record flags as timed
     while pages were swapped in says so, in PITCH_SWAPPED's words, and a win among the setups
-    chosen before the runs that another setup beats names that setup, as pitch_faster gives."""
+    chosen before the runs that another setup beats names that setup, as pitch_faster gives.
+    A figure from a timed phase in which the records list a disturbance, or flag a page swapped
+    in, carries in brackets beside it the mark the first screen gives such a figure, so the
+    pitch never quotes a marked figure bare (review R1-4)."""
     definitions = json.loads(definitions_path.read_text(encoding="utf-8"))
     pitch = definitions.get("pitch")
     if not pitch:
@@ -3760,6 +3886,16 @@ def check_pitch(definitions_path, root, readme):
         if stated not in text:
             raise TargetError(f"the README's pitch does not state {stated!r}, which "
                               f"{path.relative_to(root)} gives")
+        # A figure from a timed phase the records mark carries the mark the first screen gives
+        # such a figure, beside it (review R1-4).
+        marks = pitch_figure_marks(figure, path, document, root)
+        if marks:
+            marked = f"{stated} ({'; '.join(marks)})"
+            if marked not in text:
+                raise TargetError(f"the README's pitch states {stated!r}, a figure from a timed "
+                                  f"phase the records mark, without its mark: say {marked!r}")
+            # The mark's own figure, the replaced run's, is read with it.
+            stated = marked
         remaining = remaining.replace(stated, " ")
         stated_figures.append(stated)
     # A text kept out of the figure check is kept out once: the year of a processor is no
@@ -3897,10 +4033,19 @@ def claim_problem(claim, definitions, root):
         raise TargetError(f"pitch: no results file matches {claim['file']}")
     document = json.loads(path.read_text(encoding="utf-8"))
     if "below" in claim:
-        for lower, higher in claim["below"]:
-            first, second = evaluate(lower, document), evaluate(higher, document)
-            if not first < second:
-                return f"{first} is not below {second}"
+        documents = [("", document)]
+        # A pair the claim holds on both runs is judged on the replaced run's file too, which
+        # must be there (review R1-4).
+        if claim.get("on_replaced"):
+            found = replaced_document(root, claim["file"])
+            if found is None:
+                return f"no replaced run of {claim['file']} to judge it on as well"
+            documents.append((" on the replaced run", found[1]))
+        for where, found_document in documents:
+            for lower, higher in claim["below"]:
+                first, second = evaluate(lower, found_document), evaluate(higher, found_document)
+                if not first < second:
+                    return f"{first} is not below {second}{where}"
         return None
     if "fastest" in claim:
         spec = claim["fastest"]
