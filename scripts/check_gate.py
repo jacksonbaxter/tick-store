@@ -32,8 +32,8 @@ A file is refused if:
 - a run over the bar, or one that did not exit 0 with no finding, or on Linux one whose sibling
   was not kept busy at its start and its end, is marked pass, or a run that meets all of that is
   marked fail;
-- its summary is not what its runs give, in value and in JSON type alike (1 is not true, nor
-  31.0 31): each host's seeds, runs, seeds passed, whether all passed, and its worst run, with
+- its summary is not what its runs give, in value, in JSON type and in the order of its keys
+  alike (1 is not true, nor 31.0 31, and macOS comes before Linux): each host's seeds, runs, seeds passed, whether all passed, and its worst run, with
   every run tied for it and its seed's median.
 
 And, tying the two records together: a disturbance entry whose phase is "gate run" must name,
@@ -314,11 +314,13 @@ def coverage_problems(runs, seeds, per_seed):
 
 
 def same(one, other):
-    """Equal in value and in type at every level, as == is not: 1 == True and 31.0 == 31."""
+    """Equal in value and in type at every level, as == is not: 1 == True and 31.0 == 31; and
+    an object's keys in the same order, so the hosts come in the assembler's order, as the page
+    gives them."""
     if type(one) is not type(other):
         return False
     if isinstance(one, dict):
-        return set(one) == set(other) and all(same(one[key], other[key]) for key in one)
+        return list(one) == list(other) and all(same(one[key], other[key]) for key in one)
     if isinstance(one, list):
         return len(one) == len(other) and all(map(same, one, other))
     return one == other

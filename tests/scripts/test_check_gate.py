@@ -560,6 +560,12 @@ class SummaryTest(Tree):
         self.assert_refused(edit, "its summary is not what its runs give")
 
 
+    def test_a_summary_with_its_hosts_in_another_order_is_refused(self):
+        def edit(document):
+            summary = document["summary"]
+            document["summary"] = {"Linux": summary["Linux"], "macOS": summary["macOS"]}
+        self.assert_refused(edit, "its summary is not what its runs give")
+
     def test_a_summary_missing_a_field_is_refused(self):
         def edit(document):
             del document["summary"]["macOS"]["all_pass"]

@@ -1,9 +1,9 @@
 diff --git a/scripts/check_gate.py b/scripts/check_gate.py
 --- a/scripts/check_gate.py
 +++ b/scripts/check_gate.py
-@@ -314,7 +314,7 @@
+@@ -322,7 +322,7 @@
      if isinstance(one, dict):
-         return set(one) == set(other) and all(same(one[key], other[key]) for key in one)
+         return list(one) == list(other) and all(same(one[key], other[key]) for key in one)
      if isinstance(one, list):
 -        return len(one) == len(other) and all(map(same, one, other))
 +        return all(map(same, one, other))

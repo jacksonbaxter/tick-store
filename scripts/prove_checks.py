@@ -1817,6 +1817,9 @@ FAULTS = (
           "tied with a run that is not, as it compares a list only as far as the shorter goes",
           CHECK_FAILED, "FAIL: test_a_worst_run_tied_with_a_run_that_is_not_is_refused "
           "(__main__.SummaryTest"),
+    Fault("gate-summary-host-order-unchecked", "py-scripts", "check_gate.py compares the "
+          "summary's keys as a set, so Linux may come before macOS", CHECK_FAILED,
+          "FAIL: test_a_summary_with_its_hosts_in_another_order_is_refused (__main__.SummaryTest"),
     # scripts/gate_results.py, which wrote the gate file from the runs' raw records: each refusal of
     # its records and arguments, and the pass rule's parts.
     Fault("gate-results-list-line-unchecked", "py-scripts",

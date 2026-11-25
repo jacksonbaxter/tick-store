@@ -1,12 +1,12 @@
 diff --git a/scripts/check_gate.py b/scripts/check_gate.py
 --- a/scripts/check_gate.py
 +++ b/scripts/check_gate.py
-@@ -309,8 +309,6 @@
- 
- def same(one, other):
-     """Equal in value and in type at every level, as == is not: 1 == True and 31.0 == 31."""
+@@ -317,8 +317,6 @@
+     """Equal in value and in type at every level, as == is not: 1 == True and 31.0 == 31; and
+     an object's keys in the same order, so the hosts come in the assembler's order, as the page
+     gives them."""
 -    if type(one) is not type(other):
 -        return False
      if isinstance(one, dict):
-         return set(one) == set(other) and all(same(one[key], other[key]) for key in one)
+         return list(one) == list(other) and all(same(one[key], other[key]) for key in one)
      if isinstance(one, list):
