@@ -2,7 +2,7 @@ diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
 @@ -4141,7 +4141,7 @@
-     # holds on both runs; on_replaced says the claim needs that file there (reviews R1-4, C2-2).
+     # holds on both runs; on_replaced says the claim needs that file there (reviews R1-4, R1-20).
      documents = [("", document)]
      found = replaced_document(root, claim["file"])
 -    if found is not None:

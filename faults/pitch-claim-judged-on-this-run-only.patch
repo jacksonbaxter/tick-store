@@ -2,7 +2,7 @@ diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
 @@ -4141,9 +4141,9 @@
-     # holds on both runs; on_replaced says the claim needs that file there (reviews R1-4, C2-2).
+     # holds on both runs; on_replaced says the claim needs that file there (reviews R1-4, R1-20).
      documents = [("", document)]
      found = replaced_document(root, claim["file"])
 -    if found is not None:
@@ -12,4 +12,4 @@ diff --git a/scripts/render_results.py b/scripts/render_results.py
 +    elif False:
          return f"no replaced run of {claim['file']} to judge it on as well"
      # A part met by its rule and not counted raises no ranking sentence, so no claim compares
-     # the figures it compares (review C2-1).
+     # the figures it compares (review R1-19).

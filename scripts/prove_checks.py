@@ -2184,13 +2184,13 @@ FAULTS = (
     Fault("class-taken-from-an-uncounted-part", "render-check", "render_results.py's "
           "verdict_class makes a row of missed parts and one met and not counted missed in part, "
           "as WT-4 on Linux was", EXIT_RENDER_REFUSED,
-          # The writer's count, one row more missed in part than the targets give (review C2).
+          # The writer's count, one row more missed in part than the targets give (review R1-23).
           "the line under the table counts the other rows as {'met': 5, 'missed': 15, "
           "'missed in part': 7, 'not judged': 5}"),
     Fault("class-check-takes-an-uncounted-part", "render-check", "the check of the line under "
           "the table classes a row of missed parts and one met and not counted missed in part, "
           "apart from the writer, which does not", EXIT_RENDER_REFUSED,
-          # The check's own count, one row more missed in part than the writer's (review C2).
+          # The check's own count, one row more missed in part than the writer's (review R1-23).
           "and the targets give {'met': 5, 'missed in part': 7, 'missed': 15, 'not judged': 5}"),
     # Review R1-2: the not-counted mark names every side either run flags, with its pages in
     # each run, read from both records.
@@ -2269,13 +2269,13 @@ FAULTS = (
     Fault("left-out-met-part-unnamed", "render-check", "render_results.py's line under the table "
           "leaves out the met parts, as \"Met: 1 more of their parts\" did", EXIT_RENDER_REFUSED,
           "the line under the table does not name 'flushed one-thread ingest', which is met"),
-    # Review C2-1: no pitch claim of figures compares what a part met and not counted compares.
+    # Review R1-19: no pitch claim of figures compares what a part met and not counted compares.
     Fault("pitch-claim-of-figures-on-uncounted-part", "py-scripts", "render_results.py refuses "
           "only a pitch claim on a target for resting on a part met and not counted, so a pair "
           "or a fastest claim on the same figures raises the ranking sentence the part may not",
           CHECK_FAILED, "FAIL: test_no_claim_of_figures_compares_what_a_part_not_counted_compares "
           "(__main__.SidesTest"),
-    # Review C2-2: a claim of figures is judged on the replaced run's file wherever one is kept.
+    # Review R1-20: a claim of figures is judged on the replaced run's file wherever one is kept.
     Fault("pitch-claim-judged-on-this-run-alone", "py-scripts", "render_results.py judges a "
           "pitch claim of figures on the replaced run's file only where the claim asks for it, "
           "so a pair or a fastest claim the replaced run reverses passes", CHECK_FAILED,
@@ -2291,19 +2291,19 @@ FAULTS = (
           "judged on the replaced run's too", CHECK_FAILED,
           "FAIL: test_every_claim_of_figures_is_judged_on_the_replaced_file_where_one_is_kept "
           "(__main__.ConditionsTest"),
-    # Review C2-3: what a watcher's computed span means is said of that kind of login alone.
+    # Review R1-21: what a watcher's computed span means is said of that kind of login alone.
     Fault("legend-period-said-of-another-kind", "py-scripts", "render_results.py's kinds under "
           "RESULTS.md's targets table say of a backup run what a span computed from a watcher's "
           "period means, and the login that span belongs to loses it", CHECK_FAILED,
           "FAIL: test_the_first_screen_takes_the_short_forms_and_results_md_explains_them "
           "(__main__.ConditionsTest"),
-    # Review C2-6: the write-swap reason is given only for a replaced run no record covers.
+    # Review R1-22: the write-swap reason is given only for a replaced run no record covers.
     Fault("write-swap-reason-on-a-covered-run", "py-scripts", "render_results.py gives a rival's "
           "write side the write-swap reason, which says no disturbance record covers the "
           "replaced run, for a replaced run a record covers", CHECK_FAILED,
           "FAIL: test_a_write_side_gives_both_runs_write_phase_swap_from_the_records "
           "(__main__.SidesTest"),
-    # Review C2: a row of no parts is not judged in the writer's class, as in the check's.
+    # Review R1-23: a row of no parts is not judged in the writer's class, as in the check's.
     Fault("verdict-class-empty-row-not-counted", "py-scripts", "render_results.py's "
           "verdict_class calls a row of no parts met and not counted, where class_of calls it "
           "not judged", CHECK_FAILED,

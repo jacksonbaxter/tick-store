@@ -4,7 +4,7 @@ diff --git a/scripts/render_results.py b/scripts/render_results.py
 @@ -4147,7 +4147,7 @@
          return f"no replaced run of {claim['file']} to judge it on as well"
      # A part met by its rule and not counted raises no ranking sentence, so no claim compares
-     # the figures it compares (review C2-1).
+     # the figures it compares (review R1-19).
 -    held = not_counted_reads(definitions, root, path)
 +    held = [] and not_counted_reads(definitions, root, path)
      if "below" in claim:

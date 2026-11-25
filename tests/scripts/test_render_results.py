@@ -2739,7 +2739,7 @@ class ConditionsTest(Scratch):
             self.figure_pitch(marked, figure, [dict(claim, text=marked)])
 
     def test_every_claim_of_figures_is_judged_on_the_replaced_file_where_one_is_kept(self):
-        # Review C2-2: a pair, or a fastest claim, held on this run alone passed though the
+        # Review R1-20: a pair, or a fastest claim, held on this run alone passed though the
         # replaced run reversed it; each is judged on both runs wherever both are kept, with no
         # on_replaced asked, and a flag on the replaced run's figure asks for the swap words.
         new = with_queries(change_document(recorded_write(1.0, 0.1), recorded_write(2.0, 0.1)))
@@ -2955,7 +2955,7 @@ class ConditionsTest(Scratch):
         self.assertEqual(explained.count(RENDER.PERIOD_MEANING), 1)
         # That meaning, and the clause on a span that overlaps the next phase, are said of the
         # watcher's computed login, the one kind they hold for, in the sentence that binds them
-        # to it (review C2-3).
+        # to it (review R1-21).
         self.assertIn("A login by another project's watcher, computed from its period between two "
                       "recorded lines, fell at some time between start and end, not recorded "
                       "exactly, and where \"its bounds also overlap the phase before or after, "
@@ -3157,7 +3157,7 @@ class SidesTest(Scratch):
         self.assertNotIn("write phase", verdict)
         # Both runs keeping the write swap, a replaced run a disturbance record covers, which
         # records a disturbance on the same side, is no run no record covers: the clause on
-        # the write phase's swapping, which says so, stands nowhere (review C2-6).
+        # the write phase's swapping, which says so, stands nowhere (review R1-22).
         old["systems"]["arcticdb"]["variants"]["h"]["classes"]["B"]["swap"] = {
             "write": {"pages_in": 16304, "pages_out": 1}}
         old["header"]["commit"] = "67ae574f5666" + "0" * 28
@@ -3187,7 +3187,7 @@ class SidesTest(Scratch):
         other = ("against ArcticDB", "4 s against 2 s", False, None, {}, {})
         met = ("against ArcticDB", "1 s against 2 s", True, None, {}, {})
         # A part not judged beside one not counted leaves the row not judged, and a row of no
-        # parts is not judged, in the writer's class as in the check's (review C2).
+        # parts is not judged, in the writer's class as in the check's (review R1-23).
         unjudged = ("against ArcticDB", "no figure", RENDER.Unjudged("this code"), None, {}, {})
         for parts, kind in (([missed, other, held], "missed"), ([held], "met, not counted"),
                             ([met, held], "met"), ([met, missed, held], "missed in part"),
@@ -3331,7 +3331,7 @@ class SidesTest(Scratch):
             self.pitch_check(f"On the box it answers one stock fastest; {RENDER.PITCH_SWAPPED}.")
 
     def test_no_claim_of_figures_compares_what_a_part_not_counted_compares(self):
-        # Review C2-1: only a claim on the target was refused; a pair of the same figures, or a
+        # Review R1-19: only a claim on the target was refused; a pair of the same figures, or a
         # fastest claim on the same query, raised the ranking sentence the part may not.
         file = "results/compare/Linux-day-*.json"
         below = {"file": file, "below": [[SWAP_ROW["parts"][0]["value"],

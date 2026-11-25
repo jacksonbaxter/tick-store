@@ -3171,7 +3171,7 @@ def verdict_class(parts):
     a row with no figure. The class is taken from the parts that count: a part met by the rule
     and not counted never makes a row met or missed in part, and a row whose every part is such
     a part is met, not counted (review R1-1); a row of no parts is not judged, as class_of has
-    it (review C2)."""
+    it (review R1-23)."""
     if parts is None:
         return "not judged"
     verdict_of(parts)
@@ -4093,7 +4093,7 @@ def compares_held(held, sides):
     """Why a pitch condition comparing figures of the timed phases in sides, one list of phases
     to each figure it compares, rests on a part of held, not_counted_reads' parts: that the
     part reads two of those figures, so the condition compares what it compares. None
-    otherwise (review C2-1)."""
+    otherwise (review R1-19)."""
     for row_id, host, label, reads in held:
         if sum(1 for phases in sides if reads.intersection(phases)) > 1:
             return (f"it compares the figures {row_id} on {host} compares on ({label}), which "
@@ -4110,7 +4110,7 @@ def claim_problem(claim, definitions, root):
     field its words could be read on, median and tail alike (review DX-14). A claim of either
     of the last two forms is judged on the replaced run's file as well wherever one is kept,
     and is refused if it compares two figures that a part met by its rule and not counted
-    compares, as a target claim on that part is (reviews C2-1, C2-2)."""
+    compares, as a target claim on that part is (reviews R1-19, R1-20)."""
     if "target" in claim:
         spec = claim["target"]
         row = next((row for row in definitions["rows"]
@@ -4138,7 +4138,7 @@ def claim_problem(claim, definitions, root):
         raise TargetError(f"pitch: no results file matches {claim['file']}")
     document = json.loads(path.read_text(encoding="utf-8"))
     # A claim of figures is judged on the replaced run's file too wherever one is kept, so it
-    # holds on both runs; on_replaced says the claim needs that file there (reviews R1-4, C2-2).
+    # holds on both runs; on_replaced says the claim needs that file there (reviews R1-4, R1-20).
     documents = [("", document)]
     found = replaced_document(root, claim["file"])
     if found is not None:
@@ -4146,7 +4146,7 @@ def claim_problem(claim, definitions, root):
     elif claim.get("on_replaced"):
         return f"no replaced run of {claim['file']} to judge it on as well"
     # A part met by its rule and not counted raises no ranking sentence, so no claim compares
-    # the figures it compares (review C2-1).
+    # the figures it compares (review R1-19).
     held = not_counted_reads(definitions, root, path)
     if "below" in claim:
         for lower, higher in claim["below"]:
