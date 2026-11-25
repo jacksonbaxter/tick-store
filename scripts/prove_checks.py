@@ -1706,6 +1706,17 @@ FAULTS = (
           "check_gate.py takes a gate file that ran each seed six times, where the gate requires "
           "five", CHECK_FAILED, "FAIL: test_more_runs_than_the_gate_requires_are_refused "
           "(__main__.CoverageTest"),
+    # The summary is compared with its rows by type as well as value.
+    Fault("gate-summary-compared-by-value", "py-scripts", "check_gate.py compares the summary "
+          "with its rows by value alone, so 1 stands for true and 2.0 for 2", CHECK_FAILED,
+          "FAIL: test_an_all_pass_of_one_for_true_is_refused (__main__.SummaryTest"),
+    Fault("gate-summary-missing-field-accepted", "py-scripts", "check_gate.py takes a summary "
+          "that leaves out a field its rows give", CHECK_FAILED,
+          "FAIL: test_a_summary_missing_a_field_is_refused (__main__.SummaryTest"),
+    Fault("gate-summary-list-length-unchecked", "py-scripts", "check_gate.py takes a worst run "
+          "tied with a run that is not, as it compares a list only as far as the shorter goes",
+          CHECK_FAILED, "FAIL: test_a_worst_run_tied_with_a_run_that_is_not_is_refused "
+          "(__main__.SummaryTest"),
     Fault("ci-shallow-checkout", "py-scripts", "CI checks out the single commit it was pushed "
           "at, so G-3's file, which judges an older one, could never be tied there",
           CHECK_FAILED, "FAIL: test_the_workflow_checks_out_the_history_g3s_tie_needs "

@@ -390,6 +390,38 @@ class SummaryTest(Tree):
         self.assert_refused(edit, "its summary is not what its runs give")
 
 
+    def test_an_all_pass_of_one_for_true_is_refused(self):
+        def edit(document):
+            document["summary"]["macOS"]["all_pass"] = 1
+        self.assert_refused(edit, "its summary is not what its runs give")
+
+    def test_a_seed_count_as_a_float_is_refused(self):
+        def edit(document):
+            document["summary"]["Linux"]["seeds"] = 2.0
+        self.assert_refused(edit, "its summary is not what its runs give")
+
+    def test_a_count_of_executions_as_a_float_is_refused(self):
+        def edit(document):
+            document["summary"]["Linux"]["worst"]["executed_units"] = 2.0
+        self.assert_refused(edit, "its summary is not what its runs give")
+
+    def test_a_tied_run_as_a_float_is_refused(self):
+        def edit(document):
+            document["summary"]["Linux"]["worst"]["runs"] = [1.0]
+        self.assert_refused(edit, "its summary is not what its runs give")
+
+
+    def test_a_summary_missing_a_field_is_refused(self):
+        def edit(document):
+            del document["summary"]["macOS"]["all_pass"]
+        self.assert_refused(edit, "its summary is not what its runs give")
+
+    def test_a_worst_run_tied_with_a_run_that_is_not_is_refused(self):
+        def edit(document):
+            document["summary"]["Linux"]["worst"]["runs"] = [1, 2]
+        self.assert_refused(edit, "its summary is not what its runs give")
+
+
 class EntryTest(Tree):
     def entry_problems(self, **changes):
         self.assertEqual(self.problems(), [])

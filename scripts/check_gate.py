@@ -30,8 +30,9 @@ A file is refused if:
 - a run over the bar, or one that did not exit 0 with no finding, or on Linux one whose sibling
   was not kept busy at its start and its end, is marked pass, or a run that meets all of that is
   marked fail;
-- its summary is not what its runs give: each host's seeds, runs, seeds passed, whether all
-  passed, and its worst run, with every run tied for it and its seed's median.
+- its summary is not what its runs give, in value and in JSON type alike (1 is not true, nor
+  31.0 31): each host's seeds, runs, seeds passed, whether all passed, and its worst run, with
+  every run tied for it and its seed's median.
 
 And, tying the two records together: a disturbance entry whose phase is "gate run" must name,
 as "<seed> run <K> of <N>", a run the gate file of its commit holds on the Linux host, whose
@@ -306,6 +307,17 @@ def coverage_problems(runs, seeds, per_seed):
     return problems
 
 
+def same(one, other):
+    """Equal in value and in type at every level, as == is not: 1 == True and 31.0 == 31."""
+    if type(one) is not type(other):
+        return False
+    if isinstance(one, dict):
+        return set(one) == set(other) and all(same(one[key], other[key]) for key in one)
+    if isinstance(one, list):
+        return len(one) == len(other) and all(map(same, one, other))
+    return one == other
+
+
 def summary_of(runs, per_seed):
     """What the summary must say, from the rows alone."""
     summary = {}
@@ -347,7 +359,7 @@ def check_document(document, name, seeds, timeout, digest):
     problems += header_problems(header, runs, digest, timeout)
     problems += coverage_problems(runs, seeds, per_seed)
     problems += run_problems(runs, bar)
-    if not problems and document["summary"] != summary_of(runs, per_seed):
+    if not problems and not same(document["summary"], summary_of(runs, per_seed)):
         problems.append("its summary is not what its runs give")
     return problems
 
