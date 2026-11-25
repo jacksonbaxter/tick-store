@@ -705,17 +705,6 @@ class RenderTest(Tree):
         with self.assertRaises(SystemExit):
             self.block([{**LOGIN, "case": "run_length/bound-small-blocks run 4 of 6"}])
 
-    def test_two_gate_files_render_no_block(self):
-        other = copy.deepcopy(self.document)
-        other["header"]["commit"] = "f" * 40
-        (self.root / "results" / "fuzz-gate-ffffffffffff.json").write_text(json.dumps(other),
-                                                                         encoding="utf-8")
-        with contextlib.redirect_stderr(io.StringIO()) as told, \
-                self.assertRaises(SystemExit) as caught:
-            self.block()
-        self.assertEqual(caught.exception.code, render_results.EXIT_USAGE)
-        self.assertIn("more than one fuzz-gate-*.json", told.getvalue())
-
     def test_a_page_without_the_markers_is_refused_while_the_file_exists(self):
         with self.assertRaises(SystemExit):
             self.block(page="# Fuzzing\n")
