@@ -381,6 +381,18 @@ class HeaderTest(Tree):
                 "Assembled on 2026-11-25", "Assembled on 2026-13-45")
         self.assert_refused(edit, "its assembled gives 2026-13-45 as the day it was assembled")
 
+    def test_an_assembly_before_the_last_run_is_refused(self):
+        def edit(document):
+            document["header"]["assembled"] = document["header"]["assembled"].replace(
+                "Assembled on 2026-11-25", "Assembled on 2026-11-01")
+        self.assert_refused(edit, "its assembled gives 2026-11-01 as the day it was assembled, "
+                                  "before its last run's day, 2026-11-17")
+
+    def test_an_assembly_on_the_last_runs_day_passes(self):
+        self.document["header"]["assembled"] = self.document["header"]["assembled"].replace(
+            "Assembled on 2026-11-25", "Assembled on 2026-11-17")
+        self.assertEqual(self.problems(), [])
+
     def test_no_hosts_facts_are_refused(self):
         self.header_refused("its hosts are not the assembler's facts of macOS and Linux",
                             hosts={})

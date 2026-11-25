@@ -1793,6 +1793,9 @@ FAULTS = (
     Fault("gate-assembled-day-unchecked", "py-scripts", "check_gate.py takes a gate file "
           "assembled on the 45th of a 13th month", CHECK_FAILED,
           "FAIL: test_an_assembly_on_no_day_is_refused (__main__.HeaderTest"),
+    Fault("gate-assembled-before-runs-accepted", "py-scripts", "check_gate.py takes a gate file "
+          "assembled on 2026-11-01, before its runs of 2026-11-17", CHECK_FAILED,
+          "FAIL: test_an_assembly_before_the_last_run_is_refused (__main__.HeaderTest"),
     Fault("gate-hosts-unchecked", "py-scripts", "check_gate.py takes a gate file that gives no "
           "host's facts", CHECK_FAILED, "FAIL: test_no_hosts_facts_are_refused "
           "(__main__.HeaderTest"),

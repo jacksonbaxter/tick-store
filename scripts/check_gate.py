@@ -20,8 +20,10 @@ A file is refused if:
 - it holds a machine's path, user or host name (check_results.check_leaks);
 - its bar is not half of the tree's fuzz/launch.txt -timeout, in ms an execution, or its
   header's words are not the assembler's: its check, its statement for its runs a seed, its
-  account of its assembly with the days of its runs, its bar's text, the hosts' facts, and
-  its list, fuzz/bound_seeds.txt, by its SHA-256 as the tree holds it;
+  account of its assembly with the days of its runs and a day of assembly no earlier than its
+  last run's (a day later than today is not refused: that would make the check's result
+  depend on the day it runs), its bar's text, the hosts' facts, and its list,
+  fuzz/bound_seeds.txt, by its SHA-256 as the tree holds it;
 - a seed of the tree's fuzz/bound_seeds.txt has no runs on a host, or a host ran a seed the list
   does not hold;
 - it gives other than the gate's runs a seed, REQUIRED_RUNS, or a seed's runs on a host are
@@ -276,6 +278,9 @@ def header_problems(header, runs, digest, timeout):
         problems.append(f"its assembled gives the runs of {of}, and its runs are of {days}")
     elif not is_utc(f"{day}T00:00:00Z"):
         problems.append(f"its assembled gives {day} as the day it was assembled, which is no day")
+    elif day < max(run["end"][:10] for run in runs):
+        problems.append(f"its assembled gives {day} as the day it was assembled, before its last "
+                        f"run's day, {max(run['end'][:10] for run in runs)}")
     if header["hosts"] != HOST_FACTS:
         problems.append(f"its hosts are not the assembler's facts of {' and '.join(HOSTS)}")
     elif list(header["hosts"]) != list(HOSTS):

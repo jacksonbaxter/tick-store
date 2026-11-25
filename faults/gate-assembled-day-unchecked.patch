@@ -1,12 +1,12 @@
 diff --git a/scripts/check_gate.py b/scripts/check_gate.py
 --- a/scripts/check_gate.py
 +++ b/scripts/check_gate.py
-@@ -272,7 +272,7 @@
+@@ -276,7 +276,7 @@
                          "of its assembly")
      elif of != days:
          problems.append(f"its assembled gives the runs of {of}, and its runs are of {days}")
 -    elif not is_utc(f"{day}T00:00:00Z"):
 +    elif False:
          problems.append(f"its assembled gives {day} as the day it was assembled, which is no day")
-     if header["hosts"] != HOST_FACTS:
-         problems.append(f"its hosts are not the assembler's facts of {' and '.join(HOSTS)}")
+     elif day < max(run["end"][:10] for run in runs):
+         problems.append(f"its assembled gives {day} as the day it was assembled, before its last "

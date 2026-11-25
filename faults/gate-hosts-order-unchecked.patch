@@ -1,8 +1,8 @@
 diff --git a/scripts/check_gate.py b/scripts/check_gate.py
 --- a/scripts/check_gate.py
 +++ b/scripts/check_gate.py
-@@ -276,7 +276,7 @@
-         problems.append(f"its assembled gives {day} as the day it was assembled, which is no day")
+@@ -283,7 +283,7 @@
+                         f"run's day, {max(run['end'][:10] for run in runs)}")
      if header["hosts"] != HOST_FACTS:
          problems.append(f"its hosts are not the assembler's facts of {' and '.join(HOSTS)}")
 -    elif list(header["hosts"]) != list(HOSTS):
