@@ -554,8 +554,18 @@ class Refuses(Tree):
         self.edit("docs/writeup/WRITEUP.template.md", FILLER, FILLER + "\n\n" + FILLER)
         self.refused("outside its 2,500 to 4,000")
 
-    def test_the_word_count_leaves_out_comments_and_table_rules(self):
-        self.assertEqual(RENDER.word_count("A b.\n<!-- c d e -->\n| x | y |\n|---|---|\n"), 4)
+    def test_the_word_count_is_wc_s_count_of_the_page(self):
+        # Review R4-D: the bound is held on the count a reader makes with wc -w, so a comment,
+        # a table's pipes and rule, a mark standing alone and the generated line all count.
+        self.assertEqual(RENDER.word_count("A b.\n<!-- c d e -->\n| x | y |\n|---|---|\n"),
+                         13)
+        self.assertEqual(RENDER.word_count("a \u2020 ; b\u00a0c\t1,2\n"), 5)
+        page = self.renders()
+        done = subprocess.run(["wc", "-w"], input=page.encode("utf-8"), capture_output=True,
+                              env=dict(os.environ, LC_ALL="C"))
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(RENDER.word_count(page), int(done.stdout.split()[0]))
+        self.assertIn(f"{RENDER.word_count(page):,} words", self.run_script("--check").stdout)
 
     def test_an_essay_with_no_title(self):
         self.edit("docs/writeup/WRITEUP.template.md", "# A demo essay\n\n", "")

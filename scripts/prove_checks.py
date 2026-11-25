@@ -3161,6 +3161,10 @@ FAULTS = (
     Fault("writeup-pitch-condition-skipped", "py-scripts", "render_writeup.py judges an essay "
           "claim on the first condition of its pitch sentence alone", CHECK_FAILED,
           "FAIL: test_a_pitch_sentence_reused_on_every_condition (__main__.Claims"),
+    # Review R4-D: the essay's bound is held on wc -w's count of the rendered page.
+    Fault("writeup-words-not-as-wc", "py-scripts", "render_writeup.py counts the essay's words "
+          "leaving out its tables' pipes and rules and every mark, not as wc -w counts the page",
+          CHECK_FAILED, "FAIL: test_the_word_count_is_wc_s_count_of_the_page (__main__.Refuses"),
     # The step itself on the committed page. Its baseline passes only once WRITEUP.md is
     # rendered, when every results file it reads is committed (docs/TASKS.md).
     Fault("writeup-template-not-rendered", "writeup-check", "the essay's template reworded "

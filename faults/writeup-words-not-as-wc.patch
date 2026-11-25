@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index fca12ba..84aac53 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -286,7 +286,7 @@ def word_count(text):
+     """Words of the page as wc -w counts them, the count a reader would make: every run of
+     characters between ASCII whitespace, its comments, its tables' pipes and rules, marks and
+     the generated line all counted. A token not yet resolved counts as one."""
+-    return len(WORD.findall(text))
++    return sum(1 for word in WORD.findall(text) if re.search(r"[A-Za-z0-9]", word))
+ 
+ 
+ def opening_problem(body):

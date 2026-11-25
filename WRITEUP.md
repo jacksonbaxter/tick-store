@@ -308,7 +308,7 @@ A login or a backup run can take executions from a fuzzing run, not hide a findi
 [runs by target](RESULTS.md#g-3-runs-by-target) give each target's executions.
 
 The checks and the faults that prove them are in the README; the prover's
-record covers 99 of its 487 listed faults.
+record covers 99 of its 488 listed faults.
 
 ## Limits
 
