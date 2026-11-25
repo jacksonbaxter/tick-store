@@ -472,11 +472,11 @@ disturbance records cover the Linux host only.
 
 On Linux, 31 of 31 seeds passed, 155 runs. The worst run was `run_length/bound-small-blocks` at
 4,668.5 ms an execution, 9,337 ms over 2 executions, in its run 1 of 5 (median 3,908.0), 2026-11-17
-15:12:42 to 15:12:51 UTC, which holds no recorded event. It began 13 s after the end of a backup run
-(2026-11-17 15:12:26 to 15:12:29 UTC) and 10 s after the end of a remote login (2026-11-17 15:12:31
-to 15:12:32 UTC), each in an earlier run of the gate. The load read just before it began, 2.40, was
-the highest of its seed's five runs, and 258 processes started during it, against a median of 53
-over the host's 155 runs.
+15:12:42 to 15:12:51 UTC, which holds no recorded event. It began 13 s after a backup run's last
+line in the host's journal (2026-11-17 15:12:26 to 15:12:29 UTC) and 10 s after the end of a remote
+login (2026-11-17 15:12:31 to 15:12:32 UTC), each in an earlier run of the gate. The load read just
+before it began, 2.40, was the highest of its seed's five runs, and 258 processes started during it,
+against a median of 53 over the host's 155 runs.
 
 The Linux runs that held a recorded event, each passed: `run_length/bound-one-run-blocks` run 4 of
 5, 2026-11-17 15:12:25 to 15:12:32 UTC, 3,538.5 ms an execution against its seed's worst, 3,660.5,

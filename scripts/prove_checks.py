@@ -1561,6 +1561,10 @@ FAULTS = (
     Fault("gate-block-refusal-ignored", "py-scripts", "render_results.py renders fuzz/README.md's "
           "gate block from a gate file check_gate.py refuses", CHECK_FAILED,
           "FAIL: test_a_refused_file_renders_no_block (__main__.RenderTest"),
+    Fault("gate-block-journal-end-said", "py-scripts", "render_results.py gives an event the "
+          "host's journal shows as ending at its last line, which the journal does not show",
+          CHECK_FAILED, "FAIL: test_a_journal_event_is_given_by_its_last_line_in_the_journal "
+          "(__main__.EventEndTest"),
     Fault("gate-block-hand-edit", "render-check", "a hand edit of the Linux worst run's time "
           "in fuzz/README.md's gate block", CHECK_FAILED,
           "the table in fuzz/README.md is stale or was edited by hand"),

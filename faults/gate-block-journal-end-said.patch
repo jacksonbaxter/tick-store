@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -2914,7 +2914,7 @@ def gate_end_words(entry):
+     line there, which does not show when the job's process ended; a login computed from a
+     watcher's period, at the latest it could have ended; any other, at its end."""
+     held = held_words([entry])
+-    if "from the host's journal" in entry["what"]:
++    if False:
+         return f"{held}'s last line in the host's journal"
+     if entry["what"].startswith(WATCHER_PERIOD):
+         return f"the latest {held} could have ended"

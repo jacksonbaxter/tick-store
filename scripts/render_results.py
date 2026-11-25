@@ -2857,8 +2857,8 @@ def gate_block(root, path, document):
         before = [entry for entry, run in events if entry["end"] < first["start"]
                   and entry not in inside]
         if before:
-            gaps = [f"{gate_seconds(entry['end'], first['start'])} s after the end of "
-                    f"{held_words([entry])} ({utc_span(entry)})" for entry in before]
+            gaps = [f"{gate_seconds(entry['end'], first['start'])} s after "
+                    f"{gate_end_words(entry)} ({utc_span(entry)})" for entry in before]
             text += (f" It began {and_list(gaps)}, {'each ' if len(gaps) > 1 else ''}in an "
                      "earlier run of the gate.")
         mine = [run for run in runs if run["host"] == host]
@@ -2907,6 +2907,18 @@ def gate_block(root, path, document):
             cells.append(f"{statistics.median(times):,.1f} ({max(times):,.1f})")
         lines.append(f"| `{seed}` | " + " | ".join(cells) + " |")
     return lines
+
+
+def gate_end_words(entry):
+    """What an event's recorded end is, in words: a run the host's journal shows ends at its last
+    line there, which does not show when the job's process ended; a login computed from a
+    watcher's period, at the latest it could have ended; any other, at its end."""
+    held = held_words([entry])
+    if "from the host's journal" in entry["what"]:
+        return f"{held}'s last line in the host's journal"
+    if entry["what"].startswith(WATCHER_PERIOD):
+        return f"the latest {held} could have ended"
+    return f"the end of {held}"
 
 
 def gate_count(value):
