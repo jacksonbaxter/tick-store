@@ -28,7 +28,7 @@ The Ryzen, each system in its fixed setup except on disk; queries are warm media
 The write row is not like-for-like: tick-store's input was in memory before its clock, with 250,916,864 B read from the
 device inside it, and the others read theirs from disk inside theirs, 18,411,094,016 to
 21,521,625,088 B. On Q2 and Q3 the host swapped memory while the named systems were timed, in this run
-and in the replaced run, an earlier measurement on older code, so neither confirms the other and neither verdict counts. ArcticDB with a table per stock is faster:
+and the replaced run, an earlier measurement on older code, so neither confirms the other and neither part counts. ArcticDB with a table per stock is faster:
 44.58 ms † on Q2 and 25.00 ms † on Q3.
 
 ## How it was measured
@@ -183,11 +183,11 @@ median, so on whole queries SIMD's effect is inside or near the run-to-run sprea
 
 **The store's price column.** Per piece, the reader inflates any zstd frame, allocates, decodes
 PFOR with scale and patches, range-checks every value and appends. On the Ryzen those steps take
-11.6%, 20.4% (unpack), 25.3% (patches),
-4.6% (scale and range check) and 0.6% (allocation and copy;
+11.6%, 20.4% (unpack), 25.3% (PFOR decode),
+4.6% (range check and append) and 0.6% (allocation and copy;
 copies resolved only to the C library, 19.4%, are not counted there) of
 the decode's user cycles ([price-decode profile](results/diag/price-decode-profile-12302019-ede0176b10bb.json) ‡). The rest: 12.4% at
-addresses with no symbol, 5.6% in functions no group takes (5.5% `read_patches`) and
+unresolved addresses, 5.6% in ungrouped functions (5.5% `read_patches`) and
 0.1% in the codec's column driver.
 
 ## Branch prediction and instruction counts
@@ -229,8 +229,8 @@ of each write, tick-store's totals with and without a flush are not resolved apa
 41.0%, assembling segments 19.1%, the book state, each
 open order's stock and price kept to code the messages that name it, 18.7%,
 dictionary encoding 6.8%, sorting 4.8%, parsing 2.7%
-and zstd 1.2% ([writer profile](results/diag/writer-profile-12302019-ede0176b10bb.json) ‡). If the others' engine-only clocks hold their disk reads, the gap
-is wider than shown.
+and zstd 1.2% ([writer profile](results/diag/writer-profile-12302019-ede0176b10bb.json) ‡). If the others' engine-only clocks hold disk reads, they
+overstate their engines' work.
 
 **Queries.** ArcticDB with a table per stock takes 10.2 s on Q1. Q5, the day's sum of a shares column, decodes 152,004,760 values at
 6.0 ns each; of its sampled cycles, dictionary decoding takes 30.5%,
@@ -282,10 +282,10 @@ names systems timed while the host swapped memory.
 | Q4 cold mean | ≤ 10 ms (TimescaleDB, order-book preprint) | 356.09 ms; M4 136.16 ms | 36x; 14x | missed; M4 missed | 35.1 MB read cold |
 | Lowest median and p99 of the fixed setups, each query | same machine | warm medians in the table at a glance | 8.7x on Q1; 167x on Q4; 16.8x on Q5 | missed in part; met on Q2 warm, Q2 cold, Q3 warm and Q3 cold against each system's chosen setup, while ArcticDB with a table per stock is faster, and on Q5 cold; met, not counted: swapping memory in both runs (ArcticDB, QuestDB); swap-in: ArcticDB, QuestDB, tick-store | Q1 to Q5 under Queries |
 
-The writes against each other system, on both clocks. Without a flush:
-missed; inputs not alike: tick-store's input is in memory before the clock starts, with 250,916,864 B read from the device inside the clock; Parquet's, ArcticDB's and QuestDB's are read from disk inside it, with 18,411,094,016 to 21,521,625,088 B; engine-only: see [the method](#how-it-was-measured).
+Writes against each other system, on both clocks, without a flush:
+missed; inputs not alike: tick-store's input is in memory before the clock starts, with 250,916,864 B read from the device inside the clock; Parquet's, ArcticDB's and QuestDB's are read from disk inside it, with 18,411,094,016 to 21,521,625,088 B; engine-only may still hold those reads ([the method](#how-it-was-measured)).
 
-With a flush: met against QuestDB, not like-for-like; missed against Parquet; against ArcticDB met on this run and missed on the replaced one, a change for tick-store, counted as missed; two remote logins during tick-store's write; replaced run 188.9 s; a backup run and a remote login during QuestDB's write; replaced run 1,269.2 s; met, not counted: a disturbance the replaced run has no record to rule out (QuestDB); inputs not alike: tick-store's input is in memory before the clock starts, with 274,239,488 B read from the device inside the clock; Parquet's, ArcticDB's and QuestDB's are read from disk inside it, with 23,846,309,888 to 24,631,062,528 B; engine-only: see [the method](#how-it-was-measured). The [targets table](RESULTS.md#targets) gives both runs'
+With a flush: met against QuestDB, not like-for-like; missed against Parquet; against ArcticDB met on this run and missed on the replaced one, a change for tick-store, counted as missed; two remote logins during tick-store's write; replaced run 188.9 s; a backup run and a remote login during QuestDB's write; replaced run 1,269.2 s; met, not counted: a disturbance the replaced run has no record to rule out (QuestDB); inputs not alike: tick-store's input is in memory before the clock starts, with 274,239,488 B read from the device inside the clock; Parquet's, ArcticDB's and QuestDB's are read from disk inside it, with 23,846,309,888 to 24,631,062,528 B; engine-only may still hold those reads ([the method](#how-it-was-measured)). The [targets table](RESULTS.md#targets) gives both runs'
 figures; the cause of ArcticDB's move between them was not measured and is not known.
 
 ## Not judged

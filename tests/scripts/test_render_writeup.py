@@ -1400,14 +1400,16 @@ class Marks(Tree):
                       "a change in tick-store's favour, counted as missed; inputs not alike: "
                       "tick-store's input is in memory before the clock starts, with 0 B read "
                       "from the device inside the clock; ArcticDB's is read from disk inside it, "
-                      "with 0 B; engine-only: see [the method](#how-it-was-measured).", page)
+                      "with 0 B; engine-only may still hold those reads ([the method]"
+                      "(#how-it-was-measured)).", page)
         # The input clause stands for the long note; the moves and the replaced record's
         # sentence are the targets table's, linked, not carried.
         self.assertNotIn("from each write's record: tick-store's input, `input`", page)
 
     def test_a_write_verdict_gives_the_input_clause_short_and_the_method_in_full(self):
-        # Pass 4: beside the verdict, whose input was where and the bytes each side's records
-        # show; what engine-only holds, in the method section the clause points to.
+        # Pass 4 and 5: beside the verdict, whose input was where, the bytes each side's records
+        # show and that engine-only may still hold those reads; why, in the method section the
+        # clause points to.
         ours, theirs = write_record(190.0, 10), write_record(381.0, 1)
         ours["detail"]["device_read"]["bytes"] = 7
         theirs["detail"]["device_read"]["bytes"] = 9000
@@ -1416,8 +1418,8 @@ class Marks(Tree):
         verdict = next(line for line in page.splitlines() if line.startswith("The day write"))
         self.assertIn("inputs not alike: tick-store's input is in memory before the clock "
                       "starts, with 7 B read from the device inside the clock; ArcticDB's is "
-                      "read from disk inside it, with 9,000 B; engine-only: see [the method]"
-                      "(#how-it-was-measured).", verdict)
+                      "read from disk inside it, with 9,000 B; engine-only may still hold those "
+                      "reads ([the method](#how-it-was-measured)).", verdict)
         self.assertNotIn(RESULTS_CODE.ENGINE_ONLY_READS, verdict)
         self.assertIn(RESULTS_CODE.ENGINE_ONLY_READS,
                       " ".join(RENDER.section_of(page, RENDER.METHOD_SECTION).split()))

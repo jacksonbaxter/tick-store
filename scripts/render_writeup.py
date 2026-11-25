@@ -1056,17 +1056,19 @@ def not_counted(spec, context):
 # every comparison whose writes did not start alike, as the README's and RESULTS.md's do
 # (ruling 3; review R4-A).
 METHOD_SECTION = "## How it was measured"
-# Beside a write verdict, the essay's input clause ends by pointing to that section, whose input
-# note says what engine-only holds in full (render_results.ENGINE_ONLY_READS).
-INPUT_POINTER = f"engine-only: see [the method](#{METHOD_SECTION[3:].lower().replace(' ', '-')})"
+# Beside a write verdict, the essay's input clause ends by saying engine-only may still hold the
+# reads and pointing to that section, whose input note says why in full
+# (render_results.ENGINE_ONLY_READS).
+INPUT_POINTER = ("engine-only may still hold those reads ([the method]"
+                 f"(#{METHOD_SECTION[3:].lower().replace(' ', '-')}))")
 
 
 def short_input_clause(document, class_name):
     """The input clause of a write verdict on the essay, from render_results.py's own reading of
     each headline write's record (input_reads, input_sides): whose input was in memory before
     the clock and whose was read from disk inside it, with the bytes read from the device inside
-    each side's clocks, and for what engine-only holds the pointer to the method section. None
-    where the writes started alike."""
+    each side's clocks, and that engine-only may still hold them, pointing to the method
+    section. None where the writes started alike."""
     reads = render_results.input_reads(document, class_name)
     sides = render_results.input_sides(reads)
     if sides is None:

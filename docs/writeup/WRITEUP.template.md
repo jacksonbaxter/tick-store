@@ -28,7 +28,7 @@ The Ryzen, each system in its fixed setup except on disk; queries are warm media
 The write row is not like-for-like: tick-store's input was in memory before its clock, with {{cmpL_ts_A_device_b}} B read from the
 device inside it, and the others read theirs from disk inside theirs, {{cmpL_others_A_device_min_b}} to
 {{cmpL_others_A_device_max_b}} B. On Q2 and Q3 the host swapped memory while the named systems were timed, in this run
-and in the replaced run, an earlier measurement on older code, so neither confirms the other and neither verdict counts. ArcticDB with a table per stock is faster:
+and the replaced run, an earlier measurement on older code, so neither confirms the other and neither part counts. ArcticDB with a table per stock is faster:
 {{glance_arcps_q2_ms}} ms {{glance_arcps_q2_flag}} on Q2 and {{glance_arcps_q3_ms}} ms {{glance_arcps_q3_flag}} on Q3.
 
 ## How it was measured
@@ -183,11 +183,11 @@ median, so on whole queries SIMD's effect is inside or near the run-to-run sprea
 
 **The store's price column.** Per piece, the reader inflates any zstd frame, allocates, decodes
 PFOR with scale and patches, range-checks every value and appends. On the Ryzen those steps take
-{{d4_zstd_pct}}%, {{d4_pfor_unpack_pct}}% (unpack), {{d4_patches_pct}}% (patches),
-{{d4_scale_range_pct}}% (scale and range check) and {{d4_alloc_copy_pct}}% (allocation and copy;
+{{d4_zstd_pct}}%, {{d4_pfor_unpack_pct}}% (unpack), {{d4_pfor_decode_pct}}% (PFOR decode),
+{{d4_range_append_pct}}% (range check and append) and {{d4_alloc_copy_pct}}% (allocation and copy;
 copies resolved only to the C library, {{d4_libc_pct}}%, are not counted there) of
 the decode's user cycles ([price-decode profile]({{path:d4}}) {{note:diag-price}}). The rest: {{d4_unresolved_pct}}% at
-addresses with no symbol, {{d4_unmatched_pct}}% in functions no group takes ({{d4_read_patches_pct}}% `read_patches`) and
+unresolved addresses, {{d4_unmatched_pct}}% in ungrouped functions ({{d4_read_patches_pct}}% `read_patches`) and
 {{d4_codec_driver_pct}}% in the codec's column driver.
 
 ## Branch prediction and instruction counts
@@ -229,8 +229,8 @@ of each write, tick-store's totals with and without a flush are not resolved apa
 {{d1_pfor_encode_pct}}%, assembling segments {{d1_segment_assembly_pct}}%, the book state, each
 open order's stock and price kept to code the messages that name it, {{d1_book_state_pct}}%,
 dictionary encoding {{d1_dict_encode_pct}}%, sorting {{d1_sort_pct}}%, parsing {{d1_parse_pct}}%
-and zstd {{d1_zstd_pct}}% ([writer profile]({{path:d1}}) {{note:diag-writer}}). If the others' engine-only clocks hold their disk reads, the gap
-is wider than shown.
+and zstd {{d1_zstd_pct}}% ([writer profile]({{path:d1}}) {{note:diag-writer}}). If the others' engine-only clocks hold disk reads, they
+overstate their engines' work.
 
 **Queries.** ArcticDB with a table per stock takes {{cmpL_arcps_q1_warm_med_s}} s on Q1. Q5, the day's sum of a shares column, decodes {{cmpL_ts_q5_values}} values at
 {{q5_ns_per_value}} ns each; of its sampled cycles, dictionary decoding takes {{d2_q5_dict_pct}}%,
@@ -282,7 +282,7 @@ names systems timed while the host swapped memory.
 | Q4 cold mean | {{bar:ql3}} (TimescaleDB, order-book preprint) | {{cmpL_ts_q4_cold_mean_ms}}; M4 {{cmpM_ts_q4_cold_mean_ms}} | {{gap_ql3_linux_x}}x; {{gap_ql3_mac_x}}x | {{verdict:ql3_linux}}; M4 {{verdict:ql3_mac}} | {{cmpL_ts_q4_cold_device_mb}} MB read cold |
 | Lowest median and p99 of the fixed setups, each query | same machine | warm medians in the table at a glance | {{gap_ql4_q1_x}}x on Q1; {{gap_ql4_q4_x}}x on Q4; {{gap_ql4_q5_x}}x on Q5 | {{verdict:ql4_linux}} | Q1 to Q5 under Queries |
 
-The writes against each other system, on both clocks. Without a flush:
+Writes against each other system, on both clocks, without a flush:
 {{verdict:wt3_linux}}.
 
 With a flush: {{verdict:wt4_linux}}. The [targets table](RESULTS.md#targets) gives both runs'
