@@ -11,7 +11,9 @@ check refuse it. The committed file is checked last, with the figures the pages 
 render_results.py writes into fuzz/README.md from the file is rendered in such a tree too.
 """
 
+import contextlib
 import copy
+import io
 import json
 import shutil
 import sys
@@ -85,6 +87,13 @@ class Tree(unittest.TestCase):
         problems = self.problems(self.edited(edit))
         self.assertTrue(any(words in problem for problem in problems), problems)
 
+    def from_list(self, list_text):
+        """The small gate assembled from a list written as given, which the tree holds too."""
+        made = self.root / "made-from-list"
+        made.mkdir()
+        self.document = records.Records(made, list_text=list_text).assemble()
+        (self.root / "fuzz" / "bound_seeds.txt").write_text(list_text, encoding="utf-8")
+
 
 class ShapeTest(Tree):
     def test_a_file_named_for_another_commit_is_refused(self):
@@ -100,6 +109,95 @@ class ShapeTest(Tree):
     def test_a_run_with_a_field_missing_is_refused(self):
         self.assert_refused(lambda document: document["runs"][3].pop("load1"),
                             "run 4 is not a run of")
+
+
+class ShapeFormTest(Tree):
+    """The file's own shape: its parts, its header's keys, its commit, its whole numbers and
+    its runs."""
+
+    def test_a_file_with_another_part_is_refused(self):
+        self.assert_refused(lambda document: document.update(notes="by hand"),
+                            "not a gate file: it holds header, runs and summary")
+
+    def test_a_header_that_is_not_an_object_is_refused(self):
+        self.assert_refused(lambda document: document.update(header=["tick-store-fuzz-gate-1"]),
+                            "its schema is not")
+
+    def test_a_header_with_another_key_is_refused(self):
+        self.assert_refused(lambda document: document["header"].update(note="by hand"),
+                            "its header gives")
+
+    def test_a_short_commit_its_name_gives_is_refused(self):
+        self.assert_refused(lambda document: document["header"].update(
+            commit=records.COMMIT[:12]), "is not a full commit its name gives")
+
+    def test_a_bar_that_is_not_whole_is_refused(self):
+        self.assert_refused(lambda document: document["header"].update(
+            bar_ms_per_execution=5000.0), "its bar and its runs a seed are not whole numbers")
+
+    def test_runs_a_seed_as_a_string_are_refused(self):
+        self.assert_refused(lambda document: document["header"].update(runs_per_seed="5"),
+                            "its bar and its runs a seed are not whole numbers")
+
+    def test_a_file_of_no_runs_is_refused(self):
+        self.assert_refused(lambda document: document.update(runs=[]), "it holds no runs")
+
+    def test_runs_that_are_not_a_list_are_refused(self):
+        self.assert_refused(lambda document: document.update(runs="310 runs"),
+                            "it holds no runs")
+
+    def test_a_run_on_another_host_is_refused(self):
+        def edit(document):
+            self.run_of(document, "macOS", "gorilla_xor/bound-costliest", 2)["host"] = "Windows"
+        self.assert_refused(edit, "is not a run of ['macOS', 'Linux'] with the fields")
+
+    def test_a_file_that_is_not_json_is_refused(self):
+        self.assertEqual(self.problems(), [])
+        (self.root / "results" / NAME).write_text("{", encoding="utf-8")
+        found, _, _ = check_gate.check(self.root)
+        self.assertTrue(found[NAME] and "Expecting property name" in found[NAME][0], found)
+
+
+class ListTest(Tree):
+    """fuzz/bound_seeds.txt read as the assembler reads it, and fuzz/launch.txt's -timeout from
+    its flags row alone."""
+
+    def test_a_comment_in_the_list_is_no_seed(self):
+        self.from_list("# the gate's seeds\n" + records.seeds_text())
+        self.assertEqual(self.problems(), [])
+
+    def test_a_target_named_without_its_prefix_is_its_fuzz_target(self):
+        self.from_list("".join(f"{target.removeprefix('fuzz_')} {seed}\n"
+                               for target, seed in records.SEEDS))
+        self.assertEqual(self.problems(), [])
+
+    def test_a_list_line_that_is_not_target_and_seed_gives_no_target(self):
+        self.assertEqual(self.problems(), [])
+        (self.root / "fuzz" / "bound_seeds.txt").write_text(
+            "fuzz_run_length extra run_length/bound-small-blocks\n"
+            "fuzz_gorilla_xor gorilla_xor/bound-costliest\n", encoding="utf-8")
+        self.assertTrue(any("run_length/bound-small-blocks run 1's target 'fuzz_run_length' is "
+                            "not its own, None" in problem for problem in self.problems()))
+
+    def test_a_timeout_outside_the_flags_row_is_not_the_bar(self):
+        self.assertEqual(self.problems(), [])
+        (self.root / "fuzz" / "launch.txt").write_text("note -timeout=12\n" + records.LAUNCH,
+                                                       encoding="utf-8")
+        self.assertEqual(self.problems(), [])
+
+    def test_a_launch_file_with_no_timeout_is_refused(self):
+        self.assertEqual(self.problems(), [])
+        (self.root / "fuzz" / "launch.txt").write_text("flags -rss_limit_mb=2048\n",
+                                                       encoding="utf-8")
+        self.assertTrue(any("is not half of fuzz/launch.txt's -timeout=None" in problem
+                            for problem in self.problems()))
+
+    def test_a_launch_file_with_two_timeouts_is_refused(self):
+        self.assertEqual(self.problems(), [])
+        (self.root / "fuzz" / "launch.txt").write_text(
+            records.LAUNCH.replace("-timeout=10", "-timeout=10 -timeout=12"), encoding="utf-8")
+        self.assertTrue(any("is not half of fuzz/launch.txt's -timeout=None" in problem
+                            for problem in self.problems()))
 
 
 class FormTest(Tree):
@@ -367,6 +465,31 @@ class RunTest(Tree):
                         3)["sibling_busy_at_end"] = False
         self.assert_refused(edit, "marked pass, and its exit code")
 
+    def test_a_run_that_exited_otherwise_marked_pass_is_refused(self):
+        def edit(document):
+            self.run_of(document, "macOS", "gorilla_xor/bound-costliest", 4)["exit_code"] = 77
+        self.assert_refused(edit, "marked pass, and its exit code, findings, time and sibling "
+                                  "give the other")
+
+    def test_a_linux_run_without_its_sibling_at_its_start_marked_pass_is_refused(self):
+        def edit(document):
+            self.run_of(document, "Linux", "gorilla_xor/bound-costliest",
+                        3)["sibling_busy_at_start"] = False
+        self.assert_refused(edit, "marked pass, and its exit code")
+
+    def test_an_assembled_run_over_the_bar_marked_fail_passes(self):
+        figures = dict(records.FIGURES["Linux"])
+        figures[(1, 2)] = (10002, 2, 2.34, 130)
+
+        def over(name, text):
+            return text.replace("5001.0\t3908.0\t5000\tok", "5001.0\t3908.0\t5000\tover") \
+                if name == "gate.tsv" else text
+        made = self.root / "made-over"
+        made.mkdir()
+        self.document = records.Records(made, edit=over, figures=figures).assemble()
+        self.assertEqual(self.problems(), [])
+        self.assertFalse(self.document["summary"]["Linux"]["all_pass"])
+
     def test_a_clean_run_marked_fail_is_refused(self):
         def edit(document):
             self.run_of(document, "macOS", "gorilla_xor/bound-costliest", 4)["pass"] = False
@@ -468,6 +591,11 @@ class EntryTest(Tree):
         self.assertTrue(any("is not two UTC times, start first" in problem
                             for problem in problems), problems)
 
+    def test_an_entry_whose_case_is_not_a_run_is_refused(self):
+        problems = self.entry_problems(case="the fourth run")
+        self.assertTrue(any("its case 'the fourth run' is not" in problem for problem in problems),
+                        problems)
+
     def test_an_entry_with_no_gate_file_is_refused(self):
         self.write()
         (self.root / "results" / NAME).unlink()
@@ -537,6 +665,17 @@ class RenderTest(Tree):
         with self.assertRaises(SystemExit):
             self.block([{**LOGIN, "case": "run_length/bound-small-blocks run 4 of 6"}])
 
+    def test_two_gate_files_render_no_block(self):
+        other = copy.deepcopy(self.document)
+        other["header"]["commit"] = "f" * 40
+        (self.root / "results" / "fuzz-gate-ffffffffffff.json").write_text(json.dumps(other),
+                                                                         encoding="utf-8")
+        with contextlib.redirect_stderr(io.StringIO()) as told, \
+                self.assertRaises(SystemExit) as caught:
+            self.block()
+        self.assertEqual(caught.exception.code, render_results.EXIT_USAGE)
+        self.assertIn("more than one fuzz-gate-*.json", told.getvalue())
+
     def test_a_page_without_the_markers_is_refused_while_the_file_exists(self):
         with self.assertRaises(SystemExit):
             self.block(page="# Fuzzing\n")
@@ -544,6 +683,40 @@ class RenderTest(Tree):
     def test_no_file_and_no_markers_is_no_block(self):
         (self.root / "fuzz" / "README.md").write_text("# Fuzzing\n", encoding="utf-8")
         self.assertEqual(render_results.gate_block_files(self.root), [])
+
+
+class MainTest(Tree):
+    """The command line: exit 0 when every file and entry passes, 1 when one does not, 2 when
+    the tree's list cannot be read."""
+
+    def main(self, *argv):
+        with contextlib.redirect_stdout(io.StringIO()) as said, \
+                contextlib.redirect_stderr(io.StringIO()) as told:
+            code = check_gate.main(["--root", str(self.root), *argv])
+        return code, said.getvalue(), told.getvalue()
+
+    def test_a_file_that_passes_exits_0(self):
+        self.write()
+        self.assertEqual(self.main(), (0, f"{NAME}: ok, 20 runs on 2 hosts\n", ""))
+
+    def test_a_refused_file_exits_1(self):
+        self.document["header"]["check"] = "G-2"
+        self.write()
+        code, _, told = self.main()
+        self.assertEqual(code, check_gate.EXIT_INVALID)
+        self.assertIn(f"{NAME}: its check 'G-2' is not", told)
+
+    def test_a_refused_entry_alone_exits_1(self):
+        self.write(entries=[{**LOGIN, "case": "run_length/bound-prefix run 4 of 5"}])
+        code, said, told = self.main()
+        self.assertEqual(code, check_gate.EXIT_INVALID)
+        self.assertIn(f"{NAME}: ok", said)
+        self.assertIn("holds no Linux run 4 of run_length/bound-prefix", told)
+
+    def test_a_tree_with_no_list_exits_2(self):
+        self.write()
+        (self.root / "fuzz" / "bound_seeds.txt").unlink()
+        self.assertEqual(self.main()[0], check_gate.EXIT_USAGE)
 
 
 class CommittedTest(unittest.TestCase):
