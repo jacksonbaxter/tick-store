@@ -57,6 +57,7 @@ FILE_OF = {
     "scripts/fuzz_results.py": "scripts/fuzz_results.py",
     "scripts/fuzz_host.py": "scripts/fuzz_host.py",
     "scripts/check_fuzz.py": "scripts/check_fuzz.py",
+    "scripts/gate_results.py": "scripts/gate_results.py",
 }
 # Files no kind measures: prose, faults, the prover, and what prove_checks.py leaves out of its
 # key; then scripts and tests that are code to the prover alone.
@@ -86,6 +87,8 @@ MEASURED = {
                          "scripts/coverage_report.py"},
     "diag": BUILT | {"tools", "bench", "scripts/run_bench.py", "pins"},
     "fuzz": BUILT | {"fuzz", "scripts/fuzz_g3.py"},
+    # The gate ran the same binaries by the runs' own runner, not by the G-3 launcher.
+    "fuzz-gate": BUILT | {"fuzz"},
     "disturbances": set(),
 }
 ASSEMBLED = {
@@ -97,6 +100,7 @@ ASSEMBLED = {
     "diag": {"scripts/diag_summary.py"},
     "fuzz": {"scripts/fuzz_results.py", "scripts/fuzz_host.py", "scripts/build_preset.py",
              "scripts/check_fuzz.py"},
+    "fuzz-gate": {"scripts/gate_results.py"},
 }
 # The exact paths under results/ each validator's pin may name, written out here, apart from the
 # script's PIN_NAMES. G-3's file from before the tie, the last file a validator's pin let
@@ -132,6 +136,7 @@ def results_of(commit):
             {"commit": commit[:12], "day": "10302019"}]}),
         "coverage": ("coverage.json", {"commit": commit[:12]}),
         "diag": ("diag/writer-profile-12302019-x.json", {"commit": commit}),
+        "fuzz-gate": ("fuzz-gate-8616263b7561.json", {"header": {"commit": commit}}),
         "fuzz": ("fuzz-g3-8616263b7561.json", {"header": {"commit": commit},
                                               "runs": [{"commit": commit}]}),
         "disturbances": ("disturbances-ede0176b10bb.json", {"commit": commit[:12]}),
@@ -270,7 +275,7 @@ class SameContent(TieTest):
         for kind in FILES:
             with self.subTest(kind=kind):
                 self.assert_same(result, kind)
-        self.assertIn("check_ties: 13 files: 13 same, 0 pinned, 0 differs", result.out)
+        self.assertIn("check_ties: 14 files: 14 same, 0 pinned, 0 differs", result.out)
 
     def test_a_short_commit_is_resolved(self):
         result = run_check()
@@ -490,7 +495,7 @@ class Pinned(TieTest):
         # The others are judged, and refused.
         self.assertEqual(result.code, check_ties.EXIT_REFUSED)
         self.assert_measured_change(result, "store-size", FILE_OF["src"])
-        self.assertIn("11 differs", result.out)
+        self.assertIn("12 differs", result.out)
         self.assertIn("1 pinned", result.out)
 
     def test_pinned_files_alone_pass(self):
@@ -686,7 +691,7 @@ class NoCommit(TieTest):
         self.assertEqual(result.code, check_ties.EXIT_REFUSED, result.out)
         for name in ("latency-1.csv", "census-2.json.gz", "notes/whatever.txt"):
             self.assertIn(f"{name}: no kind in check_ties.py's KINDS", result.err)
-        self.assertIn("16 files:", result.out)
+        self.assertIn("17 files:", result.out)
         self.assertIn("3 no kind", result.out)
 
     def test_a_file_not_results_lists_is_named_and_not_judged(self):
@@ -698,7 +703,7 @@ class NoCommit(TieTest):
         self.assertEqual(result.code, check_ties.EXIT_OK, result.err)
         self.assertIn("notes/whatever.txt: not a results file: a stand-in for a listed kind of "
                       "file", result.out)
-        self.assertIn("13 files:", result.out)
+        self.assertIn("14 files:", result.out)
 
     def test_a_file_that_cannot_be_read_fails(self):
         for content in (b"{not json", b'{"commit": "\xff"}'):
@@ -798,7 +803,7 @@ class NoHistory(TieTest):
                 self.assertNotIn("ok", said)
         self.assertIn("check_ties: not judged: no history here: exported is not a git checkout",
                       result.err)
-        self.assertIn("13 unjudged", result.out)
+        self.assertIn("14 unjudged", result.out)
 
     def test_a_pinned_file_is_still_reported_pinned(self):
         stand_in_pin(self)
@@ -1189,6 +1194,19 @@ class Repository(unittest.TestCase):
             for reads in kind.reads:
                 with self.subTest(kind=kind.name, path=reads.input):
                     self.assertTrue(len(reads.reason) > 20 and reads.fields)
+
+    def test_the_gate_kind_is_the_fuzz_tie_but_the_launcher_and_its_own_assembler(self):
+        # Review P1-6: G-3's bound-seed gate ran the fuzz binaries of the fuzz kind's commit,
+        # by the runs' own runner, so it measures what they are built from but the launcher,
+        # and the script written after the runs that assembled it.
+        import check_fuzz
+        kind = check_ties.kind_of("fuzz-gate-8616263b7561.json")
+        self.assertEqual(getattr(kind, "name", None), "fuzz-gate")
+        self.assertEqual(check_ties.pathspecs(kind.measured, kind.excluded),
+                         (*(path for path in check_fuzz.TIED_PATHS
+                            if path != "scripts/fuzz_g3.py"), *check_fuzz.NOT_TIED))
+        self.assertEqual([path for path, _ in kind.assembled], ["scripts/gate_results.py"])
+        self.assertEqual(check_ties.kind_of("fuzz-g3-8616263b7561.json").name, "fuzz")
 
     def test_the_fuzz_kind_is_check_fuzz_s_tie(self):
         import check_fuzz

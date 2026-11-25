@@ -372,6 +372,26 @@ KINDS = (
                     "fuzz/launch.txt"),
                    ("scripts/check_results.py, check_compare.py, check_roundtrip.py, "
                     "check_oracle.py", VALIDATORS[1]), RENDER, PROSE)),
+    # G-3's bound-seed gate: the same fuzz binaries at the same commit, built as the fuzz kind's
+    # are, each named seed run alone by the runs' own runner before their fuzzing, not by the
+    # G-3 launcher. Its assembler was written after the runs, so it is compared from the commit
+    # that wrote the file, as the diagnostics' is.
+    Kind("fuzz-gate", ("fuzz-gate-*.json",),
+         measured=tuple((path, "what the gate's runs built and ran: the fuzz binaries, their "
+                               "oracles, the named seeds' builders and list, and "
+                               "fuzz/launch.txt's flags; check_fuzz.py's TIED_PATHS but the "
+                               "launcher")
+                        for path in check_fuzz.TIED_PATHS if path != "scripts/fuzz_g3.py"),
+         assembled=(("scripts/gate_results.py", "assembles the file from the gate's raw records "
+                                                "on each host; written after the runs"),),
+         excluded=tuple((spec.split(")", 1)[1], "check_fuzz.py's NOT_TIED: fuzz/'s prose")
+                        for spec in check_fuzz.NOT_TIED),
+         left_out=(("scripts/fuzz_g3.py", "the G-3 launcher, which ran the fuzzing runs and not "
+                    "the gate: the runs' own runner ran each named seed with -runs=1"),
+                   ("the runs' own runner and its seed-timing helper", "untracked scripts on "
+                    "each host; the step log in each host's records gives every command they ran"),
+                   ("scripts/check_gate.py, check_fuzz.py, check_results.py", VALIDATORS[1]),
+                   RENDER, PROSE)),
     # The record of what else ran on the host during a campaign's timed steps: made by hand
     # from the host's logs and the project's session records, so no code makes its entries.
     Kind("disturbances", ("disturbances-*.json",),
