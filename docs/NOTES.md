@@ -2449,12 +2449,25 @@ full-day verdict.
   s; met against QuestDB, 273.6 s, by 78.3 s. That verdict is on the total clock alone; judged
   on both clocks since RF-3, WT-3 is missed against all three, QuestDB included ("Write targets
   on both clocks (RF-3)", below).
+  Added 2026-11-25: these clocks, the replaced run's, hold QuestDB's reading of its input, the
+  day's export, from disk (that record keeps no device-read figure; on this run QuestDB's class A
+  write read 21,521,625,088 B from the device inside its clock), while tick-store's ITCH file was
+  in memory before its clock started, so they do not show a faster write; the verdict was replaced
+  in "Write targets on both clocks (RF-3)" and is now RESULTS.md's WT-3 row for Linux, missed
+  against all three at `9ead7a9`.
 - **WT-4, class B against each system, at each one's stated flush:** met against Parquet,
   188.9 s against 266.3, by 77.4 s, though Parquet `none-rg1Mi` wrote class B in 153.8 s; missed
   against ArcticDB, 123.6 s, by 65.3 s; met against QuestDB, 1,269.2 s, by 1,080.3 s, but QuestDB's
   class B is not like-for-like and its durability proof failed, so that win proves little.
   Judged on both clocks since RF-3, WT-4 is met against QuestDB only and missed against Parquet,
   whose engine-only write is shorter ("Write targets on both clocks (RF-3)", below).
+  Added 2026-11-25: these clocks, the replaced run's, hold Parquet's and QuestDB's reading of
+  their input, the day's export, from disk (that record keeps no device-read figure; on this run
+  their class B writes read 23,846,309,888 B and 24,631,062,528 B from the device inside their
+  clocks), while tick-store's ITCH file was in memory before its clock started, so they do not
+  show a faster write; the Parquet part became missed in "Write targets on both clocks (RF-3)",
+  the QuestDB part "met by the rule and not counted" in "The page review P1 and the ruling on
+  marked wins", and both are in RESULTS.md's WT-4 row for Linux, in its words at `9ead7a9`.
 - **QL-1, missed.** Q2 warm median 74.32 ms against 16.9 ms, 57.42 ms over, 4.4 times. Q2
   returns 739,944 records of the busiest locate through `tools/tick_query` and Python; the
   target returns 52 rows from a 1.5 M-row store.
@@ -4352,6 +4365,10 @@ WT-3 on Linux reads missed, and WT-4 met against QuestDB only. The other three s
 building their input inside the clock; tick-store's
 source is resident before its clock, and its time is nearly all its own. `BENCHMARKS.md`'s
 hand-written status rows for WT-3 and WT-4 still give the old verdicts until the end of the phase.
+Added 2026-11-25: as this paragraph says, these clocks hold the other systems' reading of their
+input while tick-store's was in memory before its clock started, so the met against QuestDB does
+not show a faster write; since "The page review P1 and the ruling on marked wins" that part is
+"met by the rule and not counted", in RESULTS.md's WT-4 row for Linux at `9ead7a9`.
 
 **A Linux tick-store-alone day (RV-1).** The generator now takes one: its comparison section
 has the guard's peak memory table, as the four-system day does, and no BSD time -l lines. A
@@ -5734,6 +5751,10 @@ one repetition. The new day also records where each write's input was when its c
 tick-store's ITCH file is made resident first, while the other systems' exported columns are
 taken as the cache holds them, 4,033 of 5,825,603 pages resident for most writes, with 18 to 46
 GB read from the device inside the clock. `render_results.py` now holds a verdict to both.
+Added 2026-11-25: ArcticDB's class B clock held 23,850,713,088 B read from the device while
+tick-store's ITCH file was in memory before its clock started, so the met does not show a faster
+write; RESULTS.md's WT-4 row for Linux counts the part as missed, as "The four conditions on the
+results pages, review C1" set it.
 
 - A comparison file a later run replaced stays, bytes unchanged, in `results/compare/replaced/`,
   pinned by its SHA-256 under `replaced_comparison_files` in `scripts/data_pins.json`;
@@ -6034,6 +6055,14 @@ each verdict that rests on a listed timed phase, with the replaced run's figure 
   against 211.9 and 92.5 s) and against QuestDB met, not like-for-like (against 1,595.6 and
   1,459.5 s). The line under the README's table goes from 14 missed and 7 not judged to 15 and 6,
   for DS-4 alone; missed in part stays 7.
+  Added 2026-11-25: those clocks hold ArcticDB's and QuestDB's reading of their input, the day's
+  export, from disk, 23,850,713,088 B and 24,631,062,528 B read from the device inside their
+  clocks by this run's records, while tick-store's ITCH file was in memory before its clock
+  started, so they do not show a faster write; RESULTS.md's WT-4 row for Linux gives the ArcticDB
+  part as "met on this run's figures, a change that favours tick-store, and missed on the replaced
+  run's, so counted as missed" (from "The four conditions on the results pages, review C1") and
+  the QuestDB part as "met by the rule and not counted" (from "The page review P1 and the ruling
+  on marked wins"), in its words at `9ead7a9`.
 
 Every other verdict is unchanged. Its figures moved: on the first screen Parquet's smallest store
 is 3.09 GB (its new `zstd9-rg1Mi` variant) against 3.19, one hour of one stock 74.04 ms against
@@ -7109,6 +7138,11 @@ findings; 13 REVIEW rows, P1-1 to P1-28, give each, the other pages being fixed 
   proof owed to the full re-proof.
 - **The verdict words stay as the rules give them.** QL-4's met parts and WT-4's met against
   QuestDB stand, with their marks. The proof sentence stays, as it is true.
+  Added 2026-11-25: WT-4's met against QuestDB is on clocks that hold QuestDB's reading of its
+  input from disk, 24,631,062,528 B, while tick-store's was in memory before its clock started,
+  so it does not show a faster write; "The page review P1 and the ruling on marked wins", below,
+  makes it met by the rule and not counted, as RESULTS.md's WT-4 row for Linux gives it at
+  `9ead7a9`.
 - **Counts.** 3,712 words by the renderer and 3,984 by `wc -w`.
 - **Faults, shown by hand.** `writeup-met-parts-unnamed` is new. `writeup-marks-in-full` and
   `writeup-verdict-marks-dropped` are remade on moved lines. Each was shown in a clone under
