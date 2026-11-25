@@ -3667,6 +3667,31 @@ class GuardsTest(unittest.TestCase):
                 self.assertIn(said, RENDER.GUARDS)
 
 
+class UnderSentenceTest(unittest.TestCase):
+    """Review R1-15: the README's sentence under the table claims a mark only where the
+    records tie an event to a figure, since both disturbance records list routine runs of the
+    host's jobs, inside timed steps, with no mark."""
+
+    def test_the_sentence_under_the_table_says_what_the_records_leave_unmarked(self):
+        definitions = json.loads((REPO_ROOT / "scripts" / "targets.json").read_text(
+            encoding="utf-8"))
+        text = definitions["headline"]["under"]["text"]
+        unmarked = []
+        for commit in ("8616263b7561", "ede0176b10bb"):
+            document = json.loads((REPO_ROOT / "results" / f"disturbances-{commit}.json")
+                                  .read_text(encoding="utf-8"))
+            unmarked += [item for item in document["not_listed"]
+                         if "backup" in item["what"] and "routine" in item["what"] + item["why"]
+                         or "no mark" in item["why"]]
+        # The records list such runs, so the sentence says so, and claims no mark for each.
+        self.assertTrue(unmarked)
+        self.assertIn("A result is marked where the records tie one of those jobs, or a remote "
+                      "login, to its figure", text)
+        self.assertIn("the routine runs that cannot be tied to one figure are listed, unmarked, "
+                      "in the disturbance records", text)
+        self.assertNotIn("the result says so", text)
+
+
 class PageNameTest(unittest.TestCase):
     """The check's lines name each page by its path under the tree, so README.md and
     fuzz/README.md are told apart (review R1-10)."""

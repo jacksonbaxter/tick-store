@@ -383,6 +383,18 @@ def give_a_pitch_figure_without_its_mark():
               "ArcticDB with a table per\nstock in 44.58 ms")
 
 
+def claim_every_event_is_marked():
+    """The sentence under the README's table saying again that every job or login in a timed
+    step is marked, as it read before review R1-15, which the records' unmarked runs belie."""
+    def change(document):
+        under = document["headline"]["under"]
+        start = under["text"].index(" A result is marked where")
+        under["text"] = (under["text"][:start].rstrip(".") + "; where the logs show one of those "
+                         "jobs, or a remote login, running during a timed step, the result says "
+                         "so.")
+    edit_json("scripts/targets.json", change)
+
+
 def drop_a_pitch_claims_tie():
     """The claim that ties the pitch's one-thread ingest, below Nasdaq's peak, to its verdict
     taken out of scripts/targets.json, so the sentence ranks with nothing to hold it to."""
@@ -2238,6 +2250,12 @@ FAULTS = (
           "\"one of the 65 cases its median takes\" again", CHECK_FAILED,
           "FAIL: test_a_case_of_a_median_says_how_many_cases_the_median_takes "
           "(__main__.FuzzDisturbanceTest"),
+    # Review R1-15: the sentence under the table claims a mark only where the records tie one.
+    Fault("under-sentence-claims-every-event-marked", "py-scripts", "the sentence under the "
+          "README's table says every job or login in a timed step is marked, though the records "
+          "list routine runs with no mark", CHECK_FAILED,
+          "FAIL: test_the_sentence_under_the_table_says_what_the_records_leave_unmarked "
+          "(__main__.UnderSentenceTest", claim_every_event_is_marked),
     # Review R1-16: the first screen names every side either run flags, as RESULTS.md does.
     Fault("screen-earlier-run-side-dropped", "py-scripts", "render_results.py leaves off the "
           "first screen a side only the earlier run flags, which RESULTS.md names",
