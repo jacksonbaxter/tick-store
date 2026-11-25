@@ -7589,6 +7589,45 @@ scan, cold; the list went from 249 words to 253 (R1-29). Faults added:
 now finds the new sentence. Each was shown by hand at the commit that made it, with the faults
 whose tests hold the changed phrase.
 
+### The gate's records, second pass
+
+2026-11-25. Two outside reviews of my first pass, one of the pages and records and one of the
+code, found the following in my share. The validator's and the assembler's findings went to
+another fixer. docs/REVIEW.md gives each as R3-6 to R3-14.
+
+- **An end the journal does not give (page review F1, `dc38f51`).** The gate block said the worst
+  Linux run began 13 s "after the end of a backup run", and the fuzz record put the backup
+  "wholly inside" run 4 of 5. The host's journal gives the job's first and last lines only. The
+  block now says "13 s after a backup run's last line in the host's journal"; `gate_end_words`
+  words an event's end by what its record gives. The record places the backup by its first and
+  last lines. My first pass's "lies wholly inside" above, and its "each lasted seconds, the last
+  about a minute", say more than the journal shows; the records now say only what it gives.
+- **The lengths of the other runs (page review N1, `72f2601`).** The fuzz record's item gave the
+  nine other runs as lasting seconds. It now gives their first and last journal lines one to three
+  seconds apart, the last 70 s apart, whose lengths the run records do not give.
+- **The benchmark files left out (page review F3, `2437e04`).** The freeze record's guard
+  sentence named the kernel benchmark's file alone. `check_results.py` holds the column decode
+  and ITCH codec files to the same sibling share and load lines, and the record names all three.
+  R1 changed RESULTS.md's `GUARDS` and its test to match, in the same commit.
+- **"From disk" on the replaced run (page review F4, `a14872b`).** Four sentences added on 25
+  November said the replaced run's clocks held the rivals' reading of their input from disk. That
+  record keeps no residency or device-read figure for any rival's write, and each now says so.
+- **The capacity write and the backup (page review note, `8458ec3`).** compare/README.md quotes
+  QuestDB class A's committed capacity write, 652.8 s, from the part that held the backup run
+  whose journal lines span 17:28:38Z to 17:29:48Z. A clause says so and points to the record.
+- **The code review's notes.** F-5's renderer part (`3bcd25c`): new tests for the markers both
+  or neither and for two gate files, and two faults. F-8: R1's `726f8cf` names a stale page by its
+  path, so `gate-block-hand-edit` expects `fuzz/README.md`; I remade its patch on the reworded
+  block (`d2ea79e`). F-9 (`3025243`): `fuzz-dictionary-mode-set-ignored`'s description says its
+  patch also moves the seed table's constant, and why. F-10 (`7169c23`): a stray space.
+- **Faults, shown by hand.** `gate-block-journal-end-said`, `gate-block-markers-optional` and
+  `gate-block-several-files-taken` are new; `gate-block-hand-edit` is remade. Each was shown in a
+  clone under the worktree's `build/`: the control of `test_render_gate.py`, or of the render
+  check, passed, and the fault failed with the string its entry expects. The outputs are under
+  the phase's `round3/r3/proofs-b` folder; proof owed to the full re-proof.
+- **Commit ids.** My first pass cited the ids its commits had before two rebases. Every id my
+  sections and rows cite is now the id the commit has on this line.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
