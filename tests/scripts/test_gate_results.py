@@ -3,7 +3,7 @@
 
     python3 -I tests/scripts/test_gate_results.py
 
-Each test writes the raw records of a small gate on both hosts, two named seeds run twice each,
+Each test writes the raw records of a small gate on both hosts, two named seeds run five times each,
 in the layout the runs' own runner leaves them, under the repo's gitignored build/ folder, and
 assembles the file from them: the figures are the records', the time an execution is the gate's,
 a run passes as the gate passed it, and records that disagree with each other, or with the
@@ -29,13 +29,21 @@ COMMIT = "8616263b7561bdb39c642c90fde45985fcaf81fc"
 SEEDS = (("fuzz_run_length", "run_length/bound-small-blocks"),
          ("fuzz_gorilla_xor", "gorilla_xor/bound-costliest"))
 LAUNCH = "flags -rss_limit_mb=2048 -malloc_limit_mb=256 -timeout=10 -print_final_stats=1\n"
-PER_SEED = 2
+PER_SEED = 5
 # (file_ms, units, load, processes started) of each run, by seed and run, on each host.
 FIGURES = {
     "macOS": {(1, 1): (1225, 2, 4.16, None), (1, 2): (1210, 2, 4.10, None),
-              (2, 1): (377, 1, 3.99, None), (2, 2): (370, 1, 3.99, None)},
+              (1, 3): (1220, 2, 4.10, None), (1, 4): (1215, 2, 4.05, None),
+              (1, 5): (1212, 2, 4.05, None),
+              (2, 1): (377, 1, 3.99, None), (2, 2): (370, 1, 3.99, None),
+              (2, 3): (372, 1, 3.98, None), (2, 4): (373, 1, 3.98, None),
+              (2, 5): (371, 1, 3.97, None)},
     "Linux": {(1, 1): (9337, 2, 2.40, 258), (1, 2): (8192, 2, 2.34, 130),
-              (2, 1): (3160, 1, 1.20, 53), (2, 2): (2955, 1, 1.18, 55)},
+              (1, 3): (7816, 2, 2.29, 53), (1, 4): (7816, 2, 2.24, 53),
+              (1, 5): (7801, 2, 2.20, 60),
+              (2, 1): (3160, 1, 1.20, 53), (2, 2): (2955, 1, 1.18, 55),
+              (2, 3): (2950, 1, 1.10, 53), (2, 4): (2952, 1, 1.10, 53),
+              (2, 5): (2960, 1, 1.10, 53)},
 }
 STEP = {"macOS": ("M19-bound-seeds", "mac"), "Linux": ("L20-bound-seeds", "spin")}
 HOME = {"macOS": "/Users/someone/run", "Linux": "/home/someone/run"}
@@ -172,7 +180,7 @@ class AssembleTest(Scratch):
         worst = document["summary"]["Linux"]["worst"]
         self.assertEqual((worst["seed"], worst["runs"], worst["ms_per_execution"],
                           worst["file_ms"], worst["seed_median_ms_per_execution"]),
-                         ("run_length/bound-small-blocks", [1], 4668.5, 9337, 4382.25))
+                         ("run_length/bound-small-blocks", [1], 4668.5, 9337, 3908.0))
         self.assertTrue(document["summary"]["macOS"]["all_pass"])
 
     def test_each_run_is_timed_as_the_gate_timed_it(self):
@@ -215,7 +223,7 @@ class AssembleTest(Scratch):
         figures[(1, 2)] = (10002, 2, 2.34, 130)
 
         def over(name, text):
-            return text.replace("5001.0\t4834.8\t5000\tok", "5001.0\t4834.8\t5000\tover") \
+            return text.replace("5001.0\t3908.0\t5000\tok", "5001.0\t3908.0\t5000\tover") \
                 if name == "gate.tsv" else text
         document = Records(self.dir, edit=over, figures=figures).assemble()
         run = next(run for run in document["runs"] if run["host"] == "Linux" and
@@ -266,16 +274,16 @@ class RefusedTest(Scratch):
 
     def test_a_gate_verdict_its_runs_do_not_give_is_refused(self):
         def edit(name, text):
-            return text.replace("4668.5\t4382.2\t", "4600.0\t4382.2\t") \
+            return text.replace("4668.5\t3908.0\t", "4600.0\t3908.0\t") \
                 if name == "gate.tsv" else text
         self.assert_refused(Records(self.dir, edit=edit), "the gate's verdict of")
 
     def test_a_missing_run_is_refused(self):
         def edit(name, text):
             return "\n".join(line for line in text.splitlines()
-                             if "seed-2-spin-2 end" not in line) + "\n" \
+                             if "seed-2-spin-5 end" not in line) + "\n" \
                 if name == "../../status.txt" else text
-        self.assert_refused(Records(self.dir, edit=edit), "gorilla_xor/bound-costliest run 2")
+        self.assert_refused(Records(self.dir, edit=edit), "gorilla_xor/bound-costliest run 5")
 
 
 if __name__ == "__main__":
