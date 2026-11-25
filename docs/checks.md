@@ -6,10 +6,13 @@ to, beyond the steps the README's "Checks" section lists, and what each does not
 `render_results.py --check` also holds the first screen to its rules. The pitch, headings
 included, runs to at most `max_words` words, 100; a line is a heading only as GitHub shows one,
 so `#It` is prose. Each figure in it is the one the results give now, and any other number is a
-text `scripts/targets.json` lists with its reason, found once. Each heading and sentence is one
+text `scripts/targets.json` lists with its reason, found once. A figure read from a timed phase
+in which the records list a disturbance, or flag a page swapped in, must stand with that phase's
+mark in brackets beside it, as the first screen gives such a mark. Each heading and sentence is one
 of three things: a claim, a whole sentence listed under `claims` that must hold on the results,
 holds the words its target lists for its bar and names the one machine it is judged on, so a new
-results file that turns a verdict stops the check at the sentence to change; a sentence holding a
+results file that turns a verdict stops the check at the sentence to change, and a claim that
+pairs figures may be held on the replaced run's file as well, which must then be there; a sentence holding a
 figure; or a text listed as stating no result, with its reason. A word that ranks or judges, such
 as fastest, least, below, less, ahead or keeps up, must sit inside a claim or a figure's words,
 headings included. Each table row says what it is, then its bar and the bar's source, then what
@@ -18,8 +21,13 @@ template that types a figure, names a value it is not given, or is given one it 
 stops the render, and a lowest of the other systems takes every other system the comparison
 ran. The line under the table names every part of a target with a row on the screen that the
 table leaves out and that is missed or not judged, and counts every other target-and-machine row
-by verdict. It is checked apart from the code that writes it, by verdict classes of its own: each
-such part named whole under its machine and nothing else named, each count the targets' own,
+by verdict, a row's class taken from its counted parts alone, so a part met by the rule and not
+counted makes no row met or missed in part. It names parts that carry the same marks together,
+each mark once, under their machine and setup, and opens the class of parts met and not counted
+with a gloss that fits their reasons; there a not-counted mark stands in for the swap mark of the
+same systems. It is checked apart from the code that writes it, by verdict classes of its own: each
+such part named whole, with each of its marks, under its machine and nothing else named, the
+gloss the one its parts' reasons give, each count the targets' own,
 each target asked for named under its own count, and what is shown, named and counted adding up
 to the whole table; the sentence under the table must give its row's verdict. A plain name is
 one target's, and one part's, on a machine. The table must hold a miss. The whole screen names
@@ -44,7 +52,11 @@ bytes read from the device inside the clock, what engine-only holds, and that en
 not take the reads out. A verdict that rests on a timed phase in which
 `results/disturbances-<commit>.json` records something else running, such as a login or the
 host's backup job, says so beside it, with the replaced run's figure there; the file's shape,
-spans and places in the documents are checked. No results page, the essay included, may hold a
+spans and places in the documents are checked. A part met by the rule whose swap or disturbance
+mark falls on another system's side, and which the replaced run does not confirm, keeps its word
+and its mark and is counted nowhere; its mark names every side either run flags, with each run's
+pages read from both records, and a write side gives the pages both runs swapped in over the whole
+write phase, which is wider than the clock, so the swapping is not placed inside the timed write. No results page, the essay included, may hold a
 sentence saying tick-store writes faster than a system whose write read its input from disk inside
 its clock: the rule reads the whole prose of `README.md`, `RESULTS.md`, `BENCHMARKS.md`,
 `compare/README.md` and `fuzz/README.md`, a wrapped sentence whole, and names the page and line.
