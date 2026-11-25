@@ -1964,7 +1964,10 @@ class VerdictCarry(unittest.TestCase):
                              {"q2": "283.8", "verdict:x": "met"})
 
     def test_a_verdict_s_swap_mark_carries_its_query_figure(self):
-        self.carried(earlier=False)
+        try:
+            self.carried(earlier=False)
+        except RENDER.Refused as error:
+            self.fail(f"a verdict's swap mark carries no query figure: {error}")
         with self.assertRaisesRegex(RENDER.Refused, r"\{\{q2\}\} shows a figure of x.json's "
                                                     r"queries questdb plain warm Q2"):
             self.carried(earlier=False, label="against QuestDB")
