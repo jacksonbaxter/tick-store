@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -2486,7 +2486,7 @@
+     # Beside such a side, a side this run alone flags says it is this run's alone.
+     this_only = {label for part in parts
+                  for label, _, _, both in notes_of(part).get("also_flagged") or ()
+-                 if not both and label in this_run} if earlier else set()
++                 if not both and label in this_run} if False else set()
+     for part in parts:
+         sides = notes_of(part).get("unconfirmed")
+         if sides:

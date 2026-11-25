@@ -2253,14 +2253,18 @@ def short_swapped(swapped):
         for system, _, old in swapped))
 
 
-def screen_swapped(swapped):
+def screen_swapped(swapped, this_only=()):
     """SWAPPED's mark on the README's first screen: whose runs the host was swapping during,
-    each system once, and which way that may lean on tick-store's verdict."""
+    each system once, and which way that may lean on tick-store's verdict. Where every system
+    named is one this_only gives, a side this run alone flags, it says so, as a mark beside
+    a side the earlier run alone flags must (review R1-29)."""
     systems = list(dict.fromkeys(system for system, _, _ in swapped))
     lean = "both" if "tickstore" in systems and len(systems) > 1 else \
         "ours" if "tickstore" in systems else "rivals"
     names = and_list([SYSTEM_LABEL.get(system, system) + "'s" for system in systems])
-    old = " on the replaced run" if all(old for _, _, old in swapped) else ""
+    old = " on the replaced run" if all(old for _, _, old in swapped) else \
+        " in this run only" if this_only and all(
+            SYSTEM_LABEL.get(system, system) in this_only for system in systems) else ""
     return f"{SCREEN_SWAPPED}{names} runs{old}, {SCREEN_LEANS[lean]}"
 
 
@@ -2351,7 +2355,10 @@ def short_forms_explained():
 # disturbance records give it (reviews R3-2, R1-9).
 GUARDS = ("What guards a timed figure differs by step. In the three Linux benchmark files, the "
           "kernel, column decode and ITCH codec benchmarks', and the two comparison files it is "
-          "the per-CPU record and the load rule. Each run of the "
+          "the per-CPU record and the load lines: their validators hold the busy share of each "
+          "pinned core's SMT sibling under 5% over each benchmark case and each system's "
+          "comparison run, and require the measurement lock's load line at the start and end "
+          "of each, but hold the load itself to no value. Each run of the "
           "bound-seed gate keeps per-CPU counters from before and after it, the load at its start "
           "and whether the process keeping the sibling core busy ran at both ends; the gate held "
           "a run to a clean exit, that process and the bar alone, and its counters and load to no "
@@ -2476,6 +2483,10 @@ def phase_mark_triples(parts, row=None, labelled=True):
     earlier = list(dict.fromkeys(label for part in parts
                                  for label, _, _, both in notes_of(part).get("also_flagged") or ()
                                  if not both and label not in this_run))
+    # Beside such a side, a side this run alone flags says it is this run's alone.
+    this_only = {label for part in parts
+                 for label, _, _, both in notes_of(part).get("also_flagged") or ()
+                 if not both and label in this_run} if earlier else set()
     for part in parts:
         sides = notes_of(part).get("unconfirmed")
         if sides:
@@ -2502,7 +2513,7 @@ def phase_mark_triples(parts, row=None, labelled=True):
             text = SWAPPED + and_list([f"{SYSTEM_LABEL.get(system, system)}'s `{variant}`" + (
                 " on the replaced run" if old else "") for system, variant, old in swapped])
             held.setdefault(text, (short_swapped(every),
-                                   screen_swapped(screened) if screened else None,
+                                   screen_swapped(screened, this_only) if screened else None,
                                    []))[2].append(part[0])
     triples = []
     for text, (short, screen, labels) in held.items():

@@ -121,7 +121,7 @@ runs, from each host's raw records; it times nothing, and a record that disagree
 runner's own table or the gate's verdicts stops it. `scripts/check_gate.py` refuses a file whose
 shape or name is not the assembler's, that holds a machine's path or name, whose bar is not half
 of `fuzz/launch.txt`'s timeout, that misses a seed or a run or numbers them otherwise, whose time
-an execution is not its own fields', that marks a run pass or fail against the gate's rule, or
+an execution is not its own fields', that marks a run pass or fail contrary to the gate's rule, or
 whose summary its runs do not give; and a disturbance entry in a gate run that names no run of
 the file, or whose span misses its run. `render_results.py` runs that check before it renders the
 gate's block in `fuzz/README.md`, and `--check` fails when the block differs from a fresh render.

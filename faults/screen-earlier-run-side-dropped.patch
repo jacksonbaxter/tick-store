@@ -1,7 +1,7 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -2471,7 +2471,7 @@
+@@ -2480,7 +2480,7 @@
      # not-counted mark.
      this_run = {SYSTEM_LABEL.get(item[0], item[0]) for part in parts
                  for item in notes_of(part).get("swapped") or []}
@@ -9,4 +9,4 @@ diff --git a/scripts/render_results.py b/scripts/render_results.py
 +    earlier = [] and list(dict.fromkeys(label for part in parts
                                   for label, _, _, both in notes_of(part).get("also_flagged") or ()
                                   if not both and label not in this_run))
-     for part in parts:
+     # Beside such a side, a side this run alone flags says it is this run's alone.

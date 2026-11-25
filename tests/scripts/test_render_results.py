@@ -3241,6 +3241,15 @@ class SidesTest(Scratch):
         self.assertEqual(RENDER.screen_marks([part], SWAP_ROW)[1],
                          ["swapping during ArcticDB's runs", "the host was swapping memory "
                           "during tick-store's runs, which may understate this"])
+        # Beside a side the earlier run alone flags, that side says it is this run's alone
+        # (review R1-29); a Parquet side the earlier run flags stands for it here.
+        self.assertIn(("tick-store", 3, None, False), RENDER.notes_of(part)["also_flagged"])
+        notes = dict(RENDER.notes_of(part))
+        notes["also_flagged"] = [*notes["also_flagged"], ("Parquet", 0, 5, False)]
+        self.assertEqual(RENDER.screen_marks([(*part[:5], notes)], SWAP_ROW)[1],
+                         ["swapping during ArcticDB's runs, and in the earlier run only during "
+                          "Parquet's", "the host was swapping memory during tick-store's runs in "
+                          "this run only, which may understate this"])
         # With no side both runs flag, the earlier run's side is said alone.
         self.assertEqual(RENDER.screen_unconfirmed([("ArcticDB", "no record", None)],
                                                    ["Parquet"]),
@@ -3723,12 +3732,14 @@ class ShortFormTest(unittest.TestCase):
 class GuardsTest(unittest.TestCase):
     """Review R1-9: the sentence under the targets table says what guards a timed figure step
     by step, as the disturbance records' last not_listed items give it, and never that the
-    per-CPU record and the load rule guard every figure."""
+    per-CPU record and the load rule guard every figure, nor that any rule holds the load's
+    value."""
 
     def test_the_guards_are_said_by_step_as_the_records_give_them(self):
         explained = RENDER.short_forms_explained()
         self.assertIn(RENDER.GUARDS, explained)
         self.assertNotIn("what guards each timed figure is its per-CPU record", explained)
+        self.assertNotIn("load rule", RENDER.GUARDS)
         records = {}
         for commit in ("8616263b7561", "ede0176b10bb"):
             document = json.loads((REPO_ROOT / "results" / f"disturbances-{commit}.json")
@@ -3746,7 +3757,17 @@ class GuardsTest(unittest.TestCase):
                                   "per-CPU record and the load rule"),
                  "In the three Linux benchmark files, the kernel, column decode and ITCH codec "
                  "benchmarks', and the two comparison files it is the per-CPU record and the "
-                 "load rule."),
+                 "load lines"),
+                # What the record's "load rule" is, as its validators hold it: the lines are
+                # required, the load's value held to nothing (review R1-27).
+                (("ede0176b10bb", "the busy share of each pinned core's SMT sibling over each "
+                                  "benchmark case and each system's comparison run, held under 5% "
+                                  "by their validators, and the measurement lock's load line at "
+                                  "the start and end of each, which their validators require"),
+                 "their validators hold the busy share of each pinned core's SMT sibling under 5% "
+                 "over each benchmark case and each system's comparison run, and require the "
+                 "measurement lock's load line at the start and end of each, but hold the load "
+                 "itself to no value."),
                 (("8616263b7561", "Each run of the bound-seed gate keeps the kernel's per-CPU "
                                   "counters copied before and after it"),
                  "Each run of the bound-seed gate keeps per-CPU counters from before and after it"),
@@ -3764,9 +3785,10 @@ class GuardsTest(unittest.TestCase):
 
 
 class UnderSentenceTest(unittest.TestCase):
-    """Review R1-15: the README's sentence under the table claims a mark only where the
-    records tie an event to a figure, since both disturbance records list routine runs of the
-    host's jobs, inside timed steps, with no mark."""
+    """Reviews R1-15 and R1-26: the README's sentence under the table claims a mark only on a
+    verdict whose deciding timed step a disturbance record enters, since both records list runs
+    of the host's jobs inside timed steps with no mark, and an entered event in a step that
+    decides no verdict is marked on none."""
 
     def test_the_sentence_under_the_table_says_what_the_records_leave_unmarked(self):
         definitions = json.loads((REPO_ROOT / "scripts" / "targets.json").read_text(
@@ -3781,11 +3803,15 @@ class UnderSentenceTest(unittest.TestCase):
                          or "no mark" in item["why"]]
         # The records list such runs, so the sentence says so, and claims no mark for each.
         self.assertTrue(unmarked)
-        self.assertIn("A result is marked where the records tie one of those jobs, or a remote "
-                      "login, to its figure", text)
-        self.assertIn("the routine runs that cannot be tied to one figure are listed, unmarked, "
-                      "in the disturbance records", text)
-        self.assertNotIn("the result says so", text)
+        # A mark stands on a verdict a disturbance entry's timed step decides, so the sentence
+        # claims marks for verdicts alone; and the gate's record ties its unlisted backup runs
+        # to steps, so the sentence does not say they cannot be tied (review R1-26).
+        self.assertIn("A verdict is marked where a disturbance record enters a remote login, or "
+                      "one of the few backup runs it enters one by one, in a timed step that "
+                      "decides the verdict", text)
+        self.assertIn("the records list the scheduled jobs' other runs without a mark", text)
+        for claim in ("the result says so", "cannot be tied", "A result is marked"):
+            self.assertNotIn(claim, text)
 
 
 class PageNameTest(unittest.TestCase):

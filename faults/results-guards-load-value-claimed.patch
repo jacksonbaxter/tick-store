@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -2358,7 +2358,7 @@
+           "the per-CPU record and the load lines: their validators hold the busy share of each "
+           "pinned core's SMT sibling under 5% over each benchmark case and each system's "
+           "comparison run, and require the measurement lock's load line at the start and end "
+-          "of each, but hold the load itself to no value. Each run of the "
++          "of each, and hold the load to their rule. Each run of the "
+           "bound-seed gate keeps per-CPU counters from before and after it, the load at its start "
+           "and whether the process keeping the sibling core busy ran at both ends; the gate held "
+           "a run to a clean exit, that process and the bar alone, and its counters and load to no "

@@ -388,7 +388,7 @@ def claim_every_event_is_marked():
     step is marked, as it read before review R1-15, which the records' unmarked runs belie."""
     def change(document):
         under = document["headline"]["under"]
-        start = under["text"].index(" A result is marked where")
+        start = under["text"].index(" A verdict is marked where")
         under["text"] = (under["text"][:start].rstrip(".") + "; where the logs show one of those "
                          "jobs, or a remote login, running during a timed step, the result says "
                          "so.")
@@ -2259,6 +2259,23 @@ FAULTS = (
           "list routine runs with no mark", CHECK_FAILED,
           "FAIL: test_the_sentence_under_the_table_says_what_the_records_leave_unmarked "
           "(__main__.UnderSentenceTest", claim_every_event_is_marked),
+    # Review R1-26: nor that the unmarked runs could not be tied to a figure, as R1-15 had it.
+    Fault("under-sentence-says-runs-cannot-be-tied", "py-scripts", "the sentence under the "
+          "README's table says the routine runs cannot be tied to one figure, though the gate's "
+          "record ties each to a step and a target", CHECK_FAILED,
+          "FAIL: test_the_sentence_under_the_table_says_what_the_records_leave_unmarked "
+          "(__main__.UnderSentenceTest"),
+    # Review R1-27: no rule holds the load's value, only its lines.
+    Fault("results-guards-load-value-claimed", "py-scripts", "render_results.py's guard "
+          "sentence says the validators hold the load to a rule, where they require its lines "
+          "alone", CHECK_FAILED,
+          "FAIL: test_the_guards_are_said_by_step_as_the_records_give_them (__main__.GuardsTest"),
+    # Review R1-29: beside a side the earlier run alone flags, one this run alone flags says so.
+    Fault("screen-this-run-side-unsaid", "py-scripts", "render_results.py's first screen gives "
+          "a side this run alone flags with no word of it, beside a side the earlier run alone "
+          "flags", CHECK_FAILED,
+          "FAIL: test_a_side_only_the_earlier_run_flags_is_named_on_the_first_screen "
+          "(__main__.SidesTest"),
     # Review R1-16: the first screen names every side either run flags, as RESULTS.md does.
     Fault("screen-earlier-run-side-dropped", "py-scripts", "render_results.py leaves off the "
           "first screen a side only the earlier run flags, which RESULTS.md names",

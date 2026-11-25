@@ -1,0 +1,12 @@
+diff --git a/scripts/targets.json b/scripts/targets.json
+--- a/scripts/targets.json
++++ b/scripts/targets.json
+@@ -29,7 +29,7 @@
+                "rate": {"value": {"path": ["systems", "tickstore", "variants", "@headline", "classes", "A", "write", "records_per_second_median"]}, "scale": 1e-6, "format": "{:.3f}"}}}
+   ],
+   "under": {"id": "WT-2", "host": "macOS", "parts": ["class A"],
+-   "text": "Against the same bar, one thread on an Apple M4 Max laptop, unpinned (its thread not held to one core), ingests {rate} M messages/s: {verdict}. Every figure from the Ryzen was taken while that machine's own scheduled jobs ran, backups, sync jobs and a health collector among them. A verdict is marked where a disturbance record enters a remote login, or one of the few backup runs it enters one by one, in a timed step that decides the verdict; the records list the scheduled jobs' other runs without a mark.",
++   "text": "Against the same bar, one thread on an Apple M4 Max laptop, unpinned (its thread not held to one core), ingests {rate} M messages/s: {verdict}. Every figure from the Ryzen was taken while that machine's own scheduled jobs ran, backups, sync jobs and a health collector among them. A result is marked where the records tie one of those jobs, or a remote login, to its figure; the routine runs that cannot be tied to one figure are listed, unmarked, in the disturbance records.",
+    "values": {"rate": {"value": {"path": ["systems", "tickstore", "variants", "@headline", "classes", "A", "write", "records_per_second_median"]}, "scale": 1e-6, "format": "{:.3f}"}}},
+   "names": [
+    {"id": "G-1", "host": "any", "name": "the round trip", "parts": {"12302019 macOS": "the reference day's round trip on the laptop", "12302019 Linux": "the reference day's round trip on the Ryzen", "10302019 macOS": "the second day's round trip"}},
