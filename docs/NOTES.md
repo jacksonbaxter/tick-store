@@ -7403,7 +7403,7 @@ below is from the gate's step log, the gate's results file or the disturbance re
 
 Work of 2026-11-25 (UTC), rebased the same day onto the gate's and the comparison plan's work, on `render_results.py`, `scripts/targets.json`, the README's first
 screen, RESULTS.md and `docs/checks.md`, from `9ead7a9`. The rows are
-[R1-1 to R1-8](REVIEW.md#the-final-review-r1).
+[R1-1 to R1-24](REVIEW.md#the-final-review-r1).
 
 **Classes from counted parts (R1-1).** A row's class took a part met by the rule and not counted
 as met, so a row of missed parts and one such part was "missed in part". The writer's
@@ -7489,7 +7489,7 @@ the same mutation where my edits moved them: `sides-left-out-counts-uncounted`,
 `readme-pitch-figure-edited`, `readme-pitch-unchecked-figure`,
 `readme-pitch-store-figures-swapped`, `readme-first-screen-host-by-system`, and the two above.
 Each was shown by hand in a fresh clone under `build/`: the step passed on the clean clone and
-failed with the fault for the stated reason. At `36f3157`, `89deaa0` after the rebase, every render-check fault, 34 of 34, and
+failed with the fault for the stated reason. Before the rebase, at the commit that became `89deaa0`, every render-check fault, 34 of 34, and
 every script fault whose test is in `test_render_results.py`, 129 of 129, were shown the same way,
 the second set by its one test. `results/check-proofs.json` was not rewritten; its record stays
 at `5a810a2`.
@@ -7511,6 +7511,53 @@ Faults added: `results-guards-claimed-for-every-figure`, `render-check-pages-by-
 Every fault I added or remade, these included, was shown again by hand at the rebased line's
 head, with every render-check fault and every script fault whose test is in
 `test_render_results.py`.
+
+**The second reviews (R1-15 to R1-24).** A page review and a checks review read this work the
+same day; each row gives the reviewer's id. First, on the checker's change that holds the
+column-decode and ITCH-codec benchmark files as the kernel's is held, the sentence under the
+targets table names the three Linux benchmark files beside the two comparison files (R1-18,
+`2437e04`), and the checker's three commits after it were replayed on top unchanged. The sentence
+under the README's table said that where the logs show one of the host's jobs, or a remote login,
+running during a timed step, the result says so. The records deny it: the bound-seed gate's
+record lists six backup runs inside its timed fuzzing runs that no mark shows, and the freeze's
+record says the comparison's short routine runs go unmarked. It now says a result is marked where
+the records tie one of those jobs, or a login, to its figure, and that the routine runs no record
+ties to one figure are listed, unmarked, in the disturbance records; that clause went from 21
+words to 36 (R1-15). The list under the table now names each side only the earlier run flags,
+"and in the earlier run only during Parquet's" and the like, as RESULTS.md names every side
+either run flags (R1-16), and names the met part it left out, "Met: on the laptop, flushed
+one-thread ingest.", where it said "Met: 1 more of their parts." (R1-17). The prose under the table
+went from 93 words to 108, and the list from 210 words and 1,242 characters to 249 and 1,493; the
+pitch is unchanged.
+
+The checks review found four gaps in the checks. A pitch claim of figures could compare what a
+part met by the rule and not counted compares, and only a claim on the target was refused
+(R1-19). A pair of figures was judged on the replaced run's file only when the claim asked, and a
+fastest claim never (R1-20); each is now judged on both files wherever both are kept, its swap
+flags read from both. The pitch's claims hold under both rules. The legend test no longer tied
+what a watcher's computed span means to that login (R1-21), and no test held the write-swap
+reason to a replaced run no record covers (R1-22). Of its notes: `verdict_class([])` now agrees
+with `class_of([])`, both class functions are tested on a part not judged beside one not counted,
+and the two class faults each expect the count their own fault gives (R1-23); `docs/checks.md`
+says a number listed under `not_results` is compared with no results file (R1-24). The new code
+comments name these rows (`13394e4`), since the reviewer's ids C2-1 to C2-6 already name an
+earlier review's rows in REVIEW.md. The page review's B2 and the checks review's C2-8, the guard
+sentence, were R1-9, done in `575cb10`.
+
+Faults added: `under-sentence-claims-every-event-marked`, `screen-earlier-run-side-dropped`,
+`left-out-met-part-unnamed`, `pitch-claim-of-figures-on-uncounted-part`,
+`pitch-claim-judged-on-this-run-alone`, `pitch-swap-below-on-this-run-alone`,
+`pitch-swap-fastest-on-this-run-alone`, `legend-period-said-of-another-kind`,
+`write-swap-reason-on-a-covered-run` and `verdict-class-empty-row-not-counted`. Remade with the
+same mutation where my edits moved them: `results-guards-claimed-for-every-figure`,
+`headline-left-out-drops-a-miss`, `headline-left-out-mark-dropped`,
+`headline-left-out-named-count-unchecked`, `pitch-claim-judged-on-this-run-only`,
+`render-pitch-fastest-median-only`, `sides-left-out-counts-uncounted`,
+`verdict-class-met-on-any-part` and `class-taken-from-an-uncounted-part`;
+`class-check-takes-an-uncounted-part` keeps its patch and expects a new string. Each was shown by
+hand at `700fc06` in a fresh clone under `build/`, the step passing on the clean clone and failing
+with the fault for the stated reason, and again, with every render-check fault and every script
+fault whose test is in `test_render_results.py`, at this line's head.
 
 ## Process notes
 
