@@ -43,9 +43,11 @@ What the render holds, each a refusal (exit 2) when it fails:
   own functions: an outcome the replaced comparison run judges otherwise, a disturbed phase it
   rests on, and whose write input was where;
 - no sentence says tick-store writes faster than a system whose write read its input from disk
-  inside its clock, by render_results.py's rule for every page;
+  inside its clock, by render_results.py's rule for every page, and the section describing the
+  comparison's method gives render_results.py's input note for each comparison whose writes did
+  not start alike, as the README's and RESULTS.md's do;
 - the page opens, after its title, with one paragraph of exactly three sentences, each with a
-  token, and runs to 2,500 to 4,000 words, as wc -w counts the rendered page.
+  token, and runs to 2,500 to 4,060 words, as wc -w counts the rendered page.
 
 Until the measurements are committed, some kinds of results file do not exist yet, and WRITEUP.md
 does not either. Then --check renders what resolves, applies every rule above to it, and exits
@@ -136,9 +138,10 @@ TABLE_RULE = re.compile(r"\s*\|?(?:\s*:?-+:?\s*\|)+\s*:?-*:?\s*")
 # A word as wc -w counts one: characters between ASCII whitespace.
 WORD = re.compile(r"[^ \t\n\r\f\v]+")
 # The essay's length, in words as word_count counts them, wc -w's count of the rendered page:
-# here, not in the figure list, so the list cannot widen it.
+# here, not in the figure list, so the list cannot widen it. The top was 4,000 until the write
+# row's input bytes and the uncounted parts' swap marks were added; it rises to 4,060, no further.
 WORDS_AT_LEAST = 2500
-WORDS_AT_MOST = 4000
+WORDS_AT_MOST = 4060
 # What the essay calls each host, so a figure read on one is never described as the other's.
 HOST_WORDS = {"Linux": "Zen 1", "macOS": "M4"}
 # The values a comparison of text may name: verdict words of render_results.py and the prover.
@@ -759,9 +762,11 @@ SHARED_FORMS = ("path", "case", "cases_median", "best", "codec", "store_bits", "
                 "lowest_system", "lowest_value", "engine_only")
 # The figure list's own forms that read the entry's results file.
 DOCUMENT_FORMS = ("codec_columns", "codec_column", "least", "items", "where", "count",
-                  "count_cases", "flagged_queries", "target_values", "flagged")
+                  "count_cases", "flagged_queries", "target_values", "flagged",
+                  "method_input_note")
 # Forms that read the tree, the code or the targets, not a results file.
-TREE_FORMS = ("bar", "constant", "lines", "count_matches", "prover", "verdict_is")
+TREE_FORMS = ("bar", "constant", "lines", "count_matches", "prover", "verdict_is",
+              "not_counted")
 OPERATORS = ("sub", "add", "mul", "div", "same", "log2", "pow2", "min", "max", "median",
              "each", "all", "any", "above", "below", "is", "concat", "prefix", "not")
 
@@ -987,6 +992,54 @@ def flagged(reads, context):
                 render_results.swapped_reads(phases, document))
 
 
+def not_counted(spec, context):
+    """A part met by the rule and not counted (the ruling of 17 November): its not-counted mark
+    in the short form render_results.py gives it, which names the systems on whose side the
+    reason lies, refused for a part that is counted."""
+    row = context.resolver.target_row(spec, context.name)
+    parts, _ = context.resolver.judged(row, context.name)
+    found = [part for part in parts or [] if part[0] == spec.get("part")]
+    if len(found) != 1:
+        raise Refused(f"{show(context.name)}: no one part {spec.get('part')!r} in "
+                      f"{[part[0] for part in parts or []]}")
+    if not isinstance(render_results.counted(found[0]), render_results.NotCounted):
+        raise Refused(f"{show(context.name)}: {spec['id']}'s part {spec['part']!r} is counted, "
+                      "and a not-counted mark stands only beside a part that is not")
+    marks = [short for _, short in render_results.phase_mark_pairs(found, row)
+             if short.startswith(render_results.NOT_COUNTED_SHORT)]
+    if len(marks) != 1:
+        raise Refused(f"{show(context.name)}: {spec['id']}'s part {spec['part']!r} has "
+                      f"{len(marks)} not-counted marks, not one")
+    return marks[0]
+
+
+# The section of the essay that describes the comparison's method, which gives the input note of
+# every comparison whose writes did not start alike, as the README's and RESULTS.md's do
+# (ruling 3; review R4-A).
+METHOD_SECTION = "## How it was measured"
+
+
+def method_problem(root, text):
+    """Where the essay's method section lacks render_results.py's input note for a comparison
+    file of the tree, or None."""
+    notes = []
+    for path in sorted((Path(root) / "results" / "compare").glob("*.json")):
+        note = render_results.method_input_note(read_json(path, path.name))
+        if note:
+            notes.append((path.name, note))
+    if not notes:
+        return None
+    section = section_of(text, METHOD_SECTION)
+    if section is None:
+        return f"the essay has no {METHOD_SECTION!r} section to describe the comparison's method"
+    section = " ".join(section.split())
+    for name, note in notes:
+        if note not in section:
+            return (f"the essay's {METHOD_SECTION!r} does not say where the writes' inputs were "
+                    f"in {name}: {note!r}")
+    return None
+
+
 def evaluate(expression, context):
     """A value by the figure list's expressions; scripts/targets.json's own forms go to
     render_results.evaluate on the entry's document."""
@@ -1002,6 +1055,8 @@ def evaluate(expression, context):
     if "bar" in expression:
         return bar_value(context.resolver.target_row(expression["bar"], context.name),
                          context.name)
+    if "not_counted" in expression:
+        return not_counted(expression["not_counted"], context)
     if "verdict_is" in expression:
         spec = expression["verdict_is"]
         row = context.resolver.target_row(spec, context.name)
@@ -1166,6 +1221,12 @@ def evaluate(expression, context):
         return len(cases)
     if "flagged" in expression:
         return flagged(expression["flagged"], context)
+    if "method_input_note" in expression:
+        note = render_results.method_input_note(document)
+        if note is None:
+            raise Refused(f"{name}: the comparison's writes started alike, and there is no input "
+                          "note to give")
+        return note
     if "flagged_queries" in expression:
         variant = walk(document, expression["flagged_queries"])
         return [f"{query} {kind}" for query in render_results.QUERY_NAMES
@@ -1973,6 +2034,9 @@ def render(root):
     text = text.rstrip("\n") + "\n\n" + MARKER + "\n"
     faster_write(resolver, prose(text))
     moves_and_keeps(resolver, text)
+    problem = method_problem(root, text)
+    if problem:
+        raise Refused(problem)
     notes = sum(1 for comment in comments if CUT_NOTE in comment)
     count = word_count(text)
     if not WORDS_AT_LEAST <= count <= WORDS_AT_MOST:

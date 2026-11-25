@@ -3173,6 +3173,14 @@ FAULTS = (
     Fault("writeup-words-not-as-wc", "py-scripts", "render_writeup.py counts the essay's words "
           "leaving out its tables' pipes and rules and every mark, not as wc -w counts the page",
           CHECK_FAILED, "FAIL: test_the_word_count_is_wc_s_count_of_the_page (__main__.Refuses"),
+    # Review R4-A: the method section gives each comparison's input note.
+    Fault("writeup-method-note-unchecked", "py-scripts", "render_writeup.py takes an essay whose "
+          "method section does not say whose write input was in memory before the clock",
+          CHECK_FAILED, "FAIL: test_a_method_section_without_the_input_note (__main__.Marks"),
+    # Review R4-B: a not-counted mark stands only beside a part that is not counted.
+    Fault("writeup-not-counted-of-a-counted-part", "py-scripts", "render_writeup.py gives a "
+          "counted part a not-counted mark's place", CHECK_FAILED,
+          "FAIL: test_a_not_counted_mark_of_a_counted_part (__main__.NotCountedMark"),
     # The step itself on the committed page. Its baseline passes only once WRITEUP.md is
     # rendered, when every results file it reads is committed (docs/TASKS.md).
     Fault("writeup-template-not-rendered", "writeup-check", "the essay's template reworded "

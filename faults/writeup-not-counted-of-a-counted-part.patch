@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 330f8c8..c41c1a0 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1002,7 +1002,7 @@ def not_counted(spec, context):
+     if len(found) != 1:
+         raise Refused(f"{show(context.name)}: no one part {spec.get('part')!r} in "
+                       f"{[part[0] for part in parts or []]}")
+-    if not isinstance(render_results.counted(found[0]), render_results.NotCounted):
++    if False:
+         raise Refused(f"{show(context.name)}: {spec['id']}'s part {spec['part']!r} is counted, "
+                       "and a not-counted mark stands only beside a part that is not")
+     marks = [short for _, short in render_results.phase_mark_pairs(found, row)

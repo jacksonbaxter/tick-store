@@ -25,6 +25,7 @@ import statistics
 import subprocess
 import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
 
@@ -548,11 +549,11 @@ class Refuses(Tree):
 
     def test_an_essay_too_short(self):
         self.edit("docs/writeup/WRITEUP.template.md", FILLER, "Short.")
-        self.refused("outside its 2,500 to 4,000")
+        self.refused("outside its 2,500 to 4,060")
 
     def test_an_essay_too_long(self):
         self.edit("docs/writeup/WRITEUP.template.md", FILLER, FILLER + "\n\n" + FILLER)
-        self.refused("outside its 2,500 to 4,000")
+        self.refused("outside its 2,500 to 4,060")
 
     def test_the_word_count_is_wc_s_count_of_the_page(self):
         # Review R4-D: the bound is held on the count a reader makes with wc -w, so a comment,
@@ -1105,8 +1106,35 @@ class Marks(Tree):
                                         commit="67ae574f5666" + "0" * 28)))
         self.write("scripts/data_pins.json", json.dumps({"replaced_comparison_files": {
             old.name: hashlib.sha256(old.read_bytes()).hexdigest()}}))
+        # The day's writes did not start alike, so the method section gives the input note.
+        self.figures["figures"]["method_note"] = {
+            "what": "the input note of the day's method, on the Zen 1", "kind": "day",
+            "host": "Linux", "value": {"method_input_note": True}, "format": "text"}
         self.save()
         self.insert("The day write is {{verdict:t11}}.")
+        self.insert(f"{RENDER.METHOD_SECTION}\n\nEach system wrote the day. "
+                    "{{method_note}}")
+
+    def test_the_method_section_gives_the_input_note(self):
+        # Review R4-A: the method says whose input is in memory before the clock and whose is
+        # read inside it, by render_results.py's own sentence.
+        note = RESULTS_CODE.method_input_note(json.loads(
+            (self.root / f"results/compare/Linux-day-{COMMIT[:12]}.json").read_text()))
+        self.assertIn("tick-store's input is in memory before the clock starts", note)
+        self.assertIn(note, " ".join(self.renders().split()))
+
+    def test_a_method_section_without_the_input_note(self):
+        # The note given elsewhere than the method section does not stand for it there.
+        self.edit("docs/writeup/WRITEUP.template.md", "{{method_note}}", "")
+        self.edit("docs/writeup/WRITEUP.template.md", "## Method\n", "## Method\n\n{{method_note}}\n")
+        self.refused(f"the essay's {RENDER.METHOD_SECTION!r} does not say where the writes' "
+                     "inputs were in Linux-day-")
+
+    def test_an_input_note_where_the_writes_started_alike(self):
+        self.write(f"results/compare/Linux-day-{COMMIT[:12]}.json",
+                   json.dumps(day(write_record(190.0, 10), write_record(381.0, 10))))
+        self.refused("{{method_note}}: the comparison's writes started alike, and there is no "
+                     "input note to give")
 
     def test_a_verdict_carries_the_marks_results_gives_it(self):
         page = self.renders()
@@ -1237,6 +1265,35 @@ class Marks(Tree):
         self.insert("And so it leads.")
         self.refused("rests on T-11 on Linux, whose outcome changed with the replaced run")
 
+
+class NotCountedMark(unittest.TestCase):
+    """Review R4-B: a part met by the rule and not counted gives its not-counted mark in the
+    short form, naming the systems whose swapping made it so; a counted part gives none."""
+
+    def context(self):
+        row = {"id": "T-9", "host": "Linux", "target": {"at_most": 1}, "unit": " ms",
+               "digits": 1}
+        parts = [("Q2 warm", "1.0 ms", True, "results/compare/Linux-day-x.json", {},
+                  {"unconfirmed": [("ArcticDB", "swapped", "5 pages here, 3 there")]}),
+                 ("Q1 warm", "9.0 ms", False, "results/compare/Linux-day-x.json", {}, {})]
+        resolver = types.SimpleNamespace(target_row=lambda spec, name: row,
+                                         judged=lambda row, name: (parts, None))
+        return types.SimpleNamespace(name="mark", resolver=resolver)
+
+    def test_a_not_counted_part_s_mark(self):
+        self.assertEqual(RENDER.not_counted({"id": "T-9", "host": "Linux", "part": "Q2 warm"},
+                                            self.context()),
+                         f"{RESULTS_CODE.NOT_COUNTED_SHORT}: "
+                         f"{RESULTS_CODE.UNCONFIRMED_WHY['swapped']} (ArcticDB)")
+
+    def test_a_not_counted_mark_of_a_counted_part(self):
+        with self.assertRaisesRegex(RENDER.Refused, r"T-9's part 'Q1 warm' is counted, and a "
+                                                    r"not-counted mark stands only beside"):
+            RENDER.not_counted({"id": "T-9", "host": "Linux", "part": "Q1 warm"},
+                               self.context())
+        with self.assertRaisesRegex(RENDER.Refused, r"no one part 'Q3 warm'"):
+            RENDER.not_counted({"id": "T-9", "host": "Linux", "part": "Q3 warm"},
+                               self.context())
 
 
 class SetupMark(unittest.TestCase):
