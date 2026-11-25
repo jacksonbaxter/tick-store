@@ -7403,7 +7403,7 @@ below is from the gate's step log, the gate's results file or the disturbance re
 
 Work of 2026-11-25 (UTC), rebased the same day onto the gate's and the comparison plan's work, on `render_results.py`, `scripts/targets.json`, the README's first
 screen, RESULTS.md and `docs/checks.md`, from `9ead7a9`. The rows are
-[R1-1 to R1-24](REVIEW.md#the-final-review-r1).
+[R1-1 to R1-29](REVIEW.md#the-final-review-r1).
 
 **Classes from counted parts (R1-1).** A row's class took a part met by the rule and not counted
 as met, so a row of missed parts and one such part was "missed in part". The writer's
@@ -7523,7 +7523,9 @@ record lists six backup runs inside its timed fuzzing runs that no mark shows, a
 record says the comparison's short routine runs go unmarked. It now says a result is marked where
 the records tie one of those jobs, or a login, to its figure, and that the routine runs no record
 ties to one figure are listed, unmarked, in the disturbance records; that clause went from 21
-words to 36 (R1-15). The list under the table now names each side only the earlier run flags,
+words to 36 (R1-15). (Corrected 2026-11-25: that premise was wrong. The gate's record ties each of
+the backup job's nine other runs to a step and a target, and leaves them unmarked by a stated
+choice; see R1-26.) The list under the table now names each side only the earlier run flags,
 "and in the earlier run only during Parquet's" and the like, as RESULTS.md names every side
 either run flags (R1-16), and names the met part it left out, "Met: on the laptop, flushed
 one-thread ingest.", where it said "Met: 1 more of their parts." (R1-17). The prose under the table
@@ -7558,6 +7560,33 @@ same mutation where my edits moved them: `results-guards-claimed-for-every-figur
 hand at `700fc06` in a fresh clone under `build/`, the step passing on the clean clone and failing
 with the fault for the stated reason, and again, with every render-check fault and every script
 fault whose test is in `test_render_results.py`, at this line's head.
+
+**After the second reviews (R1-25 to R1-29).** A changed outcome's short mark said "a change for
+tick-store", which a cold reader could not parse; it says "a change in tick-store's favour", or
+"a change not in tick-store's favour" the other way, in RESULTS.md's legend and wherever the short
+form stands, and the essay's copy of it goes stale with it (R1-25, `22e7386`). The page review read
+the sentence under the README's table again and found it false of the gate's record (R1-26). I
+checked each entry against the pages: in a clone, I dropped each timed entry of both records, with
+every entry of its phase, and rendered. Every entry in a step that decides a verdict changed a page;
+the freeze record's entries in the slice's setups that no table shows, and in two kernel cases
+whose medians no verdict reads, one of them a backup run, changed none: RESULTS.md's kernel table
+gives those two medians with no mark, and compare/README.md quotes ArcticDB's per-stock slice
+figures, from a phase that held a login, bare. So the sentence now claims
+a mark only on a verdict: "A verdict is marked where a disturbance record enters a remote login, or
+one of the few backup runs it enters one by one, in a timed step that decides the verdict; the
+records list the scheduled jobs' other runs without a mark." It went from 36 words to 43, and the
+prose under the table from 108 to 115. The guard sentence called the load lines a rule, though the
+validators require a start and an end line for each case and hold the load's value to nothing; it
+now says so (R1-27). `docs/checks.md` says the gate check refuses a run marked pass or fail
+"contrary to" its rule (R1-28). On the first screen, beside a side the earlier run alone flags, a
+side this run alone flags says "in this run only", as tick-store's does on the full-day column
+scan, cold; the list went from 249 words to 253 (R1-29). Faults added:
+`under-sentence-says-runs-cannot-be-tied`, `results-guards-load-value-claimed` and
+`screen-this-run-side-unsaid`; remade with the same mutation: `render-change-short-lean-unsaid`,
+`results-guards-claimed-for-every-figure`, `screen-earlier-run-side-dropped`,
+`render-screen-lean-one-way` and `render-swap-short-per-part`; `under-sentence-claims-every-event-marked`
+now finds the new sentence. Each was shown by hand at the commit that made it, with the faults
+whose tests hold the changed phrase.
 
 ## Process notes
 
