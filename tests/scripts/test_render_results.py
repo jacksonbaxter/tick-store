@@ -3579,6 +3579,45 @@ class ShortFormTest(unittest.TestCase):
 
 
 
+class GuardsTest(unittest.TestCase):
+    """Review R1-9: the sentence under the targets table says what guards a timed figure step
+    by step, as the disturbance records' last not_listed items give it, and never that the
+    per-CPU record and the load rule guard every figure."""
+
+    def test_the_guards_are_said_by_step_as_the_records_give_them(self):
+        explained = RENDER.short_forms_explained()
+        self.assertIn(RENDER.GUARDS, explained)
+        self.assertNotIn("what guards each timed figure is its per-CPU record", explained)
+        records = {}
+        for commit in ("8616263b7561", "ede0176b10bb"):
+            document = json.loads((REPO_ROOT / "results" / f"disturbances-{commit}.json")
+                                  .read_text(encoding="utf-8"))
+            records[commit] = document["not_listed"][-1]["why"] if commit == "ede0176b10bb" \
+                else next(item["why"] for item in document["not_listed"]
+                          if "bound-seed gate keeps" in item["why"])
+        # Each step's guard, the record's words beside the sentence's.
+        for record, said in (
+                (("ede0176b10bb", "In the kernel benchmark's file and the two comparison files, "
+                                  "what guards each timed figure is the per-CPU record and the "
+                                  "load rule"),
+                 "In the kernel benchmark's file and the two comparison files it is the per-CPU "
+                 "record and the load rule."),
+                (("8616263b7561", "Each run of the bound-seed gate keeps the kernel's per-CPU "
+                                  "counters copied before and after it"),
+                 "Each run of the bound-seed gate keeps per-CPU counters from before and after it"),
+                (("8616263b7561", "it held the busy shares, the load and the processes started "
+                                  "to no rule"),
+                 "its counters and load to no rule"),
+                (("8616263b7561", "The timed fuzzing runs keep no per-CPU record and no load"),
+                 "The timed fuzzing runs and the capacity check's parts keep no per-CPU record "
+                 "and no load"),
+                (("ede0176b10bb", "The capacity check's parts keep neither"),
+                 "the capacity check's guard watches memory, swap and disk alone")):
+            with self.subTest(said=said):
+                self.assertIn(record[1], records[record[0]])
+                self.assertIn(said, RENDER.GUARDS)
+
+
 class PageNameTest(unittest.TestCase):
     """The check's lines name each page by its path under the tree, so README.md and
     fuzz/README.md are told apart (review R1-10)."""

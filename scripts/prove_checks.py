@@ -2215,6 +2215,11 @@ FAULTS = (
           "the ingest tables' columns again under class B", CHECK_FAILED,
           "FAIL: test_macos_stored_bytes_say_they_can_exceed_the_files_own "
           "(__main__.RenderCompareTest"),
+    # Review R1-9: what guards a timed figure, said by step as the records give it.
+    Fault("results-guards-claimed-for-every-figure", "py-scripts", "RESULTS.md's sentence under "
+          "the targets table says the per-CPU record and the load rule guard every timed "
+          "figure, the gate's, the fuzzing's and the capacity check's included", CHECK_FAILED,
+          "FAIL: test_the_guards_are_said_by_step_as_the_records_give_them (__main__.GuardsTest"),
     # Review R1-10: the check names each page by its path.
     Fault("render-check-pages-by-name", "py-scripts", "render_results.py names the pages it "
           "checked by their file names alone, so README.md and fuzz/README.md read the same",

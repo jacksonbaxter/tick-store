@@ -2345,14 +2345,23 @@ def short_forms_explained():
 
 # The limit the marks leave, said once under the targets table (review R-D3): the host's own
 # scheduled jobs, named by kind only, ran through every window.
+# What guards a timed figure against them, step by step, as the last not_listed items of both
+# disturbance records give it (reviews R3-2, R1-9).
+GUARDS = ("What guards a timed figure differs by step. In the kernel benchmark's file and the two "
+          "comparison files it is the per-CPU record and the load rule. Each run of the "
+          "bound-seed gate keeps per-CPU counters from before and after it, the load at its start "
+          "and whether the process keeping the sibling core busy ran at both ends; the gate held "
+          "a run to a clean exit, that process and the bar alone, and its counters and load to no "
+          "rule. The timed fuzzing runs and the capacity check's parts keep no per-CPU record and "
+          "no load: each fuzzing run passes or fails by its own log, and the capacity check's "
+          "guard watches memory, swap and disk alone.")
 SCHEDULED_JOBS = ("The marks name only what the disturbance records list. The host's own "
                   "scheduled jobs, a repository backup every fifteen minutes, a health collector "
                   "and two small watchers every five, two sync jobs every ten, a file backup "
                   "about hourly and daily maintenance, ran through every window and were not "
                   "stopped, as nothing on the host is changed for a measurement beyond the "
                   "governor; the run records list none of them by phase beyond the events "
-                  "marked, and what guards each timed figure is its per-CPU record and the load "
-                  "rule.")
+                  "marked. " + GUARDS)
 
 
 # The same mark in the README's pitch, which has no room for the systems and variants: a claim
