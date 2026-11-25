@@ -1,7 +1,7 @@
 diff --git a/scripts/check_gate.py b/scripts/check_gate.py
 --- a/scripts/check_gate.py
 +++ b/scripts/check_gate.py
-@@ -137,7 +137,7 @@
+@@ -179,7 +179,7 @@
      ("end", is_utc, TIME),
      ("exit_code", is_count, WHOLE),
      ("findings", is_count, WHOLE),

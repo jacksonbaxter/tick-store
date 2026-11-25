@@ -1544,8 +1544,8 @@ FAULTS = (
     Fault("gate-over-bar-pass-accepted", "py-scripts", "check_gate.py takes a run over the bar "
           "marked pass", CHECK_FAILED,
           "FAIL: test_a_run_over_the_bar_marked_pass_is_refused (__main__.RunTest"),
-    Fault("gate-pass-rule-unchecked", "py-scripts", "check_gate.py takes a run marked pass that "
-          "reported a finding", CHECK_FAILED,
+    Fault("gate-pass-rule-unchecked", "py-scripts", "check_gate.py's pass rule leaves out "
+          "findings, so it takes a run marked pass that reported a finding", CHECK_FAILED,
           "FAIL: test_a_run_with_a_finding_marked_pass_is_refused (__main__.RunTest"),
     Fault("gate-summary-unchecked", "py-scripts", "check_gate.py takes a summary whose worst run "
           "is not the rows' worst", CHECK_FAILED,
@@ -1606,8 +1606,8 @@ FAULTS = (
           "did not run on", CHECK_FAILED, "FAIL: test_a_run_on_another_host_is_refused "
           "(__main__.ShapeFormTest"),
     Fault("gate-run-fields-unchecked", "py-scripts", "check_gate.py takes a run with a field "
-          "missing, and raises", CHECK_FAILED,
-          "ERROR: test_a_run_with_a_field_missing_is_refused (__main__.ShapeTest"),
+          "the assembler never writes there", CHECK_FAILED,
+          "FAIL: test_a_run_with_a_field_too_many_is_refused (__main__.ShapeTest"),
     Fault("gate-pass-rule-exit-ignored", "py-scripts", "check_gate.py's pass rule leaves out the "
           "exit code, so a run that exited 77 with no finding passes", CHECK_FAILED,
           "FAIL: test_a_run_that_exited_otherwise_marked_pass_is_refused (__main__.RunTest"),
@@ -1708,9 +1708,9 @@ FAULTS = (
     Fault("gate-run-findings-form-unchecked", "py-scripts", "check_gate.py takes a run whose "
           "findings are a string", CHECK_FAILED, "FAIL: test_findings_as_a_string_are_refused "
           "(__main__.FormTest"),
-    Fault("gate-run-units-form-unchecked", "py-scripts", "check_gate.py takes a run of no "
-          "executed unit, and divides by it", CHECK_FAILED,
-          "ERROR: test_no_executed_unit_is_refused (__main__.FormTest"),
+    Fault("gate-run-units-form-unchecked", "py-scripts", "check_gate.py takes a run whose unit "
+          "count is 2.0, which the page would print as 2.0 executions", CHECK_FAILED,
+          "FAIL: test_a_unit_count_as_a_float_is_refused (__main__.FormTest"),
     Fault("gate-run-file-ms-form-unchecked", "py-scripts", "check_gate.py takes a run whose "
           "libFuzzer time is not a whole number of ms", CHECK_FAILED,
           "FAIL: test_a_libfuzzer_time_that_is_not_whole_is_refused (__main__.FormTest"),

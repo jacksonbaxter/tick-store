@@ -110,6 +110,14 @@ class ShapeTest(Tree):
         self.assert_refused(lambda document: document["runs"][3].pop("load1"),
                             "run 4 is not a run of")
 
+    def test_a_run_with_a_field_too_many_is_refused(self):
+        self.assert_refused(lambda document: document["runs"][13].update(note="by hand"),
+                            "run 14 is not a run of")
+
+    def test_a_macos_run_with_a_linux_field_is_refused(self):
+        self.assert_refused(lambda document: document["runs"][3].update(processes_started=53),
+                            "run 4 is not a run of")
+
 
 class ShapeFormTest(Tree):
     """The file's own shape: its parts, its header's keys, its commit, its whole numbers and
@@ -247,6 +255,12 @@ class FormTest(Tree):
     def test_no_executed_unit_is_refused(self):
         self.assert_field_refused("executed_units", 0,
                                   "its executed_units 0 is not a whole number of at least 1")
+
+    def test_a_unit_count_as_a_float_is_refused(self):
+        def edit(document):
+            self.run_of(document, *self.LINUX_RUN)["executed_units"] = 2.0
+            document["summary"]["Linux"]["worst"]["executed_units"] = 2.0
+        self.assert_refused(edit, "its executed_units 2.0 is not a whole number of at least 1")
 
     def test_a_libfuzzer_time_that_is_not_whole_is_refused(self):
         self.assert_field_refused("file_ms", 9337.0,
