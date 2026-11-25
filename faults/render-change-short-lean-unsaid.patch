@@ -1,12 +1,12 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -2067,7 +2067,7 @@
-     """A changed outcome's mark, short: both outcomes, which way the change leans, the one
+@@ -2409,7 +2409,7 @@
      counted (review R-B1)."""
      change = notes_of(part)["change"]
--    lean = "for" if standing(change["new"]) > standing(change["old"]) else "against"
-+    lean = "for"
+     # Which way it leans, in plain words either way (review R1-25).
+-    lean = "in" if standing(change["new"]) > standing(change["old"]) else "not in"
++    lean = "in"
      return (f"{verdict_word(change['new'])} on this run and {verdict_word(change['old'])} on "
-             f"the replaced one, a change {lean} tick-store, counted as "
+             f"the replaced one, a change {lean} tick-store's favour, counted as "
              f"{verdict_word(counted(part))}")

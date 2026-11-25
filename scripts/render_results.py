@@ -2313,7 +2313,8 @@ def short_forms_explained():
             f"\"{SETUP_CHOSEN}, while ArcticDB's `rows100k-cols127-per-security`, set up "
             "otherwise, is faster\": the verdict compares each system's headline variant, and "
             "a variant the comparison did not choose beats tick-store's figure; \"met on this "
-            "run and missed on the replaced one, a change for tick-store, counted as missed\" "
+            "run and missed on the replaced one, a change in tick-store's favour, counted as "
+            "missed\" "
             "stands for a changed outcome's mark in full, the less favourable outcome being the "
             "one every count, ranking and first screen takes; "
             f"\"{NOT_COUNTED_SHORT}: {UNCONFIRMED_WHY['swapped']} (ArcticDB, QuestDB)\" stands "
@@ -2328,8 +2329,8 @@ def short_forms_explained():
             f"runs' records count over {WRITE_SWAP_SPAN}; and a verdict of "
             "several parts may "
             "be given as \"met against QuestDB, not like-for-like; missed against Parquet; "
-            "against ArcticDB met on this run and missed on the replaced one, a change for "
-            "tick-store, counted as missed\", its parts named by what they compare. The README's "
+            "against ArcticDB met on this run and missed on the replaced one, a change in "
+            "tick-store's favour, counted as missed\", its parts named by what they compare. The README's "
             "first screen says the same in words that stand alone: \"the host was swapping "
             "memory during ArcticDB's and QuestDB's runs, which may flatter this\" for a swap-in mark, "
             "\"which may understate this\" where tick-store's own figures are the swapped ones "
@@ -2407,9 +2408,10 @@ def change_short(part):
     """A changed outcome's mark, short: both outcomes, which way the change leans, the one
     counted (review R-B1)."""
     change = notes_of(part)["change"]
-    lean = "for" if standing(change["new"]) > standing(change["old"]) else "against"
+    # Which way it leans, in plain words either way (review R1-25).
+    lean = "in" if standing(change["new"]) > standing(change["old"]) else "not in"
     return (f"{verdict_word(change['new'])} on this run and {verdict_word(change['old'])} on "
-            f"the replaced one, a change {lean} tick-store, counted as "
+            f"the replaced one, a change {lean} tick-store's favour, counted as "
             f"{verdict_word(counted(part))}")
 
 

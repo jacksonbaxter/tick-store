@@ -3696,14 +3696,15 @@ class ShortFormTest(unittest.TestCase):
     def test_a_changed_outcome_has_a_short_form_and_a_full_one_true_anywhere(self):
         part = self.part("against ArcticDB", False, change={"new": True, "old": False})
         self.assertEqual(RENDER.change_short(part), "met on this run and missed on the replaced "
-                         "one, a change for tick-store, counted as missed")
+                         "one, a change in tick-store's favour, counted as missed")
         self.assertTrue(RENDER.change_text(part).endswith(
             "so counted as missed in every count, ranking and first screen of the project's "
             "pages"))
         self.assertEqual(RENDER.change_mark_pairs([part]), [(RENDER.change_text(part),
                                                              RENDER.change_short(part))])
         against = self.part("against ArcticDB", False, change={"new": False, "old": True})
-        self.assertIn("a change against tick-store", RENDER.change_short(against))
+        self.assertEqual(RENDER.change_short(against), "missed on this run and met on the "
+                         "replaced one, a change not in tick-store's favour, counted as missed")
 
     def test_a_verdict_of_several_parts_reads_as_one_sentence(self):
         parts = [self.part("against Parquet", False),
@@ -3712,7 +3713,7 @@ class ShortFormTest(unittest.TestCase):
         self.assertEqual(RENDER.short_verdict(parts),
                          "met against QuestDB, not like-for-like; missed against Parquet; "
                          "against ArcticDB met on this run and missed on the replaced one, a "
-                         "change for tick-store, counted as missed")
+                         "change in tick-store's favour, counted as missed")
         self.assertEqual(RENDER.short_verdict([self.part("Q2 warm", True),
                                                self.part("Q4 warm", False)]),
                          "met on Q2 warm; missed on Q4 warm")

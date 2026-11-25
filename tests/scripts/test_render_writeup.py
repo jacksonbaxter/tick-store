@@ -1057,7 +1057,7 @@ class Marks(Tree):
         # Review R-B1: the changed outcome's mark in its short form, both outcomes, which way
         # the change leans and the one counted.
         self.assertIn("The day write is missed; met on this run and missed on the replaced one, "
-                      "a change for tick-store, counted as missed; inputs not alike, by each write's record: tick-store's input is in "
+                      "a change in tick-store's favour, counted as missed; inputs not alike, by each write's record: tick-store's input is in "
                       "memory before the clock starts, with 0 B read from the device inside the "
                       "clock; ArcticDB's is read from disk inside it", page)
         # The input clause stands for the long note; the moves and the replaced record's
@@ -1076,7 +1076,7 @@ class Marks(Tree):
     def test_a_phase_mark_is_given_in_its_short_form(self):
         self.phase_mark()
         page = RENDER.render(self.root).text
-        self.assertIn("a change for tick-store, counted as missed; a login during tick-store's "
+        self.assertIn("a change in tick-store's favour, counted as missed; a login during tick-store's "
                       "write; inputs not alike", page)
         self.assertNotIn("which held a remote login", page)
 
@@ -1086,7 +1086,7 @@ class Marks(Tree):
         full = ("(against ArcticDB) met on this run's figures, a change that favours tick-store, "
                 "and missed on the replaced run's, so counted as missed in every count, ranking "
                 "and first screen of the project's pages")
-        short = "met on this run and missed on the replaced one, a change for tick-store, " \
+        short = "met on this run and missed on the replaced one, a change in tick-store's favour, " \
             "counted as missed"
         own = RENDER.verdict_value
         self.addCleanup(setattr, RENDER, "verdict_value", own)
