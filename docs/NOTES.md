@@ -7628,6 +7628,44 @@ tree. None of these changes is quoted in the essay; its render is stale on the s
 strings as at `1b78f97`, earlier rows' generated text and the listed fault count, until it is
 rendered again.
 
+**The final page review's P3-F1 and P3-F2 (R1-38, R1-39).** The kernel table marked only a row's
+rate median, though every other figure in the row, the cycles median 2.709 that DS-4 reads among
+them, and the range, is taken over the same cases, the disturbed ones included; the column and
+codec tables marked one cell of a case's row in the same way, though no entry falls in their files
+now. Each such row is now marked once, beside its case or kernel, and the block's legend says the
+mark covers every figure in the row, a kernel row's medians, range, spread and counters among
+them; the docstrings, `docs/checks.md` and R1-38 say so, beside R1-30 (`d771587`). Of RESULTS.md's
+other tables, the comparison tables mark each timed figure by its own phase, each half of a "warm
+/ cold" or "A / B" cell apart, and the G-3 runs table gives each run's entries on its row; the
+peak memory and per-phase swap tables are taken over whole runs, the entered phases among them,
+but are memory and swap counts, not timings, and no mark is claimed for them. The fourth wording
+of the sentence under the table said the jobs' other runs were "listed in those records without a
+note": both records describe them in `not_listed` items by kind and period (the freeze record's
+first and sixth, the gate record's second), every item carries a `why`, and only the gate record's
+third gives runs one by one, nine backup runs, so "the few backup runs they single out" read two
+ways. I tested the new wording clause by clause. "Enter" is the records' own word: the gate
+record's third item says its nine runs are listed "and not as entries, so no mark and no table of
+runs shows them". In a clone at `7a2ee12` I dropped each timed entry group of both records and
+rendered: the groups that change a verdict are the per-security warm and cold queries (QL-4), the
+QuestDB plain write with its backup run (WT-4), tick-store's write (WT-2 and WT-4), the fused
+kernel case (DS-4), and the gate's runs and the fuzzing runs (G-3, which gives a login once for
+all the targets it fell in, so a group sharing its time with another target's leaves the
+verdict's words as they were, and each group changes its run's row); every other group lies in
+the open slice, a variant no target reads, or a kernel case no verdict takes. So where a record
+enters a login or a backup run inside a verdict's timing, the verdict says so. Both records
+describe the scheduled jobs' other runs, and no mark beside a verdict names them: the marks are
+built from entries alone. The sentence is now "Where the disturbance records enter a remote login
+or a backup run inside the timing a verdict rests on, the verdict says so; those records describe
+the scheduled jobs' other runs, and no mark beside a verdict names them.", 42 words to 39, and
+the prose under the table 90 to 87 (R1-39, `d771587`). Faults added:
+`kernel-mark-on-the-rate-alone`, `under-sentence-says-runs-listed-without-note` and
+`under-sentence-record-jobs-undescribed`; remade with the same mutation:
+`bench-kernel-median-unmarked` and `under-sentence-says-runs-cannot-be-tied`;
+`under-sentence-claims-every-event-marked` finds the new sentence. Each was shown by hand at
+`d771587` in a fresh clone, with `bench-case-entries-unread` and `bench-marks-unwired`, the
+control passing and the fault failing with the string its entry expects;
+`under-sentence-record-jobs-undescribed` also stops the guard test, which reads the same item.
+
 ### The gate's records, second pass
 
 2026-11-25. Two outside reviews of my first pass, one of the pages and records and one of the
