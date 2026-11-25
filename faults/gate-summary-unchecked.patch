@@ -1,9 +1,8 @@
 diff --git a/scripts/check_gate.py b/scripts/check_gate.py
-index 65e2223..227e7ad 100644
 --- a/scripts/check_gate.py
 +++ b/scripts/check_gate.py
-@@ -204,7 +204,7 @@ def check_document(document, name, seeds, timeout):
-                         f"-timeout={timeout}")
+@@ -347,7 +347,7 @@
+     problems += header_problems(header, runs, digest, timeout)
      problems += coverage_problems(runs, seeds, per_seed)
      problems += run_problems(runs, bar)
 -    if not problems and document["summary"] != summary_of(runs, per_seed):

@@ -1,8 +1,7 @@
 diff --git a/scripts/check_gate.py b/scripts/check_gate.py
-index 65e2223..b8cf4c7 100644
 --- a/scripts/check_gate.py
 +++ b/scripts/check_gate.py
-@@ -199,7 +199,7 @@ def check_document(document, name, seeds, timeout):
+@@ -341,7 +341,7 @@
      problems += [f"it holds {leak}" for leak in check_results.check_leaks(document)]
      header, runs = document["header"], document["runs"]
      bar, per_seed = header["bar_ms_per_execution"], header["runs_per_seed"]
@@ -10,4 +9,4 @@ index 65e2223..b8cf4c7 100644
 +    if timeout is None:
          problems.append(f"its bar, {bar} ms an execution, is not half of fuzz/launch.txt's "
                          f"-timeout={timeout}")
-     problems += coverage_problems(runs, seeds, per_seed)
+     problems += header_problems(header, runs, digest, timeout)

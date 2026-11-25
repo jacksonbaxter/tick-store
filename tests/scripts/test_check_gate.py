@@ -231,6 +231,69 @@ class FormTest(Tree):
                                   "not its own, 'fuzz_run_length'")
 
 
+class HeaderTest(Tree):
+    """The header's words are the assembler's, and its list is the tree's by its SHA-256."""
+
+    def header_refused(self, words, **changes):
+        self.assert_refused(lambda document: document["header"].update(changes), words)
+
+    def test_another_check_is_refused(self):
+        self.header_refused("its check 'G-2' is not", check="G-2")
+
+    def test_another_list_named_is_refused(self):
+        self.header_refused("its seeds_file 'fuzz/other_seeds.txt' is not 'fuzz/bound_seeds.txt'",
+                            seeds_file="fuzz/other_seeds.txt")
+
+    def test_a_list_digest_not_the_trees_is_refused(self):
+        self.header_refused("its seeds_file_sha256 '" + "0" * 64 + "' is not the tree's",
+                            seeds_file_sha256="0" * 64)
+
+    def test_a_list_the_tree_has_since_changed_is_refused(self):
+        self.assertEqual(self.problems(), [])
+        with (self.root / "fuzz" / "bound_seeds.txt").open("a", encoding="utf-8") as seeds:
+            seeds.write("# a comment added since\n")
+        self.assertTrue(any("its seeds_file_sha256" in problem for problem in self.problems()))
+
+    def test_a_bar_in_other_words_is_refused(self):
+        self.header_refused("its bar 'half the timeout' is not \"half of fuzz/launch.txt's "
+                            "-timeout=10, in ms an execution\"", bar="half the timeout")
+
+    def test_another_statement_is_refused(self):
+        def edit(document):
+            document["header"]["statement"] = document["header"]["statement"].replace(
+                "with no finding and ", "")
+        self.assert_refused(edit, "its statement is not the assembler's for 5 runs a seed")
+
+    def test_an_assembly_in_other_words_is_refused(self):
+        def edit(document):
+            document["header"]["assembled"] = document["header"]["assembled"].replace(
+                "Nothing was timed again.", "Each run was timed again.")
+        self.assert_refused(edit, "is not the assembler's account of its assembly")
+
+    def test_an_assembly_from_runs_of_other_days_is_refused(self):
+        def edit(document):
+            document["header"]["assembled"] = document["header"]["assembled"].replace(
+                "the runs of 2026-11-17:", "the runs of 2026-11-16, 2026-11-17:")
+        self.assert_refused(edit, "its assembled gives the runs of 2026-11-16, 2026-11-17, and "
+                                  "its runs are of 2026-11-17")
+
+    def test_an_assembly_on_no_day_is_refused(self):
+        def edit(document):
+            document["header"]["assembled"] = document["header"]["assembled"].replace(
+                "Assembled on 2026-11-25", "Assembled on 2026-13-45")
+        self.assert_refused(edit, "its assembled gives 2026-13-45 as the day it was assembled")
+
+    def test_no_hosts_facts_are_refused(self):
+        self.header_refused("its hosts are not the assembler's facts of macOS and Linux",
+                            hosts={})
+
+    def test_hosts_in_another_order_are_refused(self):
+        def edit(document):
+            hosts = document["header"]["hosts"]
+            document["header"]["hosts"] = {"Linux": hosts["Linux"], "macOS": hosts["macOS"]}
+        self.assert_refused(edit, "its hosts are not in the order macOS, Linux")
+
+
 class LeakTest(Tree):
     def test_a_home_path_in_the_file_is_refused(self):
         self.assert_refused(lambda document: document["header"].update(
@@ -262,6 +325,16 @@ class CoverageTest(Tree):
             document["runs"] = [run for run in document["runs"] if run["run"] != 5]
             document["header"]["runs_per_seed"] = 4
         self.assert_refused(edit, "it gives 4 runs a seed, and the gate requires 5")
+
+    def test_more_runs_than_the_gate_requires_are_refused(self):
+        def edit(document):
+            for run in list(document["runs"]):
+                if run["run"] == 5:
+                    document["runs"].append({**run, "run": 6})
+            document["header"]["runs_per_seed"] = 6
+            document["header"]["statement"] = document["header"]["statement"].replace(
+                "5 times", "6 times")
+        self.assert_refused(edit, "it gives 6 runs a seed, and the gate requires 5")
 
     def test_a_seed_with_a_run_missing_is_refused(self):
         def edit(document):

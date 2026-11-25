@@ -1,0 +1,12 @@
+diff --git a/scripts/check_gate.py b/scripts/check_gate.py
+--- a/scripts/check_gate.py
++++ b/scripts/check_gate.py
+@@ -284,7 +284,7 @@
+ def coverage_problems(runs, seeds, per_seed):
+     """Every seed of the list on every host, each with its runs numbered 1 to per_seed."""
+     problems = []
+-    if per_seed != REQUIRED_RUNS:
++    if per_seed < REQUIRED_RUNS:
+         problems.append(f"it gives {per_seed} runs a seed, and the gate requires "
+                         f"{REQUIRED_RUNS}")
+     for host in HOSTS:

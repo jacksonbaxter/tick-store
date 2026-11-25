@@ -1670,6 +1670,42 @@ FAULTS = (
     Fault("gate-utc-not-real-accepted", "py-scripts", "check_gate.py takes a run that starts on "
           "31 November, which its time pattern matches", CHECK_FAILED,
           "FAIL: test_a_start_on_no_real_day_is_refused (__main__.FormTest"),
+    # The gate file's header gives the assembler's words, the tree's list by its SHA-256 and
+    # exactly the gate's runs a seed.
+    Fault("gate-header-check-unchecked", "py-scripts", "check_gate.py takes a gate file whose "
+          "check is another's", CHECK_FAILED, "FAIL: test_another_check_is_refused "
+          "(__main__.HeaderTest"),
+    Fault("gate-seeds-file-unchecked", "py-scripts", "check_gate.py takes a gate file that names "
+          "another list of seeds, which the page prints", CHECK_FAILED,
+          "FAIL: test_another_list_named_is_refused (__main__.HeaderTest"),
+    Fault("gate-seeds-digest-unchecked", "py-scripts", "check_gate.py takes a gate file whose "
+          "list's SHA-256 is not the tree's fuzz/bound_seeds.txt's", CHECK_FAILED,
+          "FAIL: test_a_list_digest_not_the_trees_is_refused (__main__.HeaderTest"),
+    Fault("gate-bar-text-unchecked", "py-scripts", "check_gate.py takes a gate file whose bar is "
+          "given in other words", CHECK_FAILED, "FAIL: test_a_bar_in_other_words_is_refused "
+          "(__main__.HeaderTest"),
+    Fault("gate-statement-unchecked", "py-scripts", "check_gate.py takes a gate file whose "
+          "statement drops the finding from the pass rule", CHECK_FAILED,
+          "FAIL: test_another_statement_is_refused (__main__.HeaderTest"),
+    Fault("gate-assembled-form-unchecked", "py-scripts", "check_gate.py takes a gate file that "
+          "says its runs were timed again", CHECK_FAILED,
+          "FAIL: test_an_assembly_in_other_words_is_refused (__main__.HeaderTest"),
+    Fault("gate-assembled-days-unchecked", "py-scripts", "check_gate.py takes a gate file that "
+          "gives its runs' days otherwise than its runs do", CHECK_FAILED,
+          "FAIL: test_an_assembly_from_runs_of_other_days_is_refused (__main__.HeaderTest"),
+    Fault("gate-assembled-day-unchecked", "py-scripts", "check_gate.py takes a gate file "
+          "assembled on the 45th of a 13th month", CHECK_FAILED,
+          "FAIL: test_an_assembly_on_no_day_is_refused (__main__.HeaderTest"),
+    Fault("gate-hosts-unchecked", "py-scripts", "check_gate.py takes a gate file that gives no "
+          "host's facts", CHECK_FAILED, "FAIL: test_no_hosts_facts_are_refused "
+          "(__main__.HeaderTest"),
+    Fault("gate-hosts-order-unchecked", "py-scripts", "check_gate.py takes a gate file whose "
+          "hosts are not in the assembler's order", CHECK_FAILED,
+          "FAIL: test_hosts_in_another_order_are_refused (__main__.HeaderTest"),
+    Fault("gate-more-runs-accepted", "py-scripts",
+          "check_gate.py takes a gate file that ran each seed six times, where the gate requires "
+          "five", CHECK_FAILED, "FAIL: test_more_runs_than_the_gate_requires_are_refused "
+          "(__main__.CoverageTest"),
     Fault("ci-shallow-checkout", "py-scripts", "CI checks out the single commit it was pushed "
           "at, so G-3's file, which judges an older one, could never be tied there",
           CHECK_FAILED, "FAIL: test_the_workflow_checks_out_the_history_g3s_tie_needs "

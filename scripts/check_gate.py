@@ -18,11 +18,14 @@ A file is refused if:
   before its start, a busy share outside 0 to 100 or not to one decimal, or a target that is
   not its seed's own in fuzz/bound_seeds.txt;
 - it holds a machine's path, user or host name (check_results.check_leaks);
-- its bar is not half of the tree's fuzz/launch.txt -timeout, in ms an execution;
+- its bar is not half of the tree's fuzz/launch.txt -timeout, in ms an execution, or its
+  header's words are not the assembler's: its check, its statement for its runs a seed, its
+  account of its assembly with the days of its runs, its bar's text, the hosts' facts, and
+  its list, fuzz/bound_seeds.txt, by its SHA-256 as the tree holds it;
 - a seed of the tree's fuzz/bound_seeds.txt has no runs on a host, or a host ran a seed the list
   does not hold;
-- it gives fewer runs a seed than the gate requires, REQUIRED_RUNS, or a seed's runs on a host
-  are not numbered 1 to its runs a seed;
+- it gives other than the gate's runs a seed, REQUIRED_RUNS, or a seed's runs on a host are
+  not numbered 1 to its runs a seed;
 - a run's time an execution is not its libFuzzer time over its executed units;
 - a run over the bar, or one that did not exit 0 with no finding, or on Linux one whose sibling
   was not kept busy at its start and its end, is marked pass, or a run that meets all of that is
@@ -41,6 +44,7 @@ Standard library only.
 
 import argparse
 import datetime
+import hashlib
 import json
 import math
 import re
@@ -65,6 +69,40 @@ LINUX_KEYS = {"cpu_busy_percent", "processes_started", "sibling_busy_at_start",
               "sibling_busy_at_end"}
 UTC = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ")
 CASE = re.compile(r"^(\S+) run (\d+) of (\d+)$")
+# The header's words, as scripts/gate_results.py writes them.
+SEEDS_FILE = "fuzz/bound_seeds.txt"
+CHECK = "G-3's bound-seed gate"
+BAR = "half of fuzz/launch.txt's -timeout={timeout}, in ms an execution"
+STATEMENT = ("Before G-3's fuzzing runs, each named seed of fuzz/bound_seeds.txt run alone through "
+             "its fuzz target, built by the fuzz preset at this commit, with fuzz/launch.txt's "
+             "flags and -max_len and -runs=1, {per_seed} times on each host. A run's time an "
+             "execution is libFuzzer's time for the whole run of the input, its Executed line, "
+             "over its count of executed units, 2 where the leak check reran the input; a run "
+             "passes if it exited 0 with no finding and within the bar, and on Linux with its "
+             "sibling kept busy at its start and its end; the gate passes if every run of every "
+             "seed does.")
+ASSEMBLED = re.compile(
+    r"Assembled on (\d{4}-\d\d-\d\d) by scripts/gate_results\.py, a script written after the "
+    r"runs, from the raw records of the runs of (.+): each host's step log and each run's "
+    r"libFuzzer output, and on Linux each run's per-CPU counter copies, wall time and record of "
+    r"its sibling's spinning process\. The runner that ran the gate and wrote those records is "
+    r"not in the repository\. Nothing was timed again\.")
+HOST_FACTS = {
+    "macOS": {
+        "placement": ("each run alone under heavy.sh, unpinned, with fuzz/launch.txt's macOS "
+                      "leak options and the build's own kernel set"),
+        "kept": ("the step log's start and end of each run, UTC to the second, its exit code, and "
+                 "its line of figures with the 1-minute load read just before it began; "
+                 "libFuzzer's output. No per-CPU record")},
+    "Linux": {
+        "placement": ("each run alone under heavy.sh, pinned to cpu6 with taskset, at "
+                      "TICK_STORE_SIMD=avx2, with fuzz/launch.txt's Linux leak options, and cpu7, "
+                      "cpu6's SMT sibling, kept busy for the whole run by a spinning process "
+                      "started a second before it"),
+        "kept": ("as on macOS, and the kernel's per-CPU counters copied before and after the "
+                 "run, which give each cpu's busy share over it and the processes started "
+                 "during it; its wall time; and whether the spinning process was running at its "
+                 "start and at its end")}}
 DISTURBANCES = "disturbances-*.json"
 EXIT_OK, EXIT_INVALID, EXIT_USAGE = 0, 1, 2
 
@@ -209,10 +247,44 @@ def run_problems(runs, bar):
     return problems
 
 
+def header_problems(header, runs, digest, timeout):
+    """The header's words against the assembler's and the tree's list, by its SHA-256."""
+    problems = []
+    if header["check"] != CHECK:
+        problems.append(f"its check {header['check']!r} is not {CHECK!r}")
+    if header["seeds_file"] != SEEDS_FILE:
+        problems.append(f"its seeds_file {header['seeds_file']!r} is not {SEEDS_FILE!r}")
+    if header["seeds_file_sha256"] != digest:
+        problems.append(f"its seeds_file_sha256 {header['seeds_file_sha256']!r} is not the "
+                        f"tree's {SEEDS_FILE}'s, {digest}")
+    if header["bar"] != BAR.format(timeout=timeout):
+        problems.append(f"its bar {header['bar']!r} is not "
+                        f"{BAR.format(timeout=timeout)!r}")
+    if header["statement"] != STATEMENT.format(per_seed=header["runs_per_seed"]):
+        problems.append(f"its statement is not the assembler's for "
+                        f"{header['runs_per_seed']} runs a seed")
+    days = ", ".join(sorted({run["start"][:10] for run in runs}))
+    found = ASSEMBLED.fullmatch(header["assembled"]) if isinstance(header["assembled"], str) \
+        else None
+    day, of = (found[1], found[2]) if found else (None, None)
+    if not found:
+        problems.append(f"its assembled {header['assembled']!r} is not the assembler's account "
+                        "of its assembly")
+    elif of != days:
+        problems.append(f"its assembled gives the runs of {of}, and its runs are of {days}")
+    elif not is_utc(f"{day}T00:00:00Z"):
+        problems.append(f"its assembled gives {day} as the day it was assembled, which is no day")
+    if header["hosts"] != HOST_FACTS:
+        problems.append(f"its hosts are not the assembler's facts of {' and '.join(HOSTS)}")
+    elif list(header["hosts"]) != list(HOSTS):
+        problems.append(f"its hosts are not in the order {', '.join(HOSTS)}")
+    return problems
+
+
 def coverage_problems(runs, seeds, per_seed):
     """Every seed of the list on every host, each with its runs numbered 1 to per_seed."""
     problems = []
-    if per_seed < REQUIRED_RUNS:
+    if per_seed != REQUIRED_RUNS:
         problems.append(f"it gives {per_seed} runs a seed, and the gate requires "
                         f"{REQUIRED_RUNS}")
     for host in HOSTS:
@@ -260,8 +332,9 @@ def summary_of(runs, per_seed):
     return summary
 
 
-def check_document(document, name, seeds, timeout):
-    """Every problem of one gate file, against the tree's list of seeds and its -timeout."""
+def check_document(document, name, seeds, timeout, digest):
+    """Every problem of one gate file, against the tree's list of seeds, the list's SHA-256 and
+    the tree's -timeout."""
     problems = shape_problems(document, name)
     if problems:
         return problems
@@ -271,6 +344,7 @@ def check_document(document, name, seeds, timeout):
     if timeout is None or bar != timeout * 1000 // 2:
         problems.append(f"its bar, {bar} ms an execution, is not half of fuzz/launch.txt's "
                         f"-timeout={timeout}")
+    problems += header_problems(header, runs, digest, timeout)
     problems += coverage_problems(runs, seeds, per_seed)
     problems += run_problems(runs, bar)
     if not problems and document["summary"] != summary_of(runs, per_seed):
@@ -328,7 +402,8 @@ def check(root, paths=None):
     paths = sorted((root / "results").glob("fuzz-gate-*.json")) if paths is None else paths
     found, documents = {}, {}
     if paths:
-        seeds = bound_seeds(root / "fuzz" / "bound_seeds.txt")
+        seeds = bound_seeds(root / SEEDS_FILE)
+        digest = hashlib.sha256((root / SEEDS_FILE).read_bytes()).hexdigest()
         timeout = timeout_of(root / "fuzz" / "launch.txt")
     for path in paths:
         try:
@@ -336,7 +411,7 @@ def check(root, paths=None):
         except (OSError, json.JSONDecodeError) as error:
             found[Path(path).name] = [str(error)]
             continue
-        problems = check_document(document, Path(path).name, seeds, timeout)
+        problems = check_document(document, Path(path).name, seeds, timeout, digest)
         found[Path(path).name] = problems
         if not problems:
             documents[document["header"]["commit"][:12]] = document
