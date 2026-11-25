@@ -2962,7 +2962,7 @@ def gate_block_files(root):
     return [(page, text, [(begin, end, lines)])]
 
 
-VERDICT_WORD ={True: "met", False: "missed", None: "not judged"}
+VERDICT_WORD = {True: "met", False: "missed", None: "not judged"}
 
 
 def has_headline(definitions_path):
