@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -630,7 +630,7 @@
+ 
+ def plain_label(label):
+     for raw, plain in PLAIN_LABEL.items():
+-        label = label.replace(raw, plain)
++        label = label
+     return label
+ 
+ 

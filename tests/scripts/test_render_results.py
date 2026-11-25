@@ -2052,7 +2052,10 @@ class RenderCompareTest(Scratch):
         sentence = ("On macOS, APFS can keep blocks allocated past the end of a file that grew "
                     "in many small writes over time, so a stored figure here can exceed the "
                     "file's own bytes: compare stored sizes from Linux.")
-        self.assertEqual(macos.count(sentence), 2)
+        # Said once a block, under class A, which class B's columns point to (review R1-6).
+        self.assertEqual(macos.count(sentence), 1)
+        self.assertEqual(macos.count("The columns read as for class A."), 1)
+        self.assertEqual(macos.count(RENDER.WRITE_TIMES), 1)
         self.assertNotIn("APFS", linux)
 
     def test_a_linux_tickstore_alone_day_renders_with_the_guards_memory(self):
@@ -2899,8 +2902,12 @@ class ConditionsTest(Scratch):
                       RENDER.NOT_COUNTED_SHORT, RENDER.NOT_COUNTED,
                       *RENDER.SCREEN_LEANS.values()):
             self.assertIn(short, explained)
+        # Each kind in the words its cells give, each clause of it, and what a span computed
+        # from a watcher's period means, which no cell repeats, said once (review R1-6).
         for what in RENDER.SHORT_DISTURBANCE:
-            self.assertIn(what, explained)
+            for clause in RENDER.held_what(what).split("; "):
+                self.assertIn(clause, explained)
+        self.assertEqual(explained.count(RENDER.PERIOD_MEANING), 1)
         self.assertIsNone(self.quoted("| T-13 | Linux | 1 ms | Met (swap-in: ArcticDB; met, not "
                                       "counted: no replaced run (ArcticDB)) |\n", [SWAP_ROW]))
 
@@ -3572,6 +3579,21 @@ class ShortFormTest(unittest.TestCase):
 
 
 
+class PlainLabelTest(unittest.TestCase):
+    """Review R1-6: a comparison file's label is given in a reader's words, not the harness's."""
+
+    def test_a_label_naming_the_host_column_says_both_machines(self):
+        label = ("The four-system full day runs on Linux only; this gives the targets whose host "
+                 "is Both their figure on this host.")
+        self.assertEqual(RENDER.plain_label(label), "The four-system full day runs on Linux "
+                         "only; this gives the targets judged on both machines their figure on "
+                         "this host.")
+        for path in (REPO_ROOT / "results" / "compare").glob("*.json"):
+            with self.subTest(path=path.name):
+                document = json.loads(path.read_text(encoding="utf-8"))
+                self.assertNotIn("host is Both", RENDER.plain_label(document["label"]))
+
+
 class FuzzDisturbanceTest(unittest.TestCase):
     """Reviews R-D1 and R-D2: a fuzz run's record, its phases checked and marked, and a phase
     of several events said by kind and count."""
@@ -3633,6 +3655,17 @@ class FuzzDisturbanceTest(unittest.TestCase):
                          "two remote logins and a backup run")
         with self.assertRaisesRegex(RENDER.TargetError, "no short form for the disturbance"):
             RENDER.held_words([dict(self.entry(), what="a neighbour's batch job")])
+
+    def test_a_cell_names_a_watchers_login_without_what_its_span_means(self):
+        # Review R1-6: what a span computed from a watcher's period means is said once, under
+        # the targets table, and not in each cell that names such a login.
+        read = ("fuzz", "fuzz_pfor")
+        for what in (self.LOGIN, f"{self.LOGIN}; {RENDER.WATCHER_OVERLAP}"):
+            with self.subTest(what=what):
+                text = RENDER.group_text(read, [self.entry(what=what)], None, {})
+                self.assertNotIn(RENDER.PERIOD_MEANING, text)
+                self.assertIn(f"which held {RENDER.WATCHER_PERIOD}", text)
+        self.assertEqual(RENDER.held_what(self.LOGIN), RENDER.WATCHER_PERIOD)
 
     def test_a_case_of_a_median_says_how_many_cases_the_median_takes(self):
         document = {"results": [{"case": f"k/w={width}/avx2"} for width in range(65)]}

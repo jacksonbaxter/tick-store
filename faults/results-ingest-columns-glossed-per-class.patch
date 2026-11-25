@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -663,7 +663,7 @@
+         clause = input_clause(document, class_name)
+         columns = (f"Stored bytes are allocated at rest, and the ratio is the {unit}'s source "
+                    "bytes over them. " + (f"{MACOS_ALLOCATION} " if host == "macOS" else "") +
+-                   WRITE_TIMES) if class_name == "A" else "The columns read as for class A."
++                   WRITE_TIMES) if class_name in "AB" else "The columns read as for class A."
+         lines += ["", f"Ingest and size, class {class_name}: {meaning}. {columns}"
+                       + (f" The rates below are not like for like: {clause}." if clause else ""),
+                   ""]

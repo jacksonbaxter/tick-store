@@ -1,12 +1,12 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -2123,7 +2123,7 @@
+@@ -2328,7 +2328,7 @@
              "which this one replaces, gave 49.65 ms\" for a disturbance's. "
              "A phase that held several events gives each kind once with its count, such as "
              "\"two remote logins\" or \"a backup run and a remote login\". "
 -            f"The kinds of disturbance, short: {kinds}. A "
 +            f"The kinds of disturbance are short. A "
              "variant's plain words are its target row's in `scripts/targets.json`. "
-             "Each row above gives every mark in full. " + SCHEDULED_JOBS)
- 
+             "Each row above gives every mark in full, but for what a computed span means, "
+             "which only this paragraph says. " + SCHEDULED_JOBS)

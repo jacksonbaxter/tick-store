@@ -623,9 +623,21 @@ def time_memory_lines(document):
     return lines
 
 
+# Words a comparison file's label gives in the harness's own terms, said here as a reader
+# takes them; the file itself is a result and is never edited (review R1-6).
+PLAIN_LABEL = {"the targets whose host is Both": "the targets judged on both machines"}
+
+
+def plain_label(label):
+    for raw, plain in PLAIN_LABEL.items():
+        label = label.replace(raw, plain)
+    return label
+
+
 def compare_for(document, entries=()):
     """One comparison file's block. entries are the disturbances the tree lists in its timed
-    phases, each figure from one marked."""
+    phases, each figure from one marked. The columns of the ingest tables are glossed once, under
+    class A, and the label is given in plain words."""
     header = document["header"]
     host = header["host"]
     day = full_day_of(document)
@@ -637,9 +649,11 @@ def compare_for(document, entries=()):
                "lowest median and the lowest tail figure of the four.")
     note = method_input_note(document)
     lines = [f"**{host}, {scope}.** {header['cpu_model']}, commit `{header['commit'][:12]}`. "
-             f"{header['statement']} {document['label']}" + (f" {note}" if note else ""),
+             f"{header['statement']} {plain_label(document['label'])}" +
+             (f" {note}" if note else ""),
              "",
-             "Queries, on each system's class B store, in milliseconds. Each latency is the "
+             f"Queries, on {'tick-store' if alone else 'each system'}'s class B store, in "
+             "milliseconds. Each latency is the "
              "median of its runs and its tail figure, the 99th percentile by nearest rank, which "
              f"is {measured_as(query_tails(document))}. {ranking}", ""]
     lines += query_table(document, entries)
@@ -647,10 +661,10 @@ def compare_for(document, entries=()):
                                 ("B", "returns after a flush to the device")):
         unit = "day" if day else "slice"
         clause = input_clause(document, class_name)
-        lines += ["", f"Ingest and size, class {class_name}: {meaning}. Stored bytes are "
-                      f"allocated at rest, and the ratio is the {unit}'s source bytes over them. "
-                      + (f"{MACOS_ALLOCATION} " if host == "macOS" else "")
-                      + f"{WRITE_TIMES}"
+        columns = (f"Stored bytes are allocated at rest, and the ratio is the {unit}'s source "
+                   "bytes over them. " + (f"{MACOS_ALLOCATION} " if host == "macOS" else "") +
+                   WRITE_TIMES) if class_name == "A" else "The columns read as for class A."
+        lines += ["", f"Ingest and size, class {class_name}: {meaning}. {columns}"
                       + (f" The rates below are not like for like: {clause}." if clause else ""),
                   ""]
         lines += ingest_table(document, class_name, entries)
@@ -669,7 +683,8 @@ def compare_for(document, entries=()):
             lines += [""] + time_memory_lines(document)
         guard = ("No guard ran beside tick-store alone. " if alone and host != "Linux" else
                  "Swap-out alone does not stop a run. ")
-        lines += ["", "Swap per phase, host-wide, over every variant and class each system ran. "
+        lines += ["", "Swap per phase, host-wide, over every variant and class "
+                      f"{'tick-store' if alone else 'each system'} ran. "
                       f"{guard}A timed query with any page swapped in is kept and "
                       f"marked{SWAP_MARK}. See \"The guard's swap rule\" in docs/NOTES.md.", ""]
         lines += swap_table(document)
@@ -2054,9 +2069,15 @@ def replaced_figure(read, replaced, row):
         return None
 
 
+def held_what(what):
+    """A disturbance's kind as a cell gives it: the record's words, less what a span computed
+    from a watcher's period means, which the kinds under the targets table say once."""
+    return what.replace(f": {PERIOD_MEANING}", "", 1)
+
+
 def disturbance_text(entry, read, replaced, row):
     """One disturbance in a phase, its span, and the replaced run's figure there if any."""
-    text = f"{phase_words(entry, read)}, which held {entry['what']}, {utc_span(entry)}"
+    text = f"{phase_words(entry, read)}, which held {held_what(entry['what'])}, {utc_span(entry)}"
     figure = replaced_figure(read, replaced, row or {})
     if figure is not None:
         text += f", where the replaced run's {figure[0]} is {shown(figure[1], row or {})}"
@@ -2080,14 +2101,17 @@ SHORT_REPLACED = "replaced run "
 # count it: its noun, then its plural. A phase that held several events says each kind once
 # with its count, "two remote logins", "a backup run and a remote login", so a mark does not
 # grow a clause per event (review R-D2). The render refuses an entry of a kind not here.
-WATCHER_COMPUTED = ("a remote login by another project's watcher, computed from its period "
-                    "between two recorded lines: at some time between start and end, not "
-                    "recorded exactly")
+WATCHER_PERIOD = ("a remote login by another project's watcher, computed from its period "
+                  "between two recorded lines")
+# What the span of such a login means, which the records give with each one: said once, in the
+# kinds under the targets table, and not in each cell that names one (review R1-6).
+PERIOD_MEANING = "at some time between start and end, not recorded exactly"
+WATCHER_COMPUTED = f"{WATCHER_PERIOD}: {PERIOD_MEANING}"
+WATCHER_OVERLAP = "its bounds also overlap the phase before or after, listed beside it"
 SHORT_DISTURBANCE = {
     "a remote login by this project": ("remote login", "remote logins"),
     WATCHER_COMPUTED: ("remote login", "remote logins"),
-    WATCHER_COMPUTED + "; its bounds also overlap the phase before or after, listed beside it":
-        ("remote login", "remote logins"),
+    f"{WATCHER_COMPUTED}; {WATCHER_OVERLAP}": ("remote login", "remote logins"),
     "a remote login by another project's watcher, recorded in its status file: the login ended "
     "at the line's time and began no earlier than start": ("remote login", "remote logins"),
     "the host's scheduled backup job": ("backup run", "backup runs"),
@@ -2137,7 +2161,7 @@ def group_text(read, entries, replaced, row, document=None):
     the replaced run's figure there if any, and for a fuzz pass that they could only slow it."""
     spans = and_list([utc_span(entry) for entry in entries])
     # One event is said as the record says it; several, by kind and count.
-    held = entries[0]["what"] if len(entries) == 1 else held_words(entries)
+    held = held_what(entries[0]["what"]) if len(entries) == 1 else held_words(entries)
     text = f"{phase_words(entries[0], read, document)}, which held {held}, {spans}"
     figure = replaced_figure(read, replaced, row or {})
     if figure is not None:
@@ -2256,8 +2280,12 @@ def setup_forms(faster):
 def short_forms_explained():
     """The sentence under RESULTS.md's targets table that explains each short form the README's
     first screen, a hand-written quote or the essay may use, in full words."""
-    kinds = "; ".join(f"\"{single}\" for {what}" for what, (single, _) in
-                      SHORT_DISTURBANCE.items())
+    # Each kind once, as its cells give it; the clause a watcher's login may add, and what its
+    # computed span means, follow once (review R1-6).
+    kinds = "; ".join(f"\"{single}\" for {held_what(what)}" for what, (single, _) in
+                      SHORT_DISTURBANCE.items() if not what.endswith(f"; {WATCHER_OVERLAP}"))
+    kinds += (f". A login {WATCHER_PERIOD[len('a remote login '):]}, fell {PERIOD_MEANING}, "
+              f"and where \"{WATCHER_OVERLAP}\" follows, its span reaches that phase too")
     return ("A mark beside a verdict or a figure may be given short: "
             f"\"({SHORT_SWAPPED}ArcticDB, QuestDB)\" stands for \"{SWAPPED}ArcticDB's ... and "
             "QuestDB's ...\", the figures that decide the verdict from those systems' headline "
@@ -2302,7 +2330,8 @@ def short_forms_explained():
             "\"two remote logins\" or \"a backup run and a remote login\". "
             f"The kinds of disturbance, short: {kinds}. A "
             "variant's plain words are its target row's in `scripts/targets.json`. "
-            "Each row above gives every mark in full. " + SCHEDULED_JOBS)
+            "Each row above gives every mark in full, but for what a computed span means, "
+            "which only this paragraph says. " + SCHEDULED_JOBS)
 
 
 # The limit the marks leave, said once under the targets table (review R-D3): the host's own

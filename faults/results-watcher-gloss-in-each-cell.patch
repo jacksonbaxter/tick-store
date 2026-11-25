@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -2072,7 +2072,7 @@
+ def held_what(what):
+     """A disturbance's kind as a cell gives it: the record's words, less what a span computed
+     from a watcher's period means, which the kinds under the targets table say once."""
+-    return what.replace(f": {PERIOD_MEANING}", "", 1)
++    return what
+ 
+ 
+ def disturbance_text(entry, read, replaced, row):

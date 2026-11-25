@@ -2192,6 +2192,19 @@ FAULTS = (
           CHECK_FAILED,
           "FAIL: test_the_not_counted_mark_stands_in_for_the_swap_mark_of_the_same_systems "
           "(__main__.SidesTest"),
+    # Review R1-6: RESULTS.md's generated prose in a reader's words, each gloss said once.
+    Fault("results-label-raw-enum", "py-scripts", "render_results.py gives a comparison file's "
+          "label as the harness words it, \"the targets whose host is Both\"", CHECK_FAILED,
+          "FAIL: test_a_label_naming_the_host_column_says_both_machines (__main__.PlainLabelTest"),
+    Fault("results-watcher-gloss-in-each-cell", "py-scripts", "render_results.py gives what a "
+          "span computed from a watcher's period means in each cell that names such a login",
+          CHECK_FAILED,
+          "FAIL: test_a_cell_names_a_watchers_login_without_what_its_span_means "
+          "(__main__.FuzzDisturbanceTest"),
+    Fault("results-ingest-columns-glossed-per-class", "py-scripts", "render_results.py glosses "
+          "the ingest tables' columns again under class B", CHECK_FAILED,
+          "FAIL: test_macos_stored_bytes_say_they_can_exceed_the_files_own "
+          "(__main__.RenderCompareTest"),
     Fault("sides-left-out-counts-uncounted", "py-scripts", "render_results.py counts a part no run confirms among the first screen's met parts", CHECK_FAILED,
           "FAIL: test_no_count_takes_a_part_not_counted (__main__.SidesTest"),
     # The ruling on review P1-5: G-3's runs beside its verdict, from its file.
