@@ -272,7 +272,7 @@ names systems timed while the host swapped memory.
 | Gorilla decode, M4 | ≤ 2.12 ns (mailing-list post, smooth synthetic values) | 8.897 ns | 4.20x | missed | Not measured |
 | Gorilla decode in L1 | ≤ 21.3 cycles (ALP paper, Intel Ice Lake) | 60.66 cycles | 2.85x | missed | 198.40 instructions a value |
 | Delta decode, M4 | ≥ 3.6 G values/s (FastLanes, Apple M1) | 3.40 G values/s | 5.6% | missed | 7 of 65 widths reach it |
-| Delta decode | ≤ 0.377 cycles (FastLanes, Zen 3 server) | 2.709 cycles | 7.18x | missed; a remote login during one of the 65 cases its median takes | 5.46 instructions a value |
+| Delta decode | ≤ 0.377 cycles (FastLanes, Zen 3 server) | 2.709 cycles | 7.18x | missed; a remote login during one of the 65 cases behind its median | 5.46 instructions a value |
 | Price-column decode | ≥ 4,605 MB/s (ALP, an AMD EPYC 9554 core) | 1,301 MB/s; M4 3,367 MB/s | 3.54x; 26.9% | missed; M4 missed | Steps under Decode |
 | Store against Gorilla decode, prices, M4 | ≥ 14x (third-party benchmark, Apple M2 Max) | 3.74x | 3.74x | missed in part | Steps under Decode |
 | Single-thread ingest | ≥ 8.59 M records/s (QuestDB vendor figure, 32 workers) | 1.270 M records/s; M4 3.302 M records/s | 6.77x; 2.60x | missed; M4 missed | A single thread; writer under Writes |
@@ -280,12 +280,12 @@ names systems timed while the host swapped memory.
 | Q2 warm median | ≤ 16.9 ms (DuckDB on a small Parquet store, preprint) | 74.04 ms; M4 25.28 ms | 4.38x; 8.38 ms | missed; M4 missed | 100 ns a row |
 | Q3 warm median | ≤ 0.41 ms (QuestDB vendor benchmark) | 36.07 ms; M4 15.06 ms | 88x; 37x | missed; M4 missed | No stored aggregate |
 | Q4 cold mean | ≤ 10 ms (TimescaleDB, order-book preprint) | 356.09 ms; M4 136.16 ms | 36x; 14x | missed; M4 missed | 35.1 MB read cold |
-| Lowest median and p99 of the fixed setups, each query | same machine | warm medians in the table at a glance | 8.7x on Q1; 167x on Q4; 16.8x on Q5 | missed in part; met on Q2 warm, Q2 cold, Q3 warm and Q3 cold against each system's chosen setup, while ArcticDB with a table per stock is faster, and on Q5 cold; met, not counted: swapping memory in both runs (ArcticDB, QuestDB); swap-in: ArcticDB, QuestDB, tick-store | Q1 to Q5 under Queries |
+| Lowest median and p99 of the fixed setups, each query | same machine | warm medians in the table at a glance | 8.7x on Q1; 167x on Q4; 16.8x on Q5 | missed; met on Q2 warm, Q2 cold, Q3 warm and Q3 cold against each system's chosen setup, while ArcticDB with a table per stock is faster, and on Q5 cold; met, not counted: swapping memory in both runs (ArcticDB, QuestDB); swap-in: ArcticDB, QuestDB, tick-store | Q1 to Q5 under Queries |
 
 Writes against each other system, on both clocks, without a flush:
 missed; inputs not alike: tick-store's input is in memory before the clock starts, with 250,916,864 B read from the device inside the clock; Parquet's, ArcticDB's and QuestDB's are read from disk inside it, with 18,411,094,016 to 21,521,625,088 B; engine-only may still hold those reads ([the method](#how-it-was-measured)).
 
-With a flush: met against QuestDB, not like-for-like; missed against Parquet; against ArcticDB met on this run and missed on the replaced one, a change for tick-store, counted as missed; two remote logins during tick-store's write; replaced run 188.9 s; a backup run and a remote login during QuestDB's write; replaced run 1,269.2 s; met, not counted: a disturbance the replaced run has no record to rule out (QuestDB); inputs not alike: tick-store's input is in memory before the clock starts, with 274,239,488 B read from the device inside the clock; Parquet's, ArcticDB's and QuestDB's are read from disk inside it, with 23,846,309,888 to 24,631,062,528 B; engine-only may still hold those reads ([the method](#how-it-was-measured)). The [targets table](RESULTS.md#targets) gives both runs'
+With a flush: met against QuestDB, not like-for-like; missed against Parquet; against ArcticDB met on this run and missed on the replaced one, a change in tick-store's favour, counted as missed; two remote logins during tick-store's write; replaced run 188.9 s; a backup run and a remote login during QuestDB's write; replaced run 1,269.2 s; met, not counted: swapping in both runs' write phases and no disturbance record for the replaced run (QuestDB); inputs not alike: tick-store's input is in memory before the clock starts, with 274,239,488 B read from the device inside the clock; Parquet's, ArcticDB's and QuestDB's are read from disk inside it, with 23,846,309,888 to 24,631,062,528 B; engine-only may still hold those reads ([the method](#how-it-was-measured)). The [targets table](RESULTS.md#targets) gives both runs'
 figures; the cause of ArcticDB's move between them was not measured and is not known.
 
 ## Not judged
@@ -307,7 +307,7 @@ executions from a fuzzing run, not hide a finding: the
 [runs by target](RESULTS.md#g-3-runs-by-target) give each target's executions.
 
 The checks and the faults that prove them are in the README; the prover's
-record covers 99 of its 514 listed faults.
+record covers 99 of its 693 listed faults.
 
 ## Limits
 
