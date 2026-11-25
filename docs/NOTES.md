@@ -7255,6 +7255,65 @@ so it cannot confirm a login or a backup on a rival's side either; WT-4's part a
 therefore not counted, and, being labelled not like-for-like, would not be in any case. Nothing
 counted it before. `render_results.py` now reads all of this from the records.
 
+### The comparison plan's capacity figures, the old write sentences and a fault stopped at its build
+
+2026-11-25. What I corrected in the final review's round of 25 November (docs/REVIEW.md, "The
+final review of 25 November: the comparison plan, the old write sentences, CI and one fault").
+
+- **compare/README.md's variant plan (`1a41032`).** The plan's QuestDB row gave writes of 10.5 and
+  16 min "from the capacity check". Those are the capacity run that `9e05af1` replaced (`git show
+  9e05af1^:results/fullday-capacity-12302019.json`, QuestDB `wall_seconds.ingest` 632.3 s and 959.0
+  s); the committed file gives 652.8 s and 444.8 s, 10.9 and 7.4 min. I checked every figure in the
+  plan and the swap paragraph against both files. Parquet's 3.1 min a class is the earlier run's
+  187.5 s; the committed file gives 178.5 s, 3.0 min. QuestDB's stored 22.9 GB, the host's memory,
+  the heap's "at most 300 MiB of 982 MiB" and "no collection after start-up" are the same in both
+  files; ArcticDB's, tick-store's and the "6 each" minutes do not come from the capacity run. The
+  swap paragraph said the capacity check met no swap filling "because swap was already full when it
+  started": that was the earlier run; in the committed one swap held 137,887,744 of its
+  1,023,406,080 bytes before the first part (`host.swap_note`). The plan was made with the earlier
+  figures, so the page now says so, gives each committed figure beside the one the plan used, and
+  keeps the minutes and totals as made; I did not make the plan again. The dated entry in "Full-day
+  comparison" above, which gives the same reason for the earlier run, stays as written.
+- **Old sentences on writes against clocks that held the other system's reads (`c2134d2`).** Six
+  places in this file, two in docs/TASKS.md and RF-3's row in docs/REVIEW.md gave tick-store's class
+  A or class B day write as met, or no slower, against a system whose clock held that system's
+  reading of its input from disk, while tick-store's input was in memory before its clock started.
+  Each now has a sentence after it, marked "Added 2026-11-25", saying whose input was where, the
+  bytes the record gives as read inside the clock (ArcticDB's class B 23,850,713,088 B; QuestDB's
+  class A 21,521,625,088 B and class B 24,631,062,528 B; Parquet's class B 23,846,309,888 B), and
+  where the verdict was replaced, with RESULTS.md's row as it reads at `9ead7a9`. The places: "The
+  full day at `67ae574`" (WT-3 and WT-4 items), "The final review's generator findings" (RF-3's
+  paragraph), "A comparison verdict beside the run it replaced, and what each write's clock holds",
+  "The freeze's results" (WT-4 against ArcticDB), "The outside page review's findings in the essay"
+  (WT-4's met against QuestDB); docs/TASKS.md's whole-day item and the two RF-3 items. No original
+  line changed. I searched this file, docs/TASKS.md, docs/REVIEW.md and `research/` for every
+  sentence that names a write, WT-3, WT-4 or a class, one of the three systems, and "met", "faster",
+  "no slower", "ahead", "win", "beat", "by N s" or the like, and ran `render_results.py`'s
+  faster-write rule over this file. Found and left, each with its reason: "tick-store in the
+  comparison (slice)", whose protocol-1 record never checked whether the export was warm; the RF-3
+  table rows, which the sentence after them covers; "A comparison verdict beside the run it
+  replaced"'s quote of the generated "counted missed"; "Two allowances and a rule made stricter"'s
+  quote of the sentence the rule refused; "A changed part" and the input clause in "The four
+  conditions on the results pages, review C1", which describe the mark and the clause; the P1
+  ruling's own record, which gives the input clause and not-counted; review rows C1-1, R-B3 and both
+  P1-2 rows, which record wording; and `research/column-systems.md`, which is about other systems
+  only.
+- **CI (`9d26110`).** "CI on jb-build, 17 November" gives what GitHub shows for the runs that
+  section names and for the two scheduled runs on main at `ca96b36`.
+- **Fault `fuzz-dictionary-mode-set-ignored` (`7804e3f`).** In the re-proof at `448790d` it ended
+  WRONG REASON: fuzz-build failed with exit 134 in 36 s, so fuzz-dictionary was blocked. The build
+  log shows the seed generator stopping on "the most-segments seed does not hold the segments the
+  table gives". That check, in `fuzz/bound_seeds.hpp`, came in `0dbdb95` on 16 November, after the
+  fault was last proven at `5a810a2`. The writer holds its hot columns to ranked PFOR, so the
+  faulted encoder, which tries Huffman whatever the mode set allows, stores the writer's one-byte
+  raw record segment in fewer bytes: 230 of them fit in `-max_len`, against the table's 219. The
+  patch now also moves that table to 230, as a change that updated the table with the encoder would,
+  and the entry expects "check_dict_column: the encoder held to ranked PFOR took another mode".
+  Shown by hand through the heavy-job wrapper in a clone under `build/`: the control passes
+  fuzz-build and fuzz-dictionary; the fault passes fuzz-build and fails fuzz-dictionary with exit 77
+  and "check_dict_column: the encoder held to ranked PFOR took another mode or entry count". Outputs
+  in the phase's `round3/r2/item4` folder; proof owed to the full re-proof.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
