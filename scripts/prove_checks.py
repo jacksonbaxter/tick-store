@@ -1487,6 +1487,57 @@ FAULTS = (
           "folder that holds an earlier launch's files for its targets", CHECK_FAILED,
           "FAIL: test_an_earlier_launchs_files_in_the_logs_folder_are_refused "
           "(__main__.LauncherTest"),
+    # Review P1-6: G-3's bound-seed gate has a results file, checked by check_gate.py, which
+    # also ties the disturbance records' gate run entries to its runs.
+    Fault("gate-seed-missing-accepted", "py-scripts", "check_gate.py takes a gate file with no "
+          "run of a seed of fuzz/bound_seeds.txt on a host", CHECK_FAILED,
+          "FAIL: test_a_seed_missing_on_a_host_is_refused (__main__.CoverageTest"),
+    Fault("gate-few-runs-accepted", "py-scripts", "check_gate.py takes a gate file that ran each "
+          "seed four times, where the gate requires five", CHECK_FAILED,
+          "FAIL: test_fewer_runs_than_the_gate_requires_are_refused (__main__.CoverageTest"),
+    Fault("gate-time-per-execution-unchecked", "py-scripts", "check_gate.py takes a run whose "
+          "time an execution is not its libFuzzer time over its executed units", CHECK_FAILED,
+          "FAIL: test_a_time_that_does_not_follow_from_the_runs_fields_is_refused "
+          "(__main__.RunTest"),
+    Fault("gate-over-bar-pass-accepted", "py-scripts", "check_gate.py takes a run over the bar "
+          "marked pass", CHECK_FAILED,
+          "FAIL: test_a_run_over_the_bar_marked_pass_is_refused (__main__.RunTest"),
+    Fault("gate-pass-rule-unchecked", "py-scripts", "check_gate.py takes a run marked pass that "
+          "reported a finding", CHECK_FAILED,
+          "FAIL: test_a_run_with_a_finding_marked_pass_is_refused (__main__.RunTest"),
+    Fault("gate-summary-unchecked", "py-scripts", "check_gate.py takes a summary whose worst run "
+          "is not the rows' worst", CHECK_FAILED,
+          "FAIL: test_another_worst_run_is_refused (__main__.SummaryTest"),
+    Fault("gate-bar-unchecked", "py-scripts", "check_gate.py takes a gate file whose bar is not "
+          "half of fuzz/launch.txt's -timeout", CHECK_FAILED,
+          "FAIL: test_a_bar_not_half_the_timeout_is_refused (__main__.BarTest"),
+    Fault("gate-name-unchecked", "py-scripts", "check_gate.py takes a gate file named for "
+          "another commit than its own", CHECK_FAILED,
+          "FAIL: test_a_file_named_for_another_commit_is_refused (__main__.ShapeTest"),
+    Fault("gate-leak-accepted", "py-scripts", "check_gate.py takes a gate file that holds a "
+          "home path", CHECK_FAILED,
+          "FAIL: test_a_home_path_in_the_file_is_refused (__main__.LeakTest"),
+    Fault("gate-entry-run-unchecked", "py-scripts", "check_gate.py ties a gate run entry to any "
+          "Linux run of its number, whatever seed the entry names", CHECK_FAILED,
+          "FAIL: test_an_entry_naming_a_run_the_file_does_not_hold_is_refused "
+          "(__main__.EntryTest"),
+    Fault("gate-entry-overlap-unchecked", "py-scripts", "check_gate.py takes a gate run entry "
+          "whose span does not overlap the run it names, as the backup's entry first named "
+          "the wrong run", CHECK_FAILED,
+          "FAIL: test_an_entry_outside_the_run_it_names_is_refused (__main__.EntryTest"),
+    Fault("gate-entry-without-file-accepted", "py-scripts", "check_gate.py takes a gate run "
+          "entry with no gate file of its commit", CHECK_FAILED,
+          "FAIL: test_an_entry_with_no_gate_file_is_refused (__main__.EntryTest"),
+    Fault("gate-block-refusal-ignored", "py-scripts", "render_results.py renders fuzz/README.md's "
+          "gate block from a gate file check_gate.py refuses", CHECK_FAILED,
+          "FAIL: test_a_refused_file_renders_no_block (__main__.RenderTest"),
+    Fault("gate-block-hand-edit", "render-check", "a hand edit of the Linux worst run's time "
+          "in fuzz/README.md's gate block", CHECK_FAILED,
+          "the table in README.md is stale or was edited by hand"),
+    Fault("ties-fuzz-gate-no-kind", "py-scripts", "check_ties.py with no kind for the gate "
+          "file", CHECK_FAILED,
+          "FAIL: test_the_gate_kind_is_the_fuzz_tie_but_the_launcher_and_its_own_assembler "
+          "(__main__.Repository"),
     Fault("ci-shallow-checkout", "py-scripts", "CI checks out the single commit it was pushed "
           "at, so G-3's file, which judges an older one, could never be tied there",
           CHECK_FAILED, "FAIL: test_the_workflow_checks_out_the_history_g3s_tie_needs "

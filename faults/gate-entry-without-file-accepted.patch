@@ -1,0 +1,12 @@
+diff --git a/scripts/check_gate.py b/scripts/check_gate.py
+index 65e2223..c57d367 100644
+--- a/scripts/check_gate.py
++++ b/scripts/check_gate.py
+@@ -238,6 +238,7 @@ def entry_problems(root, documents):
+             where = f"{path.name} entry {index}"
+             document = documents.get(commit[:12])
+             if document is None:
++                continue
+                 problems.append(f"{where}: a gate run entry, and there is no valid "
+                                 f"fuzz-gate-{commit[:12]}.json")
+                 continue

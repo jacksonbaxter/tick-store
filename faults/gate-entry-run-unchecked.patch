@@ -1,0 +1,13 @@
+diff --git a/scripts/check_gate.py b/scripts/check_gate.py
+index 65e2223..0828818 100644
+--- a/scripts/check_gate.py
++++ b/scripts/check_gate.py
+@@ -219,7 +219,7 @@ def gate_run_of(entry, document):
+         return None, f"it gives {of} runs a seed, and the gate file " \
+             f"{document['header']['runs_per_seed']}"
+     runs = [run for run in document["runs"] if run["host"] == "Linux" and
+-            run["seed"] == seed and run["run"] == number]
++            run["run"] == number][:1]
+     if len(runs) != 1:
+         return None, f"the gate file holds no Linux run {number} of {seed}"
+     return runs[0], None

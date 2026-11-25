@@ -1,0 +1,13 @@
+diff --git a/scripts/check_ties.py b/scripts/check_ties.py
+index 9a9d5ae..64574f4 100644
+--- a/scripts/check_ties.py
++++ b/scripts/check_ties.py
+@@ -376,7 +376,7 @@ KINDS = (
+     # are, each named seed run alone by the runs' own runner before their fuzzing, not by the
+     # G-3 launcher. Its assembler was written after the runs, so it is compared from the commit
+     # that wrote the file, as the diagnostics' is.
+-    Kind("fuzz-gate", ("fuzz-gate-*.json",),
++    Kind("fuzz-gate", ("fuzz-gate-*.jsonx",),
+          measured=tuple((path, "what the gate's runs built and ran: the fuzz binaries, their "
+                                "oracles, the named seeds' builders and list, and "
+                                "fuzz/launch.txt's flags; check_fuzz.py's TIED_PATHS but the "
