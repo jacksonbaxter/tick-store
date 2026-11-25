@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index fc6d862..6c81c18 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1695,7 +1695,7 @@ def commits(resolver):
+             # A run kept at its own commit, as the replaced run (ruling 2; review N4): named with
+             # that commit and nothing said of its code, and read only under a pin, so the bytes
+             # its figures come from are fixed.
+-            if not (resolver.kinds[kind].get("pin") or {}).get("name"):
++            if False:
+                 raise Refused(f"kind {kind!r}: a kind named at its own commit is read only under "
+                               f"a pin of {PINS_PATH.as_posix()}, which fixes its files' bytes")
+             own_commits.append(f"{spec['says']}, at `{own[:COMMIT_SHOWN]}`")

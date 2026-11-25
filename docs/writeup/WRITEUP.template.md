@@ -3,23 +3,23 @@
 tick-store keeps a trading day of Nasdaq TotalView-ITCH 5.0, {{ss_records}} messages in
 {{ss_source_gb}} GB, in a store {{ss_ratio}} times smaller than the feed, {{cmpL_ts_B_alloc_gb}} GB
 on disk against {{glance_disk_other}} GB for Parquet's smallest setup, and rebuilds the feed from it.
-On the Zen 1, a 2018 four-core AMD Ryzen running Linux, it answers an hour of a stock in
+On a 2018 four-core AMD Ryzen running Linux (the Ryzen), it answers an hour of a stock in
 {{cmpL_ts_q2_warm_med_ms}} warm, against {{cmpL_arcps_q2_warm_med_ms}} ms {{glance_arcps_q2_flag}} for ArcticDB with a table per stock, while a
 second and a millisecond across every stock take it {{gap_ql4_q1_x}} and {{gap_ql4_q4_x}} times as long as
 {{cmpL_q1_warm_best_system}} and {{cmpL_q4_warm_best_system}}, and the whole-day sum of a column {{gap_ql4_q5_x}} times as long as
-{{cmpL_q5_warm_best_system}} {{glance_q5_other_flag}} († marks a figure timed during a login, a backup job or swapping
-on the host).
+{{cmpL_q5_warm_best_system}} {{glance_q5_other_flag}} († marks a figure timed during a login, a backup job or, for a query,
+swapping on the host).
 A single writer thread there ingests {{cmpL_ts_A_msg_rate_m}} before a flush, {{gap_wt2_linux_x}} times
 short of Nasdaq's published peak message rate.
 
 ## At a glance
 
-The Zen 1, each system in its fixed setup; queries are warm medians.
+The Ryzen, each system in its fixed setup; queries are warm medians.
 
-| | tick-store | Other system and its figure | tick-store over it, or verdict |
+| | tick-store | Quickest or smallest other system: its figure | tick-store over it, or verdict |
 |---|---|---|---|
 | Disk, GB, each system's smallest setup | {{cmpL_ts_B_alloc_gb}} | Parquet: {{glance_disk_other}} | {{glance_disk_x}} |
-| Day write before a flush, s, total; engine-only | {{cmpL_ts_A_total_s}}; {{cmpL_ts_A_engine_s}} {{glance_write_ts_flag}} | ArcticDB: {{cmpL_arctic_A_total_s}}; {{cmpL_arctic_A_engine_s}} {{glance_write_other_flag}} | missed; inputs not alike |
+| Day write before a flush, s, total; engine-only | {{cmpL_ts_A_total_s}}; {{cmpL_ts_A_engine_s}} {{glance_write_ts_flag}} | {{glance_write_other_system}}: {{glance_write_other_s}}; {{cmpL_arctic_A_engine_s}} {{glance_write_other_flag}} | missed; inputs not alike |
 | A second of every stock (Q1), ms | {{cmpL_ts_q1_warm_med_ms}} {{glance_q1_ts_flag}} | {{cmpL_q1_warm_best_system}}: {{cmpL_q1_warm_best_ms}} {{glance_q1_other_flag}} | {{gap_ql4_q1_x}} |
 | An hour of a stock (Q2), ms | {{glance_ts_q2_ms}} {{glance_q2_ts_flag}} | {{cmpL_q2_warm_best_system}}: {{cmpL_q2_warm_best_ms}} {{glance_q2_other_flag}} | {{glance_q2_not_counted}} |
 | Its per-minute aggregate (Q3), ms | {{glance_ts_q3_ms}} {{glance_q3_ts_flag}} | {{cmpL_q3_warm_best_system}}: {{cmpL_q3_warm_best_ms}} {{glance_q3_other_flag}} | {{glance_q3_not_counted}} |
@@ -29,22 +29,22 @@ The Zen 1, each system in its fixed setup; queries are warm medians.
 The write row is not like-for-like: tick-store's input was in memory before its clock, with {{cmpL_ts_A_device_b}} B read from the
 device inside it, and the others read theirs from disk inside theirs, {{cmpL_others_A_device_min_b}} to
 {{cmpL_others_A_device_max_b}} B. Both runs: this run and the replaced run, an earlier measurement of the
-day; neither confirms the other, so the part counts nowhere. ArcticDB with a table per stock takes
-{{cmpL_arcps_q2_warm_med_ms}} ms {{glance_arcps_q2_flag}} on Q2 and {{cmpL_arcps_q3_warm_med_ms}} ms {{glance_arcps_q3_flag}} on Q3.
+day; neither confirms the other, so neither part counts. ArcticDB with a table per stock is faster:
+{{glance_arcps_q2_ms}} ms {{glance_arcps_q2_flag}} on Q2 and {{glance_arcps_q3_ms}} ms {{glance_arcps_q3_flag}} on Q3.
 
 ## How it was measured
 
 **Data.** The reference day is 30 December 2019, from Nasdaq's public sample files, and a second
 day is 30 October 2019; the round trip and the bit-flip check ran on both days on the M4, and the
-round trip on the reference day on the Zen 1 too. The round trip compares the
+round trip on the reference day on the Ryzen too. The round trip compares the
 SHA-256 of the rebuilt stream with the source's.
 
-**Hosts.** Every pinned figure comes from the Zen 1: {{cap_cpu}}, with
+**Hosts.** Every pinned figure comes from the Ryzen: {{cap_cpu}}, with
 {{cap_mem_gib}} GiB of memory. Each benchmark is pinned to a core, and
 refused if the core's hyperthread sibling was over {{code:sibling_busy_limit_pct}}% busy. Context
 figures come from an Apple M4 Max laptop, "the M4": unpinned, no hardware counters.
 
-**Clock.** The Zen 1 ran with frequency boost on and no fixed clock, so systems
+**Clock.** The Ryzen ran with frequency boost on and no fixed clock, so systems
 timed hours apart may have run at different clocks; what that costs was not measured.
 
 **The comparison.** Parquet, ArcticDB and QuestDB each ran the setup the comparison fixed for it in
@@ -56,7 +56,7 @@ write without a flush (class A) returns when the data is in the page cache; a fl
 B), after a proven flush to the device. Each write is judged on both clocks, the total and
 engine-only. {{cmpL_method_input_note}}
 
-Every figure here comes from a results file the [figure list]({{path:figures}}) names, measured
+Every figure here from a results file the [figure list]({{path:figures}}) names was measured
 at commit `{{measured_commit}}`{{commit_exceptions}}.
 
 ## Data layout
@@ -106,11 +106,11 @@ ideal code for a delta in file order is {{ce_ts_ideal_delta_bits}} bits, for a d
 residuals from a `time_base` column, the earliest time of each {{code:time_base_records}} records
 in file order, where they cost {{ss_ts_bits}}.
 
-**Sorting by stock, in bytes.** By arithmetic on the codec evaluation's bits and each column's
-count, stock order costs timestamps {{sort_ts_cost_mb}} MB, new orders' references
+**Sorting by stock, in bytes.** By arithmetic on bits as built against the codec evaluation's in file order, times each
+column's count, stock order costs timestamps {{sort_ts_cost_mb}} MB, new orders' references
 {{sort_creation_cost_mb}} MB ({{ce_creation_ref_bits}} against {{ss_creation_ref_bits}}) and the permutation {{ss_locate_mb}} MB,
-where file order would need {{sort_file_locate_mb}} MB, at the best codec measured, for the stock of each
-message naming no order; it saves prices {{sort_price_saving_mb}} MB. Distances within the stock are a code in file order too, so the sort does not buy the
+where file order, to code distances within the stock, would need {{sort_file_locate_all_mb}} MB, at the best
+codec measured, for every message's stock; it saves prices {{sort_price_saving_mb}} MB. Distances within the stock are a code in file order too, so the sort does not buy the
 references' {{ss_ref_distance_bits}}. The other columns were not set out this way, and the committed files hold no
 whole store in file order, so the net was not measured.
 
@@ -122,10 +122,10 @@ whole store in file order, so the net was not measured.
 decodes its segment's whole permutation, {{cmpL_ts_q4_values}} values for Q4's {{cmpL_q4_rows}}
 rows at the default against {{cmpL_seg1_q4_values}}, so Q4 takes {{cmpL_ts_q4_warm_med_ms}} ms
 against {{cmpL_seg1_q4_warm_med_ms}} and Q1 {{cmpL_ts_q1_warm_med_ms}} against
-{{cmpL_seg1_q1_warm_med_ms}}: on the Zen 1 the default loses both to the smaller segments. The default
+{{cmpL_seg1_q1_warm_med_ms}}: on the Ryzen the default loses both to the smaller segments. The default
 was picked by a rule I wrote before any layout was timed: each layout small enough on disk scores
 a point on each of Q1 to Q5, warm and cold, on the M4, where it is within a few percent of the
-quickest, and the most points win. I did not pick again on the Zen 1.
+quickest, and the most points win. I did not pick again on the Ryzen.
 
 ## Codecs, and whether Gorilla lost
 
@@ -147,7 +147,7 @@ every column but the near-empty `mwcb_level`, where, with {{ce_mwcb_values}} val
 A price with cents has no finite binary form, so successive dollar doubles XOR to many
 significant bits; an integer tick count stored as a double removes that. In decode time Gorilla
 takes {{cdM_ds6_ts}} as long as the store's codecs on timestamps on the M4 and {{cdM_ds6_price}} on
-prices, and {{cdL_ds7_ts}} and {{cdL_ds7_price}} on the Zen 1; why the timestamp ratio differs
+prices, and {{cdL_ds7_ts}} and {{cdL_ds7_price}} on the Ryzen; why the timestamp ratio differs
 between the hosts was not measured.
 
 **What the writer chooses.** Each column has a fixed codec family: PFOR (plain, delta, head delta,
@@ -171,10 +171,10 @@ delta-of-delta reconstruct are benchmark-only as well.
 **What SIMD bought.** On the M4, NEON over scalar, medians over widths: linear unpack
 {{skM_linear_speedup}}x, two-pass delta {{skM_two_pass_speedup}}x, fused delta
 {{skM_fused_speedup}}x and interleaved unpack {{skM_unpack_speedup}}x
-([M4 kernels]({{path:skM}})). On the Zen 1, AVX2 over scalar: interleaved unpack
+([M4 kernels]({{path:skM}})). On the Ryzen, AVX2 over scalar: interleaved unpack
 {{skL_unpack_speedup}}x, two-pass delta {{skL_two_pass_speedup}}x, fused {{skL_fused_speedup}}x.
 
-**What SIMD changes end to end.** The same Zen 1 binary at AVX2, against itself capped to scalar,
+**What SIMD changes end to end.** The same binary at AVX2 on the Ryzen, against itself capped to scalar,
 changes the warm engine median by {{d3_simd_q1_pct}}%, {{d3_simd_q2_pct}}%, {{d3_simd_q3_pct}}%,
 {{d3_simd_q4_pct}}% and {{d3_simd_q5_pct}}% on Q1 to Q5, a negative change being time saved. A
 query's own runs range {{cmpL_ts_warm_spread_min}}% to {{cmpL_ts_warm_spread_max}}% of their
@@ -183,7 +183,7 @@ median, so on whole queries SIMD's effect is inside or near the run-to-run sprea
 {{src_include_lines}} source lines.
 
 **The store's price column.** Per piece, the reader inflates any zstd frame, allocates, decodes
-PFOR with scale and patches, range-checks every value and appends. On the Zen 1 those steps take
+PFOR with scale and patches, range-checks every value and appends. On the Ryzen those steps take
 {{d4_zstd_pct}}%, {{d4_pfor_unpack_pct}}% (unpack), {{d4_patches_pct}}% (patches),
 {{d4_scale_range_pct}}% (scale and range check) and {{d4_alloc_copy_pct}}% (allocation and copy;
 copies resolved only to the C library, {{d4_libc_pct}}%, are not counted there) of
@@ -191,22 +191,22 @@ the decode's user cycles ([price-decode profile]({{path:d4}}) {{note:diag-price}
 
 ## Branch prediction and instruction counts
 
-On the Zen 1, in user mode, Gorilla takes on the whole price column {{cdL_gorilla_xor_cycles}} cycles, {{cdL_gorilla_xor_instr}}
+On the Ryzen, in user mode, Gorilla takes on the whole price column {{cdL_gorilla_xor_cycles}} cycles, {{cdL_gorilla_xor_instr}}
 instructions and {{cdL_gorilla_xor_bm}} mispredicts per price, the store's price column
 {{cdL_store_price_cycles}}, {{cdL_store_price_instr}} and {{cdL_store_price_bm}} at
 {{cdL_store_price_ipc}} IPC. Over prices and timestamps, Gorilla's mispredicts are
 {{ctr_bm_ratio_min}} to {{ctr_bm_ratio_max}} times the store's codecs' and its instructions
 {{ctr_instr_ratio_min}} to {{ctr_instr_ratio_max}} times
-([Zen 1 column decodes]({{path:cdL}})).
+([Ryzen column decodes]({{path:cdL}})).
 
 ## Memory
 
-On the M4 the writer's peak resident set, which counts the mapped source file, is
-{{cmpM_seg4_rss_mb}} MB at segments of {{rtM_segment_records}} records and {{cmpM_seg1_rss_mb}} MB at
-{{cmpM_seg1_records}}; its peak memory footprint, the memory it owns, is {{rtM_ingest_footprint_mb}} MB at the first and
-was not recorded at the second. On the Zen 1, tick-store's query process (`tick_query`) peaks at
+On the M4, in a run of tick-store alone, the writer's peak resident set, which counts the mapped
+source file, is {{cmpM_seg4_rss_mb}} MB at segments of {{rtM_segment_records}} records and {{cmpM_seg1_rss_mb}} MB at
+{{cmpM_seg1_records}}; in the round trip's write, at the first, its peak memory footprint, the memory it
+owns, is {{rtM_ingest_footprint_mb}} MB, with none recorded at the second. On the Ryzen, tick-store's query process (`tick_query`) peaks at
 {{cmpL_tick_query_vmhwm_mb}} MB resident, mapped store pages included. QuestDB's day store, {{cmpL_questdb_B_alloc_gb}} GB, is larger than
-the Zen 1's {{cap_mem_gib}} GiB of memory, so warm queries run a single system at a time.
+the Ryzen's {{cap_mem_gib}} GiB of memory, so warm queries run a single system at a time.
 
 ## Writes and queries against three systems
 
@@ -215,11 +215,11 @@ the Zen 1's {{cap_mem_gib}} GiB of memory, so warm queries run a single system a
 | Day write | tick-store | Parquet | ArcticDB | QuestDB |
 |---|---|---|---|---|
 | Without a flush | {{cmpL_ts_A_total_s}}; {{cmpL_ts_A_engine_s}} {{wr_ts_A_flag}} | {{cmpL_parquet_A_total_s}}; {{cmpL_parquet_A_engine_s}} {{wr_parquet_A_flag}} | {{cmpL_arctic_A_total_s}}; {{cmpL_arctic_A_engine_s}} {{wr_arctic_A_flag}} | {{cmpL_questdb_A_total_s}}; {{cmpL_questdb_A_engine_s}} {{wr_questdb_A_flag}} |
-| With a flush | {{cmpL_ts_B_total_s}}; {{cmpL_ts_B_engine_s}} {{wr_ts_B_flag}} | {{cmpL_parquet_B_total_s}}; {{cmpL_parquet_B_engine_s}} {{wr_parquet_B_flag}} | {{cmpL_arctic_B_total_s}}; {{cmpL_arctic_B_engine_s}} {{wr_arctic_B_flag}} | {{cmpL_questdb_B_total_s}}; {{cmpL_questdb_B_engine_s}} {{wr_questdb_B_flag}} |
+| With a flush | {{cmpL_ts_B_total_s}}; {{cmpL_ts_B_engine_s}} {{wr_ts_B_flag}} | {{cmpL_parquet_B_total_s}}; {{cmpL_parquet_B_engine_s}} {{wr_parquet_B_flag}} | {{cmpL_arctic_B_total_s}}; {{cmpL_arctic_B_engine_s}} {{wr_arctic_B_flag}} ({{pin:compare-replaced}} {{rpL_arctic_B_total_s}}; {{rpL_arctic_B_engine_s}}) | {{cmpL_questdb_B_total_s}}; {{cmpL_questdb_B_engine_s}} {{wr_questdb_B_flag}} |
 
 The harness's reading and converting of the input takes {{cmpL_others_read_share_min}}% to
 {{cmpL_others_read_share_max}}% of the others' unflushed totals; tick-store parses its ITCH file inside its engine clock.
-QuestDB's flushed write is {{verdict:questdb_B_like_for_like}}: its flush proof on the day did not pass. With a single run
+Inputs are not alike; QuestDB's flushed write is {{verdict:questdb_B_like_for_like}} either: its flush proof on the day did not pass. With a single run
 of each write, tick-store's totals with and without a flush are not resolved apart.
 
 **Where the writer's time goes.** tick-store's engine-only time is its writer's own work:
@@ -255,10 +255,10 @@ in a data block and in the footer ({{verdict:g2}}), Gorilla is built and is exac
 
 ## Missed targets
 
-On the Zen 1 unless the M4 is named, units as the bar's; "x" is how many times off the bar.
+On the Ryzen unless the M4 is named, units as the bar's; "x" is how many times off the bar.
 [BENCHMARKS.md](BENCHMARKS.md) classes nearly every bar as context, from other hardware or
 workloads, proving nothing about this store. Nasdaq's peak rate is
-a direct bar, and the rows against the other systems are relative.  A "swap-in" mark
+a direct bar, and the rows against the other systems are relative. A "swap-in" mark
 names systems timed while the host swapped memory.
 
 | Asked | Bar (source) | Measured | Gap | Verdict | Why |
@@ -281,7 +281,7 @@ names systems timed while the host swapped memory.
 | Q4 cold mean | {{bar:ql3}} (TimescaleDB, order-book preprint) | {{cmpL_ts_q4_cold_mean_ms}}; M4 {{cmpM_ts_q4_cold_mean_ms}} | {{gap_ql3_linux_x}}x; {{gap_ql3_mac_x}}x | {{verdict:ql3_linux}}; M4 {{verdict:ql3_mac}} | {{cmpL_ts_q4_cold_device_mb}} MB read cold |
 | Lowest median and p99 of the fixed setups, each query | same machine | warm medians in the table at a glance | {{gap_ql4_q1_x}}x on Q1; {{gap_ql4_q4_x}}x on Q4; {{gap_ql4_q5_x}}x on Q5 | {{verdict:ql4_linux}} | Q1 to Q5 under Queries |
 
-The writes against each other system, on both clocks, figures under Writes. Without a flush:
+The writes against each other system, on both clocks. Without a flush:
 {{verdict:wt3_linux}}.
 
 With a flush: {{verdict:wt4_linux}}. The [targets table](RESULTS.md#targets) gives both runs'
@@ -290,15 +290,15 @@ figures; the cause of ArcticDB's move between them was not measured and is not k
 ## Not judged
 
 With no published figure, or no comparison day on the M4: the store's decode speed-up over
-Gorilla on the Zen 1 ({{verdict:ds7_linux}}); delta-of-delta decode with bit parsing on the M4 ({{verdict:ds9_mac}}) and on the
-Zen 1 ({{verdict:ds9_linux}}); writes and queries against the other systems on the M4 ({{verdict:wt3_mac}}; {{verdict:ql4_mac}}).
+Gorilla on the Ryzen ({{verdict:ds7_linux}}); delta-of-delta decode with bit parsing on the M4 ({{verdict:ds9_mac}}) and on the
+Ryzen ({{verdict:ds9_linux}}); writes and queries against the other systems on the M4 ({{verdict:wt3_mac}}; {{verdict:ql4_mac}}).
 
 ## Fuzzing and checks
 
 Every parser and decoder ran {{code:fuzz_required_minutes}} minutes of fuzzing under
 AddressSanitizer and UndefinedBehaviorSanitizer: {{g3_mac_clean}} of
 {{g3_mac_targets}} targets ran clean on the M4 and {{g3_linux_clean}} of {{g3_linux_targets}} on the
-Zen 1, the shortest run {{g3_shortest_s}} s ([fuzz results]({{path:fuzz}})). The fuzzing target is
+Ryzen, the shortest run {{g3_shortest_s}} s ([fuzz results]({{path:fuzz}})). The fuzzing target is
 {{verdict:g3}}.
 
 A login or a backup can take executions from a fuzzing run, not hide a finding: the
@@ -309,13 +309,13 @@ record covers {{proofs_covered}} of its {{proofs_listed}} listed faults.
 
 ## Limits
 
-Performance comes from a pinned day on a single host, the Zen 1, whose {{cap_mem_gib}} GiB of memory
+Performance comes from a pinned day on a single host, the Ryzen, whose {{cap_mem_gib}} GiB of memory
 is smaller than the other systems' {{cmpL_others_input_gb}} GB of input, with each day write run
 {{cmpL_write_reps}} time. A fair protocol would give every system its input resident before its
 clock, or none, and repeat every write. The disturbance records hold {{disturbance:timed}} entries
 inside the campaign's timed phases and {{disturbance:timed_fuzz}} inside the fuzz run's, an event
 entered for each phase it fell in. The host's own scheduled jobs ran through every timed window
-on the Zen 1 and were not stopped: backups every 15 minutes and about hourly, a health collector and
+on the Ryzen and were not stopped: backups every 15 minutes and about hourly, a health collector and
 watchers every 5, sync jobs every 10, and daily maintenance;
 only the runs the logs place inside a phase are listed. Not measured: the cycles a mispredict
 costs and any memory-level counter.

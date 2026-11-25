@@ -3177,6 +3177,10 @@ FAULTS = (
     Fault("writeup-method-note-unchecked", "py-scripts", "render_writeup.py takes an essay whose "
           "method section does not say whose write input was in memory before the clock",
           CHECK_FAILED, "FAIL: test_a_method_section_without_the_input_note (__main__.Marks"),
+    # Review N4: a kind named at its own commit, as the replaced run, is read only under a pin.
+    Fault("writeup-own-commit-unpinned", "py-scripts", "render_writeup.py names a kind at its "
+          "own commit, whose code may differ, without a pin fixing its files", CHECK_FAILED,
+          "FAIL: test_a_kind_at_its_own_commit_read_under_no_pin (__main__.Commits"),
     # Review R4-B: a not-counted mark stands only beside a part that is not counted.
     Fault("writeup-not-counted-of-a-counted-part", "py-scripts", "render_writeup.py gives a "
           "counted part a not-counted mark's place", CHECK_FAILED,

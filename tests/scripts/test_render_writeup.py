@@ -724,6 +724,33 @@ class Commits(Tree):
         self.history("scripts/data_pins.json", json.dumps({"days": {"12302019": "b"}}))
         self.refused("differs there: ['scripts/data_pins.json (days)']")
 
+    OWN = {"why": "an earlier run kept beside this one", "says": "the earlier run",
+           "own_commit": True}
+
+    def kept(self, pinned=True):
+        """A kind at its own commit, whose code differs, read under a pin or not."""
+        name = "results/bench/macOS-other-fedcba987654.json"
+        self.other("fedcba987654" + "0" * 28, self.OWN, name)
+        if pinned:
+            digest = hashlib.sha256((self.root / name).read_bytes()).hexdigest()
+            self.write("scripts/data_pins.json", json.dumps({"kept": {
+                Path(name).name: digest}}))
+            self.figures["kinds"]["other"]["pin"] = {"name": "kept", "says": "earlier run"}
+            self.figure("pin:other", {"what": "the other's pin", "pin_of": "other"})
+            self.edit("docs/writeup/WRITEUP.template.md", "The other ran {{other}} times.",
+                      "The other ({{pin:other}}) ran {{other}} times.")
+
+    def test_a_kind_at_its_own_commit_is_named_with_that_commit(self):
+        # Review N4: the replaced run is named at its commit, and nothing is said of its code.
+        self.kept()
+        self.assertIn("at commit `0123456789ab`, except the earlier run, at `fedcba987654`.",
+                      self.renders())
+
+    def test_a_kind_at_its_own_commit_read_under_no_pin(self):
+        self.kept(pinned=False)
+        self.refused("kind 'other': a kind named at its own commit is read only under a pin of "
+                     "scripts/data_pins.json")
+
     def test_an_allow_list_of_paths_is_no_rule(self):
         self.later(dict(self.EXCEPTION, differs_only_in={"paths": ["src/"], "says": "the code"}))
         self.history("src/store.cpp")
@@ -823,7 +850,7 @@ class Hosts(Tree):
     """Review WD-5: a figure is described as its own host's."""
 
     def test_a_figure_described_as_the_other_host_s(self):
-        self.figures["figures"]["count"]["what"] = "the demo's runs on the Zen 1"
+        self.figures["figures"]["count"]["what"] = "the demo's runs on the Ryzen"
         self.save()
         self.refused("{{count}} is read on macOS, and its description",
                      "does not call it the M4's")
@@ -834,15 +861,15 @@ class Hosts(Tree):
         self.refused("does not call it the M4's")
 
     def across(self, declared):
-        self.figures["kinds"]["linux"] = {"what": "the Zen 1's demo",
+        self.figures["kinds"]["linux"] = {"what": "the Ryzen's demo",
                                           "files": {"Linux": "results/bench/Linux-demo-*.json"}}
-        entry = {"what": "the M4's runs over the Zen 1's", "kind": "demo", "host": "macOS",
+        entry = {"what": "the M4's runs over the Ryzen's", "kind": "demo", "host": "macOS",
                  "value": {"div": [{"path": ["runs"]}, {"figure": "linux_runs"}]},
                  "format": "{:.2f}"}
         if declared:
             entry["across_hosts"] = "a ratio of the two hosts' runs"
         self.figure("ratio", entry)
-        self.figure("linux_runs", {"what": "the Zen 1's runs", "kind": "linux", "host": "Linux",
+        self.figure("linux_runs", {"what": "the Ryzen's runs", "kind": "linux", "host": "Linux",
                                    "value": {"path": ["runs"]}, "helper": True})
         self.write("results/bench/Linux-demo-0123456789ab.json",
                    json.dumps(dict(RESULTS, runs=10)))
@@ -1097,7 +1124,7 @@ class Marks(Tree):
         self.targets["rows"].append(WRITE_ROW)
         self.figures["kinds"]["day"] = {"what": "the demo day", "files": {
             "Linux": "results/compare/Linux-day-*.json"}}
-        self.figures["figures"]["verdict:t11"] = {"what": "the write target, on the Zen 1",
+        self.figures["figures"]["verdict:t11"] = {"what": "the write target, on the Ryzen",
                                                   "verdict": {"id": "T-11", "host": "Linux"}}
         self.write(f"results/compare/Linux-day-{COMMIT[:12]}.json",
                    json.dumps(day(write_record(190.0, 10), write_record(381.0, 1))))
@@ -1108,7 +1135,7 @@ class Marks(Tree):
             old.name: hashlib.sha256(old.read_bytes()).hexdigest()}}))
         # The day's writes did not start alike, so the method section gives the input note.
         self.figures["figures"]["method_note"] = {
-            "what": "the input note of the day's method, on the Zen 1", "kind": "day",
+            "what": "the input note of the day's method, on the Ryzen", "kind": "day",
             "host": "Linux", "value": {"method_input_note": True}, "format": "text"}
         self.save()
         self.insert("The day write is {{verdict:t11}}.")
@@ -1204,7 +1231,7 @@ class Marks(Tree):
             "Q1": {"warm": {"swap_timed": {"flagged": True}}}}
         path.write_text(json.dumps(document))
         self.figures["figures"]["flag_x"] = {
-            "what": "whether a phase is disturbed or swapped in, on the Zen 1", "kind": "day", "host": "Linux",
+            "what": "whether a phase is disturbed or swapped in, on the Ryzen", "kind": "day", "host": "Linux",
             "value": {"flagged": reads}, "words": {"true": "flagged", "false": "clean"}}
         self.save()
         self.insert("The phase is {{flag_x}}.")

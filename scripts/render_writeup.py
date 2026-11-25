@@ -24,7 +24,9 @@ What the render holds, each a refusal (exit 2) when it fails:
   declares exceptions with their reasons, and the essay's own sentence names each exception it
   reads through a token; an exception that names another commit holds only where nothing the
   files read at the measured commit measure, by scripts/check_ties.py's kinds, differs between
-  the two commits, as git tells where the history is present;
+  the two commits, as git tells where the history is present, or, for a kind kept at its own
+  commit (own_commit), as the replaced run is, where it is read under a pin and named with that
+  commit;
 - a file under a pin of scripts/data_pins.json is read only by a kind that declares the pin,
   and every paragraph that shows one of its figures says so through the pin's token; a kind with
   a note, as the diagnostics' summaries have, puts the note in each paragraph that shows them,
@@ -143,7 +145,7 @@ WORD = re.compile(r"[^ \t\n\r\f\v]+")
 WORDS_AT_LEAST = 2500
 WORDS_AT_MOST = 4060
 # What the essay calls each host, so a figure read on one is never described as the other's.
-HOST_WORDS = {"Linux": "Zen 1", "macOS": "M4"}
+HOST_WORDS = {"Linux": "Ryzen", "macOS": "M4"}
 # The values a comparison of text may name: verdict words of render_results.py and the prover.
 VERDICT_CODES = ("met", "missed", "not judged", "missed in part", "not judged in part",
                  "PROVEN", "UNDETECTED")
@@ -1675,7 +1677,7 @@ def commits(resolver):
     if None in measured:
         raise Refused("a results file the essay reads names no commit")
     commit = next(iter(measured), None)
-    phrases, at = [], {}
+    phrases, at, own_commits = [], {}, []
     for kind in sorted(exceptions, key=lambda item: resolver.kinds[item]["exception"]["says"]):
         spec = resolver.kinds[kind]["exception"]
         if not spec.get("why") or not spec.get("says"):
@@ -1688,6 +1690,15 @@ def commits(resolver):
             phrases.append(spec["says"])
             continue
         if own == commit:
+            continue
+        if spec.get("own_commit"):
+            # A run kept at its own commit, as the replaced run (ruling 2; review N4): named with
+            # that commit and nothing said of its code, and read only under a pin, so the bytes
+            # its figures come from are fixed.
+            if not (resolver.kinds[kind].get("pin") or {}).get("name"):
+                raise Refused(f"kind {kind!r}: a kind named at its own commit is read only under "
+                              f"a pin of {PINS_PATH.as_posix()}, which fixes its files' bytes")
+            own_commits.append(f"{spec['says']}, at `{own[:COMMIT_SHOWN]}`")
             continue
         if "differs_only_in" in spec:
             raise Refused(f"kind {kind!r}: differs_only_in is no rule: a kind measured at "
@@ -1705,7 +1716,7 @@ def commits(resolver):
     # The kinds at one other commit are named together, so the commit and what holds there are
     # said once: "the fuzz result and its record, at `8616263b7561`, where ...".
     phrases = [f"{and_words(says)}, at `{own[:COMMIT_SHOWN]}`, where the code every other figure "
-               "measures is unchanged" for own, says in at.items()] + phrases
+               "measures is unchanged" for own, says in at.items()] + own_commits + phrases
     if not phrases:
         return commit, ""
     joined = phrases[0] if len(phrases) == 1 else \
