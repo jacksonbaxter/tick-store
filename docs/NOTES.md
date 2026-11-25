@@ -7262,7 +7262,105 @@ none is counted; the swap counts are the whole host's pages swapped in while tha
 was timed (`compare/swap.py`), not any one process's. The replaced run has no disturbance record,
 so it cannot confirm a login or a backup on a rival's side either; WT-4's part against QuestDB is
 therefore not counted, and, being labelled not like-for-like, would not be in any case. Nothing
-counted it before. `render_results.py` now reads all of this from the records.
+counted it before. `render_results.py` now reads all of this from the records. (Corrected
+2026-11-25, [R1-1](REVIEW.md#the-final-review-r1): the row's class rested on that uncounted part,
+so the first screen's count of 7 missed in part held it; corrected at `83cb411`.)
+
+
+### The final review R1: classes, sides, the pitch and the generated prose
+
+Work of 2026-11-25 (UTC) on `render_results.py`, `scripts/targets.json`, the README's first
+screen, RESULTS.md and `docs/checks.md`, from `9ead7a9`. The rows are
+[R1-1 to R1-8](REVIEW.md#the-final-review-r1).
+
+**Classes from counted parts (R1-1).** A row's class took a part met by the rule and not counted
+as met, so a row of missed parts and one such part was "missed in part". The writer's
+`verdict_class` and the check's own `class_of` now leave those parts out, and a row with nothing
+else is "met, not counted". Of the 37 target-and-machine rows two change, both on Linux: WT-4
+(Parquet missed, ArcticDB missed, counted as the less favourable of the two runs, QuestDB not
+like-for-like and not counted) and QL-4 (five parts missed, five not counted), each from missed
+in part to missed. QL-4 is on the first screen, so the count of the other 32 rows moves by WT-4
+alone, from 15 missed and 7 missed in part to 16 and 6. The essay's QL-4 cell now reads "missed;"
+where it read "missed in part;".
+
+**Every side either run flags (R1-2).** The not-counted clause named only the sides the
+reason rested on. It now names every side either run flags as swapped in, with its pages in each
+run read from both records. Pages in, this run and the replaced one, beside those already given:
+
+| Part | Sides already given | Sides added |
+|---|---|---|
+| Q2 warm | ArcticDB 5,075 and 3; QuestDB 3 and 3 | Parquet 0 and 5 |
+| Q2 cold | QuestDB 211 and 26 | Parquet 0 and 1 |
+| Q3 warm | ArcticDB 5,410 and 98 | Parquet 0 and 1; QuestDB 0 and 48 |
+| Q3 cold | QuestDB 18 and 27 | none |
+| Q5 cold | QuestDB 3 and 14 | tick-store 1 and 0; ArcticDB 0 and 1 |
+
+**WT-4 against QuestDB (R1-3).** The cell said only that the replaced run has no disturbance
+record. Both runs' records also count pages swapped in during QuestDB's plain class B write
+phase, 7,307 in this run and 16,304 in the replaced one, over the whole phase from the flush
+probe before the timed write to the store's sizing after it, the service's start and stop
+included, so the swapping cannot be placed inside the clock. The cell now says both, and its
+short form reads "swapping in both runs' write phases and no disturbance record for the replaced
+run".
+
+**The pitch's disturbed figure (R1-4).** The pitch gave ArcticDB's per-stock warm hour as
+44.58 ms, a figure from a phase that held two remote logins, with no mark. The check now refuses
+a pitch figure from a timed phase the records mark unless the phase's mark stands beside it in
+brackets, the replaced run's figure given by the figure's display. I dropped the figure: the
+sentence says ArcticDB with a table per stock is faster, a claim held on both runs' files, 44.58
+against 74.04 ms by median and 70.46 against 83.86 ms at p99 in this run, 49.65 against 74.32 ms
+and 70.43 against 83.95 ms in the replaced one.
+
+**The first screen (R1-5).** The pitch opens by saying what tick-store is, and the store's
+size reads "1.76 GB, down from 8.25 GB"; the ratio is no longer given there. The pitch keeps the
+swapping clause, since both of its query conditions require it: QuestDB's Q1 warm is flagged
+with 15 pages, and the replaced run's ArcticDB per-stock Q2 warm with 12. The sentence under the
+table says in plain words that where the logs show one of the host's jobs, or a remote login,
+running during a timed step, the result says so. The line under the table groups parts of the
+same marks, each mark once, glosses "Met by the rule and not counted" once, and there the
+not-counted mark stands in for the swap mark of the same systems. The pitch is 100 words with
+its heading, before and after; the screen's prose under the table went from 85 to 93 words and
+the whole first screen from 295 to 303; the list under the table went from 300 words and 1,827
+characters to 210 and 1,242.
+
+**RESULTS.md's generated prose (R1-6).** The macOS full day's label, read from its results file,
+said "the targets whose host is Both"; it is given as "the targets judged on both machines", and
+the file is unchanged. What a remote login's span computed from a watcher's period means was given
+in full in each cell that named one and twice in the kinds under the targets table; it is now said
+once there. The ingest tables' column glosses, given under class A and again under class B in each
+block, are given once a block, and the tick-store-alone block names tick-store where it said each
+system. No figure changed.
+
+**Faults (R1-7).** At `448790d` two faults failed for reasons other than their own:
+`readme-pitch-claim-reworded` expected the pitch's query sentence as it read before the pitch was
+rewritten, and `headline-fuzz-row-names-its-id` stopped only at a stale README, since the fuzz
+row's verdict cell no longer names its id and no headline row or sentence under the table may type
+a digit. The first now expects the sentence as it reads; the second names the gate's id in the
+pitch, declared there as no result, the one place left on the first screen where words with a
+digit may stand.
+
+**`docs/checks.md` (R1-8)** says each of the rules above.
+
+**Faults added and remade.** Added: `class-taken-from-an-uncounted-part`,
+`class-check-takes-an-uncounted-part`, `sides-also-flagged-this-run-only`,
+`sides-write-swap-misread`, `pitch-figure-without-its-mark`,
+`pitch-claim-judged-on-this-run-only`, `left-out-groups-merged`, `left-out-gloss-not-its-parts`,
+`screen-swap-mark-beside-not-counted`, `results-label-raw-enum`,
+`results-watcher-gloss-in-each-cell` and `results-ingest-columns-glossed-per-class`. Remade with
+the same mutation where my edits moved them: `sides-left-out-counts-uncounted`,
+`verdict-class-met-on-any-part`, `sides-unrecorded-run-confirms`, `compare-swap-in-unmarked`,
+`headline-left-out-drops-a-miss`, `headline-left-out-extra-name-accepted`,
+`headline-left-out-machine-unchecked`, `headline-left-out-mark-dropped`,
+`headline-left-out-mark-unchecked`, `render-others-list-unheaded`, `render-swap-short-per-part`,
+`sides-confirmed-without-replaced-figures`, `render-ingest-rates-alike`,
+`render-macos-allocation-unqualified`, `short-forms-kinds-unexplained`,
+`readme-pitch-figure-edited`, `readme-pitch-unchecked-figure`,
+`readme-pitch-store-figures-swapped`, `readme-first-screen-host-by-system`, and the two above.
+Each was shown by hand in a fresh clone under `build/`: the step passed on the clean clone and
+failed with the fault for the stated reason. At `36f3157` every render-check fault, 34 of 34, and
+every script fault whose test is in `test_render_results.py`, 129 of 129, were shown the same way,
+the second set by its one test. `results/check-proofs.json` was not rewritten; its record stays
+at `5a810a2`.
 
 ### The comparison plan's capacity figures, the old write sentences and a fault stopped at its build
 
