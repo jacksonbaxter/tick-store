@@ -1,0 +1,16 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -2931,9 +2931,9 @@
+         return "not judged"
+     # A part met by the rule and not counted raises nothing: the class is its counted parts'.
+     held = sum(1 for value in mets if isinstance(value, NotCounted))
+-    mets = [value for value in mets if not isinstance(value, NotCounted)]
+-    if not mets:
+-        return "met, not counted" if held else "not judged"
++    if held and all(value is True or isinstance(value, NotCounted) for value in mets):
++        return "met, not counted"
++    mets = [True if isinstance(value, NotCounted) else value for value in mets]
+     met = sum(1 for value in mets if value is True)
+     missed = sum(1 for value in mets if value is False)
+     if met == len(mets):

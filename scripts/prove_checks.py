@@ -2124,6 +2124,16 @@ FAULTS = (
           "FAIL: test_a_mark_on_tick_stores_side_alone_stays_counted (__main__.SidesTest"),
     Fault("sides-unrecorded-run-confirms", "py-scripts", "render_results.py lets a replaced run that no disturbance record covers confirm a rival's disturbed side", CHECK_FAILED,
           "FAIL: test_a_rival_disturbance_no_record_covers_on_the_replaced_run_is_not_counted (__main__.SidesTest"),
+    # Review R1-1: a row's class is its counted parts', so a part met and not counted makes no
+    # row met or missed in part; the writer and the check of the line under the table each.
+    Fault("class-taken-from-an-uncounted-part", "render-check", "render_results.py's "
+          "verdict_class makes a row of missed parts and one met and not counted missed in part, "
+          "as WT-4 on Linux was", EXIT_RENDER_REFUSED,
+          "the line under the table counts the other rows as"),
+    Fault("class-check-takes-an-uncounted-part", "render-check", "the check of the line under "
+          "the table classes a row of missed parts and one met and not counted missed in part, "
+          "apart from the writer, which does not", EXIT_RENDER_REFUSED,
+          "the line under the table counts the other rows as"),
     Fault("sides-left-out-counts-uncounted", "py-scripts", "render_results.py counts a part no run confirms among the first screen's met parts", CHECK_FAILED,
           "FAIL: test_no_count_takes_a_part_not_counted (__main__.SidesTest"),
     # The ruling on review P1-5: G-3's runs beside its verdict, from its file.

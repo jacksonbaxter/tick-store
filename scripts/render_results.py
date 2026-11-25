@@ -2967,14 +2967,16 @@ def shown_parts(entry, row, root):
 
 def verdict_class(parts):
     """Met, missed, not judged, or missed or not judged in part, for parts judged, or None for
-    a row with no figure."""
+    a row with no figure. The class is taken from the parts that count: a part met by the rule
+    and not counted never makes a row met or missed in part, and a row whose every part is such
+    a part is met, not counted (review R1-1)."""
     if parts is None:
         return "not judged"
     verdict_of(parts)
-    verdicts = [part[2] for part in parts]
     held = [part[2] is True and (bool(notes_of(part).get("unconfirmed")) or
                                  NOT_ALIKE in part[0]) for part in parts]
-    if any(held) and all(met is True for met in verdicts):
+    verdicts = [part[2] for part, kept in zip(parts, held) if not kept]
+    if not verdicts:
         return "met, not counted"
     if all(met is True for met in verdicts):
         return "met"
@@ -3117,13 +3119,15 @@ def class_of(mets):
     other (review DX-4). True is met and False missed; anything else is not judged."""
     if not mets:
         return "not judged"
+    # A part met by the rule and not counted raises nothing: the class is its counted parts'.
+    held = sum(1 for value in mets if isinstance(value, NotCounted))
+    mets = [value for value in mets if not isinstance(value, NotCounted)]
+    if not mets:
+        return "met, not counted" if held else "not judged"
     met = sum(1 for value in mets if value is True)
     missed = sum(1 for value in mets if value is False)
-    held = sum(1 for value in mets if isinstance(value, NotCounted))
     if met == len(mets):
         return "met"
-    if held and met + held == len(mets):
-        return "met, not counted"
     if missed == len(mets):
         return "missed"
     if met + missed == 0:

@@ -1818,6 +1818,17 @@ class LeftOutLineTest(Scratch):
             with self.subTest(mets=mets):
                 self.assertEqual(RENDER.class_of(mets), kind)
 
+    def test_the_checks_own_classes_take_no_part_met_and_not_counted(self):
+        # Review R1-1: a part met by the rule and not counted makes no row met or missed in
+        # part; the class is the counted parts', and a row of none is met, not counted.
+        held = RENDER.NotCounted([])
+        for mets, kind in (([held, False, False], "missed"), ([held], "met, not counted"),
+                           ([held, held], "met, not counted"), ([held, True], "met"),
+                           ([held, True, False], "missed in part"),
+                           ([held, RENDER.Unjudged("this code")], "not judged")):
+            with self.subTest(mets=mets):
+                self.assertEqual(RENDER.class_of(mets), kind)
+
 
 class RenderCompareTest(Scratch):
     """The comparison block: its own markers, one section per host, one table per class."""
@@ -2904,6 +2915,24 @@ class SidesTest(Scratch):
         self.assertIsInstance(RENDER.counted(part), RENDER.NotCounted)
         self.assertEqual(RENDER.class_of([RENDER.counted(part)]), "met, not counted")
         self.assertEqual(RENDER.verdict_class([part]), "met, not counted")
+
+    def test_a_row_whose_only_met_part_is_not_counted_takes_the_class_of_the_rest(self):
+        # Review R1-1: WT-4 on Linux is missed against Parquet and ArcticDB and met, not like-
+        # for-like and not counted, against QuestDB: missed, not missed in part, since a part
+        # that raises no count never makes a row met or missed in part.
+        held = ("against QuestDB, not like-for-like", "1 s against 2 s", True, None, {}, {})
+        missed = ("against Parquet", "3 s against 2 s", False, None, {}, {})
+        other = ("against ArcticDB", "4 s against 2 s", False, None, {}, {})
+        met = ("against ArcticDB", "1 s against 2 s", True, None, {}, {})
+        for parts, kind in (([missed, other, held], "missed"), ([held], "met, not counted"),
+                            ([met, held], "met"), ([met, missed, held], "missed in part")):
+            with self.subTest(parts=[(part[0], part[2]) for part in parts]):
+                self.assertEqual(RENDER.verdict_class(parts), kind)
+                self.assertEqual(RENDER.class_of([RENDER.counted(part) for part in parts]), kind)
+        # The cell still gives each part's own word, the part not counted included.
+        self.assertEqual(RENDER.verdict_of([missed, other, held]),
+                         "met on (against QuestDB, not like-for-like); missed on (against "
+                         "Parquet), (against ArcticDB)")
 
     def test_no_count_takes_a_part_not_counted(self):
         names = {("T-13", "Linux"): {"name": "T", "parts": {"Q2 warm": "a fast hour"}}}
