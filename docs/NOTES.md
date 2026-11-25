@@ -7945,6 +7945,10 @@ part finished there ([the R4 table](REVIEW.md#the-essays-final-review-r4)).
   "the Ryzen", introduced in each page's host line; where a sentence is about the processor's
   design (its 256-bit split, its L1, published figures for it) "Zen 1" stays. No fault patch
   touches either page.
+- Correction, 2026-11-25 ([R4-P3-N1](REVIEW.md#the-essays-final-review-r4)): BENCHMARKS.md's DS-2
+  and DS-5 cells stand under "written before the measurement", so their wording at `9ead7a9` is
+  restored, "Zen 1" for the machine there; "the Ryzen" stands in the host row and at line 129
+  only. The bullet above stands as written.
 - **Faults, shown by hand.** New: `writeup-flag-uncarried`, `writeup-flag-ratio-unread`,
   `writeup-flag-verdict-carry-ignored` and `writeup-flag-case-unread`. Remade on the lines this
   pass moved: `writeup-flag-unfixed-system-passes` with the new mutation above, and
