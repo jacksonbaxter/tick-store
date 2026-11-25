@@ -462,11 +462,17 @@ against 399) to 0.9% above it. No results file has a kind for the gate's table, 
 with the run's records. The Linux host's gate, the bar these bounds were set for, ran the same
 way at `8616263`, at AVX2, each run on cpu6 with its sibling, cpu7, kept busy for the whole of
 every run. All 31 passed. The worst was `run_length/bound-small-blocks` at 4,668.5 ms an
-execution (median 3,908.0) against 5,000, and its run 2 of 5 held a remote login, 2026-11-17
-15:12:57 to 15:12:58 UTC. In all, the Linux gate held a backup run and two remote logins, which
-could only have slowed them: the backup run, 15:12:26 to 15:12:29 UTC, between runs of its seeds;
-a login, 15:12:31 to 15:12:32 UTC, in `run_length/bound-one-run-blocks` run 4 of 5; and that one.
-`results/disturbances-8616263b7561.json` records them, and RESULTS.md marks G-3 for them. Each
+execution (median 3,908.0) against 5,000, in its run 1 of 5, 2026-11-17 15:12:42 to 15:12:51
+UTC, which holds no recorded event. In all, the Linux gate held a backup run and two remote
+logins, which could only have slowed them: the backup run, 15:12:26 to 15:12:29 UTC, and a
+login, 15:12:31 to 15:12:32 UTC, both in `run_length/bound-one-run-blocks` run 4 of 5, 15:12:25
+to 15:12:32 UTC, which took 3,538.5 ms an execution, under that seed's worst run, 3,660.5; and a
+login, 15:12:57 to 15:12:58 UTC, in `run_length/bound-small-blocks` run 2 of 5, 15:12:52 to
+15:13:01 UTC, 4,096.0 ms. `results/disturbances-8616263b7561.json` records them, and RESULTS.md
+marks G-3 for them. The worst run began 13 s after the backup's last line in the host's journal;
+the load read just before it began, 2.40, was the highest of its seed's five runs, and 258
+processes started during it, against a median of 53 over the gate's 155 runs. What started them
+is not known: nothing on record explains them. Each
 seed's median was from 21.0% below its prediction
 below (`pfor/bound-costliest`, 3,433.5 against 4,348) to 10.4% above it
 (`dictionary/bound-most-blocks`, 633.5 against 574), and the five query seeds predicted at 3,113

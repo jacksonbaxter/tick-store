@@ -1,7 +1,7 @@
 {
   "schema": "tick-store disturbances 1",
   "commit": "8616263b7561bdb39c642c90fde45985fcaf81fc",
-  "how": "Made by hand on 2026-11-17, after G-3's Linux run at this commit, from another project's watcher's status file and period and from the host's journal, read after the run, with each time in UTC. A login the watcher's status file records is placed by that line; one computed from the period between two recorded lines is given with its bounds as start and end. A gate entry's case names the seed and run it fell in, as the gate's own table gives them; a fuzz entry's case names the target.",
+  "how": "Made by hand on 2026-11-17, after G-3's Linux run at this commit, from another project's watcher's status file and period and from the host's journal, read after the run, with each time in UTC. A login the watcher's status file records is placed by that line; one computed from the period between two recorded lines is given with its bounds as start and end. A gate entry's case names the seed and run it fell in, as the gate's own table gives them, placed by the gate's step log, which gives each run's start and end; a fuzz entry's case names the target. Corrected on 2026-11-25: the backup run was first given as between runs of the gate's seeds, and the step log puts it wholly inside run 4 of 5 of run_length/bound-one-run-blocks.",
   "not_listed": [
     {
       "what": "another project's watcher's remote logins, about every half hour from 2026-11-14T15:22:16Z, each reading the host's window state and a few files",
@@ -20,7 +20,7 @@
       "what": "the host's scheduled repository backup, from the host's journal as read after the run, not from the run's own records",
       "document": "fuzz-g3-8616263b7561.json",
       "phase": "gate run",
-      "case": "the bound-seed gate, between runs of its seeds",
+      "case": "run_length/bound-one-run-blocks run 4 of 5",
       "timed": true
     },
     {
