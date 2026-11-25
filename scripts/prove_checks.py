@@ -352,8 +352,9 @@ def swap_pitch_store_sizes():
 
 
 def reword_a_pitch_claim():
-    """The pitch's query sentence reworded to rank tick-store first on short windows too, with
-    no figure in it for the figure check to catch (reviews RG-13, DX-2)."""
+    """The pitch's query sentence reworded to rank tick-store first on short windows too, in
+    its clause on Q1 and Q4, which holds no figure for the figure check to catch (reviews
+    RG-13, DX-2)."""
     edit_text("README.md", "; ArcticDB or QuestDB wins short", "; tick-store wins short")
 
 
@@ -393,7 +394,12 @@ def drop_a_pitch_claims_tie():
 
 def show_the_fuzz_row():
     """The fuzz target added to the headline's table, as the proposal for the first screen
-    considered: its verdict cell, written from the results, names its id."""
+    considered, and named by its id on the screen. When this fault was made the row's verdict
+    cell, written from the results, named the id; it no longer does, and no headline row or
+    sentence under the table may type a digit, so the row alone took no rule of the screen's and
+    the render stopped only at a stale README (review R1-7). The id stands in the pitch here,
+    declared among its texts that are no result, the one place on the screen where words with a
+    digit may still stand, taking a word's place since the pitch sits at its word limit."""
     def change(document):
         document["headline"]["rows"].append({
             "id": "G-3", "host": "any", "what": "Fuzzing",
@@ -401,7 +407,9 @@ def show_the_fuzz_row():
             "measured": "{clean} targets clean",
             "values": {"clean": {"value": {"path": ["summary", "macOS", "targets_clean"]},
                                  "format": "{:,}"}}})
+        document["pitch"]["not_results"].append({"text": "G-3", "why": "the fuzz gate's id"})
     edit_json("scripts/targets.json", change)
+    edit_text("README.md", "It stores a day's", "G-3 stores a day's")
 
 
 def call_a_host_by_its_system():
@@ -1661,9 +1669,10 @@ FAULTS = (
           "pitch figures of one format, which could trade places in the text unseen",
           CHECK_FAILED,
           "FAIL: test_two_figures_of_one_format_are_refused (__main__.RenderPitchTest"),
-    Fault("readme-pitch-claim-reworded", "render-check", "the pitch's Q1 and Q4 sentence "
-          "reworded to rank tick-store first, with no figure in it", EXIT_RENDER_REFUSED,
-          "the README's pitch no longer says \"On the Ryzen it answers one-stock queries",
+    Fault("readme-pitch-claim-reworded", "render-check", "the pitch's query sentence "
+          "reworded to rank tick-store first on short market-wide windows, its Q1 and Q4 "
+          "clause, which holds no figure", EXIT_RENDER_REFUSED,
+          "the README's pitch no longer says \"On the Ryzen it answers one stock's hour",
           reword_a_pitch_claim),
     Fault("render-pitch-claim-unchecked", "py-scripts", "render_results.py finds each claim's "
           "words in the pitch and never judges its condition, so a ranking the results reverse "
@@ -2045,7 +2054,8 @@ FAULTS = (
           "FAIL: test_a_disturbance_file_and_a_replaced_comparison_file_have_kinds "
           "(__main__.Repository"),
     Fault("headline-fuzz-row-names-its-id", "render-check", "the fuzz target added to the "
-          "headline's table, whose verdict cell, written from the results, names its id",
+          "headline's table and its id named on the first screen, in the pitch, where the id is "
+          "declared no result",
           EXIT_RENDER_REFUSED, "the README's first screen names 'G-3'", show_the_fuzz_row),
     Fault("readme-first-screen-host-by-system", "render-check", "the pitch calling the Linux "
           "host Linux again past its introduction", EXIT_RENDER_REFUSED,
