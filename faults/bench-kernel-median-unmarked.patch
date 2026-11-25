@@ -2,11 +2,11 @@ diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
 @@ -278,7 +278,7 @@
+             return median_or_none([per_value(row["counters"], name) for row, _ in rows])
  
-         cells = (f"`{family}`", kernel_set, f"`{commit}`", str(len(rows)),
-                  f"{statistics.median(rates):.2f}" + (
--                     DISTURBED_MARK if any(row["case"] in disturbed for row, _ in rows) else ""),
-+                     "" if any(row["case"] in disturbed for row, _ in rows) else ""),
+         marked = any(row["case"] in disturbed for row, _ in rows)
+-        cells = (f"`{family}`" + (DISTURBED_MARK if marked else ""), kernel_set, f"`{commit}`",
++        cells = (f"`{family}`" + ("" if marked else ""), kernel_set, f"`{commit}`",
+                  str(len(rows)), f"{statistics.median(rates):.2f}",
                   f"{min(rates):.2f} to {max(rates):.2f}",
                   f"{max(cvs) * 100:.2f}%", number_or_na(median_counter("cycles"), 3),
-                  number_or_na(median_counter("instructions"), 3),

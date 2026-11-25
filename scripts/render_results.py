@@ -229,19 +229,18 @@ def header_line(host, document, what):
 
 def column_table(host, document, disturbed=()):
     """Real-data column decodes, one row a case: values per second and the column's size; a
-    case disturbed names, one the disturbance file lists a timed disturbance in, has its
-    time marked."""
+    case disturbed names, one the disturbance file lists a timed disturbance in, has its row
+    marked beside its name, as every figure in the row is that case's (review R1-38)."""
     lines = [header_line(host, document, "real-data column decodes of the slice"), "",
              "| " + " | ".join(COLUMN_COLUMNS) + " |", "|" + "---|" * len(COLUMN_COLUMNS)]
     commit = document["header"]["commit"][:12]
     for result, start in zip(document["results"], starts_of(document)):
         rate = result["throughput"]["values_per_second"]
         counters = result["counters"]
-        cells = (f"`{result['case']}`", f"`{commit}`", result["isa"].split(", ", 1)[-1],
+        cells = (f"`{result['case']}`" + (DISTURBED_MARK if result["case"] in disturbed else ""),
+                 f"`{commit}`", result["isa"].split(", ", 1)[-1],
                  f"{result['verification']['values']:,}",
-                 f"{result['ratio']['bits_per_value']:.2f}",
-                 f"{1e9 / rate['median']:.3f}" + (DISTURBED_MARK if result["case"] in disturbed
-                                                   else ""),
+                 f"{result['ratio']['bits_per_value']:.2f}", f"{1e9 / rate['median']:.3f}",
                  f"{rate['median'] * 8 / 1e6:,.0f}", f"{rate['cv'] * 100:.2f}%",
                  number_or_na(per_value(counters, "cycles")),
                  number_or_na(per_value(counters, "instructions")),
@@ -256,9 +255,11 @@ def median_or_none(values):
 
 
 def kernel_table(host, document, disturbed=()):
-    """Seeded kernel cases, one row a kernel and set: the median across its widths, marked
-    where a case it takes is one disturbed names, which the disturbance file lists a timed
-    disturbance in, so no median from a disturbed case stands bare (review R1-30)."""
+    """Seeded kernel cases, one row a kernel and set: the medians and range across its widths.
+    Where a case it takes is one disturbed names, which the disturbance file lists a timed
+    disturbance in, the row is marked beside its kernel's name, as every figure in it, each
+    median, the range, the spread and the counters, is taken over that case among the others;
+    so no figure from a disturbed case stands bare (reviews R1-30, R1-38)."""
     groups = {}
     for result, start in zip(document["results"], starts_of(document)):
         family, _, kernel_set = WIDTH.sub("", result["case"]).rpartition("/")
@@ -276,9 +277,9 @@ def kernel_table(host, document, disturbed=()):
         def median_counter(name, rows=rows):
             return median_or_none([per_value(row["counters"], name) for row, _ in rows])
 
-        cells = (f"`{family}`", kernel_set, f"`{commit}`", str(len(rows)),
-                 f"{statistics.median(rates):.2f}" + (
-                     DISTURBED_MARK if any(row["case"] in disturbed for row, _ in rows) else ""),
+        marked = any(row["case"] in disturbed for row, _ in rows)
+        cells = (f"`{family}`" + (DISTURBED_MARK if marked else ""), kernel_set, f"`{commit}`",
+                 str(len(rows)), f"{statistics.median(rates):.2f}",
                  f"{min(rates):.2f} to {max(rates):.2f}",
                  f"{max(cvs) * 100:.2f}%", number_or_na(median_counter("cycles"), 3),
                  number_or_na(median_counter("instructions"), 3),
@@ -301,10 +302,10 @@ def table_for(host, documents, disturbed=None):
             rate = throughput["messages_per_second"]
             latency = result["latency"]
             counters = result["counters"]
-            cells = (f"`{result['case']}`", f"`{header['commit'][:12]}`",
-                     str(throughput["repetitions"]),
-                     f"{rate['median'] / 1e6:.2f} M" + (DISTURBED_MARK if result["case"] in
-                                                        (disturbed or {}).get(id(document), ()) else ""),
+            marked = result["case"] in (disturbed or {}).get(id(document), ())
+            cells = (f"`{result['case']}`" + (DISTURBED_MARK if marked else ""),
+                     f"`{header['commit'][:12]}`", str(throughput["repetitions"]),
+                     f"{rate['median'] / 1e6:.2f} M",
                      f"{rate['cv'] * 100:.2f}%", f"{latency['batch_messages']} msgs",
                      percentile_us(latency, 50.0), percentile_us(latency, 99.0),
                      percentile_us(latency, 99.9), per_message(counters, "cycles"),
@@ -317,11 +318,12 @@ def table_for(host, documents, disturbed=None):
     return lines
 
 
-# What the benchmark block says once of a figure it marks from a disturbed case.
-BENCH_DISTURBED = (f"A figure from a timed case in which the disturbance file lists a "
-                   f"disturbance is marked{DISTURBED_MARK}, and so is a kernel row's median "
-                   "when one of the cases it takes is such a case; a verdict in Targets that "
-                   "rests on one says what it was beside its word.")
+# What the benchmark block says once of a row it marks for a disturbed case.
+BENCH_DISTURBED = (f"A row marked{DISTURBED_MARK} beside its case or kernel holds a timed case in "
+                   "which the disturbance file lists a disturbance, and every figure in the row "
+                   "is taken over that case: a kernel row's medians, range, spread and counters "
+                   "take it among its widths. A verdict in Targets that rests on one says what "
+                   "it was beside its word.")
 
 
 def render(results_dir, root=None):

@@ -1,0 +1,12 @@
+diff --git a/scripts/targets.json b/scripts/targets.json
+--- a/scripts/targets.json
++++ b/scripts/targets.json
+@@ -29,7 +29,7 @@
+                "rate": {"value": {"path": ["systems", "tickstore", "variants", "@headline", "classes", "A", "write", "records_per_second_median"]}, "scale": 1e-6, "format": "{:.3f}"}}}
+   ],
+   "under": {"id": "WT-2", "host": "macOS", "parts": ["class A"],
+-   "text": "Against the same bar, one thread on an Apple M4 Max laptop, unpinned (its thread not held to one core), ingests {rate} M messages/s: {verdict}. Every figure from the Ryzen was taken while that machine's own scheduled jobs ran, backups, sync jobs and a health collector among them. Where the disturbance records enter a remote login or a backup run inside the timing a verdict rests on, the verdict says so; those records describe the scheduled jobs' other runs, and no mark beside a verdict names them.",
++   "text": "Against the same bar, one thread on an Apple M4 Max laptop, unpinned (its thread not held to one core), ingests {rate} M messages/s: {verdict}. Every figure from the Ryzen was taken while that machine's own scheduled jobs ran, backups, sync jobs and a health collector among them. Where the disturbance records enter a remote login or a backup run inside the timing a verdict rests on, the verdict says so; the scheduled jobs' other runs are listed in those records without a note.",
+    "values": {"rate": {"value": {"path": ["systems", "tickstore", "variants", "@headline", "classes", "A", "write", "records_per_second_median"]}, "scale": 1e-6, "format": "{:.3f}"}}},
+   "names": [
+    {"id": "G-1", "host": "any", "name": "the round trip", "parts": {"12302019 macOS": "the reference day's round trip on the laptop", "12302019 Linux": "the reference day's round trip on the Ryzen", "10302019 macOS": "the second day's round trip"}},

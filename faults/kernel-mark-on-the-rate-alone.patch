@@ -1,0 +1,14 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -278,8 +278,8 @@
+             return median_or_none([per_value(row["counters"], name) for row, _ in rows])
+ 
+         marked = any(row["case"] in disturbed for row, _ in rows)
+-        cells = (f"`{family}`" + (DISTURBED_MARK if marked else ""), kernel_set, f"`{commit}`",
+-                 str(len(rows)), f"{statistics.median(rates):.2f}",
++        cells = (f"`{family}`", kernel_set, f"`{commit}`",
++                 str(len(rows)), f"{statistics.median(rates):.2f}" + (DISTURBED_MARK if marked else ""),
+                  f"{min(rates):.2f} to {max(rates):.2f}",
+                  f"{max(cvs) * 100:.2f}%", number_or_na(median_counter("cycles"), 3),
+                  number_or_na(median_counter("instructions"), 3),

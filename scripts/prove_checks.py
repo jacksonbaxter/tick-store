@@ -388,11 +388,20 @@ def claim_every_event_is_marked():
     step is marked, as it read before review R1-15, which the records' unmarked runs belie."""
     def change(document):
         under = document["headline"]["under"]
-        start = under["text"].index(" Where the disturbance records place")
+        start = under["text"].index(" Where the disturbance records enter")
         under["text"] = (under["text"][:start].rstrip(".") + "; where the logs show one of those "
                          "jobs, or a remote login, running during a timed step, the result says "
                          "so.")
     edit_json("scripts/targets.json", change)
+
+
+def drop_gate_record_jobs_item():
+    """The gate's disturbance record losing the not_listed item that describes the host's
+    scheduled jobs, on which the sentence under the README's table rests (review R1-39)."""
+    def change(document):
+        document["not_listed"] = [item for item in document["not_listed"]
+                                  if "scheduled jobs" not in item["what"]]
+    edit_json("results/disturbances-8616263b7561.json", change)
 
 
 def drop_a_pitch_claims_tie():
@@ -2667,7 +2676,7 @@ FAULTS = (
     # Review R1-30: a benchmark figure from a disturbed case, and a kernel median over one, is
     # marked from the disturbance record.
     Fault("bench-kernel-median-unmarked", "py-scripts", "render_results.py gives a kernel "
-          "row's median over a case the disturbance record enters with no mark", CHECK_FAILED,
+          "row taken over a case the disturbance record enters with no mark", CHECK_FAILED,
           "FAIL: test_a_kernel_median_over_a_disturbed_case_is_marked "
           "(__main__.RenderResultsTest"),
     Fault("bench-case-entries-unread", "py-scripts", "render_results.py's benchmark block "
@@ -2678,12 +2687,29 @@ FAULTS = (
           "without the tree's disturbance records, so RESULTS.md's kernel medians over a "
           "disturbed case lose their mark", CHECK_FAILED,
           "the table in RESULTS.md is stale or was edited by hand"),
+    # Review R1-38: the mark covers the whole kernel row, not its rate median alone.
+    Fault("kernel-mark-on-the-rate-alone", "py-scripts", "render_results.py marks only the rate "
+          "median of a kernel row taken over a disturbed case, leaving its cycles and other "
+          "medians and its range, taken over the same cases, bare", CHECK_FAILED,
+          "AssertionError: '`pfor_delta_two_pass`' != '`pfor_delta_two_pass` (disturbed)'"),
     # Review R1-26: nor that the unmarked runs could not be tied to a figure, as R1-15 had it.
     Fault("under-sentence-says-runs-cannot-be-tied", "py-scripts", "the sentence under the "
           "README's table says the routine runs cannot be tied to one figure, though the gate's "
           "record ties each to a step and a target", CHECK_FAILED,
           "FAIL: test_the_sentence_under_the_table_says_what_the_records_leave_unmarked "
           "(__main__.UnderSentenceTest"),
+    # Review R1-39: nor that the jobs' other runs are listed without a note, as each record
+    # describes them in a not_listed item with its why; and the records do describe them.
+    Fault("under-sentence-says-runs-listed-without-note", "py-scripts", "the sentence under the "
+          "README's table says the scheduled jobs' other runs are listed in the records without a "
+          "note, though the records describe them by kind and period, each with its why",
+          CHECK_FAILED, "AssertionError: \"those records describe the scheduled jobs' other runs, "
+          "and no mark beside a verdict names them\" not found in"),
+    Fault("under-sentence-record-jobs-undescribed", "py-scripts", "the gate's disturbance "
+          "record without its item describing the host's scheduled jobs, which the sentence under "
+          "the README's table says both records describe", CHECK_FAILED,
+          "test_the_sentence_under_the_table_says_what_the_records_leave_unmarked) "
+          "(record='8616263b7561')", drop_gate_record_jobs_item),
     # Review R1-27: no rule holds the load's value, only its lines.
     Fault("results-guards-load-value-claimed", "py-scripts", "render_results.py's guard "
           "sentence says the validators hold the load to a rule, where they require its lines "

@@ -217,8 +217,10 @@ class RenderResultsTest(Scratch):
 
     def test_a_kernel_median_over_a_disturbed_case_is_marked(self):
         # Review R1-30: the kernel table gave medians over a case that held a backup run, and
-        # one that held a login, with no mark; a median over such a case is marked, from the
-        # disturbance record, and the block says once what the mark means.
+        # one that held a login, with no mark; and R1-38: marking the rate median alone left
+        # the row's other figures, taken over the same cases, bare. The row is marked beside
+        # its kernel, from the disturbance record, once, and the block says once that the mark
+        # covers every figure in the row.
         document = self.kernel_document("Linux")
         bench = self.tree / "results" / "bench"
         bench.mkdir(parents=True)
@@ -234,8 +236,14 @@ class RenderResultsTest(Scratch):
         lines = RENDER.render(bench, self.tree)
         row = next(line for line in lines if "`pfor_delta_two_pass`" in line)
         cells = [cell.strip() for cell in row.strip("|").split("|")]
-        self.assertEqual(cells[3:6], ["3", f"2.00{RENDER.DISTURBED_MARK}", "1.00 to 3.00"])
+        self.assertEqual(cells[0], f"`pfor_delta_two_pass`{RENDER.DISTURBED_MARK}",
+                         "the kernel row taken over a disturbed case is not marked beside its "
+                         "kernel")
+        self.assertEqual(row.count(RENDER.DISTURBED_MARK), 1, row)
+        self.assertEqual(cells[3:6], ["3", "2.00", "1.00 to 3.00"])
         self.assertEqual(lines[0], RENDER.BENCH_DISTURBED)
+        self.assertIn("every figure in the row is taken over that case", lines[0])
+        self.assertIn("medians, range, spread and counters", lines[0])
         # A column case's and an ITCH codec case's own figure, likewise.
         commit = FIXTURES.COMMIT[:12]
         files = {f"Linux-column_decode-{commit}.json": (FIXTURES.column_document("Linux"),
@@ -249,11 +257,11 @@ class RenderResultsTest(Scratch):
                            for file, (_, case, _) in files.items()], commit=FIXTURES.COMMIT)),
             encoding="utf-8")
         lines = RENDER.render(bench, self.tree)
-        for file, (_, case, column) in files.items():
+        for file, (_, case, _) in files.items():
             with self.subTest(case=case):
-                row = next(line for line in lines if line.startswith(f"| `{case}` |"))
-                cells = [cell.strip() for cell in row.strip("|").split("|")]
-                self.assertTrue(cells[column].endswith(RENDER.DISTURBED_MARK), row)
+                row = next(line for line in lines
+                           if line.startswith(f"| `{case}`{RENDER.DISTURBED_MARK} |"))
+                self.assertEqual(row.count(RENDER.DISTURBED_MARK), 1, row)
         # The kernel row, its case no longer entered, stands bare.
         row = next(line for line in lines if "`pfor_delta_two_pass`" in line)
         self.assertNotIn(RENDER.DISTURBED_MARK, row)
@@ -3895,10 +3903,12 @@ class GuardsTest(unittest.TestCase):
 
 
 class UnderSentenceTest(unittest.TestCase):
-    """Reviews R1-15 and R1-26: the README's sentence under the table claims a mark only on a
-    verdict whose deciding timed step a disturbance record enters, since both records list runs
-    of the host's jobs inside timed steps with no mark, and an entered event in a step that
-    decides no verdict is marked on none."""
+    """Reviews R1-15, R1-26 and R1-39: the README's sentence under the table claims a mark only
+    on a verdict whose deciding timed step a disturbance record enters, since both records
+    describe runs of the host's jobs inside timed steps with no mark, and an entered event in a
+    step that decides no verdict is marked on none; and it says the records describe the jobs'
+    other runs, as each record does in a `not_listed` item, each with its `why`, so not that
+    they are listed without a note."""
 
     def test_the_sentence_under_the_table_says_what_the_records_leave_unmarked(self):
         definitions = json.loads((REPO_ROOT / "scripts" / "targets.json").read_text(
@@ -3911,17 +3921,23 @@ class UnderSentenceTest(unittest.TestCase):
             unmarked += [item for item in document["not_listed"]
                          if "backup" in item["what"] and "routine" in item["what"] + item["why"]
                          or "no mark" in item["why"]]
-        # The records list such runs, so the sentence says so, and claims no mark for each.
+            # Each record describes the host's scheduled jobs in a not_listed item, and every
+            # such item carries its why, a note (review R1-39).
+            with self.subTest(record=commit):
+                self.assertTrue(any("scheduled jobs" in item["what"]
+                                    for item in document["not_listed"]))
+                self.assertTrue(all(item["why"] for item in document["not_listed"]))
+        # The records describe such runs, so the sentence says so, and claims no mark for each.
         self.assertTrue(unmarked)
         # A mark stands on a verdict a disturbance entry's timed step decides, so the sentence
         # claims marks for verdicts alone; and the gate's record ties its unlisted backup runs
         # to steps, so the sentence does not say they cannot be tied (review R1-26).
-        self.assertIn("Where the disturbance records place a remote login, or one of the few "
-                      "backup runs they single out, inside the timing a verdict rests on, the "
-                      "verdict says so", text)
-        self.assertIn("the scheduled jobs' other runs are listed in those records without a "
-                      "note", text)
-        for claim in ("the result says so", "cannot be tied", "A result is marked"):
+        self.assertIn("Where the disturbance records enter a remote login or a backup run inside "
+                      "the timing a verdict rests on, the verdict says so", text)
+        self.assertIn("those records describe the scheduled jobs' other runs, and no mark "
+                      "beside a verdict names them", text)
+        for claim in ("the result says so", "cannot be tied", "A result is marked",
+                      "without a note", "they single out"):
             self.assertNotIn(claim, text)
 
 

@@ -61,8 +61,10 @@ bytes read from the device inside the clock, what engine-only holds, and that en
 not take the reads out. A verdict that rests on a timed phase in which
 `results/disturbances-<commit>.json` records something else running, such as a login or the
 host's backup job, says so beside it, with the replaced run's figure there; the file's shape,
-spans and places in the documents are checked. RESULTS.md's tables mark each figure they show
-from such a phase, and each kernel median over such a case, " (disturbed)". So an entry is marked
+spans and places in the documents are checked. RESULTS.md's benchmark tables mark each row that
+holds such a case " (disturbed)" beside its case or kernel, the mark covering every figure in the
+row, a kernel row's medians, range, spread and counters among them, as the block's legend says;
+its comparison tables mark each timed figure they show from such a phase. So an entry is marked
 on the verdicts and figures the generated pages show; an entry in a phase no page shows, such as
 a slice setup no table gives, is in the record only. A figure typed by hand on
 `compare/README.md` or `BENCHMARKS.md` is not held to the disturbance records: nothing checks
