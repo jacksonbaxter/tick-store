@@ -7628,6 +7628,143 @@ another fixer. docs/REVIEW.md gives each as R3-6 to R3-14.
 - **Commit ids.** My first pass cited the ids its commits had before two rebases. Every id my
   sections and rows cite is now the id the commit has on this line.
 
+### The gate's validator and assembler: the code review's findings
+
+2026-11-25. An outside code review of `scripts/check_gate.py` and `scripts/gate_results.py`, the
+gate file's validator and assembler, and of their tests and faults, found the gaps below; a second
+pass found five more. It reassembled `results/fuzz-gate-8616263b7561.json` from the raw logs byte
+for byte, so the file was right; the gaps were in what the validator would let through and in what
+was tested and proven. docs/REVIEW.md gives each as [R4-1 to
+R4-12](REVIEW.md#the-final-reviews-code-review-of-the-gates-checks-r4). The committed file passes
+every new refusal: `check_gate.py` still prints "fuzz-gate-8616263b7561.json: ok, 310 runs on 2
+hosts". No bar moved: `REQUIRED_RUNS` is 5 and the bar half the 10 s timeout.
+
+- **Run fields (R4-1, code review F-1, `a8e03fa`).** Only some fields were type-checked. A NaN,
+  negative or string `load1`, a negative or string `processes_started`, a NaN or negative `wall_ms`,
+  a busy share of "lots", a `fuzz_pfor` target on a run-length seed and a start of 25:61:99 were all
+  accepted, and the gate block then printed "nan", "-258 processes" and "25:61:99"; a string load
+  made the renderer raise. Shown by the review's script of wrong files and its renders. Each field
+  now has the form the assembler writes: whole numbers, finite floats of at least 0, real UTC times
+  with the end not before the start, busy shares of named cpus in order, cpu2 and cpu7 among them,
+  to one decimal from 0 to 100, and the target its seed's own in `fuzz/bound_seeds.txt`.
+- **The header and the runs a seed (R4-2, code review F-2, `1e8ea7d`).** Another `seeds_file`, a
+  SHA-256 of zeros, another bar text or statement and no hosts were accepted, and six runs a seed
+  passed where the gate requires five. Each header field is now the assembler's, the list's SHA-256
+  is the tree's `fuzz/bound_seeds.txt`'s, and the runs a seed are exactly five.
+- **The summary by type (R4-3, code review F-3, `3bcdf05`).** It was compared with `==`, so
+  `all_pass: 1` and `seeds: 31.0` passed and the page read "31 of 31.0 seeds". It is now compared in
+  type and value at every level.
+- **Refusals with no test (R4-4, code review F-4, `0642397`).** I took out each refusal of both
+  scripts in a throwaway clone and ran its test file: 61 of 92 such edits failed no test. Tests were
+  added until each fails one, but `len(runs) != 1` in `gate_run_of`, which cannot change a result:
+  only a file whose runs are numbered 1 to 5 once each reaches it.
+- **Refusals with no fault (R4-5, code review F-5, `b88b912`).** `gate_results.py` had no fault, and
+  several refusals of `check_gate.py` had none. Each refusal of both now has one.
+- **Repeated lines in the raw logs (R4-6, code review F-6): a known gap.** `gate_results.py` reads
+  the step log's start, end and figures lines into maps, so a repeated line silently replaces the
+  one before, and lines for runs past the runs a seed are ignored. I did not change it.
+  `check_ties.py` ties the gate file to the assembler as it stood at the commit that wrote the file,
+  `23200ff`, and a changed assembler unties it. In a clone I added both refusals to the assembler
+  and assembled the file again from the raw logs: the result was byte for byte the committed file,
+  SHA-256 `e4754634…`, and the real logs met both refusals; but as it was assembled on the same day,
+  even its `assembled` field was the same, so there was nothing to commit, and `check_ties.py`
+  reported the file as differing ("what assembled it changed since: scripts/gate_results.py"). Only
+  weakening `check_ties.py` would have changed that. The real step logs hold no repeat: each host's
+  has 310 start and end lines and 155 lines of figures, one of each for each of the 31 seeds' five
+  runs, none for a run past five. Assembled again on a later day, the file's `assembled` field would
+  change, so the changed assembler and the file could be committed and tied again; docs/TASKS.md
+  keeps it open.
+- **Entry spans run alone (R4-7, code review F-7, `8202026`).** Run alone, the check took a "gate
+  run" entry whose span was "" to "Z", or whose end was null; the renderer's own check of the
+  disturbance files refused both. The check now wants two real UTC times, start first.
+- **The day of assembly (R4-8, second pass G-1, `2c51167`).** It was only checked to be a real day,
+  so "2026-11-01", before the runs of 2026-11-17, and "2099-01-01" passed, and the page printed
+  them. A day before the last run's day is refused. A day after today is not: the only way to know
+  today is the clock, and the check's result would then depend on the day it runs.
+- **Two faults that showed only a crash (R4-9, second pass G-2, `5494e66`).**
+  `gate-run-fields-unchecked` expected a test that, with the refusal gone, raised a KeyError, and
+  with it gone a run with an extra field, or a macOS run with `processes_started`, passed no test.
+  `gate-run-units-form-unchecked` expected a division by zero, and a unit count of 2.0 with its
+  summary to match passed. Each now has a test of that case and expects it.
+  `gate-pass-rule-unchecked`, which took out the whole pass check that its parts' faults now take
+  out one by one, takes out the findings.
+- **The summary's host order (R4-10, second pass G-3, `546d771`).** Dicts were compared as sets, so
+  a summary with Linux before macOS passed, and the block would swap the host paragraphs and the
+  table's columns. Keys are now compared in order too.
+- **Negative zero (R4-11, second pass G-4, `e280180`).** -0.0 passed as a number of at least 0, and
+  the page would print "-0.00". It is refused as a load, a time an execution or a busy share.
+- **What the check does not hold (R4-12, second pass G-5): a stated limit.** It does not hold a
+  run's fields against each other: a wall time of 1 ms against 9,337 ms of libFuzzer time, a span of
+  0 s or of two hours, runs that overlap in time, an extra cpu in the busy shares, or a load of
+  1e308 all pass. The gate set no rule on these; in the committed file every wall time is at least
+  its libFuzzer time and each span is within 0.92 s of its wall time. docs/checks.md says so.
+- **A test twice.** `test_render_gate.py`'s `test_more_than_one_gate_file_is_refused` and my
+  `test_two_gate_files_render_no_block` were the same test of the renderer's refusal of two gate
+  files; mine is dropped (`e7b3b8c`), and `gate-block-several-files-taken` names the other.
+- **Faults, shown by hand.** 127 are new. For the run fields: `gate-run-seed-form-unchecked`,
+  `gate-run-target-form-unchecked`, `gate-run-number-form-unchecked`,
+  `gate-run-start-form-unchecked`, `gate-run-end-form-unchecked`,
+  `gate-run-exit-code-form-unchecked`, `gate-run-findings-form-unchecked`,
+  `gate-run-units-form-unchecked`, `gate-run-file-ms-form-unchecked`,
+  `gate-run-time-form-unchecked`, `gate-run-wall-form-unchecked`, `gate-run-load-form-unchecked`,
+  `gate-run-pass-form-unchecked`, `gate-run-shares-form-unchecked`,
+  `gate-run-processes-form-unchecked`, `gate-run-sibling-start-form-unchecked`,
+  `gate-run-sibling-end-form-unchecked`, `gate-run-end-before-start-accepted`,
+  `gate-run-target-not-its-own-accepted`, `gate-infinite-number-accepted`,
+  `gate-negative-zero-accepted`, `gate-share-past-a-hundred-accepted`,
+  `gate-share-decimals-unchecked`, `gate-share-order-unchecked`,
+  `gate-share-sibling-missing-accepted`, `gate-share-names-unchecked` and
+  `gate-utc-not-real-accepted`. For the header: `gate-header-check-unchecked`,
+  `gate-seeds-file-unchecked`, `gate-seeds-digest-unchecked`, `gate-bar-text-unchecked`,
+  `gate-statement-unchecked`, `gate-assembled-form-unchecked`, `gate-assembled-days-unchecked`,
+  `gate-assembled-day-unchecked`, `gate-assembled-before-runs-accepted`, `gate-hosts-unchecked`,
+  `gate-hosts-order-unchecked` and `gate-more-runs-accepted`. For the summary:
+  `gate-summary-compared-by-value`, `gate-summary-missing-field-accepted`,
+  `gate-summary-list-length-unchecked` and `gate-summary-host-order-unchecked`. For the entries:
+  `gate-entry-span-form-unchecked` and `gate-entry-span-backwards-accepted`. The other refusals of
+  `check_gate.py`: `gate-file-parts-unchecked`, `gate-header-object-unchecked`,
+  `gate-header-keys-unchecked`, `gate-commit-form-unchecked`, `gate-bar-whole-unchecked`,
+  `gate-runs-a-seed-whole-unchecked`, `gate-no-runs-accepted`, `gate-runs-not-a-list-accepted`,
+  `gate-run-host-unchecked`, `gate-run-fields-unchecked`, `gate-pass-rule-exit-ignored`,
+  `gate-pass-rule-bar-ignored`, `gate-pass-rule-sibling-start-ignored`,
+  `gate-pass-rule-sibling-end-ignored`, `gate-marked-fail-accepted`,
+  `gate-seed-not-listed-accepted`, `gate-run-numbering-unchecked`, `gate-no-timeout-raises`,
+  `gate-entry-case-unchecked`, `gate-entry-of-n-unchecked`, `gate-entry-any-host`,
+  `gate-file-not-json-raises`, `gate-main-exits-0`, `gate-main-entries-ignored`,
+  `gate-list-comment-a-seed`, `gate-list-target-unprefixed`, `gate-list-line-form-unchecked`,
+  `gate-timeout-any-row` and `gate-timeout-first-of-two`. For `gate_results.py`, 53:
+  `gate-results-list-line-unchecked`, `gate-results-list-comment-a-seed`,
+  `gate-results-list-target-unprefixed`, `gate-results-no-timeout-assumed`,
+  `gate-results-timeout-first-of-two`, `gate-results-counters-processes-unchecked`,
+  `gate-results-iowait-busy`, `gate-results-counters-cpus-unchecked`,
+  `gate-results-counters-no-time-accepted`, `gate-results-executed-twice-accepted`,
+  `gate-results-executed-other-input-accepted`, `gate-results-units-twice-accepted`,
+  `gate-results-no-unit-accepted`, `gate-results-findings-not-read`,
+  `gate-results-table-columns-unchecked`, `gate-results-first-of-two-steps`,
+  `gate-results-first-of-two-bars`, `gate-results-other-label-taken`,
+  `gate-results-other-step-start-taken`, `gate-results-other-step-figures-taken`,
+  `gate-results-no-start-raises`, `gate-results-no-end-raises`, `gate-results-no-figures-raises`,
+  `gate-results-no-table-row-raises`, `gate-results-other-seed-taken`,
+  `gate-results-wall-unchecked`, `gate-results-shares-unchecked`, `gate-results-figures-unchecked`,
+  `gate-results-table-unchecked`, `gate-results-outcome-unchecked`,
+  `gate-results-pass-rule-findings-ignored`, `gate-results-pass-rule-exit-ignored`,
+  `gate-results-pass-rule-sibling-ignored`, `gate-results-pass-rule-bar-ignored`,
+  `gate-results-table-count-unchecked`, `gate-results-gate-verdicts-unread`,
+  `gate-results-gate-verdict-missing-raises`, `gate-results-gate-median-unchecked`,
+  `gate-results-gate-limit-unchecked`, `gate-results-gate-verdict-unchecked`,
+  `gate-results-list-count-unchecked`, `gate-results-list-digest-unchecked`,
+  `gate-results-bar-timeout-unchecked`, `gate-results-bar-half-unchecked`,
+  `gate-results-hosts-runs-unchecked`, `gate-results-commit-unchecked`,
+  `gate-results-list-order-unchecked`, `gate-results-commit-argument-unchecked`,
+  `gate-results-day-argument-unchecked`, `gate-results-host-name-unchecked`,
+  `gate-results-host-folder-unchecked`, `gate-results-host-twice-accepted` and
+  `gate-results-refusal-exits-0`. Remade on the lines my edits moved: `gate-few-runs-accepted`,
+  `gate-bar-unchecked`, `gate-summary-unchecked` and `gate-entry-overlap-unchecked` with the same
+  mutation, and `gate-pass-rule-unchecked` as above. Each of the 132 was shown in a clone under the
+  worktree's `build/`, with no bytecode written: the control run of its test file passed, and the
+  fault failed it with the string its entry expects. I ran no `prove_checks.py`; proof owed to the
+  full re-proof. The README's proofs paragraph counts 660 listed faults.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
