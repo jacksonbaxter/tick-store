@@ -1590,6 +1590,86 @@ FAULTS = (
           "file", CHECK_FAILED,
           "FAIL: test_the_gate_kind_is_the_fuzz_tie_but_the_launcher_and_its_own_assembler "
           "(__main__.Repository"),
+    # Each run field of the gate file holds only what scripts/gate_results.py writes there.
+    Fault("gate-run-seed-form-unchecked", "py-scripts", "check_gate.py takes a run whose seed is "
+          "a number, not a name", CHECK_FAILED, "FAIL: test_a_seed_that_is_not_a_name_is_refused "
+          "(__main__.FormTest"),
+    Fault("gate-run-target-form-unchecked", "py-scripts",
+          "check_gate.py takes a run whose target is null, not a name", CHECK_FAILED,
+          "FAIL: test_a_target_that_is_not_a_name_is_refused (__main__.FormTest"),
+    Fault("gate-run-number-form-unchecked", "py-scripts", "check_gate.py takes a run numbered 0",
+          CHECK_FAILED, "FAIL: test_a_run_numbered_zero_is_refused (__main__.FormTest"),
+    Fault("gate-run-start-form-unchecked", "py-scripts", "check_gate.py takes a run whose start "
+          "is not a UTC time", CHECK_FAILED, "FAIL: test_a_start_that_is_no_time_is_refused "
+          "(__main__.FormTest"),
+    Fault("gate-run-end-form-unchecked", "py-scripts", "check_gate.py takes a run whose end is "
+          "not a UTC time", CHECK_FAILED, "FAIL: test_an_end_that_is_no_time_is_refused "
+          "(__main__.FormTest"),
+    Fault("gate-run-exit-code-form-unchecked", "py-scripts", "check_gate.py takes a run whose "
+          "exit code is negative", CHECK_FAILED, "FAIL: test_a_negative_exit_code_is_refused "
+          "(__main__.FormTest"),
+    Fault("gate-run-findings-form-unchecked", "py-scripts", "check_gate.py takes a run whose "
+          "findings are a string", CHECK_FAILED, "FAIL: test_findings_as_a_string_are_refused "
+          "(__main__.FormTest"),
+    Fault("gate-run-units-form-unchecked", "py-scripts", "check_gate.py takes a run of no "
+          "executed unit, and divides by it", CHECK_FAILED,
+          "ERROR: test_no_executed_unit_is_refused (__main__.FormTest"),
+    Fault("gate-run-file-ms-form-unchecked", "py-scripts", "check_gate.py takes a run whose "
+          "libFuzzer time is not a whole number of ms", CHECK_FAILED,
+          "FAIL: test_a_libfuzzer_time_that_is_not_whole_is_refused (__main__.FormTest"),
+    Fault("gate-run-time-form-unchecked", "py-scripts", "check_gate.py takes a run whose time an "
+          "execution is a whole number, which the assembler never writes", CHECK_FAILED,
+          "FAIL: test_a_time_an_execution_that_is_not_a_float_is_refused (__main__.FormTest"),
+    Fault("gate-run-wall-form-unchecked", "py-scripts", "check_gate.py takes a run whose wall "
+          "time is negative", CHECK_FAILED, "FAIL: test_a_negative_wall_time_is_refused "
+          "(__main__.FormTest"),
+    Fault("gate-run-load-form-unchecked", "py-scripts", "check_gate.py takes a run whose load is "
+          "NaN, which the page prints", CHECK_FAILED,
+          "FAIL: test_a_load_that_is_not_a_number_is_refused (__main__.FormTest"),
+    Fault("gate-run-pass-form-unchecked", "py-scripts", "check_gate.py takes a run whose pass is "
+          "1, not true or false", CHECK_FAILED,
+          "FAIL: test_a_pass_that_is_not_true_or_false_is_refused (__main__.FormTest"),
+    Fault("gate-run-shares-form-unchecked", "py-scripts", "check_gate.py takes a Linux run whose "
+          "busy shares hold a string", CHECK_FAILED,
+          "FAIL: test_a_busy_share_that_is_not_a_number_is_refused (__main__.FormTest"),
+    Fault("gate-run-processes-form-unchecked", "py-scripts", "check_gate.py takes a Linux run "
+          "whose processes started are negative, which the page prints", CHECK_FAILED,
+          "FAIL: test_negative_processes_started_are_refused (__main__.FormTest"),
+    Fault("gate-run-sibling-start-form-unchecked", "py-scripts",
+          "check_gate.py takes a Linux run whose sibling at its start is 1, not true or false",
+          CHECK_FAILED, "FAIL: test_a_sibling_at_its_start_that_is_not_true_or_false_is_refused "
+          "(__main__.FormTest"),
+    Fault("gate-run-sibling-end-form-unchecked", "py-scripts", "check_gate.py takes a Linux run "
+          "whose sibling at its end is a string, not true or false", CHECK_FAILED,
+          "FAIL: test_a_sibling_at_its_end_that_is_not_true_or_false_is_refused "
+          "(__main__.FormTest"),
+    Fault("gate-run-end-before-start-accepted", "py-scripts", "check_gate.py takes a run that "
+          "ends before it starts", CHECK_FAILED, "FAIL: test_an_end_before_the_start_is_refused "
+          "(__main__.FormTest"),
+    Fault("gate-run-target-not-its-own-accepted", "py-scripts", "check_gate.py takes a run whose "
+          "target is not its seed's in fuzz/bound_seeds.txt", CHECK_FAILED,
+          "FAIL: test_a_target_not_its_seeds_own_is_refused (__main__.FormTest"),
+    Fault("gate-infinite-number-accepted", "py-scripts",
+          "check_gate.py takes an infinite load or time an execution", CHECK_FAILED,
+          "FAIL: test_an_infinite_load_is_refused (__main__.FormTest"),
+    Fault("gate-share-past-a-hundred-accepted", "py-scripts", "check_gate.py takes a busy share "
+          "over 100", CHECK_FAILED, "FAIL: test_a_busy_share_over_a_hundred_is_refused "
+          "(__main__.FormTest"),
+    Fault("gate-share-decimals-unchecked", "py-scripts",
+          "check_gate.py takes a busy share to two decimals, which the assembler rounds to one",
+          CHECK_FAILED, "FAIL: test_a_busy_share_past_one_decimal_is_refused (__main__.FormTest"),
+    Fault("gate-share-order-unchecked", "py-scripts",
+          "check_gate.py takes busy shares out of the cpus' order", CHECK_FAILED,
+          "FAIL: test_busy_shares_out_of_the_cpus_order_are_refused (__main__.FormTest"),
+    Fault("gate-share-sibling-missing-accepted", "py-scripts", "check_gate.py takes busy shares "
+          "with no share of cpu7, the sibling the gate kept busy", CHECK_FAILED,
+          "FAIL: test_busy_shares_without_the_sibling_are_refused (__main__.FormTest"),
+    Fault("gate-share-names-unchecked", "py-scripts",
+          "check_gate.py takes a busy share named for no cpu", CHECK_FAILED,
+          "FAIL: test_busy_shares_of_no_cpu_name_are_refused (__main__.FormTest"),
+    Fault("gate-utc-not-real-accepted", "py-scripts", "check_gate.py takes a run that starts on "
+          "31 November, which its time pattern matches", CHECK_FAILED,
+          "FAIL: test_a_start_on_no_real_day_is_refused (__main__.FormTest"),
     Fault("ci-shallow-checkout", "py-scripts", "CI checks out the single commit it was pushed "
           "at, so G-3's file, which judges an older one, could never be tied there",
           CHECK_FAILED, "FAIL: test_the_workflow_checks_out_the_history_g3s_tie_needs "

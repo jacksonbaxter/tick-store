@@ -1,0 +1,12 @@
+diff --git a/scripts/check_gate.py b/scripts/check_gate.py
+--- a/scripts/check_gate.py
++++ b/scripts/check_gate.py
+@@ -121,7 +121,7 @@
+         all(re.fullmatch(r"cpu(0|[1-9]\d*)", cpu) for cpu in value) and \
+         list(value) == sorted(value, key=lambda cpu: (len(cpu), cpu)) and \
+         {"cpu2", "cpu7"} <= set(value) and \
+-        all(is_real(share, 0.0, 100.0) and share == float(f"{share:.1f}")
++        all(is_real(share, 0.0, 100.0)
+             for share in value.values())
+ 
+ 

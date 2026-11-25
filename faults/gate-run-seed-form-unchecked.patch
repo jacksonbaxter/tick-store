@@ -1,0 +1,12 @@
+diff --git a/scripts/check_gate.py b/scripts/check_gate.py
+--- a/scripts/check_gate.py
++++ b/scripts/check_gate.py
+@@ -130,7 +130,7 @@
+ REAL, TIME = "a finite number of at least 0", "a real UTC time to the second"
+ TRUTH = "true or false"
+ RUN_FORMS = (
+-    ("seed", lambda value: isinstance(value, str), "a seed's name"),
++    ("seed", lambda value: True, "a seed's name"),
+     ("target", lambda value: isinstance(value, str), "a fuzz target's name"),
+     ("run", lambda value: is_count(value, 1), PAST_ONE),
+     ("start", is_utc, TIME),

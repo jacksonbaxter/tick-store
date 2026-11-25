@@ -1,0 +1,12 @@
+diff --git a/scripts/check_gate.py b/scripts/check_gate.py
+--- a/scripts/check_gate.py
++++ b/scripts/check_gate.py
+@@ -99,7 +99,7 @@
+ def is_real(value, least=0.0, most=math.inf):
+     """A float, as the assembler writes a time an execution, a load or a share: finite and
+     from least to most."""
+-    return isinstance(value, float) and math.isfinite(value) and least <= value <= most
++    return isinstance(value, float) and least <= value <= most
+ 
+ 
+ def is_utc(value):

@@ -102,6 +102,135 @@ class ShapeTest(Tree):
                             "run 4 is not a run of")
 
 
+class FormTest(Tree):
+    """Each run field holds only what the assembler writes there: what is printed on the page
+    as a number is a finite number of at least 0, a time is a real UTC time."""
+
+    LINUX_RUN = ("Linux", "run_length/bound-small-blocks", 1)
+
+    def assert_field_refused(self, key, value, words, run=LINUX_RUN):
+        def edit(document):
+            self.run_of(document, *run)[key] = value
+        self.assert_refused(edit, words)
+
+    def test_a_seed_that_is_not_a_name_is_refused(self):
+        self.assert_field_refused("seed", 5, "its seed 5 is not a seed's name")
+
+    def test_a_target_that_is_not_a_name_is_refused(self):
+        self.assert_field_refused("target", None, "its target None is not a fuzz target's name")
+
+    def test_a_run_numbered_zero_is_refused(self):
+        self.assert_field_refused("run", 0, "its run 0 is not a whole number of at least 1")
+
+    def test_a_start_that_is_no_time_is_refused(self):
+        self.assert_field_refused("start", "2026-11-17T25:61:99Z",
+                                  "its start '2026-11-17T25:61:99Z' is not a real UTC time")
+
+    def test_a_start_on_no_real_day_is_refused(self):
+        self.assert_field_refused("start", "2026-11-31T15:10:00Z",
+                                  "its start '2026-11-31T15:10:00Z' is not a real UTC time")
+
+    def test_an_end_that_is_no_time_is_refused(self):
+        self.assert_field_refused("end", "2026-11-17T15:10:60Z",
+                                  "its end '2026-11-17T15:10:60Z' is not a real UTC time")
+
+    def test_an_end_before_the_start_is_refused(self):
+        self.assert_field_refused("end", "2026-11-17T15:09:59Z",
+                                  "it ends at 2026-11-17T15:09:59Z, before it starts")
+
+    def test_a_negative_exit_code_is_refused(self):
+        self.assert_field_refused("exit_code", -1,
+                                  "its exit_code -1 is not a whole number of at least 0")
+
+    def test_findings_as_a_string_are_refused(self):
+        self.assert_field_refused("findings", "0",
+                                  "its findings '0' is not a whole number of at least 0")
+
+    def test_no_executed_unit_is_refused(self):
+        self.assert_field_refused("executed_units", 0,
+                                  "its executed_units 0 is not a whole number of at least 1")
+
+    def test_a_libfuzzer_time_that_is_not_whole_is_refused(self):
+        self.assert_field_refused("file_ms", 9337.0,
+                                  "its file_ms 9337.0 is not a whole number of at least 0")
+
+    def test_a_time_an_execution_that_is_not_a_float_is_refused(self):
+        def edit(document):
+            run = self.run_of(document, *self.LINUX_RUN)
+            run.update(file_ms=9336, ms_per_execution=4668)
+        self.assert_refused(edit, "its ms_per_execution 4668 is not a finite number of at "
+                                  "least 0")
+
+    def test_a_negative_wall_time_is_refused(self):
+        self.assert_field_refused("wall_ms", -1,
+                                  "its wall_ms -1 is not a whole number of at least 0")
+
+    def test_a_load_that_is_not_a_number_is_refused(self):
+        self.assert_field_refused("load1", float("nan"),
+                                  "its load1 nan is not a finite number of at least 0")
+
+    def test_an_infinite_load_is_refused(self):
+        self.assert_field_refused("load1", float("inf"),
+                                  "its load1 inf is not a finite number of at least 0")
+
+    def test_a_negative_load_is_refused(self):
+        self.assert_field_refused("load1", -3.0,
+                                  "its load1 -3.0 is not a finite number of at least 0")
+
+    def test_a_load_as_a_string_is_refused(self):
+        self.assert_field_refused("load1", "2.40",
+                                  "its load1 '2.40' is not a finite number of at least 0")
+
+    def test_a_pass_that_is_not_true_or_false_is_refused(self):
+        self.assert_field_refused("pass", 1, "its pass 1 is not true or false")
+
+    def test_a_busy_share_that_is_not_a_number_is_refused(self):
+        self.assert_field_refused("cpu_busy_percent", {"cpu2": 2.0, "cpu7": "lots"},
+                                  "its cpu_busy_percent {'cpu2': 2.0, 'cpu7': 'lots'} is not")
+
+    def test_a_busy_share_over_a_hundred_is_refused(self):
+        self.assert_field_refused("cpu_busy_percent", {"cpu2": 2.0, "cpu7": 100.5},
+                                  "its cpu_busy_percent {'cpu2': 2.0, 'cpu7': 100.5} is not")
+
+    def test_a_busy_share_past_one_decimal_is_refused(self):
+        self.assert_field_refused("cpu_busy_percent", {"cpu2": 2.05, "cpu7": 100.0},
+                                  "its cpu_busy_percent {'cpu2': 2.05, 'cpu7': 100.0} is not")
+
+    def test_busy_shares_out_of_the_cpus_order_are_refused(self):
+        self.assert_field_refused("cpu_busy_percent", {"cpu7": 100.0, "cpu2": 2.0},
+                                  "its cpu_busy_percent {'cpu7': 100.0, 'cpu2': 2.0} is not")
+
+    def test_busy_shares_without_the_sibling_are_refused(self):
+        self.assert_field_refused("cpu_busy_percent", {"cpu2": 2.0, "cpu6": 100.0},
+                                  "its cpu_busy_percent {'cpu2': 2.0, 'cpu6': 100.0} is not")
+
+    def test_busy_shares_of_no_cpu_name_are_refused(self):
+        self.assert_field_refused("cpu_busy_percent",
+                                  {"cpu2": 2.0, "cpu7": 100.0, "disk": 1.0},
+                                  "'disk': 1.0} is not each cpu's busy share")
+
+    def test_negative_processes_started_are_refused(self):
+        self.assert_field_refused("processes_started", -258,
+                                  "its processes_started -258 is not a whole number of at least 0")
+
+    def test_processes_started_as_a_string_are_refused(self):
+        self.assert_field_refused("processes_started", "258",
+                                  "its processes_started '258' is not a whole number of at least 0")
+
+    def test_a_sibling_at_its_start_that_is_not_true_or_false_is_refused(self):
+        self.assert_field_refused("sibling_busy_at_start", 1,
+                                  "its sibling_busy_at_start 1 is not true or false")
+
+    def test_a_sibling_at_its_end_that_is_not_true_or_false_is_refused(self):
+        self.assert_field_refused("sibling_busy_at_end", "yes",
+                                  "its sibling_busy_at_end 'yes' is not true or false")
+
+    def test_a_target_not_its_seeds_own_is_refused(self):
+        self.assert_field_refused("target", "fuzz_pfor",
+                                  "run_length/bound-small-blocks run 1's target 'fuzz_pfor' is "
+                                  "not its own, 'fuzz_run_length'")
+
+
 class LeakTest(Tree):
     def test_a_home_path_in_the_file_is_refused(self):
         self.assert_refused(lambda document: document["header"].update(

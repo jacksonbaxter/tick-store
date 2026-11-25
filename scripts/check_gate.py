@@ -12,6 +12,11 @@ validators' code: a change there would untie the fuzz file's runs from the tree.
 A file is refused if:
 - its shape is not the assembler's: its schema, its header's fields, each run's fields, or a
   name that is not fuzz-gate-<the first 12 of its commit>.json;
+- a run's field is not what the assembler writes there (RUN_FORMS, LINUX_FORMS): a count that
+  is not a whole number of at least 0 or 1, a time an execution or a load that is not a finite
+  number of at least 0, a start or end that is not a real UTC time to the second, or an end
+  before its start, a busy share outside 0 to 100 or not to one decimal, or a target that is
+  not its seed's own in fuzz/bound_seeds.txt;
 - it holds a machine's path, user or host name (check_results.check_leaks);
 - its bar is not half of the tree's fuzz/launch.txt -timeout, in ms an execution;
 - a seed of the tree's fuzz/bound_seeds.txt has no runs on a host, or a host ran a seed the list
@@ -35,7 +40,9 @@ Standard library only.
 """
 
 import argparse
+import datetime
 import json
+import math
 import re
 import statistics
 import sys
@@ -63,12 +70,14 @@ EXIT_OK, EXIT_INVALID, EXIT_USAGE = 0, 1, 2
 
 
 def bound_seeds(path):
-    """The seed names of fuzz/bound_seeds.txt, in its order."""
-    seeds = []
+    """{seed name: its fuzz target} of fuzz/bound_seeds.txt, in its order, the target named as
+    the assembler names it; None where a line is not "target seed"."""
+    seeds = {}
     for line in Path(path).read_text(encoding="utf-8").splitlines():
         words = [word for word in re.split(r"[,\s]+", line.strip()) if word]
         if words and not words[0].startswith("#"):
-            seeds.append(words[-1])
+            target = words[0] if words[0].startswith("fuzz_") else f"fuzz_{words[0]}"
+            seeds[words[-1]] = target if len(words) == 2 else None
     return seeds
 
 
@@ -85,6 +94,61 @@ def timeout_of(launch):
 
 def is_count(value, least=0):
     return isinstance(value, int) and not isinstance(value, bool) and value >= least
+
+
+def is_real(value, least=0.0, most=math.inf):
+    """A float, as the assembler writes a time an execution, a load or a share: finite and
+    from least to most."""
+    return isinstance(value, float) and math.isfinite(value) and least <= value <= most
+
+
+def is_utc(value):
+    """A real UTC time to the second, as the step log gives each run's start and end."""
+    if not isinstance(value, str) or not UTC.fullmatch(value):
+        return False
+    try:
+        datetime.datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError:
+        return False
+    return True
+
+
+def is_shares(value):
+    """The assembler's busy shares: each cpu the counters name, in their order, cpu2 and cpu7
+    among them, each to one decimal from 0 to 100. Of names cpuN with no leading zero, the
+    shorter comes first and names of one length sort as their numbers do."""
+    return isinstance(value, dict) and \
+        all(re.fullmatch(r"cpu(0|[1-9]\d*)", cpu) for cpu in value) and \
+        list(value) == sorted(value, key=lambda cpu: (len(cpu), cpu)) and \
+        {"cpu2", "cpu7"} <= set(value) and \
+        all(is_real(share, 0.0, 100.0) and share == float(f"{share:.1f}")
+            for share in value.values())
+
+
+# What the assembler writes in each run's field, and what a refusal calls it.
+WHOLE, PAST_ONE = "a whole number of at least 0", "a whole number of at least 1"
+REAL, TIME = "a finite number of at least 0", "a real UTC time to the second"
+TRUTH = "true or false"
+RUN_FORMS = (
+    ("seed", lambda value: isinstance(value, str), "a seed's name"),
+    ("target", lambda value: isinstance(value, str), "a fuzz target's name"),
+    ("run", lambda value: is_count(value, 1), PAST_ONE),
+    ("start", is_utc, TIME),
+    ("end", is_utc, TIME),
+    ("exit_code", is_count, WHOLE),
+    ("findings", is_count, WHOLE),
+    ("executed_units", lambda value: is_count(value, 1), PAST_ONE),
+    ("file_ms", is_count, WHOLE),
+    ("ms_per_execution", is_real, REAL),
+    ("wall_ms", is_count, WHOLE),
+    ("load1", is_real, REAL),
+    ("pass", lambda value: isinstance(value, bool), TRUTH))
+LINUX_FORMS = (
+    ("cpu_busy_percent", is_shares, "each cpu's busy share, cpu2 and cpu7 among them, in the "
+                                    "cpus' order, to one decimal from 0 to 100"),
+    ("processes_started", is_count, WHOLE),
+    ("sibling_busy_at_start", lambda value: isinstance(value, bool), TRUTH),
+    ("sibling_busy_at_end", lambda value: isinstance(value, bool), TRUTH))
 
 
 def shape_problems(document, name):
@@ -111,13 +175,14 @@ def shape_problems(document, name):
         if not isinstance(run, dict) or run.get("host") not in HOSTS or set(run) != wanted:
             problems.append(f"run {index} is not a run of {list(HOSTS)} with the fields "
                             f"{sorted(wanted)}")
-        elif not all(is_count(run[key], least) for key, least in (
-                ("run", 1), ("exit_code", 0), ("findings", 0), ("executed_units", 1),
-                ("file_ms", 0))) or not isinstance(run["pass"], bool) or \
-                not all(isinstance(run[key], str) and UTC.fullmatch(run[key])
-                        for key in ("start", "end")) or run["end"] < run["start"]:
-            problems.append(f"run {index}: its counts, its pass or its UTC span is not of the "
-                            "assembler's form")
+            continue
+        forms = RUN_FORMS + (LINUX_FORMS if run["host"] == "Linux" else ())
+        wrong = [f"run {index}: its {key} {run[key]!r} is not {what}"
+                 for key, form, what in forms if not form(run[key])]
+        problems += wrong
+        if not wrong and run["end"] < run["start"]:
+            problems.append(f"run {index}: it ends at {run['end']}, before it starts, "
+                            f"{run['start']}")
     return problems
 
 
@@ -162,6 +227,10 @@ def coverage_problems(runs, seeds, per_seed):
             numbers = sorted(run["run"] for run in mine if run["seed"] == seed)
             if numbers != list(range(1, per_seed + 1)):
                 problems.append(f"{host}: {seed} has runs {numbers}, not 1 to {per_seed}")
+        for run in mine:
+            if run["seed"] in seeds and run["target"] != seeds[run["seed"]]:
+                problems.append(f"{host}: {run['seed']} run {run['run']}'s target "
+                                f"{run['target']!r} is not its own, {seeds[run['seed']]!r}")
     return problems
 
 

@@ -1,0 +1,12 @@
+diff --git a/scripts/check_gate.py b/scripts/check_gate.py
+--- a/scripts/check_gate.py
++++ b/scripts/check_gate.py
+@@ -148,7 +148,7 @@
+                                     "cpus' order, to one decimal from 0 to 100"),
+     ("processes_started", is_count, WHOLE),
+     ("sibling_busy_at_start", lambda value: isinstance(value, bool), TRUTH),
+-    ("sibling_busy_at_end", lambda value: isinstance(value, bool), TRUTH))
++    ("sibling_busy_at_end", lambda value: True, TRUTH))
+ 
+ 
+ def shape_problems(document, name):
