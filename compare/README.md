@@ -696,7 +696,7 @@ made again.
 |---|---|
 | Parquet | 7 streamable variants at 34 to 41 each (write 3.1 min a class, the earlier capacity run's Parquet ingest of 187.5 s; the committed file gives 178.5 s, 3.0 min; read-back and oracle 10, queries 7), about 250. `zstd1-rgall`, one row group for the whole input, cannot stream a day |
 | ArcticDB | headline 43, `rows10M-cols127` 52, `rows100k-cols1` 72 (class B writes 5.3 times the headline's on the slice), per security 98 (partition and writes 33, read-back over 8,907 symbols 28, Q1, Q4 and Q5 over every symbol 37), about 265 |
-| QuestDB | `plain` 87 (writes 10.5 min for class A and 16 min for class B from the earlier capacity run, 632.3 s and 959.0 s; the committed file gives 10.9 min for class A and 7.4 min for class B, `wall_seconds.ingest` 652.8 s and 444.8 s; settle, read-back 38, cold restarts 8), `locate-index` 95, about 182 |
+| QuestDB | `plain` 87 (writes 10.5 min for class A and 16 min for class B from the earlier capacity run, 632.3 s and 959.0 s; the committed file gives 10.9 min for class A and 7.4 min for class B, `wall_seconds.ingest` 652.8 s and 444.8 s, its class A part holding a run of the host's scheduled repository backup, journal lines from 17:28:38Z to 17:29:48Z on 2026-11-17, which `results/disturbances-ede0176b10bb.json` lists under `not_listed`; settle, read-back 38, cold restarts 8), `locate-index` 95, about 182 |
 | tick-store | 43 each (write about 4 min a class, `tick_export --store`, the oracle and G-1 15 min a class), 86 |
 | Every system | the source's SHA-256 and the export's oracle before it starts, 6 each, 24 |
 
