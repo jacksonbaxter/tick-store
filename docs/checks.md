@@ -56,7 +56,12 @@ bytes read from the device inside the clock, what engine-only holds, and that en
 not take the reads out. A verdict that rests on a timed phase in which
 `results/disturbances-<commit>.json` records something else running, such as a login or the
 host's backup job, says so beside it, with the replaced run's figure there; the file's shape,
-spans and places in the documents are checked. A part met by the rule whose swap or disturbance
+spans and places in the documents are checked. RESULTS.md's tables mark each figure they show
+from such a phase, and each kernel median over such a case, " (disturbed)". So an entry is marked
+on the verdicts and figures the generated pages show; an entry in a phase no page shows, such as
+a slice setup no table gives, is in the record only. A figure typed by hand on
+`compare/README.md` or `BENCHMARKS.md` is not held to the disturbance records: nothing checks
+that one quoted from a phase with an entry says so. A part met by the rule whose swap or disturbance
 mark falls on another system's side, and which the replaced run does not confirm, keeps its word
 and its mark and is counted nowhere; its mark names every side either run flags as swapped in, in
 RESULTS.md with each run's pages read from both records and on the first screen by system, a side

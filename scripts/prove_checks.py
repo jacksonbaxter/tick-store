@@ -2657,6 +2657,20 @@ FAULTS = (
           "list routine runs with no mark", CHECK_FAILED,
           "FAIL: test_the_sentence_under_the_table_says_what_the_records_leave_unmarked "
           "(__main__.UnderSentenceTest", claim_every_event_is_marked),
+    # Review R1-30: a benchmark figure from a disturbed case, and a kernel median over one, is
+    # marked from the disturbance record.
+    Fault("bench-kernel-median-unmarked", "py-scripts", "render_results.py gives a kernel "
+          "row's median over a case the disturbance record enters with no mark", CHECK_FAILED,
+          "FAIL: test_a_kernel_median_over_a_disturbed_case_is_marked "
+          "(__main__.RenderResultsTest"),
+    Fault("bench-case-entries-unread", "py-scripts", "render_results.py's benchmark block "
+          "reads no disturbance record, so no case's figure is marked", CHECK_FAILED,
+          "FAIL: test_a_kernel_median_over_a_disturbed_case_is_marked "
+          "(__main__.RenderResultsTest"),
+    Fault("bench-marks-unwired", "render-check", "render_results.py renders the benchmark block "
+          "without the tree's disturbance records, so RESULTS.md's kernel medians over a "
+          "disturbed case lose their mark", CHECK_FAILED,
+          "the table in RESULTS.md is stale or was edited by hand"),
     # Review R1-26: nor that the unmarked runs could not be tied to a figure, as R1-15 had it.
     Fault("under-sentence-says-runs-cannot-be-tied", "py-scripts", "the sentence under the "
           "README's table says the routine runs cannot be tied to one figure, though the gate's "

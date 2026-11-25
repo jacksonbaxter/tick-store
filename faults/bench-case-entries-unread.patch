@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -331,7 +331,7 @@
+     documents = [json.loads(path.read_text(encoding="utf-8")) for path in paths]
+     if not documents:
+         return ["No reported results yet."]
+-    entries = disturbance_entries(root) if root is not None else []
++    entries = []
+     disturbed = {id(document): {entry["case"] for entry in entries
+                                 if entry["timed"] and entry["phase"] == "case" and
+                                 entry["document"] == f"bench/{path.name}"}

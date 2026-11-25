@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -4638,7 +4638,7 @@
+         print(f"render_results: the markers are not in {md_name}", file=sys.stderr)
+         return EXIT_USAGE
+     try:
+-        blocks = [(BEGIN, END, render(args.results, args.targets_root))]
++        blocks = [(BEGIN, END, render(args.results))]
+     except TargetError as error:
+         print(f"render_results: benchmarks: {error}", file=sys.stderr)
+         return EXIT_USAGE

@@ -543,7 +543,9 @@ Mac, against 0.50 s and 0.54 s for one symbol, and 15.10 s and 137.8 s on Linux,
 and 1.29 s. The class B store took 235,167,744 bytes against 141,860,864 on the Mac, and 206,958,592
 against 141,168,640 on Linux. A one-security query gains: Q2 warm 2.0 ms against 41.8 ms on the
 Mac, 8.4 ms against 142.6 ms on Linux. A query over every security loses: Q1 warm 1.11 s against
-7.6 ms on the Mac, 6.11 s against 30.8 ms on Linux.
+7.6 ms on the Mac, 6.11 s against 30.8 ms on Linux. On Linux the per-security setup's warm
+queries, both figures here among them, held a remote login by another project's watcher, which
+`results/disturbances-ede0176b10bb.json` enters.
 
 ## Full-day capacity
 

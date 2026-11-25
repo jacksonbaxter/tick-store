@@ -227,8 +227,10 @@ def header_line(host, document, what):
             f"`{header['compile_flags']}`. {header['statement']}")
 
 
-def column_table(host, document):
-    """Real-data column decodes, one row a case: values per second and the column's size."""
+def column_table(host, document, disturbed=()):
+    """Real-data column decodes, one row a case: values per second and the column's size; a
+    case disturbed names, one the disturbance file lists a timed disturbance in, has its
+    time marked."""
     lines = [header_line(host, document, "real-data column decodes of the slice"), "",
              "| " + " | ".join(COLUMN_COLUMNS) + " |", "|" + "---|" * len(COLUMN_COLUMNS)]
     commit = document["header"]["commit"][:12]
@@ -237,7 +239,9 @@ def column_table(host, document):
         counters = result["counters"]
         cells = (f"`{result['case']}`", f"`{commit}`", result["isa"].split(", ", 1)[-1],
                  f"{result['verification']['values']:,}",
-                 f"{result['ratio']['bits_per_value']:.2f}", f"{1e9 / rate['median']:.3f}",
+                 f"{result['ratio']['bits_per_value']:.2f}",
+                 f"{1e9 / rate['median']:.3f}" + (DISTURBED_MARK if result["case"] in disturbed
+                                                   else ""),
                  f"{rate['median'] * 8 / 1e6:,.0f}", f"{rate['cv'] * 100:.2f}%",
                  number_or_na(per_value(counters, "cycles")),
                  number_or_na(per_value(counters, "instructions")),
@@ -251,8 +255,10 @@ def median_or_none(values):
     return statistics.median(present) if present else None
 
 
-def kernel_table(host, document):
-    """Seeded kernel cases, one row a kernel and set: the median across its widths."""
+def kernel_table(host, document, disturbed=()):
+    """Seeded kernel cases, one row a kernel and set: the median across its widths, marked
+    where a case it takes is one disturbed names, which the disturbance file lists a timed
+    disturbance in, so no median from a disturbed case stands bare (review R1-30)."""
     groups = {}
     for result, start in zip(document["results"], starts_of(document)):
         family, _, kernel_set = WIDTH.sub("", result["case"]).rpartition("/")
@@ -271,7 +277,9 @@ def kernel_table(host, document):
             return median_or_none([per_value(row["counters"], name) for row, _ in rows])
 
         cells = (f"`{family}`", kernel_set, f"`{commit}`", str(len(rows)),
-                 f"{statistics.median(rates):.2f}", f"{min(rates):.2f} to {max(rates):.2f}",
+                 f"{statistics.median(rates):.2f}" + (
+                     DISTURBED_MARK if any(row["case"] in disturbed for row, _ in rows) else ""),
+                 f"{min(rates):.2f} to {max(rates):.2f}",
                  f"{max(cvs) * 100:.2f}%", number_or_na(median_counter("cycles"), 3),
                  number_or_na(median_counter("instructions"), 3),
                  number_or_na(median_counter("branch_misses"), 4),
@@ -280,7 +288,7 @@ def kernel_table(host, document):
     return lines
 
 
-def table_for(host, documents):
+def table_for(host, documents, disturbed=None):
     lines = [f"**{host}.** {documents[0]['header']['cpu_model']}, "
              f"{documents[0]['header']['compiler']}, `{documents[0]['header']['compile_flags']}`, "
              f"{documents[0]['header']['isa']}. {documents[0]['header']['statement']}", "",
@@ -294,7 +302,9 @@ def table_for(host, documents):
             latency = result["latency"]
             counters = result["counters"]
             cells = (f"`{result['case']}`", f"`{header['commit'][:12]}`",
-                     str(throughput["repetitions"]), f"{rate['median'] / 1e6:.2f} M",
+                     str(throughput["repetitions"]),
+                     f"{rate['median'] / 1e6:.2f} M" + (DISTURBED_MARK if result["case"] in
+                                                        (disturbed or {}).get(id(document), ()) else ""),
                      f"{rate['cv'] * 100:.2f}%", f"{latency['batch_messages']} msgs",
                      percentile_us(latency, 50.0), percentile_us(latency, 99.0),
                      percentile_us(latency, 99.9), per_message(counters, "cycles"),
@@ -307,24 +317,39 @@ def table_for(host, documents):
     return lines
 
 
-def render(results_dir):
-    """The block between the markers, from every results file."""
+# What the benchmark block says once of a figure it marks from a disturbed case.
+BENCH_DISTURBED = (f"A figure from a timed case in which the disturbance file lists a "
+                   f"disturbance is marked{DISTURBED_MARK}, and so is a kernel row's median "
+                   "when one of the cases it takes is such a case; a verdict in Targets that "
+                   "rests on one says what it was beside its word.")
+
+
+def render(results_dir, root=None):
+    """The block between the markers, from every results file; with root, each figure from a
+    case in which the tree's disturbance files list a timed disturbance is marked."""
     paths = sorted(results_dir.glob("*.json"))
     documents = [json.loads(path.read_text(encoding="utf-8")) for path in paths]
     if not documents:
         return ["No reported results yet."]
+    entries = disturbance_entries(root) if root is not None else []
+    disturbed = {id(document): {entry["case"] for entry in entries
+                                if entry["timed"] and entry["phase"] == "case" and
+                                entry["document"] == f"bench/{path.name}"}
+                 for path, document in zip(paths, documents)}
     lines = []
     for host in HOSTS:
         mine = [document for document in documents if document["header"]["host"] == host]
         messages = [document for document in mine if kind_of(document) == "slice"]
         if messages:
-            lines += table_for(host, messages) + [""]
+            lines += table_for(host, messages, disturbed) + [""]
         for document in mine:
             if kind_of(document) == "column":
-                lines += column_table(host, document) + [""]
+                lines += column_table(host, document, disturbed[id(document)]) + [""]
         for document in mine:
             if kind_of(document) == "seeded":
-                lines += kernel_table(host, document) + [""]
+                lines += kernel_table(host, document, disturbed[id(document)]) + [""]
+    if any(DISTURBED_MARK in line for line in lines):
+        lines = [BENCH_DISTURBED, "", *lines]
     return lines[:-1]
 
 
@@ -4612,7 +4637,11 @@ def main(argv=None):
     if block_of(text) is None:
         print(f"render_results: the markers are not in {md_name}", file=sys.stderr)
         return EXIT_USAGE
-    blocks = [(BEGIN, END, render(args.results))]
+    try:
+        blocks = [(BEGIN, END, render(args.results, args.targets_root))]
+    except TargetError as error:
+        print(f"render_results: benchmarks: {error}", file=sys.stderr)
+        return EXIT_USAGE
     if block_of(text, COMPARE_BEGIN, COMPARE_END) is not None:
         try:
             blocks.append((COMPARE_BEGIN, COMPARE_END, render_compare(args.compare_results,
