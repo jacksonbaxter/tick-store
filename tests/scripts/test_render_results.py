@@ -3579,6 +3579,21 @@ class ShortFormTest(unittest.TestCase):
 
 
 
+class PageNameTest(unittest.TestCase):
+    """The check's lines name each page by its path under the tree, so README.md and
+    fuzz/README.md are told apart (review R1-10)."""
+
+    def test_each_page_is_named_by_its_path(self):
+        root = REPO_ROOT
+        names = [RENDER.page_name(root / name, root) for name in
+                 ("RESULTS.md", "README.md", "fuzz/README.md")]
+        self.assertEqual(names, ["RESULTS.md", "README.md", "fuzz/README.md"])
+        self.assertEqual(RENDER.and_list(names) + ": tables are current",
+                         "RESULTS.md, README.md and fuzz/README.md: tables are current")
+        # A page outside the tree keeps its own name.
+        self.assertEqual(RENDER.page_name(Path("/nowhere/page.md"), root), "page.md")
+
+
 class PlainLabelTest(unittest.TestCase):
     """Review R1-6: a comparison file's label is given in a reader's words, not the harness's."""
 

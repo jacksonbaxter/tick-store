@@ -1019,6 +1019,15 @@ def and_list(items):
     return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
 
 
+def page_name(path, root):
+    """A page by its path under the tree, so README.md and fuzz/README.md are told apart, or by
+    its name where it lies outside the tree."""
+    try:
+        return Path(path).resolve().relative_to(Path(root).resolve()).as_posix()
+    except ValueError:
+        return Path(path).name
+
+
 def counted_with(value, singular, plural=None):
     return f"{value:,} {singular if value == 1 else plural or singular + 's'}"
 
@@ -4622,7 +4631,7 @@ def main(argv=None):
             before, _, after = block_of(fresh, begin, end)
             fresh = before + "\n" + "\n".join(lines) + "\n" + after
         if fresh != content:
-            stale.append(path.name)
+            stale.append(page_name(path, args.targets_root))
         rendered.append((path, content, fresh))
     if args.check:
         for name in stale:
@@ -4630,7 +4639,8 @@ def main(argv=None):
                   "Regenerate it.", file=sys.stderr)
         if stale:
             return EXIT_STALE
-        print(" and ".join(path.name for path, _, _ in rendered) + ": tables are current")
+        print(and_list([page_name(path, args.targets_root) for path, _, _ in rendered]) +
+              ": tables are current")
         return untied(done)
     for path, content, fresh in rendered:
         if fresh != content:

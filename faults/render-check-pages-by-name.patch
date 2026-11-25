@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1023,7 +1023,7 @@
+     """A page by its path under the tree, so README.md and fuzz/README.md are told apart, or by
+     its name where it lies outside the tree."""
+     try:
+-        return Path(path).resolve().relative_to(Path(root).resolve()).as_posix()
++        return Path(path).name
+     except ValueError:
+         return Path(path).name
+ 

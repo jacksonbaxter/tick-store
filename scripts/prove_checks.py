@@ -1560,7 +1560,7 @@ FAULTS = (
           "FAIL: test_a_refused_file_renders_no_block (__main__.RenderTest"),
     Fault("gate-block-hand-edit", "render-check", "a hand edit of the Linux worst run's time "
           "in fuzz/README.md's gate block", CHECK_FAILED,
-          "the table in README.md is stale or was edited by hand"),
+          "the table in fuzz/README.md is stale or was edited by hand"),
     Fault("ties-fuzz-gate-no-kind", "py-scripts", "check_ties.py with no kind for the gate "
           "file", CHECK_FAILED,
           "FAIL: test_the_gate_kind_is_the_fuzz_tie_but_the_launcher_and_its_own_assembler "
@@ -2215,6 +2215,10 @@ FAULTS = (
           "the ingest tables' columns again under class B", CHECK_FAILED,
           "FAIL: test_macos_stored_bytes_say_they_can_exceed_the_files_own "
           "(__main__.RenderCompareTest"),
+    # Review R1-10: the check names each page by its path.
+    Fault("render-check-pages-by-name", "py-scripts", "render_results.py names the pages it "
+          "checked by their file names alone, so README.md and fuzz/README.md read the same",
+          CHECK_FAILED, "FAIL: test_each_page_is_named_by_its_path (__main__.PageNameTest"),
     Fault("sides-left-out-counts-uncounted", "py-scripts", "render_results.py counts a part no run confirms among the first screen's met parts", CHECK_FAILED,
           "FAIL: test_no_count_takes_a_part_not_counted (__main__.SidesTest"),
     # The ruling on review P1-5: G-3's runs beside its verdict, from its file.
