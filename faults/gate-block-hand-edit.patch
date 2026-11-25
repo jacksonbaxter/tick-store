@@ -1,5 +1,5 @@
 diff --git a/fuzz/README.md b/fuzz/README.md
-index 541fbb1..4cd3a6b 100644
+index 8232f80..619a9fd 100644
 --- a/fuzz/README.md
 +++ b/fuzz/README.md
 @@ -471,7 +471,7 @@ On macOS, 31 of 31 seeds passed, 155 runs. The worst run was `dictionary/bound-o
@@ -8,6 +8,6 @@ index 541fbb1..4cd3a6b 100644
  On Linux, 31 of 31 seeds passed, 155 runs. The worst run was `run_length/bound-small-blocks` at
 -4,668.5 ms an execution, 9,337 ms over 2 executions, in its run 1 of 5 (median 3,908.0), 2026-11-17
 +4,068.5 ms an execution, 9,337 ms over 2 executions, in its run 1 of 5 (median 3,908.0), 2026-11-17
- 15:12:42 to 15:12:51 UTC, which holds no recorded event. It began 13 s after the end of a backup run
- (2026-11-17 15:12:26 to 15:12:29 UTC) and 10 s after the end of a remote login (2026-11-17 15:12:31
- to 15:12:32 UTC), each in an earlier run of the gate. The load read just before it began, 2.40, was
+ 15:12:42 to 15:12:51 UTC, which holds no recorded event. It began 13 s after a backup run's last
+ line in the host's journal (2026-11-17 15:12:26 to 15:12:29 UTC) and 10 s after the end of a remote
+ login (2026-11-17 15:12:31 to 15:12:32 UTC), each in an earlier run of the gate. The load read just
