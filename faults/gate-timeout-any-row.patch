@@ -1,0 +1,12 @@
+diff --git a/scripts/check_gate.py b/scripts/check_gate.py
+--- a/scripts/check_gate.py
++++ b/scripts/check_gate.py
+@@ -125,7 +125,7 @@
+     """fuzz/launch.txt's -timeout, in seconds, from its flags row, or None."""
+     for line in Path(launch).read_text(encoding="utf-8").splitlines():
+         words = line.split()
+-        if words and words[0] == "flags":
++        if words:
+             found = [word for word in words[1:] if re.fullmatch(r"-timeout=\d+", word)]
+             if len(found) == 1:
+                 return int(found[0].split("=", 1)[1])

@@ -1,0 +1,12 @@
+diff --git a/scripts/check_gate.py b/scripts/check_gate.py
+--- a/scripts/check_gate.py
++++ b/scripts/check_gate.py
+@@ -425,7 +425,7 @@
+     for path in paths:
+         try:
+             document = json.loads(Path(path).read_text(encoding="utf-8"))
+-        except (OSError, json.JSONDecodeError) as error:
++        except OSError as error:
+             found[Path(path).name] = [str(error)]
+             continue
+         problems = check_document(document, Path(path).name, seeds, timeout, digest)

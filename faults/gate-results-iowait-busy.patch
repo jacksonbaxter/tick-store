@@ -1,0 +1,12 @@
+diff --git a/scripts/gate_results.py b/scripts/gate_results.py
+--- a/scripts/gate_results.py
++++ b/scripts/gate_results.py
+@@ -117,7 +117,7 @@
+         words = line.split()
+         if words and re.fullmatch(r"cpu\d+", words[0]):
+             values = [int(value) for value in words[1:]]
+-            idle = values[3] + (values[4] if len(values) > 4 else 0)
++            idle = values[3]
+             cpus[words[0]] = (sum(values) - idle, sum(values))
+         elif words and words[0] == "processes":
+             processes = int(words[1])

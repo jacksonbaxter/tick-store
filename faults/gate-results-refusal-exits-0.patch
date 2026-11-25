@@ -1,0 +1,12 @@
+diff --git a/scripts/gate_results.py b/scripts/gate_results.py
+--- a/scripts/gate_results.py
++++ b/scripts/gate_results.py
+@@ -395,7 +395,7 @@
+         document = assemble(args.commit, args.assembled_on, hosts, args.seeds, args.launch)
+     except (Refused, OSError, ValueError, IndexError) as error:
+         print(f"gate_results: {error}", file=sys.stderr)
+-        return 1
++        return 0
+     args.out.write_text(json.dumps(document, indent=1) + "\n", encoding="utf-8")
+     print(f"wrote {args.out}")
+     return 0

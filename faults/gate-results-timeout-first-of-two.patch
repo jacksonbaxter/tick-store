@@ -1,0 +1,12 @@
+diff --git a/scripts/gate_results.py b/scripts/gate_results.py
+--- a/scripts/gate_results.py
++++ b/scripts/gate_results.py
+@@ -105,7 +105,7 @@
+         words = line.split()
+         if words and words[0] == "flags":
+             found = [word for word in words[1:] if re.fullmatch(r"-timeout=\d+", word)]
+-            if len(found) == 1:
++            if found:
+                 return int(found[0].split("=", 1)[1])
+     raise Refused(f"{Path(launch).name} has no flags row with one -timeout=N")
+ 

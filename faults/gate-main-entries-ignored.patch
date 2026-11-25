@@ -1,0 +1,12 @@
+diff --git a/scripts/check_gate.py b/scripts/check_gate.py
+--- a/scripts/check_gate.py
++++ b/scripts/check_gate.py
+@@ -447,7 +447,7 @@
+     except (OSError, json.JSONDecodeError) as error:
+         print(f"check_gate: {error}", file=sys.stderr)
+         return EXIT_USAGE
+-    failed = bool(entries)
++    failed = False
+     for name, problems in found.items():
+         for problem in problems:
+             print(f"{name}: {problem}", file=sys.stderr)

@@ -1,0 +1,12 @@
+diff --git a/scripts/gate_results.py b/scripts/gate_results.py
+--- a/scripts/gate_results.py
++++ b/scripts/gate_results.py
+@@ -92,7 +92,7 @@
+     for line in Path(path).read_text(encoding="utf-8").splitlines():
+         words = [word for word in re.split(r"[,\s]+", line.strip()) if word]
+         if words and not words[0].startswith("#"):
+-            if len(words) != 2:
++            if False:
+                 raise Refused(f"{Path(path).name}: not \"target seed\": {line!r}")
+             target = words[0] if words[0].startswith("fuzz_") else f"fuzz_{words[0]}"
+             found.append((target, words[1]))

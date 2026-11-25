@@ -1,0 +1,12 @@
+diff --git a/scripts/gate_results.py b/scripts/gate_results.py
+--- a/scripts/gate_results.py
++++ b/scripts/gate_results.py
+@@ -193,7 +193,7 @@
+     state = STATES[host]
+     for line in status:
+         match = EDGE_LINE.search(line)
+-        if match and match[1] == step.name and match[3] == state:
++        if match and match[3] == state:
+             key = (int(match[2]), int(match[4]))
+             edges.setdefault(key, {})[match[5]] = (match[6], match[7])
+         match = FIGURES_LINE.search(line)

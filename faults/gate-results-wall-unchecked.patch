@@ -1,0 +1,12 @@
+diff --git a/scripts/gate_results.py b/scripts/gate_results.py
+--- a/scripts/gate_results.py
++++ b/scripts/gate_results.py
+@@ -243,7 +243,7 @@
+                              "cpu2_busy_pct": f"{shares[f'cpu{THIRD_CPU}']:.1f}"})
+                 if (figure[11], figure[12], figure[13], figure[14], figure[16]) != (
+                         str(SPIN_CPU), told["sibling_busy_pct"], str(THIRD_CPU),
+-                        told["cpu2_busy_pct"], beside) or record["wall_ms"] != int(figure[8]):
++                        told["cpu2_busy_pct"], beside):
+                     raise Refused(f"{where}: the step log's shares, busy process or wall time "
+                                   "are not the run's own records'")
+             if (figure[6], figure[7], figure[9]) != (told["libfuzzer_ms"], told["units"],

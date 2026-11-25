@@ -1,0 +1,12 @@
+diff --git a/scripts/check_gate.py b/scripts/check_gate.py
+--- a/scripts/check_gate.py
++++ b/scripts/check_gate.py
+@@ -240,7 +240,7 @@
+             problems.append(f"{where}: {run['ms_per_execution']} ms an execution is over the "
+                             f"bar, {bar}, and the run is marked pass")
+             continue
+-        busy = run["host"] != "Linux" or (run["sibling_busy_at_start"] is True and
++        busy = run["host"] != "Linux" or (
+                                           run["sibling_busy_at_end"] is True)
+         passed = run["exit_code"] == 0 and run["findings"] == 0 and not over and busy
+         if run["pass"] is not passed:

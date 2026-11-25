@@ -1,0 +1,12 @@
+diff --git a/scripts/gate_results.py b/scripts/gate_results.py
+--- a/scripts/gate_results.py
++++ b/scripts/gate_results.py
+@@ -253,7 +253,7 @@
+                 if row[column] != value:
+                     raise Refused(f"{where}: the runner's table gives {column} {row[column]!r}, "
+                                   f"the records {value!r}")
+-            clean = exit_code == 0 and not findings
++            clean = not findings
+             if (row["outcome"] == "ok", figure[10] == "ok") != (clean, clean):
+                 raise Refused(f"{where}: the runner's outcome {row['outcome']!r} is not what its "
+                               "records give")

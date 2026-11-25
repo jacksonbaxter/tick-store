@@ -1577,6 +1577,96 @@ FAULTS = (
     Fault("gate-entry-span-backwards-accepted", "py-scripts", "check_gate.py takes a gate run "
           "entry that ends before it starts", CHECK_FAILED,
           "FAIL: test_an_entry_that_ends_before_it_starts_is_refused (__main__.EntryTest"),
+    # Every other refusal of check_gate.py: the file's shape, the pass rule's parts, the list and
+    # launch file as the assembler reads them, an entry's case and count, and its exits.
+    Fault("gate-file-parts-unchecked", "py-scripts",
+          "check_gate.py takes a gate file with a part beside its header, runs and summary",
+          CHECK_FAILED, "FAIL: test_a_file_with_another_part_is_refused (__main__.ShapeFormTest"),
+    Fault("gate-header-object-unchecked", "py-scripts", "check_gate.py reads a header that is a "
+          "list as an object, and raises", CHECK_FAILED,
+          "ERROR: test_a_header_that_is_not_an_object_is_refused (__main__.ShapeFormTest"),
+    Fault("gate-header-keys-unchecked", "py-scripts", "check_gate.py takes a header with a key "
+          "the assembler never writes", CHECK_FAILED,
+          "FAIL: test_a_header_with_another_key_is_refused (__main__.ShapeFormTest"),
+    Fault("gate-commit-form-unchecked", "py-scripts", "check_gate.py takes a gate file whose "
+          "commit is the 12 characters of its name, not a full commit", CHECK_FAILED,
+          "FAIL: test_a_short_commit_its_name_gives_is_refused (__main__.ShapeFormTest"),
+    Fault("gate-bar-whole-unchecked", "py-scripts", "check_gate.py takes a bar that is not a "
+          "whole number of ms", CHECK_FAILED, "FAIL: test_a_bar_that_is_not_whole_is_refused "
+          "(__main__.ShapeFormTest"),
+    Fault("gate-runs-a-seed-whole-unchecked", "py-scripts", "check_gate.py takes runs a seed "
+          "given as a string, and raises", CHECK_FAILED,
+          "ERROR: test_runs_a_seed_as_a_string_are_refused (__main__.ShapeFormTest"),
+    Fault("gate-no-runs-accepted", "py-scripts", "check_gate.py takes a gate file of no runs",
+          CHECK_FAILED, "FAIL: test_a_file_of_no_runs_is_refused (__main__.ShapeFormTest"),
+    Fault("gate-runs-not-a-list-accepted", "py-scripts", "check_gate.py reads runs that are a "
+          "string as a list of runs", CHECK_FAILED,
+          "FAIL: test_runs_that_are_not_a_list_are_refused (__main__.ShapeFormTest"),
+    Fault("gate-run-host-unchecked", "py-scripts", "check_gate.py takes a run on a host the gate "
+          "did not run on", CHECK_FAILED, "FAIL: test_a_run_on_another_host_is_refused "
+          "(__main__.ShapeFormTest"),
+    Fault("gate-run-fields-unchecked", "py-scripts", "check_gate.py takes a run with a field "
+          "missing, and raises", CHECK_FAILED,
+          "ERROR: test_a_run_with_a_field_missing_is_refused (__main__.ShapeTest"),
+    Fault("gate-pass-rule-exit-ignored", "py-scripts", "check_gate.py's pass rule leaves out the "
+          "exit code, so a run that exited 77 with no finding passes", CHECK_FAILED,
+          "FAIL: test_a_run_that_exited_otherwise_marked_pass_is_refused (__main__.RunTest"),
+    Fault("gate-pass-rule-bar-ignored", "py-scripts", "check_gate.py's pass rule leaves out the "
+          "bar, so it refuses an assembled run over the bar marked fail", CHECK_FAILED,
+          "FAIL: test_an_assembled_run_over_the_bar_marked_fail_passes (__main__.RunTest"),
+    Fault("gate-pass-rule-sibling-start-ignored", "py-scripts",
+          "check_gate.py's pass rule leaves out the sibling at a Linux run's start", CHECK_FAILED,
+          "FAIL: test_a_linux_run_without_its_sibling_at_its_start_marked_pass_is_refused "
+          "(__main__.RunTest"),
+    Fault("gate-pass-rule-sibling-end-ignored", "py-scripts", "check_gate.py's pass rule leaves "
+          "out the sibling at a Linux run's end", CHECK_FAILED,
+          "FAIL: test_a_linux_run_without_its_sibling_busy_marked_pass_is_refused "
+          "(__main__.RunTest"),
+    Fault("gate-marked-fail-accepted", "py-scripts",
+          "check_gate.py takes a run that met the pass rule marked fail", CHECK_FAILED,
+          "FAIL: test_a_clean_run_marked_fail_is_refused (__main__.RunTest"),
+    Fault("gate-seed-not-listed-accepted", "py-scripts", "check_gate.py takes a host's runs of a "
+          "seed fuzz/bound_seeds.txt does not hold", CHECK_FAILED,
+          "FAIL: test_a_seed_not_in_the_list_is_refused (__main__.CoverageTest"),
+    Fault("gate-run-numbering-unchecked", "py-scripts", "check_gate.py takes a seed whose runs "
+          "are not numbered 1 to its runs a seed, one missing", CHECK_FAILED,
+          "FAIL: test_a_seed_with_a_run_missing_is_refused (__main__.CoverageTest"),
+    Fault("gate-no-timeout-raises", "py-scripts", "check_gate.py takes no -timeout in "
+          "fuzz/launch.txt as a number, and raises", CHECK_FAILED,
+          "ERROR: test_a_launch_file_with_no_timeout_is_refused (__main__.ListTest"),
+    Fault("gate-entry-case-unchecked", "py-scripts", "check_gate.py reads a gate run entry whose "
+          "case is not \"<seed> run <K> of <N>\", and raises", CHECK_FAILED,
+          "ERROR: test_an_entry_whose_case_is_not_a_run_is_refused (__main__.EntryTest"),
+    Fault("gate-entry-of-n-unchecked", "py-scripts", "check_gate.py takes a gate run entry that "
+          "gives another count of runs a seed than the gate file's", CHECK_FAILED,
+          "FAIL: test_an_entry_naming_another_count_of_runs_is_refused (__main__.EntryTest"),
+    Fault("gate-entry-any-host", "py-scripts", "check_gate.py looks for an entry's run on both "
+          "hosts, so it finds two and refuses every entry", CHECK_FAILED,
+          "FAIL: test_an_entry_inside_the_run_it_names_passes (__main__.EntryTest"),
+    Fault("gate-file-not-json-raises", "py-scripts",
+          "check_gate.py raises on a gate file that is not JSON", CHECK_FAILED,
+          "ERROR: test_a_file_that_is_not_json_is_refused (__main__.ShapeFormTest"),
+    Fault("gate-main-exits-0", "py-scripts", "check_gate.py exits 0 whatever it refuses",
+          CHECK_FAILED, "FAIL: test_a_refused_file_exits_1 (__main__.MainTest"),
+    Fault("gate-main-entries-ignored", "py-scripts", "check_gate.py exits 0 when only a "
+          "disturbance entry is refused", CHECK_FAILED,
+          "FAIL: test_a_refused_entry_alone_exits_1 (__main__.MainTest"),
+    Fault("gate-list-comment-a-seed", "py-scripts", "check_gate.py reads a comment line of "
+          "fuzz/bound_seeds.txt as a seed", CHECK_FAILED,
+          "FAIL: test_a_comment_in_the_list_is_no_seed (__main__.ListTest"),
+    Fault("gate-list-target-unprefixed", "py-scripts",
+          "check_gate.py reads a list's target named without fuzz_ as another target than the "
+          "assembler's", CHECK_FAILED,
+          "FAIL: test_a_target_named_without_its_prefix_is_its_fuzz_target (__main__.ListTest"),
+    Fault("gate-list-line-form-unchecked", "py-scripts", "check_gate.py gives a seed a target "
+          "from a list line of three words", CHECK_FAILED,
+          "FAIL: test_a_list_line_that_is_not_target_and_seed_gives_no_target (__main__.ListTest"),
+    Fault("gate-timeout-any-row", "py-scripts", "check_gate.py reads -timeout from any row of "
+          "fuzz/launch.txt, not its flags row", CHECK_FAILED,
+          "FAIL: test_a_timeout_outside_the_flags_row_is_not_the_bar (__main__.ListTest"),
+    Fault("gate-timeout-first-of-two", "py-scripts", "check_gate.py takes the first of two "
+          "-timeout flags as the bar's", CHECK_FAILED,
+          "FAIL: test_a_launch_file_with_two_timeouts_is_refused (__main__.ListTest"),
     Fault("gate-block-refusal-ignored", "py-scripts", "render_results.py renders fuzz/README.md's "
           "gate block from a gate file check_gate.py refuses", CHECK_FAILED,
           "FAIL: test_a_refused_file_renders_no_block (__main__.RenderTest"),
@@ -1724,6 +1814,171 @@ FAULTS = (
           "tied with a run that is not, as it compares a list only as far as the shorter goes",
           CHECK_FAILED, "FAIL: test_a_worst_run_tied_with_a_run_that_is_not_is_refused "
           "(__main__.SummaryTest"),
+    # scripts/gate_results.py, which wrote the gate file from the runs' raw records: each refusal of
+    # its records and arguments, and the pass rule's parts.
+    Fault("gate-results-list-line-unchecked", "py-scripts",
+          "gate_results.py takes a list line of three words", CHECK_FAILED,
+          "FAIL: test_a_list_line_that_is_not_target_and_seed_is_refused (__main__.RefusedTest"),
+    Fault("gate-results-list-comment-a-seed", "py-scripts",
+          "gate_results.py reads a comment line of fuzz/bound_seeds.txt as a seed, and refuses it",
+          CHECK_FAILED, "ERROR: test_a_comment_in_the_list_is_no_seed (__main__.AssembleTest"),
+    Fault("gate-results-list-target-unprefixed", "py-scripts", "gate_results.py reads a list's "
+          "target named without fuzz_ as another target than the gate's", CHECK_FAILED,
+          "ERROR: test_a_target_named_without_its_prefix_is_its_fuzz_target "
+          "(__main__.AssembleTest"),
+    Fault("gate-results-no-timeout-assumed", "py-scripts", "gate_results.py takes a launch file "
+          "with no -timeout as -timeout=10", CHECK_FAILED,
+          "FAIL: test_a_launch_file_with_no_timeout_is_refused (__main__.RefusedTest"),
+    Fault("gate-results-timeout-first-of-two", "py-scripts", "gate_results.py takes the first of "
+          "two -timeout flags as the bar's", CHECK_FAILED,
+          "FAIL: test_a_launch_file_with_two_timeouts_is_refused (__main__.RefusedTest"),
+    Fault("gate-results-counters-processes-unchecked", "py-scripts", "gate_results.py takes a "
+          "copy of the counters with no processes line, and raises", CHECK_FAILED,
+          "ERROR: test_counters_without_a_processes_line_are_refused (__main__.RefusedTest"),
+    Fault("gate-results-iowait-busy", "py-scripts",
+          "gate_results.py counts iowait as busy, which the gate did not", CHECK_FAILED,
+          "ERROR: test_iowait_counts_as_idle (__main__.AssembleTest"),
+    Fault("gate-results-counters-cpus-unchecked", "py-scripts",
+          "gate_results.py takes two copies of the counters that name other cpus, and raises",
+          CHECK_FAILED, "ERROR: test_counters_naming_other_cpus_are_refused (__main__.RefusedTest"),
+    Fault("gate-results-counters-no-time-accepted", "py-scripts",
+          "gate_results.py takes counters over which no time passed on a cpu, and divides by it",
+          CHECK_FAILED, "ERROR: test_counters_over_which_no_time_passed_are_refused "
+          "(__main__.RefusedTest"),
+    Fault("gate-results-executed-twice-accepted", "py-scripts",
+          "gate_results.py takes a log with two Executed lines", CHECK_FAILED,
+          "FAIL: test_a_log_with_two_executed_lines_is_refused (__main__.RefusedTest"),
+    Fault("gate-results-executed-other-input-accepted", "py-scripts", "gate_results.py takes a "
+          "log that executed another input than its seed", CHECK_FAILED,
+          "FAIL: test_a_log_that_executed_another_input_is_refused (__main__.RefusedTest"),
+    Fault("gate-results-units-twice-accepted", "py-scripts", "gate_results.py takes a log with "
+          "two unit counts", CHECK_FAILED, "FAIL: test_a_log_with_two_unit_counts_is_refused "
+          "(__main__.RefusedTest"),
+    Fault("gate-results-no-unit-accepted", "py-scripts", "gate_results.py takes a log of no "
+          "executed unit, and divides by it", CHECK_FAILED,
+          "ERROR: test_a_log_with_no_executed_unit_is_refused (__main__.RefusedTest"),
+    Fault("gate-results-findings-not-read", "py-scripts", "gate_results.py reads no finding in a "
+          "run's log, so a run that crashed with one gives none", CHECK_FAILED,
+          "FAIL: test_a_run_that_crashed_keeps_its_findings (__main__.AssembleTest"),
+    Fault("gate-results-table-columns-unchecked", "py-scripts", "gate_results.py takes the "
+          "runner's table with a column named otherwise", CHECK_FAILED,
+          "FAIL: test_a_runners_table_of_other_columns_is_refused (__main__.RefusedTest"),
+    Fault("gate-results-first-of-two-steps", "py-scripts", "gate_results.py takes the first of "
+          "two gate folders in a host's records", CHECK_FAILED,
+          "FAIL: test_two_gate_folders_are_refused (__main__.RefusedTest"),
+    Fault("gate-results-first-of-two-bars", "py-scripts",
+          "gate_results.py takes the first of two lines of the gate's list and bar", CHECK_FAILED,
+          "FAIL: test_a_step_log_with_two_bar_lines_is_refused (__main__.RefusedTest"),
+    Fault("gate-results-other-label-taken", "py-scripts", "gate_results.py takes a start line of "
+          "another run label as the run's", CHECK_FAILED,
+          "FAIL: test_a_start_line_of_another_runs_label_is_not_the_runs (__main__.AssembleTest"),
+    Fault("gate-results-other-step-start-taken", "py-scripts", "gate_results.py takes a start "
+          "line of another step as the run's", CHECK_FAILED,
+          "FAIL: test_a_start_line_of_another_step_is_not_the_runs (__main__.AssembleTest"),
+    Fault("gate-results-other-step-figures-taken", "py-scripts",
+          "gate_results.py takes a line of figures of another step as the run's", CHECK_FAILED,
+          "ERROR: test_a_line_of_figures_of_another_step_is_not_the_runs (__main__.AssembleTest"),
+    Fault("gate-results-no-start-raises", "py-scripts", "gate_results.py reads a run with no "
+          "start line, and raises", CHECK_FAILED, "ERROR: test_a_run_with_no_start_is_refused "
+          "(__main__.RefusedTest"),
+    Fault("gate-results-no-end-raises", "py-scripts", "gate_results.py reads a run with no end "
+          "line, and raises", CHECK_FAILED, "ERROR: test_a_missing_run_is_refused "
+          "(__main__.RefusedTest"),
+    Fault("gate-results-no-figures-raises", "py-scripts", "gate_results.py reads a run with no "
+          "line of figures, and raises", CHECK_FAILED,
+          "ERROR: test_a_run_with_no_line_of_figures_is_refused (__main__.RefusedTest"),
+    Fault("gate-results-no-table-row-raises", "py-scripts", "gate_results.py reads a run with no "
+          "row in the runner's table, and raises", CHECK_FAILED,
+          "ERROR: test_a_run_with_no_table_row_is_refused (__main__.RefusedTest"),
+    Fault("gate-results-other-seed-taken", "py-scripts", "gate_results.py takes a step log or "
+          "table row that names another seed for a run", CHECK_FAILED,
+          "FAIL: test_a_step_log_naming_another_seed_is_refused (__main__.RefusedTest"),
+    Fault("gate-results-wall-unchecked", "py-scripts", "gate_results.py takes a Linux run's wall "
+          "time that is not its step log's", CHECK_FAILED,
+          "FAIL: test_a_wall_time_not_the_step_logs_is_refused (__main__.RefusedTest"),
+    Fault("gate-results-shares-unchecked", "py-scripts", "gate_results.py takes busy shares, a "
+          "busy process or a wall time that are not the step log's", CHECK_FAILED,
+          "FAIL: test_counters_that_disagree_with_the_step_log_are_refused (__main__.RefusedTest"),
+    Fault("gate-results-figures-unchecked", "py-scripts",
+          "gate_results.py takes a step log whose figures are not the libFuzzer output's",
+          CHECK_FAILED, "FAIL: test_a_step_log_that_disagrees_with_a_log_is_refused "
+          "(__main__.RefusedTest"),
+    Fault("gate-results-table-unchecked", "py-scripts", "gate_results.py takes a runner's table "
+          "that disagrees with the records", CHECK_FAILED,
+          "FAIL: test_a_runners_table_that_disagrees_with_a_log_is_refused (__main__.RefusedTest"),
+    Fault("gate-results-outcome-unchecked", "py-scripts", "gate_results.py takes a runner's "
+          "outcome its records do not give", CHECK_FAILED,
+          "FAIL: test_a_runners_outcome_its_records_do_not_give_is_refused (__main__.RefusedTest"),
+    Fault("gate-results-pass-rule-findings-ignored", "py-scripts", "gate_results.py's pass rule "
+          "leaves out findings", CHECK_FAILED, "ERROR: test_a_run_with_a_finding_does_not_pass "
+          "(__main__.AssembleTest"),
+    Fault("gate-results-pass-rule-exit-ignored", "py-scripts", "gate_results.py's pass rule "
+          "leaves out the exit code", CHECK_FAILED,
+          "ERROR: test_a_run_that_exited_otherwise_does_not_pass (__main__.AssembleTest"),
+    Fault("gate-results-pass-rule-sibling-ignored", "py-scripts", "gate_results.py's pass rule "
+          "leaves out the sibling's busy process", CHECK_FAILED,
+          "ERROR: test_a_linux_run_whose_sibling_stopped_does_not_pass (__main__.AssembleTest"),
+    Fault("gate-results-pass-rule-bar-ignored", "py-scripts",
+          "gate_results.py's pass rule leaves out the bar", CHECK_FAILED,
+          "ERROR: test_a_run_over_the_bar_does_not_pass (__main__.AssembleTest"),
+    Fault("gate-results-table-count-unchecked", "py-scripts", "gate_results.py takes a runner's "
+          "table with a run its records do not hold", CHECK_FAILED,
+          "FAIL: test_a_runners_table_with_a_run_too_many_is_refused (__main__.RefusedTest"),
+    Fault("gate-results-gate-verdicts-unread", "py-scripts", "gate_results.py does not hold the "
+          "runs to the gate's own verdicts", CHECK_FAILED,
+          "FAIL: test_a_gate_verdict_its_runs_do_not_give_is_refused (__main__.RefusedTest"),
+    Fault("gate-results-gate-verdict-missing-raises", "py-scripts",
+          "gate_results.py reads a gate table without a seed's verdict, and raises", CHECK_FAILED,
+          "ERROR: test_a_gate_table_without_a_seed_is_refused (__main__.RefusedTest"),
+    Fault("gate-results-gate-median-unchecked", "py-scripts", "gate_results.py takes a gate "
+          "median its runs do not give", CHECK_FAILED,
+          "FAIL: test_a_gate_median_its_runs_do_not_give_is_refused (__main__.RefusedTest"),
+    Fault("gate-results-gate-limit-unchecked", "py-scripts", "gate_results.py takes a gate "
+          "verdict judged against another limit than the bar", CHECK_FAILED,
+          "FAIL: test_a_gate_limit_not_the_bar_is_refused (__main__.RefusedTest"),
+    Fault("gate-results-gate-verdict-unchecked", "py-scripts", "gate_results.py takes a gate "
+          "verdict that fails a seed whose runs passed", CHECK_FAILED,
+          "FAIL: test_a_gate_failing_a_seed_whose_runs_passed_is_refused (__main__.RefusedTest"),
+    Fault("gate-results-list-count-unchecked", "py-scripts", "gate_results.py takes a gate that "
+          "ran a list of another count of seeds", CHECK_FAILED,
+          "FAIL: test_a_list_of_another_length_is_refused (__main__.RefusedTest"),
+    Fault("gate-results-list-digest-unchecked", "py-scripts", "gate_results.py takes a gate that "
+          "ran a list whose SHA-256 is not the tree's", CHECK_FAILED,
+          "FAIL: test_a_list_not_the_trees_is_refused (__main__.RefusedTest"),
+    Fault("gate-results-bar-timeout-unchecked", "py-scripts",
+          "gate_results.py takes a gate whose bar came from another -timeout than the tree's",
+          CHECK_FAILED, "FAIL: test_a_bar_from_another_timeout_is_refused (__main__.RefusedTest"),
+    Fault("gate-results-bar-half-unchecked", "py-scripts", "gate_results.py takes a gate whose "
+          "bar is not half its -timeout", CHECK_FAILED,
+          "FAIL: test_a_bar_not_half_its_timeout_is_refused (__main__.RefusedTest"),
+    Fault("gate-results-hosts-runs-unchecked", "py-scripts", "gate_results.py takes hosts that "
+          "ran each seed a different number of times", CHECK_FAILED,
+          "FAIL: test_hosts_that_ran_each_seed_a_different_number_of_times_are_refused "
+          "(__main__.RefusedTest"),
+    Fault("gate-results-commit-unchecked", "py-scripts", "gate_results.py takes records of "
+          "another commit than the one it is given", CHECK_FAILED,
+          "FAIL: test_another_commit_is_refused (__main__.RefusedTest"),
+    Fault("gate-results-list-order-unchecked", "py-scripts",
+          "gate_results.py takes a gate's list in another order than fuzz/bound_seeds.txt",
+          CHECK_FAILED, "FAIL: test_seeds_in_another_order_are_refused (__main__.RefusedTest"),
+    Fault("gate-results-commit-argument-unchecked", "py-scripts", "gate_results.py takes a "
+          "--commit that is not a full commit", CHECK_FAILED,
+          "FAIL: test_a_commit_that_is_not_a_full_hash_is_a_usage_error (__main__.MainTest"),
+    Fault("gate-results-day-argument-unchecked", "py-scripts", "gate_results.py takes an "
+          "--assembled-on that is not YYYY-MM-DD", CHECK_FAILED,
+          "FAIL: test_a_day_that_is_not_a_date_is_a_usage_error (__main__.MainTest"),
+    Fault("gate-results-host-name-unchecked", "py-scripts", "gate_results.py takes a --host of "
+          "another name than macOS or Linux", CHECK_FAILED,
+          "FAIL: test_a_host_of_another_name_is_a_usage_error (__main__.MainTest"),
+    Fault("gate-results-host-folder-unchecked", "py-scripts", "gate_results.py takes a --host "
+          "with no folder", CHECK_FAILED, "FAIL: test_a_host_with_no_folder_is_a_usage_error "
+          "(__main__.MainTest"),
+    Fault("gate-results-host-twice-accepted", "py-scripts", "gate_results.py takes the same "
+          "--host twice", CHECK_FAILED, "FAIL: test_a_host_given_twice_is_a_usage_error "
+          "(__main__.MainTest"),
+    Fault("gate-results-refusal-exits-0", "py-scripts", "gate_results.py exits 0 when it refuses "
+          "the records", CHECK_FAILED, "FAIL: test_records_that_disagree_make_no_file "
+          "(__main__.MainTest"),
     Fault("ci-shallow-checkout", "py-scripts", "CI checks out the single commit it was pushed "
           "at, so G-3's file, which judges an older one, could never be tied there",
           CHECK_FAILED, "FAIL: test_the_workflow_checks_out_the_history_g3s_tie_needs "

@@ -1,0 +1,12 @@
+diff --git a/scripts/check_gate.py b/scripts/check_gate.py
+--- a/scripts/check_gate.py
++++ b/scripts/check_gate.py
+@@ -242,7 +242,7 @@
+             continue
+         busy = run["host"] != "Linux" or (run["sibling_busy_at_start"] is True and
+                                           run["sibling_busy_at_end"] is True)
+-        passed = run["exit_code"] == 0 and run["findings"] == 0 and not over and busy
++        passed = run["findings"] == 0 and not over and busy
+         if run["pass"] is not passed:
+             problems.append(f"{where}: marked {'pass' if run['pass'] else 'fail'}, and its exit "
+                             "code, findings, time and sibling give the other")

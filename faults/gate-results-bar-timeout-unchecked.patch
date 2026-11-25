@@ -1,0 +1,12 @@
+diff --git a/scripts/gate_results.py b/scripts/gate_results.py
+--- a/scripts/gate_results.py
++++ b/scripts/gate_results.py
+@@ -339,7 +339,7 @@
+         if bar[1] != digest or int(bar[2]) != len(seeds):
+             raise Refused(f"{host}: the gate ran a list whose SHA-256 is {bar[1]}, not the tree's "
+                           f"fuzz/bound_seeds.txt, {digest}")
+-        if (int(bar[5]), bar_ms(bar)) != (timeout, timeout * 1000 // 2):
++        if bar_ms(bar) != timeout * 1000 // 2:
+             raise Refused(f"{host}: the gate's bar, {bar[4]} ms, is not half of fuzz/launch.txt's "
+                           f"-timeout={timeout}")
+         if per_seed not in (None, int(bar[3])):

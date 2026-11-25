@@ -1,0 +1,12 @@
+diff --git a/scripts/check_gate.py b/scripts/check_gate.py
+--- a/scripts/check_gate.py
++++ b/scripts/check_gate.py
+@@ -196,7 +196,7 @@
+     if not isinstance(document, dict) or set(document) != {"header", "runs", "summary"}:
+         return ["not a gate file: it holds header, runs and summary and nothing else"]
+     header, runs = document["header"], document["runs"]
+-    if not isinstance(header, dict) or header.get("schema") != SCHEMA:
++    if header.get("schema") != SCHEMA:
+         return [f"its schema is not {SCHEMA!r}"]
+     if set(header) != HEADER_KEYS:
+         return [f"its header gives {sorted(header)}, not {sorted(HEADER_KEYS)}"]

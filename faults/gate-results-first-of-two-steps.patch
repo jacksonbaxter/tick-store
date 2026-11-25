@@ -1,0 +1,12 @@
+diff --git a/scripts/gate_results.py b/scripts/gate_results.py
+--- a/scripts/gate_results.py
++++ b/scripts/gate_results.py
+@@ -176,7 +176,7 @@
+         raise Refused(f"{host}: the run's commit is {first[1] if first else 'not given'}, not "
+                       f"{commit}")
+     steps = sorted(folder.glob("raw/*-bound-seeds"))
+-    if len(steps) != 1:
++    if not steps:
+         raise Refused(f"{host}: not one raw/*-bound-seeds folder in the run's folder")
+     step = steps[0]
+     bars = [match for line in status if f"[{step.name}]" in line

@@ -1,0 +1,12 @@
+diff --git a/scripts/gate_results.py b/scripts/gate_results.py
+--- a/scripts/gate_results.py
++++ b/scripts/gate_results.py
+@@ -388,7 +388,7 @@
+     hosts = []
+     for item in args.host:
+         name, _, folder = item.partition("=")
+-        if name not in HOSTS or not folder or name in dict(hosts):
++        if name not in HOSTS or name in dict(hosts):
+             parser.error(f"--host {item}: HOST=DIR, HOST one of {list(HOSTS)}, once each")
+         hosts.append((name, Path(folder)))
+     try:

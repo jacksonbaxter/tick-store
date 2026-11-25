@@ -1,0 +1,12 @@
+diff --git a/scripts/check_gate.py b/scripts/check_gate.py
+--- a/scripts/check_gate.py
++++ b/scripts/check_gate.py
+@@ -115,7 +115,7 @@
+     seeds = {}
+     for line in Path(path).read_text(encoding="utf-8").splitlines():
+         words = [word for word in re.split(r"[,\s]+", line.strip()) if word]
+-        if words and not words[0].startswith("#"):
++        if words:
+             target = words[0] if words[0].startswith("fuzz_") else f"fuzz_{words[0]}"
+             seeds[words[-1]] = target if len(words) == 2 else None
+     return seeds

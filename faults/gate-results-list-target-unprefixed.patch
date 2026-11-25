@@ -1,0 +1,12 @@
+diff --git a/scripts/gate_results.py b/scripts/gate_results.py
+--- a/scripts/gate_results.py
++++ b/scripts/gate_results.py
+@@ -94,7 +94,7 @@
+         if words and not words[0].startswith("#"):
+             if len(words) != 2:
+                 raise Refused(f"{Path(path).name}: not \"target seed\": {line!r}")
+-            target = words[0] if words[0].startswith("fuzz_") else f"fuzz_{words[0]}"
++            target = words[0]
+             found.append((target, words[1]))
+     return found
+ 

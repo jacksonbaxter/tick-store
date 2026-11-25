@@ -1,0 +1,12 @@
+diff --git a/scripts/gate_results.py b/scripts/gate_results.py
+--- a/scripts/gate_results.py
++++ b/scripts/gate_results.py
+@@ -187,7 +187,7 @@
+     listed = [line.split("\t") for line in
+               (step / "list.txt").read_text(encoding="utf-8").splitlines() if line.strip()]
+     names = [(target, seed_path.split("/fuzz-seeds/", 1)[-1]) for target, seed_path, _ in listed]
+-    if names != seeds:
++    if sorted(names) != sorted(seeds):
+         raise Refused(f"{host}: the gate's list is not fuzz/bound_seeds.txt's seeds in order")
+     edges, figures = {}, {}
+     state = STATES[host]

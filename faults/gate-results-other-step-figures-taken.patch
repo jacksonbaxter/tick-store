@@ -1,0 +1,12 @@
+diff --git a/scripts/gate_results.py b/scripts/gate_results.py
+--- a/scripts/gate_results.py
++++ b/scripts/gate_results.py
+@@ -197,7 +197,7 @@
+             key = (int(match[2]), int(match[4]))
+             edges.setdefault(key, {})[match[5]] = (match[6], match[7])
+         match = FIGURES_LINE.search(line)
+-        if match and f"[{step.name}]" in line:
++        if match:
+             figures[(int(match[1]), int(match[4]))] = match
+     table = read_table(step / "seedtime.tsv", TABLE_COLUMNS)
+     rows = {}

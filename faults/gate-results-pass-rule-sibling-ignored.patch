@@ -1,0 +1,12 @@
+diff --git a/scripts/gate_results.py b/scripts/gate_results.py
+--- a/scripts/gate_results.py
++++ b/scripts/gate_results.py
+@@ -257,7 +257,7 @@
+             if (row["outcome"] == "ok", figure[10] == "ok") != (clean, clean):
+                 raise Refused(f"{where}: the runner's outcome {row['outcome']!r} is not what its "
+                               "records give")
+-            record["pass"] = clean and busy_both_ends and file_ms <= limit * units
++            record["pass"] = clean and file_ms <= limit * units
+             runs.append(record)
+     if len(table) != len(runs):
+         raise Refused(f"{host}: the runner's table holds {len(table)} runs, the records "

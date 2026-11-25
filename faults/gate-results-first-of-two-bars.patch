@@ -1,0 +1,12 @@
+diff --git a/scripts/gate_results.py b/scripts/gate_results.py
+--- a/scripts/gate_results.py
++++ b/scripts/gate_results.py
+@@ -181,7 +181,7 @@
+     step = steps[0]
+     bars = [match for line in status if f"[{step.name}]" in line
+             for match in [BAR_LINE.search(line)] if match]
+-    if len(bars) != 1:
++    if not bars:
+         raise Refused(f"{host}: the step log holds not one line of the gate's list and bar")
+     bar = bars[0]
+     listed = [line.split("\t") for line in

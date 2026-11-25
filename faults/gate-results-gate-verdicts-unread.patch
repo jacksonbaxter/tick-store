@@ -1,0 +1,12 @@
+diff --git a/scripts/gate_results.py b/scripts/gate_results.py
+--- a/scripts/gate_results.py
++++ b/scripts/gate_results.py
+@@ -262,7 +262,7 @@
+     if len(table) != len(runs):
+         raise Refused(f"{host}: the runner's table holds {len(table)} runs, the records "
+                       f"{len(runs)}")
+-    check_gate_table(host, step / "gate.tsv", runs, bar_ms(bar))
++
+     return runs, bar
+ 
+ 

@@ -1,0 +1,12 @@
+diff --git a/scripts/check_gate.py b/scripts/check_gate.py
+--- a/scripts/check_gate.py
++++ b/scripts/check_gate.py
+@@ -206,7 +206,7 @@
+         return [f"its commit {commit!r} is not a full commit its name gives"]
+     if not is_count(header["bar_ms_per_execution"], 1) or not is_count(header["runs_per_seed"]):
+         return ["its bar and its runs a seed are not whole numbers"]
+-    if not isinstance(runs, list) or not runs:
++    if not isinstance(runs, list):
+         return ["it holds no runs"]
+     problems = []
+     for index, run in enumerate(runs, 1):

@@ -1,0 +1,12 @@
+diff --git a/scripts/gate_results.py b/scripts/gate_results.py
+--- a/scripts/gate_results.py
++++ b/scripts/gate_results.py
+@@ -212,7 +212,7 @@
+             key, where = (index, run), f"{host}: {seed} run {run}"
+             stem = step / f"seed-{index}-{state}-{run}"
+             edge, figure, row = edges.get(key, {}), figures.get(key), rows.get(key)
+-            if "start" not in edge or "end" not in edge or figure is None or row is None:
++            if "end" not in edge or figure is None or row is None:
+                 raise Refused(f"{where}: no start, end, line of figures and table row")
+             if (row["target"].removesuffix("-avx2"), row["seed"], figure[2], figure[3]) != (
+                     target, seed, target, seed):
