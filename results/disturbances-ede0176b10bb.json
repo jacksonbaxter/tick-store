@@ -25,7 +25,7 @@
     },
     {
       "what": "the host's own scheduled jobs: a repository backup every fifteen minutes, a health collector and two small watchers every five minutes, two sync jobs every ten minutes, a file backup about hourly and daily maintenance",
-      "why": "they run through every window and were not stopped, as nothing on the host is changed for a measurement beyond the governor; the run records keep no list of them by phase apart from the events listed here, and what guards each timed figure is the per-CPU record of the other processors' use and the load rule"
+      "why": "they run through every window and were not stopped, as nothing on the host is changed for a measurement beyond the governor; the run records keep no list of them by phase apart from the events listed here. In the kernel benchmark's file and the two comparison files, what guards each timed figure is the per-CPU record and the load rule: the busy share of each pinned core's SMT sibling over each kernel case and each system's comparison run, held under 5% by their validators, and the measurement lock's load line at the start and end of each, which their validators require. The capacity check's parts keep neither: its guard samples the host's available memory, free swap, swap-in and swap-out and free disk every two seconds and stops a part that crosses its limits, which no part did, and nothing records the processors' use or the load during a part, so nothing guards a part's times against a disturbance"
     }
   ],
   "entries": [
