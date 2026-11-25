@@ -1570,6 +1570,13 @@ FAULTS = (
     Fault("gate-entry-without-file-accepted", "py-scripts", "check_gate.py takes a gate run "
           "entry with no gate file of its commit", CHECK_FAILED,
           "FAIL: test_an_entry_with_no_gate_file_is_refused (__main__.EntryTest"),
+    # A gate run entry's span is two real UTC times, start first.
+    Fault("gate-entry-span-form-unchecked", "py-scripts", "check_gate.py takes a gate run entry "
+          "whose span is \"\" to \"Z\", which overlaps every run as a string", CHECK_FAILED,
+          "FAIL: test_an_entry_whose_span_is_no_time_is_refused (__main__.EntryTest"),
+    Fault("gate-entry-span-backwards-accepted", "py-scripts", "check_gate.py takes a gate run "
+          "entry that ends before it starts", CHECK_FAILED,
+          "FAIL: test_an_entry_that_ends_before_it_starts_is_refused (__main__.EntryTest"),
     Fault("gate-block-refusal-ignored", "py-scripts", "render_results.py renders fuzz/README.md's "
           "gate block from a gate file check_gate.py refuses", CHECK_FAILED,
           "FAIL: test_a_refused_file_renders_no_block (__main__.RenderTest"),

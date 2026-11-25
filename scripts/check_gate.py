@@ -37,7 +37,8 @@ A file is refused if:
 And, tying the two records together: a disturbance entry whose phase is "gate run" must name,
 as "<seed> run <K> of <N>", a run the gate file of its commit holds on the Linux host, whose
 records are the only ones the disturbance files keep, with N its runs a seed, and its span must
-overlap that run's start and end. A "gate run" entry with no gate file of its commit is refused.
+be two real UTC times, start first, that overlap that run's start and end. A "gate run" entry
+with no gate file of its commit is refused.
 
 Exit 0 when every file passes, 1 when one is refused, 2 on a usage error.
 Standard library only.
@@ -382,7 +383,8 @@ def gate_run_of(entry, document):
 
 def entry_problems(root, documents):
     """Each "gate run" entry of the root's disturbance files, against the gate file of its
-    commit: the run it names must be there, and its span must overlap that run's."""
+    commit: the run it names must be there, and its span, two UTC times, start first, must
+    overlap that run's."""
     problems = []
     for path in sorted((Path(root) / "results").glob(DISTURBANCES)):
         record = json.loads(path.read_text(encoding="utf-8"))
@@ -397,10 +399,13 @@ def entry_problems(root, documents):
                                 f"fuzz-gate-{commit[:12]}.json")
                 continue
             run, why = gate_run_of(entry, document)
+            start, end = entry.get("start"), entry.get("end")
             if run is None:
                 problems.append(f"{where}: {why}")
-            elif not (str(entry.get("start")) <= run["end"] and
-                      str(entry.get("end")) >= run["start"]):
+            elif not (is_utc(start) and is_utc(end)) or end < start:
+                problems.append(f"{where}: its span {start!r} to {end!r} is not two UTC times, "
+                                "start first")
+            elif not (start <= run["end"] and end >= run["start"]):
                 problems.append(f"{where}: its span, {entry.get('start')} to {entry.get('end')}, "
                                 f"does not overlap {entry['case']}, {run['start']} to "
                                 f"{run['end']}")

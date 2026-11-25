@@ -453,6 +453,21 @@ class EntryTest(Tree):
                                        case="run_length/bound-small-blocks run 5 of 5")
         self.assertTrue(any("does not overlap" in problem for problem in problems), problems)
 
+    def test_an_entry_whose_span_is_no_time_is_refused(self):
+        problems = self.entry_problems(start="", end="Z")
+        self.assertTrue(any("its span '' to 'Z' is not two UTC times" in problem
+                            for problem in problems), problems)
+
+    def test_an_entry_with_no_end_is_refused(self):
+        problems = self.entry_problems(end=None)
+        self.assertTrue(any("to None is not two UTC times" in problem for problem in problems),
+                        problems)
+
+    def test_an_entry_that_ends_before_it_starts_is_refused(self):
+        problems = self.entry_problems(start="2026-11-17T15:10:35Z", end="2026-11-17T15:10:31Z")
+        self.assertTrue(any("is not two UTC times, start first" in problem
+                            for problem in problems), problems)
+
     def test_an_entry_with_no_gate_file_is_refused(self):
         self.write()
         (self.root / "results" / NAME).unlink()

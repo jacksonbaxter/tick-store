@@ -1,0 +1,12 @@
+diff --git a/scripts/check_gate.py b/scripts/check_gate.py
+--- a/scripts/check_gate.py
++++ b/scripts/check_gate.py
+@@ -402,7 +402,7 @@
+             start, end = entry.get("start"), entry.get("end")
+             if run is None:
+                 problems.append(f"{where}: {why}")
+-            elif not (is_utc(start) and is_utc(end)) or end < start:
++            elif not (is_utc(start) and is_utc(end)):
+                 problems.append(f"{where}: its span {start!r} to {end!r} is not two UTC times, "
+                                 "start first")
+             elif not (start <= run["end"] and end >= run["start"]):
