@@ -6646,6 +6646,45 @@ hosted macOS runner never started a step and GitHub marked the job cancelled; no
 repository ran in them. I did not cancel them and did not rerun them. The rule in force allows
 `gh run rerun <id> --failed` at most twice an hour for a failure on GitHub's side.
 
+2026-11-25. What GitHub shows now for the run above that was still going, the three later pushes
+to `jb-build`, and the two scheduled runs on `main` since; their run and job records, the failed
+logs and the repo jobs' uploaded check logs are kept outside the repository. Times are UTC. I
+cancelled none of these runs or jobs and reran none.
+
+- Run 44157638132, at `16a5db9`, ended at 22:00:58Z with the conclusion failure. 12 jobs passed,
+  among them the three still running at 20:24Z: `unit on linux-x86-64` to 20:51:27Z,
+  `asan-ubsan on macos-arm64` to 20:29:46Z and `unit on macos-arm64`, 19:42:06Z to 22:00:57Z.
+  `repo on linux-x86-64` failed as above, on check-ties alone, the one `check-proofs.json` that
+  differs. The three macOS jobs marked cancelled stayed so, with no step run, and GitHub's run
+  page gives each the line "The job was not acquired by Runner of type hosted even after multiple
+  attempts".
+- Run 44170238417, at `3a5e430`, created at 20:31:43Z while 44157638132 ran: no job in it
+  started, and it is marked cancelled at 20:41:23Z, one second after run 44171930645 for the next
+  push was created in the same concurrency group, `ci-refs/heads/jb-build`, whose
+  `cancel-in-progress` is false for a push (`.github/workflows/ci.yml`). That is what the record
+  shows.
+- Run 44171930645, at `448790d`, created at 20:41:22Z: the same; no job started, and it is marked
+  cancelled at 20:59:17Z, one second after run 44175024065 was created.
+- Run 44175024065, at `9ead7a9`, created at 20:59:16Z; its first jobs started at 22:00:58Z, when
+  44157638132 ended, and it ended at 00:30:43Z on 18 November with the conclusion failure. 13 jobs
+  passed. `repo` failed on both hosts, linux-x86-64 22:00:59Z to 22:03:26Z and macos-arm64
+  22:01:01Z to 22:06:37Z, in "Run the checks", on check-ties alone: 31 files: 29 same, 1 pinned,
+  1 differs, the one `check-proofs.json`, measured at `5a810a2`; their other eight steps passed,
+  writeup-check with "WRITEUP.md is current: 323 tokens, 3,730 words". `fuzz-codecs on
+  macos-arm64` is marked cancelled, 22:00:58Z to 22:28:24Z, with no step run and GitHub's same
+  line.
+- On `main` at `ca96b36`, the scheduled run 44091415526, created at 13:18:27Z on 17 November,
+  ended at 16:50:52Z with the conclusion failure. 14 jobs passed, among them the fuzz jobs at the
+  schedule's 1,800 s a target: `fuzz-codecs on linux-x86-64` to 16:20:17Z, and `fuzz-stores` to
+  16:50:31Z on Linux and 16:50:51Z on macOS. No job failed. Two are marked cancelled with no step
+  run, `repo on macos-arm64`, 13:18:28Z to 13:46:12Z, and `fuzz-codecs on macos-arm64`, 13:18:28Z
+  to 13:49:28Z, each with GitHub's same line.
+- The scheduled run 45418262744 on `main` at `ca96b36`, created at 14:48:44Z on 24 November,
+  ended at 18:20:39Z with the conclusion failure. 13 jobs passed, `fuzz-codecs` and `fuzz-stores`
+  on Linux to 17:50:40Z and 18:20:38Z. No job failed. Three macOS jobs are marked cancelled with
+  no step run, each with GitHub's same line: `asan-ubsan`, 14:48:45Z to 15:09:18Z, `fuzz-stores`
+  to 15:11:16Z and `fuzz-codecs` to 15:14:18Z.
+
 ### The second collection's Mac half
 
 2026-11-17. The Mac's judged run at `8616263`, the second commit, ran from 14:05:44 to 16:21:33
