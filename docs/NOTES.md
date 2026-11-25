@@ -7642,7 +7642,8 @@ but are memory and swap counts, not timings, and no mark is claimed for them. Th
 of the sentence under the table said the jobs' other runs were "listed in those records without a
 note": both records describe them in `not_listed` items by kind and period (the freeze record's
 first and sixth, the gate record's second), every item carries a `why`, and only the gate record's
-third gives runs one by one, nine backup runs, so "the few backup runs they single out" read two
+third gives runs one by one, nine backup runs, two of which the freeze record's first also
+gives, in the capacity check, so "the few backup runs they single out" read two
 ways. I tested the new wording clause by clause. "Enter" is the records' own word: the gate
 record's third item says its nine runs are listed "and not as entries, so no mark and no table of
 runs shows them". In a clone at `7a2ee12` I dropped each timed entry group of both records and
@@ -7968,6 +7969,82 @@ part finished there ([the R4 table](REVIEW.md#the-essays-final-review-r4)).
   35 was shown failing by hand at the head that adds this entry, in a clone, with the failing line
   `prove_checks.py` expects, against a control that passed. `prove_checks.py` was not run, so
   `results/check-proofs.json` still covers 99 of the 697; the rest wait for the full re-proof.
+
+### The essay's final review R4, pass 7
+
+The three outside reads of `7a2ee12` asked for one verdict cell to say which parts it counts, the
+flag rule to read every form of expression, two branches to be tested and three records to be put
+right ([the R4 table](REVIEW.md#the-essays-final-review-r4), R4-G1 to R4-P4-N1). My two commits were
+rebased onto R1's `a01c3fd` and are `9466c26` and `d0fe4fe`; `5dd8dcc` makes one test fail rather
+than error, so its fault gives the line the prover expects; this entry and its rows are the commit
+after them.
+
+- **The lowest-median row ([R4-G1](REVIEW.md#the-essays-final-review-r4)).** The cell began
+  "missed;" and then named only parts met, which are the parts not counted. `verdict_value` now
+  gives "missed on each counted part" for any row whose class is missed while a part is met:
+  `render_results.py`'s class is missed only where every counted part is, so a part met there is
+  one it does not count, and the parts the cell then names as met are those. Only that row on the
+  page has the pattern: every other verdict token is met, missed or missed in part with no part
+  met beside a missed class, not judged, or, on the flushed write, a sentence naming each part's
+  outcome. The cell now reads "missed on each counted part; met on Q2 warm, Q2 cold, Q3 warm and
+  Q3 cold against each system's chosen setup, while ArcticDB with a table per stock is faster, and
+  on Q5 cold; met, not counted: swapping memory in both runs (ArcticDB, QuestDB); swap-in:
+  ArcticDB, QuestDB, tick-store". Test `test_a_row_missed_on_every_counted_part_says_so`; fault
+  `writeup-uncounted-missed-unsaid`.
+- **The dagger's definition ([R4-G2](REVIEW.md#the-essays-final-review-r4)).** "† marks a figure
+  with a timing during a login, a backup or, for a query, swapping on the host", true of the two
+  speed-ups, ratios of medians over cases one or two of which were so timed, as of every figure
+  timed so itself.
+- **The words.** G1 cost 4 words and G2 1 net ("timed" became "with a timing", "a backup job" "a
+  backup"); five were cut where no qualification is lost: "on the Ryzen too" lost "too"; "The
+  `locate` column, despite its name, holds" lost "despite its name"; "4 cores, 8 threads, with
+  15.33 GiB of memory" lost "with". The page holds 4,060 words by the renderer and by `wc -w` in
+  both locales.
+- **Every form read ([R4-C4-1](REVIEW.md#the-essays-final-review-r4)).** `shown_reads` read a
+  `min` or `max` with a filter as nothing and gave no reads for any form it did not name, so the
+  reviewer's B1 (a `max` with `only_above`), B2 (a `median`) and B3 (a `count_cases` over the
+  disturbed case `w=31`) stood unmarked. Now every operator is read through its items and filters,
+  a results file's `items`, `where` and `count` through their path, a count of cases through its
+  cases and its floor, a target's values through its parts; forms that read the code, the targets,
+  the flag words or a codec or size field read no timed phase (`NO_PHASE_FORMS`), and any other
+  form is refused by name. The reviewer's own tool, run in a clone at `d0fe4fe`, refuses B1, B2
+  and B3 with "shows a figure of … which the records flag", and B4 to B9 as before; the committed
+  page passes. Tests for each form; faults `writeup-flag-filtered-min-unread`,
+  `writeup-flag-filter-unread`, `writeup-flag-unknown-form-unread` and
+  `writeup-flag-case-count-unread`.
+- **Sentences ([R4-C4-2](REVIEW.md#the-essays-final-review-r4)).** `sentences_of` split only
+  before a capital, so a sentence starting "tick-store" or with a quote mark joined the one before
+  and a flag there carried its figure (B7, B7b). It now splits before a letter of either case or a
+  quote mark too; the page's only such sentence is the one starting "zstd still", and every check
+  passes. B7 and B7b are refused. Test
+  `test_a_flag_in_a_lowercase_or_quoted_sentence_carries_no_earlier_figure`; fault
+  `writeup-sentence-lowercase-joined`. docs/checks.md says an abbreviation's stop before a word
+  would end a sentence too, and that the essay has none.
+- **Two branches ([R4-C4-3](REVIEW.md#the-essays-final-review-r4)).** The swap carry (V4) and its
+  `if not earlier` (V2) now have a test each,
+  `test_a_verdict_s_swap_mark_carries_its_query_figure` and
+  `test_a_swap_of_the_replaced_run_alone_carries_nothing`, and the reviewer's mutations are the
+  faults `writeup-flag-swap-carry-ignored` and `writeup-flag-earlier-swap-carries`. V3, that a
+  flag carries only where it prints its mark, is held by the page's own check (B10);
+  docs/checks.md says so.
+- **Records ([R4-P3-F3](REVIEW.md#the-essays-final-review-r4),
+  [R4-P3-N1](REVIEW.md#the-essays-final-review-r4),
+  [R4-P4-N1](REVIEW.md#the-essays-final-review-r4)).** The R4 row on wording kept speaks in the
+  first person; BENCHMARKS.md's DS-2 and DS-5 cells read as they did at `9ead7a9`, with dated
+  corrections beside the R4-Ryzen row, part A's "Still waiting" row and the R4 entry above; R1's
+  entry now says that two of the gate record's nine backup runs are also given, one by one, by the
+  freeze record's first `not_listed` item, in the capacity check, as that record's `why` shows.
+  docs/checks.md did not name the lines that say "the Ryzen", so nothing there changed for it.
+- **Remade.** `writeup-marks-in-full` and `writeup-flag-ratio-unread`, on the lines this pass
+  moved, with the same mutations.
+- **The essay check's stale range.** `render_writeup.py --check` is current at `7a2ee12`, stale at
+  R1's `d771587` and `a01c3fd`, whose prover lists 700 faults where the page says 697, and current
+  again from `9466c26`, which renders the page; R1 changed no other string the essay quotes. The
+  page now counts 708 listed faults. The entry above says 697, true of its commit, and stands.
+- **Faults, shown by hand.** Each of the eight new faults and the two remade was shown failing by
+  hand at the head that adds this entry, in a clone, with the failing line `prove_checks.py`
+  expects, against a control that passed. `prove_checks.py` was not run, so
+  `results/check-proofs.json` still covers 99 of the 708; the rest wait for the full re-proof.
 
 ## Process notes
 
