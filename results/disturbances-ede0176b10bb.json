@@ -5,7 +5,7 @@
   "not_listed": [
     {
       "what": "the backup job's short routine runs, about ten seconds every fifteen minutes",
-      "why": "they ran through every timed step, so every phase may hold one, and the comparison documents keep no time per query or per write to place them; the kernel benchmark's file keeps no time per case, so only the run its attempt record ties to a case is listed"
+      "why": "they ran through every timed step, so every phase may hold one, and the comparison documents keep no time per query or per write to place them; the kernel benchmark's file keeps no time per case, so only the run its attempt record ties to a case is listed. On 2026-11-17 two of them fell in the capacity check's parts, whose file this record covers: 17:13:20Z to 17:13:22Z in ArcticDB's and 17:28:38Z to 17:29:48Z in QuestDB class A's, each from its first to its last line in the host's journal as read on 2026-11-25, which is not in the repository and does not show when the job's process ended; they are listed here with the job's other routine runs, and results/disturbances-8616263b7561.json, the record of the run they fell in, lists them beside the job's runs in its other steps"
     },
     {
       "what": "a queued window request by this project, waiting from the slice's ArcticDB write on until the benchmark campaign took the window",
