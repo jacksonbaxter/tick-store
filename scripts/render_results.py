@@ -2466,13 +2466,22 @@ def phase_mark_triples(parts, row=None, labelled=True):
     # The not-counted mark's short form names every system over all the parts once, as the
     # swap mark's does.
     every_side = [side for part in parts for side in notes_of(part).get("unconfirmed") or []]
+    # The first screen names every side either run flags, as RESULTS.md does (review R1-16): a
+    # side only the earlier run flags, which no swap mark of this run names, stands beside the
+    # not-counted mark.
+    this_run = {SYSTEM_LABEL.get(item[0], item[0]) for part in parts
+                for item in notes_of(part).get("swapped") or []}
+    earlier = list(dict.fromkeys(label for part in parts
+                                 for label, _, _, both in notes_of(part).get("also_flagged") or ()
+                                 if not both and label not in this_run))
     for part in parts:
         sides = notes_of(part).get("unconfirmed")
         if sides:
             full, _ = unconfirmed_forms(sides, notes_of(part).get("replaced_text"), part[0],
                                         notes_of(part).get("also_flagged") or ())
             short = unconfirmed_forms(every_side)[1]
-            held.setdefault(full, (short, screen_unconfirmed(every_side), []))[2].append(
+            held.setdefault(full, (short, screen_unconfirmed(every_side, earlier),
+                                   []))[2].append(
                 part[0])
         sides = notes_of(part).get("confirmed")
         if sides:
@@ -2560,16 +2569,25 @@ def unconfirmed_forms(sides, replaced_text=None, label="", also=()):
             f"count, ranking or first screen takes it{then}", f"{NOT_COUNTED_SHORT}: {short}")
 
 
-def screen_unconfirmed(sides):
+def screen_unconfirmed(sides, earlier=()):
     """The not-counted mark as the README gives it, under the class whose heading glosses it:
-    whose runs the host swapped during in both runs, or each other reason with its systems."""
+    whose runs the host swapped during in both runs, or each other reason with its systems;
+    and whose runs the earlier run alone swapped during, which this run's marks do not name."""
     by_why = {}
     for label, why, _ in sides:
         if why and label not in by_why.setdefault(why, []):
             by_why[why].append(label)
-    return "; ".join(f"swapping during {and_list([label_of(label) for label in labels])} runs"
-                     if why == "swapped" else f"{UNCONFIRMED_WHY[why]} ({', '.join(labels)})"
-                     for why, labels in by_why.items())
+    pieces = [f"swapping during {and_list([label_of(label) for label in labels])} runs"
+              if why == "swapped" else f"{UNCONFIRMED_WHY[why]} ({', '.join(labels)})"
+              for why, labels in by_why.items()]
+    if earlier:
+        only = f"in the earlier run only during {and_list([label_of(label) for label in earlier])}"
+        if "swapped" in by_why:
+            index = list(by_why).index("swapped")
+            pieces[index] += f", and {only}"
+        else:
+            pieces.append(f"swapping {only} runs")
+    return "; ".join(pieces)
 
 
 def phase_mark_pairs(parts, row=None, labelled=True):
@@ -2990,7 +3008,9 @@ FORMATTER = string.Formatter()
 # The verdict classes the line under the headline's table names, each with the word it opens.
 LEFT_OUT_HEADS = {"missed": "Missed", "missed in part": "Missed in part",
                   "not judged": "Not judged", "not judged in part": "Not judged in part",
-                  "met, not counted": "Met by the rule and not counted"}
+                  "met, not counted": "Met by the rule and not counted",
+                  # The met parts are named too, as the others are, not counted (review R1-17).
+                  "met": "Met"}
 
 
 # The not-counted class glossed where the README first names it (review R1-5): in the words of
@@ -3229,12 +3249,10 @@ def left_out_items(definitions, root, shown, names):
                 raise TargetError(f"no plain name for the part {part[0]!r} of {key[0]} on "
                                   f"{key[1]}, which the screen leaves out")
             kind = verdict_class([part])
-            if kind == "met":
-                met_parts += 1
-            else:
-                reasons = tuple(side[1] for side in notes_of(part).get("unconfirmed") or []) + \
-                    (("not alike",) if NOT_ALIKE in part[0] else ())
-                items[kind].append((row["host"], *marked_name(name, part, row), reasons))
+            met_parts += kind == "met"
+            reasons = tuple(side[1] for side in notes_of(part).get("unconfirmed") or []) + \
+                (("not alike",) if NOT_ALIKE in part[0] else ())
+            items[kind].append((row["host"], *marked_name(name, part, row), reasons))
     return items, met_parts, counts, named
 
 
@@ -3307,8 +3325,6 @@ def left_out_line(items, met_parts, counts, named, hosts):
     sentences = [f"{not_counted_head([why for item in found for why in item[4]]) if kind == 'met, not counted' else LEFT_OUT_HEADS[kind]}: "
                  f"{host_groups(found, hosts)}."
                  for kind, found in items.items() if found]
-    if met_parts:
-        sentences.append(f"Met: {met_parts} more of their parts.")
     sentences += [f"{AMONG}{kind}: {' and '.join(named[kind])}."
                   for kind in COUNT_ORDER if named[kind]]
     pieces = [f"{counts[kind]} {kind}" for kind in COUNT_ORDER if counts[kind]]
@@ -3459,8 +3475,6 @@ def check_left_out(text, definitions, root, shown, names, hosts):
             stated[found.group(2)] = int(found.group(1))
             continue
         raise TargetError(f"the first screen counts {piece!r}, which is no count of a verdict")
-    met = re.fullmatch(r"Met: (\d+) more of their parts?", sentences.get("Met", "Met: 0 more of "
-                                                                          "their parts"))
     asked = [(entry["id"], entry["host"]) for entry in
              definitions["headline"].get("name_among_counts", [])]
     expected, expected_named, named_parts, shown_parts_count, total_parts, met_parts = \
@@ -3482,9 +3496,7 @@ def check_left_out(text, definitions, root, shown, names, hosts):
                 shown_parts_count += 1
                 continue
             kind = class_of([counted(part)])
-            if kind == "met":
-                met_parts += 1
-                continue
+            met_parts += kind == "met"
             name, lead, marks = marked_name(names[key].get("parts", {}).get(part[0]), part, row)
             found_items[kind].setdefault((name, lead, "; ".join(marks) or None),
                                          {})[row["host"]] = key
@@ -3522,17 +3534,13 @@ def check_left_out(text, definitions, root, shown, names, hosts):
     if stated_named != expected_named:
         raise TargetError(f"the line under the table names {stated_named} among its counts, and "
                           f"the targets give {expected_named}")
-    stated_met = int(met.group(1)) if met else -1
-    if stated_met != met_parts:
-        raise TargetError(f"the line under the table counts {stated_met} more parts met, and "
-                          f"the targets give {met_parts}")
     if len(shown) + others != len(definitions["rows"]) or sum(stated.values()) != others:
         raise TargetError(f"the screen shows {len(shown)} rows and counts {others} others, "
                           f"{sum(stated.values())} by verdict, of the targets' "
                           f"{len(definitions['rows'])}")
-    if shown_parts_count + named_parts + stated_met != total_parts:
-        raise TargetError(f"the screen shows {shown_parts_count} parts of its targets, names "
-                          f"{named_parts} and counts {stated_met} met, of their {total_parts}")
+    if shown_parts_count + named_parts != total_parts:
+        raise TargetError(f"the screen shows {shown_parts_count} parts of its targets and names "
+                          f"{named_parts}, {met_parts} of them met, of their {total_parts}")
 
 
 def under_sentence(under, row, parts, hosts, root):

@@ -2238,6 +2238,16 @@ FAULTS = (
           "\"one of the 65 cases its median takes\" again", CHECK_FAILED,
           "FAIL: test_a_case_of_a_median_says_how_many_cases_the_median_takes "
           "(__main__.FuzzDisturbanceTest"),
+    # Review R1-16: the first screen names every side either run flags, as RESULTS.md does.
+    Fault("screen-earlier-run-side-dropped", "py-scripts", "render_results.py leaves off the "
+          "first screen a side only the earlier run flags, which RESULTS.md names",
+          CHECK_FAILED,
+          "FAIL: test_a_side_only_the_earlier_run_flags_is_named_on_the_first_screen "
+          "(__main__.SidesTest"),
+    # Review R1-17: the met parts the screen leaves out are named, not counted.
+    Fault("left-out-met-part-unnamed", "render-check", "render_results.py's line under the table "
+          "leaves out the met parts, as \"Met: 1 more of their parts\" did", EXIT_RENDER_REFUSED,
+          "the line under the table does not name 'flushed one-thread ingest', which is met"),
     # Review R1-10: the check names each page by its path.
     Fault("render-check-pages-by-name", "py-scripts", "render_results.py names the pages it "
           "checked by their file names alone, so README.md and fuzz/README.md read the same",

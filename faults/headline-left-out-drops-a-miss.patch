@@ -1,12 +1,13 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -2980,7 +2980,7 @@
-             kind = verdict_class([part])
-             if kind == "met":
-                 met_parts += 1
--            else:
-+            elif kind != "missed":
-                 reasons = tuple(side[1] for side in notes_of(part).get("unconfirmed") or []) + \
-                     (("not alike",) if NOT_ALIKE in part[0] else ())
-                 items[kind].append((row["host"], *marked_name(name, part, row), reasons))
+@@ -3252,7 +3252,8 @@
+             met_parts += kind == "met"
+             reasons = tuple(side[1] for side in notes_of(part).get("unconfirmed") or []) + \
+                 (("not alike",) if NOT_ALIKE in part[0] else ())
+-            items[kind].append((row["host"], *marked_name(name, part, row), reasons))
++            if kind != "missed":
++                items[kind].append((row["host"], *marked_name(name, part, row), reasons))
+     return items, met_parts, counts, named
+ 
+ 

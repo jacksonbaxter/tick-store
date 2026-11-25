@@ -1,0 +1,13 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -3252,7 +3252,8 @@
+             met_parts += kind == "met"
+             reasons = tuple(side[1] for side in notes_of(part).get("unconfirmed") or []) + \
+                 (("not alike",) if NOT_ALIKE in part[0] else ())
+-            items[kind].append((row["host"], *marked_name(name, part, row), reasons))
++            if kind != "met":
++                items[kind].append((row["host"], *marked_name(name, part, row), reasons))
+     return items, met_parts, counts, named
+ 
+ 

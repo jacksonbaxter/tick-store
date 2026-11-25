@@ -1,7 +1,7 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -1452,7 +1452,7 @@
+@@ -3531,7 +3531,7 @@
          raise TargetError(f"the line under the table counts the other rows as {stated}, and the "
                            f"targets give {expected}")
      expected_named = {kind: " and ".join(items) for kind, items in expected_named.items()}
@@ -9,4 +9,4 @@ diff --git a/scripts/render_results.py b/scripts/render_results.py
 +    if False:
          raise TargetError(f"the line under the table names {stated_named} among its counts, and "
                            f"the targets give {expected_named}")
-     stated_met = int(met.group(1)) if met else -1
+     if len(shown) + others != len(definitions["rows"]) or sum(stated.values()) != others:

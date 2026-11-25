@@ -1322,8 +1322,9 @@ class RenderHeadlineTest(Scratch):
     def test_what_is_shown_named_and_counted_adds_up_to_the_whole_table(self):
         self.assertIn("the screen shows 4 rows and counts 3 others, 2 by verdict, of the "
                       "targets' 6", self.check_line(LEFT_OUT_LINE.replace("other 2", "other 3")))
-        self.assertIn("counts 1 more parts met, and the targets give 0", self.check_line(
-            LEFT_OUT_LINE + " Met: 1 more of their part."))
+        # The met parts are named, not counted (review R1-17), so a count is no name of one.
+        self.assertIn("names '1 more of their part' with no machine as met, and the targets give "
+                      "no such part", self.check_line(LEFT_OUT_LINE + " Met: 1 more of their part."))
         self.assertIn("gives no count of the other rows",
                       self.check_line(LEFT_OUT_LINE.replace(": of the other 2 rows", "")))
 
@@ -3154,6 +3155,50 @@ class SidesTest(Scratch):
         # The full and short forms, which RESULTS.md and a quote give, keep both marks.
         self.assertIn(RENDER.SHORT_SWAPPED + "tick-store, ArcticDB",
                       RENDER.short_marks([part], SWAP_ROW))
+
+    def test_a_side_only_the_earlier_run_flags_is_named_on_the_first_screen(self):
+        # Review R1-16: the first screen names every side either run flags, as RESULTS.md does:
+        # a side the earlier run alone flags stands beside the not-counted mark, and one this
+        # run alone flags keeps its swap mark.
+        part = self.runs(["arcticdb"], ["arcticdb", "tickstore"])
+        self.assertEqual(RENDER.screen_marks([part], SWAP_ROW)[1],
+                         ["swapping during ArcticDB's runs, and in the earlier run only during "
+                          "tick-store's"])
+        self.assertIn("in one run only, on tick-store's side", RENDER.verdict_of([part], SWAP_ROW))
+        # A side this run alone flags is named by its swap mark, and not again.
+        part = self.runs(["arcticdb", "tickstore"], ["arcticdb"])
+        self.assertEqual(RENDER.screen_marks([part], SWAP_ROW)[1],
+                         ["swapping during ArcticDB's runs", "the host was swapping memory "
+                          "during tick-store's runs, which may understate this"])
+        # With no side both runs flag, the earlier run's side is said alone.
+        self.assertEqual(RENDER.screen_unconfirmed([("ArcticDB", "no record", None)],
+                                                   ["Parquet"]),
+                         f"{RENDER.UNCONFIRMED_WHY['no record']} (ArcticDB); swapping in the "
+                         "earlier run only during Parquet's runs")
+
+    def test_a_met_part_the_screen_leaves_out_is_named_under_met(self):
+        # Review R1-17: "Met: 1 more of their parts" did not say which; the line names it.
+        names = {("T-13", "Linux"): {"name": "T", "parts": {"Q2 warm": "a fast hour"}},
+                 ("T-99", "any"): {"name": "another"}}
+        definitions = {"rows": [SWAP_ROW, {"id": "T-99", "host": "any", "no_figure": "none"}],
+                       "headline": {}}
+        shown = {("T-13", "Linux"): set()}
+        self.runs([], [])
+        items, met, counts, named = RENDER.left_out_items(definitions, self.tree, shown, names)
+        count, line = RENDER.left_out_line(items, met, counts, named, SCREEN_HOSTS)
+        self.assertEqual(line, "Not shown in the table above. Met: on the box, a fast hour.")
+        text = "\n".join(["", count, "", RENDER.OTHERS_HEADING, "", line])
+        RENDER.check_left_out(text, definitions, self.tree, shown, names, SCREEN_HOSTS)
+        for broken, expected in (
+                (text.replace("Met: on the box, a fast hour.", "Met: 1 more of their parts."),
+                 "does not name 'a fast hour', which is met"),
+                (text.replace(" Met: on the box, a fast hour.", ""),
+                 "does not name 'a fast hour', which is met")):
+            with self.subTest(broken=broken):
+                with self.assertRaises(RENDER.TargetError) as refused:
+                    RENDER.check_left_out(broken, definitions, self.tree, shown, names,
+                                          SCREEN_HOSTS)
+                self.assertIn(expected, str(refused.exception))
 
     def test_the_line_groups_parts_of_the_same_marks_and_glosses_the_class(self):
         # Review R1-5: two parts not counted for the same reason on the same systems are named

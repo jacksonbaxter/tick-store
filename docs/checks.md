@@ -20,12 +20,13 @@ was measured, from a template whose figures are named values read from the resul
 template that types a figure, names a value it is not given, or is given one it does not name
 stops the render, and a lowest of the other systems takes every other system the comparison
 ran. The line under the table names every part of a target with a row on the screen that the
-table leaves out and that is missed or not judged, and counts every other target-and-machine row
+table leaves out, under its verdict, the met parts too, and counts every other target-and-machine row
 by verdict, a row's class taken from its counted parts alone, so a part met by the rule and not
 counted makes no row met or missed in part. It names parts that carry the same marks together,
 each mark once, under their machine and setup, and opens the class of parts met and not counted
 with a gloss that fits their reasons; there a not-counted mark stands in for the swap mark of the
-same systems. It is checked apart from the code that writes it, by verdict classes of its own: each
+same systems, and names beside it each side only the earlier run flags, so the screen names every
+side either run flags, as RESULTS.md does. It is checked apart from the code that writes it, by verdict classes of its own: each
 such part named whole, with each of its marks, under its machine and nothing else named, the
 gloss the one its parts' reasons give, each count the targets' own,
 each target asked for named under its own count, and what is shown, named and counted adding up
@@ -54,8 +55,9 @@ not take the reads out. A verdict that rests on a timed phase in which
 host's backup job, says so beside it, with the replaced run's figure there; the file's shape,
 spans and places in the documents are checked. A part met by the rule whose swap or disturbance
 mark falls on another system's side, and which the replaced run does not confirm, keeps its word
-and its mark and is counted nowhere; its mark names every side either run flags, with each run's
-pages read from both records, and a write side gives the pages both runs swapped in over the whole
+and its mark and is counted nowhere; its mark names every side either run flags as swapped in, in
+RESULTS.md with each run's pages read from both records and on the first screen by system, a side
+only this run flags by its swap mark and one only the earlier run flags as such, and a write side gives the pages both runs swapped in over the whole
 write phase, which is wider than the clock, so the swapping is not placed inside the timed write. No results page, the essay included, may hold a
 sentence saying tick-store writes faster than a system whose write read its input from disk inside
 its clock: the rule reads the whole prose of `README.md`, `RESULTS.md`, `BENCHMARKS.md`,
