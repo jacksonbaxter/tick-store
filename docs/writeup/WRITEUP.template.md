@@ -178,7 +178,7 @@ changes the warm engine median by {{d3_simd_q1_pct}}%, {{d3_simd_q2_pct}}%, {{d3
 {{d3_simd_q4_pct}}% and {{d3_simd_q5_pct}}% on Q1 to Q5, a negative change being time saved. A
 query's own runs range {{cmpL_ts_warm_spread_min}}% to {{cmpL_ts_warm_spread_max}}% of their
 median, so on whole queries SIMD's effect is inside or near the run-to-run spread
-([counters run]({{path:d3}}): {{note:diag-counters}}). SIMD cost {{simd_src_lines}} lines of kernels and dispatch, {{simd_src_share}}% of the
+([counters run]({{path:d3}}) {{mark:diag-counters}}). SIMD cost {{simd_src_lines}} lines of kernels and dispatch, {{simd_src_share}}% of the
 {{src_include_lines}} source lines.
 
 **The store's price column.** Per piece, the reader inflates any zstd frame, allocates, decodes
@@ -186,7 +186,7 @@ PFOR with scale and patches, range-checks every value and appends. On the Zen 1 
 {{d4_zstd_pct}}%, {{d4_pfor_unpack_pct}}% (unpack), {{d4_patches_pct}}% (patches),
 {{d4_scale_range_pct}}% (scale and range check) and {{d4_alloc_copy_pct}}% (allocation and copy;
 copies resolved only to the C library, {{d4_libc_pct}}%, are not counted there) of
-the decode's user cycles ([price-decode profile]({{path:d4}}): {{note:diag-price}}).
+the decode's user cycles ([price-decode profile]({{path:d4}}) {{note:diag-price}}).
 
 ## Branch prediction and instruction counts
 
@@ -221,18 +221,18 @@ day did not pass. With a flush, tick-store's write took {{cmpL_ts_B_total_s}} s 
 
 **Where the writer's time goes.** tick-store's engine-only time is its writer's own work:
 {{d3_write_cycles_per_msg}} cycles and {{d3_write_instr_per_msg}} instructions a message at
-{{d3_write_ipc}} IPC ({{note:diag-counters}}). Of its user cycles, PFOR encoding takes
+{{d3_write_ipc}} IPC {{note:diag-counters}}. Of its user cycles, PFOR encoding takes
 {{d1_pfor_encode_pct}}%, assembling segments {{d1_segment_assembly_pct}}%, the book state, each
 open order's stock and price kept to code the messages that name it, {{d1_book_state_pct}}%,
 dictionary encoding {{d1_dict_encode_pct}}%, sorting {{d1_sort_pct}}%, parsing {{d1_parse_pct}}%
-and zstd {{d1_zstd_pct}}% ([writer profile]({{path:d1}}): {{note:diag-writer}}). The others' engine-only times may still hold reading their input from disk, so
+and zstd {{d1_zstd_pct}}% ([writer profile]({{path:d1}}) {{note:diag-writer}}). The others' engine-only times may still hold reading their input from disk, so
 the clocks are not alike and the gap is not all tick-store's writer.
 
 **Queries.** The table at a glance gives Q1 to Q5 warm; ArcticDB with a table per stock takes
 {{cmpL_arcps_q1_warm_med_s}} s on Q1. Q5, the day's sum of a shares column, decodes {{cmpL_ts_q5_values}} values at
 {{q5_ns_per_value}} ns each; of its sampled cycles, dictionary decoding takes {{d2_q5_dict_pct}}%,
 the C library {{d2_q5_libc_pct}}% and the unpack kernels {{d2_q5_unpack_pct}}%
-([query profile]({{path:d2}}): {{note:diag-query}}).
+([query profile]({{path:d2}}) {{note:diag-query}}).
 
 ## Tried and not kept, and not done
 

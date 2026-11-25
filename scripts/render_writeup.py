@@ -27,7 +27,8 @@ What the render holds, each a refusal (exit 2) when it fails:
   the two commits, as git tells where the history is present;
 - a file under a pin of scripts/data_pins.json is read only by a kind that declares the pin,
   and every paragraph that shows one of its figures says so through the pin's token; a kind with
-  a note, as the diagnostics' summaries have, puts the note in each paragraph that shows them;
+  a note, as the diagnostics' summaries have, puts the note in each paragraph that shows them,
+  or its mark, defined once with the note in the first paragraph that carries it;
 - a figure read from one host is described as that host's, and one computed across hosts
   declares it;
 - a bar is shown exactly, a measured figure beside it rounds the same way the verdict does, and
@@ -588,7 +589,7 @@ class Resolver:
             if not path.is_file():
                 raise Refused(f"{show(name)}: {entry['repo_file']} is not in the tree")
             return entry["repo_file"]
-        for special in ("measured_commit", "commit_exceptions", "pin_of", "note_of"):
+        for special in ("measured_commit", "commit_exceptions", "pin_of", "note_of", "mark_of"):
             if special in entry:
                 raise Refused(f"{show(name)}: {special} is shown once the page is read")
         value = self.raw(name)
@@ -1454,11 +1455,28 @@ def check_entries(resolver, names, factors):
         for key in ("note", ):
             if key in spec and (not isinstance(spec[key], str) or TYPED.search(spec[key])):
                 raise Refused(f"kind {kind!r}: its {key} is no text free of numbers")
+        if "mark" in spec:
+            mark = spec["mark"]
+            if not spec.get("note") or not isinstance(mark, str) or not mark or \
+                    len(mark) > 2 or any(char.isalnum() or char.isspace() or
+                                         unicodedata.numeric(char, None) is not None
+                                         for char in mark):
+                raise Refused(f"kind {kind!r}: its mark {mark!r} is no short symbol standing "
+                              "for its note")
+    notes = {}
+    for kind, spec in resolver.kinds.items():
+        if isinstance(spec, dict) and spec.get("mark"):
+            if notes.setdefault(spec["mark"], spec["note"]) != spec["note"]:
+                raise Refused(f"the mark {spec['mark']!r} stands for two notes, "
+                              f"{notes[spec['mark']]!r} and {spec['note']!r}")
 
 
 def paragraph_rules(resolver, blocks):
     """Each block that shows a figure of a kind with a pin or a note says so through the kind's
-    pin or note token; and each table row holds one target's tokens."""
+    pin or note token, or, for a note with a mark, the token that defines the mark; a mark is
+    defined once, in the first block that carries it; and each table row holds one target's
+    tokens."""
+    mark_rules(resolver, blocks)
     for block in blocks:
         names = TOKEN.findall(block)
         kinds = set()
@@ -1468,7 +1486,8 @@ def paragraph_rules(resolver, blocks):
         for kind in sorted(kinds):
             spec = resolver.kinds.get(kind, {})
             for key, token in (("pin", f"pin:{kind}"), ("note", f"note:{kind}")):
-                if spec.get(key) and token not in names:
+                if spec.get(key) and token not in names and \
+                        not (key == "note" and f"mark:{kind}" in names):
                     raise Refused(f"a block shows figures of the kind {kind!r}, and does not hold "
                                   f"{show(token)}: {block[:80]!r}")
         if block.lstrip().startswith("|"):
@@ -1481,6 +1500,30 @@ def paragraph_rules(resolver, blocks):
             if len(ids) > 1:
                 raise Refused(f"a table row holds the tokens of {sorted(ids)}, not of one "
                               f"target: {block[:80]!r}")
+
+
+def mark_rules(resolver, blocks):
+    """A note given by its mark (review R4-C12): each block that carries the mark, through a
+    kind's note token, comes at or after the block that defines it through a mark token, and
+    the mark is defined once."""
+    defined = {}
+    for index, block in enumerate(blocks):
+        names = TOKEN.findall(block)
+        uses, defines = [], []
+        for name in names:
+            head, _, kind = name.partition(":")
+            spec = resolver.kinds.get(kind) or {}
+            if head in ("note", "mark") and spec.get("mark"):
+                (defines if head == "mark" else uses).append(spec["mark"])
+        for mark in defines:
+            if mark in defined:
+                raise Refused(f"the mark {mark!r} is defined twice: a mark is defined once, "
+                              f"where it first stands: {block[:80]!r}")
+            defined[mark] = index
+        for mark in uses:
+            if mark not in defined:
+                raise Refused(f"the mark {mark!r} stands in a block before any block defines "
+                              f"it through a mark token: {block[:80]!r}")
 
 
 def commit_of(resolver, path, kind):
@@ -1896,7 +1939,7 @@ def render(root):
     for name in dict.fromkeys(names):
         entry = resolver.entries[name]
         if any(key in entry for key in ("measured_commit", "commit_exceptions", "pin_of",
-                                        "note_of")):
+                                        "note_of", "mark_of")):
             later.append(name)
             continue
         try:
@@ -1941,7 +1984,7 @@ def render(root):
 
 def special_value(resolver, name, entry, waiting):
     """The tokens shown from the page's whole reading: the measured commit and its exceptions,
-    and a kind's pin and note."""
+    and a kind's pin, note and its mark's definition."""
     if "measured_commit" in entry or "commit_exceptions" in entry:
         commit, phrase = commits(resolver)
         if "measured_commit" in entry:
@@ -1951,14 +1994,18 @@ def special_value(resolver, name, entry, waiting):
                 raise Refused(f"{show(name)}: no results file read names a measured commit")
             return commit[:COMMIT_SHOWN]
         return phrase
-    if "pin_of" in entry or "note_of" in entry:
-        key = "pin_of" if "pin_of" in entry else "note_of"
+    if "pin_of" in entry or "note_of" in entry or "mark_of" in entry:
+        key = next(key for key in ("pin_of", "note_of", "mark_of") if key in entry)
         kind = entry[key]
         spec = resolver.kinds.get(kind) or {}
         if key == "pin_of":
             words = (spec.get("pin") or {}).get("says")
+        elif key == "mark_of":
+            # A mark's definition: the mark and the note it stands for.
+            words = f"{spec['mark']}: {spec['note']}" if spec.get("mark") else None
         else:
-            words = spec.get("note")
+            # A note with a mark is given by its mark, which a block of its own defines.
+            words = spec.get("mark") or spec.get("note")
         if not words:
             raise Refused(f"{show(name)}: kind {kind!r} has no {key[:-3]} to show")
         if name != f"{key[:-3]}:{kind}":

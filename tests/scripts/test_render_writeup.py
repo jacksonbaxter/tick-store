@@ -771,6 +771,52 @@ class Pins(Tree):
         self.insert("These are {{note:demo}}.")
         self.refused("does not hold {{note:demo}}")
 
+    def marked(self):
+        """The demo's note given by a mark: the opening defines it, a paragraph carries it."""
+        self.figures["kinds"]["demo"]["note"] = "summaries assembled by a script"
+        self.figures["kinds"]["demo"]["mark"] = "\u2021"
+        self.figures["figures"]["note:demo"] = {"what": "the demo's note", "note_of": "demo"}
+        self.figure("mark:demo", {"what": "the demo's mark", "mark_of": "demo"})
+        self.edit("docs/writeup/WRITEUP.template.md", "([results]({{path:demo}})).",
+                  "([results]({{path:demo}}) {{mark:demo}}).")
+        self.insert("The demo ran {{count}} times again {{note:demo}}.")
+
+    def test_a_kind_s_mark_in_each_paragraph_defined_where_it_first_stands(self):
+        # Review R4-C12: a note given by its mark is as strict as the note: every paragraph
+        # showing the kind's figures carries it, and its definition is there, at or before the
+        # first paragraph that carries it, once.
+        self.marked()
+        page = self.renders()
+        self.assertIn("([results](results/bench/macOS-demo-0123456789ab.json) \u2021: summaries "
+                      "assembled by a script).", page)
+        self.assertIn("The demo ran 30 times again \u2021.", page)
+        self.assertEqual(page.count("summaries assembled by a script"), 1)
+        self.insert("It ran {{count}} times in all.")
+        self.refused("a block shows figures of the kind 'demo', and does not hold {{note:demo}}: "
+                     "'It ran {{count}} times in all.'")
+
+    def test_a_mark_with_no_definition_before_it(self):
+        self.marked()
+        self.edit("docs/writeup/WRITEUP.template.md", "([results]({{path:demo}}) {{mark:demo}}).",
+                  "([results]({{path:demo}}) {{note:demo}}).")
+        self.insert("The mark is {{mark:demo}}.")
+        self.refused("the mark '\u2021' stands in a block before any block defines it")
+        self.edit("docs/writeup/WRITEUP.template.md", "([results]({{path:demo}}) {{note:demo}}).",
+                  "([results]({{path:demo}}) {{mark:demo}}).")
+        self.refused("the mark '\u2021' is defined twice")
+
+    def test_a_mark_that_is_no_symbol_or_stands_for_two_notes(self):
+        self.marked()
+        self.figures["kinds"]["demo"]["mark"] = "n1"
+        self.save()
+        self.refused("its mark 'n1' is no short symbol")
+        self.figures["kinds"]["demo"]["mark"] = "\u2021"
+        self.figures["kinds"]["other"] = {"what": "another", "note": "another note",
+                                          "mark": "\u2021",
+                                          "files": {"macOS": "results/bench/macOS-other-*.json"}}
+        self.save()
+        self.refused("the mark '\u2021' stands for two notes")
+
 
 class Hosts(Tree):
     """Review WD-5: a figure is described as its own host's."""

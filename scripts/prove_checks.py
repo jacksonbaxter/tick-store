@@ -3161,6 +3161,14 @@ FAULTS = (
     Fault("writeup-pitch-condition-skipped", "py-scripts", "render_writeup.py judges an essay "
           "claim on the first condition of its pitch sentence alone", CHECK_FAILED,
           "FAIL: test_a_pitch_sentence_reused_on_every_condition (__main__.Claims"),
+    # Review R4-C12: a diagnostic summary's note given by a mark, carried and defined.
+    Fault("writeup-mark-unsaid", "py-scripts", "render_writeup.py lets a paragraph show a "
+          "figure of a kind whose note has a mark without carrying the mark", CHECK_FAILED,
+          "FAIL: test_a_kind_s_mark_in_each_paragraph_defined_where_it_first_stands "
+          "(__main__.Pins"),
+    Fault("writeup-mark-undefined", "py-scripts", "render_writeup.py lets a note's mark stand "
+          "with no definition at or before it", CHECK_FAILED,
+          "FAIL: test_a_mark_with_no_definition_before_it (__main__.Pins"),
     # Review R4-D: the essay's bound is held on wc -w's count of the rendered page.
     Fault("writeup-words-not-as-wc", "py-scripts", "render_writeup.py counts the essay's words "
           "leaving out its tables' pipes and rules and every mark, not as wc -w counts the page",

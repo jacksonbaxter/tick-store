@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index ace0c0c..a1beb3c 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1487,7 +1487,7 @@ def paragraph_rules(resolver, blocks):
+             spec = resolver.kinds.get(kind, {})
+             for key, token in (("pin", f"pin:{kind}"), ("note", f"note:{kind}")):
+                 if spec.get(key) and token not in names and \
+-                        not (key == "note" and f"mark:{kind}" in names):
++                        not (key == "note" and spec.get("mark")):
+                     raise Refused(f"a block shows figures of the kind {kind!r}, and does not hold "
+                                   f"{show(token)}: {block[:80]!r}")
+         if block.lstrip().startswith("|"):

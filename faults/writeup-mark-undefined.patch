@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index ace0c0c..f72074e 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1521,7 +1521,7 @@ def mark_rules(resolver, blocks):
+                               f"where it first stands: {block[:80]!r}")
+             defined[mark] = index
+         for mark in uses:
+-            if mark not in defined:
++            if False:
+                 raise Refused(f"the mark {mark!r} stands in a block before any block defines "
+                               f"it through a mark token: {block[:80]!r}")
+ 

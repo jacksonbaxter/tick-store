@@ -178,7 +178,7 @@ changes the warm engine median by -2.3%, -3.6%, -4.3%,
 -3.7% and -7.3% on Q1 to Q5, a negative change being time saved. A
 query's own runs range 2.7% to 13.7% of their
 median, so on whole queries SIMD's effect is inside or near the run-to-run spread
-([counters run](results/diag/counters-simd-12302019-ede0176b10bb.json): a diagnostic summary no separate validator re-reads). SIMD cost 1,870 lines of kernels and dispatch, 6.6% of the
+([counters run](results/diag/counters-simd-12302019-ede0176b10bb.json) ‡: a diagnostic summary no separate validator re-reads). SIMD cost 1,870 lines of kernels and dispatch, 6.6% of the
 28,526 source lines.
 
 **The store's price column.** Per piece, the reader inflates any zstd frame, allocates, decodes
@@ -186,7 +186,7 @@ PFOR with scale and patches, range-checks every value and appends. On the Zen 1 
 11.6%, 20.4% (unpack), 25.3% (patches),
 4.6% (scale and range check) and 0.6% (allocation and copy;
 copies resolved only to the C library, 19.4%, are not counted there) of
-the decode's user cycles ([price-decode profile](results/diag/price-decode-profile-12302019-ede0176b10bb.json): a diagnostic summary no separate validator re-reads).
+the decode's user cycles ([price-decode profile](results/diag/price-decode-profile-12302019-ede0176b10bb.json) ‡).
 
 ## Branch prediction and instruction counts
 
@@ -221,18 +221,18 @@ day did not pass. With a flush, tick-store's write took 190.7 s and without a fl
 
 **Where the writer's time goes.** tick-store's engine-only time is its writer's own work:
 2,328 cycles and 3,334 instructions a message at
-1.43 IPC (a diagnostic summary no separate validator re-reads). Of its user cycles, PFOR encoding takes
+1.43 IPC ‡. Of its user cycles, PFOR encoding takes
 41.0%, assembling segments 19.1%, the book state, each
 open order's stock and price kept to code the messages that name it, 18.7%,
 dictionary encoding 6.8%, sorting 4.8%, parsing 2.7%
-and zstd 1.2% ([writer profile](results/diag/writer-profile-12302019-ede0176b10bb.json): a diagnostic summary no separate validator re-reads). The others' engine-only times may still hold reading their input from disk, so
+and zstd 1.2% ([writer profile](results/diag/writer-profile-12302019-ede0176b10bb.json) ‡). The others' engine-only times may still hold reading their input from disk, so
 the clocks are not alike and the gap is not all tick-store's writer.
 
 **Queries.** The table at a glance gives Q1 to Q5 warm; ArcticDB with a table per stock takes
 10.2 s on Q1. Q5, the day's sum of a shares column, decodes 152,004,760 values at
 6.0 ns each; of its sampled cycles, dictionary decoding takes 30.5%,
 the C library 20.6% and the unpack kernels 13.7%
-([query profile](results/diag/query-profile-12302019-ede0176b10bb.json): a diagnostic summary no separate validator re-reads).
+([query profile](results/diag/query-profile-12302019-ede0176b10bb.json) ‡).
 
 ## Tried and not kept, and not done
 
@@ -308,7 +308,7 @@ A login or a backup run can take executions from a fuzzing run, not hide a findi
 [runs by target](RESULTS.md#g-3-runs-by-target) give each target's executions.
 
 The checks and the faults that prove them are in the README; the prover's
-record covers 99 of its 488 listed faults.
+record covers 99 of its 490 listed faults.
 
 ## Limits
 
