@@ -1,7 +1,21 @@
+diff --git a/fuzz/bound_seeds.hpp b/fuzz/bound_seeds.hpp
+index de2fb56..9778463 100644
+--- a/fuzz/bound_seeds.hpp
++++ b/fuzz/bound_seeds.hpp
+@@ -572,7 +572,7 @@ static_assert(kStoreMostSegments == 382);
+ // The writer's most: one-record segments of a one-byte raw record, four blocks each (type,
+ // raw_length, raw_bytes, seek), 317 bytes, of which the payloads beyond the least are 90; as
+ // many as -max_len holds.
+-inline constexpr std::size_t kStoreWriterMostSegments = 219;
++inline constexpr std::size_t kStoreWriterMostSegments = 230;
+ inline constexpr std::array<std::byte, 1> kOneByteRecord{std::byte{'z'}};
+ [[nodiscard]] inline Bytes itch_store_most_segments_seed() {
+     const auto file = [](std::size_t records) {
 diff --git a/src/codec/dictionary.cpp b/src/codec/dictionary.cpp
+index 08e9479..4de9898 100644
 --- a/src/codec/dictionary.cpp
 +++ b/src/codec/dictionary.cpp
-@@ -514,7 +514,7 @@
+@@ -482,7 +482,7 @@ std::expected<void, CodecError> encode_dict_block(std::span<const std::uint64_t>
      const auto allowed = [&](DictMode mode) {
          return (modes & (1U << static_cast<unsigned>(mode))) != 0;
      };

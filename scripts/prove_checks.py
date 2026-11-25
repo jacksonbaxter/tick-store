@@ -709,9 +709,16 @@ FAULTS = (
     Fault("fuzz-dictionary-repeated-entry", "fuzz-dictionary", "the dictionary decoder stops "
           "refusing a ranked dictionary that holds one value twice", EXIT_LIBFUZZER,
           "check_dict_column:", arguments=FUZZ_ARGUMENTS),
+    # The writer holds its hot columns to ranked PFOR too, so the faulted writer stores a
+    # one-byte raw record's segment in fewer bytes, 230 of them in -max_len, and the seed
+    # generator's most-segments table (219) stops fuzz-build before any fuzzing. The patch moves
+    # that table to 230, as a change that updated the table with the encoder would, so the
+    # fuzzer is reached and refuses the mode by name.
     Fault("fuzz-dictionary-mode-set-ignored", "fuzz-dictionary", "the dictionary encoder tries "
           "Huffman whatever its mode set allows, so a column held to ranked PFOR can take "
-          "Huffman", EXIT_LIBFUZZER, "check_dict_column:", arguments=FUZZ_ARGUMENTS),
+          "Huffman", EXIT_LIBFUZZER,
+          "check_dict_column: the encoder held to ranked PFOR took another mode",
+          arguments=FUZZ_ARGUMENTS),
     Fault("fuzz-dictionary-mode-set-larger-block", "fuzz-dictionary", "the dictionary encoder "
           "takes Huffman even when it is up to 64 bytes larger than ranked PFOR", EXIT_LIBFUZZER,
           "check_dict_column:", arguments=FUZZ_ARGUMENTS),
