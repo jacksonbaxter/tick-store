@@ -7846,6 +7846,87 @@ R4-A to R4-D).
   `writeup-not-counted-of-a-counted-part`, was shown failing by hand at the head that adds this
   entry, in a clone, against a control that passed.
 
+### The essay's final review R4, after the rebase
+
+The essay's commits were rebased onto the final review's line at `a7f700c` on 2026-11-25, and its
+part finished there ([the R4 table](REVIEW.md#the-essays-final-review-r4)).
+
+- **The rebase.** My ten commits became eight on this line, `7bebbc6`, `7ff5e31`, `db9cd3f`,
+  `411a96c`, `ec764c1`, `cd9d54b`, `4bdcaef` and `404eb2c`: two that only remade fault patches the
+  commit before them had left stale are folded into that commit, so every script test file passes
+  at each commit. After them come `e8514aa`, `af431a2`, `0459064`, `4395de3` and the commit that
+  adds this entry. README.md conflicted at its generated blocks in five commits; each took the
+  line's text and was rendered again by `render_results.py` as it stands at that commit.
+  docs/REVIEW.md conflicted after part A's "Still waiting" row; both sides are kept. One test
+  literal of mine took R1's "a change in tick-store's favour".
+- **The essay check's stale range.** `render_writeup.py --check` passes at `9ead7a9` and first
+  reports WRITEUP.md stale at `33d829e`, whose prover lists 502 faults where the page says 487;
+  R1's `c77e850` then changed a verdict the essay quotes ("missed in part" to "missed"). It stays
+  stale through `a7f700c` and every commit of mine before `e8514aa`, that is `7bebbc6` to
+  `404eb2c`; `e8514aa` renders the page again and the check is current from there, at 4,060 words.
+  `render_results.py --check` exits 0 at each of my commits.
+- **The strings the essay picks up.** The kernel row's mark reads "one of the 65 cases behind its
+  median"; the lowest-median row's verdict "missed"; ArcticDB's flushed write "a change in
+  tick-store's favour"; QuestDB's not-counted reason "swapping in both runs' write phases and no
+  disturbance record for the replaced run". RESULTS.md's three kernel medians marked "(disturbed)"
+  and its guard sentence are not quoted by the essay; the medians' speed-ups now carry their
+  dagger (below). The page counts 697 listed faults.
+- **Every flagged figure carries its flag ([R4-C3-5](REVIEW.md#the-essays-final-review-r4)).**
+  `flags_carried` refuses a page on which a token prints a figure resting on a phase the
+  disturbance records place a disturbance in, or the record flags as timed while pages were
+  swapped in, unless its table row or sentence holds a flag of that phase or the verdict whose
+  marks name it. A figure rests on what `shown_reads` gives: now also each item of a ratio,
+  product, sum or difference, and a bench case or median over cases; a flag may read bench cases.
+  It found four figures on the page unmarked: the smaller segments' warm Q4, 55.81 ms (tick-store
+  `v3-seg1Mi`, swapped in); ArcticDB with a table per stock's warm Q1, 10.2 s (remote logins
+  during that setup's warm queries, and swapped in); and the Ryzen's AVX2 speed-ups of the
+  two-pass delta, 1.25x, and the fused delta, 1.35x, which rest on the kernel cases the records
+  enter, a remote login in `pfor_delta_two_pass/w=48/scalar` and `pfor_delta_fused/w=52/avx2` and
+  a backup run in `pfor_delta_two_pass/w=31/avx2`. Each now carries a dagger. The DS-4 and WT-2
+  rows are carried by their verdicts, and the Q5 ratio by the QuestDB flag or the swap mark in its
+  row. The four words came from wording that loses no qualification: "Nasdaq's published peak
+  rate" for "peak message rate"; "is benchmarked, never called" for "and never called";
+  "benchmark-only too" for "as well"; "in a data block and the footer" for "and in the footer";
+  "Gorilla is built and exact" for "and is exact", with its claim's text in the figure list to
+  match. The Ryzen's speed-up sentence now ends "on the Ryzen", so no dagger stands before a stop.
+  The page holds 4,060 words by the renderer and by `wc -w` in both locales.
+- **The dead branch ([R4-C3-8](REVIEW.md#the-essays-final-review-r4)).** A figure whose expression
+  fixes no system of the flag's phase is not beside the flag, with no message of its own;
+  `writeup-flag-unfixed-system-passes` now makes `beside_flag` accept such a figure, which prints
+  a wrong dagger, and its test fails.
+- **Three untested reads ([R4-C3, U11, U14, U16](REVIEW.md#the-essays-final-review-r4)).** One
+  test holds a min or max of figures to the item it takes, a same to its first item and a lowest
+  value to its system's headline setup; each mutation fails it.
+- **docs/checks.md** gives the bound, 4,060, how words are counted and what the page is refused
+  for, the mark rules, the flag and carry rules, the method note and short input clause with its
+  pointer, the not-counted tie and the replaced run in the commit sentence, and what none of them
+  holds ([R4-C3-6](REVIEW.md#the-essays-final-review-r4),
+  [R4-C3-7](REVIEW.md#the-essays-final-review-r4), "straight after", the tie by query and kind,
+  `own_commit`'s words, the prose, and the two right pages refused).
+- **"the Ryzen" on BENCHMARKS.md and compare/README.md.** Where "Zen 1" named the machine it says
+  "the Ryzen", introduced in each page's host line; where a sentence is about the processor's
+  design (its 256-bit split, its L1, published figures for it) "Zen 1" stays. No fault patch
+  touches either page.
+- **Faults, shown by hand.** New: `writeup-flag-uncarried`, `writeup-flag-ratio-unread`,
+  `writeup-flag-verdict-carry-ignored` and `writeup-flag-case-unread`. Remade on the lines this
+  pass moved: `writeup-flag-unfixed-system-passes` with the new mutation above, and
+  `writeup-flag-system-unchecked`, `writeup-flag-variant-unchecked`, `writeup-flag-not-beside`,
+  `writeup-flag-never-set` and `writeup-flag-variant-ignored` with the same mutation. Earlier in
+  the round, and listed here with them: `writeup-words-not-as-wc`, `writeup-mark-unsaid`,
+  `writeup-mark-undefined`, `writeup-pin-unsaid` (remade), `writeup-method-note-unchecked`,
+  `writeup-not-counted-of-a-counted-part` (remade), `writeup-own-commit-unpinned`,
+  `writeup-typed-mark`, `writeup-flag-mark-undefined`, `writeup-mark-in-foreign-token`,
+  `writeup-flag-mark-defined-late`, `writeup-flag-mark-defined-twice`,
+  `writeup-note-outside-its-kind`, `writeup-not-counted-untied`,
+  `writeup-no-method-section-passes`, `writeup-method-heading-twice`,
+  `writeup-method-note-joined`, `writeup-method-note-token-unchecked`,
+  `writeup-mark-length-unbounded`, `writeup-words-utf8-unchecked`, `writeup-draft-writes-page`,
+  `writeup-replaced-run-unnamed`, `writeup-short-input-without-bytes`,
+  `writeup-input-pointer-unchecked` and `writeup-pinned-file-undeclared` (remade). Each of these
+  35 was shown failing by hand at the head that adds this entry, in a clone, with the failing line
+  `prove_checks.py` expects, against a control that passed. `prove_checks.py` was not run, so
+  `results/check-proofs.json` still covers 99 of the 697; the rest wait for the full re-proof.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
