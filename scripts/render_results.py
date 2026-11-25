@@ -1608,6 +1608,8 @@ def finished(row, root, specs, parts):
 # Why a rival side's mark is not confirmed by the replaced run, in the words the marks give.
 UNCONFIRMED_WHY = {
     "swapped": "swapping memory in both runs",
+    "write swapped": "swapping in both runs' write phases and no disturbance record for the "
+                     "replaced run",
     "no record": "a disturbance the replaced run has no record to rule out",
     "no figure": "no figure on the replaced run",
     "no run": "no replaced run",
@@ -1644,6 +1646,14 @@ def side_confirmation(root, entries, path, document, deciding, tainted, replaced
         if disturbed(entries, root, path, [read]):
             covered = any(entry["document"] == results_name(root, old_path) for entry in entries)
             if not covered or disturbed(entries, root, old_path, [read]):
+                # A write's swap record spans more than its clock, so it marks nothing alone;
+                # beside a disturbance the replaced run cannot rule out, both runs' counts are
+                # said, as each record gives them (review R1-3).
+                pages = [write_swap_in(found_document, read) for found_document in
+                         (document, old_document)] if read[0] == "write" else [None]
+                if not covered and all(pages):
+                    found[label] = (label, "write swapped", tuple(pages))
+                    continue
                 found[label] = (label, "no record", "")
                 continue
         if swapped_reads([read], old_document):
@@ -1658,6 +1668,23 @@ def pages_in(document, read):
     """The pages the whole host swapped in while a query phase was timed, by its record."""
     return walk(document, ["systems", read[1], "variants", read[2], "queries", read[4],
                            read[3], "swap_timed", "pages_in"])
+
+
+# What a write's swap record spans, as compare/run_system.py's run_class opens and closes it.
+WRITE_SWAP_SPAN = ("the whole write phase, from the flush probe before the timed write to the "
+                   "store's sizing after it, the service's start and stop included, a span "
+                   "wider than the clock")
+
+
+def write_swap_in(document, read):
+    """The pages the whole host swapped in over a write's class's whole write phase, by its
+    record (classes.<class>.swap.write), or None where the record keeps none."""
+    try:
+        pages = walk(document, ["systems", read[1], "variants", read[2], "classes", read[3],
+                                "swap", "write", "pages_in"])
+    except TargetError:
+        return None
+    return pages if isinstance(pages, int) and not isinstance(pages, bool) else None
 
 
 def also_flagged(deciding, document, old_document, sides):
@@ -2257,7 +2284,10 @@ def short_forms_explained():
             "confirm, as that side carries the same mark there or no disturbance record covers "
             "that run: it keeps its verdict word and its mark, the cell gives both runs' figures, "
             "and no count, ranking or first screen takes it, while a mark on tick-store's side "
-            "alone, which can only have slowed it, leaves the part counted; and a verdict of "
+            "alone, which can only have slowed it, leaves the part counted, and "
+            f"\"{UNCONFIRMED_WHY['write swapped']}\" stands for a rival's write that holds a "
+            "disturbance no record of the replaced run can rule out, beside the swapping both "
+            f"runs' records count over {WRITE_SWAP_SPAN}; and a verdict of "
             "several parts may "
             "be given as \"met against QuestDB, not like-for-like; missed against Parquet; "
             "against ArcticDB met on this run and missed on the replaced one, a change for "
@@ -2435,15 +2465,17 @@ def side_pages(label, new, old):
 
 
 def unconfirmed_forms(sides, replaced_text=None, label="", also=()):
-    """A not-counted part's mark in full and short: each reason with the systems it holds for
-    and, for swapping, the pages each run's record gives, with every other side either run
-    flags (review R1-2); that neither run confirms the other, so nothing counts it; and the
-    replaced run's figures where it has them."""
+    """A not-counted part's mark in full and short: that a part labelled not like-for-like is
+    so; each reason with the systems it holds for and, for swapping, the pages each run's
+    record gives, with every other side either run flags (review R1-2), and for a write, the
+    pages its record gives over the whole write phase, which no clock holds (review R1-3);
+    that neither run confirms the other, so nothing counts it; and the replaced run's figures
+    where it has them."""
     by_why = {}
     for side, why, detail in sides:
         if why and (side, detail) not in by_why.get(why, []):
             by_why.setdefault(why, []).append((side, detail))
-    pieces = []
+    pieces = [f"it is {NOT_ALIKE}"] if NOT_ALIKE in label else []
     # The sides the reasons do not give with both runs' pages, which either run flags.
     others = "".join(f", and {words}, " + " and ".join(found) for words, found in (
         (words, [side_pages(side, new, old) for side, new, old, flags in also if flags is both])
@@ -2454,6 +2486,14 @@ def unconfirmed_forms(sides, replaced_text=None, label="", also=()):
         if why == "swapped":
             pieces.append(f"{UNCONFIRMED_WHY[why]}, on " + " and on ".join(
                 f"{label_of(side)} side {detail}" for side, detail in items) + others)
+        elif why == "write swapped":
+            for side, (new, old) in items:
+                pieces.append(f"both runs' records show the host swapping in pages during "
+                              f"{side}'s write phase, {new:,} in this run and {old:,} in the "
+                              f"replaced one, counted over {WRITE_SWAP_SPAN}, so the swapping "
+                              "cannot be placed inside the timed write; and no disturbance "
+                              f"record covers the replaced run to rule out on {label_of(side)} "
+                              "side the disturbance this run records there")
         else:
             pieces.append(f"{UNCONFIRMED_WHY[why]} on "
                           f"{and_list([label_of(label) for label, _ in items])} side")

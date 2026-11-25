@@ -2140,6 +2140,11 @@ FAULTS = (
           "mark names only the sides this run flags, and leaves out a side the replaced run "
           "alone flags", CHECK_FAILED,
           "FAIL: test_the_not_counted_mark_names_every_side_either_run_flags (__main__.SidesTest"),
+    # Review R1-3: a write side's swapping in both runs' write phases, read from each record.
+    Fault("sides-write-swap-misread", "py-scripts", "render_results.py gives a write side's "
+          "pages swapped out over its write phase as the pages swapped in", CHECK_FAILED,
+          "FAIL: test_a_write_side_gives_both_runs_write_phase_swap_from_the_records "
+          "(__main__.SidesTest"),
     Fault("sides-left-out-counts-uncounted", "py-scripts", "render_results.py counts a part no run confirms among the first screen's met parts", CHECK_FAILED,
           "FAIL: test_no_count_takes_a_part_not_counted (__main__.SidesTest"),
     # The ruling on review P1-5: G-3's runs beside its verdict, from its file.

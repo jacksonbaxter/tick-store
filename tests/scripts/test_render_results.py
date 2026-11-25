@@ -2941,6 +2941,43 @@ class SidesTest(Scratch):
         self.assertEqual(RENDER.notes_of(part)["also_flagged"], [])
         self.assertNotIn("in one run only", RENDER.verdict_of([part], SWAP_ROW))
 
+    def test_a_write_side_gives_both_runs_write_phase_swap_from_the_records(self):
+        # Review R1-3: a disturbance on a rival's write that no record of the replaced run can
+        # rule out, beside the swapping both runs' records count over the whole write phase:
+        # each count is read from its run's record, and the clause says the span is wider
+        # than the clock.
+        entry = dict(LOGIN, system="arcticdb")
+        new = change_document(recorded_write(1.0, 0.1), recorded_write(2.0, 0.1))
+        old = change_document(recorded_write(1.0, 0.1), recorded_write(2.0, 0.1),
+                              commit="67ae574f5666")
+        for document, pages in ((new, 7307), (old, 16304)):
+            document["systems"]["arcticdb"]["variants"]["h"]["classes"]["B"]["swap"] = {
+                "write": {"pages_in": pages, "pages_out": 1}}
+        self.write(new, old)
+        self.disturb(entry)
+        part = self.parts(CHANGE_ROW)[0]
+        self.assertIsInstance(RENDER.counted(part), RENDER.NotCounted)
+        verdict = RENDER.verdict_of([part], CHANGE_ROW)
+        self.assertIn("met by the rule and not counted: both runs' records show the host "
+                      "swapping in pages during ArcticDB's write phase, 7,307 in this run and "
+                      "16,304 in the replaced one, counted over the whole write phase, from the "
+                      "flush probe before the timed write to the store's sizing after it, the "
+                      "service's start and stop included, a span wider than the clock, so the "
+                      "swapping cannot be placed inside the timed write; and no disturbance "
+                      "record covers the replaced run to rule out on ArcticDB's side the "
+                      "disturbance this run records there, so neither run confirms the other",
+                      verdict)
+        self.assertIn("met, not counted: swapping in both runs' write phases and no disturbance "
+                      "record for the replaced run (ArcticDB)", RENDER.short_marks([part], CHANGE_ROW))
+        # A replaced run whose record keeps no write swap, or none swapped in, leaves the
+        # reason a disturbance the replaced run has no record to rule out.
+        del old["systems"]["arcticdb"]["variants"]["h"]["classes"]["B"]["swap"]
+        self.write(new, old)
+        verdict = RENDER.verdict_of(self.parts(CHANGE_ROW), CHANGE_ROW)
+        self.assertIn("a disturbance the replaced run has no record to rule out on ArcticDB's "
+                      "side", verdict)
+        self.assertNotIn("write phase", verdict)
+
     def test_a_part_not_like_for_like_is_never_counted(self):
         part = ("against QuestDB, not like-for-like", "1 s against 2 s", True, None, {}, {})
         self.assertIsInstance(RENDER.counted(part), RENDER.NotCounted)

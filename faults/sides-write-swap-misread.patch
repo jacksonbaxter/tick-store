@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1681,7 +1681,7 @@
+     record (classes.<class>.swap.write), or None where the record keeps none."""
+     try:
+         pages = walk(document, ["systems", read[1], "variants", read[2], "classes", read[3],
+-                                "swap", "write", "pages_in"])
++                                "swap", "write", "pages_out"])
+     except TargetError:
+         return None
+     return pages if isinstance(pages, int) and not isinstance(pages, bool) else None
