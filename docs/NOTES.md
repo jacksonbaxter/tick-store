@@ -7589,6 +7589,45 @@ scan, cold; the list went from 249 words to 253 (R1-29). Faults added:
 now finds the new sentence. Each was shown by hand at the commit that made it, with the faults
 whose tests hold the changed phrase.
 
+**The entries no page showed, the third checks review and a recruiter's read (R1-30 to
+R1-37).** My entry check under R1-26 left two kinds of entry that marked no page. RESULTS.md's
+kernel table now marks each median that takes a disturbed case, and each column or codec figure
+from one, " (disturbed)", read from the record by case and file: `pfor_delta_two_pass` scalar 0.96
+and avx2 1.20, and `pfor_delta_fused` avx2 1.30 (R1-30). compare/README.md's per-stock slice
+figures are typed by hand, which no check can hold, so a sentence beside them says their warm
+queries held a login and names the record, and `docs/checks.md` says which entries mark a page,
+and that hand-typed figures on `compare/README.md` and `BENCHMARKS.md` are held to no record
+(R1-34, `02eb185`). So the sentence under the table still claims marks on verdicts, not on every
+result: on those two pages a figure can stand bare. The checks review's third pass found a
+pitch could rank tick-store on a not-counted part through another variant (C3-1) or name the
+replaced run's file and be judged there alone (C3-2). I reran the reviewer's pitch edits in a
+clone at `709e7d4`'s tree, with the screen's new wording: F3 and F4 are refused for ranking
+tick-store on what QL-4 on Linux judges on (Q2 warm), whatever the variants; F5, F6 and F8 for
+naming a replaced run's file as their own; the shipped pitch, with "though ArcticDB with a table
+per stock is faster", passes, and so does G2, which ranks ArcticDB over tick-store. G1, which
+ranks QuestDB over Parquet on Q2 warm, is refused too: the rule fails safe, which I left as it is
+and `docs/checks.md` says (C3-3) (R1-31, R1-32). Four faults' expected strings named a test any
+failure of which passed them; each now expects its own failure, and I checked each fault's log
+for the other two pitch faults' strings (C3-4, R1-37). For a recruiter's read, the sentence under
+the table says the same claim plainly, 43 words to 42 (the prose under the table 115 to 114)
+(R1-35); "which may flatter" is "which may favour" wherever it is generated (R1-36); and the list
+stands under "## What the table leaves out" with a lead-in giving the targets above and the 32
+other rows, one item a verdict class, 253 words to 269, its lead-in checked against the screen
+(R1-33). Faults added: `bench-kernel-median-unmarked`, `bench-case-entries-unread`,
+`bench-marks-unwired`, `pitch-claim-ranks-through-another-variant`,
+`pitch-claim-on-the-replaced-file` and `headline-list-lead-unchecked`; remade with the same
+mutation where my edits moved them: `under-sentence-says-runs-cannot-be-tied`,
+`compare-claim-takes-this-run`, `pitch-claim-of-figures-on-uncounted-part` and
+`render-others-list-unheaded`; `under-sentence-claims-every-event-marked` finds the new
+sentence; `headline-left-out-drops-a-miss`, `pitch-claim-judged-on-this-run-alone`,
+`pitch-swap-below-on-this-run-alone`, `pitch-swap-fastest-on-this-run-alone` and
+`legend-period-said-of-another-kind` expect new strings. Each was shown by hand in a fresh clone,
+the control passing and the fault failing for the stated reason, and every render-check fault
+(37) and every script fault whose test is in `test_render_results.py` (145) again at `709e7d4`'s
+tree. None of these changes is quoted in the essay; its render is stale on the same quoted
+strings as at `1b78f97`, earlier rows' generated text and the listed fault count, until it is
+rendered again.
+
 ### The gate's records, second pass
 
 2026-11-25. Two outside reviews of my first pass, one of the pages and records and one of the
