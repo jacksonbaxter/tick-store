@@ -7100,7 +7100,7 @@ for the fuzz and capacity parts. I ruled: no rerun; the entries and the marks go
   *Corrected 2026-11-25:* the backup run was placed between runs of the gate's seeds. The gate's
   step log puts 15:12:26Z to 15:12:29Z wholly inside `run_length/bound-one-run-blocks` run 4 of 5,
   15:12:25Z to 15:12:32Z, with the login at 15:12:31Z. The entry's case and fuzz/README.md say so
-  now (`6f03fd9`; "The bound-seed gate's results file and the backup's run", below).
+  now (`38793d7`; "The bound-seed gate's results file and the backup's run", below).
 - **The gate's worst run.** It is 4,668.5 ms against 5,000, from 15:12:42Z to 15:12:51Z. It holds
   no login, and shows the highest load of its seed's five runs and about 205 more processes
   started than usual. Nothing on record explains that.
@@ -7122,8 +7122,9 @@ for the fuzz and capacity parts. I ruled: no rerun; the entries and the marks go
   *Corrected 2026-11-25:* that holds for the gate's runs, the kernel benchmark's file and the
   comparison files, not for every figure. The timed fuzzing runs and the capacity check's parts
   keep no per-CPU record and no load. Both records' `not_listed` now say what guards each step
-  (`1c0726c`). RESULTS.md's sentence under the targets table still says it of every figure; the
-  essay's limits paragraph names the jobs and makes no claim of what guards a figure.
+  (`60e4f1c`). RESULTS.md's sentence under the targets table then still said it of every figure,
+  until `575cb10` gave it step by step; the essay's limits paragraph names the jobs and makes no
+  claim of what guards a figure.
 - **The essay (`4fb405f`, `b8db07c`).** Each disturbance kind reads one record a run: `record_of`
   names the kind whose run it records, so no commit is named. The fuzz run's record is a commit
   exception beside the fuzz result. The final render resolves 341 tokens to 3,803 words, and
@@ -7331,7 +7332,7 @@ final review of 25 November: the comparison plan, the old write sentences, CI an
 2026-11-25. I fixed the gate's records from a checker's report on the final review. Every time
 below is from the gate's step log, the gate's results file or the disturbance records, in UTC.
 
-- **Where the backup run fell (`6f03fd9`).** The host's scheduled repository backup, 15:12:26Z to
+- **Where the backup run fell (`38793d7`).** The host's scheduled repository backup, 15:12:26Z to
   15:12:29Z, lies wholly inside `run_length/bound-one-run-blocks` run 4 of 5, 15:12:25Z to
   15:12:32Z, with the login at 15:12:31Z to 15:12:32Z. That run took 3,538.5 ms an execution,
   under its seed's worst, 3,660.5. The record had placed the backup between runs of the gate's
@@ -7345,14 +7346,14 @@ below is from the gate's step log, the gate's results file or the disturbance re
   median of 53 over the gate's 155 Linux runs, about 205 more. Nothing on record says what started
   them, and I do not attribute them to the backup. The P1-6 row in docs/REVIEW.md says the
   worst case carries its login; the records show it carries none.
-- **What guards each figure (`1c0726c`).** The scheduled-jobs item in both records said the per-CPU
+- **What guards each figure (`60e4f1c`).** The scheduled-jobs item in both records said the per-CPU
   record and the load rule guard every timed figure. Each now says what guards each step. The
   gate's runs keep per-CPU counters, the load and the sibling's busy process at both ends, and the
   gate's rule; it held the shares, the load and the processes to no rule. The kernel benchmark's
   file and the comparison files keep the sibling share under 5% and the load lines. The timed
   fuzzing runs keep neither, and nothing guards their counts of executions. The capacity check's
   parts keep its guard's memory, swap and disk samples, and nothing guards their times.
-- **The backup's other runs (`4463d2b`).** The host's journal holds ten runs of the backup from
+- **The backup's other runs (`ffaf6ba`).** The host's journal holds ten runs of the backup from
   the gate's start to the capacity check's end. Besides the gate's, seven fell in the fuzz step,
   six of them during timed runs and one during the replays and a merge before them, and two in the
   capacity check's parts, ArcticDB's and QuestDB class A's. Each is listed once under
@@ -7361,7 +7362,7 @@ below is from the gate's step log, the gate's results file or the disturbance re
   in a step whose verdict is pass or fail by its own logs, where it could only slow a run. The
   journal is not in the repository. Making them entries would change G-3's mark in RESULTS.md and
   the essay's count of fuzz entries, so I listed them and left that choice open.
-- **The gate's results file (`b144a40`, `33d61e0`).** The gate's run wrote no results file.
+- **The gate's results file (`23200ff`, `3df697d`).** The gate's run wrote no results file.
   `scripts/gate_results.py`, written on 2026-11-25, after the runs, assembles
   `results/fuzz-gate-8616263b7561.json` from each host's raw records of 2026-11-17: the step log,
   each run's libFuzzer output, and on Linux each run's per-CPU counter copies, wall time and
@@ -7373,7 +7374,7 @@ below is from the gate's step log, the gate's results file or the disturbance re
   measured paths without the launcher, which did not run the gate. Its assembled path is
   `scripts/gate_results.py`. The rule compares an assembled path from the last commit that wrote
   the file, so an assembler newer than the runs does not untie it, and a later change to it does.
-- **Its validator and the page (`1dea57b`, `4f4b0fd`).** `scripts/check_gate.py` refuses:
+- **Its validator and the page (`fa4e2ca`, `e6e8282`).** `scripts/check_gate.py` refuses:
   - a seed of the list missing on a host, or fewer runs a seed than the gate's five;
   - a time an execution that is not the run's libFuzzer time over its units;
   - a run over the bar marked pass, or a pass its exit, findings and sibling do not give;
@@ -7386,7 +7387,7 @@ below is from the gate's step log, the gate's results file or the disturbance re
   event and each seed's median and worst. The predictions and the old Mac medians stay in the
   page's table, labelled as from earlier runs' logs. The new block's file makes `--check` name
   "README.md" twice in its last line, as it names each page by its file name.
-- **Faults (`ed11500`, `570337f`).** Fifteen are new: `gate-seed-missing-accepted`,
+- **Faults (`33d829e`, `d225623`).** Fifteen are new: `gate-seed-missing-accepted`,
   `gate-few-runs-accepted`, `gate-time-per-execution-unchecked`, `gate-over-bar-pass-accepted`,
   `gate-pass-rule-unchecked`, `gate-summary-unchecked`, `gate-bar-unchecked`,
   `gate-name-unchecked`, `gate-leak-accepted`, `gate-entry-run-unchecked`,
@@ -7396,7 +7397,7 @@ below is from the gate's step log, the gate's results file or the disturbance re
   `prove_checks.py`. Each was shown by hand in a clone under the worktree's `build/`: the control
   run of its test file, or of the render check, passed, and the fault failed with the string its
   entry expects. The outputs are under the phase's `round3/r3/proofs` folder; proof owed to the
-  full re-proof. The README's proofs paragraph now counts 502 listed faults; the essay, which
+  full re-proof. The README's proofs paragraph counted 502 listed faults at `33d829e`; the essay, which
   quotes the count, is rendered again at the merge.
 
 ### The final review R1: classes, sides, the pitch and the generated prose
