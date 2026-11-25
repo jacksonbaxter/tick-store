@@ -388,7 +388,7 @@ def claim_every_event_is_marked():
     step is marked, as it read before review R1-15, which the records' unmarked runs belie."""
     def change(document):
         under = document["headline"]["under"]
-        start = under["text"].index(" A verdict is marked where")
+        start = under["text"].index(" Where the disturbance records place")
         under["text"] = (under["text"][:start].rstrip(".") + "; where the logs show one of those "
                          "jobs, or a remote login, running during a timed step, the result says "
                          "so.")
@@ -2370,6 +2370,13 @@ FAULTS = (
           "(review R-A5)", CHECK_FAILED,
           "FAIL: test_the_list_stays_under_its_heading_and_the_count_on_the_screen "
           "(__main__.RenderHeadlineTest"),
+    # Review R1-33: the list's lead-in gives the targets shown and the count of the other rows.
+    Fault("headline-list-lead-unchecked", "py-scripts", "render_results.py taking a first "
+          "screen whose list under the table opens with a lead-in giving other targets or "
+          "another count than the screen's", CHECK_FAILED,
+          "FAIL: test_what_is_shown_named_and_counted_adds_up_to_the_whole_table "
+          "(__main__.RenderHeadlineTest.test_what_is_shown_named_and_counted_adds_up_to_the_whole_"
+          "table) (wrong="),
     Fault("render-pitch-setup-unsaid", "py-scripts", "render_results.py taking a pitch win "
           "among the chosen setups without the setup that beats it (review R-A1)", CHECK_FAILED,
           "FAIL: test_a_pitch_win_another_setup_beats_names_that_setup (__main__.ConditionsTest"),
@@ -2497,7 +2504,7 @@ FAULTS = (
           drop_a_rows_source),
     Fault("headline-left-out-drops-a-miss", "render-check", "render_results.py leaves the "
           "missed parts of the targets on the screen out of the line under the table",
-          EXIT_RENDER_REFUSED, "the line under the table does not name"),
+          EXIT_RENDER_REFUSED, ", which is missed ("),
     Fault("headline-left-out-miscounted", "render-check", "render_results.py counts the other "
           "targets missed in part as met in the line under the table", EXIT_RENDER_REFUSED,
           "the line under the table counts the other rows as"),
@@ -2704,28 +2711,38 @@ FAULTS = (
           "or a fastest claim on the same figures raises the ranking sentence the part may not",
           CHECK_FAILED, "FAIL: test_no_claim_of_figures_compares_what_a_part_not_counted_compares "
           "(__main__.SidesTest"),
+    # Review R1-31: nor does a claim rank tick-store on that part's query and kind through
+    # another variant.
+    Fault("pitch-claim-ranks-through-another-variant", "py-scripts", "render_results.py refuses "
+          "a pair resting on a part met and not counted only on the part's own figures, so a "
+          "pair putting another of tick-store's variants below another of a rival's on the same "
+          "query and kind passes", CHECK_FAILED,
+          "FAIL: test_no_claim_ranks_tick_store_on_what_a_part_not_counted_judges_whatever_the_"
+          "variant (__main__.SidesTest"),
+    # Review R1-32: no claim names the replaced run's file as its own.
+    Fault("pitch-claim-on-the-replaced-file", "py-scripts", "render_results.py judges a pitch "
+          "claim naming the replaced run's file on that run alone", CHECK_FAILED,
+          "FAIL: test_no_claim_is_judged_on_the_replaced_run_alone (__main__.SidesTest"),
     # Review R1-20: a claim of figures is judged on the replaced run's file wherever one is kept.
     Fault("pitch-claim-judged-on-this-run-alone", "py-scripts", "render_results.py judges a "
           "pitch claim of figures on the replaced run's file only where the claim asks for it, "
           "so a pair or a fastest claim the replaced run reverses passes", CHECK_FAILED,
-          "FAIL: test_every_claim_of_figures_is_judged_on_the_replaced_file_where_one_is_kept "
-          "(__main__.ConditionsTest"),
+          "AssertionError: None != '2500.0 is not below 2000.0 on the replaced run'"),
     Fault("pitch-swap-below-on-this-run-alone", "py-scripts", "render_results.py reads the "
           "swap flags a pair of figures rests on from the replaced run's file only where the "
           "claim asks for it, though the pair is judged there", CHECK_FAILED,
-          "FAIL: test_every_claim_of_figures_is_judged_on_the_replaced_file_where_one_is_kept "
-          "(__main__.ConditionsTest"),
+          "test_every_claim_of_figures_is_judged_on_the_replaced_file_where_one_is_kept) "
+          "(form='below')"),
     Fault("pitch-swap-fastest-on-this-run-alone", "py-scripts", "render_results.py reads the "
           "swap flags a fastest claim rests on from this run's file alone, though the claim is "
           "judged on the replaced run's too", CHECK_FAILED,
-          "FAIL: test_every_claim_of_figures_is_judged_on_the_replaced_file_where_one_is_kept "
-          "(__main__.ConditionsTest"),
+          "test_every_claim_of_figures_is_judged_on_the_replaced_file_where_one_is_kept) "
+          "(form='fastest')"),
     # Review R1-21: what a watcher's computed span means is said of that kind of login alone.
     Fault("legend-period-said-of-another-kind", "py-scripts", "render_results.py's kinds under "
           "RESULTS.md's targets table say of a backup run what a span computed from a watcher's "
           "period means, and the login that span belongs to loses it", CHECK_FAILED,
-          "FAIL: test_the_first_screen_takes_the_short_forms_and_results_md_explains_them "
-          "(__main__.ConditionsTest"),
+          "AssertionError: 'A login by another project\\'s watcher, computed from its period"),
     # Review R1-22: the write-swap reason is given only for a replaced run no record covers.
     Fault("write-swap-reason-on-a-covered-run", "py-scripts", "render_results.py gives a rival's "
           "write side the write-swap reason, which says no disturbance record covers the "

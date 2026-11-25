@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -3515,7 +3515,7 @@
+         raise TargetError("the first screen gives no count of the other rows")
+     # The lead-in names the targets shown, by count, and the other rows the count gives.
+     wanted_lead = others_lead(len({key[0] for key in shown}), int(clause.group(1)), bool(listed))
+-    if lead != wanted_lead:
++    if False:
+         raise TargetError(f"the list under {OTHERS_HEADING!r} opens {lead!r}, and the screen's "
+                           f"targets and count give {wanted_lead!r}")
+     stated_named = {}

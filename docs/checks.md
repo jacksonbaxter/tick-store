@@ -15,23 +15,28 @@ the results, holds the words its target lists for its bar and names the one mach
 on, so a new results file that turns a verdict stops the check at the sentence to change; a
 sentence holding a figure; or a text listed as stating no result, with its reason. A claim that
 pairs figures or names the fastest is held on the replaced run's file as well wherever one is
-kept, and one marked `on_replaced` is refused if none is. No claim rests on a part met by the rule
-and not counted: a claim on that part's target, or one comparing two figures that part compares,
-is refused. A word that ranks or judges, such as fastest, least, below, less, ahead or keeps up,
+kept, and one marked `on_replaced` is refused if none is; a claim that names the replaced run's
+file as its own is refused. No claim rests on a part met by the rule and not counted: a claim on
+that part's target, or one comparing two figures that part compares, is refused, and so is one
+ranking tick-store below or ahead of a system on that part's query and kind, whatever the
+variants. A claim ranking two other systems on such a part is refused too, though it favours
+neither side: the rule fails safe. A word that ranks or judges, such as fastest, least, below, less, ahead or keeps up,
 must sit inside a claim or a figure's words, headings included. Each table row says what it is,
 then its bar and the bar's source, then what was measured, from a template whose figures are
 named values read from the results files: a template that types a figure, names a value it is not given, or is given one it does not name
 stops the render, and a lowest of the other systems takes every other system the comparison
-ran. The line under the table names every part of a target with a row on the screen that the
-table leaves out, under its verdict, the met parts too, and counts every other target-and-machine row
-by verdict, a row's class taken from its counted parts alone, so a part met by the rule and not
+ran. The list under the table, under its own heading, opens with a lead-in giving the targets
+shown and the count of other rows, then names every part of a target with a row on the screen that
+the table leaves out, one item a verdict class, the met parts too, and counts every other
+target-and-machine row by verdict, a row's class taken from its counted parts alone, so a part met by the rule and not
 counted makes no row met or missed in part. It names parts that carry the same marks together,
 each mark once, under their machine and setup, and opens the class of parts met and not counted
 with a gloss that fits their reasons; there a not-counted mark stands in for the swap mark of the
 same systems, and names beside it each side only the earlier run flags, so the screen names every
 side either run flags, as RESULTS.md does. It is checked apart from the code that writes it, by verdict classes of its own: each
 such part named whole, with each of its marks, under its machine and nothing else named, the
-gloss the one its parts' reasons give, each count the targets' own,
+gloss the one its parts' reasons give, each count the targets' own, the lead-in the one the
+screen's targets and count give,
 each target asked for named under its own count, and what is shown, named and counted adding up
 to the whole table; the sentence under the table must give its row's verdict. A plain name is
 one target's, and one part's, on a machine. The table must hold a miss. The whole screen names

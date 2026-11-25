@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -4247,7 +4247,7 @@
+             # A pair puts its first figure below its second, so it favours tick-store where
+             # tick-store's figure is the first alone.
+             if not rests and not any(read[1] == "tickstore" for read in second):
+-                rests = favours_held(held, first, {read[1] for read in second})
++                rests = None
+             if rests:
+                 return rests
+         for where, found_document in documents:

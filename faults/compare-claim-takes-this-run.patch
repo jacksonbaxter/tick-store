@@ -1,7 +1,7 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -3533,7 +3533,7 @@
+@@ -4217,7 +4217,7 @@
              return (f"{spec['id']} on {spec['host']} is {NOT_COUNTED} on ({held[0]}), which no "
                      "run confirms, and raises no ranking sentence")
          # A claim takes each part's less favourable outcome, worked out here from both runs.
@@ -9,4 +9,4 @@ diff --git a/scripts/render_results.py b/scripts/render_results.py
 +        verdict = core_verdict([(part[0], part[1], notes_of(part).get("change", {}).get("new", part[2]), *part[3:]) for part in parts])
          return None if verdict == spec["verdict"] else \
              f"{spec['id']} on {spec['host']} is {verdict}, not {spec['verdict']}"
-     path = target_file(root, claim["file"])
+     # A claim is judged on this run's file and the replaced run's beside it, never on the

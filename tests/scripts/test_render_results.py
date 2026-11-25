@@ -1204,15 +1204,18 @@ HEADLINE = {
         {"id": "T-4", "host": "Linux", "name": "order"},
         {"id": "T-5", "host": "macOS", "name": "the four"},
         {"id": "T-6", "host": "Linux", "name": "kernel time"}]}
-def left_out(count, listed):
+def left_out(count, listed, targets):
     """The block's tail after the sentence under the table: the count sentence ending the first
-    screen, then the heading and the list under it (review R-A5)."""
+    screen, then the heading and the list under it, its lead-in for the targets shown and one
+    item a sentence of listed (reviews R-A5, R1-33)."""
+    items = [f"- {piece.rstrip('.')}." for piece in RENDER.top_level(listed, ". ") if piece]
     return "\n".join(["", "Every other result is in the [full table](RESULTS.md#targets): of the "
-                      f"other {count}.", "", "## The other results of the targets above", "",
-                      "Not shown in the table above." + (f" {listed}" if listed else "")])
+                      f"other {count}.", "", "## What the table leaves out", "",
+                      RENDER.others_lead(targets, int(count.split()[0]), bool(items)),
+                      *([""] if items else []), *items])
 
 
-LEFT_OUT_LINE = left_out("2 rows, 2 not judged", "Missed: bits of two.")
+LEFT_OUT_LINE = left_out("2 rows, 2 not judged", "Missed: bits of two.", 4)
 
 
 def with_row(index, **changes):
@@ -1287,11 +1290,12 @@ class RenderHeadlineTest(Scratch):
         self.render()
         self.assertEqual(self.headline_row("Bits"),
                          "| Bits | at most 3.0 bits (a codec) | 2.0 bits | met |")
-        self.assertIn("Not shown in the table above. Missed: bits of two.", self.headline())
+        self.assertIn("\n- Missed: bits of two.", self.headline())
 
     def test_the_line_under_the_table_names_every_miss_and_counts_the_met(self):
         self.render()
-        self.assertEqual("\n".join(self.headline().splitlines()[-6:]), LEFT_OUT_LINE)
+        self.assertEqual("\n".join(self.headline().splitlines()[-len(LEFT_OUT_LINE.split("\n")):]),
+                         LEFT_OUT_LINE)
 
     def test_a_part_another_row_shows_is_not_named_as_left_out(self):
         headline = json.loads(json.dumps(HEADLINE))
@@ -1300,7 +1304,7 @@ class RenderHeadlineTest(Scratch):
         self.assertEqual(self.render().returncode, 0)
         self.assertNotIn("bits of two", self.headline())
         self.assertIn("of the other 2 rows, 2 not judged.", self.headline())
-        self.assertTrue(self.headline().rstrip().endswith("Not shown in the table above."))
+        self.assertTrue(self.headline().rstrip().endswith(RENDER.others_lead(4, 2, False)))
 
     def test_a_met_target_left_out_is_counted_not_named(self):
         headline = json.loads(json.dumps(HEADLINE))
@@ -1363,10 +1367,20 @@ class RenderHeadlineTest(Scratch):
 
     def test_what_is_shown_named_and_counted_adds_up_to_the_whole_table(self):
         self.assertIn("the screen shows 4 rows and counts 3 others, 2 by verdict, of the "
-                      "targets' 6", self.check_line(LEFT_OUT_LINE.replace("other 2", "other 3")))
+                      "targets' 6", self.check_line(LEFT_OUT_LINE.replace("other 2", "other 3")
+                                                    .replace("the 2 other", "the 3 other")))
+        # The list's lead-in gives the targets shown and the other rows as the screen does
+        # (review R1-33).
+        self.assertEqual(RENDER.others_lead(4, 2), "These are the other parts of the four "
+                         "targets above, by verdict; the 2 other rows are in "
+                         "[RESULTS.md](RESULTS.md#targets).")
+        for wrong in (LEFT_OUT_LINE.replace("the 2 other", "the 3 other"),
+                      LEFT_OUT_LINE.replace("the four targets", "the five targets")):
+            with self.subTest(wrong=wrong):
+                self.assertIn("the screen's targets and count give", self.check_line(wrong))
         # The met parts are named, not counted (review R1-17), so a count is no name of one.
         self.assertIn("names '1 more of their part' with no machine as met, and the targets give "
-                      "no such part", self.check_line(LEFT_OUT_LINE + " Met: 1 more of their part."))
+                      "no such part", self.check_line(LEFT_OUT_LINE + "\n- Met: 1 more of their part."))
         self.assertIn("gives no count of the other rows",
                       self.check_line(LEFT_OUT_LINE.replace(": of the other 2 rows", "")))
 
@@ -1721,7 +1735,7 @@ LEFT_OUT_HEADLINE = {
         {"id": "U-1", "host": "macOS", "name": "laptop latency"}]}
 LEFT_OUT_TEXT = left_out("3 rows, 1 met, 1 missed in part, 1 not judged",
                          "Missed: on both machines, two bits; on the box, bits b, bits c. "
-                         "Among the other rows not judged: kernel time.")
+                         "Among the other rows not judged: kernel time.", 5)
 
 
 class LeftOutLineTest(Scratch):
@@ -1837,11 +1851,11 @@ class LeftOutLineTest(Scratch):
                  "names 'bits c' twice or empty under missed"),
                 (LEFT_OUT_TEXT.replace("Missed:", "Missed in part:"),
                  "does not name 'bits b', which is missed"),
-                (LEFT_OUT_TEXT.replace("above. ", "above. Lost: bits. "),
+                (LEFT_OUT_TEXT.replace("\n- Missed:", "\n- Lost: bits.\n- Missed:"),
                  "the line under the table says 'Lost: bits', which is no class of its own"),
                 (LEFT_OUT_TEXT.replace("1 met, ", "1 met, 2 lost, "),
                  "counts '2 lost', which is no count of a verdict"),
-                (LEFT_OUT_TEXT.replace(" Among the other rows not judged: kernel time.", ""),
+                (LEFT_OUT_TEXT.replace("\n- Among the other rows not judged: kernel time.", ""),
                  "names {} among its counts, and the targets give {'not judged': 'kernel "
                  "time'}")):
             with self.subTest(line=line):
@@ -2795,8 +2809,8 @@ class ConditionsTest(Scratch):
                                              "fields": ["median_us"], "one_of": ["tickstore"]}}
         definitions = {"rows": []}
         self.write(new, old)
-        for claim in (below, fastest):
-            with self.subTest(claim=claim):
+        for form, claim in (("below", below), ("fastest", fastest)):
+            with self.subTest(form=form):
                 self.assertIsNone(RENDER.claim_problem(claim, definitions, self.tree))
                 self.assertEqual(RENDER.pitch_swapped(claim, definitions, self.tree), [])
         old["systems"]["tickstore"]["variants"]["h"]["queries"]["Q2"]["warm"]["median_us"] = \
@@ -2811,14 +2825,14 @@ class ConditionsTest(Scratch):
                                                      recorded_write(2.0, 0.1),
                                                      commit="67ae574f5666"),
                                      flagged=["arcticdb"]))
-        for claim in (below, fastest):
-            with self.subTest(claim=claim):
+        for form, claim in (("below", below), ("fastest", fastest)):
+            with self.subTest(form=form):
                 self.assertEqual(RENDER.pitch_swapped(claim, definitions, self.tree),
                                  ["arcticdb"])
         # With no replaced file a claim is judged on this run, unless it asks for both.
         self.old.unlink()
-        for claim in (below, fastest):
-            with self.subTest(claim=claim):
+        for form, claim in (("below", below), ("fastest", fastest)):
+            with self.subTest(form=form):
                 self.assertIsNone(RENDER.claim_problem(claim, definitions, self.tree))
                 self.assertEqual(RENDER.claim_problem(dict(claim, on_replaced=True), definitions,
                                                       self.tree),
@@ -2978,7 +2992,7 @@ class ConditionsTest(Scratch):
         # gives its reason and systems alone (review R1-5).
         self.assertEqual(RENDER.screen_verdict(parts, SWAP_ROW), "met (no replaced run "
                          "(ArcticDB); the host was swapping memory during ArcticDB's runs, which "
-                         "may flatter this)")
+                         "may favour this)")
         self.assertEqual(RENDER.short_marks(parts, SWAP_ROW),
                          ["met, not counted: no replaced run (ArcticDB)",
                           RENDER.SHORT_SWAPPED + "ArcticDB"])
@@ -3308,13 +3322,14 @@ class SidesTest(Scratch):
         self.runs([], [])
         items, met, counts, named = RENDER.left_out_items(definitions, self.tree, shown, names)
         count, line = RENDER.left_out_line(items, met, counts, named, SCREEN_HOSTS)
-        self.assertEqual(line, "Not shown in the table above. Met: on the box, a fast hour.")
+        self.assertEqual(line, f"{RENDER.others_lead(1, 1)}\n\n- Met: on the box, a fast hour.")
         text = "\n".join(["", count, "", RENDER.OTHERS_HEADING, "", line])
         RENDER.check_left_out(text, definitions, self.tree, shown, names, SCREEN_HOSTS)
         for broken, expected in (
                 (text.replace("Met: on the box, a fast hour.", "Met: 1 more of their parts."),
                  "does not name 'a fast hour', which is met"),
-                (text.replace(" Met: on the box, a fast hour.", ""),
+                (text.replace(f"{RENDER.others_lead(1, 1)}\n\n- Met: on the box, a fast hour.",
+                              RENDER.others_lead(1, 1, False)),
                  "does not name 'a fast hour', which is met")):
             with self.subTest(broken=broken):
                 with self.assertRaises(RENDER.TargetError) as refused:
@@ -3337,9 +3352,9 @@ class SidesTest(Scratch):
         self.runs(["arcticdb"], ["arcticdb"])
         items, met, counts, named = RENDER.left_out_items(definitions, self.tree, shown, names)
         count, line = RENDER.left_out_line(items, met, counts, named, SCREEN_HOSTS)
-        self.assertEqual(line, f"Not shown in the table above. Met by the rule and not counted "
-                               f"({RENDER.NOT_COUNTED_GLOSS}): on the box, a fast hour, a fast "
-                               "hour again (swapping during ArcticDB's runs).")
+        self.assertEqual(line, f"{RENDER.others_lead(1, 1)}\n\n- Met by the rule and not "
+                               f"counted ({RENDER.NOT_COUNTED_GLOSS}): on the box, a fast hour, "
+                               "a fast hour again (swapping during ArcticDB's runs).")
         text = "\n".join(["", count, "", RENDER.OTHERS_HEADING, "", line])
         RENDER.check_left_out(text, definitions, self.tree, shown, names, SCREEN_HOSTS)
         for broken, expected in (
@@ -3404,6 +3419,59 @@ class SidesTest(Scratch):
         for claim in (below, fastest, alone):
             with self.subTest(claim=claim):
                 self.assertIsNone(RENDER.claim_problem(claim, definitions, self.tree))
+
+    def test_no_claim_ranks_tick_store_on_what_a_part_not_counted_judges_whatever_the_variant(
+            self):
+        # Review R1-31: a pair with one side in another variant compared no two figures the
+        # part compares, so it passed; a claim in tick-store's favour on the query and kind of
+        # such a part, against a system it judges, is refused whatever the variants, and one
+        # against tick-store, as "ArcticDB with a table per stock is faster" is, still stands.
+        def runs_with_variants(old_flagged):
+            self.runs(["arcticdb"], old_flagged)
+            new, old = (json.loads(path.read_text(encoding="utf-8"))
+                        for path in (self.new, self.old))
+            for document in (new, old):
+                for system, variant, median in (("arcticdb", "split", 500.0),
+                                                ("tickstore", "small", 900.0)):
+                    variants = document["systems"][system]["variants"]
+                    variants[variant] = json.loads(json.dumps(variants["h"]))
+                    variants[variant]["queries"]["Q2"]["warm"]["median_us"] = median
+            self.write(new, old)
+        runs_with_variants(["arcticdb"])
+        file = "results/compare/Linux-day-*.json"
+
+        def q2(system, variant):
+            return {"path": ["systems", system, "variants", variant, "queries", "Q2", "warm",
+                             "median_us"]}
+        definitions = {"rows": [SWAP_ROW]}
+        said = (f"it ranks tick-store on what T-13 on Linux judges on (Q2 warm), which is "
+                f"{RENDER.NOT_COUNTED}, which no run confirms, and raises no ranking sentence, "
+                "whatever the variants")
+        for pair in ([q2("tickstore", "small"), q2("arcticdb", "h")],
+                     [q2("tickstore", "small"), q2("arcticdb", "split")]):
+            with self.subTest(pair=pair):
+                self.assertEqual(RENDER.claim_problem({"file": file, "below": [pair]},
+                                                      definitions, self.tree), said)
+        self.assertIsNone(RENDER.claim_problem(
+            {"file": file, "below": [[q2("arcticdb", "split"), q2("tickstore", "h")]]},
+            definitions, self.tree))
+        # Confirmed, the part raises the ranking again.
+        runs_with_variants([])
+        self.assertIsNone(RENDER.claim_problem(
+            {"file": file, "below": [[q2("tickstore", "small"), q2("arcticdb", "h")]]},
+            definitions, self.tree))
+
+    def test_no_claim_is_judged_on_the_replaced_run_alone(self):
+        # Review R1-32: a claim naming the replaced run's file was judged on that run alone,
+        # with no not-counted refusal.
+        self.runs(["arcticdb"], ["arcticdb"])
+        file = "results/compare/replaced/Linux-day-*.json"
+        self.assertEqual(RENDER.claim_problem(
+            {"file": file, "below": [[SWAP_ROW["parts"][0]["value"],
+                                      SWAP_ROW["parts"][0]["at_most"]]]},
+            {"rows": [SWAP_ROW]}, self.tree),
+            f"it names {file}, a replaced run's file, as its own; name this run's file, and the "
+            "replaced run's is judged beside it")
 
     def test_a_quote_without_the_not_counted_words_is_refused(self):
         self.runs(["arcticdb"], ["arcticdb"])
@@ -3734,7 +3802,7 @@ class ShortFormTest(unittest.TestCase):
 
     def test_the_screen_says_whose_runs_swapped_and_which_way_it_leans(self):
         for swapped, words in (
-                ([("arcticdb", "h", False)], "during ArcticDB's runs, which may flatter this"),
+                ([("arcticdb", "h", False)], "during ArcticDB's runs, which may favour this"),
                 ([("tickstore", "h", False)], "during tick-store's runs, which may understate "
                                               "this"),
                 ([("tickstore", "h", False), ("questdb", "p", False)],
@@ -3848,10 +3916,11 @@ class UnderSentenceTest(unittest.TestCase):
         # A mark stands on a verdict a disturbance entry's timed step decides, so the sentence
         # claims marks for verdicts alone; and the gate's record ties its unlisted backup runs
         # to steps, so the sentence does not say they cannot be tied (review R1-26).
-        self.assertIn("A verdict is marked where a disturbance record enters a remote login, or "
-                      "one of the few backup runs it enters one by one, in a timed step that "
-                      "decides the verdict", text)
-        self.assertIn("the records list the scheduled jobs' other runs without a mark", text)
+        self.assertIn("Where the disturbance records place a remote login, or one of the few "
+                      "backup runs they single out, inside the timing a verdict rests on, the "
+                      "verdict says so", text)
+        self.assertIn("the scheduled jobs' other runs are listed in those records without a "
+                      "note", text)
         for claim in ("the result says so", "cannot be tied", "A result is marked"):
             self.assertNotIn(claim, text)
 

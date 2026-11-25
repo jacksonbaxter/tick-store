@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -4222,7 +4222,7 @@
+             f"{spec['id']} on {spec['host']} is {verdict}, not {spec['verdict']}"
+     # A claim is judged on this run's file and the replaced run's beside it, never on the
+     # replaced run's alone (review R1-32).
+-    if REPLACED in Path(claim["file"]).parts:
++    if False:
+         return (f"it names {claim['file']}, a replaced run's file, as its own; name this run's "
+                 "file, and the replaced run's is judged beside it")
+     path = target_file(root, claim["file"])

@@ -2229,7 +2229,7 @@ SCREEN_DISTURBANCE = {"a remote login by this project": "a remote login on the t
                       "a file copy and process launch by this project":
                           "a file copy and process launch on the test machine"}
 SCREEN_SWAPPED = "the host was swapping memory during "
-SCREEN_LEANS = {"rivals": "which may flatter this", "ours": "which may understate this",
+SCREEN_LEANS = {"rivals": "which may favour this", "ours": "which may understate this",
                 "both": "which may lean either way"}
 SCREEN_REPLACED = "an earlier full run, which this one replaces, gave "
 SCREEN_SWAPPED_FIGURE = "timed while the host was swapping"
@@ -2361,7 +2361,7 @@ def short_forms_explained():
             "against ArcticDB met on this run and missed on the replaced one, a change in "
             "tick-store's favour, counted as missed\", its parts named by what they compare. The README's "
             "first screen says the same in words that stand alone: \"the host was swapping "
-            "memory during ArcticDB's and QuestDB's runs, which may flatter this\" for a swap-in mark, "
+            "memory during ArcticDB's and QuestDB's runs, which may favour this\" for a swap-in mark, "
             "\"which may understate this\" where tick-store's own figures are the swapped ones "
             "and \"which may lean either way\" where both are; and \"a remote login on the "
             "test machine fell inside the timing of ArcticDB's warm queries; an earlier full run, "
@@ -2402,7 +2402,7 @@ SCHEDULED_JOBS = ("The marks name only what the disturbance records list. The ho
 # The same mark in the README's pitch, which has no room for the systems and variants: a claim
 # there that rests on a rival's flagged figure says this, and the table below it keeps the whole
 # mark. It is held only in the pitch; a quote of a verdict anywhere else takes SWAPPED.
-PITCH_SWAPPED = "the host was swapping memory during some rivals' runs, which may flatter tick-store"
+PITCH_SWAPPED = "the host was swapping memory during some rivals' runs, which may favour tick-store"
 
 
 def swapped_reads(reads, document):
@@ -3261,8 +3261,8 @@ def plain_names(definitions, hosts):
 
 
 def left_out_items(definitions, root, shown, names):
-    """What the line under the table holds: per verdict class, (host, plain name) of each part
-    of a target with a row on the screen that the screen leaves out and that is not met; the
+    """What the list under the table holds: per verdict class, (host, plain name) of each part
+    of a target with a row on the screen that the screen leaves out, the met ones too; the
     count of those met; and, for every other row of the targets, the count of each verdict
     class, with the plain name of each target the headline asks to name among its count."""
     items = {kind: [] for kind in LEFT_OUT_HEADS}
@@ -3352,15 +3352,30 @@ COUNT_ORDER = ("met", "missed", "missed in part", "not judged", "not judged in p
 COUNT_OPENING = "Every other result is in the [full table]"
 COUNT_CLAUSE = re.compile(r"^" + re.escape(COUNT_OPENING) + r"\(" + re.escape(TARGETS_ANCHOR) +
                           r"\): of the other (\d+) rows, (.*)\.$")
-OTHERS_HEADING = "## The other results of the targets above"
-OTHERS_OPENING = "Not shown in the table above."
+# The heading names what the list holds, so it is not read as other targets, and the list's
+# lead-in says whose parts these are and where the other rows are, one item a class below it
+# (review R1-33).
+OTHERS_HEADING = "## What the table leaves out"
+NUMBER_WORDS = ("no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+                "ten")
+
+
+def others_lead(targets, others, listed=True):
+    """The list's lead-in: the targets the screen shows, by count, whose other parts the list
+    gives, and the other rows, by count, in RESULTS.md."""
+    many = NUMBER_WORDS[targets] if targets < len(NUMBER_WORDS) else f"{targets:,}"
+    whose = f"the {many} target{'' if targets == 1 else 's'} above"
+    where = f"the {counted_with(others, 'other row')} are in [RESULTS.md]({TARGETS_ANCHOR})"
+    return (f"These are the other parts of {whose}, by verdict; {where}." if listed else
+            f"The table shows every part of {whose}; {where}.")
 # A sentence of the list that names, among the other rows of one verdict, each target the
 # headline asks to name there.
 AMONG = "Among the other rows "
 
 
-def left_out_line(items, met_parts, counts, named, hosts):
-    """The first screen's count sentence, and the list under OTHERS_HEADING."""
+def left_out_line(items, met_parts, counts, named, hosts, targets=1):
+    """The first screen's count sentence, and the list under OTHERS_HEADING: its lead-in, for
+    the targets shown, by count, then one item a class."""
     sentences = [f"{not_counted_head([why for item in found for why in item[4]]) if kind == 'met, not counted' else LEFT_OUT_HEADS[kind]}: "
                  f"{host_groups(found, hosts)}."
                  for kind, found in items.items() if found]
@@ -3369,7 +3384,9 @@ def left_out_line(items, met_parts, counts, named, hosts):
     pieces = [f"{counts[kind]} {kind}" for kind in COUNT_ORDER if counts[kind]]
     count = (f"{COUNT_OPENING}({TARGETS_ANCHOR}): of the other {sum(counts.values())} rows, "
              + ", ".join(pieces) + ".")
-    return count, " ".join([OTHERS_OPENING, *sentences])
+    lead = others_lead(targets, sum(counts.values()), bool(sentences))
+    return count, "\n".join([lead, *([""] if sentences else []),
+                             *(f"- {sentence}" for sentence in sentences)])
 
 
 def class_of(mets):
@@ -3472,13 +3489,15 @@ def check_left_out(text, definitions, root, shown, names, hosts):
     (review R-A5)."""
     tail = text.split("\n")
     shape = ["", None, "", OTHERS_HEADING, "", None]
-    if len(tail) != len(shape) or any(want is not None and got != want
-                                      for got, want in zip(tail, shape)) or \
-            not tail[1].startswith(COUNT_OPENING) or not tail[5].startswith(OTHERS_OPENING):
+    items_shape = len(tail) == len(shape) or (len(tail) > 7 and tail[6] == "" and all(
+        item.startswith("- ") for item in tail[7:]))
+    if len(tail) < len(shape) or not items_shape or any(
+            want is not None and got != want for got, want in zip(tail, shape)) or \
+            not tail[1].startswith(COUNT_OPENING):
         raise TargetError("the first screen does not end with the count of the other rows "
                           f"followed directly by {OTHERS_HEADING!r} and the list of what the "
                           "table's targets leave out under it")
-    count_line, line = tail[1], tail[5]
+    count_line, lead, listed = tail[1], tail[5], [item[2:].rstrip(".") for item in tail[7:]]
     # The not-counted class's opening, glossed for the reasons its parts carry, worked out here.
     reasons = []
     for row in definitions["rows"]:
@@ -3494,10 +3513,13 @@ def check_left_out(text, definitions, root, shown, names, hosts):
     clause = COUNT_CLAUSE.search(count_line)
     if clause is None:
         raise TargetError("the first screen gives no count of the other rows")
-    body = line.strip()
+    # The lead-in names the targets shown, by count, and the other rows the count gives.
+    wanted_lead = others_lead(len({key[0] for key in shown}), int(clause.group(1)), bool(listed))
+    if lead != wanted_lead:
+        raise TargetError(f"the list under {OTHERS_HEADING!r} opens {lead!r}, and the screen's "
+                          f"targets and count give {wanted_lead!r}")
     stated_named = {}
-    for sentence in [piece for piece in top_level(body[len(OTHERS_OPENING):].strip(), ". ")
-                     if piece]:
+    for sentence in listed:
         head = sentence.split(":", 1)[0]
         if head.startswith(AMONG) and head[len(AMONG):] in COUNT_ORDER and \
                 head[len(AMONG):] not in stated_named:
@@ -3691,8 +3713,9 @@ def render_headline(definitions_path, root):
             lines += ["", sentence]
         names = plain_names(definitions, hosts)
         items, met_parts, counts, named = left_out_items(definitions, root, shown, names)
-        count, line = left_out_line(items, met_parts, counts, named, hosts)
-        tail = ["", count, "", OTHERS_HEADING, "", line]
+        count, line = left_out_line(items, met_parts, counts, named, hosts,
+                                    len({key[0] for key in shown}))
+        tail = ["", count, "", OTHERS_HEADING, "", *line.split("\n")]
         check_left_out("\n".join(tail), definitions, root, shown, names, hosts)
     except (TargetError, KeyError, TypeError, ValueError, ZeroDivisionError) as error:
         raise TargetError(f"headline: {error}") from error
@@ -4139,6 +4162,32 @@ def compares_held(held, sides):
     return None
 
 
+def phase_kind(read):
+    """What a timed phase measures, whatever system or variant: a query of a kind, or a write
+    of a class."""
+    if read[0] == "queries":
+        return ("queries", read[3], read[4])
+    if read[0] == "write":
+        return ("write", read[3])
+    return None
+
+
+def favours_held(held, ours, theirs):
+    """Why a pitch condition in tick-store's favour, on tick-store's timed phases ours against
+    the systems theirs, rests on a part of held: that the part measures what one of them
+    measures, a query of the same kind or a write of the same class, against one of those
+    systems, whatever the variants, so the condition is a ranking the part raises. None
+    otherwise (review R1-31)."""
+    kinds = {phase_kind(read) for read in ours if read[1] == "tickstore"} - {None}
+    for row_id, host, label, reads in held:
+        rivals = {read[1] for read in reads if read[1] != "tickstore"}
+        if kinds & {phase_kind(read) for read in reads} and rivals & set(theirs):
+            return (f"it ranks tick-store on what {row_id} on {host} judges on ({label}), "
+                    f"which is {NOT_COUNTED}, which no run confirms, and raises no ranking "
+                    "sentence, whatever the variants")
+    return None
+
+
 def claim_problem(claim, definitions, root):
     """Why the results do not bear out one condition of a sentence of the pitch that ranks
     tick-store, or None (review RG-13). "target" is a row's verdict, judged as in the targets
@@ -4171,6 +4220,11 @@ def claim_problem(claim, definitions, root):
         verdict = core_verdict([(part[0], part[1], counted(part), *part[3:]) for part in parts])
         return None if verdict == spec["verdict"] else \
             f"{spec['id']} on {spec['host']} is {verdict}, not {spec['verdict']}"
+    # A claim is judged on this run's file and the replaced run's beside it, never on the
+    # replaced run's alone (review R1-32).
+    if REPLACED in Path(claim["file"]).parts:
+        return (f"it names {claim['file']}, a replaced run's file, as its own; name this run's "
+                "file, and the replaced run's is judged beside it")
     path = target_file(root, claim["file"])
     if path is None:
         raise TargetError(f"pitch: no results file matches {claim['file']}")
@@ -4188,7 +4242,12 @@ def claim_problem(claim, definitions, root):
     held = not_counted_reads(definitions, root, path)
     if "below" in claim:
         for lower, higher in claim["below"]:
-            rests = compares_held(held, [reads_of(lower, document), reads_of(higher, document)])
+            first, second = reads_of(lower, document), reads_of(higher, document)
+            rests = compares_held(held, [first, second])
+            # A pair puts its first figure below its second, so it favours tick-store where
+            # tick-store's figure is the first alone.
+            if not rests and not any(read[1] == "tickstore" for read in second):
+                rests = favours_held(held, first, {read[1] for read in second})
             if rests:
                 return rests
         for where, found_document in documents:
