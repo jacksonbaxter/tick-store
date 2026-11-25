@@ -400,7 +400,7 @@
   "note:diag-query": {"what": "what the counters summary is", "note_of": "diag-query"},
   "note:diag-price": {"what": "what the price-decode summary is", "note_of": "diag-price"},
   "note:diag-writer": {"what": "what the writer profile summary is", "note_of": "diag-writer"},
-  "mark:flags": {"what": "the definition of the mark the flag tokens print, on the Ryzen: a figure timed during a recorded disturbance or, for a query, while pages were swapped in", "flag_mark": {"mark": "†", "says": "marks a figure timed during a login, a backup job or, for a query, swapping on the host"}},
+  "mark:flags": {"what": "the definition of the mark the flag tokens print, on the Ryzen: a figure timed during a recorded disturbance or, for a query, while pages were swapped in", "flag_mark": {"mark": "†", "says": "marks a figure with a timing during a login, a backup or, for a query, swapping on the host"}},
   "mark:diag-counters": {"what": "the diagnostic summaries' mark and what it stands for, defined where it first stands", "mark_of": "diag-counters"},
   "disturbance:timed": {"what": "the entries the disturbances file holds inside timed phases, an event entered once for each phase it fell in, on the Ryzen", "kind": "disturbances", "host": "Linux", "value": {"count": ["entries"], "where": {"field": ["timed"], "equals": true}}, "format": "{:d}"},
   "disturbance:timed_fuzz": {"what": "the entries the fuzz run's disturbances file holds inside timed phases, an event entered once for each target it fell in, on the Ryzen", "kind": "disturbances-fuzz", "host": "Linux", "value": {"count": ["entries"], "where": {"field": ["timed"], "equals": true}}, "format": "{:d}"},

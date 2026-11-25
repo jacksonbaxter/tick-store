@@ -1462,6 +1462,80 @@ class Marks(Tree):
                   "| Ratio | Q1, ms |\n|---|---|\n| {{ratio_q1}} | {{q1_ms}} {{q1_flag}} |")
         self.assertIn("| 5.0000 | 5.0 \u2020 |", self.renders())
 
+    def test_a_figure_through_a_filtered_min_or_max_or_a_median_carries_its_flag(self):
+        # Review C4-1, B1 and B2: a figure rests on every item its expression reads, the
+        # filter's side included, through any form.
+        self.dagger()
+        path = ["systems", "arcticdb", "variants", "@headline", "queries", "Q1", "warm",
+                "median_us"]
+        forms = {"q1_over_ms": {"max": [{"path": path}],
+                                "only_above": {"sub": [{"path": path}, {"path": path}]}},
+                 "q1_mid_ms": {"median": [{"path": path}]}}
+        for name, value in forms.items():
+            with self.subTest(form=name):
+                self.figure(name, {"what": "ArcticDB's warm Q1 median by another form, ms, on "
+                                   "the Ryzen", "kind": "day", "host": "Linux",
+                                   "format": "{:,.1f}", "scale": 0.001, "value": value})
+                self.insert(f"Again ArcticDB took {{{{{name}}}}} ms on Q1.")
+                self.refused(f"{{{{{name}}}}} shows a figure of Linux-day-",
+                             "queries arcticdb h warm Q1, which the records flag")
+                self.edit("docs/writeup/WRITEUP.template.md", f"{{{{{name}}}}} ms on Q1.",
+                          f"{{{{{name}}}}} ms {{{{q1_flag}}}} on Q1.")
+                self.assertIn("Again ArcticDB took 5.0 ms \u2020 on Q1.", self.renders())
+
+    def test_a_flag_in_a_lowercase_or_quoted_sentence_carries_no_earlier_figure(self):
+        # Review C4-2, B7 and B7b: a sentence that starts lowercase or with a quote mark is a
+        # sentence of its own, so a flag there carries no figure of the one before.
+        self.other_figures()
+        for start in ("tick-store's own Q1 took {{ts_q1_ms}} ms, against",
+                      '"Per stock" costs it: again'):
+            with self.subTest(start=start):
+                text = f"Again ArcticDB took {{{{q1_ms}}}} ms on Q1. {start} {{{{q1_ms}}}} ms " \
+                    "{{q1_flag}} there."
+                self.insert(text)
+                self.refused("{{q1_ms}} shows a figure of Linux-day-", "'Again ArcticDB took")
+                self.edit("docs/writeup/WRITEUP.template.md", text, "")
+
+    def disturbed_kernel(self):
+        """The demo kernel's cases, one of its AVX2 cases entered as disturbed."""
+        self.dagger()
+        name = f"results/bench/Linux-simd_kernel-{COMMIT[:12]}.json"
+        def case(name, rate):
+            return {"case": name, "throughput": {"values_per_second": {"median": rate}}}
+        self.write(name, json.dumps({"header": {"host": "Linux", "commit": COMMIT}, "results": [
+            case("k/w=1/avx2", 2e9), case("k/w=2/avx2", 3e9), case("k/w=1/scalar", 1e9),
+            case("k/w=2/scalar", 1e9)]}))
+        self.write(f"results/disturbances-{COMMIT[:12]}.json", json.dumps({
+            "schema": RESULTS_CODE.DISTURBANCE_SCHEMA, "commit": COMMIT, "how": "by hand",
+            "entries": [{"start": "2026-11-15T03:22:17Z", "end": "2026-11-15T03:22:51Z",
+                         "precision": "second", "what": "a remote login by this project",
+                         "document": name[len("results/"):], "phase": "case",
+                         "case": "k/w=2/avx2", "timed": True}]}))
+        self.figures["kinds"]["kernels"] = {"what": "the demo kernels", "files": {
+            "Linux": "results/bench/Linux-simd_kernel-*.json"}}
+
+    def test_a_count_of_cases_carries_the_flag_of_a_disturbed_case(self):
+        # Review C4-1, B3: a count of cases rests on every case it counts.
+        self.disturbed_kernel()
+        field = ["throughput", "values_per_second", "median"]
+        self.figure("k_fast", {
+            "what": "the kernel's AVX2 widths at or above 2.5 G values/s, on the Ryzen",
+            "kind": "kernels", "host": "Linux", "format": "{:d}",
+            "value": {"count_cases": "k/w=*/avx2", "field": field,
+                      "at_least": {"mul": [{"cases_median": "k/*scalar", "field": field},
+                                           2.5]}}})
+        self.figures["factors"].append({"value": 2.5, "why": "the demo's floor"})
+        self.save()
+        self.insert("Of the kernel's AVX2 widths {{k_fast}} pass it.")
+        self.refused("{{k_fast}} shows a figure of Linux-simd_kernel-", "case k/w=*/avx2, which "
+                     "the records flag")
+        self.figure("k_avx2_flag", {
+            "what": "a dagger if a case of the kernel's AVX2 set is disturbed, on the Ryzen",
+            "kind": "kernels", "host": "Linux", "words": {"true": "\u2020", "false": ""},
+            "value": {"flagged": [{"case": "k/w=*/avx2"}]}})
+        self.edit("docs/writeup/WRITEUP.template.md", "{{k_fast}} pass", "{{k_fast}} {{k_avx2_flag}} pass")
+        self.assertIn("Of the kernel's AVX2 widths 1 \u2020 pass it.", self.renders())
+
     def disturbed_write(self):
         """A remote login during tick-store's flushed write, entered in the day's record."""
         entry = {"start": "2026-11-15T03:22:17Z", "end": "2026-11-15T03:22:51Z",
@@ -1824,11 +1898,11 @@ class SetupMark(unittest.TestCase):
     """Review P1-27: a verdict not met in whole names every part met, those another setup beats
     before the setup mark and the rest after it, so each mark beside it has its part."""
 
-    def value(self, parts):
+    def value(self, parts, word=None):
         mark = RENDER.render_results.SHORT_SETUP + ", while another setup is faster"
         # The word by the parts' raw outcomes alone: the faster note here is a stand-in that
         # render_results.py's own marks would not read.
-        word = RENDER.render_results.class_of([part[2] for part in parts])
+        word = word or RENDER.render_results.class_of([part[2] for part in parts])
         for name, value in (("verdict_parts", lambda *_: ({}, parts, None)),
                             ("marks_of", lambda *_: [(mark,)]),
                             ("verdict_class_of", lambda *_: word)):
@@ -1853,6 +1927,99 @@ class SetupMark(unittest.TestCase):
         value, mark = self.value([("Q1 warm", None, False, None, None, {}),
                                   ("Q2 warm", None, True, None, None, {"faster": {"by": 1}})])
         self.assertEqual(value, f"missed in part; met on Q2 warm {mark}")
+
+    def test_a_row_missed_on_every_counted_part_says_so(self):
+        # Review G1: where every counted part is missed and a part is met and not counted, the
+        # word is of the counted parts, and the parts then named as met are the uncounted ones.
+        parts = [("Q1 warm", None, False, None, None, {}),
+                 ("Q2 warm", None, True, None, None, {"faster": {"by": 1},
+                                                      "unconfirmed": [("QuestDB", True)]}),
+                 ("Q5 cold", None, True, None, None, {"unconfirmed": [("QuestDB", True)]})]
+        value, mark = self.value(parts, word="missed")
+        self.assertEqual(value, f"missed on each counted part; met on Q2 warm {mark}, and on "
+                         "Q5 cold")
+        # With no part met, the word stands alone.
+        value, _ = self.value([("Q1 warm", None, False, None, None, {})], word="missed")
+        self.assertNotIn("counted", value)
+
+class VerdictCarry(unittest.TestCase):
+    """Review C4-3: a verdict's swap mark carries a query figure of the system, setup, query and
+    kind it names (V4), and only a swap of this run, not of the replaced run alone (V2)."""
+
+    def carried(self, earlier, label="Q2 warm"):
+        part = (label, "1.0 ms", True, "x.json", {},
+                {"swapped": [("questdb", "plain", earlier)]})
+        phase = ("queries", "questdb", "plain", "warm", "Q2")
+        resolver = types.SimpleNamespace(root=None, entries={"q2": {}, "verdict:x": {
+            "verdict": {}}}, document_of=lambda path: {})
+        for owner, name, value in (
+                (RENDER, "verdict_parts", lambda *_: ({}, [part], None)),
+                (RENDER, "rested_phases", lambda resolver, name: [(Path("x.json"), phase)]),
+                (RENDER.render_results, "disturbance_entries", lambda root: []),
+                (RENDER.render_results, "disturbed", lambda *_: False),
+                (RENDER.render_results, "swapped_reads", lambda phases, document: True)):
+            self.addCleanup(setattr, owner, name, getattr(owner, name))
+            setattr(owner, name, value)
+        RENDER.flags_carried(resolver, ["QuestDB took {{q2}} ms, {{verdict:x}}."],
+                             {"q2": "283.8", "verdict:x": "met"})
+
+    def test_a_verdict_s_swap_mark_carries_its_query_figure(self):
+        self.carried(earlier=False)
+        with self.assertRaisesRegex(RENDER.Refused, r"\{\{q2\}\} shows a figure of x.json's "
+                                                    r"queries questdb plain warm Q2"):
+            self.carried(earlier=False, label="against QuestDB")
+
+    def test_a_swap_of_the_replaced_run_alone_carries_nothing(self):
+        with self.assertRaisesRegex(RENDER.Refused, r"\{\{q2\}\} shows a figure of x.json's "
+                                                    r"queries questdb plain warm Q2"):
+            self.carried(earlier=True)
+
+
+class ShownReads(unittest.TestCase):
+    """Review C4-1: every form is read through to what it takes, or names no timed phase, or
+    is refused by name; none gives no reads unseen."""
+
+    PATH = ["systems", "arcticdb", "variants", "h", "queries", "Q1", "warm", "median_us"]
+
+    def reads(self, value, **entries):
+        resolver = types.SimpleNamespace(entries={"x": {"value": value}, **entries},
+                                         raw=lambda name: 1)
+        return RENDER.shown_reads(resolver, "x")
+
+    def test_each_operator_reads_its_items_and_filters(self):
+        item = {"path": self.PATH}
+        for key in RENDER.READ_THROUGH:
+            with self.subTest(form=key):
+                value = {"each": ["Q1"], "of": {"path": [*self.PATH[:5], "$", "warm",
+                                                         "median_us"]}} if key == "each" \
+                    else {key: [item, 2]}
+                self.assertIn((self.PATH, "arcticdb", "h"), self.reads(value))
+        for key in ("min", "max", "median"):
+            for side in ("only_above", "only_below"):
+                with self.subTest(form=key, filter=side):
+                    self.assertIn((self.PATH, "arcticdb", "h"),
+                                  self.reads({key: [{"constant": 1}], side: item}))
+
+    def test_document_forms_and_counts_of_cases_read_what_they_take(self):
+        self.assertEqual(self.reads({"items": self.PATH, "field": ["x"]}),
+                         [(self.PATH, "arcticdb", "h")])
+        self.assertEqual(self.reads({"where": self.PATH, "match": {}, "field": ["x"]}),
+                         [(self.PATH, "arcticdb", "h")])
+        self.assertEqual(self.reads({"count": self.PATH}), [(self.PATH, "arcticdb", "h")])
+        self.assertEqual(self.reads({"count_cases": "k/w=*/avx2", "field": ["x"],
+                                     "at_least": {"path": self.PATH}}),
+                         [(["case", "k/w=*/avx2"], None, None), (self.PATH, "arcticdb", "h")])
+
+    def test_a_form_that_reads_no_timed_phase_gives_nothing(self):
+        for key in RENDER.NO_PHASE_FORMS:
+            with self.subTest(form=key):
+                self.assertEqual(self.reads({key: {}}), [])
+
+    def test_a_form_the_rule_cannot_read_is_refused_by_name(self):
+        with self.assertRaisesRegex(RENDER.Refused, r"x\}\}: the flag rule cannot tell what the "
+                                                    r"form \['frob'\] rests on"):
+            self.reads({"frob": [{"path": self.PATH}]})
+
 
 class Prover(Tree):
     """Review WD-8: faults counted without the control, the record in its own terms."""

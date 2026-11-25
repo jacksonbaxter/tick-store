@@ -1,0 +1,14 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 3bc53b9..763e87e 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1899,8 +1899,7 @@ def shown_reads(resolver, name, seen=()):
+                              for read in walk_reads(substitute(expression["of"], item))]
+                 else:
+                     reads = walk_reads(over) + walk_reads(expression.get("of"))
+-                return reads + walk_reads([expression.get("only_above"),
+-                                           expression.get("only_below")])
++                return reads
+         raise Refused(f"{show(name)}: the flag rule cannot tell what the form {sorted(expression)} "
+                       "rests on; read it in shown_reads or name it among the forms that read no "
+                       "timed phase")

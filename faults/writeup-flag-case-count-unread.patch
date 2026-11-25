@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 3bc53b9..0db0cb8 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1881,7 +1881,7 @@ def shown_reads(resolver, name, seen=()):
+                 return walk_reads({"figure": taken})
+         for key in ("case", "cases_median", "count_cases"):
+             if isinstance(expression.get(key), str):
+-                return [(["case", expression[key]], None, None)] + \
++                return ([] if key == "count_cases" else [(["case", expression[key]], None, None)]) + \
+                     walk_reads(expression.get("at_least"))
+         if any(key in expression for key in NO_PHASE_FORMS):
+             return []

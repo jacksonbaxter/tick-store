@@ -1,14 +1,13 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
-index 64c8cfb..82ed523 100644
+index 3bc53b9..be8cc7f 100644
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -1855,8 +1855,7 @@ def shown_reads(resolver, name, seen=()):
-         for key in ("case", "cases_median"):
-             if isinstance(expression.get(key), str):
-                 return [(["case", expression[key]], None, None)]
--        return [read for key in ("div", "mul", "sub", "add", "sum") if key in expression
--                for read in walk_reads(expression[key])]
-+        return []
-     found += walk_reads(entry.get("value"))
-     if "target" in entry:
-         spec = entry["target"]
+@@ -1892,6 +1892,8 @@ def shown_reads(resolver, name, seen=()):
+             row = resolver.target_row(expression["target_values"], name)
+             return [read for part in row.get("parts", []) for read in walk_reads(part.get("value"))]
+         for key in READ_THROUGH:
++            if key in expression and key in ("div", "mul", "sub", "add", "sum"):
++                return []
+             if key in expression:
+                 over = expression[key]
+                 if key == "each" and isinstance(over, list) and "of" in expression:

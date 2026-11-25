@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 3bc53b9..4e26c5c 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -2082,7 +2082,7 @@ def flags_carried(resolver, blocks, values):
+                         carried.update(phase_key(read) for _, read in notes.get("disturbed", []))
+                         # A swap mark names the system and setup; the part, a query and kind.
+                         query, _, kind = str(part[0]).partition(" ")
+-                        if kind in ("warm", "cold"):
++                        if False:
+                             carried.update(("queries", system, variant, kind, query)
+                                            for system, variant, earlier in
+                                            notes.get("swapped") or [] if not earlier)

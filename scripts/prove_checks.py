@@ -3274,6 +3274,23 @@ FAULTS = (
           "FAIL: test_a_write_verdict_gives_the_input_clause_short_and_the_method_in_full (__main__.Marks"),
     Fault("writeup-input-pointer-unchecked", "py-scripts", "render_writeup.py takes a short input clause pointing to a method section that does not say what engine-only holds", CHECK_FAILED,
           "FAIL: test_a_short_input_clause_where_the_method_does_not_say_engine_only (__main__.Marks"),
+    # Pass 7: the uncounted missed word (review G1), the flag rule's reads (C4-1, C4-2, C4-3).
+    Fault("writeup-uncounted-missed-unsaid", "py-scripts", "render_writeup.py gives a row missed on every counted part, with a part met and not counted, the bare word missed, so the parts it names as met read as counted", CHECK_FAILED,
+          "FAIL: test_a_row_missed_on_every_counted_part_says_so (__main__.SetupMark"),
+    Fault("writeup-flag-filtered-min-unread", "py-scripts", "render_writeup.py reads nothing through a min, max or median, so a figure built by one rests on no phase and its flag is never asked for", CHECK_FAILED,
+          "FAIL: test_a_figure_through_a_filtered_min_or_max_or_a_median_carries_its_flag (__main__.Marks"),
+    Fault("writeup-flag-filter-unread", "py-scripts", "render_writeup.py reads an operator's items but not its only_above or only_below filter", CHECK_FAILED,
+          "FAIL: test_each_operator_reads_its_items_and_filters (__main__.ShownReads"),
+    Fault("writeup-flag-unknown-form-unread", "py-scripts", "render_writeup.py gives no reads for a form the flag rule does not know, instead of refusing it by name", CHECK_FAILED,
+          "FAIL: test_a_form_the_rule_cannot_read_is_refused_by_name (__main__.ShownReads"),
+    Fault("writeup-flag-case-count-unread", "py-scripts", "render_writeup.py reads no bench case a count of cases takes, so a count over a disturbed case gets no dagger", CHECK_FAILED,
+          "FAIL: test_a_count_of_cases_carries_the_flag_of_a_disturbed_case (__main__.Marks"),
+    Fault("writeup-sentence-lowercase-joined", "py-scripts", "render_writeup.py joins a sentence that starts lowercase or with a quote mark to the one before, so a flag there carries the earlier sentence's figure", CHECK_FAILED,
+          "FAIL: test_a_flag_in_a_lowercase_or_quoted_sentence_carries_no_earlier_figure (__main__.Marks"),
+    Fault("writeup-flag-swap-carry-ignored", "py-scripts", "render_writeup.py takes no swap mark of a verdict as carrying the query figure beside it", CHECK_FAILED,
+          "FAIL: test_a_verdict_s_swap_mark_carries_its_query_figure (__main__.VerdictCarry"),
+    Fault("writeup-flag-earlier-swap-carries", "py-scripts", "render_writeup.py lets a verdict's swap mark of the replaced run alone carry this run's figure", CHECK_FAILED,
+          "FAIL: test_a_swap_of_the_replaced_run_alone_carries_nothing (__main__.VerdictCarry"),
     # The step itself on the committed page. Its baseline passes only once WRITEUP.md is
     # rendered, when every results file it reads is committed (docs/TASKS.md).
     Fault("writeup-template-not-rendered", "writeup-check", "the essay's template reworded "

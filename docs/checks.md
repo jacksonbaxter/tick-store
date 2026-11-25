@@ -113,7 +113,9 @@ verdict the replaced run judges otherwise rests no claim; and render_results.py'
 sentence says tick-store writes faster than a system whose clock holds its disk reads, that a move
 between the replaced run and this one is said with its cause not measured and not known, and that
 what the replaced record keeps is said as its fields give it, hold on the essay as on the other
-pages. A figure read on one host must be
+pages. A verdict missed on every part it counts while a part is met by the rule and not counted
+reads "missed on each counted part", so the parts it then names as met are those not counted. A
+figure read on one host must be
 described as that host's. The essay must run 2,500 to 4,060 words as `LC_ALL=C wc -w` counts the
 rendered page, its tables, marks and generated line included, and a page that macOS's `wc -w` in a
 UTF-8 locale counts otherwise is refused, as that count ends a word at a dagger with no space after
@@ -124,8 +126,16 @@ block showing its kind's figures. A flag stands straight after a token whose fig
 it flags: a query and kind or a class's write, of its system and, where both name one, its
 variant, or a bench case; a figure whose expression fixes no system is not beside it. Every
 figure from a phase the disturbance records place a disturbance in, or the record flags as timed
-while pages were swapped in, also through a ratio, product, sum or difference of it, carries in its sentence
-or table row a flag of that phase or the verdict whose marks name it. A write verdict's input
+while pages were swapped in, carries in its sentence or table row a flag of that phase or the
+verdict whose marks name it, through whatever its expression reads: each item and filter of a
+ratio, product, sum, difference, minimum, maximum, median or other operator, a results file's
+items, and every bench case a median or count over cases takes, a same held to its first item
+and a minimum or maximum of figures with no filter to the one it takes. A form that reads the
+code, the targets or a codec or size field names no timed phase, and a form the rule cannot read
+is refused by name. A sentence ends at ., ! or ? before a letter of either case, a token, a bold
+lead-in, a code span, a bracket or a quote mark, so one starting "tick-store" stands alone. A
+verdict's swap mark carries a query figure of its system, setup, query and kind, and only a
+swap of this run. A write verdict's input
 clause may stand short, its bytes kept, only where it points to the method section and that section
 says what engine-only may still hold; the section gives `render_results.py`'s input note whole,
 through a token that gives the note alone. A not-counted token stands in the sentence or table row
@@ -141,9 +151,11 @@ number after a letter, as in a version, and the content of the profiler and coun
 file and host with its figure's; hold a flag to the side of a ratio it marks; hold a figure of a
 fuzzing or gate run, a read-back or a capacity part to a flag, though their verdicts carry the
 marks; tie a not-counted token of a query part to the part's system, only to its query and kind;
-check the words an exception that names its own commit gives; or hold the sort's net, whose guard
+check the words an exception that names its own commit gives; hold a flag that prints no mark
+to carry nothing by a test, which the page's own check does on today's data; or hold the sort's net, whose guard
 that it is a cost lives in the list's `only_above` and in no check. "Straight after" is the token before the flag in
-its cell or sentence, so words between them pass. Two right pages are refused: a flag in a table
+its cell or sentence, so words between them pass, and an abbreviation's stop before a word ends a
+sentence too; the essay has none. Two right pages are refused: a flag in a table
 column of its own, not straight after its figure, and the input note after a lead-in such as "On
 inputs:", which joins it to other words.
 

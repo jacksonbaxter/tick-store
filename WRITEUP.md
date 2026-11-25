@@ -4,7 +4,7 @@ tick-store keeps a trading day of Nasdaq TotalView-ITCH 5.0, 268,744,780 message
 8.25 GB, in a store 4.69 times smaller than the feed, 1.76 GB
 on disk against 3.09 GB for Parquet's smallest setup, and rebuilds the feed from it.
 On a 2018 four-core AMD Ryzen running Linux (the Ryzen), it answers an hour of a stock in
-74.04 ms warm, against 44.58 ms † († marks a figure timed during a login, a backup job or, for a query, swapping on the host) for ArcticDB with a table per stock, while a
+74.04 ms warm, against 44.58 ms † († marks a figure with a timing during a login, a backup or, for a query, swapping on the host) for ArcticDB with a table per stock, while a
 second and a millisecond across every stock take it 8.7 and 167 times as long as
 ArcticDB and QuestDB, and the whole-day sum of a column 16.8 times as long as
 QuestDB † does.
@@ -35,10 +35,10 @@ and the replaced run, an earlier measurement on older code, so neither confirms 
 
 **Data.** The reference day is 30 December 2019, from Nasdaq's public sample files, and a second
 day is 30 October 2019; the round trip and the bit-flip check ran on both days on the M4, and the
-round trip on the reference day on the Ryzen too. The round trip compares the
+round trip on the reference day on the Ryzen. The round trip compares the
 SHA-256 of the rebuilt stream with the source's.
 
-**Hosts.** Every pinned figure comes from the Ryzen: AMD Ryzen Embedded V1605B, 4 cores, 8 threads, with
+**Hosts.** Every pinned figure comes from the Ryzen: AMD Ryzen Embedded V1605B, 4 cores, 8 threads,
 15.33 GiB of memory. Each benchmark is pinned to a core, and
 refused if the core's hyperthread sibling was over 5% busy. Context
 figures come from an Apple M4 Max laptop, "the M4": unpinned, no hardware counters.
@@ -70,7 +70,7 @@ a time or stock filter reads the footer alone.
 65 on the day ([docs/store.md](docs/store.md)). Inside a segment, records are sorted by
 stock locate, the day's 16-bit number for each stock, and kept in file order within each stock, so
 a single-stock query reads a range of each of the 39 columns. The `locate`
-column, despite its name, holds each record's position in the segment's file order: the
+column holds each record's position in the segment's file order: the
 permutation that puts the sorted runs back in file order, which a window across every stock must
 decode whole. Columns are cut into pieces of 16,384 values, the unit read and
 checked, each holding 4 codec blocks of 4,096
@@ -280,7 +280,7 @@ names systems timed while the host swapped memory.
 | Q2 warm median | ≤ 16.9 ms (DuckDB on a small Parquet store, preprint) | 74.04 ms; M4 25.28 ms | 4.38x; 8.38 ms | missed; M4 missed | 100 ns a row |
 | Q3 warm median | ≤ 0.41 ms (QuestDB vendor benchmark) | 36.07 ms; M4 15.06 ms | 88x; 37x | missed; M4 missed | No stored aggregate |
 | Q4 cold mean | ≤ 10 ms (TimescaleDB, order-book preprint) | 356.09 ms; M4 136.16 ms | 36x; 14x | missed; M4 missed | 35.1 MB read cold |
-| Lowest median and p99 of the fixed setups, each query | same machine | warm medians in the table at a glance | 8.7x on Q1; 167x on Q4; 16.8x on Q5 | missed; met on Q2 warm, Q2 cold, Q3 warm and Q3 cold against each system's chosen setup, while ArcticDB with a table per stock is faster, and on Q5 cold; met, not counted: swapping memory in both runs (ArcticDB, QuestDB); swap-in: ArcticDB, QuestDB, tick-store | Q1 to Q5 under Queries |
+| Lowest median and p99 of the fixed setups, each query | same machine | warm medians in the table at a glance | 8.7x on Q1; 167x on Q4; 16.8x on Q5 | missed on each counted part; met on Q2 warm, Q2 cold, Q3 warm and Q3 cold against each system's chosen setup, while ArcticDB with a table per stock is faster, and on Q5 cold; met, not counted: swapping memory in both runs (ArcticDB, QuestDB); swap-in: ArcticDB, QuestDB, tick-store | Q1 to Q5 under Queries |
 
 Writes against each other system, on both clocks, without a flush:
 missed; inputs not alike: tick-store's input is in memory before the clock starts, with 250,916,864 B read from the device inside the clock; Parquet's, ArcticDB's and QuestDB's are read from disk inside it, with 18,411,094,016 to 21,521,625,088 B; engine-only may still hold those reads ([the method](#how-it-was-measured)).
@@ -307,7 +307,7 @@ executions from a fuzzing run, not hide a finding: the
 [runs by target](RESULTS.md#g-3-runs-by-target) give each target's executions.
 
 The checks and the faults that prove them are in the README; the prover's
-record covers 99 of its 697 listed faults.
+record covers 99 of its 708 listed faults.
 
 ## Limits
 

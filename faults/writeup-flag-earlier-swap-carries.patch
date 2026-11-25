@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 3bc53b9..41eeebb 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -2085,7 +2085,7 @@ def flags_carried(resolver, blocks, values):
+                         if kind in ("warm", "cold"):
+                             carried.update(("queries", system, variant, kind, query)
+                                            for system, variant, earlier in
+-                                           notes.get("swapped") or [] if not earlier)
++                                           notes.get("swapped") or [])
+             for name in names:
+                 entry = resolver.entries.get(name) or {}
+                 value = values.get(name)

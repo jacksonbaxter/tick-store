@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 3bc53b9..f8c8337 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1891,6 +1891,8 @@ def shown_reads(resolver, name, seen=()):
+         if isinstance(expression.get("target_values"), dict):
+             row = resolver.target_row(expression["target_values"], name)
+             return [read for part in row.get("parts", []) for read in walk_reads(part.get("value"))]
++        if any(key in expression for key in ("min", "max", "median")):
++            return []
+         for key in READ_THROUGH:
+             if key in expression:
+                 over = expression[key]

@@ -1,10 +1,11 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 3bc53b9..58090d8 100644
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -1311,7 +1311,7 @@
-         word = verdict_class_of(parts, {}, name)
-     if not marks:
+@@ -1500,7 +1500,7 @@ def verdict_value(resolver, name, entry, marks=True):
          return word
+     if word == "missed" and any(part[2] is True for part in parts or []):
+         word = UNCOUNTED_MISSED
 -    shown = [mark for mark in dict.fromkeys(forms[-1] for forms in marks_of(row, parts, name))
 +    shown = [mark for mark in dict.fromkeys(forms[0] for forms in marks_of(row, parts, name))
               if mark not in word]

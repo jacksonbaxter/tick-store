@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 3bc53b9..75b6a0b 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -249,7 +249,7 @@ def sentences_of(block):
+     if block.lstrip().startswith("|"):
+         return [block]
+     text = " ".join(block.split())
+-    return [part for part in re.split(r"(?<=[.!?])\s+(?=[A-Za-z*`{(\[\"'\u201c\u2018])", text)
++    return [part for part in re.split(r"(?<=[.!?])\s+(?=[A-Z*`{(\[])", text)
+             if part]
+ 
+ 

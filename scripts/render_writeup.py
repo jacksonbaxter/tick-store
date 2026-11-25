@@ -244,11 +244,13 @@ def blocks_of(body):
 
 def sentences_of(block):
     """A block's sentences: a table row is one, and prose splits after ., ! or ? before a
-    capital, a token or a bold lead-in."""
+    letter, a token, a bold lead-in, a code span, a bracket or a quote mark; a sentence may start
+    lowercase, as "tick-store" or "zstd" does (review C4-2)."""
     if block.lstrip().startswith("|"):
         return [block]
     text = " ".join(block.split())
-    return [part for part in re.split(r"(?<=[.!?])\s+(?=[A-Z*`{(\[])", text) if part]
+    return [part for part in re.split(r"(?<=[.!?])\s+(?=[A-Za-z*`{(\[\"'\u201c\u2018])", text)
+            if part]
 
 
 def scoped(not_results, body):
@@ -1474,6 +1476,9 @@ def marks_of(row, parts, name):
     return forms + ([(clause, short)] if clause else [])
 
 
+UNCOUNTED_MISSED = "missed on each counted part"
+
+
 def verdict_value(resolver, name, entry, marks=True):
     """A target's verdict, the Targets block's own: render_results.py judges the row on its
     files, its verdict code names the parts the token takes, and its marks stand beside it, each
@@ -1487,8 +1492,14 @@ def verdict_value(resolver, name, entry, marks=True):
             if len(parts) > 1 else render_results.core_verdict(parts)
     else:
         word = verdict_class_of(parts, {}, name)
+    # A row missed while a part of it is met by the rule and not counted: the class is the
+    # counted parts', so the word says so, and the parts then named as met are the uncounted
+    # ones (review G1). render_results.py's class is missed only where every counted part is,
+    # so any part met there is one it does not count.
     if not marks:
         return word
+    if word == "missed" and any(part[2] is True for part in parts or []):
+        word = UNCOUNTED_MISSED
     shown = [mark for mark in dict.fromkeys(forms[-1] for forms in marks_of(row, parts, name))
              if mark not in word]
     # On a verdict not met in whole, the setup mark names the parts it stands beside, and the
@@ -1803,14 +1814,28 @@ def flag_phase(read):
     return ["queries", read.get("query"), read.get("kind")]
 
 
+# Forms that read the code, the targets, the flag words or a results file's codec and size
+# fields: none is a timed phase a disturbance record or a swap record can flag (review C4-1).
+NO_PHASE_FORMS = ("bar", "constant", "lines", "count_matches", "prover", "verdict_is",
+                  "not_counted", "method_input_note", "flagged", "flagged_queries",
+                  "codec_columns", "codec_column", "least", "codec", "best", "store_bits")
+# Forms read through: a figure built by one rests on everything its items and filters read.
+READ_THROUGH = ("sub", "add", "mul", "div", "sum", "log2", "pow2", "min", "max", "median",
+                "each", "all", "any", "above", "below", "is", "concat", "prefix", "not")
+
+
 def shown_reads(resolver, name, seen=()):
     """What the value a token prints rests on: (path, system, variant) for each phase it
     takes, the system and variant None where the expression does not fix them. A path through
     systems names both; a lowest_value or lowest_system, the system it finds, in its headline
     variant; a min_variant, its system; a figure, that entry's; a same, its first item's, the
-    value it prints; a min or max, the item it takes; a bench case or a median over cases, the
-    path ["case", its pattern]; a ratio, product, sum or difference, every item's; a target's
-    figure, its part's paths and cases (review C3-5)."""
+    value it prints; a min or max of figures with no filter, the item it takes; a bench case, a
+    median over cases or a count of cases, the path ["case", its pattern], and the count's
+    floor; a document's items, a where or a count, their path; a target's values, its parts';
+    every other operator, each item's and each filter's (review C4-1); a target's figure, its
+    part's paths and cases (review C3-5). A form that reads no timed phase gives nothing
+    (NO_PHASE_FORMS); a form this does not know is refused by name, so no figure rests on
+    nothing unseen."""
     entry = resolver.entries.get(name) or {}
     found = []
     def system_of(path):
@@ -1821,6 +1846,9 @@ def shown_reads(resolver, name, seen=()):
         variant = path[path.index("variants") + 1] if "variants" in path and \
             path.index("variants") + 1 < len(path) else None
         return system, variant
+    def path_read(items):
+        path = [item for item in items if isinstance(item, str)]
+        return [(path, *system_of(path))]
     def walk_reads(expression):
         if isinstance(expression, list):
             return [read for item in expression for read in walk_reads(item)]
@@ -1828,8 +1856,7 @@ def shown_reads(resolver, name, seen=()):
             return []
         for key in ("path", "engine_only"):
             if isinstance(expression.get(key), list):
-                path = [item for item in expression[key] if isinstance(item, str)]
-                return [(path, *system_of(path))]
+                return path_read(expression[key])
         for key in ("lowest_value", "lowest_system"):
             if isinstance(expression.get(key), dict):
                 spec = expression[key]
@@ -1852,11 +1879,31 @@ def shown_reads(resolver, name, seen=()):
                 values = {item["figure"]: resolver.raw(item["figure"]) for item in items}
                 taken = (min if key == "min" else max)(values, key=values.get)
                 return walk_reads({"figure": taken})
-        for key in ("case", "cases_median"):
+        for key in ("case", "cases_median", "count_cases"):
             if isinstance(expression.get(key), str):
-                return [(["case", expression[key]], None, None)]
-        return [read for key in ("div", "mul", "sub", "add", "sum") if key in expression
-                for read in walk_reads(expression[key])]
+                return [(["case", expression[key]], None, None)] + \
+                    walk_reads(expression.get("at_least"))
+        if any(key in expression for key in NO_PHASE_FORMS):
+            return []
+        for key in ("items", "count", "where"):
+            if isinstance(expression.get(key), list):
+                return path_read(expression[key])
+        if isinstance(expression.get("target_values"), dict):
+            row = resolver.target_row(expression["target_values"], name)
+            return [read for part in row.get("parts", []) for read in walk_reads(part.get("value"))]
+        for key in READ_THROUGH:
+            if key in expression:
+                over = expression[key]
+                if key == "each" and isinstance(over, list) and "of" in expression:
+                    reads = [read for item in over
+                             for read in walk_reads(substitute(expression["of"], item))]
+                else:
+                    reads = walk_reads(over) + walk_reads(expression.get("of"))
+                return reads + walk_reads([expression.get("only_above"),
+                                           expression.get("only_below")])
+        raise Refused(f"{show(name)}: the flag rule cannot tell what the form {sorted(expression)} "
+                      "rests on; read it in shown_reads or name it among the forms that read no "
+                      "timed phase")
     found += walk_reads(entry.get("value"))
     if "target" in entry:
         spec = entry["target"]

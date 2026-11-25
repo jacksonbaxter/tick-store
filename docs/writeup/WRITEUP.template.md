@@ -35,10 +35,10 @@ and the replaced run, an earlier measurement on older code, so neither confirms 
 
 **Data.** The reference day is 30 December 2019, from Nasdaq's public sample files, and a second
 day is 30 October 2019; the round trip and the bit-flip check ran on both days on the M4, and the
-round trip on the reference day on the Ryzen too. The round trip compares the
+round trip on the reference day on the Ryzen. The round trip compares the
 SHA-256 of the rebuilt stream with the source's.
 
-**Hosts.** Every pinned figure comes from the Ryzen: {{cap_cpu}}, with
+**Hosts.** Every pinned figure comes from the Ryzen: {{cap_cpu}},
 {{cap_mem_gib}} GiB of memory. Each benchmark is pinned to a core, and
 refused if the core's hyperthread sibling was over {{code:sibling_busy_limit_pct}}% busy. Context
 figures come from an Apple M4 Max laptop, "the M4": unpinned, no hardware counters.
@@ -70,7 +70,7 @@ a time or stock filter reads the footer alone.
 {{ss_segments}} on the day ([docs/store.md](docs/store.md)). Inside a segment, records are sorted by
 stock locate, the day's 16-bit number for each stock, and kept in file order within each stock, so
 a single-stock query reads a range of each of the {{code:column_count}} columns. The `locate`
-column, despite its name, holds each record's position in the segment's file order: the
+column holds each record's position in the segment's file order: the
 permutation that puts the sorted runs back in file order, which a window across every stock must
 decode whole. Columns are cut into pieces of {{code:piece_values}} values, the unit read and
 checked, each holding {{code:piece_codec_blocks}} codec blocks of {{code:column_block_values}}
