@@ -20,6 +20,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 import shutil
 import statistics
 import subprocess
@@ -1181,6 +1182,14 @@ class Marks(Tree):
                                         commit="67ae574f5666" + "0" * 28)))
         self.write("scripts/data_pins.json", json.dumps({"replaced_comparison_files": {
             old.name: hashlib.sha256(old.read_bytes()).hexdigest()}}))
+        # The verdict is judged on the replaced run's file too, so a kind declares it, under its
+        # pin, at its own commit (review C2-9).
+        self.figures["kinds"]["replaced-day"] = {
+            "what": "the demo day's replaced run",
+            "files": {"Linux": "results/compare/replaced/Linux-day-*.json"},
+            "pin": {"name": "replaced_comparison_files", "says": "replaced run"},
+            "exception": {"why": "an earlier run kept beside this one", "says": "the replaced run",
+                          "own_commit": True}}
         # The day's writes did not start alike, so the method section gives the input note.
         self.figures["figures"]["method_note"] = {
             "what": "the input note of the day's method, on the Ryzen", "kind": "day",
@@ -1293,7 +1302,89 @@ class Marks(Tree):
         self.dagger()
         self.edit("docs/writeup/WRITEUP.template.md", "ArcticDB took {{q1_ms}} ms {{q1_flag}}",
                   "ArcticDB {{q1_flag}} took {{q1_ms}} ms")
-        self.refused("{{q1_flag}} does not stand straight after a figure of the phase it flags")
+        self.refused("{{q1_flag}} does not stand straight after a figure of the phase, system "
+                     "and variant it flags")
+
+    def other_figures(self):
+        """Beside the dagger's ArcticDB Q1: tick-store's warm Q1, ArcticDB's in a second setup,
+        the lowest of the two systems' and a ratio of ArcticDB's."""
+        self.dagger()
+        path = self.root / f"results/compare/Linux-day-{COMMIT[:12]}.json"
+        document = json.loads(path.read_text())
+        document["systems"]["tickstore"]["variants"]["h"]["queries"] = {
+            "Q1": {"warm": {"median_us": 9000, "swap_timed": {"flagged": False}}}}
+        document["systems"]["arcticdb"]["variants"]["p"] = {"queries": {
+            "Q1": {"warm": {"median_us": 4000, "swap_timed": {"flagged": True}}}}}
+        path.write_text(json.dumps(document))
+        def q1(system, variant="@headline"):
+            return {"what": f"{system}'s warm Q1 median in {variant}, ms, on the Ryzen",
+                    "kind": "day", "host": "Linux", "format": "{:,.1f}", "scale": 0.001,
+                    "value": {"path": ["systems", system, "variants", variant, "queries", "Q1",
+                                       "warm", "median_us"]}}
+        self.figures["figures"]["ts_q1_ms"] = q1("tickstore")
+        self.figures["figures"]["p_q1_ms"] = q1("arcticdb", "p")
+        self.figures["figures"]["low_q1_ms"] = {
+            "what": "the lower warm Q1 median of the two, ms, on the Ryzen", "kind": "day",
+            "host": "Linux", "format": "{:,.1f}", "scale": 0.001, "value": {"lowest_value": {
+                "systems": ["tickstore", "arcticdb"], "path": ["queries", "Q1", "warm",
+                                                           "median_us"]}}}
+        self.figures["figures"]["low_q1_system"] = {
+            "what": "the system of that median, on the Ryzen", "kind": "day", "host": "Linux",
+            "format": "system", "value": {"lowest_system": {
+                "systems": ["tickstore", "arcticdb"], "path": ["queries", "Q1", "warm",
+                                                           "median_us"]}}}
+        self.figures["figures"]["ratio_q1"] = {
+            "what": "ArcticDB's warm Q1 median in ms over a thousand, on the Ryzen",
+            "value": {"mul": [{"figure": "q1_ms"}, 0.001]}, "format": "{:.4f}"}
+        self.figures["figures"]["low_q1_flag"] = {
+            "what": "a dagger if the lower system's warm Q1 is swapped in, on the Ryzen",
+            "kind": "day", "host": "Linux", "words": {"true": "\u2020", "false": ""},
+            "value": {"flagged": [{"system": {"figure": "low_q1_system"}, "query": "Q1",
+                                   "kind": "warm"}]}}
+        self.figures["figures"]["p_q1_flag"] = {
+            "what": "a dagger if ArcticDB's warm Q1 in its second setup is swapped in, on the "
+            "Ryzen", "kind": "day", "host": "Linux", "words": {"true": "\u2020", "false": ""},
+            "value": {"flagged": [{"system": "arcticdb", "variant": "p", "query": "Q1",
+                                   "kind": "warm"}]}}
+        self.save()
+        self.insert("Tick-store took {{ts_q1_ms}} ms, its second setup ArcticDB "
+                    "{{p_q1_ms}} ms {{p_q1_flag}} and by system {{low_q1_system}} "
+                    "{{low_q1_ms}} ms {{low_q1_flag}} and a ratio {{ratio_q1}}.")
+
+    def test_a_flag_beside_another_system_s_figure(self):
+        # Review C2-10: the system a flag reads is compared with the figure's, named as text,
+        # by a token, or found by a lowest_value; the variant where both name one.
+        self.other_figures()
+        page = self.renders()
+        self.assertIn("ArcticDB 4.0 ms \u2020 and by system ArcticDB 5.0 ms \u2020 and", page)
+        moves = [("{{ts_q1_ms}} ms,", "{{ts_q1_ms}} ms {{q1_flag}},", "{{q1_flag}}"),
+                 ("{{ts_q1_ms}} ms,", "{{ts_q1_ms}} ms {{low_q1_flag}},", "{{low_q1_flag}}")]
+        for old, new, flag in moves:
+            with self.subTest(flag=flag):
+                self.edit("docs/writeup/WRITEUP.template.md", old, new)
+                self.refused(f"{flag} does not stand straight after a figure of the phase, "
+                             "system and variant it flags")
+                self.edit("docs/writeup/WRITEUP.template.md", new, old)
+
+    def test_a_flag_beside_its_system_s_figure_in_another_setup(self):
+        self.other_figures()
+        self.edit("docs/writeup/WRITEUP.template.md", "{{p_q1_ms}} ms {{p_q1_flag}}",
+                  "{{p_q1_ms}} ms {{q1_flag}} {{p_q1_flag}}")
+        self.refused("{{q1_flag}} does not stand straight after a figure of the phase, system "
+                     "and variant it flags")
+        self.edit("docs/writeup/WRITEUP.template.md", "{{p_q1_ms}} ms {{q1_flag}} {{p_q1_flag}}",
+                  "{{p_q1_ms}} ms {{p_q1_flag}}")
+        self.edit("docs/writeup/WRITEUP.template.md", "a ratio {{ratio_q1}}.",
+                  "a ratio {{ratio_q1}}, and again {{q1_ms}} ms {{p_q1_flag}}.")
+        self.refused("{{p_q1_flag}} does not stand straight after a figure of the phase, system "
+                     "and variant it flags")
+
+    def test_a_flag_beside_a_figure_whose_system_is_not_fixed(self):
+        self.other_figures()
+        self.edit("docs/writeup/WRITEUP.template.md", "a ratio {{ratio_q1}}.",
+                  "a ratio {{ratio_q1}} {{q1_flag}}.")
+        self.refused("{{q1_flag}} stands after {{ratio_q1}}, whose figure's system its "
+                     "expression does not fix")
 
     def test_an_input_note_where_the_writes_started_alike(self):
         self.write(f"results/compare/Linux-day-{COMMIT[:12]}.json",
@@ -1306,12 +1397,84 @@ class Marks(Tree):
         # Review R-B1: the changed outcome's mark in its short form, both outcomes, which way
         # the change leans and the one counted.
         self.assertIn("The day write is missed; met on this run and missed on the replaced one, "
-                      "a change in tick-store's favour, counted as missed; inputs not alike, by each write's record: tick-store's input is in "
-                      "memory before the clock starts, with 0 B read from the device inside the "
-                      "clock; ArcticDB's is read from disk inside it", page)
+                      "a change in tick-store's favour, counted as missed; inputs not alike: "
+                      "tick-store's input is in memory before the clock starts, with 0 B read "
+                      "from the device inside the clock; ArcticDB's is read from disk inside it, "
+                      "with 0 B; engine-only: see [the method](#how-it-was-measured).", page)
         # The input clause stands for the long note; the moves and the replaced record's
         # sentence are the targets table's, linked, not carried.
         self.assertNotIn("from each write's record: tick-store's input, `input`", page)
+
+    def test_a_write_verdict_gives_the_input_clause_short_and_the_method_in_full(self):
+        # Pass 4: beside the verdict, whose input was where and the bytes each side's records
+        # show; what engine-only holds, in the method section the clause points to.
+        ours, theirs = write_record(190.0, 10), write_record(381.0, 1)
+        ours["detail"]["device_read"]["bytes"] = 7
+        theirs["detail"]["device_read"]["bytes"] = 9000
+        self.write(f"results/compare/Linux-day-{COMMIT[:12]}.json", json.dumps(day(ours, theirs)))
+        page = self.renders()
+        verdict = next(line for line in page.splitlines() if line.startswith("The day write"))
+        self.assertIn("inputs not alike: tick-store's input is in memory before the clock "
+                      "starts, with 7 B read from the device inside the clock; ArcticDB's is "
+                      "read from disk inside it, with 9,000 B; engine-only: see [the method]"
+                      "(#how-it-was-measured).", verdict)
+        self.assertNotIn(RESULTS_CODE.ENGINE_ONLY_READS, verdict)
+        self.assertIn(RESULTS_CODE.ENGINE_ONLY_READS,
+                      " ".join(RENDER.section_of(page, RENDER.METHOD_SECTION).split()))
+
+    def test_a_short_input_clause_where_the_method_does_not_say_engine_only(self):
+        own = RENDER.render_results.method_input_note
+        self.addCleanup(setattr, RENDER.render_results, "method_input_note", own)
+        RENDER.render_results.method_input_note = lambda document: (own(document) or "").replace(
+            "; " + RESULTS_CODE.ENGINE_ONLY_READS, "") or None
+        with self.assertRaisesRegex(RENDER.Refused, re.escape(
+                f"{{{{verdict:t11}}}} points to {RENDER.METHOD_SECTION!r} for what engine-only "
+                "holds, and that section does not say it")):
+            RENDER.render(self.root)
+
+    def test_an_input_clause_in_neither_form_is_refused(self):
+        own = RENDER.verdict_value
+        self.addCleanup(setattr, RENDER, "verdict_value", own)
+        RENDER.verdict_value = lambda resolver, name, entry, marks=True: own(
+            resolver, name, entry, marks).replace("; " + RENDER.INPUT_POINTER, "")
+        with self.assertRaisesRegex(RENDER.Refused, r"\{\{verdict:t11\}\} drops a mark "
+                                                    r"RESULTS.md sets beside its verdict: "
+                                                    r".inputs not alike, by each write's record"):
+            RENDER.render(self.root)
+
+    def test_a_verdict_judged_on_the_replaced_run_names_it_in_the_commit_sentence(self):
+        # Review C2-9: no token reads the replaced run's file, and the verdict's marks give its
+        # figures, so the commit sentence names that run at its commit.
+        self.assertIn("at commit `0123456789ab`, except the replaced run, at `67ae574f5666`.",
+                      self.renders())
+        del self.figures["kinds"]["replaced-day"]
+        self.save()
+        self.refused("T-11 on Linux, judged on its replaced run, reads "
+                     "results/compare/replaced/Linux-day-*.json, and 0 kinds of the figure list "
+                     "name that pattern")
+
+    def test_a_method_note_token_that_prints_more_than_the_note(self):
+        # Review C2, U4: the note's own token is held to the note, not only its expression.
+        own = RENDER.Resolver.shown
+        self.addCleanup(setattr, RENDER.Resolver, "shown", own)
+        RENDER.Resolver.shown = lambda resolver, name: own(resolver, name) + " Or so." \
+            if name == "method_note" else own(resolver, name)
+        with self.assertRaisesRegex(RENDER.Refused, r"gives the input note of Linux-day-.* "
+                                                    r"through no token whose value is the note "
+                                                    r"alone"):
+            RENDER.render(self.root)
+
+    def test_a_flag_mark_whose_words_hold_a_number_or_whose_mark_a_space(self):
+        # Review C2, U6 and U9.
+        self.dagger()
+        for spec in ({"mark": "\u2020", "says": "marks a figure timed during 2 logins"},
+                     {"mark": "\u2020", "says": "marks a figure timed during two logins"},
+                     {"mark": "\u2020 ", "says": "marks a figure timed while pages were swapped in"}):
+            with self.subTest(spec=spec):
+                self.figures["figures"]["mark:flags"]["flag_mark"] = spec
+                self.save()
+                self.refused("{{mark:flags}}: a flag mark is a short symbol and the words, free "
+                             "of numbers, that say what it marks")
 
     def phase_mark(self):
         """A disturbed phase's mark, in full and short, on every part of the row."""
@@ -1485,6 +1648,15 @@ class NotCountedTie(unittest.TestCase):
         with self.assertRaisesRegex(RENDER.Refused, r"\{\{nc\}\} gives QL-4's part 'Q2 warm', "
                                                     r"and nothing beside it reads that part"):
             RENDER.not_counted_ties(resolver, ["| Q3 | {{q3}} | {{nc}} |"])
+
+    def test_a_not_counted_token_beside_its_query_of_another_kind(self):
+        # Review C2, U3: the tie reads the part's query and its kind.
+        resolver = self.resolver({"id": "QL-4", "host": "Linux", "part": "Q2 warm"})
+        resolver.entries["q2_cold"] = {"value": {"path": [
+            "systems", "tickstore", "variants", "@headline", "queries", "Q2", "cold", "mean_us"]}}
+        with self.assertRaisesRegex(RENDER.Refused, r"\{\{nc\}\} gives QL-4's part 'Q2 warm', "
+                                                    r"and nothing beside it reads that part"):
+            RENDER.not_counted_ties(resolver, ["| Q2 cold | {{q2_cold}} | {{nc}} |"])
 
     def test_a_not_counted_token_of_another_row_s_part(self):
         resolver = self.resolver({"id": "WT-4", "host": "Linux", "part": "against QuestDB"})

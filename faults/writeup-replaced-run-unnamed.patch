@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 219078d..c1c51a0 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -528,7 +528,7 @@ class Resolver:
+         except (render_results.TargetError, KeyError, TypeError, ZeroDivisionError) as error:
+             raise Refused(f"{show(name)}: {error}") from error
+         for spec, found in zip(specs, replaced):
+-            if found is not None:
++            if False:
+                 kind, host = self.kind_of_pattern(
+                     render_results.replaced_pattern(spec["file"]),
+                     f"{row['id']} on {row['host']}, judged on its replaced run,")

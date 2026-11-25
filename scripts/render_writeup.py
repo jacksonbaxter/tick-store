@@ -457,9 +457,10 @@ class Resolver:
         self.note_read(path, kind, host, name)
         return path, pattern
 
-    def note_read(self, path, kind, host, name):
+    def note_read(self, path, kind, host, name, token=True):
         """A file read: its pin must be declared by its kind, and the token reading it must
-        say so."""
+        say so. A file a verdict is judged on beside its own (token False) is not the token's
+        figure, so nothing beside it need say its pin."""
         pin = pin_of(self.root, path, self.pins)
         declared = (self.kinds[kind].get("pin") or {}).get("name")
         if pin and pin != declared:
@@ -470,6 +471,8 @@ class Resolver:
             raise Refused(f"kind {kind!r} declares the pin {declared!r}, and {path.name} is not "
                           "held under it")
         self.read[path] = (kind, host)
+        if not token:
+            return
         for found in self.reading:
             found.add((path, kind, host))
 
@@ -516,9 +519,21 @@ class Resolver:
                 if "if_missing" not in row:
                     raise
         try:
-            return render_results.judged_parts(own, self.root)
+            judged = render_results.judged_parts(own, self.root)
+            # A comparison row is judged on the replaced run's pinned file too, and its verdict
+            # carries that run's figures in its marks, so the file is read as any token's and
+            # the commit sentence names the run (review C2-9).
+            replaced = [render_results.replaced_document(self.root, spec["file"])
+                        for spec in specs] if render_results.is_comparison(row) else []
         except (render_results.TargetError, KeyError, TypeError, ZeroDivisionError) as error:
             raise Refused(f"{show(name)}: {error}") from error
+        for spec, found in zip(specs, replaced):
+            if found is not None:
+                kind, host = self.kind_of_pattern(
+                    render_results.replaced_pattern(spec["file"]),
+                    f"{row['id']} on {row['host']}, judged on its replaced run,")
+                self.note_read(found[0], kind, host, name, token=False)
+        return judged
 
     # Values.
     def entry(self, name):
@@ -1041,6 +1056,50 @@ def not_counted(spec, context):
 # every comparison whose writes did not start alike, as the README's and RESULTS.md's do
 # (ruling 3; review R4-A).
 METHOD_SECTION = "## How it was measured"
+# Beside a write verdict, the essay's input clause ends by pointing to that section, whose input
+# note says what engine-only holds in full (render_results.ENGINE_ONLY_READS).
+INPUT_POINTER = f"engine-only: see [the method](#{METHOD_SECTION[3:].lower().replace(' ', '-')})"
+
+
+def short_input_clause(document, class_name):
+    """The input clause of a write verdict on the essay, from render_results.py's own reading of
+    each headline write's record (input_reads, input_sides): whose input was in memory before
+    the clock and whose was read from disk inside it, with the bytes read from the device inside
+    each side's clocks, and for what engine-only holds the pointer to the method section. None
+    where the writes started alike."""
+    reads = render_results.input_reads(document, class_name)
+    sides = render_results.input_sides(reads)
+    if sides is None:
+        return None
+    resident, disk = sides
+    def read(systems):
+        found = [reads[system][1] for system in systems if reads[system][1] is not None]
+        return render_results.byte_range(found) if found else None
+    here, there = read(resident), read(disk)
+    return (f"inputs not alike: {render_results.possessive(resident)} "
+            f"{'input is' if len(resident) == 1 else 'inputs are'} in memory before the clock "
+            "starts" + (f", with {here} read from the device inside the clock" if here else
+                        ", with no device-read figure")
+            + f"; {render_results.possessive(disk)} {'is' if len(disk) == 1 else 'are'} read "
+            "from disk inside it" + (f", with {there}" if there and here else
+                                     f", with {there} read from the device inside the clock"
+                                     if there else ", with no device-read figure")
+            + f"; {INPUT_POINTER}")
+
+
+def pointer_problem(text, values, resolver):
+    """Where a verdict's input clause points to the method section for what engine-only holds
+    and that section does not say it, or None."""
+    pointing = [name for name, value in values.items()
+                if "verdict" in resolver.entries.get(name, {}) and isinstance(value, str)
+                and INPUT_POINTER in value]
+    if not pointing:
+        return None
+    section = section_of(text, METHOD_SECTION)
+    if section is None or render_results.ENGINE_ONLY_READS not in " ".join(section.split()):
+        return (f"{show(pointing[0])} points to {METHOD_SECTION!r} for what engine-only holds, "
+                f"and that section does not say it: {render_results.ENGINE_ONLY_READS[:60]!r}")
+    return None
 
 
 def method_problem(root, text, body=None, resolver=None, values=None):
@@ -1387,7 +1446,8 @@ def marks_of(row, parts, name):
     and each swapped-in figure, in full or in the short form the README's first screen uses and
     RESULTS.md explains; and, for a write against other systems whose inputs did not start alike,
     the input clause, whose input was in memory before the clock and whose was read from disk
-    inside it, with the bytes read. Each is a tuple of forms, the shortest last."""
+    inside it, with the bytes read, word for word or short, pointing to the method section for
+    what engine-only holds (short_input_clause). Each is a tuple of forms, the shortest last."""
     if parts is None:
         return []
     try:
@@ -1396,9 +1456,10 @@ def marks_of(row, parts, name):
         classes = [render_results.notes_of(part)["write"] for part in parts
                    if render_results.notes_of(part).get("write")]
         clause = render_results.input_clause(parts[0][4], classes[0]) if classes else None
+        short = short_input_clause(parts[0][4], classes[0]) if clause else None
     except (render_results.TargetError, KeyError, TypeError) as error:
         raise Refused(f"{show(name)}: {error}") from error
-    return forms + ([(clause,)] if clause else [])
+    return forms + ([(clause, short)] if clause else [])
 
 
 def verdict_value(resolver, name, entry, marks=True):
@@ -1436,8 +1497,9 @@ def verdict_value(resolver, name, entry, marks=True):
 
 def check_marks(resolver, values):
     """Every verdict on the page carries each mark RESULTS.md gives it, in one of the forms
-    marks_of allows: a changed outcome and the input clause word for word, a phase's mark in
-    full or in its short form, and no other."""
+    marks_of allows: a changed outcome, a phase's mark and the input clause, each in full or in
+    its short form, and no other. A short input clause stands only where the method section
+    says what engine-only holds (pointer_problem)."""
     for name, value in values.items():
         entry = resolver.entries.get(name, {})
         if "verdict" not in entry:
@@ -1727,21 +1789,87 @@ def flag_phase(read):
     return ["queries", read.get("query"), read.get("kind")]
 
 
-def beside_flag(path, read):
-    """Whether a path is a figure of the phase a flag reads: its phase, and its system and
-    variant where both name them."""
-    if not holds_path(path, flag_phase(read)):
-        return False
-    system = read.get("system")
-    if isinstance(system, str) and "systems" in path:
+def shown_reads(resolver, name, seen=()):
+    """What the value a token prints was read from: (path, system, variant) for each phase it
+    takes, the system and variant None where the expression does not fix them. A path through
+    systems names both; a lowest_value or lowest_system, the system it finds, in its headline
+    variant; a min_variant, its system; a figure, that entry's; a same, its first item's, the
+    value it prints; a min or max, the item it takes; a target's figure, its part's paths."""
+    entry = resolver.entries.get(name) or {}
+    found = []
+    def system_of(path):
+        if "systems" not in path:
+            return None, None
         at = path.index("systems")
-        if path[at + 1:at + 2] != [system]:
-            return False
-        if "variants" in path:
-            variant = path[path.index("variants") + 1:path.index("variants") + 2]
-            if variant != [read.get("variant", "@headline")]:
-                return False
-    return True
+        system = path[at + 1] if at + 1 < len(path) else None
+        variant = path[path.index("variants") + 1] if "variants" in path and \
+            path.index("variants") + 1 < len(path) else None
+        return system, variant
+    def walk_reads(expression):
+        if isinstance(expression, list):
+            return [read for item in expression for read in walk_reads(item)]
+        if not isinstance(expression, dict):
+            return []
+        for key in ("path", "engine_only"):
+            if isinstance(expression.get(key), list):
+                path = [item for item in expression[key] if isinstance(item, str)]
+                return [(path, *system_of(path))]
+        for key in ("lowest_value", "lowest_system"):
+            if isinstance(expression.get(key), dict):
+                spec = expression[key]
+                document = resolver.context(name, entry).document
+                system = render_results.evaluate({"lowest_system": spec}, document)
+                return [(list(spec.get("path", [])), system, "@headline")]
+        if isinstance(expression.get("min_variant"), list):
+            system, *path = expression["min_variant"]
+            return [(path, system, None)]
+        if isinstance(expression.get("figure"), str):
+            other = expression["figure"]
+            return [] if other in seen else shown_reads(resolver, other, seen + (name,))
+        if isinstance(expression.get("same"), list) and expression["same"]:
+            return walk_reads(expression["same"][0])
+        for key in ("min", "max"):
+            items = expression.get(key)
+            if isinstance(items, list) and all(isinstance(item, dict) and "figure" in item
+                                                for item in items) and "only_above" not in \
+                    expression and "only_below" not in expression:
+                values = {item["figure"]: resolver.raw(item["figure"]) for item in items}
+                taken = (min if key == "min" else max)(values, key=values.get)
+                return walk_reads({"figure": taken})
+        return []
+    found += walk_reads(entry.get("value"))
+    if "target" in entry:
+        spec = entry["target"]
+        row = resolver.target_row(spec, name)
+        found += [(path, *system_of(path)) for path in part_paths(row, spec.get("part"))]
+    return found
+
+
+def beside_flag(resolver, flag, figure, read):
+    """Whether the token figure prints a figure of the phase the flag's read names: its phase,
+    its system, and its variant where both name one (review C2-10). None where the token's
+    expression names no read, as a ratio's, or fixes the system of none it reads of that
+    phase."""
+    system = read.get("system")
+    if isinstance(system, dict) and isinstance(system.get("figure"), str):
+        system = resolver.raw(system["figure"])
+    document = resolver.context(flag, resolver.entries[flag]).document
+    def headline(name, variant):
+        if variant in (None, "@headline"):
+            return walk(document, ["systems", name, "headline_variant"])
+        return variant
+    reads = shown_reads(resolver, figure)
+    phase = [(its_system, variant) for path, its_system, variant in reads
+             if holds_path(path, flag_phase(read))]
+    if not reads or (phase and all(its_system is None for its_system, _ in phase)):
+        return None
+    for its_system, variant in phase:
+        if its_system != system:
+            continue
+        if variant is None or headline(its_system, variant) == headline(system,
+                                                                      read.get("variant")):
+            return True
+    return False
 
 
 def marks_hold(resolver, body, blocks, values):
@@ -1749,7 +1877,7 @@ def marks_hold(resolver, body, blocks, values):
     essay states (review C2-5): no mark is typed in the template; a mark stands only through a
     token whose own it is; each is defined once, by its token, in the first block it stands in;
     a note token stands only in a block showing its kind's figures; and a flag token stands
-    straight after a figure of the phase it flags, in its cell or sentence."""
+    straight after a figure of the phase, system and variant it flags, in its cell or sentence."""
     definitions = {name: entry["flag_mark"]["mark"] for name, entry in resolver.entries.items()
                    if isinstance(entry, dict) and "flag_mark" in entry}
     kind_marks = {spec["mark"]: kind for kind, spec in resolver.kinds.items()
@@ -1814,12 +1942,16 @@ def marks_hold(resolver, body, blocks, values):
                 if not flag_word(entry):
                     continue
                 before = unit_names[index - 1] if index else None
-                paths = paths_read(resolver, before) if before else []
                 reads = entry["value"]["flagged"]
-                if not before or not all(any(beside_flag(path, read) for path in paths)
-                                         for read in reads):
+                found = [beside_flag(resolver, name, before, read) for read in reads] \
+                    if before else [False]
+                if None in found:
+                    raise Refused(f"{show(name)} stands after {show(before)}, whose figure's "
+                                  "system its expression does not fix, so the flag cannot be "
+                                  f"held to it: {unit.strip()[:80]!r}")
+                if not all(found):
                     raise Refused(f"{show(name)} does not stand straight after a figure of the "
-                                  f"phase it flags: {unit.strip()[:80]!r}")
+                                  f"phase, system and variant it flags: {unit.strip()[:80]!r}")
 
 
 def commit_of(resolver, path, kind):
@@ -2280,7 +2412,8 @@ def render(root):
     text = text.rstrip("\n") + "\n\n" + MARKER + "\n"
     faster_write(resolver, prose(text))
     moves_and_keeps(resolver, text)
-    problem = method_problem(root, text, body, resolver, values)
+    problem = method_problem(root, text, body, resolver, values) or \
+        pointer_problem(text, values, resolver)
     if problem:
         raise Refused(problem)
     notes = sum(1 for comment in comments if CUT_NOTE in comment)

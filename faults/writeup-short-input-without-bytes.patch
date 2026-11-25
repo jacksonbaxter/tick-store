@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 219078d..cd16e7e 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1081,7 +1081,7 @@ def short_input_clause(document, class_name):
+             "starts" + (f", with {here} read from the device inside the clock" if here else
+                         ", with no device-read figure")
+             + f"; {render_results.possessive(disk)} {'is' if len(disk) == 1 else 'are'} read "
+-            "from disk inside it" + (f", with {there}" if there and here else
++            "from disk inside it" + ("" if there and here else
+                                      f", with {there} read from the device inside the clock"
+                                      if there else ", with no device-read figure")
+             + f"; {INPUT_POINTER}")

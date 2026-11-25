@@ -1,13 +1,14 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
-index 77da66d..63676b8 100644
+index 219078d..5e357c7 100644
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -1808,7 +1808,7 @@ def marks_hold(resolver, body, blocks, values):
+@@ -1943,8 +1943,7 @@ def marks_hold(resolver, body, blocks, values):
+                     continue
                  before = unit_names[index - 1] if index else None
-                 paths = paths_read(resolver, before) if before else []
                  reads = entry["value"]["flagged"]
--                if not before or not all(any(beside_flag(path, read) for path in paths)
-+                if False and not all(any(beside_flag(path, read) for path in paths)
-                                          for read in reads):
-                     raise Refused(f"{show(name)} does not stand straight after a figure of the "
-                                   f"phase it flags: {unit.strip()[:80]!r}")
+-                found = [beside_flag(resolver, name, before, read) for read in reads] \
+-                    if before else [False]
++                found = [True]
+                 if None in found:
+                     raise Refused(f"{show(name)} stands after {show(before)}, whose figure's "
+                                   "system its expression does not fix, so the flag cannot be "

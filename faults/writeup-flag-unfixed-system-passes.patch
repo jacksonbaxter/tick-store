@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 219078d..5e3cf80 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1945,7 +1945,7 @@ def marks_hold(resolver, body, blocks, values):
+                 reads = entry["value"]["flagged"]
+                 found = [beside_flag(resolver, name, before, read) for read in reads] \
+                     if before else [False]
+-                if None in found:
++                if False:
+                     raise Refused(f"{show(name)} stands after {show(before)}, whose figure's "
+                                   "system its expression does not fix, so the flag cannot be "
+                                   f"held to it: {unit.strip()[:80]!r}")

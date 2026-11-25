@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 219078d..420de0c 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1866,7 +1866,7 @@ def beside_flag(resolver, flag, figure, read):
+     for its_system, variant in phase:
+         if its_system != system:
+             continue
+-        if variant is None or headline(its_system, variant) == headline(system,
++        if True or headline(its_system, variant) == headline(system,
+                                                                       read.get("variant")):
+             return True
+     return False

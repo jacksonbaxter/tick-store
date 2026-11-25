@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 219078d..af0722a 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -1093,7 +1093,7 @@ def pointer_problem(text, values, resolver):
+     pointing = [name for name, value in values.items()
+                 if "verdict" in resolver.entries.get(name, {}) and isinstance(value, str)
+                 and INPUT_POINTER in value]
+-    if not pointing:
++    if True:
+         return None
+     section = section_of(text, METHOD_SECTION)
+     if section is None or render_results.ENGINE_ONLY_READS not in " ".join(section.split()):

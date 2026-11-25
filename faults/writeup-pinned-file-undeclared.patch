@@ -1,8 +1,9 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index 219078d..cc2b2e1 100644
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -423,7 +423,7 @@
-         say so."""
+@@ -463,7 +463,7 @@ class Resolver:
+         figure, so nothing beside it need say its pin."""
          pin = pin_of(self.root, path, self.pins)
          declared = (self.kinds[kind].get("pin") or {}).get("name")
 -        if pin and pin != declared:

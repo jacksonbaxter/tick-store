@@ -3223,6 +3223,21 @@ FAULTS = (
     # Review C2: a draft never writes the page.
     Fault("writeup-draft-writes-page", "py-scripts", "render_writeup.py --draft also rewrites WRITEUP.md when every token resolves", CHECK_FAILED,
           "FAIL: test_a_draft_never_writes_the_page (__main__.Renders"),
+    # Review C2-10: a flag is held to the system and variant of the figure it follows.
+    Fault("writeup-flag-system-unchecked", "py-scripts", "render_writeup.py takes a flag token straight after another system's figure of the same phase", CHECK_FAILED,
+          "FAIL: test_a_flag_beside_another_system_s_figure (__main__.Marks"),
+    Fault("writeup-flag-variant-unchecked", "py-scripts", "render_writeup.py takes a flag token straight after its system's figure in another setup", CHECK_FAILED,
+          "FAIL: test_a_flag_beside_its_system_s_figure_in_another_setup (__main__.Marks"),
+    Fault("writeup-flag-unfixed-system-passes", "py-scripts", "render_writeup.py does not say a flag token stands after a figure whose system its expression does not fix", CHECK_FAILED,
+          "FAIL: test_a_flag_beside_a_figure_whose_system_is_not_fixed (__main__.Marks"),
+    # Review C2-9: a verdict judged on the replaced run names that run in the commit sentence.
+    Fault("writeup-replaced-run-unnamed", "py-scripts", "render_writeup.py leaves the replaced run out of the commit sentence when only a verdict's marks give its figures", CHECK_FAILED,
+          "FAIL: test_a_verdict_judged_on_the_replaced_run_names_it_in_the_commit_sentence (__main__.Marks"),
+    # Pass 4: the short input clause beside a write verdict.
+    Fault("writeup-short-input-without-bytes", "py-scripts", "render_writeup.py's short input clause drops the bytes read inside the clocks of the systems that read their input from disk", CHECK_FAILED,
+          "FAIL: test_a_write_verdict_gives_the_input_clause_short_and_the_method_in_full (__main__.Marks"),
+    Fault("writeup-input-pointer-unchecked", "py-scripts", "render_writeup.py takes a short input clause pointing to a method section that does not say what engine-only holds", CHECK_FAILED,
+          "FAIL: test_a_short_input_clause_where_the_method_does_not_say_engine_only (__main__.Marks"),
     # The step itself on the committed page. Its baseline passes only once WRITEUP.md is
     # rendered, when every results file it reads is committed (docs/TASKS.md).
     Fault("writeup-template-not-rendered", "writeup-check", "the essay's template reworded "

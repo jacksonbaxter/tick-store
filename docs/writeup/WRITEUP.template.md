@@ -4,16 +4,16 @@ tick-store keeps a trading day of Nasdaq TotalView-ITCH 5.0, {{ss_records}} mess
 {{ss_source_gb}} GB, in a store {{ss_ratio}} times smaller than the feed, {{cmpL_ts_B_alloc_gb}} GB
 on disk against {{glance_disk_other}} GB for Parquet's smallest setup, and rebuilds the feed from it.
 On a 2018 four-core AMD Ryzen running Linux (the Ryzen), it answers an hour of a stock in
-{{cmpL_ts_q2_warm_med_ms}} warm, against {{cmpL_arcps_q2_warm_med_ms}} ms {{glance_arcps_q2_flag}} for ArcticDB with a table per stock, while a
+{{cmpL_ts_q2_warm_med_ms}} warm, against {{cmpL_arcps_q2_warm_med_ms}} ms {{glance_arcps_q2_flag}} ({{mark:flags}}) for ArcticDB with a table per stock, while a
 second and a millisecond across every stock take it {{gap_ql4_q1_x}} and {{gap_ql4_q4_x}} times as long as
 {{cmpL_q1_warm_best_system}} and {{cmpL_q4_warm_best_system}}, and the whole-day sum of a column {{gap_ql4_q5_x}} times as long as
-{{cmpL_q5_warm_best_system}} {{glance_q5_other_flag}} ({{mark:flags}}).
+{{cmpL_q5_warm_best_system}} {{glance_q5_other_flag}} does.
 A single writer thread there ingests {{cmpL_ts_A_msg_rate_m}} before a flush, {{gap_wt2_linux_x}} times
 short of Nasdaq's published peak message rate.
 
 ## At a glance
 
-The Ryzen, each system in its fixed setup; queries are warm medians.
+The Ryzen, each system in its fixed setup except on disk; queries are warm medians.
 
 | | tick-store | Quickest or smallest other system: its figure | tick-store over it, or verdict |
 |---|---|---|---|
@@ -27,8 +27,8 @@ The Ryzen, each system in its fixed setup; queries are warm medians.
 
 The write row is not like-for-like: tick-store's input was in memory before its clock, with {{cmpL_ts_A_device_b}} B read from the
 device inside it, and the others read theirs from disk inside theirs, {{cmpL_others_A_device_min_b}} to
-{{cmpL_others_A_device_max_b}} B. Both runs: this run and the replaced run, an earlier measurement, on older
-code; neither confirms the other, so neither part counts. ArcticDB with a table per stock is faster:
+{{cmpL_others_A_device_max_b}} B. On Q2 and Q3 the host swapped memory while the named systems were timed, in this run
+and in the replaced run, an earlier measurement on older code, so neither confirms the other and neither verdict counts. ArcticDB with a table per stock is faster:
 {{glance_arcps_q2_ms}} ms {{glance_arcps_q2_flag}} on Q2 and {{glance_arcps_q3_ms}} ms {{glance_arcps_q3_flag}} on Q3.
 
 ## How it was measured
@@ -50,10 +50,10 @@ timed hours apart may have run at different clocks; what that costs was not meas
 advance, plus the setups a selection run on a slice kept, among them ArcticDB with a table per
 stock. The others read the day as parsed columns this project exported, {{cmpL_others_input_gb}} GB;
 tick-store, its ITCH file. Each query ran {{cmpL_warm_runs}} times
-warm, proven to read nothing from storage, and {{cmpL_cold_runs}} times cold, proven evicted. A
+warm, its processes proven to read nothing from storage, host swapping counted apart, and {{cmpL_cold_runs}} times cold, proven evicted. A
 write without a flush (class A) returns when the data is in the page cache; a flushed write (class
 B), after a proven flush to the device. Each write is judged on both clocks, the total and
-engine-only. {{cmpL_method_input_note}}
+engine-only. {{cmpL_method_input_note}} This favours tick-store.
 
 Every figure here from a results file the [figure list]({{path:figures}}) names was measured
 at commit `{{measured_commit}}`{{commit_exceptions}}.
@@ -103,23 +103,23 @@ ideal code for a delta in file order is {{ce_ts_ideal_delta_bits}} bits, for a d
 {{ce_ts_ideal_dod_bits}}. PFOR delta reaches {{ce_ts_best_bits}}, its patches saving
 {{ce_ts_patch_saving_bits}} bits against the same codec unpatched. I keep timestamps per stock as
 residuals from a `time_base` column, the earliest time of each {{code:time_base_records}} records
-in file order, where they cost {{ss_ts_bits}}.
+in file order, where they cost {{ss_ts_bits}} with that column's {{ss_time_base_mb}} MB and block metadata.
 
 **Sorting by stock, in bytes.** By arithmetic on bits as built against the codec evaluation's in file order, times each
 column's count, stock order costs timestamps {{sort_ts_cost_mb}} MB, new orders' references
 {{sort_creation_cost_mb}} MB ({{ce_creation_ref_bits}} against {{ss_creation_ref_bits}}) and the permutation {{ss_locate_mb}} MB,
 where file order, to code distances within the stock, would need {{sort_file_locate_all_mb}} MB, at the best
-codec measured, for every message's stock; it saves prices {{sort_price_saving_mb}} MB. Distances within the stock are a code in file order too, so the sort does not buy the
+codec measured, for every message's stock; it saves prices {{sort_price_saving_mb}} MB. On these columns the sort costs {{sort_net_mb}} MB net. Distances within the stock are a code in file order too, so the sort does not buy the
 references' {{ss_ref_distance_bits}}. The other columns were not set out this way, and the committed files hold no
-whole store in file order, so the net was not measured.
+whole store in file order, so the store's net was not measured.
 
 **Segment size.** The comparison ran {{seg1_records}}-record segments beside the default
 {{seg_records}}. At the default each stock's run is {{seg_run_ratio}} times as long: Q2 touches
 {{cmpL_ts_q2_segments}} segments instead of {{cmpL_seg1_q2_segments}} and takes
 {{cmpL_ts_q2_warm_med_ms}} warm against {{cmpL_seg1_q2_warm_med_ms}}, and the store takes
 {{ss_stored_bytes}} bytes against {{cmpL_seg1_apparent_bytes}}. But a window across every stock
-decodes its segment's whole permutation, {{cmpL_ts_q4_values}} values for Q4's {{cmpL_q4_rows}}
-rows at the default against {{cmpL_seg1_q4_values}}, so Q4 takes {{cmpL_ts_q4_warm_med_ms}} ms
+decodes its segment's whole permutation; Q4's {{cmpL_q4_rows}} rows decode
+{{cmpL_ts_q4_values}} values over every column read at the default against {{cmpL_seg1_q4_values}}, so Q4 takes {{cmpL_ts_q4_warm_med_ms}} ms
 against {{cmpL_seg1_q4_warm_med_ms}} and Q1 {{cmpL_ts_q1_warm_med_ms}} against
 {{cmpL_seg1_q1_warm_med_ms}}: on the Ryzen the default loses both to the smaller segments. The default
 was picked by a rule I wrote before any layout was timed: each layout small enough on disk scores
@@ -143,7 +143,7 @@ every column but the near-empty `mwcb_level`, where, with {{ce_mwcb_values}} val
 
 \* Without the permutation's cost.
 
-A price with cents has no finite binary form, so successive dollar doubles XOR to many
+A price with cents has a finite binary form only at .00, .25, .50 or .75, so successive dollar doubles XOR to many
 significant bits; an integer tick count stored as a double removes that. In decode time Gorilla
 takes {{cdM_ds6_ts}} as long as the store's codecs on timestamps on the M4 and {{cdM_ds6_price}} on
 prices, and {{cdL_ds7_ts}} and {{cdL_ds7_price}} on the Ryzen; why the timestamp ratio differs
@@ -170,7 +170,7 @@ delta-of-delta reconstruct are benchmark-only as well.
 **What SIMD bought.** On the M4, NEON over scalar, medians over widths: linear unpack
 {{skM_linear_speedup}}x, two-pass delta {{skM_two_pass_speedup}}x, fused delta
 {{skM_fused_speedup}}x and interleaved unpack {{skM_unpack_speedup}}x
-([M4 kernels]({{path:skM}})). On the Ryzen, AVX2 over scalar: interleaved unpack
+([M4 kernels]({{path:skM}})). On the Ryzen, AVX2 over scalar: linear unpack {{skL_linear_speedup}}x, interleaved unpack
 {{skL_unpack_speedup}}x, two-pass delta {{skL_two_pass_speedup}}x, fused {{skL_fused_speedup}}x.
 
 **What SIMD changes end to end.** The same binary at AVX2 on the Ryzen, against itself capped to scalar,
@@ -186,7 +186,9 @@ PFOR with scale and patches, range-checks every value and appends. On the Ryzen 
 {{d4_zstd_pct}}%, {{d4_pfor_unpack_pct}}% (unpack), {{d4_patches_pct}}% (patches),
 {{d4_scale_range_pct}}% (scale and range check) and {{d4_alloc_copy_pct}}% (allocation and copy;
 copies resolved only to the C library, {{d4_libc_pct}}%, are not counted there) of
-the decode's user cycles ([price-decode profile]({{path:d4}}) {{note:diag-price}}).
+the decode's user cycles ([price-decode profile]({{path:d4}}) {{note:diag-price}}). The rest: {{d4_unresolved_pct}}% at
+addresses with no symbol, {{d4_unmatched_pct}}% in functions no group takes ({{d4_read_patches_pct}}% `read_patches`) and
+{{d4_codec_driver_pct}}% in the codec's column driver.
 
 ## Branch prediction and instruction counts
 
@@ -227,8 +229,8 @@ of each write, tick-store's totals with and without a flush are not resolved apa
 {{d1_pfor_encode_pct}}%, assembling segments {{d1_segment_assembly_pct}}%, the book state, each
 open order's stock and price kept to code the messages that name it, {{d1_book_state_pct}}%,
 dictionary encoding {{d1_dict_encode_pct}}%, sorting {{d1_sort_pct}}%, parsing {{d1_parse_pct}}%
-and zstd {{d1_zstd_pct}}% ([writer profile]({{path:d1}}) {{note:diag-writer}}). As the others' engine-only clocks may hold their disk reads, the gap is
-not all tick-store's writer.
+and zstd {{d1_zstd_pct}}% ([writer profile]({{path:d1}}) {{note:diag-writer}}). If the others' engine-only clocks hold their disk reads, the gap
+is wider than shown.
 
 **Queries.** ArcticDB with a table per stock takes {{cmpL_arcps_q1_warm_med_s}} s on Q1. Q5, the day's sum of a shares column, decodes {{cmpL_ts_q5_values}} values at
 {{q5_ns_per_value}} ns each; of its sampled cycles, dictionary decoding takes {{d2_q5_dict_pct}}%,
@@ -290,7 +292,7 @@ figures; the cause of ArcticDB's move between them was not measured and is not k
 
 With no published figure, or no comparison day on the M4: the store's decode speed-up over
 Gorilla on the Ryzen ({{verdict:ds7_linux}}); delta-of-delta decode with bit parsing on the M4 ({{verdict:ds9_mac}}) and on the
-Ryzen ({{verdict:ds9_linux}}); writes and queries against the other systems on the M4 ({{verdict:wt3_mac}}; {{verdict:ql4_mac}}).
+Ryzen ({{verdict:ds9_linux}}); writes ({{verdict:wt3_mac}}) and queries ({{verdict:ql4_mac}}) against the other systems on the M4.
 
 ## Fuzzing and checks
 
@@ -300,8 +302,9 @@ AddressSanitizer and UndefinedBehaviorSanitizer: {{g3_mac_clean}} of
 Ryzen, the shortest run {{g3_shortest_s}} s ([fuzz results]({{path:fuzz}})). The fuzzing target is
 {{verdict:g3}}.
 
-A login or a backup can take executions from a fuzzing run, not hide a finding: the
-[runs by target](RESULTS.md#g-3-runs-by-target) give each target's.
+The bound-seed gate checks fixed inputs, pass or fail. A login or a backup can take
+executions from a fuzzing run, not hide a finding: the
+[runs by target](RESULTS.md#g-3-runs-by-target) give each target's executions.
 
 The checks and the faults that prove them are in the README; the prover's
 record covers {{proofs_covered}} of its {{proofs_listed}} listed faults.
