@@ -112,15 +112,38 @@ sentence says tick-store writes faster than a system whose clock holds its disk 
 between the replaced run and this one is said with its cause not measured and not known, and that
 what the replaced record keeps is said as its fields give it, hold on the essay as on the other
 pages. A figure read on one host must be
-described as that host's. The essay must run 2,500 to 4,000 words and open with one paragraph of
-three sentences, each holding a token. Until every file it reads is committed there is no
-`WRITEUP.md`, and the step is not judged, naming how many tokens and checks wait and on what, which
-is a failure under `--no-skips`; once the page exists, a missing file or a page that differs from
-a fresh render fails. What it does not check is that the prose is true beyond its figures, claims
-and verdicts: a sentence that misleads with no judging word, a verdict token set beside the wrong
-target, a line of the list that misdescribes what its entry reads, a number after a letter, as in
-a version, and the content of the profiler and counter summaries in `results/diag/`, which no
-separate validator re-reads, would all pass.
+described as that host's. The essay must run 2,500 to 4,060 words as `LC_ALL=C wc -w` counts the
+rendered page, its tables, marks and generated line included, and a page that macOS's `wc -w` in a
+UTF-8 locale counts otherwise is refused, as that count ends a word at a dagger with no space after
+it. It opens with one paragraph of three sentences, each holding a token. Two marks stand only
+through their own tokens and are typed nowhere: a diagnostic kind's note mark and the flag's
+dagger, each defined once, by its token, in the first block it stands in, the note mark only in a
+block showing its kind's figures. A flag stands straight after a token whose figure rests on what
+it flags: a query and kind or a class's write, of its system and, where both name one, its
+variant, or a bench case; a figure whose expression fixes no system is not beside it. Every
+figure from a phase the disturbance records place a disturbance in, or the record flags as timed
+while pages were swapped in, also through a ratio, product, sum or difference of it, carries in its sentence
+or table row a flag of that phase or the verdict whose marks name it. A write verdict's input
+clause may stand short, its bytes kept, only where it points to the method section and that section
+says what engine-only may still hold; the section gives `render_results.py`'s input note whole,
+through a token that gives the note alone. A not-counted token stands in the sentence or table row
+of a figure of the query and kind, or write, of the part it names. A verdict judged on the replaced
+run's figures names that run, at its own commit, in the commit sentence. Until every file it reads
+is committed there is no `WRITEUP.md`, and the step is not judged, naming how many tokens and checks
+wait and on what, which is a failure under `--no-skips`; once the page exists, a missing file or a
+page that differs from a fresh render fails. What it does not check is that the prose is true
+beyond its figures, claims and verdicts: a sentence that misleads with no judging word, a verdict
+token set beside the wrong target, a line of the list that misdescribes what its entry reads, a
+number after a letter, as in a version, and the content of the profiler and counter summaries in
+`results/diag/`, which no separate validator re-reads, would all pass. Nor does it compare a flag's
+file and host with its figure's; hold a flag to the side of a ratio it marks; hold a figure of a
+fuzzing or gate run, a read-back or a capacity part to a flag, though their verdicts carry the
+marks; tie a not-counted token of a query part to the part's system, only to its query and kind;
+check the words an exception that names its own commit gives; or hold the sort's net, whose guard
+that it is a cost lives in the list's `only_above` and in no check. "Straight after" is the token before the flag in
+its cell or sentence, so words between them pass. Two right pages are refused: a flag in a table
+column of its own, not straight after its figure, and the input note after a lead-in such as "On
+inputs:", which joins it to other words.
 
 `results/fuzz-gate-8616263b7561.json` holds the fuzzing's bound-seed gate: each named seed of
 `fuzz/bound_seeds.txt` run alone through its fuzz target five times on each host, 310 runs, with
