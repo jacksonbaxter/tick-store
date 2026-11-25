@@ -7804,6 +7804,42 @@ hosts". No bar moved: `REQUIRED_RUNS` is 5 and the bar half the 10 s timeout.
   fault failed it with the string its entry expects. I ran no `prove_checks.py`; proof owed to the
   full re-proof. The README's proofs paragraph counts 660 listed faults.
 
+### The essay's final review: R4
+
+The essay's last review asked for its method, write row and uncounted parts to say what the
+records say, and for a first reader's stops to be removed, within its length (docs/REVIEW.md,
+R4-A to R4-D).
+
+- The method section now ends with `render_results.py`'s own input note, the sentence RESULTS.md
+  and the README give: whose write input is in memory before the clock and whose is read from
+  disk inside it, the bytes each side read from the device, what the engine-only clock holds,
+  and that the two-clock rule does not take the difference out. `render_writeup.py` refuses an
+  essay whose "How it was measured" section lacks that note for a comparison file whose writes
+  did not start alike. The write row's note gives the bytes by token: tick-store 250,916,864 B
+  read from the device inside its unflushed write, the others 18,411,094,016 to 21,521,625,088 B.
+- The Q2 and Q3 warm cells give the part's not-counted mark in its short form through a new form,
+  `not_counted`, which reads the part's sides from the records and refuses a counted part: Q2
+  names ArcticDB and QuestDB, Q3 ArcticDB.
+- The old essay credited the sort by stock with the references' 7.563 bits against 25.68 in file
+  order. The codec evaluation's distances within the stock are themselves coded in file order, so
+  the sort does not buy them; the essay now says so. The sort's cost is given as labelled
+  arithmetic on the codec evaluation's bits and each column's count, and new orders' references
+  cost the sort too, 7.797 bits in file order against 11.363 as built.
+- The bound is held on the count `wc -w` makes of the rendered page: runs of characters between
+  ASCII whitespace, with comments, table pipes and rules and marks counted. macOS's `wc -w` in a
+  UTF-8 locale ends a word at a dagger, so "†;" counts as two words there and one under
+  `LC_ALL=C`; every dagger in the page is followed by a space, so both give 4,044.
+- The top of the bound rose from 4,000 to 4,060, the most the review allowed: after the
+  disturbance detail was said once, at first use, and other text was cut, the input note, the
+  bytes and the swap marks still took about 150 words more than the cuts freed.
+- The diagnostic summaries' note is given by a mark, ‡, defined in the first paragraph that uses
+  it; a kind's mark must be a symbol, may stand for one note only, and may not stand before its
+  definition.
+- Each fault this entry adds or remakes, `writeup-words-not-as-wc`, `writeup-mark-unsaid`,
+  `writeup-mark-undefined`, `writeup-pin-unsaid`, `writeup-method-note-unchecked` and
+  `writeup-not-counted-of-a-counted-part`, was shown failing by hand at the head that adds this
+  entry, in a clone, against a control that passed.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
