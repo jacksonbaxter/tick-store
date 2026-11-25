@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -3179,7 +3179,7 @@
+                                  NOT_ALIKE in part[0]) for part in parts]
+     verdicts = [part[2] for part, kept in zip(parts, held) if not kept]
+     if not verdicts:
+-        return "met, not counted" if any(held) else "not judged"
++        return "met, not counted"
+     if all(met is True for met in verdicts):
+         return "met"
+     if all(met is False for met in verdicts):

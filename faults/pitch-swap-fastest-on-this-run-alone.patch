@@ -1,0 +1,13 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -3844,7 +3844,8 @@
+         if path is None:
+             return []
+         documents = [json.loads(path.read_text(encoding="utf-8"))]
+-        replaced = replaced_document(root, condition["file"])
++        replaced = replaced_document(root, condition["file"]) \
++            if condition.get("on_replaced") else None
+         documents += [replaced[1]] if replaced else []
+         spec = condition["fastest"]
+         found = []

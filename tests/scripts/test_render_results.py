@@ -2738,6 +2738,50 @@ class ConditionsTest(Scratch):
         with self.assertRaisesRegex(RENDER.TargetError, "no replaced run of"):
             self.figure_pitch(marked, figure, [dict(claim, text=marked)])
 
+    def test_every_claim_of_figures_is_judged_on_the_replaced_file_where_one_is_kept(self):
+        # Review C2-2: a pair, or a fastest claim, held on this run alone passed though the
+        # replaced run reversed it; each is judged on both runs wherever both are kept, with no
+        # on_replaced asked, and a flag on the replaced run's figure asks for the swap words.
+        new = with_queries(change_document(recorded_write(1.0, 0.1), recorded_write(2.0, 0.1)))
+        old = with_queries(change_document(recorded_write(1.0, 0.1), recorded_write(2.0, 0.1),
+                                           commit="67ae574f5666"))
+        file = "results/compare/Linux-day-*.json"
+        below = {"file": file, "below": [[SWAP_ROW["parts"][0]["value"],
+                                          SWAP_ROW["parts"][0]["at_most"]]]}
+        fastest = {"file": file, "fastest": {"systems": ["tickstore", "arcticdb"],
+                                             "queries": ["Q2"], "kinds": ["warm"],
+                                             "fields": ["median_us"], "one_of": ["tickstore"]}}
+        definitions = {"rows": []}
+        self.write(new, old)
+        for claim in (below, fastest):
+            with self.subTest(claim=claim):
+                self.assertIsNone(RENDER.claim_problem(claim, definitions, self.tree))
+                self.assertEqual(RENDER.pitch_swapped(claim, definitions, self.tree), [])
+        old["systems"]["tickstore"]["variants"]["h"]["queries"]["Q2"]["warm"]["median_us"] = \
+            2500.0
+        self.write(new, old)
+        self.assertEqual(RENDER.claim_problem(below, definitions, self.tree),
+                         "2500.0 is not below 2000.0 on the replaced run")
+        self.assertEqual(RENDER.claim_problem(fastest, definitions, self.tree),
+                         "Q2 warm: arcticdb has the lowest median_us on the replaced run")
+        # A flag on the replaced run's figure alone is a figure the claim rests on.
+        self.write(new, with_queries(change_document(recorded_write(1.0, 0.1),
+                                                     recorded_write(2.0, 0.1),
+                                                     commit="67ae574f5666"),
+                                     flagged=["arcticdb"]))
+        for claim in (below, fastest):
+            with self.subTest(claim=claim):
+                self.assertEqual(RENDER.pitch_swapped(claim, definitions, self.tree),
+                                 ["arcticdb"])
+        # With no replaced file a claim is judged on this run, unless it asks for both.
+        self.old.unlink()
+        for claim in (below, fastest):
+            with self.subTest(claim=claim):
+                self.assertIsNone(RENDER.claim_problem(claim, definitions, self.tree))
+                self.assertEqual(RENDER.claim_problem(dict(claim, on_replaced=True), definitions,
+                                                      self.tree),
+                                 f"no replaced run of {file} to judge it on as well")
+
     def test_the_pitchs_short_form_speaks_of_rivals_and_stands_nowhere_else(self):
         self.write(with_queries(change_document(recorded_write(1.0, 0.1),
                                                 recorded_write(2.0, 0.1)), flagged=["tickstore"]))
@@ -2909,6 +2953,13 @@ class ConditionsTest(Scratch):
             for clause in RENDER.held_what(what).split("; "):
                 self.assertIn(clause, explained)
         self.assertEqual(explained.count(RENDER.PERIOD_MEANING), 1)
+        # That meaning, and the clause on a span that overlaps the next phase, are said of the
+        # watcher's computed login, the one kind they hold for, in the sentence that binds them
+        # to it (review C2-3).
+        self.assertIn("A login by another project's watcher, computed from its period between two "
+                      "recorded lines, fell at some time between start and end, not recorded "
+                      "exactly, and where \"its bounds also overlap the phase before or after, "
+                      "listed beside it\" follows, its span reaches that phase too.", explained)
         self.assertIsNone(self.quoted("| T-13 | Linux | 1 ms | Met (swap-in: ArcticDB; met, not "
                                       "counted: no replaced run (ArcticDB)) |\n", [SWAP_ROW]))
 
@@ -3104,6 +3155,22 @@ class SidesTest(Scratch):
         self.assertIn("a disturbance the replaced run has no record to rule out on ArcticDB's "
                       "side", verdict)
         self.assertNotIn("write phase", verdict)
+        # Both runs keeping the write swap, a replaced run a disturbance record covers, which
+        # records a disturbance on the same side, is no run no record covers: the clause on
+        # the write phase's swapping, which says so, stands nowhere (review C2-6).
+        old["systems"]["arcticdb"]["variants"]["h"]["classes"]["B"]["swap"] = {
+            "write": {"pages_in": 16304, "pages_out": 1}}
+        old["header"]["commit"] = "67ae574f5666" + "0" * 28
+        self.write(new, old)
+        (self.tree / "results" / "disturbances-67ae574f5666.json").write_text(json.dumps(
+            disturbances(dict(entry, document="compare/replaced/Linux-day-67ae574f5666.json"),
+                         commit=old["header"]["commit"])), encoding="utf-8")
+        part = self.parts(CHANGE_ROW)[0]
+        self.assertEqual([side[:2] for side in RENDER.counted(part).sides],
+                         [("ArcticDB", "no record")])
+        verdict = RENDER.verdict_of([part], CHANGE_ROW)
+        self.assertNotIn("no disturbance record covers the replaced run", verdict)
+        self.assertNotIn("write phase", verdict)
 
     def test_a_part_not_like_for_like_is_never_counted(self):
         part = ("against QuestDB, not like-for-like", "1 s against 2 s", True, None, {}, {})
@@ -3119,8 +3186,12 @@ class SidesTest(Scratch):
         missed = ("against Parquet", "3 s against 2 s", False, None, {}, {})
         other = ("against ArcticDB", "4 s against 2 s", False, None, {}, {})
         met = ("against ArcticDB", "1 s against 2 s", True, None, {}, {})
+        # A part not judged beside one not counted leaves the row not judged, and a row of no
+        # parts is not judged, in the writer's class as in the check's (review C2).
+        unjudged = ("against ArcticDB", "no figure", RENDER.Unjudged("this code"), None, {}, {})
         for parts, kind in (([missed, other, held], "missed"), ([held], "met, not counted"),
-                            ([met, held], "met"), ([met, missed, held], "missed in part")):
+                            ([met, held], "met"), ([met, missed, held], "missed in part"),
+                            ([unjudged, held], "not judged"), ([], "not judged")):
             with self.subTest(parts=[(part[0], part[2]) for part in parts]):
                 self.assertEqual(RENDER.verdict_class(parts), kind)
                 self.assertEqual(RENDER.class_of([RENDER.counted(part) for part in parts]), kind)
@@ -3258,6 +3329,30 @@ class SidesTest(Scratch):
         with self.assertRaisesRegex(RENDER.TargetError, "is met by the rule and not counted on "
                                                         r"\(Q2 warm\), which no run confirms"):
             self.pitch_check(f"On the box it answers one stock fastest; {RENDER.PITCH_SWAPPED}.")
+
+    def test_no_claim_of_figures_compares_what_a_part_not_counted_compares(self):
+        # Review C2-1: only a claim on the target was refused; a pair of the same figures, or a
+        # fastest claim on the same query, raised the ranking sentence the part may not.
+        file = "results/compare/Linux-day-*.json"
+        below = {"file": file, "below": [[SWAP_ROW["parts"][0]["value"],
+                                          SWAP_ROW["parts"][0]["at_most"]]]}
+        fastest = {"file": file, "fastest": {"systems": ["tickstore", "arcticdb"],
+                                             "queries": ["Q2"], "kinds": ["warm"],
+                                             "fields": ["median_us"], "one_of": ["tickstore"]}}
+        # One of the part's figures against a constant compares nothing the part compares.
+        alone = {"file": file, "below": [[SWAP_ROW["parts"][0]["value"], 5000.0]]}
+        definitions = {"rows": [SWAP_ROW]}
+        said = (f"it compares the figures T-13 on Linux compares on (Q2 warm), which is "
+                f"{RENDER.NOT_COUNTED}, which no run confirms, and raises no ranking sentence")
+        self.runs(["arcticdb"], ["arcticdb"])
+        self.assertEqual(RENDER.claim_problem(below, definitions, self.tree), said)
+        self.assertEqual(RENDER.claim_problem(fastest, definitions, self.tree), f"Q2 warm: {said}")
+        self.assertIsNone(RENDER.claim_problem(alone, definitions, self.tree))
+        # The part confirmed and counted, both claims stand.
+        self.runs(["arcticdb"], [])
+        for claim in (below, fastest, alone):
+            with self.subTest(claim=claim):
+                self.assertIsNone(RENDER.claim_problem(claim, definitions, self.tree))
 
     def test_a_quote_without_the_not_counted_words_is_refused(self):
         self.runs(["arcticdb"], ["arcticdb"])

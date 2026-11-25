@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -1675,7 +1675,7 @@
+                 # said, as each record gives them (review R1-3).
+                 pages = [write_swap_in(found_document, read) for found_document in
+                          (document, old_document)] if read[0] == "write" else [None]
+-                if not covered and all(pages):
++                if all(pages):
+                     found[label] = (label, "write swapped", tuple(pages))
+                     continue
+                 found[label] = (label, "no record", "")

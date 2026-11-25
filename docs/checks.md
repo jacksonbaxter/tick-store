@@ -6,18 +6,21 @@ to, beyond the steps the README's "Checks" section lists, and what each does not
 `render_results.py --check` also holds the first screen to its rules. The pitch, headings
 included, runs to at most `max_words` words, 100; a line is a heading only as GitHub shows one,
 so `#It` is prose. Each figure in it is the one the results give now, and any other number is a
-text `scripts/targets.json` lists with its reason, found once. A figure read from a timed phase
-in which the records list a disturbance, or flag a page swapped in, must stand with that phase's
-mark in brackets beside it, as the first screen gives such a mark. Each heading and sentence is one
-of three things: a claim, a whole sentence listed under `claims` that must hold on the results,
-holds the words its target lists for its bar and names the one machine it is judged on, so a new
-results file that turns a verdict stops the check at the sentence to change, and a claim that
-pairs figures may be held on the replaced run's file as well, which must then be there; a sentence holding a
-figure; or a text listed as stating no result, with its reason. A word that ranks or judges, such
-as fastest, least, below, less, ahead or keeps up, must sit inside a claim or a figure's words,
-headings included. Each table row says what it is, then its bar and the bar's source, then what
-was measured, from a template whose figures are named values read from the results files: a
-template that types a figure, names a value it is not given, or is given one it does not name
+text `scripts/targets.json` lists with its reason, found once. Such a number is compared with no
+results file: the check holds it to its listing and its count alone. A figure read from a timed
+phase in which the records list a disturbance, or flag a page swapped in, must stand with that
+phase's mark in brackets beside it, as the first screen gives such a mark. Each heading and
+sentence is one of three things: a claim, a whole sentence listed under `claims` that must hold on
+the results, holds the words its target lists for its bar and names the one machine it is judged
+on, so a new results file that turns a verdict stops the check at the sentence to change; a
+sentence holding a figure; or a text listed as stating no result, with its reason. A claim that
+pairs figures or names the fastest is held on the replaced run's file as well wherever one is
+kept, and one marked `on_replaced` is refused if none is. No claim rests on a part met by the rule
+and not counted: a claim on that part's target, or one comparing two figures that part compares,
+is refused. A word that ranks or judges, such as fastest, least, below, less, ahead or keeps up,
+must sit inside a claim or a figure's words, headings included. Each table row says what it is,
+then its bar and the bar's source, then what was measured, from a template whose figures are
+named values read from the results files: a template that types a figure, names a value it is not given, or is given one it does not name
 stops the render, and a lowest of the other systems takes every other system the comparison
 ran. The line under the table names every part of a target with a row on the screen that the
 table leaves out, under its verdict, the met parts too, and counts every other target-and-machine row

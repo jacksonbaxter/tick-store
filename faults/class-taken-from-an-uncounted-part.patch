@@ -1,14 +1,16 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -2785,8 +2785,8 @@
+@@ -3177,9 +3177,9 @@
      verdict_of(parts)
      held = [part[2] is True and (bool(notes_of(part).get("unconfirmed")) or
                                   NOT_ALIKE in part[0]) for part in parts]
 -    verdicts = [part[2] for part, kept in zip(parts, held) if not kept]
 -    if not verdicts:
+-        return "met, not counted" if any(held) else "not judged"
 +    verdicts = [part[2] for part in parts]
 +    if any(held) and all(met is True for met in verdicts):
-         return "met, not counted"
++        return "met, not counted"
      if all(met is True for met in verdicts):
          return "met"
+     if all(met is False for met in verdicts):

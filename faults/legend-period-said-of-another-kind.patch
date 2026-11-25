@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -2294,7 +2294,7 @@
+     # computed span means, follow once (review R1-6).
+     kinds = "; ".join(f"\"{single}\" for {held_what(what)}" for what, (single, _) in
+                       SHORT_DISTURBANCE.items() if not what.endswith(f"; {WATCHER_OVERLAP}"))
+-    kinds += (f". A login {WATCHER_PERIOD[len('a remote login '):]}, fell {PERIOD_MEANING}, "
++    kinds += (f". A backup run fell {PERIOD_MEANING}, "
+               f"and where \"{WATCHER_OVERLAP}\" follows, its span reaches that phase too")
+     return ("A mark beside a verdict or a figure may be given short: "
+             f"\"({SHORT_SWAPPED}ArcticDB, QuestDB)\" stands for \"{SWAPPED}ArcticDB's ... and "

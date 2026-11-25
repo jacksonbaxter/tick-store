@@ -1,0 +1,12 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -4141,7 +4141,7 @@
+     # holds on both runs; on_replaced says the claim needs that file there (reviews R1-4, C2-2).
+     documents = [("", document)]
+     found = replaced_document(root, claim["file"])
+-    if found is not None:
++    if found is not None and claim.get("on_replaced"):
+         documents.append((" on the replaced run", found[1]))
+     elif claim.get("on_replaced"):
+         return f"no replaced run of {claim['file']} to judge it on as well"

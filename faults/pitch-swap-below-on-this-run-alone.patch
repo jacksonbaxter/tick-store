@@ -1,0 +1,13 @@
+diff --git a/scripts/render_results.py b/scripts/render_results.py
+--- a/scripts/render_results.py
++++ b/scripts/render_results.py
+@@ -3835,7 +3835,8 @@
+         if path is None:
+             return []
+         documents = [json.loads(path.read_text(encoding="utf-8"))]
+-        found = replaced_document(root, condition["file"])
++        found = replaced_document(root, condition["file"]) if condition.get("on_replaced") \
++            else None
+         documents += [found[1]] if found else []
+         return [read[0] for document in documents for pair in condition["below"]
+                 for item in pair for read in swapped_reads(reads_of(item, document), document)]

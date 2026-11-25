@@ -1,10 +1,10 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -2788,7 +2788,7 @@
+@@ -3180,7 +3180,7 @@
      verdicts = [part[2] for part, kept in zip(parts, held) if not kept]
      if not verdicts:
-         return "met, not counted"
+         return "met, not counted" if any(held) else "not judged"
 -    if all(met is True for met in verdicts):
 +    if any(met is True for met in verdicts):
          return "met"

@@ -3170,7 +3170,8 @@ def verdict_class(parts):
     """Met, missed, not judged, or missed or not judged in part, for parts judged, or None for
     a row with no figure. The class is taken from the parts that count: a part met by the rule
     and not counted never makes a row met or missed in part, and a row whose every part is such
-    a part is met, not counted (review R1-1)."""
+    a part is met, not counted (review R1-1); a row of no parts is not judged, as class_of has
+    it (review C2)."""
     if parts is None:
         return "not judged"
     verdict_of(parts)
@@ -3178,7 +3179,7 @@ def verdict_class(parts):
                                  NOT_ALIKE in part[0]) for part in parts]
     verdicts = [part[2] for part, kept in zip(parts, held) if not kept]
     if not verdicts:
-        return "met, not counted"
+        return "met, not counted" if any(held) else "not judged"
     if all(met is True for met in verdicts):
         return "met"
     if all(met is False for met in verdicts):
@@ -3834,8 +3835,7 @@ def pitch_swapped(condition, definitions, root):
         if path is None:
             return []
         documents = [json.loads(path.read_text(encoding="utf-8"))]
-        found = replaced_document(root, condition["file"]) if condition.get("on_replaced") \
-            else None
+        found = replaced_document(root, condition["file"])
         documents += [found[1]] if found else []
         return [read[0] for document in documents for pair in condition["below"]
                 for item in pair for read in swapped_reads(reads_of(item, document), document)]
@@ -3843,19 +3843,23 @@ def pitch_swapped(condition, definitions, root):
         path = target_file(root, condition["file"])
         if path is None:
             return []
-        document = json.loads(path.read_text(encoding="utf-8"))
+        documents = [json.loads(path.read_text(encoding="utf-8"))]
+        replaced = replaced_document(root, condition["file"])
+        documents += [replaced[1]] if replaced else []
         spec = condition["fastest"]
         found = []
-        for system in spec["systems"]:
-            for query in spec["queries"]:
-                for kind in spec["kinds"]:
-                    try:
-                        block = walk(document, ["systems", system, "variants", "@headline",
-                                                "queries", query, kind])
-                    except TargetError:
-                        continue
-                    if isinstance(block, dict) and (block.get("swap_timed") or {}).get("flagged"):
-                        found.append(system)
+        for document in documents:
+            for system in spec["systems"]:
+                for query in spec["queries"]:
+                    for kind in spec["kinds"]:
+                        try:
+                            block = walk(document, ["systems", system, "variants", "@headline",
+                                                    "queries", query, kind])
+                        except TargetError:
+                            continue
+                        if isinstance(block, dict) and \
+                                (block.get("swap_timed") or {}).get("flagged"):
+                            found.append(system)
         return found
     return []
 
@@ -4068,13 +4072,45 @@ def check_pitch(definitions_path, root, readme):
                               "pitch does not say it")
 
 
+def not_counted_reads(definitions, root, path):
+    """Each part of a target row judged on the results file at path that is met by its rule and
+    not counted: (its row's id, host, its label, the timed phases its verdict reads)."""
+    found = []
+    for row in definitions.get("rows", []):
+        parts = judged_parts(row, root)[0]
+        if not parts:
+            continue
+        specs = [row["lowest_of"]] * len(parts) if "lowest_of" in row else row["parts"]
+        for spec, part in zip(specs, parts):
+            if Path(part[3]).resolve() == Path(path).resolve() and \
+                    isinstance(counted(part), NotCounted):
+                found.append((row["id"], row["host"], part[0],
+                              set(reads_of_part(row, spec, part[0], part[4]))))
+    return found
+
+
+def compares_held(held, sides):
+    """Why a pitch condition comparing figures of the timed phases in sides, one list of phases
+    to each figure it compares, rests on a part of held, not_counted_reads' parts: that the
+    part reads two of those figures, so the condition compares what it compares. None
+    otherwise (review C2-1)."""
+    for row_id, host, label, reads in held:
+        if sum(1 for phases in sides if reads.intersection(phases)) > 1:
+            return (f"it compares the figures {row_id} on {host} compares on ({label}), which "
+                    f"is {NOT_COUNTED}, which no run confirms, and raises no ranking sentence")
+    return None
+
+
 def claim_problem(claim, definitions, root):
     """Why the results do not bear out one condition of a sentence of the pitch that ranks
     tick-store, or None (review RG-13). "target" is a row's verdict, judged as in the targets
     block, on the parts named; "below" pairs of figures of one file, each first below its
     second; "fastest" the system with the lowest of each field among the systems' headline
     variants, for each query and kind, one of those named. A fastest claim is judged on every
-    field its words could be read on, median and tail alike (review DX-14)."""
+    field its words could be read on, median and tail alike (review DX-14). A claim of either
+    of the last two forms is judged on the replaced run's file as well wherever one is kept,
+    and is refused if it compares two figures that a part met by its rule and not counted
+    compares, as a target claim on that part is (reviews C2-1, C2-2)."""
     if "target" in claim:
         spec = claim["target"]
         row = next((row for row in definitions["rows"]
@@ -4101,15 +4137,22 @@ def claim_problem(claim, definitions, root):
     if path is None:
         raise TargetError(f"pitch: no results file matches {claim['file']}")
     document = json.loads(path.read_text(encoding="utf-8"))
+    # A claim of figures is judged on the replaced run's file too wherever one is kept, so it
+    # holds on both runs; on_replaced says the claim needs that file there (reviews R1-4, C2-2).
+    documents = [("", document)]
+    found = replaced_document(root, claim["file"])
+    if found is not None:
+        documents.append((" on the replaced run", found[1]))
+    elif claim.get("on_replaced"):
+        return f"no replaced run of {claim['file']} to judge it on as well"
+    # A part met by its rule and not counted raises no ranking sentence, so no claim compares
+    # the figures it compares (review C2-1).
+    held = not_counted_reads(definitions, root, path)
     if "below" in claim:
-        documents = [("", document)]
-        # A pair the claim holds on both runs is judged on the replaced run's file too, which
-        # must be there (review R1-4).
-        if claim.get("on_replaced"):
-            found = replaced_document(root, claim["file"])
-            if found is None:
-                return f"no replaced run of {claim['file']} to judge it on as well"
-            documents.append((" on the replaced run", found[1]))
+        for lower, higher in claim["below"]:
+            rests = compares_held(held, [reads_of(lower, document), reads_of(higher, document)])
+            if rests:
+                return rests
         for where, found_document in documents:
             for lower, higher in claim["below"]:
                 first, second = evaluate(lower, found_document), evaluate(higher, found_document)
@@ -4122,13 +4165,21 @@ def claim_problem(claim, definitions, root):
             raise TargetError("pitch: a fastest claim names no fields to judge fastest on")
         for query in spec["queries"]:
             for kind in spec["kinds"]:
-                for field in spec["fields"]:
-                    values = {system: walk(document, ["systems", system, "variants", "@headline",
-                                                      "queries", query, kind, field])
-                              for system in spec["systems"]}
-                    fastest = min(values, key=values.get)
-                    if fastest not in spec["one_of"]:
-                        return f"{query} {kind}: {fastest} has the lowest {field}"
+                rests = compares_held(held, [[(
+                    "queries", system, walk(document, ["systems", system, "headline_variant"]),
+                    kind, query)] for system in spec["systems"]])
+                if rests:
+                    return f"{query} {kind}: {rests}"
+        for where, found_document in documents:
+            for query in spec["queries"]:
+                for kind in spec["kinds"]:
+                    for field in spec["fields"]:
+                        values = {system: walk(found_document, [
+                            "systems", system, "variants", "@headline", "queries", query, kind,
+                            field]) for system in spec["systems"]}
+                        fastest = min(values, key=values.get)
+                        if fastest not in spec["one_of"]:
+                            return f"{query} {kind}: {fastest} has the lowest {field}{where}"
         return None
     raise TargetError(f"pitch: the claim {claim.get('text', 'condition')!r} names no condition")
 

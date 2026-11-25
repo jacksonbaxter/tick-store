@@ -1,12 +1,12 @@
 diff --git a/scripts/render_results.py b/scripts/render_results.py
 --- a/scripts/render_results.py
 +++ b/scripts/render_results.py
-@@ -1880,7 +1880,7 @@
-             raise TargetError("pitch: a fastest claim names no fields to judge fastest on")
-         for query in spec["queries"]:
-             for kind in spec["kinds"]:
--                for field in spec["fields"]:
-+                for field in spec["fields"][:1]:
-                     values = {system: walk(document, ["systems", system, "variants", "@headline",
-                                                       "queries", query, kind, field])
-                               for system in spec["systems"]}
+@@ -4173,7 +4173,7 @@
+         for where, found_document in documents:
+             for query in spec["queries"]:
+                 for kind in spec["kinds"]:
+-                    for field in spec["fields"]:
++                    for field in spec["fields"][:1]:
+                         values = {system: walk(found_document, [
+                             "systems", system, "variants", "@headline", "queries", query, kind,
+                             field]) for system in spec["systems"]}
