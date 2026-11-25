@@ -114,23 +114,34 @@ separate validator re-reads, would all pass.
 
 `results/fuzz-gate-8616263b7561.json` holds the fuzzing's bound-seed gate: each named seed of
 `fuzz/bound_seeds.txt` run alone through its fuzz target five times on each host, 310 runs, with
-each run's exit, findings, executed units, time an execution, wall time and load, and on Linux
-each processor's busy share, the processes started and whether the sibling core's busy process
-ran at its start and its end. `scripts/gate_results.py` assembled it on 2026-11-25, after the
-runs, from each host's raw records; it times nothing, and a record that disagrees with the
-runner's own table or the gate's verdicts stops it. `scripts/check_gate.py` refuses a file whose
-shape or name is not the assembler's, that holds a machine's path or name, whose bar is not half
-of `fuzz/launch.txt`'s timeout, that misses a seed or a run or numbers them otherwise, whose time
-an execution is not its own fields', that marks a run pass or fail contrary to the gate's rule, or
-whose summary its runs do not give; and a disturbance entry in a gate run that names no run of
-the file, or whose span misses its run. `render_results.py` runs that check before it renders the
+each run's exit, findings, executed units, time an execution, wall time and load, and on Linux each
+processor's busy share, the processes started and whether the sibling core's busy process ran at its
+start and its end. `scripts/gate_results.py` assembled it on 2026-11-25, after the runs, from each
+host's raw records; it times nothing, and a record that disagrees with the runner's own table or the
+gate's verdicts stops it. `scripts/check_gate.py` refuses a file whose shape or name is not the
+assembler's, that holds a machine's path or name, or whose bar is not half of `fuzz/launch.txt`'s
+timeout; a run field not of the form the assembler writes there: a count that is not a whole number,
+a time an execution or a load that is not a finite number of at least 0, -0.0 included, a start or
+end that is not a real UTC time or an end before its start, a busy share outside 0 to 100 or past
+one decimal, and a target not its seed's own; a header whose words are not the assembler's, whose
+list is not the tree's `fuzz/bound_seeds.txt` by its SHA-256, or whose day of assembly is before its
+last run's; a file that misses a seed or a run, gives other than exactly five runs a seed or numbers
+them otherwise; a time an execution that is not its own fields'; a run marked pass or fail contrary
+to the gate's rule; or a summary its runs do not give, in value, in type and in the order of its
+keys; and a disturbance entry in a gate run that names no run of the file, whose span is not two UTC
+times, start first, or misses its run. `render_results.py` runs that check before it renders the
 gate's block in `fuzz/README.md`, and `--check` fails when the block differs from a fresh render.
-`check_ties.py` gives the file a kind of its own, `fuzz-gate`: the fuzz binaries and their inputs
-at the file's commit, without the fuzzing runs' launcher, which did not run the gate, its assembler
-compared from the commit that wrote the file. What they do not check: the raw records, which are
-not in the repository, so the file is held to the assembler's reading of them and to its own
-sums; the busy shares, the load and the processes started, which the gate held to no rule and
-the file keeps unjudged; and the untracked runner that ran the gate, which no kind ties.
+`check_ties.py` gives the file a kind of its own, `fuzz-gate`: the fuzz binaries and their inputs at
+the file's commit, without the fuzzing runs' launcher, which did not run the gate, its assembler
+compared from the commit that wrote the file. What they do not check: the raw records, which are not
+in the repository, so the file is held to the assembler's reading of them and to its own sums, and a
+repeated line in a host's step log, which only the assembler could see and which it takes the last
+of (docs/TASKS.md keeps it open); a run's fields against each other, so a wall time shorter than its
+libFuzzer time, a span far from its wall time, runs that overlap in time, an extra cpu's busy share
+or a load of 1e308 would pass; a day of assembly after today, which only the clock could refuse,
+making the check's result depend on the day it runs; the busy shares, the load and the processes
+started, which the gate held to no rule and the file keeps unjudged; and the untracked runner that
+ran the gate, which no kind ties.
 
 `check_ties.py` examines every file under `results/`, and fails one of no kind. It refuses a
 commit not in HEAD's history, a symbolic link git tracks in a compared path, and any git command
