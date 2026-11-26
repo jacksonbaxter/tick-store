@@ -167,9 +167,10 @@ inputs:", which joins it to other words.
 `fuzz/bound_seeds.txt` run alone through its fuzz target five times on each host, 310 runs, with
 each run's exit, findings, executed units, time an execution, wall time and load, and on Linux each
 processor's busy share, the processes started and whether the sibling core's busy process ran at its
-start and its end. `scripts/gate_results.py` assembled it on 2026-11-25, after the runs, from each
-host's raw records; it times nothing, and a record that disagrees with the runner's own table or the
-gate's verdicts stops it. `scripts/check_gate.py` refuses a file whose shape or name is not the
+start and its end. `scripts/gate_results.py` assembled it after the runs, from each host's raw
+records, on 2026-11-25 and again on 2026-11-26, when one sentence of its header was reworded; it
+times nothing, and a record that disagrees with the runner's own table or the gate's verdicts
+stops it. `scripts/check_gate.py` refuses a file whose shape or name is not the
 assembler's, that holds a machine's path or name, or whose bar is not half of `fuzz/launch.txt`'s
 timeout; a run field not of the form the assembler writes there: a count that is not a whole number,
 a time an execution or a load that is not a finite number of at least 0, -0.0 included, a start or

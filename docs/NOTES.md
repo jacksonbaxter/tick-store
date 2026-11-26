@@ -8170,6 +8170,89 @@ scratch ones, and `scripts/check.sh`, which runs them, passed the variables on.
   `ties-refused-exits-0` does not apply, so `test_prove_checks.py` fails, until `3c6af7b`
   remakes it.
 
+### CI run 45742322238 at `a6ff17f`: the hosted runners' user and their wc (R7)
+
+2026-11-26. CI's run 45742322238, at `a6ff17f`, failed `py-scripts` and `render-check` in both
+repository jobs, on two causes, one on both hosts and one on Linux only.
+
+- **The user name `runner` ([R7-1](REVIEW.md#the-final-reviews-ci-run-at-a6ff17f-r7)).** GitHub's hosted runners run as the user `runner`,
+  and `check_results.py`'s leak check refuses this machine's host and user name, as
+  `getpass.getuser()` gives it, anywhere in a results file's text. The gate file's
+  `header.assembled` said "The runner that ran the gate and wrote those records is not in the
+  repository", so there `check_gate.py` refused it, "fuzz-gate-8616263b7561.json: it holds
+  $.header.assembled: this machine's name in the text", and render-check and the script tests
+  that take the committed gate file failed with it: 119 tests failed or erred in the macOS job's
+  py-scripts log, which holds that line 222 times. The leak check is right and stays as it is. The sentence
+  now says "The script that ran the gate", in `gate_results.py`, in `check_gate.py`'s pin of the
+  sentence and in the file; no other word changed.
+- **The gate file made again.** `gate_results.py`, run on the same raw records of both hosts'
+  runs of 2026-11-17 with `--assembled-on 2026-11-25`, first gave the committed file byte for
+  byte; with the new sentence and `--assembled-on 2026-11-26` it gave the file committed in
+  `b11e607`, which differs from the old one only in `header.assembled`, its day and the one word:
+  the runs, the summary and the key order are the same. The script and the file are committed
+  together, so `check_ties.py` still finds the file written after its assembler and gives "32
+  files: 30 same, 1 pinned, 1 differs". The dated entries above that give 2026-11-25 stand as
+  written; docs/checks.md now gives both days, docs/TASKS.md the new writing commit, and
+  fuzz/README.md's generated line 2026-11-26.
+- **The test.** `test_check_sh.py`'s
+  `test_the_results_validators_pass_under_the_hosted_runners_user_name` runs check.sh's
+  check-results, check-compare and render-check with `LOGNAME` and `USER` set to `runner`. With
+  the old sentence back it failed, render-check failing with CI's line; with the new one it
+  passes.
+- **Under that name, the other checks.** Run here at `9d883b1`, with this entry's documents
+  edited, with `LOGNAME` and `USER` set to `runner`, check.sh's py-scripts (1,419 tests, 6
+  skipped), check-results, check-compare, render-check, writeup-check, actionlint and hygiene
+  steps passed, and check-ties failed only on `results/check-proofs.json`, measured at
+  `5a810a2`, as it does under any name: no other string a validator reads holds it.
+- **A gap left open ([R7-3](REVIEW.md#the-final-reviews-ci-run-at-a6ff17f-r7)).** `results/fullday-capacity-12302019.json`'s
+  `method.peak_memory` says "the runner's" twice, and CI's check-compare passes. `check_leaks` is
+  called only by `check_results.py` (on `results/bench`), `check_compare.py` (on
+  `results/compare`), `check_fuzz.py` and `check_gate.py`; `check_compare.py` reads the capacity
+  file only as its `--capacity` input, never through `check_leaks`. Called on the file by hand
+  under that name, `check_leaks` gives "$.method.peak_memory: this machine's name in the text".
+  The text is a measured file's content and is not edited here; docs/TASKS.md lists it.
+- **The word count ([R7-2](REVIEW.md#the-final-reviews-ci-run-at-a6ff17f-r7)).** On the Linux job,
+  `test_the_word_count_is_wc_s_count_of_the_page` failed "AssertionError: 2857 != 2856": the
+  runner's `wc -w` under `LC_ALL=C` counted the test's page one word fewer than the renderer. The
+  page holds 2,857 runs between ASCII whitespace, and exactly one holds no printable ASCII
+  character, 0x21 to 0x7E: a "≤" standing alone. macOS's `/usr/bin/wc` and GNU coreutils 9.12's
+  `wc` here count it, 2,857 in the C and the UTF-8 locale both, and the project's Linux host,
+  with GNU coreutils 9.7, counts a dagger standing alone as 1 in the C locale and in C.UTF-8. So,
+  of the hosts I can reach, only CI's ubuntu-24.04 runner has the `wc` that gave 2,856, and its
+  rule is read from that one count, not run here. The renderer's rule and its bound, 2,500 to
+  4,060 words, do not change. The test now asks the host's `wc` how many words "a ≤ b" holds and
+  decides by that, never by the system or by whose `wc` it is: at 3 it holds the page's count to
+  `word_count`, at 2 to the new `ascii_wc_count`, the runs holding a printable ASCII character,
+  and at anything else it fails; it also requires the page to hold exactly one run without one.
+  `word_count`'s docstring, the comments by `WORD` and the bound, the module's rule list, the
+  refusal of a page the UTF-8 count reads otherwise, docs/checks.md and two fault descriptions
+  said the count was `LC_ALL=C wc -w`'s without saying whose; each now says macOS's, and
+  docs/checks.md says what the runner's `wc` did. The essay is unchanged: 4,060 words by the
+  renderer and by macOS's `wc -w` in both locales.
+- **What could be shown here of the count.** The `ascii_wc_count` branch runs against a real
+  `wc` only in CI. Here it was run with a stand-in `wc` placed first on `PATH`, a few lines of
+  Python that count only runs holding a printable ASCII byte and are no one's `wc`: the new test
+  passed with it, with macOS's `wc` and with GNU 9.12's, and the old test at `14dd75a` failed
+  with it "AssertionError: 2857 != 2856", CI's line. `ascii_wc_count` has no fault of its own,
+  as the renderer's rule does not use it; the test's two exact counts of it on fixed strings hold
+  it on every host: with it changed to give `word_count`'s count the test failed "5 != 4" under
+  both `wc`s, and with the test holding every host to `word_count`, the old rule, it passed under
+  macOS's `wc` and failed "2857 != 2856 : word_count" under the stand-in.
+- **Faults, shown by hand.** New: `gate-hosted-runner-name-kept` (the old sentence back in the
+  assembler, the pin and the file). Remade to apply to the new text: `writeup-words-not-as-wc`
+  and `writeup-words-utf8-unchecked`. At `9d883b1`, in a clone under `build/`, through check.sh's
+  `py-scripts` step:
+  - control: `py-scripts` PASS, 1,419 tests, 6 skipped;
+  - `gate-hosted-runner-name-kept`: FAIL, with
+    `test_the_results_validators_pass_under_the_hosted_runners_user_name` failing on
+    "fuzz-gate-8616263b7561.json: it holds $.header.assembled: this machine's name in the text";
+  - `writeup-words-not-as-wc`: FAIL, with "FAIL: test_the_word_count_is_wc_s_count_of_the_page
+    (__main__.Refuses", at the first exact count, "7 != 13", which fails before the `wc` is
+    asked, so on either kind of `wc`.
+  `prove_checks.py` was not run, so `results/check-proofs.json` still covers 99 of the 713 listed
+  faults; the rest wait for the full re-proof. README.md and WRITEUP.md count 713 faults and 1
+  control.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
