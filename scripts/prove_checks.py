@@ -3296,6 +3296,19 @@ FAULTS = (
     Fault("writeup-template-not-rendered", "writeup-check", "the essay's template reworded "
           "and WRITEUP.md not rendered again", CHECK_FAILED,
           "WRITEUP.md differs from a fresh render", mutate=reword_the_writeup_template),
+    # Review R6-1: a caller's git variables, as a hook or git rebase --exec exports them, name
+    # a decoy repository, which nothing that makes or clones a repository may change.
+    Fault("check-sh-git-variables-kept", "py-scripts", "check.sh keeps a caller's git "
+          "variables, so a step that makes a repository makes it in the caller's", CHECK_FAILED,
+          "a step of check.sh changed the decoy repository the caller's git variables name"),
+    Fault("script-test-git-variables-kept", "py-scripts", "test_check_ties.py keeps a caller's "
+          "git variables, so its scratch repository's init, config and commits go to the "
+          "caller's", CHECK_FAILED,
+          "test_check_ties.py SameContent.test_a_short_commit_is_resolved changed the decoy "
+          "repository"),
+    Fault("prover-git-variables-kept", "py-scripts", "prove_checks.py keeps a caller's git "
+          "variables, so its clone, fetch and reset act on the caller's repository",
+          CHECK_FAILED, "prove_checks.py's clone changed the decoy repository"),
     Fault("control-comment-only", "render-check", "a comment, which no check should notice",
           0, "", control=True),
 )

@@ -1,0 +1,13 @@
+diff --git a/scripts/prove_checks.py b/scripts/prove_checks.py
+index e0bbdd1..361b443 100644
+--- a/scripts/prove_checks.py
++++ b/scripts/prove_checks.py
+@@ -3453,7 +3453,7 @@ def clear_git_variables(environ=os.environ):
+     if done.returncode != 0:
+         raise SystemExit(f"prove_checks: git rev-parse --local-env-vars: {done.stderr.strip()}")
+     for name in (*done.stdout.split(), "GIT_NAMESPACE"):
+-        environ.pop(name, None)
++        environ.get(name)
+ 
+ 
+ def prepare_tree():

@@ -1,0 +1,13 @@
+diff --git a/scripts/check.sh b/scripts/check.sh
+index a86c104..f985ea0 100755
+--- a/scripts/check.sh
++++ b/scripts/check.sh
+@@ -130,8 +130,6 @@ require_tools
+ # scratch repositories among them, on the caller's repository. They go before any step: git's
+ # own list of a repository's variables, and GIT_NAMESPACE, which that list leaves out. Each
+ # step's git then finds this tree from ROOT, a linked worktree's or a clone's alike.
+-# shellcheck disable=SC2046
+-unset $(git rev-parse --local-env-vars) GIT_NAMESPACE
+ 
+ # Steps a step cannot run without. A step blocked this way is a failure, not a skip.
+ needs() {
