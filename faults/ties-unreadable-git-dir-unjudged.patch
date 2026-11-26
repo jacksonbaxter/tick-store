@@ -1,13 +1,16 @@
 diff --git a/scripts/check_ties.py b/scripts/check_ties.py
-index 520d96a..abb0c2c 100644
+index c8ffea7..4e3fd0a 100644
 --- a/scripts/check_ties.py
 +++ b/scripts/check_ties.py
-@@ -393,8 +393,9 @@ def history_of(repo):
-     is. Anything else is a Refusal: a .git git cannot read, or a folder inside a checkout."""
-     repo = Path(repo)
-     if (repo / ".git").exists():
--        top = run_git(repo, "rev-parse", "--show-toplevel").stdout.strip()
-+        top = run_git(repo, "rev-parse", "--show-toplevel", ok=(0, 128)).stdout.strip()
+@@ -472,11 +472,13 @@ def history_of(repo):
+         # checkout around the tree, or, in a folder no checkout holds, none (review R7-5).
+         top = run_git(repo, "rev-parse", "--show-toplevel", ok=(0, 128))
+         if top.returncode != 0:
++            return False
+             said = top.stderr.strip().replace("\n", "; ") or "nothing on stderr"
+             raise Refusal(f"{repo.name} holds a .git that git does not read as its own "
+                           f"repository: git rev-parse --show-toplevel exited 128: {said}")
+         top = top.stdout.strip()
          if Path(top).resolve() != repo.resolve():
 +            return False
              raise Refusal(f"{repo.name} holds a .git that git does not read as its own "
