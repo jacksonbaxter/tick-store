@@ -201,9 +201,9 @@ git -C "{made}" -c user.name=t -c user.email=t@t -c commit.gpgsign=false \\
                                       capture_output=True, text=True, env=env)
                 self.assert_unchanged(decoy, before, "prove_checks.py's clone")
                 self.assertEqual(done.returncode, 0, said(done.stderr))
-                left, said = done.stdout.splitlines()[:2]
+                left, stopped = done.stdout.splitlines()[:2]
                 self.assertEqual(sorted(set(json.loads(left)) & CLEARED), [])
-                self.assertIn("googletest-src is not fetched", said)
+                self.assertIn("googletest-src is not fetched", stopped)
                 self.assertEqual(git(work / "tree", "rev-parse", "HEAD"), commit)
 
     def test_prove_checks_clears_them_before_anything_else(self):
