@@ -209,23 +209,31 @@ the file, by hand or not, resets that comparison, and nothing shows the bytes ar
 assembler wrote; a new file this checkout's own excludes hide is not seen; and it compares the
 work tree, which CI's clean checkout makes the commit.
 
-`scripts/check.sh` before its first step, each script test that makes or clones a repository,
-by itself or through `check_hygiene.py`'s helpers, before it runs git, and `prove_checks.py`
-before it clones anything, drop the variables `git rev-parse --local-env-vars` prints, git's own
-list of a repository's variables (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`,
-`GIT_OBJECT_DIRECTORY`, `GIT_ALTERNATE_OBJECT_DIRECTORIES`, `GIT_COMMON_DIR`, `GIT_PREFIX` and
-the rest, as the git that runs prints them), and `GIT_NAMESPACE`, which that list leaves out. Git
-exports them to hooks and to `git rebase --exec`, and inherited they turned the tests' own
-`git init`, commits, resets and config writes on the caller's repository
-([R6-1](REVIEW.md#the-final-reviews-git-variables-r6) to [R6-3](REVIEW.md#the-final-reviews-git-variables-r6)). `tests/scripts/test_git_env.py` sets them
-to a decoy repository of its own, runs one repository-making test of each such file, check.sh's
-hygiene step with a stand-in that makes a repository, and the prover's clone, and requires every
-file under the decoy's `.git` unchanged byte for byte, and check.sh's hygiene step still reading
-its own tree. What this does not cover: a script that only reads the repository it sits in, run
-on its own rather than through check.sh under a caller whose variables name another repository,
-reads that one. `run_bench.py`, `fuzz_g3.py`, `fuzz_results.py`, `coverage_report.py`,
-`check_fuzz.py` and `compare/run.py` would then record that repository's commit or state in what
-they write, or judge against it; they are tied to the results files they made, so they are left as they are ([R6-4](REVIEW.md#the-final-reviews-git-variables-r6)).
-`check_ties.py`, `render_results.py` and `render_writeup.py` would judge against its history,
-and `check_hygiene.py` in an exported tree, under a caller that sets `GIT_DIR` and
-`GIT_WORK_TREE` both, runs its `git init` of an empty scratch repository on it.
+`scripts/check.sh` before its first step, each script test that runs git, before it does,
+`prove_checks.py` before it clones anything, and `check_ties.py`, `check_hygiene.py`,
+`render_results.py` and `render_writeup.py`, which no results file is tied to, first thing in
+`main`, drop the variables `git rev-parse --local-env-vars` prints, git's own list of a
+repository's variables (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, `GIT_OBJECT_DIRECTORY`,
+`GIT_ALTERNATE_OBJECT_DIRECTORIES`, `GIT_COMMON_DIR`, `GIT_PREFIX` and the rest, as the git that
+runs prints them), and `GIT_NAMESPACE`, which that list leaves out. Git exports them to hooks and
+to `git rebase --exec`, and inherited they turned the tests' own `git init`, commits, resets and
+config writes on the caller's repository, and a `git status`, or a `git diff` of a commit against
+the work tree, refreshes the caller's index and writes it back ([R6-1](REVIEW.md#the-final-reviews-git-variables-r6) to [R6-3](REVIEW.md#the-final-reviews-git-variables-r6),
+[R6-5](REVIEW.md#the-final-reviews-git-variables-r6)). `tests/scripts/test_git_env.py` sets them to a decoy repository of its own and
+requires every file of the decoy, its work tree's and its `.git`'s, unchanged byte for byte after
+one repository-making test of each script test that makes one, check.sh's hygiene step with a
+stand-in that makes a repository, the prover's clone, and each of those four scripts run on its
+own against a clone of this tree as the decoy, which must also give the output it gives with no
+variables set; and it requires every script test that runs git to clear them at its top. What
+this does not cover ([R6-4](REVIEW.md#the-final-reviews-git-variables-r6), [R6-5](REVIEW.md#the-final-reviews-git-variables-r6)): the measured code and the scripts tied to results
+files are not edited, and run on their own, not through check.sh, under a caller whose variables
+name another repository, they act on that one. `cmake/GenerateBuildInfo.cmake`, at configure
+time, records that repository's HEAD as this build's commit and its `git status --porcelain` as
+the build's dirty state, which every results file's build facts carry, and the `git status`
+writes its index; `compare/run.py` runs `git status --porcelain`, writing its index and recording
+its state as this tree's; `fuzz_g3.py` records its HEAD as the run's commit, and `check_fuzz.py`'s
+`git diff` of a commit against the work tree, which `fuzz_g3.py` runs too, writes its index;
+`run_bench.py` and `coverage_report.py` record its HEAD as the run's commit, and
+`coverage_report.py` its file list; `fuzz_results.py` compares two commits in its history. A
+script test that runs git only through a script in a child relies on that script's own clearing,
+and the test's list of what runs git is a pattern of the calls the tests make today.
