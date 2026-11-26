@@ -1,8 +1,8 @@
 diff --git a/scripts/check_ties.py b/scripts/check_ties.py
-index 520d96a..542259e 100644
+index d8aea50..9813c0e 100644
 --- a/scripts/check_ties.py
 +++ b/scripts/check_ties.py
-@@ -691,7 +691,7 @@ def table():
+@@ -850,7 +850,7 @@ def table():
      return "\n".join(lines)
  
  
@@ -10,4 +10,4 @@ index 520d96a..542259e 100644
 +ERRORS = ("differs", "no commit", "no kind")
  
  
- def main(argv=None):
+ def clear_git_variables():
