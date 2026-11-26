@@ -3309,6 +3309,11 @@ FAULTS = (
     Fault("prover-git-variables-kept", "py-scripts", "prove_checks.py keeps a caller's git "
           "variables, so its clone, fetch and reset act on the caller's repository",
           CHECK_FAILED, "prove_checks.py's clone changed the decoy repository"),
+    # Review R6-5: check_ties.py's git status and git diff against the work tree write the index.
+    Fault("ties-git-variables-kept", "py-scripts", "check_ties.py keeps a caller's git "
+          "variables, so run on its own it refreshes and writes the caller's index",
+          CHECK_FAILED, "check_ties.py run on its own changed the decoy repository the caller's "
+          "git variables name: .git/index"),
     Fault("control-comment-only", "render-check", "a comment, which no check should notice",
           0, "", control=True),
 )

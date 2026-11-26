@@ -1,0 +1,13 @@
+diff --git a/scripts/check_ties.py b/scripts/check_ties.py
+index d8aea50..a21c050 100644
+--- a/scripts/check_ties.py
++++ b/scripts/check_ties.py
+@@ -865,7 +865,7 @@ def clear_git_variables():
+     except OSError:
+         listed = []
+     for variable in (*listed, "GIT_NAMESPACE"):
+-        os.environ.pop(variable, None)
++        os.environ.get(variable)
+ 
+ 
+ def main(argv=None):
