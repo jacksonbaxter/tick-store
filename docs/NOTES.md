@@ -8362,8 +8362,14 @@ before both.
 - **Added 2026-11-26: CI run 45757899496 at `3d9144d`.** Both repository jobs passed py-scripts
   (1,427 tests; 6 skipped on macOS, 2 on Linux), py-compare, check-results, check-compare,
   render-check, writeup-check, actionlint and hygiene. They failed check-ties on the proof record,
-  as designed. So the `ascii_wc_count` branch has now met the ubuntu-24.04 runner's own `wc` on the
-  test's page and held. That is still one page with one lone mark.
+  as designed. So the word-count test passed on the ubuntu-24.04 runner in that run. The saved
+  job logs hold the step summaries only, not each test's output, and they do not show the probe's
+  answer: a `wc` that counts a lone "≤" takes the `word_count` branch and passes too, so which
+  count the page was held to there is not shown. The runner's image differed between the two runs:
+  `ubuntu24/20261116.376` in this run's Linux job, `ubuntu24/20261122.23` in the run at `a6ff17f`.
+  (Corrected 2026-11-26 after an outside read, [R10-1](REVIEW.md#the-final-reviews-ci-run-at-a6ff17f-r7): this item said the `ascii_wc_count`
+  branch "has now met the ubuntu-24.04 runner's own `wc` on the test's page and held", which the
+  logs do not show.)
 - **The second outside review, of `ee8aa5d..3d9144d` ([R9](REVIEW.md#the-final-reviews-ci-run-at-a6ff17f-r7)).**
   - R9-1: the entry above.
   - R9-2: docs/checks.md now names `test_git_env.py`'s decoy test among the export's skips.
@@ -8372,10 +8378,11 @@ before both.
     there both gave the skip, held only by the bound and the UTF-8 count; a checkout catches them.
     docs/checks.md says so.
   - R9-4: `render_writeup.py:162`'s "one under LC_ALL=C" stays. It reads as macOS's within its
-    comment, and a script's comment is not changed after CI and the Linux host have run on this
-    code.
+    comment, and a change to a script now would move what the proof record measures, and mean running CI and the Linux host's whole check again for it. (Corrected 2026-11-26 after an outside read, [R10-2](REVIEW.md#the-final-reviews-ci-run-at-a6ff17f-r7): the reason
+    given was that CI and the Linux host had run on this code, which was not so when written; CI's
+    run had only its two repository jobs done, and the Linux host's whole check has not ended.)
   - R9-5: `check_ties.py --repo .` prints an empty name in "cannot judge:  holds a .git …". It is
-    cosmetic, left, and open in docs/TASKS.md.
+    cosmetic, left, and open in docs/TASKS.md; a change to a script now would move what the proof record measures, and mean running CI and the Linux host's whole check again for it.
 
 ## Process notes
 
