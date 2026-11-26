@@ -34,6 +34,11 @@ import check_hygiene  # noqa: E402
 SCRIPT = REPO_ROOT / "scripts" / "check.sh"
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 SCRATCH_ROOT = REPO_ROOT / "build" / "test_check_sh"
+# This tree as a sync to the Linux host exports it, by the scripts' own rule: then the steps that
+# tie a results file or the essay to git history skip (review R7-5).
+EXPORTED = check_hygiene.exported_tree(REPO_ROOT)
+NO_HISTORY = ("an exported tree has no git history, which this test reads; check.sh skips the "
+              "step that would read it there")
 
 
 class CheckScript(unittest.TestCase):
@@ -84,12 +89,13 @@ class CheckScript(unittest.TestCase):
         self.assertEqual(done.returncode, 2)
 
     def test_a_passing_step_exits_zero(self):
-        done = self.run_script("--only", "render-check")
+        # hygiene passes in a checkout and in an exported tree alike (review R7-5).
+        done = self.run_script("--only", "hygiene")
         self.assertEqual(done.returncode, 0, done.stdout)
-        self.assertEqual(self.summary(), {"render-check": "PASS"})
+        self.assertEqual(self.summary(), {"hygiene": "PASS"})
 
     def test_quick_skips_visibly_and_says_so(self):
-        done = self.run_script("--quick", "--only", "asan-test,coverage,render-check")
+        done = self.run_script("--quick", "--only", "asan-test,coverage,hygiene")
         self.assertEqual(done.returncode, 0, done.stdout)
         status = self.summary()
         self.assertEqual(status["asan-test"], "SKIP")
@@ -189,14 +195,22 @@ class CheckScript(unittest.TestCase):
         # GitHub's hosted runners run as the user `runner`, and check_results.py's leak check
         # refuses a results file holding the user's name: CI's run 45742322238 found the word in
         # the gate file's header, which this Mac's user name never showed.
+        # In an exported tree render-check checks every file and then skips, for want of the
+        # history that ties G-3's file to its code; a leak there is still its failure.
         steps = ("check-results", "check-compare", "render-check")
         done = self.run_script("--only", ",".join(steps),
                                env=dict(self.env, LOGNAME="runner", USER="runner"))
         said = "".join((self.logs / f"{step}.log").read_text() for step in steps
                        if (self.logs / f"{step}.log").exists())
-        self.assertEqual(self.summary(), dict.fromkeys(steps, "PASS"), said[-3000:])
+        self.assertEqual(self.summary(), {"check-results": "PASS", "check-compare": "PASS",
+                                          "render-check": "SKIP" if EXPORTED else "PASS"},
+                         said[-3000:])
         self.assertEqual(done.returncode, 0, done.stdout)
+        if EXPORTED:
+            self.assertIn("could not be tied to the code it judged: no git history",
+                          done.stdout)
 
+    @unittest.skipIf(EXPORTED, NO_HISTORY)
     def test_render_check_names_how_the_g3_file_is_tied(self):
         done = self.run_script("--only", "render-check")
         self.assertEqual(done.returncode, 0, done.stdout)

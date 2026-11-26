@@ -36,6 +36,19 @@ SPEC.loader.exec_module(prove)
 
 FAULT = prove.Fault("example", "dev-test", "an example", 8, "the expected string")
 
+# This tree as a sync to the Linux host exports it, by the scripts' own rule (review R7-5).
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+import check_hygiene  # noqa: E402
+
+EXPORTED = check_hygiene.exported_tree(REPO_ROOT)
+
+
+def fingerprint(fault):
+    """prove.fingerprint with HEAD's blob ids in a checkout, as the prover takes them. An
+    exported tree has no HEAD, so there the tests of what else a fingerprint holds take no blob
+    ids; the tests of the blobs themselves give theirs."""
+    return prove.fingerprint(fault, blob_of={}.get if EXPORTED else None)
+
 
 def run_of(script_exit=1, status="FAIL", step_exit=8, log="... the expected string ...",
            later_status=""):
@@ -106,14 +119,14 @@ class FaultList(unittest.TestCase):
 
     def test_a_changed_fault_has_a_changed_fingerprint(self):
         other = prove.Fault("example", "dev-test", "an example", 8, "another string")
-        self.assertNotEqual(prove.fingerprint(FAULT), prove.fingerprint(other))
+        self.assertNotEqual(fingerprint(FAULT), fingerprint(other))
 
     def test_a_fault_judged_otherwise_has_a_changed_fingerprint(self):
         # Review RP-11: a tolerated fault must pass, a control go undetected.
         for field in ("tolerated", "control"):
             with self.subTest(field=field):
                 other = dataclasses.replace(FAULT, **{field: not getattr(FAULT, field)})
-                self.assertNotEqual(prove.fingerprint(FAULT), prove.fingerprint(other))
+                self.assertNotEqual(fingerprint(FAULT), fingerprint(other))
 
 
 def mutation_named_alike(argument, helper_value="one"):
@@ -140,29 +153,29 @@ class Fingerprint(unittest.TestCase):
         a = prove.Fault("example", "render-check", "x", 1, "s", mutation_named_alike("a"))
         b = prove.Fault("example", "render-check", "x", 1, "s", mutation_named_alike("b"))
         self.assertEqual(a.mutate.__name__, b.mutate.__name__)
-        self.assertNotEqual(prove.fingerprint(a), prove.fingerprint(b))
+        self.assertNotEqual(fingerprint(a), fingerprint(b))
 
     def test_a_mutation_whose_helper_changed_has_another_fingerprint(self):
         a = prove.Fault("example", "render-check", "x", 1, "s", mutation_named_alike("a", "one"))
         b = prove.Fault("example", "render-check", "x", 1, "s", mutation_named_alike("a", "two"))
-        self.assertNotEqual(prove.fingerprint(a), prove.fingerprint(b))
+        self.assertNotEqual(fingerprint(a), fingerprint(b))
 
     def test_an_edited_verdict_changes_every_fingerprint(self):
-        before = prove.fingerprint(FAULT)
+        before = fingerprint(FAULT)
         original = prove.judge
         self.addCleanup(setattr, prove, "judge", original)
         # An edit to judge() in the script itself: a new body in the script's own globals.
         exec("def judge(fault, result):\n    return 'PROVEN'\n", vars(prove))
-        self.assertNotEqual(prove.fingerprint(FAULT), before)
+        self.assertNotEqual(fingerprint(FAULT), before)
 
     def test_an_edited_gate_on_stored_verdicts_changes_every_fingerprint(self):
         # Review RP-12: main keeps a stored verdict by is_proven, which proving never reaches.
-        before = prove.fingerprint(FAULT)
+        before = fingerprint(FAULT)
         original = prove.is_proven
         self.addCleanup(setattr, prove, "is_proven", original)
         exec("def is_proven(entry):\n    return entry.get('verdict') != 'UNDETECTED'\n",
              vars(prove))
-        self.assertNotEqual(prove.fingerprint(FAULT), before)
+        self.assertNotEqual(fingerprint(FAULT), before)
 
     def test_the_prose_a_patch_edits_is_in_its_fingerprint(self):
         patch = self.root / "example.patch"
@@ -201,6 +214,8 @@ class Fingerprint(unittest.TestCase):
         self.assertEqual(one, two)
 
 
+@unittest.skipIf(EXPORTED, "an exported tree has no commit to clone; the prover, which "
+                 "applies each fault to a clone of HEAD, needs a checkout too (review R7-5)")
 class EveryFaultApplies(unittest.TestCase):
     """Each listed fault breaks what it says on the committed tree: its patch applies, its
     mutation changes a file. Three patches once stopped applying, and nothing saw it until a
