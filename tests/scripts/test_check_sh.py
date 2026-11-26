@@ -160,6 +160,18 @@ class CheckScript(unittest.TestCase):
         self.assertEqual(done.returncode, 1, done.stdout)
         self.assertEqual(self.summary(), {"render-check": "FAIL"})
 
+    def test_the_results_validators_pass_under_the_hosted_runners_user_name(self):
+        # GitHub's hosted runners run as the user `runner`, and check_results.py's leak check
+        # refuses a results file holding the user's name: CI's run 45742322238 found the word in
+        # the gate file's header, which this Mac's user name never showed.
+        steps = ("check-results", "check-compare", "render-check")
+        done = self.run_script("--only", ",".join(steps),
+                               env=dict(self.env, LOGNAME="runner", USER="runner"))
+        said = "".join((self.logs / f"{step}.log").read_text() for step in steps
+                       if (self.logs / f"{step}.log").exists())
+        self.assertEqual(self.summary(), dict.fromkeys(steps, "PASS"), said[-3000:])
+        self.assertEqual(done.returncode, 0, done.stdout)
+
     def test_render_check_names_how_the_g3_file_is_tied(self):
         done = self.run_script("--only", "render-check")
         self.assertEqual(done.returncode, 0, done.stdout)
