@@ -92,6 +92,12 @@ def make_repo(root, text):
     return git(root, "rev-parse", "HEAD")
 
 
+def said(output):
+    """A child's output, indented, so that its own "Ran 1 test" and FAIL lines are not read as
+    this file's by check.sh's count of tests or by a fault's expected string."""
+    return "\n" + "\n".join("    " + line for line in output.splitlines())
+
+
 def state(repo):
     """Every file under the repository's .git, by path, with its bytes."""
     git_dir = repo / ".git"
@@ -137,7 +143,7 @@ class GitVariables(unittest.TestCase):
                     done = subprocess.run([sys.executable, "-I", str(TESTS / name), test],
                                           capture_output=True, text=True, env=env)
                     self.assert_unchanged(decoy, before, f"{name} {test}")
-                    self.assertEqual(done.returncode, 0, done.stderr[-3000:])
+                    self.assertEqual(done.returncode, 0, said(done.stderr[-3000:]))
 
     def stand_in(self, made, seen):
         """A python3 first on PATH, which the hygiene step runs: it makes a repository of its
@@ -168,7 +174,7 @@ git -C "{made}" -c user.name=t -c user.email=t@t -c commit.gpgsign=false \\
                 done = self.run_check_sh(dict(env, PATH=f"{folder}{os.pathsep}{env['PATH']}"),
                                          self.dir / f"logs-{self.runs}")
                 self.assert_unchanged(decoy, before, "a step of check.sh")
-                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                self.assertEqual(done.returncode, 0, said(done.stdout + done.stderr))
                 self.assertEqual(git(made, "rev-list", "--count", "HEAD"), "1")
                 self.assertEqual(sorted(set(seen.read_text().split()) & CLEARED), [])
 
@@ -180,7 +186,7 @@ git -C "{made}" -c user.name=t -c user.email=t@t -c commit.gpgsign=false \\
                 logs = self.dir / f"logs-{self.runs}"
                 done = self.run_check_sh(env, logs)
                 self.assert_unchanged(decoy, before, "check.sh's hygiene step")
-                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                self.assertEqual(done.returncode, 0, said(done.stdout + done.stderr))
                 self.assertIn(f"{len(names)} {kind} clean", (logs / "hygiene.log").read_text())
 
     def test_prove_checks_clears_them_before_it_clones(self):
@@ -194,7 +200,7 @@ git -C "{made}" -c user.name=t -c user.email=t@t -c commit.gpgsign=false \\
                                        str(REPO_ROOT / "scripts"), str(source), str(work)],
                                       capture_output=True, text=True, env=env)
                 self.assert_unchanged(decoy, before, "prove_checks.py's clone")
-                self.assertEqual(done.returncode, 0, done.stderr)
+                self.assertEqual(done.returncode, 0, said(done.stderr))
                 left, said = done.stdout.splitlines()[:2]
                 self.assertEqual(sorted(set(json.loads(left)) & CLEARED), [])
                 self.assertIn("googletest-src is not fetched", said)
