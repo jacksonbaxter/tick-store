@@ -3320,6 +3320,12 @@ FAULTS = (
           "runners, which the leak check refuses there", CHECK_FAILED,
           "fuzz-gate-8616263b7561.json: it holds $.header.assembled: this machine's name in the "
           "text"),
+    # Review R7-5: a .git git cannot read, in a folder no checkout holds, is named as such.
+    Fault("ties-unread-git-dir-unnamed", "py-scripts", "check_ties.py, given a tree whose .git "
+          "git cannot read and no checkout around it, as on the Linux host, refuses it only "
+          "with git's exit, not as a .git git does not read", CHECK_FAILED,
+          "FAIL: test_a_git_dir_git_cannot_read_in_no_checkout_is_refused_alike "
+          "(__main__.GitErrors"),
     # Review R7-4: the essay skips for want of git history only in an exported tree.
     Fault("writeup-history-skip-anywhere", "py-scripts", "render_writeup.py skips the essay "
           "whose tokens wait only for git history in any tree, not only in an exported one",

@@ -884,6 +884,27 @@ class GitErrors(TieTest):
         self.assertIn("check_ties: cannot judge: copy holds a .git that git does not read",
                       result.err)
 
+    def test_a_git_dir_git_cannot_read_in_no_checkout_is_refused_alike(self):
+        # Review R7-5: in a folder no checkout holds, as an exported tree on the Linux host,
+        # git finds no repository above the one it cannot read and exits 128; that is the same
+        # refusal. Here git is answered as it answers there, wherever this tree is.
+        copy = self.copy()
+        (copy / ".git" / "HEAD").write_text("garbage\n", encoding="utf-8")
+        real = check_ties.git
+
+        def git(repo, *arguments):
+            if arguments == ("rev-parse", "--show-toplevel"):
+                return subprocess.CompletedProcess(
+                    ["git", *arguments], 128, "", "fatal: not a git repository (or any of the "
+                    "parent directories): .git\n")
+            return real(repo, *arguments)
+        with mock.patch.object(check_ties, "git", git):
+            result = run_check(copy)
+        self.assertEqual(result.code, check_ties.EXIT_REFUSED, result.out + result.err)
+        self.assertIn("check_ties: cannot judge: copy holds a .git that git does not read as its "
+                      "own repository: git rev-parse --show-toplevel exited 128: fatal: not a git "
+                      "repository", result.err)
+
     def test_a_folder_inside_a_checkout_is_refused(self):
         result = run_check(REPO / "results", "--results", str(REPO / "results"), "--pins",
                            str(REPO / PINS))

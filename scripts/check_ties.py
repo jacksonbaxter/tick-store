@@ -468,7 +468,14 @@ def history_of(repo):
     is. Anything else is a Refusal: a .git git cannot read, or a folder inside a checkout."""
     repo = Path(repo)
     if (repo / ".git").exists():
-        top = run_git(repo, "rev-parse", "--show-toplevel").stdout.strip()
+        # git passes over a .git it cannot read and looks in the folders above: it finds the
+        # checkout around the tree, or, in a folder no checkout holds, none (review R7-5).
+        top = run_git(repo, "rev-parse", "--show-toplevel", ok=(0, 128))
+        if top.returncode != 0:
+            said = top.stderr.strip().replace("\n", "; ") or "nothing on stderr"
+            raise Refusal(f"{repo.name} holds a .git that git does not read as its own "
+                          f"repository: git rev-parse --show-toplevel exited 128: {said}")
+        top = top.stdout.strip()
         if Path(top).resolve() != repo.resolve():
             raise Refusal(f"{repo.name} holds a .git that git does not read as its own "
                           f"repository: git rev-parse --show-toplevel gives {top}")
