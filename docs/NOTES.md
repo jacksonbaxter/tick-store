@@ -8134,6 +8134,40 @@ scratch ones, and `scripts/check.sh`, which runs them, passed the variables on.
   WRITEUP.md still count 708 and render-check fails, until `921fa3a` renders them; at `80e4482`
   `test_git_env.py`'s clone test errors on a name its new quote helper shadowed, until `95f162a`.
   The subject line of `6758c22` runs to 73 characters, one over the rule; it stands as made.
+- **Corrected 2026-11-26 ([R6-5](REVIEW.md#the-final-reviews-git-variables-r6)).** "Left as
+  they are" above called the scripts it left "the scripts that only read the repository they sit
+  in", said "`check_ties.py`, `render_results.py` and `render_writeup.py` write nothing to a
+  repository", and ended "each reads that one". An outside review of `80f318d` found that a
+  `git status` refreshes the index and writes it back, and I found the same of a `git diff` of a
+  commit against the work tree; `ls-files`, `log`, `show`, `rev-parse`, `cat-file` and a `diff`
+  of two commits wrote nothing, each run under `GIT_DIR` naming a clone of this tree. So under a
+  caller's variables `check_ties.py` (its `git status` and `git diff`), the `check_fuzz.py` that
+  `render_results.py` and `fuzz_g3.py` run, `compare/run.py` and `cmake/GenerateBuildInfo.cmake`
+  write the caller's index, and the build-info step, which the entry did not name, records the
+  caller's HEAD and dirty state as the build's, which every results file's build facts carry.
+  What is true now: `check_ties.py`, `check_hygiene.py`, `render_results.py` and
+  `render_writeup.py`, which of `check_ties.py`'s 14 kinds only `proofs` holds (it measures the
+  whole tree and already differs), clear the variables first in `main`, and `check_ties.py`
+  still gives "32 files: 30 same, 1 pinned, 1 differs". `test_git_env.py` runs each of them on
+  its own under variables naming a clone of this tree, and requires the clone unchanged and the
+  output it gives with no variables: with those scripts as at `80f318d` it failed
+  "check_ties.py run on its own changed the decoy repository the caller's git variables name:
+  .git/index", the same for `render_results.py`, while `check_hygiene.py` and
+  `render_writeup.py` wrote nothing and gave another tree's output. The decoy's work tree is now
+  compared with its `.git`, and a test requires every script test that runs git, by a pattern of
+  the calls the tests make, to clear the variables at its top; none runs git only through a
+  cleared helper. The measured code and the tied scripts stay as they are; docs/checks.md and
+  docs/TASKS.md now say what each does under a caller's variables.
+- **Faults, shown by hand, 2026-11-26.** New: `ties-git-variables-kept` (`check_ties.py`'s
+  clearing reads each variable and drops none). Remade: `ties-refused-exits-0`, the same change to
+  `ERRORS`, whose context the clearing moved. At `3c6af7b`, in a clone under `build/`, through
+  check.sh's `py-scripts` step, the control passed (1,418 tests, 6 skipped), and
+  `ties-git-variables-kept` failed with "check_ties.py run on its own changed the decoy repository
+  the caller's git variables name: .git/index"; the three faults of the first pass, shown again there, failed with their lines as before, each now naming the decoy's files by their place under it (".git/config", ".git/index"). README.md and WRITEUP.md count 712
+  listed faults and 1 control; `results/check-proofs.json` still covers 99 of them.
+- **Commits that fail a check, this pass.** At `4ba7ee0`, `3fefc60` and `b07133b`
+  `ties-refused-exits-0` does not apply, so `test_prove_checks.py` fails, until `3c6af7b`
+  remakes it.
 
 ## Process notes
 
