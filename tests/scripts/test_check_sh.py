@@ -160,6 +160,31 @@ class CheckScript(unittest.TestCase):
         self.assertEqual(done.returncode, 1, done.stdout)
         self.assertEqual(self.summary(), {"render-check": "FAIL"})
 
+    def test_the_essay_with_no_history_for_its_commit_skips_and_fails_under_no_skips(self):
+        # Review R7-4: in an exported tree the essay's commit tokens wait for git history, and
+        # everything else on the page is held to a fresh render; that is a skip, not a pass.
+        tree = self.exported_copy()
+        script = str(tree / "scripts" / "check.sh")
+        done = subprocess.run([script, "--log-dir", str(self.logs), "--only", "writeup-check"],
+                              capture_output=True, text=True, env=self.env)
+        self.assertEqual(done.returncode, 0, done.stdout)
+        self.assertEqual(self.summary(), {"writeup-check": "SKIP"})
+        self.assertIn("WRITEUP.md not judged: no git history here for 2 of its tokens "
+                      "(commit_exceptions, measured_commit), an exported tree", done.stdout)
+        done = subprocess.run([script, "--no-skips", "--log-dir", str(self.logs), "--only",
+                               "writeup-check"], capture_output=True, text=True, env=self.env)
+        self.assertEqual(done.returncode, 1, done.stdout)
+        self.assertEqual(self.summary(), {"writeup-check": "FAIL"})
+        page = tree / "WRITEUP.md"
+        page.write_text(page.read_text(encoding="utf-8").replace(" the ", " a ", 1),
+                        encoding="utf-8")
+        done = subprocess.run([script, "--log-dir", str(self.logs), "--only", "writeup-check"],
+                              capture_output=True, text=True, env=self.env)
+        self.assertEqual(done.returncode, 1, done.stdout)
+        self.assertEqual(self.summary(), {"writeup-check": "FAIL"})
+        self.assertIn("differs from a fresh render outside the 2 tokens git history gives",
+                      (self.logs / "writeup-check.log").read_text())
+
     def test_the_results_validators_pass_under_the_hosted_runners_user_name(self):
         # GitHub's hosted runners run as the user `runner`, and check_results.py's leak check
         # refuses a results file holding the user's name: CI's run 45742322238 found the word in

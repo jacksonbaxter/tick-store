@@ -759,6 +759,66 @@ class Commits(Tree):
                       "where the code every other figure measures is unchanged.",
                       self.renders())
 
+    def exported(self):
+        """A page rendered from the tree's history, then the tree as a sync exports it: no .git
+        and a COMMIT file, so the commit tokens wait for history there (review R7-4)."""
+        self.later(self.EXCEPTION)
+        self.history("docs/NOTES.md")
+        page = self.renders()
+        shutil.rmtree(self.root / ".git")
+        self.write("COMMIT", "0" * 40 + "\n")
+        self.assertTrue(check_hygiene.exported_tree(self.root))
+        return page
+
+    def test_an_export_whose_tokens_wait_only_for_history_is_not_judged(self):
+        self.exported()
+        done = self.run_script("--check")
+        self.assertEqual(done.returncode, RENDER.EXIT_UNJUDGED, done.stdout + done.stderr)
+        self.assertIn("render_writeup: not judged: no git history here for 2 of its tokens "
+                      "(commit_exceptions, measured_commit), an exported tree; the rest is as a "
+                      "fresh render", done.stdout)
+
+    def test_an_export_whose_page_differs_outside_those_tokens_fails(self):
+        page = self.exported()
+        self.assertIn("ITCH 5.0", page)
+        self.write("WRITEUP.md", page.replace("ITCH 5.0", "ITCH 4.1", 1))
+        done = self.run_script("--check")
+        self.assertEqual(done.returncode, RENDER.EXIT_STALE, done.stdout + done.stderr)
+        self.assertIn("WRITEUP.md differs from a fresh render outside the 2 tokens git history "
+                      "gives", done.stderr)
+
+    def test_an_export_holds_each_waiting_token_to_one_text(self):
+        page = self.exported()
+        self.insert("Again at commit `{{measured_commit}}`.")
+        commit = re.search(r"at commit `([0-9a-f]{12})`", page).group(1)
+        for shown, code in ((commit, RENDER.EXIT_UNJUDGED), ("0" * 12, RENDER.EXIT_STALE)):
+            with self.subTest(shown=shown):
+                self.write("WRITEUP.md", page.replace(
+                    "\n\n## Method", f"\n\nAgain at commit `{shown}`.\n\n## Method", 1))
+                done = self.run_script("--check")
+                self.assertEqual(done.returncode, code, done.stdout + done.stderr)
+
+    def test_an_export_with_another_refusal_fails(self):
+        self.exported()
+        self.edit("docs/writeup/WRITEUP.template.md", FILLER, "Short.")
+        self.refused("outside its 2,500 to 4,060")
+
+    def test_an_export_with_a_token_waiting_for_a_file_fails(self):
+        self.exported()
+        (self.root / self.LATER).unlink()
+        done = self.run_script("--check")
+        self.assertEqual(done.returncode, RENDER.EXIT_STALE, done.stdout + done.stderr)
+        self.assertIn("WRITEUP.md exists, and ", done.stderr)
+
+    def test_the_same_tree_not_exported_fails_as_before(self):
+        self.exported()
+        (self.root / "COMMIT").unlink()
+        self.assertFalse(check_hygiene.exported_tree(self.root))
+        done = self.run_script("--check")
+        self.assertEqual(done.returncode, RENDER.EXIT_STALE, done.stdout + done.stderr)
+        self.assertIn("WRITEUP.md exists, and 2 of its tokens have no results file: "
+                      "commit_exceptions, measured_commit", done.stderr)
+
     def test_a_change_only_the_later_kind_measures_passes(self):
         # The fuzz harness and its unit tests, and the coverage script: what the later result
         # measures, and no figure read at the measured commit does.

@@ -3320,6 +3320,16 @@ FAULTS = (
           "runners, which the leak check refuses there", CHECK_FAILED,
           "fuzz-gate-8616263b7561.json: it holds $.header.assembled: this machine's name in the "
           "text"),
+    # Review R7-4: the essay skips for want of git history only in an exported tree.
+    Fault("writeup-history-skip-anywhere", "py-scripts", "render_writeup.py skips the essay "
+          "whose tokens wait only for git history in any tree, not only in an exported one",
+          CHECK_FAILED, "FAIL: test_the_same_tree_not_exported_fails_as_before "
+          "(__main__.Commits"),
+    # Review R7-4: in an exported tree the rest of the page is still held to a fresh render.
+    Fault("writeup-export-page-unchecked", "py-scripts", "render_writeup.py skips the essay in "
+          "an exported tree without holding the page outside the history tokens to a fresh "
+          "render", CHECK_FAILED,
+          "FAIL: test_an_export_whose_page_differs_outside_those_tokens_fails (__main__.Commits"),
     Fault("control-comment-only", "render-check", "a comment, which no check should notice",
           0, "", control=True),
 )

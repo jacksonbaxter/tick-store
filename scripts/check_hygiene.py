@@ -84,6 +84,13 @@ def is_work_tree_top(root):
     return done.returncode == 0 and Path(done.stdout.strip()).resolve() == Path(root).resolve()
 
 
+def exported_tree(root):
+    """True for a tree exported with git archive, as a sync to the Linux host makes: not the top
+    of a git work tree, and holding a COMMIT file. scripts/check.sh's exported_tree is the same
+    rule, and the scripts and their tests that change what they do there ask this one."""
+    return not is_work_tree_top(root) and (Path(root) / "COMMIT").is_file()
+
+
 def exported_files(root):
     """Every file of an exported tree but COMMIT and what its .gitignore files exclude. git
     lists them against an empty repository of its own, so the rules are git's, and only the
@@ -102,9 +109,8 @@ def files_to_check(root):
     """The files and what they are, or None if root is neither a checkout nor an export."""
     if is_work_tree_top(root):
         return tracked_files(root), "tracked files"
-    commit_file = Path(root) / "COMMIT"
-    if commit_file.is_file():
-        commit = commit_file.read_text(encoding="utf-8").strip()[:12]
+    if exported_tree(root):
+        commit = (Path(root) / "COMMIT").read_text(encoding="utf-8").strip()[:12]
         return exported_files(root), f"files of the tree exported at {commit}"
     return None
 

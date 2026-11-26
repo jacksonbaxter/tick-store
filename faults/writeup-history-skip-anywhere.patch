@@ -1,0 +1,13 @@
+diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
+index e1e2012..19b3aa1 100644
+--- a/scripts/render_writeup.py
++++ b/scripts/render_writeup.py
+@@ -2655,7 +2655,7 @@ HISTORY = "history (git)"
+ def history_alone(root, rendered):
+     """True where the tree is exported, by check_hygiene.exported_tree, and every token that
+     waits waits only for git history, which an exported tree has none of (review R7-4)."""
+-    return check_hygiene.exported_tree(root) and set(rendered.waiting.values()) == {HISTORY}
++    return set(rendered.waiting.values()) == {HISTORY}
+ 
+ 
+ def unresolved_problem(page_text, rendered):

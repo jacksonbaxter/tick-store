@@ -65,7 +65,11 @@ does not either. Then --check renders what resolves, applies every rule above to
 EXIT_UNJUDGED, naming how many tokens wait and their kinds: scripts/check.sh reports that as a
 skip, a failure under --no-skips, never a pass. Once WRITEUP.md exists, a token with no file is a
 failure, and so are a page that differs from a fresh render and a template that still holds a
-CUT-OR-CAUSE note. What none of this checks is that a sentence describes its figure rightly, that
+CUT-OR-CAUSE note. In a tree exported with git archive (check_hygiene.exported_tree), where every
+token that waits waits only for git history, the page is held to the fresh render in every other
+character and to the bound and the UTF-8 count as it stands, and --check exits EXIT_UNJUDGED;
+what those tokens say, the commit sentence and git's comparison of the commits behind it, is not
+checked there. What none of this checks is that a sentence describes its figure rightly, that
 a verdict token sits beside the words for its own part outside a table, or that the files
 themselves are sound: the validators of scripts/check.sh hold the results files, and none
 re-reads the diagnostics' summaries.
@@ -91,6 +95,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
+import check_hygiene  # noqa: E402
 import check_ties  # noqa: E402
 import render_results  # noqa: E402
 
@@ -2643,6 +2648,45 @@ def waiting_lines(rendered):
     return tuple(lines)
 
 
+# What a token waits for where the tree has no git history (Waiting("history", "git")).
+HISTORY = "history (git)"
+
+
+def history_alone(root, rendered):
+    """True where the tree is exported, by check_hygiene.exported_tree, and every token that
+    waits waits only for git history, which an exported tree has none of (review R7-4)."""
+    return check_hygiene.exported_tree(root) and set(rendered.waiting.values()) == {HISTORY}
+
+
+def unresolved_problem(page_text, rendered):
+    """The exit code and why, where the page is not the fresh render in every character but the
+    waiting tokens', or None. Each waiting token stands for one text, the same wherever it
+    stands, within a line; the bound and the UTF-8 count are held on the page as it stands."""
+    pattern, seen = [], {}
+    for index, piece in enumerate(TOKEN.split(rendered.text)):
+        if index % 2 == 0:
+            pattern.append(re.escape(piece))
+        elif piece not in rendered.waiting:
+            pattern.append(re.escape("{{" + piece + "}}"))
+        elif piece in seen:
+            pattern.append(f"(?P={seen[piece]})")
+        else:
+            seen[piece] = f"t{len(seen)}"
+            pattern.append(f"(?P<{seen[piece]}>[^\n]*?)")
+    if not re.fullmatch("".join(pattern), page_text):
+        return EXIT_STALE, (f"{PAGE_PATH.as_posix()} differs from a fresh render outside the "
+                            f"{len(rendered.waiting)} tokens git history gives: it is stale or "
+                            "was edited by hand. Render it again in a checkout.")
+    count, other = word_count(page_text), utf8_wc_count(page_text)
+    if other != count:
+        return EXIT_REFUSED, (f"the page counts {count:,} words under macOS's wc -w in the C "
+                              f"locale and {other:,} in a UTF-8 locale")
+    if not WORDS_AT_LEAST <= count <= WORDS_AT_MOST:
+        return EXIT_REFUSED, (f"the essay runs to {count:,} words, outside its "
+                              f"{WORDS_AT_LEAST:,} to {WORDS_AT_MOST:,}")
+    return None
+
+
 def final_problem(rendered):
     if rendered.notes:
         return (f"the template still holds {rendered.notes} {CUT_NOTE} notes: keep each sentence "
@@ -2701,6 +2745,17 @@ def main(argv=None):
             print(f"render_writeup: {line}")
         print(f"render_writeup: {page_name} does not exist yet; it is rendered once every token "
               "resolves")
+        return EXIT_UNJUDGED
+    if rendered.waiting and history_alone(args.root, rendered):
+        problem = final_problem(rendered)
+        found = (EXIT_REFUSED, problem) if problem else unresolved_problem(
+            page.read_text(encoding="utf-8"), rendered)
+        if found:
+            print(f"render_writeup: {found[1]}", file=sys.stderr)
+            return found[0]
+        names = ", ".join(sorted(rendered.waiting))
+        print(f"render_writeup: not judged: no git history here for {len(rendered.waiting)} of "
+              f"its tokens ({names}), an exported tree; the rest is as a fresh render")
         return EXIT_UNJUDGED
     if rendered.waiting:
         names = ", ".join(sorted(rendered.waiting)[:8])
