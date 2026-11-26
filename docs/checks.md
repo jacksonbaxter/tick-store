@@ -208,3 +208,24 @@ assembled a file is compared with the last commit that wrote the file, so any la
 the file, by hand or not, resets that comparison, and nothing shows the bytes are what the
 assembler wrote; a new file this checkout's own excludes hide is not seen; and it compares the
 work tree, which CI's clean checkout makes the commit.
+
+`scripts/check.sh` before its first step, each script test that makes or clones a repository,
+by itself or through `check_hygiene.py`'s helpers, before it runs git, and `prove_checks.py`
+before it clones anything, drop the variables `git rev-parse --local-env-vars` prints, git's own
+list of a repository's variables (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`,
+`GIT_OBJECT_DIRECTORY`, `GIT_ALTERNATE_OBJECT_DIRECTORIES`, `GIT_COMMON_DIR`, `GIT_PREFIX` and
+the rest, as the git that runs prints them), and `GIT_NAMESPACE`, which that list leaves out. Git
+exports them to hooks and to `git rebase --exec`, and inherited they turned the tests' own
+`git init`, commits, resets and config writes on the caller's repository
+([R6-1](REVIEW.md#the-final-reviews-git-variables-r6) to [R6-3](REVIEW.md#the-final-reviews-git-variables-r6)). `tests/scripts/test_git_env.py` sets them
+to a decoy repository of its own, runs one repository-making test of each such file, check.sh's
+hygiene step with a stand-in that makes a repository, and the prover's clone, and requires every
+file under the decoy's `.git` unchanged byte for byte, and check.sh's hygiene step still reading
+its own tree. What this does not cover: a script that only reads the repository it sits in, run
+on its own rather than through check.sh under a caller whose variables name another repository,
+reads that one. `run_bench.py`, `fuzz_g3.py`, `fuzz_results.py`, `coverage_report.py`,
+`check_fuzz.py` and `compare/run.py` would then record that repository's commit or state in what
+they write, or judge against it; they are tied to the results files they made, so they are left as they are ([R6-4](REVIEW.md#the-final-reviews-git-variables-r6)).
+`check_ties.py`, `render_results.py` and `render_writeup.py` would judge against its history,
+and `check_hygiene.py` in an exported tree, under a caller that sets `GIT_DIR` and
+`GIT_WORK_TREE` both, runs its `git init` of an empty scratch repository on it.
