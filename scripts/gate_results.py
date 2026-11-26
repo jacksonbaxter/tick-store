@@ -361,7 +361,7 @@ def assemble(commit, assembled_on, hosts, seeds_file, launch):
                       f"after the runs, from the raw records of the runs of {', '.join(dates)}: "
                       "each host's step log and each run's libFuzzer output, and on Linux each "
                       "run's per-CPU counter copies, wall time and record of its sibling's "
-                      "spinning process. The runner that ran the gate and wrote those records is "
+                      "spinning process. The script that ran the gate and wrote those records is "
                       "not in the repository. Nothing was timed again."),
         "seeds_file": "fuzz/bound_seeds.txt", "seeds_file_sha256": digest,
         "bar_ms_per_execution": timeout * 1000 // 2,

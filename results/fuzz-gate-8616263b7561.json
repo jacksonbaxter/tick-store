@@ -4,7 +4,7 @@
   "check": "G-3's bound-seed gate",
   "commit": "8616263b7561bdb39c642c90fde45985fcaf81fc",
   "statement": "Before G-3's fuzzing runs, each named seed of fuzz/bound_seeds.txt run alone through its fuzz target, built by the fuzz preset at this commit, with fuzz/launch.txt's flags and -max_len and -runs=1, 5 times on each host. A run's time an execution is libFuzzer's time for the whole run of the input, its Executed line, over its count of executed units, 2 where the leak check reran the input; a run passes if it exited 0 with no finding and within the bar, and on Linux with its sibling kept busy at its start and its end; the gate passes if every run of every seed does.",
-  "assembled": "Assembled on 2026-11-25 by scripts/gate_results.py, a script written after the runs, from the raw records of the runs of 2026-11-17: each host's step log and each run's libFuzzer output, and on Linux each run's per-CPU counter copies, wall time and record of its sibling's spinning process. The runner that ran the gate and wrote those records is not in the repository. Nothing was timed again.",
+  "assembled": "Assembled on 2026-11-26 by scripts/gate_results.py, a script written after the runs, from the raw records of the runs of 2026-11-17: each host's step log and each run's libFuzzer output, and on Linux each run's per-CPU counter copies, wall time and record of its sibling's spinning process. The script that ran the gate and wrote those records is not in the repository. Nothing was timed again.",
   "seeds_file": "fuzz/bound_seeds.txt",
   "seeds_file_sha256": "0ea835374d991a332da61db1cb80f5bb2db56af6029d6e16a9e8cffefdc82737",
   "bar_ms_per_execution": 5000,

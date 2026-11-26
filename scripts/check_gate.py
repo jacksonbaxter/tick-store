@@ -89,7 +89,7 @@ ASSEMBLED = re.compile(
     r"Assembled on (\d{4}-\d\d-\d\d) by scripts/gate_results\.py, a script written after the "
     r"runs, from the raw records of the runs of (.+): each host's step log and each run's "
     r"libFuzzer output, and on Linux each run's per-CPU counter copies, wall time and record of "
-    r"its sibling's spinning process\. The runner that ran the gate and wrote those records is "
+    r"its sibling's spinning process\. The script that ran the gate and wrote those records is "
     r"not in the repository\. Nothing was timed again\.")
 HOST_FACTS = {
     "macOS": {

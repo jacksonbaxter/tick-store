@@ -464,7 +464,7 @@ fell inside its Linux runs (review [P1-6](../docs/REVIEW.md)):
 `results/fuzz-gate-8616263b7561.json` holds the gate's 310 runs at `8616263`, 2026-11-17: each of
 the 31 seeds of `fuzz/bound_seeds.txt` run five times on both hosts, against 5,000 ms an execution,
 half of `-timeout=10`. `scripts/gate_results.py`, a script written after the runs, assembled it on
-2026-11-25 from the runs' raw records, and `scripts/check_gate.py` checks it.
+2026-11-26 from the runs' raw records, and `scripts/check_gate.py` checks it.
 
 On macOS, 31 of 31 seeds passed, 155 runs. The worst run was `dictionary/bound-one-value-blocks` at
 682.0 ms an execution, 1,364 ms over 2 executions, in its runs 2 and 5 of 5 (median 681.0); the
