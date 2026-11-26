@@ -3444,6 +3444,18 @@ def compiler_name():
     return run([cxx, "--version"]).stdout.splitlines()[0].partition(" (")[0]
 
 
+def clear_git_variables(environ=os.environ):
+    """Git exports GIT_DIR and its kin to hooks and to `git rebase --exec`. Inherited, they would
+    turn the clone below, its fetch and resets, the faults it applies and each check.sh run in it
+    on the caller's repository. git's own list of a repository's variables goes, and
+    GIT_NAMESPACE, which that list leaves out, before anything here runs git."""
+    done = run(["git", "rev-parse", "--local-env-vars"])
+    if done.returncode != 0:
+        raise SystemExit(f"prove_checks: git rev-parse --local-env-vars: {done.stderr.strip()}")
+    for name in (*done.stdout.split(), "GIT_NAMESPACE"):
+        environ.pop(name, None)
+
+
 def prepare_tree():
     """A clone at HEAD, with its own copy of the fetched sources, so a fault can touch them."""
     WORK.mkdir(parents=True, exist_ok=True)
@@ -3622,6 +3634,7 @@ def write_results(commit, compiler, entries):
 
 
 def main(argv=None):
+    clear_git_variables()
     parser = argparse.ArgumentParser(description="Show every check failing on a fault.")
     parser.add_argument("--force", action="store_true", help="redo faults already proven")
     parser.add_argument("--only", help="comma-separated fault ids")
