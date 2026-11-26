@@ -20,6 +20,7 @@ injected fault.
 import argparse
 import fnmatch
 import json
+import os
 import re
 import subprocess
 import sys
@@ -142,7 +143,24 @@ def is_json_object(content):
         return False
 
 
+def clear_git_variables():
+    """Git exports GIT_DIR and its kin to hooks and to `git rebase --exec`. Inherited, they
+    would turn the git calls below on the caller's repository: its file list read from the
+    caller's index, and the empty scratch repository's `git init` run on the caller's instead.
+    git's own list of a repository's variables goes, and GIT_NAMESPACE, which that list leaves
+    out. With no git to run, no git call here reaches any repository, and what this script says
+    of that stands."""
+    try:
+        listed = subprocess.run(["git", "rev-parse", "--local-env-vars"], check=False,
+                                capture_output=True, text=True).stdout.split()
+    except OSError:
+        listed = []
+    for variable in (*listed, "GIT_NAMESPACE"):
+        os.environ.pop(variable, None)
+
+
 def main(argv=None):
+    clear_git_variables()
     parser = argparse.ArgumentParser(description="Check what git tracks.")
     parser.add_argument("--root", type=Path, default=REPO_ROOT)
     args = parser.parse_args(argv)

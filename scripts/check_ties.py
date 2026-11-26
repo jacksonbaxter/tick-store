@@ -89,7 +89,9 @@ import fnmatch
 import functools
 import hashlib
 import json
+import os
 import re
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -851,7 +853,23 @@ def table():
 ERRORS = ("differs", "no commit", "no kind", "refused")
 
 
+def clear_git_variables():
+    """Git exports GIT_DIR and its kin to hooks and to `git rebase --exec`. Inherited, they
+    would turn the git calls below on the caller's repository, whose index this script's `git
+    status` and `git diff` against the work tree would write. git's own list of a repository's
+    variables goes, and GIT_NAMESPACE, which that list leaves out. With no git to run, no git
+    call here reaches any repository, and what this script says of that stands."""
+    try:
+        listed = subprocess.run(["git", "rev-parse", "--local-env-vars"], check=False,
+                                capture_output=True, text=True).stdout.split()
+    except OSError:
+        listed = []
+    for variable in (*listed, "GIT_NAMESPACE"):
+        os.environ.pop(variable, None)
+
+
 def main(argv=None):
+    clear_git_variables()
     parser = argparse.ArgumentParser(description="Tie every results file to the code it was "
                                                  "measured at.")
     parser.add_argument("--repo", type=Path, default=REPO_ROOT,

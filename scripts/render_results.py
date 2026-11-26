@@ -85,6 +85,7 @@ import fnmatch
 import hashlib
 import json
 import operator
+import os
 import re
 import statistics
 import string
@@ -4648,7 +4649,24 @@ def validate(paths, pins, validator=CHECK_RESULTS, extra=(), echo=False):
     return checked.returncode == 0
 
 
+def clear_git_variables():
+    """Git exports GIT_DIR and its kin to hooks and to `git rebase --exec`. Inherited, they
+    would turn the git calls of the validators this script runs, check_fuzz.py's `git diff`
+    against the work tree among them, which writes the index, on the caller's repository. git's
+    own list of a repository's variables goes, and GIT_NAMESPACE, which that list leaves out.
+    With no git to run, no git call here reaches any repository, and what this script says of
+    that stands."""
+    try:
+        listed = subprocess.run(["git", "rev-parse", "--local-env-vars"], check=False,
+                                capture_output=True, text=True).stdout.split()
+    except OSError:
+        listed = []
+    for variable in (*listed, "GIT_NAMESPACE"):
+        os.environ.pop(variable, None)
+
+
 def main(argv=None):
+    clear_git_variables()
     parser = argparse.ArgumentParser(
         description="Generate RESULTS.md's results tables and the README's headline.")
     parser.add_argument("--check", action="store_true",

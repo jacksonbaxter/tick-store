@@ -80,6 +80,7 @@ import glob
 import hashlib
 import json
 import math
+import os
 import re
 import unicodedata
 import statistics
@@ -2635,7 +2636,23 @@ def final_problem(rendered):
     return None
 
 
+def clear_git_variables():
+    """Git exports GIT_DIR and its kin to hooks and to `git rebase --exec`. Inherited, they
+    would turn the git calls below, and those of check_ties.py's code it runs, on the caller's
+    repository, whose history they would read for this tree's. git's own list of a repository's
+    variables goes, and GIT_NAMESPACE, which that list leaves out. With no git to run, no git
+    call here reaches any repository, and what this script says of that stands."""
+    try:
+        listed = subprocess.run(["git", "rev-parse", "--local-env-vars"], check=False,
+                                capture_output=True, text=True).stdout.split()
+    except OSError:
+        listed = []
+    for variable in (*listed, "GIT_NAMESPACE"):
+        os.environ.pop(variable, None)
+
+
 def main(argv=None):
+    clear_git_variables()
     parser = argparse.ArgumentParser(description="Render WRITEUP.md from its template and its "
                                                  "figure list, and check it.")
     parser.add_argument("--check", action="store_true",
