@@ -125,6 +125,14 @@ require_tools() {
 }
 require_tools
 
+# Git exports GIT_DIR and its kin to hooks and to `git rebase --exec`. Inherited, they would
+# turn every step's git calls, the script tests' `git init`, commits and clones of their own
+# scratch repositories among them, on the caller's repository. They go before any step: git's
+# own list of a repository's variables, and GIT_NAMESPACE, which that list leaves out. Each
+# step's git then finds this tree from ROOT, a linked worktree's or a clone's alike.
+# shellcheck disable=SC2046
+unset $(git rev-parse --local-env-vars) GIT_NAMESPACE
+
 # Steps a step cannot run without. A step blocked this way is a failure, not a skip.
 needs() {
     case $1 in
