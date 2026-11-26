@@ -9,12 +9,21 @@ exit code and the message naming the file. The clean repository is shown passing
 fault test cannot pass by the repository having been broken all along.
 """
 
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+
+# Git exports GIT_DIR and its kin to hooks and to `git rebase --exec`. Inherited, they would
+# turn this file's git calls on the caller's repository instead of its own scratch ones: git's
+# own list of a repository's variables goes, and GIT_NAMESPACE, before anything here runs git.
+for git_variable in (*subprocess.run(["git", "rev-parse", "--local-env-vars"], check=True,
+                                     capture_output=True, text=True).stdout.split(),
+                     "GIT_NAMESPACE"):
+    os.environ.pop(git_variable, None)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CHECK = REPO_ROOT / "scripts" / "check_hygiene.py"
