@@ -3314,6 +3314,12 @@ FAULTS = (
           "variables, so run on its own it refreshes and writes the caller's index",
           CHECK_FAILED, "check_ties.py run on its own changed the decoy repository the caller's "
           "git variables name: .git/index"),
+    # Review R7-1: GitHub's hosted runners run as the user runner, a name no results file may hold.
+    Fault("gate-hosted-runner-name-kept", "py-scripts", "the gate file's header, its assembler "
+          "and its pin say \"The runner that ran the gate\", the user name on GitHub's hosted "
+          "runners, which the leak check refuses there", CHECK_FAILED,
+          "fuzz-gate-8616263b7561.json: it holds $.header.assembled: this machine's name in the "
+          "text"),
     Fault("control-comment-only", "render-check", "a comment, which no check should notice",
           0, "", control=True),
 )
