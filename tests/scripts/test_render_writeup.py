@@ -580,8 +580,9 @@ class Refuses(Tree):
         self.refused("outside its 2,500 to 4,060")
 
     def test_the_word_count_is_wc_s_count_of_the_page(self):
-        # Review R4-D: the bound is held on the count a reader makes with wc -w, so a comment,
-        # a table's pipes and rule, a mark standing alone and the generated line all count.
+        # Review R4-D: the bound is held on the count a reader makes with macOS's wc -w in the
+        # C locale, so a comment, a table's pipes and rule, a mark standing alone and the
+        # generated line all count.
         self.assertEqual(RENDER.word_count("A b.\n<!-- c d e -->\n| x | y |\n|---|---|\n"),
                          13)
         self.assertEqual(RENDER.word_count("a \u2020 ; b\u00a0c\t1,2\n"), 5)
@@ -589,7 +590,9 @@ class Refuses(Tree):
         # fewer, its one run with no printable ASCII character being a "\u2264" standing alone.
         # So the host's wc is asked whether it counts that mark, and held to its kind's count:
         # word_count where it does, ascii_wc_count, every run holding a printable ASCII
-        # character, where it does not.
+        # character, where it does not. ascii_wc_count is a reading of that one count; the probe
+        # asks one question, so a wc of another kind that answers it alike is held to the same
+        # count, and the page's count must then equal it (review R8-4).
         self.assertEqual(RENDER.ascii_wc_count("a \u2020 ; b\u00a0c\t1,2\n"), 4)
         self.assertEqual(RENDER.ascii_wc_count("\u2264 \u2020\u2021 a\u2264 \u2264; ~\n"), 3)
 

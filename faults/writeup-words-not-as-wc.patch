@@ -1,11 +1,11 @@
 diff --git a/scripts/render_writeup.py b/scripts/render_writeup.py
-index 8e1ff89..e35f3ed 100644
+index f8985ef..53df78e 100644
 --- a/scripts/render_writeup.py
 +++ b/scripts/render_writeup.py
-@@ -316,7 +316,7 @@ def word_count(text):
-     make: every run of characters between ASCII whitespace, its comments, its tables' pipes and
-     rules, marks and the generated line all counted. A token not yet resolved counts as one. A wc
-     that counts only a run holding a printable ASCII character counts ascii_wc_count's."""
+@@ -323,7 +323,7 @@ def word_count(text):
+     that wc makes: every run of characters between ASCII whitespace, its comments, its tables'
+     pipes and rules, marks and the generated line all counted. A token not yet resolved counts as
+     one. The wc on CI's ubuntu-24.04 runner counted otherwise; ascii_wc_count reads it."""
 -    return len(WORD.findall(text))
 +    return sum(1 for word in WORD.findall(text) if re.search(r"[A-Za-z0-9]", word))
  

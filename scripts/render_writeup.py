@@ -319,10 +319,10 @@ def typed_numbers(body, not_results):
 
 
 def word_count(text):
-    """Words of the page as macOS's wc -w counts them in the C locale, the count a reader would
-    make: every run of characters between ASCII whitespace, its comments, its tables' pipes and
-    rules, marks and the generated line all counted. A token not yet resolved counts as one. A wc
-    that counts only a run holding a printable ASCII character counts ascii_wc_count's."""
+    """Words of the page as macOS's wc -w counts them in the C locale, the count a reader with
+    that wc makes: every run of characters between ASCII whitespace, its comments, its tables'
+    pipes and rules, marks and the generated line all counted. A token not yet resolved counts as
+    one. The wc on CI's ubuntu-24.04 runner counted otherwise; ascii_wc_count reads it."""
     return len(WORD.findall(text))
 
 
@@ -333,7 +333,9 @@ def utf8_wc_count(text):
 
 def ascii_wc_count(text):
     """Words of the page as a wc -w that counts only a run holding a printable ASCII character
-    counts them (PRINTABLE_ASCII): word_count's, less each mark standing alone."""
+    counts them (PRINTABLE_ASCII): word_count's, less each mark standing alone. A reading of the
+    one count CI's ubuntu-24.04 runner gave, a page one word short with one lone "\u2264" on it;
+    no other mark went through that wc (review R7-2, R8-4)."""
     return sum(1 for word in WORD.findall(text) if PRINTABLE_ASCII.search(word))
 
 
