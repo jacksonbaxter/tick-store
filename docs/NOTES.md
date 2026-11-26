@@ -8046,6 +8046,95 @@ after them.
   expects, against a control that passed. `prove_checks.py` was not run, so
   `results/check-proofs.json` still covers 99 of the 708; the rest wait for the full re-proof.
 
+### The script tests and a caller's git variables (R6)
+
+Git exports `GIT_DIR`, and with it at times `GIT_INDEX_FILE` and `GIT_WORK_TREE`, to hooks and to
+the commands `git rebase --exec` runs, and `GIT_DIR` overrides git's own search for a repository.
+The script tests' `git -C <scratch> init`, commits, `reset --hard`, `clone --depth 1` and `config`
+calls, run under such a caller, therefore acted on the caller's repository instead of their own
+scratch ones, and `scripts/check.sh`, which runs them, passed the variables on.
+
+- **How it showed itself.** On 2026-11-25 a rebase step of mine ran every `tests/scripts/test_*.py`
+  from `git rebase --exec` in a linked worktree, from 20:26:38Z to 20:27:38Z. The tests left 280
+  entries on that worktree's detached HEAD (182 commits, 96 resets and 2 checkouts, authored
+  "test" and "t"), replaced its index, and wrote three keys into the repository's shared config:
+  `core.bare = true`, `gc.auto = 0` and `maintenance.auto = false`, the last two being what
+  `tests/scripts/test_check_ties.py`'s repository helper sets on its own repositories. The keys
+  stood changed from 20:26Z until I restored them at 00:02Z on 26 November, and the worktree was
+  reset; `git fsck --connectivity-only` over all refs was clean, and no pushed commit was
+  affected. Anyone running `scripts/check.sh` from a pre-push hook or under
+  `git rebase --exec scripts/check.sh` would have met the same.
+- **Shown again, on a decoy.** At `4a6b025`, with `GIT_DIR` naming a decoy repository of one
+  commit made under `build/` for it, `test_check_ties.py`'s
+  `SameContent.test_a_short_commit_is_resolved` moved the decoy's `main` to a new commit, added
+  four entries to its HEAD's log (three commits and a reset), replaced its index, added 41 objects
+  and wrote `gc.auto = 0` and `maintenance.auto = false` into its config;
+  `test_check_hygiene.py`'s `Hygiene.test_a_clean_repository_passes` replaced its index and added
+  an object. With `GIT_WORK_TREE` naming the decoy too, `test_check_ties.py` still wrote both keys
+  and replaced the index.
+- **What holds it now ([R6-1](REVIEW.md#the-final-reviews-git-variables-r6) to
+  [R6-3](REVIEW.md#the-final-reviews-git-variables-r6)).** `scripts/check.sh`, before its first
+  step; each of the seven script tests that make or clone a repository, by themselves or through
+  `check_hygiene.py`'s helpers (`test_check_fuzz.py`, `test_check_hygiene.py`, `test_check_sh.py`,
+  `test_check_ties.py`, `test_fuzz_g3.py`, `test_prove_checks.py`, `test_render_writeup.py`),
+  before it runs git, so each is safe run on its own; and `scripts/prove_checks.py`, first thing in
+  `main`, drop every variable `git rev-parse --local-env-vars` prints, git's own list of a
+  repository's variables (fifteen on the Mac's git, `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`,
+  `GIT_OBJECT_DIRECTORY`, `GIT_ALTERNATE_OBJECT_DIRECTORIES`, `GIT_COMMON_DIR` and `GIT_PREFIX`
+  among them), and `GIT_NAMESPACE`, which that list leaves out. I took git's list, asked of the
+  git that runs, rather than a fixed one, because it is the list git itself clears when it moves
+  into another repository, so a git that adds a variable is cleared of it too and no copy can
+  drift. Each step's git then finds this tree from check.sh's `ROOT`, which comes from the
+  script's own path: shown by hand from a linked worktree and from a plain clone, each with the
+  variables naming a decoy, the hygiene step passing on the tree's 1,073 files and the decoy
+  unchanged. The test files share no helper module, so the same five lines stand in each.
+- **The test.** `tests/scripts/test_git_env.py` makes a decoy repository in its own scratch folder
+  under `build/` for each run, sets `GIT_DIR`, `GIT_COMMON_DIR`, `GIT_INDEX_FILE`,
+  `GIT_OBJECT_DIRECTORY` and `GIT_NAMESPACE`, and in a second run `GIT_WORK_TREE` too, to that
+  decoy in a child's environment and nowhere else, and requires every file under the decoy's
+  `.git`, its HEAD, refs, config, index and objects, unchanged byte for byte after: one
+  repository-making test of each of the seven files; check.sh's hygiene step with a stand-in
+  `python3` that makes a repository of its own, which must hold one commit; and the prover's
+  `prepare_tree` pointed at a small source repository, whose clone must hold that repository's
+  commit. A failure names the files of the decoy that changed. It also holds that check.sh's hygiene
+  step still reads its own tree under those variables, and that `main` clears them before anything
+  else.
+- **Left as they are ([R6-4](REVIEW.md#the-final-reviews-git-variables-r6)).** The scripts that
+  only read the repository they sit in: `run_bench.py`, `fuzz_g3.py`, `fuzz_results.py`,
+  `coverage_report.py`, `check_fuzz.py` and `compare/run.py` are tied to the results files they
+  made (`compare/` is measured code), so an edit would untie them; `check_ties.py`,
+  `render_results.py` and `render_writeup.py` write nothing to a repository; `check_hygiene.py`'s
+  one `git init` runs only in an exported tree; and `check_results.py` runs no git. Run through
+  check.sh, every one is cleared; run on its own under a caller whose variables name another
+  repository, each reads that one. docs/checks.md and docs/TASKS.md say so.
+- **Faults, shown by hand.** New: `check-sh-git-variables-kept` (check.sh's `unset` line taken
+  out), `script-test-git-variables-kept` (`test_check_ties.py`'s clearing taken out) and
+  `prover-git-variables-kept` (`clear_git_variables` reads each variable and drops none). Each was
+  shown by hand at `921fa3a`, in a clone under `build/`, through check.sh's `py-scripts` step:
+  the control passed, and each fault failed the step with the line its entry expects, which names
+  what changed in the decoy:
+  - control: `py-scripts` PASS, 1,416 tests, 6 skipped;
+  - `check-sh-git-variables-kept`: "a step of check.sh changed the decoy repository the caller's
+    git variables name: COMMIT_EDITMSG, logs/HEAD, logs/refs/heads/main, objects/…,
+    refs/heads/main", under both callers, and `test_check_sh_still_reads_its_own_tree` failed
+    too;
+  - `script-test-git-variables-kept`: "test_check_ties.py
+    SameContent.test_a_short_commit_is_resolved changed the decoy repository the caller's git
+    variables name: COMMIT_EDITMSG, ORIG_HEAD, config, index, logs/HEAD, logs/refs/heads/main",
+    41 objects and refs/heads/main under `GIT_DIR`, and "COMMIT_EDITMSG, config" with
+    `GIT_WORK_TREE` too;
+  - `prover-git-variables-kept`: "prove_checks.py's clone changed the decoy repository the
+    caller's git variables name: config, objects/…" under `GIT_DIR`; with `GIT_WORK_TREE` too
+    the clone itself failed before it wrote to the decoy, so that run fails on the clone's exit.
+  No existing fault patch needed remaking; every patch under `faults/` still applies. `prove_checks.py` was not run,
+  so `results/check-proofs.json` still covers 99 of the 711 listed faults; the rest wait for the
+  full re-proof. README.md and WRITEUP.md now count 711 faults and 1 control; the essay holds
+  4,060 words by the renderer and by `wc -w` in both locales.
+- **Commits that fail a check.** At `18513fe`, which lists the three faults, README.md and
+  WRITEUP.md still count 708 and render-check fails, until `921fa3a` renders them; at `80e4482`
+  `test_git_env.py`'s clone test errors on a name its new quote helper shadowed, until `95f162a`.
+  The subject line of `6758c22` runs to 73 characters, one over the rule; it stands as made.
+
 ## Process notes
 
 - A runner fault killed all eight research subagents before any wrote its evidence file. Fresh agents rebuilt the files from
