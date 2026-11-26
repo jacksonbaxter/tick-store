@@ -8157,7 +8157,8 @@ scratch ones, and `scripts/check.sh`, which runs them, passed the variables on.
   compared with its `.git`, and a test requires every script test that runs git, by a pattern of
   the calls the tests make, to clear the variables at its top; none runs git only through a
   cleared helper. The measured code and the tied scripts stay as they are; docs/checks.md and
-  docs/TASKS.md now say what each does under a caller's variables.
+  docs/TASKS.md now say what each does under a caller's variables. (Added 2026-11-26: `check_hygiene.py` and `render_writeup.py` gave another tree's output
+  only under the caller that sets `GIT_WORK_TREE` too; under `GIT_DIR` alone the decoy, a clone of this tree, and this tree's own work tree agree, so those two give the same output and cannot fail there ([R6-6](REVIEW.md#the-final-reviews-git-variables-r6)).)
 - **Faults, shown by hand, 2026-11-26.** New: `ties-git-variables-kept` (`check_ties.py`'s
   clearing reads each variable and drops none). Remade: `ties-refused-exits-0`, the same change to
   `ERRORS`, whose context the clearing moved. At `3c6af7b`, in a clone under `build/`, through

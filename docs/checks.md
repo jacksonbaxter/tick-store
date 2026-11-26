@@ -211,11 +211,13 @@ work tree, which CI's clean checkout makes the commit.
 
 `scripts/check.sh` before its first step, each script test that runs git, before it does,
 `prove_checks.py` before it clones anything, and `check_ties.py`, `check_hygiene.py`,
-`render_results.py` and `render_writeup.py`, which no results file is tied to, first thing in
-`main`, drop the variables `git rev-parse --local-env-vars` prints, git's own list of a
+`render_results.py` and `render_writeup.py`, which no results file is tied to but the proof record, whose kind takes the whole tree and which is measured again at the final head, first
+thing in `main`, drop the variables `git rev-parse --local-env-vars` prints, git's own list of a
 repository's variables (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, `GIT_OBJECT_DIRECTORY`,
 `GIT_ALTERNATE_OBJECT_DIRECTORIES`, `GIT_COMMON_DIR`, `GIT_PREFIX` and the rest, as the git that
-runs prints them), and `GIT_NAMESPACE`, which that list leaves out. Git exports them to hooks and
+runs prints them), and `GIT_NAMESPACE`, which that list leaves out. The list includes `GIT_CONFIG_PARAMETERS` and
+`GIT_CONFIG_COUNT`, so settings a caller passes with `git -c` through the environment do not
+reach the steps either. Git exports them to hooks and
 to `git rebase --exec`, and inherited they turned the tests' own `git init`, commits, resets and
 config writes on the caller's repository, and a `git status`, or a `git diff` of a commit against
 the work tree, refreshes the caller's index and writes it back ([R6-1](REVIEW.md#the-final-reviews-git-variables-r6) to [R6-3](REVIEW.md#the-final-reviews-git-variables-r6),
@@ -224,7 +226,8 @@ requires every file of the decoy, its work tree's and its `.git`'s, unchanged by
 one repository-making test of each script test that makes one, check.sh's hygiene step with a
 stand-in that makes a repository, the prover's clone, and each of those four scripts run on its
 own against a clone of this tree as the decoy, which must also give the output it gives with no
-variables set; and it requires every script test that runs git to clear them at its top. What
+variables set; and it requires the text `["git", "rev-parse", "--local-env-vars"]` in every
+script test whose text runs git. What
 this does not cover ([R6-4](REVIEW.md#the-final-reviews-git-variables-r6), [R6-5](REVIEW.md#the-final-reviews-git-variables-r6)): the measured code and the scripts tied to results
 files are not edited, and run on their own, not through check.sh, under a caller whose variables
 name another repository, they act on that one. `cmake/GenerateBuildInfo.cmake`, at configure
@@ -234,6 +237,12 @@ writes its index; `compare/run.py` runs `git status --porcelain`, writing its in
 its state as this tree's; `fuzz_g3.py` records its HEAD as the run's commit, and `check_fuzz.py`'s
 `git diff` of a commit against the work tree, which `fuzz_g3.py` runs too, writes its index;
 `run_bench.py` and `coverage_report.py` record its HEAD as the run's commit, and
-`coverage_report.py` its file list; `fuzz_results.py` compares two commits in its history. A
-script test that runs git only through a script in a child relies on that script's own clearing,
-and the test's list of what runs git is a pattern of the calls the tests make today.
+`coverage_report.py` its file list; `fuzz_results.py` compares two commits in its history. The test's
+limits: a script test that runs git only through a script in a child relies on that script's own
+clearing; the test's list of what runs git is a pattern of the calls the tests make today; the
+test over the test files finds the clearing call's text somewhere in the file, not where it
+stands or that it runs, so a commented-out call would pass; and for `check_hygiene.py` and
+`render_writeup.py`, which write no index, the caller that sets `GIT_DIR` alone cannot fail, since
+the decoy is a clone of this tree and the work tree is still this one, so the two agree and the
+output is the same: only the caller that also sets `GIT_WORK_TREE` shows either reading another
+tree.
