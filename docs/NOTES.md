@@ -8211,6 +8211,13 @@ repository jobs, on two causes, one on both hosts and one on Linux only.
   file only as its `--capacity` input, never through `check_leaks`. Called on the file by hand
   under that name, `check_leaks` gives "$.method.peak_memory: this machine's name in the text".
   The text is a measured file's content and is not edited here; docs/TASKS.md lists it.
+  (Widened 2026-11-26, [R8-3](REVIEW.md#the-final-reviews-ci-run-at-a6ff17f-r7): the gap is wider than this file. `check_leaks`, run by hand on
+  all 32 `results/**/*.json` at `af6eddf`, refuses five files no validator gives it: on any host
+  the two `codec-eval` files, whose `$.peak_rss_note` names `/usr/bin/time`, an absolute path;
+  under `runner` this file and `results/check-proofs.json`, `$.faults[75].what`; under the Linux
+  host's own name `results/store-size-12302019.json`, `$.cr2.note`. The full re-proof writes every
+  listed fault's text into the proof record, and seven of them hold the word. docs/TASKS.md says
+  all of it.)
 - **The word count ([R7-2](REVIEW.md#the-final-reviews-ci-run-at-a6ff17f-r7)).** On the Linux job,
   `test_the_word_count_is_wc_s_count_of_the_page` failed "AssertionError: 2857 != 2856": the
   runner's `wc -w` under `LC_ALL=C` counted the test's page one word fewer than the renderer. The
@@ -8252,6 +8259,98 @@ repository jobs, on two causes, one on both hosts and one on Linux only.
   `prove_checks.py` was not run, so `results/check-proofs.json` still covers 99 of the 713 listed
   faults; the rest wait for the full re-proof. README.md and WRITEUP.md count 713 faults and 1
   control.
+
+### check.sh on an exported tree, and the review of the CI fixes (R7, R8)
+
+2026-11-26. An export of `ee8aa5d`, made by `git archive` with a `COMMIT` file as the Linux host
+holds its tree, failed two of check.sh's repository steps. `writeup-check` exited 1: "WRITEUP.md
+exists, and 2 of its tokens have no results file: commit_exceptions, measured_commit". `py-scripts`
+had 15 tests failing or erring. `a6ff17f` fails the same way: this phase's tests and the essay
+check had never been run on an export. The Phase 3 run on the Linux host, at `d307a31`, came
+before both.
+
+- **The essay check ([R7-4](REVIEW.md#the-final-reviews-ci-run-at-a6ff17f-r7)).** In an export the two tokens of the commit sentence wait for
+  git history, which `commits()` needs to compare the exceptions' commits. Where
+  `check_hygiene.exported_tree` finds an export, the rule check.sh's `exported_tree` uses, and
+  nothing else waits, `render_writeup.py --check` holds the rest of the page to a fresh render
+  character by character. Each waiting token must stand for one text wherever it stands, within a
+  line, and the bound and the UTF-8 count are held to the page as it stands. Then it exits 3,
+  which check.sh reports as "WRITEUP.md not judged: no git history here for 2 of its tokens
+  (commit_exceptions, measured_commit), an exported tree; the rest is as a fresh render", and
+  `--no-skips` fails. What the commit sentence says, and git's comparison of the commits behind
+  it, is not checked in an export. Any other refusal, or a token waiting for a file, fails there as
+  in a checkout, and in a checkout nothing changed. Tests: six in `test_render_writeup.py`'s
+  `Commits` and one through check.sh in `test_check_sh.py`. Faults: `writeup-history-skip-anywhere`,
+  the export condition dropped, and `writeup-export-page-unchecked`, the page not compared.
+  `writeup-not-judged-passes` was remade.
+- **The 15 tests ([R7-5](REVIEW.md#the-final-reviews-ci-run-at-a6ff17f-r7)).** Each now decides "export" by `check_hygiene.exported_tree`.
+  - Not needing history, now passing on both kinds of tree:
+    - `test_a_passing_step_exits_zero` and `test_quick_skips_visibly_and_says_so` take `hygiene`,
+      which passes in both, for render-check.
+    - `test_the_results_validators_pass_under_the_hosted_runners_user_name` expects render-check's
+      skip, with its reason, on an export. There render_results.py checks every file before it
+      skips, and with `gate-hosted-runner-name-kept` applied in the export the test failed,
+      render-check FAIL on the leak line.
+    - The six fingerprint tests take no blob ids in an export, where HEAD has none, and HEAD's in
+      a checkout as before.
+    - `test_a_git_dir_git_cannot_read_is_refused` failed because, in a folder no checkout holds,
+      git exits 128 rather than finding the checkout around the tree, and `check_ties.py` then
+      named only the exit. It now gives the same refusal in both cases. A new test answers git as
+      it answers in such a folder; fault `ties-unread-git-dir-unnamed`. `ties-unreadable-git-dir-
+      unjudged` was remade for it, in a commit of its own after two commits at which
+      `test_prove_checks.py` failed on its patch (`66635fb`, `7b0b846`). I committed `7b0b846`
+      without reading the run that showed it.
+    - The two `test_git_env.py` failures were `test_prove_checks.py`'s sub-runs, and pass now.
+  - Needing this repository's own history, skipped on an export with their reasons and run as
+    before in a checkout: `test_render_check_names_how_the_g3_file_is_tied`, and
+    `EveryFaultApplies`'s three tests, which clone HEAD.
+- **Both trees at `af6eddf`, through heavy.sh.** Two exports gave the same summary: one under the
+  clone's `build/`, where git finds the clone above it, and one outside any repository, as on the
+  Linux host. py-scripts, check-results, check-compare and hygiene passed, with 1,427 tests and
+  10 skipped. check-ties, render-check, writeup-check and actionlint skipped with their reasons,
+  and py-compare skipped for want of a venv. The 10 skips are run_bench's four and test_guard's
+  one, which are Linux-only and skip here in both trees; test_git_env's decoy test, skipped on an
+  export before this pass; and the four above. In a checkout, with and without `LOGNAME` and
+  `USER` set to `runner`, every step passed but check-ties on the proof record, with 1,427 tests
+  and 6 skipped: pass 4's 1,419 and 6, and this pass's 8 new tests, with no new skip.
+- **What else an export changes.** I read check.sh's changes since `d307a31`: the
+  `git rev-parse --local-env-vars` line, which exits 0 outside a repository; the tsan step's
+  exclusions; the fuzz steps' `fuzz/launch.txt`; `--no-skips`; and the check-ties, render-check
+  and writeup-check steps, each now a skip on exit 3. I also read the scripts they run that call
+  git. `compare/run.py` and `coverage_report.py` read `COMMIT` where there is no checkout, and
+  `cmake/GenerateBuildInfo.cmake` has its export branch. None asks git unguarded. The C++ steps,
+  coverage and py-compare were not run on an export here.
+- **The outside review of `a6ff17f..ee8aa5d` ([R8](REVIEW.md#the-final-reviews-ci-run-at-a6ff17f-r7)).**
+  - R8-1: GNU coreutils 9.12, run here in the C locale, counts "x†y" and "a<U+00A0>b" as two
+    words each, where macOS's counts one; the comment by `WORD` and docs/checks.md said it counted
+    as macOS's.
+  - R8-2: docs/checks.md stated as fact that a reader with the runner's `wc` counts one word fewer
+    per lone mark. It now gives that as a reading.
+  - R8-3: the leak gap above, widened.
+  - R8-4: the probe asks one question, whether the host's `wc` counts a lone "≤". A `wc` of
+    another kind that answers it the same way is held to the same count, and the reviewer showed
+    two such. What holds it is that the page's count must equal that count; `ascii_wc_count` is a
+    reading of the one observation.
+  - R8-5: `word_count`'s docstring and the test's comment now say whose `wc`.
+  - R8-6: fuzz/README.md's generated line moved with the gate file's date.
+- **Faults, shown by hand.** New: `writeup-history-skip-anywhere`, `writeup-export-page-unchecked`
+  and `ties-unread-git-dir-unnamed`. Remade: `writeup-not-judged-passes`,
+  `ties-unreadable-git-dir-unjudged` and `writeup-words-not-as-wc`. All were shown at `af6eddf`,
+  in a clone under `build/`:
+  - Through check.sh's `py-scripts` step, the control passed, 1,427 tests with 6 skipped.
+    `writeup-history-skip-anywhere`, the new decision's fault, failed it with "FAIL:
+    test_the_same_tree_not_exported_fails_as_before (__main__.Commits".
+  - The other five were run through the test file their expected line names, and each failed with
+    that line:
+    - `writeup-export-page-unchecked`: `test_an_export_whose_page_differs_outside_those_tokens_
+      fails`, and the one-text test's different-text case;
+    - `ties-unread-git-dir-unnamed`: `test_a_git_dir_git_cannot_read_in_no_checkout_is_refused_
+      alike`;
+    - `writeup-not-judged-passes`: `test_a_token_whose_kind_is_still_to_come_is_not_judged`;
+    - `ties-unreadable-git-dir-unjudged`: `test_a_git_dir_git_cannot_read_is_refused`;
+    - `writeup-words-not-as-wc`: `test_the_word_count_is_wc_s_count_of_the_page`.
+  README.md and WRITEUP.md count 716 faults and 1 control; `results/check-proofs.json` still
+  covers 99 of them.
 
 ## Process notes
 

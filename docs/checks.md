@@ -119,11 +119,14 @@ figure read on one host must be
 described as that host's. The essay must run 2,500 to 4,060 words as macOS's `wc -w` counts the
 rendered page in the C locale, its tables, marks and generated line included, and a page that
 macOS's `wc -w` in a UTF-8 locale counts otherwise is refused, as that count ends a word at a dagger
-with no space after it. GNU coreutils 9.12's `wc -w` counted the page as macOS's does in the C
-locale. The `wc -w` on GitHub's ubuntu-24.04 runner counted a test's page one word fewer, its one
-run with no printable ASCII character being a `≤` standing alone, so a reader with such a `wc`
-counts one word fewer for each mark standing alone; the test holds the host's `wc` to the count of
-its kind. It opens with one paragraph of three sentences, each holding a token. Two marks stand only
+with no space after it. GNU coreutils 9.12's `wc -w`, run here, counted the essay as macOS's does
+in the C locale, but it too ends a word at a byte 0xA0 there, so `x†y` is two words to it: it
+agrees only on a page the UTF-8 rule takes ([R8-1](REVIEW.md#the-final-reviews-ci-run-at-a6ff17f-r7)).
+The `wc -w` on GitHub's ubuntu-24.04 runner counted a test's page one word fewer, its one run with
+no printable ASCII character being a `≤` standing alone; that it counts no run without a printable
+ASCII character is a reading of that one count, as no other mark went through it, and it gives no
+count of the essay ([R8-2](REVIEW.md#the-final-reviews-ci-run-at-a6ff17f-r7)). The test asks the
+host's `wc` whether it counts a lone `≤` and holds it to the count of that answer's kind. It opens with one paragraph of three sentences, each holding a token. Two marks stand only
 through their own tokens and are typed nowhere: a diagnostic kind's note mark and the flag's
 dagger, each defined once, by its token, in the first block it stands in, the note mark only in a
 block showing its kind's figures. A flag stands straight after a token whose figure rests on what
@@ -147,7 +150,17 @@ of a figure of the query and kind, or write, of the part it names. A verdict jud
 run's figures names that run, at its own commit, in the commit sentence. Until every file it reads
 is committed there is no `WRITEUP.md`, and the step is not judged, naming how many tokens and checks
 wait and on what, which is a failure under `--no-skips`; once the page exists, a missing file or a
-page that differs from a fresh render fails. What it does not check is that the prose is true
+page that differs from a fresh render fails. In a tree exported with git archive, as the Linux
+host holds it (`check_hygiene.exported_tree`, the rule `check.sh` uses), the commit sentence's two
+tokens, the measured commit and its exceptions, wait for git history. Where nothing else waits,
+the step holds the rest of the page to a fresh render character by character, each of those
+tokens to one text wherever it stands, and the bound and the UTF-8 count to the page as it stands,
+then skips, as check-ties and render-check do there for the same lack, a failure under
+`--no-skips`. What the commit sentence says, and git's comparison of the commits behind it, is not
+checked in an export; any other refusal or waiting token fails there as in a checkout. There too
+the script tests that need this repository's own history skip, each with its reason:
+`test_render_check_names_how_the_g3_file_is_tied`, and the three of `EveryFaultApplies`, which
+clone HEAD ([R7-4, R7-5](REVIEW.md#the-final-reviews-ci-run-at-a6ff17f-r7)). What it does not check is that the prose is true
 beyond its figures, claims and verdicts: a sentence that misleads with no judging word, a verdict
 token set beside the wrong target, a line of the list that misdescribes what its entry reads, a
 number after a letter, as in a version, and the content of the profiler and counter summaries in
@@ -197,7 +210,8 @@ ran the gate, which no kind ties.
 
 `check_ties.py` examines every file under `results/`, and fails one of no kind. It refuses a
 commit not in HEAD's history, a symbolic link git tracks in a compared path, and any git command
-that fails, naming it: a missing object, a `.git` git cannot read, a folder inside a checkout
+that fails, naming it: a missing object, a `.git` git cannot read (named so whether or not a
+checkout holds the tree), a folder inside a checkout
 given as the checkout, or a results folder outside it. A pin names its file by its exact path
 under `results/`, from a set fixed in the script, and a line in the pins file for any other name
 is refused. A results file not committed as it is is not judged against what assembled it, but
