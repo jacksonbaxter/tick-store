@@ -3197,8 +3197,8 @@ FAULTS = (
           "FAIL: test_a_mark_with_no_definition_before_it (__main__.Pins"),
     # Review R4-D: the essay's bound is held on wc -w's count of the rendered page.
     Fault("writeup-words-not-as-wc", "py-scripts", "render_writeup.py counts the essay's words "
-          "leaving out its tables' pipes and rules and every mark, not as LC_ALL=C wc -w counts the "
-          "page",
+          "leaving out its tables' pipes and rules and every mark, not as macOS's wc -w counts the "
+          "page in the C locale",
           CHECK_FAILED, "FAIL: test_the_word_count_is_wc_s_count_of_the_page (__main__.Refuses"),
     # Review R4-A: the method section gives each comparison's input note.
     Fault("writeup-method-note-unchecked", "py-scripts", "render_writeup.py takes an essay whose "
@@ -3244,7 +3244,7 @@ FAULTS = (
     Fault("writeup-mark-length-unbounded", "py-scripts", "render_writeup.py takes a kind's mark of more than two characters", CHECK_FAILED,
           "FAIL: test_a_mark_that_is_no_symbol_or_stands_for_two_notes (__main__.Pins"),
     # Review C2: the page counts alike under both locales.
-    Fault("writeup-words-utf8-unchecked", "py-scripts", "render_writeup.py takes a page that macOS's wc -w in a UTF-8 locale counts otherwise than LC_ALL=C wc -w", CHECK_FAILED,
+    Fault("writeup-words-utf8-unchecked", "py-scripts", "render_writeup.py takes a page that macOS's wc -w in a UTF-8 locale counts otherwise than in the C locale", CHECK_FAILED,
           "FAIL: test_a_page_macos_wc_counts_otherwise_in_a_utf8_locale (__main__.Refuses"),
     # Review C2: a draft never writes the page.
     Fault("writeup-draft-writes-page", "py-scripts", "render_writeup.py --draft also rewrites WRITEUP.md when every token resolves", CHECK_FAILED,

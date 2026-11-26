@@ -116,10 +116,14 @@ what the replaced record keeps is said as its fields give it, hold on the essay 
 pages. A verdict missed on every part it counts while a part is met by the rule and not counted
 reads "missed on each counted part", so the parts it then names as met are those not counted. A
 figure read on one host must be
-described as that host's. The essay must run 2,500 to 4,060 words as `LC_ALL=C wc -w` counts the
-rendered page, its tables, marks and generated line included, and a page that macOS's `wc -w` in a
-UTF-8 locale counts otherwise is refused, as that count ends a word at a dagger with no space after
-it. It opens with one paragraph of three sentences, each holding a token. Two marks stand only
+described as that host's. The essay must run 2,500 to 4,060 words as macOS's `wc -w` counts the
+rendered page in the C locale, its tables, marks and generated line included, and a page that
+macOS's `wc -w` in a UTF-8 locale counts otherwise is refused, as that count ends a word at a dagger
+with no space after it. GNU coreutils 9.12's `wc -w` counted the page as macOS's does in the C
+locale. The `wc -w` on GitHub's ubuntu-24.04 runner counted a test's page one word fewer, its one
+run with no printable ASCII character being a `≤` standing alone, so a reader with such a `wc`
+counts one word fewer for each mark standing alone; the test holds the host's `wc` to the count of
+its kind. It opens with one paragraph of three sentences, each holding a token. Two marks stand only
 through their own tokens and are typed nowhere: a diagnostic kind's note mark and the flag's
 dagger, each defined once, by its token, in the first block it stands in, the note mark only in a
 block showing its kind's figures. A flag stands straight after a token whose figure rests on what

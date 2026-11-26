@@ -585,11 +585,25 @@ class Refuses(Tree):
         self.assertEqual(RENDER.word_count("A b.\n<!-- c d e -->\n| x | y |\n|---|---|\n"),
                          13)
         self.assertEqual(RENDER.word_count("a \u2020 ; b\u00a0c\t1,2\n"), 5)
+        # Review R7-2: the wc -w on GitHub's ubuntu-24.04 runner counted this page one word
+        # fewer, its one run with no printable ASCII character being a "\u2264" standing alone.
+        # So the host's wc is asked whether it counts that mark, and held to its kind's count:
+        # word_count where it does, ascii_wc_count, every run holding a printable ASCII
+        # character, where it does not.
+        self.assertEqual(RENDER.ascii_wc_count("a \u2020 ; b\u00a0c\t1,2\n"), 4)
+        self.assertEqual(RENDER.ascii_wc_count("\u2264 \u2020\u2021 a\u2264 \u2264; ~\n"), 3)
+
+        def wc(text):
+            done = subprocess.run(["wc", "-w"], input=text.encode("utf-8"), capture_output=True,
+                                  env=dict(os.environ, LC_ALL="C"))
+            self.assertEqual(done.returncode, 0, done.stderr)
+            return int(done.stdout.split()[0])
+        counts_a_mark = {3: True, 2: False}.get(wc("a \u2264 b\n"))
+        self.assertIsNotNone(counts_a_mark, "wc -w counts \"a \u2264 b\" as neither 3 nor 2")
         page = self.renders()
-        done = subprocess.run(["wc", "-w"], input=page.encode("utf-8"), capture_output=True,
-                              env=dict(os.environ, LC_ALL="C"))
-        self.assertEqual(done.returncode, 0, done.stderr)
-        self.assertEqual(RENDER.word_count(page), int(done.stdout.split()[0]))
+        self.assertEqual(RENDER.word_count(page) - RENDER.ascii_wc_count(page), 1)
+        kind = RENDER.word_count if counts_a_mark else RENDER.ascii_wc_count
+        self.assertEqual(kind(page), wc(page), kind.__name__)
         self.assertIn(f"{RENDER.word_count(page):,} words", self.run_script("--check").stdout)
 
     def test_a_page_macos_wc_counts_otherwise_in_a_utf8_locale(self):
@@ -605,7 +619,7 @@ class Refuses(Tree):
                                                                     LC_ALL="en_US.UTF-8"))
                 self.assertEqual(int(done.stdout.split()[0]), utf8, text)
         self.insert("The store keeps each\u00a0stock together.")
-        self.refused("under LC_ALL=C wc -w and", "under macOS's wc -w in a UTF-8 locale")
+        self.refused("under macOS's wc -w in the C locale and", "in a UTF-8 locale, which ends")
 
     def test_an_essay_with_no_title(self):
         self.edit("docs/writeup/WRITEUP.template.md", "# A demo essay\n\n", "")
