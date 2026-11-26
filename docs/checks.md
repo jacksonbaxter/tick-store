@@ -157,10 +157,14 @@ the step holds the rest of the page to a fresh render character by character, ea
 tokens to one text wherever it stands, and the bound and the UTF-8 count to the page as it stands,
 then skips, as check-ties and render-check do there for the same lack, a failure under
 `--no-skips`. What the commit sentence says, and git's comparison of the commits behind it, is not
-checked in an export; any other refusal or waiting token fails there as in a checkout. There too
-the script tests that need this repository's own history skip, each with its reason:
-`test_render_check_names_how_the_g3_file_is_tied`, and the three of `EveryFaultApplies`, which
-clone HEAD ([R7-4, R7-5](REVIEW.md#the-final-reviews-ci-run-at-a6ff17f-r7)). What it does not check is that the prose is true
+checked in an export. The two tokens stand side by side, so in an export the whole of that line
+from "at commit `" to its last full stop is free text: another commit there, or a word dropped
+from it, still gives the skip, held only by the bound and the UTF-8 count, and only a checkout
+checks it ([R9-3](REVIEW.md#the-final-reviews-ci-run-at-a6ff17f-r7)). Any other refusal or waiting token fails there as in a checkout. There
+too the script tests that need this repository's own history skip, each with its reason:
+`test_render_check_names_how_the_g3_file_is_tied`, the three of `EveryFaultApplies`, which clone
+HEAD, and `test_git_env.py`'s decoy test, as an exported tree has no history to make a decoy of
+([R7-4, R7-5](REVIEW.md#the-final-reviews-ci-run-at-a6ff17f-r7), [R9-2](REVIEW.md#the-final-reviews-ci-run-at-a6ff17f-r7)). What it does not check is that the prose is true
 beyond its figures, claims and verdicts: a sentence that misleads with no judging word, a verdict
 token set beside the wrong target, a line of the list that misdescribes what its entry reads, a
 number after a letter, as in a version, and the content of the profiler and counter summaries in

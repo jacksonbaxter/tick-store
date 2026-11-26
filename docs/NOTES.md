@@ -8351,6 +8351,31 @@ before both.
     - `writeup-words-not-as-wc`: `test_the_word_count_is_wc_s_count_of_the_page`.
   README.md and WRITEUP.md count 716 faults and 1 control; `results/check-proofs.json` still
   covers 99 of them.
+- **Commits that fail a check, this pass ([R9-1](REVIEW.md#the-final-reviews-ci-run-at-a6ff17f-r7)).** At `66635fb` and `7b0b846`
+  `ties-unreadable-git-dir-unjudged` does not apply, so `test_prove_checks.py` fails, until
+  `9040d59` remakes it. A second outside review ran `git apply --check` of every patch at each of
+  this pass's eight commits: exactly those two fail. `render_results.py --check`,
+  `render_writeup.py --check` and `check_hygiene.py` pass at all eight. I checked pass 4's six
+  commits, `b11e607` to `ee8aa5d`, the same way: every patch applies at each, but
+  `werror-dependency-tolerated`'s fetched source, which is checked only where it is fetched, and
+  the three checks pass at each. So no commit of pass 4 fails them.
+- **Added 2026-11-26: CI run 45757899496 at `3d9144d`.** Both repository jobs passed py-scripts
+  (1,427 tests; 6 skipped on macOS, 2 on Linux), py-compare, check-results, check-compare,
+  render-check, writeup-check, actionlint and hygiene. They failed check-ties on the proof record,
+  as designed. So the `ascii_wc_count` branch has now met the ubuntu-24.04 runner's own `wc` on the
+  test's page and held. That is still one page with one lone mark.
+- **The second outside review, of `ee8aa5d..3d9144d` ([R9](REVIEW.md#the-final-reviews-ci-run-at-a6ff17f-r7)).**
+  - R9-1: the entry above.
+  - R9-2: docs/checks.md now names `test_git_env.py`'s decoy test among the export's skips.
+  - R9-3: in an export the two waiting tokens are side by side, so the line's whole span from
+    "at commit `" to its last full stop is free text. The reviewer's other commit and dropped word
+    there both gave the skip, held only by the bound and the UTF-8 count; a checkout catches them.
+    docs/checks.md says so.
+  - R9-4: `render_writeup.py:162`'s "one under LC_ALL=C" stays. It reads as macOS's within its
+    comment, and a script's comment is not changed after CI and the Linux host have run on this
+    code.
+  - R9-5: `check_ties.py --repo .` prints an empty name in "cannot judge:  holds a .git …". It is
+    cosmetic, left, and open in docs/TASKS.md.
 
 ## Process notes
 
